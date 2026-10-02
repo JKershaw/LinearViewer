@@ -947,3 +947,54 @@ describe('LIN-3211: the run-step rung sends the card panel\'s harness, else clau
     assert.equal((await pressRung({ panel: false })).harness, 'claude-code');
   });
 });
+
+// =============================================================================
+// LIN-2944 P1 F9 / addendum 7: the picker and the primary under flag states.
+// Home's inline renderer (renderPromptButtons) is retired; these truth
+// conditions now live in the shared component.
+// =============================================================================
+describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () => {
+  test('templates, "more" keys and custom prompts render under "other prompts"', async () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-pick', identifier: 'LIN-PICK' }, {
+      defaultPromptKeys: ['implementation', 'plan'],
+      morePromptKeys: ['retro'],
+      promptMeta: { implementation: 'Implementation', plan: 'Plan', retro: 'Retro' },
+      customPrompts: [{ id: 'c1', name: 'Custom One' }]
+    }));
+
+    assert.ok(container.innerHTML.includes('data-testid="other-prompts"'), 'other-prompts group present');
+    assert.ok(container.innerHTML.includes('data-prompt="implementation"'), 'default template present');
+    assert.ok(container.innerHTML.includes('data-prompt="plan"'), 'second default template present');
+    assert.ok(container.innerHTML.includes('data-prompt="__more__"'), 'more toggle present (more key + custom prompt)');
+
+    await container.click({ prompt: '__more__' });
+    assert.ok(container.innerHTML.includes('data-prompt="retro"'), 'more-key template revealed');
+    assert.ok(container.innerHTML.includes('data-prompt="custom:c1"'), 'custom prompt revealed');
+  });
+
+  test('promptButtons=false hides the templates but keeps the ✦ primary (F9)', () => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-pb', identifier: 'LIN-PB' }, { promptButtons: false }));
+    assert.equal(container.innerHTML.includes('data-testid="other-prompts"'), false, 'templates hidden');
+    assert.ok(container.innerHTML.includes('data-testid="opened-task-go"'), '✦ primary still shown');
+  });
+
+  test('AI off by choice disables the ✦ primary with a reason and a click spends nothing (F9)', async () => {
+    const { PromptSection, calls } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts({ id: 'issue-ai', identifier: 'LIN-AI' }, { aiState: 'off', hasAI: false }));
+
+    assert.match(container.innerHTML, /data-testid="opened-task-go"[^>]*disabled/, 'primary is disabled');
+    assert.match(container.innerHTML, /data-testid="opened-task-primary-reason"[^>]*>AI suggestions are off/, 'plain-words reason shown');
+
+    // A disabled button never fires a click (the browser guarantee); the guard in
+    // handleClick is the load-bearing half, so press with a disabled synthetic button.
+    const btn = { dataset: { prompt: '__ai__' }, disabled: true, textContent: '', closest: () => btn };
+    await container._clickHandler({ target: btn });
+    await flush();
+    assert.equal(calls.fetch.length, 0, 'no recommend request from a disabled primary');
+  });
+});

@@ -1,109 +1,96 @@
 /**
- * LIN-2944 P1 — characterization tests for Home opened-task behaviors.
+ * LIN-2944 P1 — Home opened-task behavior, at its NEW home.
  *
- * Written BEFORE the Home migration (beat 1) so the P1 change has a safety net.
- * These pin behaviors that P1 KEEPS (not the ones it deliberately retargets, e.g.
- * the F9 `promptButtons`/`aiRecommendations` truth conditions, which get their
- * own explicit retarget in beat 3). They are written against the current
- * unmigrated renderer, so beat 3 must retarget the *selectors* of the ones whose
- * Home markup moves onto the shared `PromptSection` mount — while the truth
- * (source provenance on the opened-task surface, templates surviving AI-off,
- * proxy-gated Autopilot) stays asserted.
- *
- * Behavior table (see the P1 PR / Linear comment for the full one):
- *   K1 source provenance on the manual/recommend/Autopilot containers  -> keep/move
- *   K2 no data-source when no provider resolves                        -> keep
- *   K3 data-url-key on every container                                 -> keep
- *   K4 AI off does not remove the templates                            -> keep
- *   K5 AI off removes the AI suggest + recommend container             -> keep
- *   K6 proxy off removes the Autopilot container                       -> keep
- *   K7 promptButtons off hides the default template links              -> keep (narrowed in F9)
+ * Beat 1 pinned these behaviors against Home's inline renderer. P1 retires that
+ * renderer and mounts the shared `PromptSection`; each kept behavior is now
+ * asserted where it lives:
+ *   - source provenance / data-url-key  → the `[data-prompt-mount]` placeholder
+ *   - AI-off keeps templates            → `__HOME_PROMPT_OPTS__` catalog + the
+ *                                          component test in prompt-section-p0
+ *   - AI-off drops the AI primary        → `__HOME_PROMPT_OPTS__.aiState` + the
+ *                                          component test (disabled primary)
+ *   - proxy-off drops "run the whole task" → `__HOME_PROMPT_OPTS__.proxyEnabled`
+ *   - promptButtons-off hides templates  → `__HOME_PROMPT_OPTS__.promptButtons`
+ * No assertion was deleted or loosened; each moved. The client-side half of the
+ * F9 conditions is covered by `tests/unit/prompt-section-p0.test.js`.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { renderDetailsContent } from '../../lib/render.js';
-
-function stubIssue() {
-  return {
-    id: 'i1',
-    identifier: 'STB-1',
-    title: 'A task',
-    state: { type: 'started' },
-    labels: { nodes: [] }
-  };
-}
+import { renderPage, renderDetailsContent } from '../../lib/render.js';
 
 const STUB_PROVIDER = { name: 'jira', ui: { write: false, comments: true, estimates: true, subtasks: true, displayName: 'Jira' } };
+const WORKSPACE = { urlKey: 'ws', name: 'WS', provider: 'jira' };
 
-function render(overrides = {}) {
-  return renderDetailsContent(stubIssue(), {
-    isLanding: false,
-    urlKey: 'ws',
-    openRouterSource: 'oauth',
-    provider: STUB_PROVIDER,
-    featureFlags: { dispatch: true, proxy: true },
-    ...overrides
-  });
+function stubIssue() {
+  return { id: 'i1', identifier: 'STB-1', title: 'A task', state: { type: 'started' }, labels: { nodes: [] } };
 }
 
-// Grab the opening tag of a named container so a test asserts on its attributes
-// without depending on the surrounding markup.
-function containerTag(html, className) {
-  const m = html.match(new RegExp(`<div class="${className}[^>]*>`));
-  return m ? m[0] : '';
+function mountTag(html) {
+  return (html.match(/<div class="home-prompt-mount"[^>]*>/) || [''])[0];
 }
 
-describe('Home opened-task characterization: source provenance (LIN-1904/LIN-1910)', () => {
-  test('threads the resolved provider name as data-source on all three containers (K1)', () => {
-    const html = render();
-    assert.match(containerTag(html, 'prompt-container'), /data-source="jira"/, 'manual prompt container carries data-source');
-    assert.match(containerTag(html, 'recommend-container'), /data-source="jira"/, 'recommend container carries data-source');
-    assert.match(containerTag(html, 'autopilot-container'), /data-source="jira"/, 'Autopilot container carries data-source');
+function homeOpts(overrides = {}) {
+  const html = renderPage([], [], [], 'Org', {
+    urlKey: 'ws', workspaces: [WORKSPACE], openRouterSource: 'oauth', featureFlags: {}, ...overrides
+  });
+  const m = html.match(/window\.__HOME_PROMPT_OPTS__ = (.*?);<\/script>/s);
+  assert.ok(m, '__HOME_PROMPT_OPTS__ embedded');
+  return JSON.parse(m[1]);
+}
+
+describe('Home opened-task mount: source provenance (LIN-1904/LIN-1910)', () => {
+  test('the mount carries the issue id, provider source, url key and instance key (K1/K3)', () => {
+    const html = renderDetailsContent(stubIssue(), {
+      isLanding: false, urlKey: 'ws', provider: STUB_PROVIDER, featureFlags: { dispatch: true, proxy: true }, section: 'in-progress'
+    });
+    const tag = mountTag(html);
+    assert.match(tag, /data-issue-id="i1"/, 'issue id');
+    assert.match(tag, /data-source="jira"/, 'provider source');
+    assert.match(tag, /data-url-key="ws"/, 'url key');
+    assert.match(tag, /data-instance-key="in-progress-i1"/, 'instance key');
   });
 
-  test('omits data-source when no provider resolves (no-op, K2)', () => {
-    const html = render({ provider: null });
-    assert.match(containerTag(html, 'prompt-container'), /data-prompt-for="i1"/, 'container still renders');
-    assert.ok(!containerTag(html, 'prompt-container').includes('data-source='), 'no data-source attribute');
-    assert.ok(!containerTag(html, 'recommend-container').includes('data-source='), 'no data-source attribute');
-    assert.ok(!containerTag(html, 'autopilot-container').includes('data-source='), 'no data-source attribute');
-  });
-
-  test('carries data-url-key on every container so the client fetch is workspace-scoped (K3)', () => {
-    const html = render();
-    for (const cls of ['prompt-container', 'recommend-container', 'autopilot-container']) {
-      assert.match(containerTag(html, cls), /data-url-key="ws"/, `${cls} carries data-url-key`);
-    }
+  test('no data-source attribute when no provider resolves (K2)', () => {
+    const html = renderDetailsContent(stubIssue(), { isLanding: false, urlKey: 'ws', featureFlags: {} });
+    const tag = mountTag(html);
+    assert.match(tag, /data-issue-id="i1"/, 'mount still renders');
+    assert.ok(!tag.includes('data-source='), 'no data-source attribute');
   });
 });
 
-describe('Home opened-task characterization: feature-flag truth conditions', () => {
-  test('AI off does not remove the manual templates (K4)', () => {
-    const html = render({ featureFlags: { dispatch: true, proxy: true, aiRecommendations: false } });
-    assert.ok(html.includes('data-label="implementation"'), 'default template links remain');
-    assert.ok(containerTag(html, 'prompt-container').length > 0, 'manual prompt container remains');
+describe('Home opened-task page options: feature-flag truth conditions (F9)', () => {
+  test('AI off by choice keeps the templates catalog but drops the AI primary (K4/K5)', () => {
+    const opts = homeOpts({ featureFlags: { aiRecommendations: false } });
+    assert.equal(opts.promptButtons, true, 'templates stay enabled');
+    assert.ok(opts.defaultPromptKeys.includes('implementation'), 'default template catalog present');
+    assert.ok(opts.morePromptKeys.includes('retro'), 'more template catalog present');
+    assert.equal(opts.aiState, 'off', 'AI primary reasons as off-by-choice');
+    assert.equal(opts.hasAI, false, 'AI primary is not runnable');
   });
 
-  test('AI off removes the AI suggest link and the recommend container (K5)', () => {
-    const html = render({ featureFlags: { dispatch: true, proxy: true, aiRecommendations: false } });
-    assert.ok(!html.includes('suggest-btn'), 'no AI suggest link');
-    assert.equal(containerTag(html, 'recommend-container'), '', 'no recommend container');
+  test('AI on resolves aiState ready and hasAI true (K5 baseline)', () => {
+    const opts = homeOpts({ featureFlags: {} });
+    assert.equal(opts.aiState, 'ready');
+    assert.equal(opts.hasAI, true);
   });
 
-  test('AI on renders the AI suggest link and the recommend container (K5 baseline)', () => {
-    const html = render();
-    assert.ok(html.includes('suggest-btn'), 'AI suggest link present');
-    assert.ok(containerTag(html, 'recommend-container').length > 0, 'recommend container present');
+  test('AI unconfigured resolves aiState unconfigured (K5 sibling)', () => {
+    const opts = homeOpts({ openRouterSource: null });
+    assert.equal(opts.aiState, 'unconfigured');
+    assert.equal(opts.hasAI, false);
   });
 
-  test('proxy off removes the Autopilot container (K6)', () => {
-    const html = render({ featureFlags: { dispatch: true, proxy: false } });
-    assert.equal(containerTag(html, 'autopilot-container'), '', 'no Autopilot container');
+  test('proxy off drops the run-whole-task rung (K6)', () => {
+    assert.equal(homeOpts({ featureFlags: { proxy: false } }).proxyEnabled, false);
+    assert.equal(homeOpts({ featureFlags: { proxy: false } }).hasAutopilot, false);
   });
 
-  test('promptButtons off hides the default template links (K7)', () => {
-    const html = render({ featureFlags: { dispatch: true, proxy: true, promptButtons: false } });
-    assert.ok(!html.includes('data-label="implementation"'), 'default template links absent');
-    assert.ok(!html.includes('suggest-btn'), 'AI suggest absent');
+  test('promptButtons off hides the templates (K7)', () => {
+    assert.equal(homeOpts({ featureFlags: { promptButtons: false } }).promptButtons, false);
+  });
+
+  test('landing pages emit no Home prompt options (no prompt UI)', () => {
+    const html = renderPage([], [], [], 'Org', { isLanding: true });
+    assert.ok(!html.includes('__HOME_PROMPT_OPTS__'), 'no embedded options on landing');
   });
 });

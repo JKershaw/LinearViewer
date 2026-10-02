@@ -10,36 +10,41 @@ const BUG_ISSUE_ID = 'dddddddd-dddd-dddd-dddd-ddddddddddde';
 const PLAN_ISSUE_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef';
 const CODE_REVIEW_ISSUE_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
 
-/**
- * Helper to expand Prompts section for an issue
- * Use after clicking the task line to expand details
- */
-async function expandPromptsSection(page, containerSelector, issueId) {
+// Home mounts the SAME shared opened-task component as Swipe (LIN-2944 P1). The
+// retired inline renderer's selectors (`.label-prompt`, `.suggest-btn`,
+// `.prompt-container`, `.recommend-container`, `.more-toggle`) are replaced by
+// the component's DOM below — same truth conditions, different markup.
+async function openTaskPrompts(page, containerSelector, issueId) {
+  await page.locator(`${containerSelector} .line[data-id="${issueId}"]`).first().click();
   const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
-  const promptsToggle = details.locator('.detail-toggle[data-toggle="prompts"]');
-  await promptsToggle.click();
+  await details.locator('.detail-toggle[data-toggle="prompts"]').click();
+  const component = details.locator('.prompt-section');
+  await expect(component).toBeVisible();
+  return component;
 }
 
-/**
- * Helper to expand Details section for an issue
- * Use after clicking the task line to expand details
- */
-async function expandDetailsSection(page, containerSelector, issueId) {
-  const details = page.locator(`${containerSelector} .details[data-details-for="${issueId}"]`);
-  const detailsToggle = details.locator('.detail-toggle[data-toggle="details"]');
-  await detailsToggle.click();
+/** Pick a template from "other prompts", revealing the more-group if needed. */
+async function pickTemplate(component, key) {
+  const other = component.locator('[data-testid="other-prompts"]');
+  const target = other.locator(`.swipe-prompt-btn[data-prompt="${key}"]`);
+  if (!(await target.isVisible().catch(() => false))) {
+    await other.locator('[data-prompt="__more__"]').click();
+  }
+  await target.click();
+  await expect(component).toHaveAttribute('data-phase', 'fresh');
 }
 
-/**
- * Helper to reveal hidden prompts behind "more" toggle
- * Use after expanding the Prompts section
- */
-async function clickMoreToggle(page, containerSelector, issueId) {
-  const moreToggle = page.locator(`${containerSelector} .more-toggle[data-issue-id="${issueId}"]`);
-  await moreToggle.click();
+/** Reveal the "more" group if the target template is currently hidden. */
+async function revealTemplate(page, component, key) {
+  const other = component.locator('[data-testid="other-prompts"]');
+  const target = other.locator(`.swipe-prompt-btn[data-prompt="${key}"]`);
+  if (!(await target.isVisible().catch(() => false))) {
+    await other.locator('[data-prompt="__more__"]').click();
+  }
+  return target;
 }
 
-test.describe('Promptable Labels', () => {
+test.describe('Templates and the shared opened-task component', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Prompt GET is template/data-driven; the local provider supplies the data.
     await seedLocal(workspaceApiLocalSeed);
@@ -47,185 +52,63 @@ test.describe('Promptable Labels', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders blocked label as clickable link', async ({ page }) => {
-    // Blocked task is in-progress, so it appears in the In Progress section
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await expect(taskLine).toBeVisible();
-
-    // Click to expand details
-    await taskLine.click();
-
-    // Expand Prompts section to reveal prompt buttons
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Find the label link in the specific issue's details panel
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await expect(labelLink).toBeVisible();
-    await expect(labelLink).toHaveText('blocked');
+  test('renders the blocked template as a button under "other prompts"', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const button = await revealTemplate(page, component, 'blocked');
+    await expect(button).toBeVisible();
+    await expect(button).toHaveText('blocked');
   });
 
-  test('regular labels are not clickable', async ({ page }) => {
-    // Find the task with feature label in project section (not in-progress section)
+  test('regular labels are not templates (they stay metadata text)', async ({ page }) => {
     const taskLine = page.locator('.project .line[data-id="issue-1"]');
     await expect(taskLine).toBeVisible();
-
-    // Click to expand details
     await taskLine.click();
 
-    // Expand Details section to reveal metadata
-    await expandDetailsSection(page, '.project', 'issue-1');
-
-    // The feature label should be text, not a link
     const details = page.locator('.project .details[data-details-for="issue-1"]');
+    await details.locator('.detail-toggle[data-toggle="details"]').click();
     await expect(details).toBeVisible();
 
-    // Feature should appear as plain text, not as a .label-prompt link in Details section
     const detailsContent = details.locator('.detail-content[data-content="details"]');
-    const labelLink = detailsContent.locator('.label-prompt[data-label="feature"]');
-    await expect(labelLink).toHaveCount(0);
-
-    // But feature text should appear in metadata within Details section
     await expect(detailsContent.locator('.detail-meta')).toContainText('feature');
   });
 
-  test('clicking promptable label shows prompt container', async ({ page }) => {
-    // Find and expand the task with blocked label
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
+  test('clicking a template renders its prompt in the shared component', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for prompt container to appear
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-
-    // Wait for prompt to load (not showing "Loading...")
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Should show prompt name
-    const promptName = promptContainer.locator('.prompt-name');
-    await expect(promptName).toContainText('blocked');
-
-    // Should show prompt text (now rendered as HTML, so headers don't have ##)
-    const promptText = promptContainer.locator('.prompt-text');
-    await expect(promptText).toBeVisible();
-    await expect(promptText).toContainText('Goal');
+    await expect(component.locator('.swipe-prompt-name')).toContainText('blocked');
+    await expect(component.locator('[data-prompt-body]')).toContainText('Goal');
   });
 
-  test('prompt contains issue identifier', async ({ page }) => {
-    // Find and expand the task
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for prompt to load
-    const promptText = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"] .prompt-text`);
-    await expect(promptText).not.toContainText('Loading', { timeout: 10000 });
-
-    // Prompt should contain the task identifier
-    await expect(promptText).toContainText('TEST-');
+  test('the generated prompt contains the issue identifier', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
+    await expect(component.locator('[data-prompt-body]')).toContainText('TEST-');
   });
 
-  test('clicking label again hides prompt container', async ({ page }) => {
-    // Find and expand the task
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label to show
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for container to appear
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-
-    // Click again to hide
-    await labelLink.click();
-    await expect(promptContainer).toBeHidden();
+  test('↻ change returns the component to idle', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
+    await component.locator('[data-action="change"]').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'idle');
   });
 
-  test('copy button copies prompt text', async ({ page, context }) => {
-    // Grant clipboard permissions
+  test('copy button copies the generated prompt text', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
 
-    // Find and expand the task
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Click copy button
-    const copyButton = promptContainer.locator('.prompt-copy');
+    const copyButton = component.locator('.swipe-prompt-copy');
     await copyButton.click();
-
-    // Button should show "copied!"
     await expect(copyButton).toHaveText('copied!');
-
-    // Button should revert after a delay
     await expect(copyButton).toHaveText('copy', { timeout: 3000 });
   });
 
-  test('LIN-316: download button saves prompt as a .md file', async ({ page }) => {
-    // Find and expand the task
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
+  test('LIN-316: download button saves the prompt as a .md file', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Click download and capture the triggered download
-    const downloadButton = promptContainer.locator('.prompt-download');
+    const downloadButton = component.locator('.swipe-prompt-download');
     await expect(downloadButton).toBeVisible();
     const downloadPromise = page.waitForEvent('download');
     await downloadButton.click();
@@ -233,64 +116,24 @@ test.describe('Promptable Labels', () => {
 
     // Filename is <identifier>-<promptName>.md (TEST-11 / blocked)
     expect(download.suggestedFilename()).toBe('test-11-blocked.md');
-
-    // Button gives "saved!" feedback then reverts
     await expect(downloadButton).toHaveText('saved!');
     await expect(downloadButton).toHaveText('download', { timeout: 3000 });
   });
 
-  test('LIN-191: copy button enabled only after prompt loads', async ({ page }) => {
-    // Find and expand the task with blocked label
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Copy button should now be enabled
-    const copyButton = promptContainer.locator('.prompt-copy');
-    await expect(copyButton).toBeEnabled();
+  test('the copy action exists only once a prompt is loaded', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    // Idle: no action cluster yet.
+    await expect(component.locator('.swipe-prompt-copy')).toHaveCount(0);
+    await pickTemplate(component, 'blocked');
+    await expect(component.locator('.swipe-prompt-copy')).toBeEnabled();
   });
 
-  test('prompt container has correct structure', async ({ page }) => {
-    // Find and expand the task
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click the promptable label
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Wait for container and prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    // Should have header with name and copy button
-    await expect(promptContainer.locator('.prompt-header')).toBeVisible();
-    await expect(promptContainer.locator('.prompt-name')).toBeVisible();
-    await expect(promptContainer.locator('.prompt-copy')).toBeVisible();
-
-    // Should have prompt text
-    await expect(promptContainer.locator('.prompt-text')).toBeVisible();
+  test('the component has the expected structure', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
+    await expect(component.locator('.swipe-prompt-name')).toBeVisible();
+    await expect(component.locator('.swipe-prompt-copy')).toBeVisible();
+    await expect(component.locator('[data-prompt-body]')).toBeVisible();
   });
 });
 
@@ -425,386 +268,152 @@ test.describe('Prompt API', () => {
   });
 });
 
-// Tests for promptable label rendering across different labels
-test.describe('Multiple Promptable Labels UI', () => {
+// Templates across different labels, all served by the shared component.
+test.describe('Templates across labels', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders blocked as clickable link in in-progress section', async ({ page }) => {
-    // Blocked task is in-progress, so it appears in the In Progress section
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await expect(taskLine).toBeVisible();
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Use specific issue ID to avoid ambiguity (task appears in both In Progress and Project sections)
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await expect(labelLink).toBeVisible();
+  test('the blocked template renders in the In Progress section', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await expect(await revealTemplate(page, component, 'blocked')).toBeVisible();
   });
 
-  test('renders bug as clickable link', async ({ page }) => {
-    const taskLine = page.locator('.project .line:has-text("Login fails with special characters")');
-    await expect(taskLine).toBeVisible();
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.project', BUG_ISSUE_ID);
-
-    // Reveal hidden prompts (bug is behind "more")
-    await clickMoreToggle(page, '.project', BUG_ISSUE_ID);
-
-    // Use specific issue ID to avoid ambiguity (bug label also exists on completed issue-3)
-    const labelLink = page.locator(`.label-prompt[data-label="bug"][data-issue-id="${BUG_ISSUE_ID}"]`);
-    await expect(labelLink).toBeVisible();
+  test('the bug template renders in the project section', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.project', BUG_ISSUE_ID);
+    await expect(await revealTemplate(page, component, 'bug')).toBeVisible();
   });
 
-  test('clicking blocked shows correct prompt', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Reveal hidden prompts (blocked is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    await expect(promptContainer.locator('.prompt-name')).toContainText('blocked');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
+  test('picking blocked renders the correct prompt', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await pickTemplate(component, 'blocked');
+    await expect(component.locator('.swipe-prompt-name')).toContainText('blocked');
+    await expect(component.locator('[data-prompt-body]')).toContainText('Goal');
   });
 
-  test('renders review as clickable link in in-progress section', async ({ page }) => {
-    // Issue is In Progress (started), so it appears in In Progress section.
-    // review is the universal quality gate (code-review was consolidated into it — LIN-523).
-    const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
-    await expect(taskLine).toBeVisible();
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
-
-    // Reveal hidden prompts (review is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
-
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
-    await expect(labelLink).toBeVisible();
+  test('the review template renders in the In Progress section', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
+    await expect(await revealTemplate(page, component, 'review')).toBeVisible();
   });
 
-  test('clicking review shows correct prompt', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Refactor authentication module")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
-
-    // Reveal hidden prompts (review is behind "more")
-    await clickMoreToggle(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
-
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="review"][data-issue-id="${CODE_REVIEW_ISSUE_ID}"]`);
-    await labelLink.click();
-
-    // Use more specific locator since issue appears in both In Progress and Project sections
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${CODE_REVIEW_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-
-    await expect(promptContainer.locator('.prompt-name')).toContainText('review');
-    await expect(promptContainer.locator('.prompt-text')).toContainText('Goal');
+  test('picking review renders the correct prompt', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', CODE_REVIEW_ISSUE_ID);
+    await pickTemplate(component, 'review');
+    await expect(component.locator('.swipe-prompt-name')).toContainText('review');
+    await expect(component.locator('[data-prompt-body]')).toContainText('Goal');
   });
 });
 
-// Tests for "more" inline expansion feature
-test.describe('More Prompts Inline', () => {
+// "more ▾" inline expansion, now the shared component's "other prompts" group.
+test.describe('Other prompts "more" toggle', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders "more" link for issues with additional prompts', async ({ page }) => {
-    // Expand an issue that has promptable labels
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Should show "more" link inline with other labels
-    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
-    await expect(moreLink).toBeVisible();
-    await expect(moreLink).toHaveText('more');
+  test('renders a "more ▾" control when there are hidden templates', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const more = component.locator('[data-testid="other-prompts"] [data-prompt="__more__"]');
+    await expect(more).toBeVisible();
+    await expect(more).toContainText(/more/i);
   });
 
-  test('clicking "more" reveals hidden prompts inline', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Hidden prompts should not be visible initially
-    const hiddenPrompts = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(hiddenPrompts).toBeHidden();
-
-    // Click "more"
-    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
-    await moreLink.click();
-
-    // Hidden prompts should now be visible
-    await expect(hiddenPrompts).toBeVisible();
-
-    // "more" link should be removed
-    await expect(moreLink).toHaveCount(0);
-
-    // Check a revealed prompt is visible (most prompts are behind "more")
-    await expect(hiddenPrompts.locator('.label-prompt:has-text("bug")')).toBeVisible();
+  test('clicking "more" reveals hidden templates inline', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const hidden = component.locator('[data-testid="other-prompts"] .swipe-more-prompts');
+    await expect(hidden).toBeHidden();
+    await component.locator('[data-testid="other-prompts"] [data-prompt="__more__"]').click();
+    await expect(hidden).toBeVisible();
+    await expect(hidden.locator('.swipe-prompt-btn[data-prompt="bug"]')).toBeVisible();
   });
 
-  test('clicking revealed prompt loads it into container', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Click "more" to reveal prompts
-    const moreLink = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .more-toggle`);
-    await moreLink.click();
-
-    // Click a revealed prompt
-    const bugLink = page.locator(`.in-progress-items [data-more-for="${BLOCKED_ISSUE_ID}"] .label-prompt[data-label="bug"]`);
-    await bugLink.click();
-
-    // Prompt container should show the prompt
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer).toBeVisible();
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
-    await expect(promptContainer.locator('.prompt-name')).toContainText('bug');
+  test('clicking a revealed template loads it into the component', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await component.locator('[data-testid="other-prompts"] [data-prompt="__more__"]').click();
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="bug"]').click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh');
+    await expect(component.locator('.swipe-prompt-name')).toContainText('bug');
   });
 
-  test('works in project section', async ({ page }) => {
-    // Bug issue appears in project section
-    const projectLine = page.locator('.project .line:has-text("Login fails with special characters")');
-    await projectLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.project', BUG_ISSUE_ID);
-
-    // Should have "more" link
-    const moreLink = page.locator(`.project .details[data-details-for="${BUG_ISSUE_ID}"] .more-toggle`);
-    await expect(moreLink).toBeVisible();
-
-    // Click to reveal
-    await moreLink.click();
-
-    const hiddenPrompts = page.locator(`.project [data-more-for="${BUG_ISSUE_ID}"]`);
-    await expect(hiddenPrompts).toBeVisible();
+  test('works in the project section', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.project', BUG_ISSUE_ID);
+    const more = component.locator('[data-testid="other-prompts"] [data-prompt="__more__"]');
+    await expect(more).toBeVisible();
+    await more.click();
+    await expect(component.locator('[data-testid="other-prompts"] .swipe-more-prompts')).toBeVisible();
   });
 });
 
 // =============================================================================
-// AI Recommendation Tests
+// AI Recommendation (the ✦ next-step primary), via the shared component.
 // =============================================================================
 
 test.describe('AI Recommendations', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // AI suggest button requires OpenRouter to be configured
+    // The ✦ primary requires OpenRouter to be configured.
     await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
 
-  test('renders AI suggest button for each issue when OpenRouter is configured', async ({ page }) => {
-    // Expand an issue
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Should have AI suggest button
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await expect(suggestBtn).toBeVisible();
-    await expect(suggestBtn).toHaveText('AI suggest');
+  test('renders the ✦ primary enabled when OpenRouter is configured', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeVisible();
+    await expect(go).toContainText(/next step/i);
+    await expect(go).toBeEnabled();
   });
 
-  test('AI suggest button is hidden when OpenRouter is not configured', async ({ page, seedLocal, localWorkerUrlKey }) => {
+  test('the ✦ primary is disabled with a plain-words reason when OpenRouter is not configured', async ({ page, seedLocal, localWorkerUrlKey }) => {
     // Re-seed WITHOUT OpenRouter — the absence of the key is the thing under test,
     // so it must not inherit the block's connected seed.
     await seedLocal(workspaceApiLocalSeed);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
-    // Expand an issue
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    // Should NOT have AI suggest button (it's not rendered, not just hidden)
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await expect(suggestBtn).toHaveCount(0);
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeDisabled();
+    await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/needs OpenRouter/i);
   });
 
-  test('clicking suggest button shows recommendation container', async ({ page }) => {
-    // Intercept the recommend API to add delay so we can test loading state
-    let resolveDelay;
-    const delayPromise = new Promise(resolve => { resolveDelay = resolve; });
+  test('the ✦ primary streams reasoning that stays visible, then the prompt', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await component.locator('[data-testid="opened-task-go"]').click();
 
-    // LIN-3198: the client appends `?source=<provider>` (public/app.js, LIN-1910),
-    // so a glob ending at `/stream` never matches and the hold is inert — the
-    // "Analyzing…" loading assertion below would pass for the wrong reason (or
-    // race). The trailing `*` matches the query string; same form as the working
-    // sibling at tests/e2e/opened-task-first-screen.spec.js:122.
-    await page.route(`**/api/recommend/*/stream*`, async (route) => {
-      // Wait for our signal before continuing with the request
-      await delayPromise;
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
+    // LIN-2944 reverses LIN-70: reasoning stays visible by default.
+    await expect(component.locator('[data-testid="opened-task-reasoning"]')).toBeVisible();
+    await expect(component.locator('[data-prompt-body]')).not.toBeEmpty();
+  });
+
+  test('the generating phase is shown while the recommend stream is held', async ({ page }) => {
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    await page.route('**/api/recommend/*/stream*', async (route) => {
+      await held;
       await route.continue();
     });
 
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await component.locator('[data-testid="opened-task-go"]').click();
+    await expect(component).toHaveAttribute('data-phase', 'generating');
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
-
-    // Recommendation container should appear
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(recommendContainer).toBeVisible();
-
-    // Reasoning shows "Analyzing..." during loading, then hides after loading
-    const reasoning = recommendContainer.locator('.recommend-reasoning');
-    const toggleBtn = recommendContainer.locator('.reasoning-toggle');
-
-    // Toggle button should be hidden during loading (LIN-111 fix)
-    await expect(toggleBtn).toBeHidden();
-    // Reasoning element is hidden during loading (SSE streams into it once response arrives)
-    await expect(reasoning).toBeHidden();
-
-    // Now release the API request to complete
-    resolveDelay();
-
-    // Wait for loading to complete (reasoning becomes hidden)
-    await expect(reasoning).toBeHidden({ timeout: 10000 });
-    // Toggle button should become visible after loading
-    await expect(toggleBtn).toBeVisible();
-    await expect(toggleBtn).toHaveText('show reasoning');
-
-    // Click show reasoning toggle
-    await toggleBtn.click();
-
-    // Reasoning should now be visible
-    await expect(reasoning).toBeVisible();
-    await expect(toggleBtn).toHaveText('hide reasoning');
-
-    // Should contain reasoning content (LIN-357: generic overview now that the
-    // blocked label is abolished and the local provider doesn't surface blocking).
-    await expect(reasoning).not.toBeEmpty();
+    release();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
+    await expect(component.locator('[data-testid="opened-task-reasoning"]')).toBeVisible();
   });
 
-  test('recommendation shows generated prompt', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
+  test('↻ change dismisses the generated prompt back to idle', async ({ page }) => {
+    const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
+    await component.locator('[data-testid="opened-task-go"]').click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
 
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
-
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(recommendContainer).toBeVisible();
-
-    // Wait for prompt to be generated (prompt text should have content)
-    const promptDiv = recommendContainer.locator('.recommend-prompt');
-    await expect(promptDiv).toBeVisible({ timeout: 10000 });
-
-    const promptText = promptDiv.locator('.prompt-text');
-    await expect(promptText).toBeVisible();
-    // Prompt should have content (not empty)
-    const text = await promptText.textContent();
-    expect(text.length).toBeGreaterThan(0);
-  });
-
-  test('generated prompt has copy button', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
-
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-
-    // Wait for prompt to be generated
-    const promptDiv = recommendContainer.locator('.recommend-prompt');
-    await expect(promptDiv).toBeVisible({ timeout: 10000 });
-
-    // Should have copy button
-    const copyBtn = promptDiv.locator('.prompt-copy');
-    await expect(copyBtn).toBeVisible();
-    await expect(copyBtn).toContainText('copy');
-  });
-
-  test('dismiss button hides recommendation', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
-
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(recommendContainer).toBeVisible();
-
-    // Click dismiss
-    const dismissBtn = recommendContainer.locator('.recommend-close');
-    await dismissBtn.click();
-
-    // Should be hidden
-    await expect(recommendContainer).toBeHidden();
-  });
-
-  test('clicking suggest again toggles recommendation off', async ({ page }) => {
-    const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
-    await taskLine.click();
-
-    // Expand Prompts section
-    await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
-
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(recommendContainer).toBeVisible();
-
-    // Click suggest again
-    await suggestBtn.click();
-
-    // Should be hidden
-    await expect(recommendContainer).toBeHidden();
+    await component.locator('[data-action="change"]').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'idle');
   });
 });
 

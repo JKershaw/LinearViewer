@@ -286,6 +286,9 @@ async function loadDetails(details) {
   details.dataset.loaded = 'loading'
   try {
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/detail/${encodeURIComponent(issueId)}${detailQuery}`)
+    // Tear down any component mounted from a previous fragment before replacing
+    // it (a retry after an earlier failure re-fetches this wrapper).
+    destroyHomePromptSections(details)
     details.innerHTML = (data && data.html) || ''
     details.dataset.loaded = 'true'
     // The fetched fragment's dispatch panels (prompt/recommend/autopilot) need
@@ -294,12 +297,80 @@ async function loadDetails(details) {
     // client-side initDispatchDisclosures now renders full disclosures with exec
     // controls, replacing the old two-step render+inject pattern (LIN-1137).
     initDispatchDisclosures(details)
+    // LIN-2944 P1: mount the shared opened-task component on the injected
+    // fragment (Home's retired inline renderer is replaced by this one).
+    mountHomePromptSections(details)
   } catch (error) {
     console.error('Failed to load detail:', error)
     details.innerHTML = '<div class="detail-line"><span class="detail-text">Failed to load details</span></div>'
     // Clear the flag so a later expand can retry.
     delete details.dataset.loaded
   }
+}
+
+/**
+ * Mount the shared opened-task component (LIN-2944 P1) on Home's lazy detail
+ * fragment. The server emits one `[data-prompt-mount]` placeholder per opened
+ * task carrying its identity, provenance and per-render instance key; the
+ * page-level options arrive once as `window.__HOME_PROMPT_OPTS__` (mirroring
+ * Swipe's `__SWIPE_DATA__`). Home and Swipe therefore render the SAME component
+ * from the SAME vocabulary — Home has no second opened-task renderer.
+ * @param {ParentNode} [root=document] - Subtree to scan
+ */
+function mountHomePromptSections(root) {
+  const page = window.__HOME_PROMPT_OPTS__
+  if (!page || !window.PromptSection) return
+  ;(root || document).querySelectorAll('[data-prompt-mount]').forEach((el) => {
+    if (el.dataset.mounted) return
+    const id = el.dataset.issueId
+    if (!id) return
+    const issue = {
+      id,
+      identifier: el.dataset.identifier || '',
+      title: el.dataset.title || '',
+      url: el.dataset.url || '',
+      // LIN-1904/LIN-1910: thread the resolved provider so the template and
+      // Autopilot fetches resolve THIS issue's own binding, exactly as before.
+      source: el.dataset.source || undefined,
+      // LIN-3240: carry the row's binding stamp so the component's fetches and
+      // per-task memory resolve THIS issue's own binding in a multi-binding workspace.
+      bindingScope: el.dataset.bindingScope || undefined
+    }
+    el.dataset.mounted = 'true'
+    el._promptSectionHandle = window.PromptSection.init(el, {
+      urlKey: el.dataset.urlKey || page.urlKey || undefined,
+      issue,
+      // LIN-2942: where the ladder press happened, carried on its mode record.
+      surface: 'home',
+      // LIN-2944 F3: only the ordering pipeline's front card advertises a
+      // ranking reason; every other opened task renders no why line.
+      why: id === page.topTaskId ? (page.topTaskWhy || []) : [],
+      hasAI: page.hasAI,
+      aiState: page.aiState,
+      freeTier: page.freeTier,
+      promptButtons: page.promptButtons,
+      hasAutopilot: page.hasAutopilot,
+      dispatchEnabled: page.dispatchEnabled,
+      proxyEnabled: page.proxyEnabled,
+      isLocalhost: page.isLocalhost,
+      customPrompts: page.customPrompts,
+      defaultPromptKeys: page.defaultPromptKeys,
+      morePromptKeys: page.morePromptKeys,
+      promptMeta: page.promptMeta,
+      // LIN-732: a caller-supplied dispatch-disclosure id prefix so the same
+      // issue in In Progress AND its project tree gets disjoint panel ids.
+      idPrefix: el.dataset.instanceKey || `home-${id}`
+    })
+  })
+}
+
+/** Tear down any mounted opened-task component under `root` (before re-fetch). */
+function destroyHomePromptSections(root) {
+  ;(root || document).querySelectorAll('[data-prompt-mount]').forEach((el) => {
+    if (el._promptSectionHandle && typeof el._promptSectionHandle.destroy === 'function') {
+      el._promptSectionHandle.destroy()
+    }
+  })
 }
 
 /**
@@ -938,146 +1009,12 @@ function init() {
 // Prompt Generation for Labels
 // ==========================================================================
 
-// Track active fetch to prevent race conditions
-let activePromptFetch = null
-
 /**
- * Hide all prompt containers for an issue (ensures only one visible at a time)
- * @param {Element} detailsContainer - The .details element containing prompt UI
- * @param {string} issueId - The issue ID
- */
-function hideIssuePromptUI(detailsContainer, issueId) {
-  // Hide manual prompt container and reset its state
-  const promptContainer = detailsContainer?.querySelector(`[data-prompt-for="${issueId}"]`)
-  if (promptContainer) {
-    promptContainer.classList.add('hidden')
-    promptContainer.dataset.activeLabel = ''
-  }
-
-  // Hide AI recommendation container
-  const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
-  if (recommendContainer) {
-    recommendContainer.classList.add('hidden')
-  }
-
-  // Hide autopilot container
-  const autopilotContainer = detailsContainer?.querySelector(`[data-autopilot-for="${issueId}"]`)
-  if (autopilotContainer) {
-    autopilotContainer.classList.add('hidden')
-  }
-}
-
-/**
- * Toggle disabled state on prompt action buttons (dispatch + copy + download) within a container.
- * LIN-191: Prevents interaction while prompts are loading or streaming.
- * @param {Element} container - Parent element containing .prompt-actions buttons
- * @param {boolean} disabled - Whether buttons should be disabled
- */
-function setPromptActionsDisabled(container, disabled) {
-  if (!container) return
-  const buttons = container.querySelectorAll('.prompt-actions button')
-  buttons.forEach(btn => { btn.disabled = disabled })
-}
-
-/**
- * Initialize prompt functionality for clickable labels
+ * Initialize the page-wide prompt handlers (copy / download / dispatch). These
+ * still serve the periodical Mint, Mint + Autopilot and Setup Prompt containers
+ * (LIN-2944 P1 F1); the opened-task surface is now the shared PromptSection.
  */
 function initPrompts() {
-  // Handle clicks on promptable labels
-  document.addEventListener('click', async (e) => {
-    const labelLink = e.target.closest('.label-prompt')
-    if (!labelLink || labelLink.classList.contains('more-toggle') || labelLink.classList.contains('suggest-btn')) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = labelLink.dataset.issueId
-    const labelName = labelLink.dataset.label
-
-    // Find the prompt container within the same details context as the clicked label
-    // This is important because the same issue can appear in both the "In Progress"
-    // section and its project tree, each with its own prompt container
-    const detailsContainer = labelLink.closest('.details')
-    const promptContainer = detailsContainer?.querySelector(`[data-prompt-for="${issueId}"]`)
-    if (!promptContainer) return
-
-    // If already visible with same label, toggle off
-    if (!promptContainer.classList.contains('hidden') &&
-        promptContainer.dataset.activeLabel === labelName) {
-      promptContainer.classList.add('hidden')
-      promptContainer.dataset.activeLabel = ''
-      return
-    }
-
-    // Cancel any in-flight request
-    if (activePromptFetch) {
-      activePromptFetch.abort()
-    }
-
-    // Create new abort controller for this request
-    const abortController = new AbortController()
-    activePromptFetch = abortController
-
-    // Hide any other prompt UI for this issue (AI suggestion)
-    hideIssuePromptUI(detailsContainer, issueId)
-
-    // Show loading state
-    const promptText = promptContainer.querySelector('.prompt-text')
-    const promptName = promptContainer.querySelector('.prompt-name')
-    promptText.textContent = 'Loading...'
-    promptName.textContent = ''
-    promptContainer.classList.remove('hidden')
-    promptContainer.dataset.activeLabel = labelName
-
-    // LIN-191: Disable dispatch/copy buttons while loading
-    setPromptActionsDisabled(promptContainer, true)
-
-    try {
-      // Get workspace URL key from data attribute (workspace-prefixed URLs)
-      const urlKey = promptContainer.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      // LIN-1904: forward the resolved provider (stamped server-side in
-      // lib/render.js) so the fetch resolves THIS issue's own binding.
-      // LIN-3240: forward its binding stamp too.
-      const source = promptContainer.dataset.source
-      const bindingScope = promptContainer.dataset.bindingScope
-      const sourceQuery = sourceBindingQuery(source, bindingScope)
-      const data = await window.api(
-        `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}${sourceQuery}`,
-        { signal: abortController.signal }
-      )
-
-      // Only update if this is still the active request
-      if (activePromptFetch === abortController) {
-        promptName.textContent = data.promptName
-        // Store raw markdown for copy, render HTML for display
-        promptText.dataset.rawPrompt = data.prompt
-        promptText.innerHTML = renderMarkdown(data.prompt)
-        // Store repo from project description for dispatch
-        if (data.repo) {
-          promptContainer.dataset.repo = data.repo
-        } else {
-          delete promptContainer.dataset.repo
-        }
-        // LIN-191: Enable dispatch/copy buttons now content is loaded
-        setPromptActionsDisabled(promptContainer, false)
-      }
-    } catch (error) {
-      // Ignore abort errors (user clicked away)
-      if (error.name === 'AbortError') return
-
-      // LIN-191: Re-enable buttons so user can retry without reloading
-      setPromptActionsDisabled(promptContainer, false)
-      promptText.textContent = `Error: ${error.message}`
-      console.error('Failed to fetch prompt:', error)
-    } finally {
-      // Clear active fetch if this was it
-      if (activePromptFetch === abortController) {
-        activePromptFetch = null
-      }
-    }
-  })
-
   // Handle copy button clicks
   document.addEventListener('click', async (e) => {
     const copyBtn = e.target.closest('.prompt-copy')
@@ -1633,63 +1570,9 @@ function initFeatureToggles() {
   })
 }
 
-
-
 // ==========================================================================
-// More Prompts Inline Toggle
+// Footer AI status helpers
 // ==========================================================================
-
-/**
- * Initialize "more" toggle for revealing additional prompt options inline
- */
-function initMorePrompts() {
-  document.addEventListener('click', (e) => {
-    const moreToggle = e.target.closest('.more-toggle')
-    if (!moreToggle) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = moreToggle.dataset.issueId
-
-    // Find the more-prompts span within the same details context as the clicked toggle
-    // This is important because the same issue can appear in both the "In Progress"
-    // section and its project tree, each with its own set of prompt links
-    const detailsContainer = moreToggle.closest('.details')
-    const moreSpan = detailsContainer?.querySelector(`[data-more-for="${issueId}"]`)
-
-    if (moreSpan) {
-      // Reveal hidden prompts
-      moreSpan.classList.remove('hidden')
-      // Remove the "more" link and preceding comma
-      moreToggle.remove()
-    }
-  })
-}
-
-// ==========================================================================
-// AI Recommendation Feature
-// ==========================================================================
-
-// Track active recommendation fetch to prevent race conditions
-let activeRecommendFetch = null
-
-/**
- * Show free tier usage info below a recommendation container
- * @param {Element} recommendContainer - The recommendation container element
- * @param {Object} freeTier - Free tier usage data
- */
-function showFreeTierInfo(recommendContainer, freeTier) {
-  // Remove existing info if present
-  const existing = recommendContainer.querySelector('.free-tier-info')
-  if (existing) existing.remove()
-
-  const info = document.createElement('div')
-  info.className = 'free-tier-info'
-  info.setAttribute('data-testid', 'free-tier-info')
-  info.textContent = `free tier \u00b7 ${freeTier.remaining} of ${freeTier.limit} daily prompts remaining \u00b7 resets midnight UTC`
-  recommendContainer.appendChild(info)
-}
 
 /**
  * Update the footer AI status with free tier remaining count
@@ -1716,277 +1599,6 @@ function updateFooterModel(modelName) {
   if (!el || !modelName) return
   el.textContent = modelName
   el.title = `Workspace model: ${modelName}`
-}
-
-/**
- * Phase labels for streaming UI
- */
-const PHASE_LABELS = {
-  fetching_context: 'Fetching task context...',
-  reasoning: 'Analyzing...',
-  prompt: 'Building prompt...'
-}
-
-/**
- * Initialize AI recommendation functionality
- * LIN-185: Uses SSE streaming for dynamic suggestion UX
- */
-function initRecommendations() {
-  // Handle clicks on suggest buttons
-  document.addEventListener('click', async (e) => {
-    const suggestBtn = e.target.closest('.suggest-btn')
-    if (!suggestBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = suggestBtn.dataset.issueId
-
-    // Find the recommendation container within the same details context
-    const detailsContainer = suggestBtn.closest('.details')
-    const recommendContainer = detailsContainer?.querySelector(`[data-recommend-for="${issueId}"]`)
-    if (!recommendContainer) return
-
-    // If already visible, toggle off
-    if (!recommendContainer.classList.contains('hidden')) {
-      recommendContainer.classList.add('hidden')
-      return
-    }
-
-    // Cancel any in-flight request
-    if (activeRecommendFetch) {
-      activeRecommendFetch.abort()
-    }
-
-    // Create new abort controller for this request
-    const abortController = new AbortController()
-    activeRecommendFetch = abortController
-
-    // Hide any other prompt UI for this issue (manual prompts)
-    hideIssuePromptUI(detailsContainer, issueId)
-
-    // Get DOM elements
-    const reasoning = recommendContainer.querySelector('.recommend-reasoning')
-    const promptDiv = recommendContainer.querySelector('.recommend-prompt')
-    const promptText = promptDiv?.querySelector('.prompt-text')
-    const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
-    const phaseIndicator = recommendContainer.querySelector('.streaming-phase')
-
-    // Reset state
-    reasoning.textContent = ''
-    reasoning.classList.add('hidden')
-    if (toggleBtn) toggleBtn.classList.add('hidden')
-    if (promptText) {
-      promptText.textContent = ''
-      delete promptText.dataset.rawPrompt
-    }
-    if (promptDiv) {
-      promptDiv.classList.add('hidden')
-      // LIN-191: Disable dispatch/copy buttons while streaming
-      setPromptActionsDisabled(promptDiv, true)
-    }
-    recommendContainer.classList.remove('hidden')
-
-    // Show phase indicator
-    if (phaseIndicator) {
-      phaseIndicator.textContent = PHASE_LABELS.fetching_context
-      phaseIndicator.classList.remove('hidden')
-    }
-
-    // Add loading class to button
-    suggestBtn.classList.add('loading')
-
-    // Accumulators for streamed content
-    let reasoningRaw = ''
-    let promptRaw = ''
-    let renderPending = false
-
-    // Throttled markdown render using requestAnimationFrame
-    function scheduleRender(element, text) {
-      if (renderPending) return
-      renderPending = true
-      requestAnimationFrame(() => {
-        element.innerHTML = renderMarkdown(text)
-        renderPending = false
-      })
-    }
-
-    try {
-      const urlKey = recommendContainer.dataset.urlKey
-      const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
-      // LIN-1910: forward the resolved provider (stamped server-side in
-      // lib/render.js) so the recommend stream resolves THIS issue's own
-      // binding instead of the workspace's active provider.
-      // LIN-3240: forward its binding stamp too.
-      const source = recommendContainer.dataset.source
-      const bindingScope = recommendContainer.dataset.bindingScope
-      const sourceQuery = sourceBindingQuery(source, bindingScope)
-      // Deliberately raw fetch (NOT window.api): this is an SSE stream read via
-      // response.body.getReader() (readSSEStream, public/common.js). api() consumes
-      // the body as JSON, so streaming readers stay on raw fetch. (api() carve-out.)
-      const response = await fetch(
-        `${apiPrefix}/api/recommend/${issueId}/stream${sourceQuery}`,
-        { signal: abortController.signal }
-      )
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        if (response.status === 429 && errorData.freeTier) {
-          throw Object.assign(new Error(errorData.error), { freeTier: errorData.freeTier })
-        }
-        const errorMsg = errorData.message
-          ? `${errorData.error}: ${errorData.message}`
-          : errorData.error || 'Failed to get recommendation'
-        throw new Error(errorMsg)
-      }
-
-      // Read SSE stream
-      await readSSEStream(response, (type, data) => {
-        if (activeRecommendFetch !== abortController) return
-
-        switch (type) {
-          case 'phase':
-            // Update phase indicator
-            if (phaseIndicator) {
-              phaseIndicator.textContent = PHASE_LABELS[data.phase] || data.phase
-            }
-            // Show reasoning section when reasoning phase starts
-            if (data.phase === 'reasoning') {
-              reasoning.classList.remove('hidden')
-            }
-            // Show prompt section when prompt phase starts
-            if (data.phase === 'prompt') {
-              if (promptDiv) promptDiv.classList.remove('hidden')
-            }
-            break
-
-          case 'delta':
-            if (data.section === 'reasoning') {
-              reasoningRaw += data.content
-              scheduleRender(reasoning, reasoningRaw)
-            } else if (data.section === 'prompt') {
-              promptRaw += data.content
-              if (promptText) scheduleRender(promptText, promptRaw)
-            }
-            break
-
-          case 'done':
-            // Finalize: do a final render to ensure completeness
-            if (reasoningRaw) {
-              const reasoningText = data.truncated
-                ? '[Warning: Response may be incomplete due to length limit]\n\n' + reasoningRaw
-                : reasoningRaw
-              reasoning.innerHTML = renderMarkdown(reasoningText)
-            }
-
-            // Hide reasoning, show toggle
-            reasoning.classList.add('hidden')
-            if (toggleBtn) {
-              toggleBtn.classList.remove('hidden')
-              toggleBtn.textContent = 'show reasoning'
-            }
-
-            if (promptText && promptRaw) {
-              promptText.dataset.rawPrompt = promptRaw
-              promptText.innerHTML = renderMarkdown(promptRaw)
-              if (promptDiv) promptDiv.classList.remove('hidden')
-            }
-
-            // Store repo for dispatch
-            if (data.repo && promptDiv) {
-              promptDiv.dataset.repo = data.repo
-            } else if (promptDiv) {
-              delete promptDiv.dataset.repo
-            }
-
-            // Free tier info
-            if (data.freeTier) {
-              showFreeTierInfo(recommendContainer, data.freeTier)
-              updateFooterFreeTier(data.freeTier)
-            }
-
-            // Hide phase indicator
-            if (phaseIndicator) phaseIndicator.classList.add('hidden')
-
-            // LIN-191: Enable dispatch/copy buttons now streaming is complete
-            setPromptActionsDisabled(promptDiv, false)
-            break
-
-          case 'error':
-            reasoning.textContent = `Error: ${data.error}`
-            reasoning.classList.remove('hidden')
-            if (phaseIndicator) phaseIndicator.classList.add('hidden')
-            // LIN-191: Re-enable buttons so user can retry
-            setPromptActionsDisabled(promptDiv, false)
-            break
-        }
-      })
-    } catch (error) {
-      // Ignore abort errors (user clicked away)
-      if (error.name === 'AbortError') return
-
-      // Show free tier limit exceeded with helpful message
-      if (error.freeTier) {
-        const urlKey = recommendContainer.dataset.urlKey
-        const settingsUrl = urlKey ? `/workspace/${encodeURIComponent(urlKey)}/settings` : '/settings'
-        reasoning.innerHTML = `<span class="free-tier-limit-reached">${escapeHtml(error.message)}</span><br>` +
-          `<a href="${escapeHtml(settingsUrl)}">Connect your OpenRouter account</a> for unlimited prompts.`
-        reasoning.classList.remove('hidden')
-        updateFooterFreeTier(error.freeTier)
-      } else {
-        reasoning.textContent = `Error: ${error.message}`
-        reasoning.classList.remove('hidden')
-      }
-      // Reasoning stays visible with error, so toggle should say "hide"
-      if (toggleBtn) {
-        toggleBtn.classList.remove('hidden')
-        toggleBtn.textContent = 'hide reasoning'
-      }
-      if (phaseIndicator) phaseIndicator.classList.add('hidden')
-      console.error('Failed to get recommendation:', error)
-    } finally {
-      if (activeRecommendFetch === abortController) {
-        activeRecommendFetch = null
-      }
-      suggestBtn.classList.remove('loading')
-    }
-  })
-
-  // Handle dismiss button clicks
-  document.addEventListener('click', (e) => {
-    const dismissBtn = e.target.closest('.recommend-close')
-    if (!dismissBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const recommendContainer = dismissBtn.closest('.recommend-container')
-    if (recommendContainer) {
-      recommendContainer.classList.add('hidden')
-      // Reset reasoning toggle state when dismissed
-      const reasoning = recommendContainer.querySelector('.recommend-reasoning')
-      const toggleBtn = recommendContainer.querySelector('.reasoning-toggle')
-      if (reasoning) reasoning.classList.add('hidden')
-      if (toggleBtn) toggleBtn.textContent = 'show reasoning'
-    }
-  })
-
-  // Handle reasoning toggle button clicks
-  document.addEventListener('click', (e) => {
-    const toggleBtn = e.target.closest('.reasoning-toggle')
-    if (!toggleBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const recommendContainer = toggleBtn.closest('.recommend-container')
-    const reasoning = recommendContainer?.querySelector('.recommend-reasoning')
-    if (!reasoning) return
-
-    // Toggle visibility
-    const isHidden = reasoning.classList.toggle('hidden')
-    toggleBtn.textContent = isHidden ? 'show reasoning' : 'hide reasoning'
-  })
 }
 
 // ==========================================================================
@@ -2207,93 +1819,6 @@ async function initFreeTierStatus() {
   }
 }
 
-/**
- * Initialize the Autopilot button. Fetches the
- * task-scoped Autopilot kickoff ("run on autopilot until this task is done")
- * and renders it in the .autopilot-container with the same copy/dispatch/+proxy
- * affordances. The container carries data-kind="autopilot" so the shared
- * dispatch handler tags the queued item as the autopilot meta-loop.
- */
-function initAutopilot() {
-  let activeAutopilotFetch = null
-
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.autopilot-btn')
-    if (!btn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const issueId = btn.dataset.issueId
-    // LIN-836: the stepper sibling button carries data-variant="stepper"; the
-    // classic button has none (→ standard). Both share one container per issue.
-    const variant = btn.dataset.variant
-    const detailsContainer = btn.closest('.details')
-    const container = detailsContainer?.querySelector(`[data-autopilot-for="${issueId}"]`)
-    if (!container) return
-
-    // Toggle off when already visible
-    if (!container.classList.contains('hidden')) {
-      container.classList.add('hidden')
-      return
-    }
-
-    if (activeAutopilotFetch) activeAutopilotFetch.abort()
-    const abortController = new AbortController()
-    activeAutopilotFetch = abortController
-
-    // Dismiss sibling prompt UI for this issue
-    hideIssuePromptUI(detailsContainer, issueId)
-
-    const promptText = container.querySelector('.prompt-text')
-    promptText.textContent = 'Loading...'
-    container.classList.remove('hidden')
-    setPromptActionsDisabled(container, true)
-
-    try {
-      const urlKey = container.dataset.urlKey
-      // LIN-1904: forward the resolved provider (stamped server-side in
-      // lib/render.js) so the kickoff fetch resolves THIS issue's own binding.
-      // LIN-3240: forward its binding stamp too.
-      const source = container.dataset.source
-      const bindingScope = container.dataset.bindingScope
-      const data = await window.fetchAutopilotKickoff({
-        urlKey,
-        issueId,
-        variant: variant || undefined,
-        source: source || undefined,
-        bindingScope: bindingScope || undefined,
-        signal: abortController.signal
-      })
-
-      if (activeAutopilotFetch === abortController) {
-        promptText.dataset.rawPrompt = data.prompt
-        promptText.innerHTML = renderMarkdown(data.prompt)
-        // Tag the dispatch queue entry with the variant-specific name. The
-        // shared dispatch handler reads .prompt-name; reset it for standard so a
-        // prior stepper click on the same container can't leak its label.
-        const nameEl = container.querySelector('.prompt-name')
-        if (nameEl) nameEl.textContent = variant === 'stepper' ? (data.promptName || 'Autopilot · stepped') : 'Autopilot'
-        if (data.repo) {
-          container.dataset.repo = data.repo
-        } else {
-          delete container.dataset.repo
-        }
-        setPromptActionsDisabled(container, false)
-      }
-    } catch (error) {
-      if (error.name === 'AbortError') return
-      setPromptActionsDisabled(container, false)
-      promptText.textContent = `Error: ${error.message}`
-      console.error('Failed to fetch autopilot prompt:', error)
-    } finally {
-      if (activeAutopilotFetch === abortController) {
-        activeAutopilotFetch = null
-      }
-    }
-  })
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   init()
   // initNavBar() runs from common.js's DOMContentLoaded handler (LIN-288);
@@ -2301,9 +1826,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initSearch()
   initPrompts()
   initDispatchDisclosures()
-  initMorePrompts()
-  initRecommendations()
-  initAutopilot()
   initQueuePanel()
   initFeatureToggles()
   initFreeTierStatus()

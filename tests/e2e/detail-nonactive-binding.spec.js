@@ -112,8 +112,10 @@ test.describe('Sibling id-scoped routes on a non-active (Jira) binding (LIN-1904
     // provider's issue context for this id, either 404ing or embedding the
     // wrong issue's title.
     await jiraNode.locator('[data-toggle="prompts"]').first().click();
-    await jiraNode.locator('[data-label="implementation"]').first().click();
-    await expect(jiraNode.locator('.prompt-text').first()).toContainText('Jira task in progress');
+    const component = jiraNode.locator('.prompt-section').first();
+    await expect(component).toBeVisible();
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="implementation"]').click();
+    await expect(component.locator('[data-prompt-body]')).toContainText('Jira task in progress');
 
     // Comments: expand the nested Comments toggle and assert the JIRA
     // comment body is present — proof the fetch reached the Jira binding's
@@ -288,10 +290,10 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     await expect(jiraRow).toBeAttached();
     await jiraRow.click();
     await jiraNode.locator('[data-toggle="prompts"]').first().click();
-
-    await jiraNode.locator('.suggest-btn').click();
-    const promptText = jiraNode.locator('.recommend-prompt .prompt-text');
-    await expect(promptText).toContainText('ENG-1', { timeout: 5000 });
+    const component = jiraNode.locator('.prompt-section').first();
+    await expect(component).toBeVisible();
+    await component.locator('[data-testid="opened-task-go"]').click();
+    await expect(component.locator('[data-prompt-body]')).toContainText('ENG-1', { timeout: 5000 });
   });
 
   test('task chat, reached via the dashboard Chat deep-link, answers first-person as the Jira row', async ({ page, seedLocal }) => {

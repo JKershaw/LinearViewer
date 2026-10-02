@@ -160,7 +160,7 @@ test.describe('Free Tier UI', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('shows AI suggest button for free tier users', async ({ page }) => {
+  test('shows the ✦ primary enabled for free tier users', async ({ page }) => {
     // Expand an issue
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
@@ -168,9 +168,10 @@ test.describe('Free Tier UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    // Should have AI suggest button (free tier acts like having a key)
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await expect(suggestBtn).toBeVisible();
+    // Free tier acts like having a key: the ✦ primary is runnable.
+    const go = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-go"]`);
+    await expect(go).toBeVisible();
+    await expect(go).toBeEnabled();
   });
 
   test('footer shows free tier AI status', async ({ page }) => {
@@ -180,7 +181,7 @@ test.describe('Free Tier UI', () => {
     await expect(footerStatus).toContainText('free');
   });
 
-  test('shows free tier info after recommendation', async ({ page }) => {
+  test('a free-tier user can recommend and the footer shows the allowance', async ({ page }) => {
     // Expand an issue
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
@@ -188,26 +189,19 @@ test.describe('Free Tier UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    // Click suggest
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
+    // Run the ✦ primary (free tier spends the mock, no real AI).
+    const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
+    await component.locator('[data-testid="opened-task-go"]').click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
+    await expect(component.locator('[data-prompt-body]')).not.toBeEmpty();
 
-    // Wait for recommendation to load
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(recommendContainer).toBeVisible();
-
-    // Wait for prompt to appear
-    const promptDiv = recommendContainer.locator('.recommend-prompt');
-    await expect(promptDiv).toBeVisible({ timeout: 10000 });
-
-    // Should show free tier info
-    const freeTierInfo = recommendContainer.locator('[data-testid="free-tier-info"]');
-    await expect(freeTierInfo).toBeVisible();
-    await expect(freeTierInfo).toContainText('free tier');
-    await expect(freeTierInfo).toContainText('daily prompts remaining');
+    // The free-tier allowance is disclosed in the footer.
+    const footerStatus = page.locator('.footer-ai-status.free');
+    await expect(footerStatus).toBeVisible();
+    await expect(footerStatus).toContainText('free');
   });
 
-  test('shows error message when limit exceeded', async ({ page, localWorkerUrlKey }) => {
+  test('disables the ✦ primary with the quota message when the limit is exhausted', async ({ page, localWorkerUrlKey }) => {
     // Pre-fill usage to the limit
     await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${localWorkerUrlKey}`);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
@@ -220,18 +214,11 @@ test.describe('Free Tier UI', () => {
     // Expand Prompts section
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    // Click suggest
-    const suggestBtn = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .suggest-btn`);
-    await suggestBtn.click();
-
-    // Should show rate limit error
-    const recommendContainer = page.locator(`.in-progress-items .recommend-container[data-recommend-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(recommendContainer).toBeVisible();
-
-    const reasoning = recommendContainer.locator('.recommend-reasoning');
-    await expect(reasoning).toBeVisible({ timeout: 10000 });
-    await expect(reasoning).toContainText('Daily limit reached');
-    await expect(reasoning).toContainText('Connect your OpenRouter account');
+    // The load-time quota signal disables the primary with the quota reason
+    // (addendum 5) instead of letting a request 429.
+    const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
+    await expect(component.locator('[data-testid="opened-task-go"]')).toBeDisabled();
+    await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/daily free-tier limit reached/i);
   });
 });
 

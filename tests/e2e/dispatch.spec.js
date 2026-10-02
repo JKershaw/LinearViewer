@@ -33,7 +33,7 @@ async function expandPromptsSection(page, containerSelector, issueId) {
  * Use after expanding the Prompts section
  */
 async function clickMoreToggle(page, containerSelector, issueId) {
-  const moreToggle = page.locator(`${containerSelector} .more-toggle[data-issue-id="${issueId}"]`);
+  const moreToggle = page.locator(`${containerSelector} .prompt-section [data-prompt="__more__"]`);
   await moreToggle.click();
 }
 
@@ -85,36 +85,36 @@ test.describe('Dispatch Queue', () => {
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt container to appear
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
     await expect(promptContainer).toBeVisible();
 
     // Wait for prompt to load
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
     // Verify four dispatch buttons exist with correct data-target attributes (includes local on localhost)
-    const dispatchBtns = promptContainer.locator('.prompt-dispatch');
+    const dispatchBtns = promptContainer.locator('.swipe-prompt-dispatch');
     await expect(dispatchBtns).toHaveCount(4);
 
-    const cliBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const cliBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await expect(cliBtn).toBeVisible();
     await expect(cliBtn).toHaveText('cli');
 
-    const webBtn = promptContainer.locator('.prompt-dispatch[data-target="web"]');
+    const webBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="web"]');
     await expect(webBtn).toBeVisible();
     await expect(webBtn).toHaveText('web');
 
-    const dashBtn = promptContainer.locator('.prompt-dispatch[data-target="dash"]');
+    const dashBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="dash"]');
     await expect(dashBtn).toBeVisible();
     await expect(dashBtn).toHaveText('dash');
 
-    const localBtn = promptContainer.locator('.prompt-dispatch[data-target="local"]');
+    const localBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="local"]');
     await expect(localBtn).toBeVisible();
     await expect(localBtn).toHaveText('harbour');
   });
@@ -131,22 +131,22 @@ test.describe('Dispatch Queue', () => {
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
     // Click dispatch button
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
-    // Should show "dispatched!" feedback
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    // Should show "✓" feedback
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Should revert to "cli" after timeout
     await expect(dispatchBtn).toHaveText('cli', { timeout: 3000 });
@@ -168,22 +168,22 @@ test.describe('Dispatch Queue', () => {
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt to load
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
     // Click dispatch button
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
     // Wait for dispatch to complete
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Verify the dispatched item has the repo field via consumer API
     const pollResponse = await request.get('/api/dispatch/poll', {
@@ -210,20 +210,20 @@ test.describe('Dispatch Queue', () => {
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label and dispatch
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
 
     // Wait for dispatch to complete
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Badge should now be visible (wait for async badge update)
     await expect(badge).not.toHaveClass(/hidden/, { timeout: 10000 });
@@ -241,18 +241,18 @@ test.describe('Dispatch Queue', () => {
     // Reveal hidden prompts (blocked is behind "more")
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Click the queue badge (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
@@ -324,18 +324,18 @@ test.describe('Dispatch Queue', () => {
     // Reveal hidden prompts (blocked is behind "more")
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Open queue panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
@@ -370,16 +370,16 @@ test.describe('Dispatch Queue', () => {
     // Reveal hidden prompts (blocked is behind "more")
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
-    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+    await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
 
     // Open panel (wait for async badge update)
     const badge = page.locator('[data-queue-badge]');
@@ -412,19 +412,19 @@ test.describe('Dispatch Queue', () => {
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
     // Click the promptable label to show prompt
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
 
     // Wait for prompt to load and dispatch
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
 
     // Dispatch targets are now collapsed behind a "Dispatch ▾" disclosure.
     await openDispatchOptions(promptContainer);
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Badge should show 1 queued
     const badge = page.locator('[data-queue-badge]');
@@ -457,10 +457,10 @@ test.describe('Dispatch Queue', () => {
     await taskLine.click();
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
     await clickMoreToggle(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    const labelLink = page.locator(`.in-progress-items .label-prompt[data-label="blocked"][data-issue-id="${BLOCKED_ISSUE_ID}"]`);
+    const labelLink = page.locator(`.in-progress-items .prompt-section [data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="blocked"]`);
     await labelLink.click();
-    const promptContainer = page.locator(`.in-progress-items .prompt-container[data-prompt-for="${BLOCKED_ISSUE_ID}"]`);
-    await expect(promptContainer.locator('.prompt-text')).not.toContainText('Loading', { timeout: 10000 });
+    const promptContainer = page.locator(`.in-progress-items .prompt-section`);
+    await expect(promptContainer.locator('[data-prompt-body]')).not.toContainText('Loading', { timeout: 10000 });
     return promptContainer;
   }
 
@@ -471,17 +471,17 @@ test.describe('Dispatch Queue', () => {
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
     // Targets are hidden until expanded.
-    await expect(promptContainer.locator('.prompt-dispatch[data-target="cli"]')).toBeHidden();
+    await expect(promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]')).toBeHidden();
 
     // Expand.
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await expect(promptContainer.locator('.prompt-dispatch[data-target="cli"]')).toBeVisible();
+    await expect(promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]')).toBeVisible();
 
     // Collapse via the trigger.
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    await expect(promptContainer.locator('.prompt-dispatch[data-target="cli"]')).toBeHidden();
+    await expect(promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]')).toBeHidden();
   });
 
   test('Dispatch panel closes on outside click and Escape', async ({ page }) => {
@@ -491,7 +491,7 @@ test.describe('Dispatch Queue', () => {
     // Outside click (the prompt name is outside both trigger and panel) closes it.
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    await promptContainer.locator('.prompt-name').click();
+    await promptContainer.locator('.swipe-prompt-name').click();
     await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
     // Escape closes it.
@@ -505,9 +505,9 @@ test.describe('Dispatch Queue', () => {
     const promptContainer = await revealPrompt(page);
     await openDispatchOptions(promptContainer);
 
-    const dispatchBtn = promptContainer.locator('.prompt-dispatch[data-target="cli"]');
+    const dispatchBtn = promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // The panel stays open after dispatch so the button feedback remains visible.
     await expect(promptContainer.locator('.disclosure-toggle')).toHaveAttribute('aria-expanded', 'true');
@@ -529,7 +529,7 @@ test.describe('Dispatch Queue', () => {
 
     const dispatchReq = page.waitForRequest(req =>
       req.url().includes('/api/dispatch') && req.method() === 'POST');
-    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+    await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
 
     const req = await dispatchReq;
     const body = JSON.parse(req.postData() || '{}');
@@ -543,7 +543,7 @@ test.describe('Dispatch Queue', () => {
 
     const dispatchReq = page.waitForRequest(req =>
       req.url().includes('/api/dispatch') && req.method() === 'POST');
-    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+    await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
 
     const req = await dispatchReq;
     const body = JSON.parse(req.postData() || '{}');
@@ -560,7 +560,7 @@ test.describe('Dispatch Queue', () => {
 
     const dispatchReq = page.waitForRequest(req =>
       req.url().includes('/api/dispatch') && req.method() === 'POST');
-    await promptContainer.locator('.prompt-dispatch[data-target="cli"]').click();
+    await promptContainer.locator('.swipe-prompt-dispatch[data-target="cli"]').click();
 
     const req = await dispatchReq;
     const body = JSON.parse(req.postData() || '{}');
@@ -1332,8 +1332,8 @@ test.describe('Custom Prompt Dispatch', () => {
     const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
 
-    // Should show "dispatched!" feedback
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    // Should show "✓" feedback
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Textarea should be cleared
     await expect(textarea).toHaveValue('');
@@ -1358,7 +1358,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await webBtn.click();
 
     // Should show feedback
-    await expect(webBtn).toContainText('dispatched!');
+    await expect(webBtn).toContainText('✓');
 
     // Verify target is "web" via API
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
@@ -1379,7 +1379,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await dashBtn.click();
 
     // Should show feedback
-    await expect(dashBtn).toContainText('dispatched!');
+    await expect(dashBtn).toContainText('✓');
 
     // Verify target is "dash" via API
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
@@ -1419,7 +1419,7 @@ test.describe('Custom Prompt Dispatch', () => {
     const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
 
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Verify prompt is literally "/plan"
     const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
@@ -1437,7 +1437,7 @@ test.describe('Custom Prompt Dispatch', () => {
     await textarea.fill('First custom prompt');
     const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
     await dispatchBtn.click();
-    await expect(dispatchBtn).toHaveText('dispatched!');
+    await expect(dispatchBtn).toHaveText('✓');
 
     // Wait for recents to render (async update after dispatch)
     const recentItem = page.locator('.dispatch-recents-container .queue-recent-item');
