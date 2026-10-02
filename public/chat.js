@@ -368,6 +368,11 @@
     if (data.phase === 'error') {
       return name + ' failed: ' + (data.error || 'unknown error');
     }
+    if (data.phase === 'proposed') {
+      // LIN-3254: a run-scoped turn proposes instead of acting — say so, never
+      // reuse the 'call' frame's "sent a follow-up" wording (nothing was sent).
+      return name === 'send_follow_up' ? 'proposed a follow-up' : name + ' proposed';
+    }
     if (data.phase === 'cap') {
       return 'reached the tool-lookup limit';
     }

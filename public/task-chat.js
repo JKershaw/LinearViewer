@@ -19,6 +19,8 @@
   var prefillSource = data.defaultSource || '';
   // LIN-3240: the issue's binding stamp beside the source hint.
   var prefillBindingScope = data.defaultBindingScope || '';
+  // LIN-3254: the run id this chat is scoped to (run-scoped chat proposes).
+  var prefillRun = data.defaultRun || '';
 
   var idInput = document.getElementById('task-chat-id');
   var questionInput = document.getElementById('task-chat-question');
@@ -334,6 +336,9 @@
     // "still the prefilled task" rule. String concatenation (not URLSearchParams)
     // keeps the unstamped `?source=` form byte-identical.
     var bindingScopeHint = (taskId === prefillTask) ? prefillBindingScope : '';
+    // LIN-3254: the run id rides the SAME "still the prefilled task" rule; it is
+    // sent in the turn body so the server scopes the turn to the run.
+    var runHint = (taskId === prefillTask) ? prefillRun : '';
     var sourceParts = [];
     if (sourceHint) sourceParts.push('source=' + encodeURIComponent(sourceHint));
     if (bindingScopeHint) sourceParts.push('bindingScope=' + encodeURIComponent(bindingScopeHint));
@@ -342,10 +347,12 @@
     // Raw fetch carve-out: Server-Sent Events stream consumed via readSSEStream
     // (public/common.js); window.api() parses the body as JSON and would break
     // the stream, so the SSE reader keeps its own response handling.
+    var turnBody = { question: question, history: priorHistory };
+    if (runHint) turnBody.runId = runHint;
     fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/task-chat/' + encodeURIComponent(taskId) + sourceQuery, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify({ question: question, history: priorHistory })
+      body: JSON.stringify(turnBody)
     }).then(function (response) {
       if (!response.ok) {
         return response.json().then(function (body) {
