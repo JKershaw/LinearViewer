@@ -69,6 +69,18 @@ export function createMockCollection() {
     return { ...obj, [head]: setAtPath(child, rest.join('.'), value) };
   };
 
+  // Immutable dot-path $inc (e.g. "byReason.repeat-same-target"), used by the
+  // LIN-3257 wake-shadow per-day tally. Mirrors Mongo/MangoDB: a missing leaf
+  // starts from 0 before the delta is applied.
+  const incAtPath = (obj, path, delta) => {
+    const [head, ...rest] = path.split('.');
+    if (rest.length === 0) {
+      return { ...obj, [head]: (typeof obj[head] === 'number' ? obj[head] : 0) + delta };
+    }
+    const child = (obj && typeof obj[head] === 'object' && obj[head] !== null) ? obj[head] : {};
+    return { ...obj, [head]: incAtPath(child, rest.join('.'), delta) };
+  };
+
   // Applies $set/$push/$addToSet update operators to a doc, returning a NEW
   // object (never mutates the input) so callers holding the pre-update doc
   // (e.g. a findOneAndUpdate caller reading the stored array reference) are
@@ -106,7 +118,7 @@ export function createMockCollection() {
     if (update.$inc) {
       next = { ...next };
       for (const [field, delta] of Object.entries(update.$inc)) {
-        next[field] = (typeof next[field] === 'number' ? next[field] : 0) + delta;
+        next = field.includes('.') ? incAtPath(next, field, delta) : { ...next, [field]: (typeof next[field] === 'number' ? next[field] : 0) + delta };
       }
     }
     return next;
@@ -190,8 +202,13 @@ export function createMockCollection() {
     async updateOne(query, update, opts = {}) {
       const idx = docs.findIndex(d => matches(d, query));
       if (idx === -1) {
-        if (opts.upsert && update.$set) {
-          docs.push({ ...query, ...update.$set });
+        // Upsert: build the new doc from the query's equality fields + every
+        // update operator applied to it. Generalised (LIN-3257) so `$inc`
+        // upserts — the wake-shadow tally — start their counters at 0, exactly
+        // like Mongo, instead of only supporting `$set`.
+        const hasOperator = update && Object.keys(update).some(k => k.startsWith('$'));
+        if (opts.upsert && hasOperator) {
+          docs.push(applyUpdate({ ...query }, update));
           return { matchedCount: 0, upsertedCount: 1 };
         }
         return { matchedCount: 0, upsertedCount: 0 };

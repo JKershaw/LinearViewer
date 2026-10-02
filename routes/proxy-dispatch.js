@@ -54,7 +54,12 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // (status transition or new feedback during the hold), 'timeout' (held the full
 // window, nothing new); `waitedMs` is how long the handler actually held. Omitted
 // on the plain short-poll (no `?wait`) so that path stays byte-identical.
-function formatDispatchWatch(item, meta = null) {
+//
+// `wakeShadow` (LIN-3257) is the read-only shadow verdict for a `kind:'wake'`
+// row — `{ wouldSkip, reason }` — or null on every non-wake row. It is a
+// READ-ONLY annotation: the shadow is recorded at mint time and nothing here
+// can suppress a wake.
+function formatDispatchWatch(item, meta = null, wakeShadow = null) {
   // LIN-2079: the REPORTED status is the lifecycle one (terminal, else `blocked`
   // when the lineage is parked on a human). `item.feedback` is already
   // lineage-merged by getItemStatus({includeGroupFeedback:true}).
@@ -124,7 +129,11 @@ function formatDispatchWatch(item, meta = null) {
       // assign only when present, never emit `kind: null` (LIN-1475).
       if (f.kind) entry.kind = f.kind;
       return entry;
-    })
+    }),
+    // LIN-3257: read-only shadow verdict. Present (null) on every row so the
+    // shape is stable; non-null only for a `kind:'wake'` row that has a recorded
+    // shadow. Never suppressable — display/telemetry only.
+    wakeShadow: (item.kind === 'wake' ? (wakeShadow || null) : null)
   };
   if (meta) {
     body.reason = meta.reason;
@@ -1779,6 +1788,13 @@ export function createDispatchRoutes({
       // (The terminal short-circuit also keeps re-polling a finished item free
       // — the caller can re-verify without ever incurring the hold.)
       let current = item;
+      // LIN-3257: the read-only shadow verdict, for a wake row only. Computed
+      // once — it is written at mint time and never changes. A read failure
+      // degrades to null (the store's getWakeShadow swallows), so it can never
+      // fail the watch response.
+      const wakeShadow = item.kind === 'wake'
+        ? await dispatchQueueStore.getWakeShadow(req.proxyUrlKey, item.id)
+        : null;
       const alreadyTerminal = deriveTerminalStatus(current.feedback) !== null;
       if (waitSeconds > 0) {
         // Long-poll path. The response carries `reason`/`waitedMs` so the caller
@@ -1787,7 +1803,7 @@ export function createDispatchRoutes({
         // 'timeout'.
         if (alreadyTerminal) {
           logEvent(req, '/api/proxy/dispatch/:id', 200);
-          return res.json(formatDispatchWatch(current, { reason: 'terminal', waitedMs: 0 }));
+          return res.json(formatDispatchWatch(current, { reason: 'terminal', waitedMs: 0 }, wakeShadow));
         }
         // Hold the request open. armKeepalive flushes 200 + JSON whitespace at
         // 25s so the connection survives Heroku's 30s H12 while we wait; the
@@ -1815,11 +1831,11 @@ export function createDispatchRoutes({
         }
         keepalive.stop();
         logEvent(req, '/api/proxy/dispatch/:id', 200);
-        return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }));
+        return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }, wakeShadow));
       }
 
       logEvent(req, '/api/proxy/dispatch/:id', 200);
-      res.json(formatDispatchWatch(current));
+      res.json(formatDispatchWatch(current, null, wakeShadow));
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch/:id', 500);
       console.error('Proxy dispatch watch error:', err.message);
@@ -1884,6 +1900,43 @@ export function createDispatchRoutes({
       logEvent(req, '/api/proxy/dispatch/:id/prompt', 500);
       console.error('Proxy dispatch prompt read error:', err.message);
       jsonError(res, 500, 'Failed to read dispatch prompt');
+    }
+  });
+
+  /**
+   * GET /api/proxy/wake-shadow?days=N
+   *
+   * LIN-3257 (M1 shadow): read-only per-day tally of the shadow wake
+   * classification — how many wakes were minted, how many the classifier WOULD
+   * skip, and the breakdown by reason. The Flight Companion reads this to build
+   * the evidence for a later switch-on. Nothing was suppressed; this is a
+   * measurement.
+   *
+   * Read scope only (no write verb). `days` defaults to 7, clamped to [1, 31].
+   * Workspace-scoped via req.proxyUrlKey like every sibling read. When no shadow
+   * collection is wired the store returns an empty, well-formed summary (the
+   * documented no-op degrade) rather than an error.
+   *
+   * → { "days": [{ "day": "YYYY-MM-DD", "minted": N, "wouldSkip": N, "byReason": { ... } }],
+   *     "totals": { "minted": N, "wouldSkip": N, "share": 0.35, "byReason": { ... } } }
+   */
+  router.get('/api/proxy/wake-shadow', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    if (!dispatchQueueStore) {
+      logEvent(req, '/api/proxy/wake-shadow', 503);
+      return jsonError(res, 503, 'Dispatch is not available');
+    }
+
+    const rawDays = Number(req.query.days);
+    const days = Number.isFinite(rawDays) ? Math.max(1, Math.min(31, Math.floor(rawDays))) : undefined;
+
+    try {
+      const summary = await dispatchQueueStore.getWakeShadowTally(req.proxyUrlKey, days ? { days } : {});
+      logEvent(req, '/api/proxy/wake-shadow', 200);
+      res.json(summary);
+    } catch (err) {
+      logEvent(req, '/api/proxy/wake-shadow', 500);
+      console.error('Proxy wake-shadow read error:', err.message);
+      jsonError(res, 500, 'Failed to read wake-shadow tally');
     }
   });
 

@@ -346,10 +346,15 @@ localProvider.configure({ store: localStore })
 const dispatchQueueCollection = db.collection('dispatch-queue')
 const dispatchTokensCollection = db.collection('dispatch-tokens')
 const dispatchHistoryCollection = db.collection('dispatch-history')
+// LIN-3257 (M1 shadow): additive, optional storage for the wake-shadow verdict,
+// per-day tally and per-edge prior. Nothing on the delivery path reads it — the
+// write is best-effort and the proxy reads are read-only. Absent ⇒ no-op.
+const wakeShadowCollection = db.collection('wake_shadow')
 
 const dispatchQueueStore = new DispatchQueueStore({
   collection: dispatchQueueCollection,
   historyCollection: dispatchHistoryCollection,
+  wakeShadowCollection,
   ttl: 24 * 60 * 60 // 24 hours
 })
 
