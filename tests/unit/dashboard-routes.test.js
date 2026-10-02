@@ -5954,7 +5954,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     now = () => Date.now(),
     bucket,
     cache,
-    runRefs,
+    allowlistCache,
     loadRun
   } = {}) {
     const counts = { github: 0, fetchProjects: 0, comments: 0 };
@@ -5969,7 +5969,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
       prState: {
         now,
         cache: cache || new Map(),
-        runRefs: runRefs || new Map(),
+        allowlistCache: allowlistCache || new Map(),
         bucket: bucket || { windowStart: now(), count: 0 },
         resolveProvider: () => ({ provider, callScope: 'scope' }),
         loadRun: loadRun || (async () => ({ issueIdentifier: 'LIN-1', evidenceUrls: [] })),
@@ -6048,23 +6048,43 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
   });
 
   test('budget spent with no stale value returns state not reported, status 200, zero upstream fetches', async () => {
-    const runId = 'run-x';
-    const runRefs = new Map([[`ws-a:${runId}`, { repo: 'acme/widget', number: 12, url: PR_URL }]]);
-    const bucket = { windowStart: 3_000_000, count: 36 };
+    const nowMs = 3_000_000;
+    const allowlistCache = new Map([['ws-a', { value: new Set(['acme/widget']), expiresAt: nowMs + 15 * 60 * 1000 }]]);
+    const bucket = { windowStart: nowMs, count: 36 };
     const { router, counts } = makePrStateRouter({
-      now: () => 3_000_000,
+      now: () => nowMs,
       bucket,
-      runRefs,
+      allowlistCache,
       cache: new Map(),
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
       github: { state: 'open' }
     });
 
-    const res = await callPrState(router, runId);
+    const res = await callPrState(router, 'run-x');
     assert.equal(res.statusCode, 200, 'never a 403');
     assert.equal(res.jsonBody.state, 'unknown');
     assert.equal(res.jsonBody.number, 12);
     assert.equal(counts.github, 0, 'zero upstream GitHub fetches');
-    assert.equal(counts.fetchProjects, 0, 'the cached PR ref means no allowlist read');
+    assert.equal(counts.fetchProjects, 0, 'the cached allowlist means no fetchProjects');
+  });
+
+  test('a PR URL newly posted on the run is picked up on the next poll (one fetchPrStatus)', async () => {
+    const comments = []; // the provider reads this live reference each GET
+    const { router, counts } = makePrStateRouter({
+      comments,
+      github: { state: 'open' }
+    });
+
+    const first = await callPrState(router);
+    assert.equal(first.jsonBody.state, 'none', 'no PR on record yet');
+
+    // the worker posts the PR URL after the first poll
+    comments.push(prComment(`opened ${PR_URL}`, '2026-07-01T00:00:00.000Z'));
+
+    const second = await callPrState(router);
+    assert.equal(second.jsonBody.state, 'open', 'the newly posted PR is seen on the next poll');
+    assert.equal(second.jsonBody.number, 12);
+    assert.equal(counts.github, 4, 'exactly one fetchPrStatus call (4 upstream)');
   });
 
   test('no PR URL on the run returns the none state with zero upstream fetches', async () => {

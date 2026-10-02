@@ -96,6 +96,9 @@ const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 // the stale value or "state not reported" and never lets another reader see a 403.
 const PR_STATE_OPEN_TTL_MS = 15 * 60 * 1000;
 const PR_STATE_CLOSED_TTL_MS = 24 * 60 * 60 * 1000;
+// The per-workspace repo allowlist (a tracker `fetchProjects` read) is held for
+// the open-PR TTL. Comments are re-read every poll, so this is only the filter.
+const PR_STATE_ALLOWLIST_TTL_MS = 15 * 60 * 1000;
 const PR_STATE_UPSTREAM_LIMIT = 36;
 const PR_STATE_WINDOW_MS = 60 * 60 * 1000;
 const PR_STATE_BUDGET_EXHAUSTED = 'PR_STATE_BUDGET_EXHAUSTED';
@@ -684,7 +687,7 @@ export function createDashboardRoutes({
   readRunEvidence: readRunEvidenceFn = null,
   // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
   // store, which is process-wide in production (one router). Tests inject
-  // `{ now, resolveProvider, loadRun, githubFetch, cache, runRefs, bucket }`.
+  // `{ now, resolveProvider, loadRun, githubFetch, cache, allowlistCache, bucket }`.
   prState = null
 }) {
   const router = Router();
@@ -693,9 +696,15 @@ export function createDashboardRoutes({
   // PR-state store (LIN-3251, C1). `cache`/`bucket` default to this router's own
   // process-wide state; a test overrides any subset. `loadRun` and
   // `resolveProvider` are seams so a route test needs no Mongo or provider bind.
+  //
+  // NOTE: there is deliberately NO run->PR pointer cache. Every GET re-reads the
+  // run's tracker comments and re-extracts the PR URL, so a PR posted after the
+  // first poll is picked up on the next one. The only thing cached across polls
+  // is the per-workspace repo allowlist (a tracker `fetchProjects` read, not a
+  // GitHub read), so a PR-state cache hit still runs no `fetchProjects`.
   const prStateStore = {
     cache: new Map(),
-    runRefs: new Map(),
+    allowlistCache: new Map(),
     bucket: { windowStart: 0, count: 0 },
     now: Date.now,
     resolveProvider: (workspace, selector) => resolveIssueBinding(workspace, selector),
@@ -1413,8 +1422,23 @@ export function createDashboardRoutes({
   // stale value) resolve to the "state not reported" (`unknown`) state — never a
   // 403, never a thrown read.
 
-  function runPrKey(urlKey, runId) {
-    return `${urlKey}:${runId}`;
+  /**
+   * The per-workspace repo allowlist, cached for 15 min. This is a tracker
+   * `fetchProjects` read — NOT a GitHub read — so a PR-state cache hit still
+   * costs no upstream GitHub call. Comments are re-read every request, so a
+   * newly posted PR URL is found on the next poll without this cache mattering.
+   */
+  async function prStateAllowlist(workspace, provider, callScope, nowMs) {
+    const cached = prStateStore.allowlistCache.get(workspace.urlKey);
+    if (cached && cached.expiresAt > nowMs) return cached.value;
+    let allowlist;
+    try {
+      allowlist = await resolveRepoAllowlist(provider, callScope);
+    } catch {
+      allowlist = new Set();
+    }
+    prStateStore.allowlistCache.set(workspace.urlKey, { value: allowlist, expiresAt: nowMs + PR_STATE_ALLOWLIST_TTL_MS });
+    return allowlist;
   }
 
   /** The C1 TTL for a reader result: 15 min while open, else 24 h. */
@@ -1507,40 +1531,33 @@ export function createDashboardRoutes({
       return jsonError(res, 400, 'Invalid run id');
     }
     const nowMs = prStateStore.now();
-    const refKey = runPrKey(workspace.urlKey, runId);
     try {
-      let ref = prStateStore.runRefs.get(refKey) || null;
-      if (!ref) {
-        const run = await prStateStore.loadRun(workspace.urlKey, runId);
-        if (!run || !run.issueIdentifier) {
-          return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
-        }
-        const { provider, callScope } = prStateStore.resolveProvider(workspace, null);
-        const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-        let allowlist = new Set();
-        try {
-          allowlist = await resolveRepoAllowlist(provider, callScope);
-        } catch {
-          allowlist = new Set();
-        }
-        // Through LIN-2949's run-evidence model, not a new parser.
-        const model = buildRunEvidence({
-          issueIdentifier: run.issueIdentifier,
-          comments,
-          allowlist,
-          evidenceUrls: run.evidenceUrls || [],
-          prStatus: null
-        });
-        const urls = (model.state && model.state.prUrls) || [];
-        if (urls.length !== 1) {
-          // zero PRs -> "none"; several -> withhold (never pick one silently)
-          const state = urls.length === 0 ? 'none' : 'unknown';
-          const payload = { state, number: null, checks: null, url: null };
-          return res.json({ ...payload, message: prStateCopy(payload) });
-        }
-        ref = { repo: urls[0].repo, number: urls[0].number, url: urls[0].url };
-        prStateStore.runRefs.set(refKey, ref);
+      // Re-resolve the run's PR URL on EVERY request (no run->PR pointer cache),
+      // so a PR posted after the first poll is seen on the next one. Only the
+      // repo allowlist (a tracker read) is cached, not the PR URL or its state.
+      const run = await prStateStore.loadRun(workspace.urlKey, runId);
+      if (!run || !run.issueIdentifier) {
+        return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
       }
+      const { provider, callScope } = prStateStore.resolveProvider(workspace, null);
+      const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
+      const allowlist = await prStateAllowlist(workspace, provider, callScope, nowMs);
+      // Through LIN-2949's run-evidence model, not a new parser.
+      const model = buildRunEvidence({
+        issueIdentifier: run.issueIdentifier,
+        comments,
+        allowlist,
+        evidenceUrls: run.evidenceUrls || [],
+        prStatus: null
+      });
+      const urls = (model.state && model.state.prUrls) || [];
+      if (urls.length !== 1) {
+        // zero PRs -> "none"; several -> withhold (never pick one silently)
+        const state = urls.length === 0 ? 'none' : 'unknown';
+        const payload = { state, number: null, checks: null, url: null };
+        return res.json({ ...payload, message: prStateCopy(payload) });
+      }
+      const ref = { repo: urls[0].repo, number: urls[0].number, url: urls[0].url };
       const payload = await readPrState(ref, nowMs);
       return res.json({ ...payload, message: prStateCopy(payload) });
     } catch (error) {
