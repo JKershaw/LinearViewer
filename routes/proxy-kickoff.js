@@ -136,7 +136,7 @@ export function createKickoffRoutes({
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks, maxSessionsPerTask } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, issueSource, issueBindingScope, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks, maxSessionsPerTask } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -277,7 +277,12 @@ export function createKickoffRoutes({
       let issue = null;
       let resolvedRepo = repo || null;
       if (issueIdentifier) {
-        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
+        // LIN-3242 (LIN-3126 §4): a scoped kickoff forwards the row's binding
+        // selector pair into the seam when the body supplies one; otherwise
+        // `selector` stays absent and the seam's query-selector fallback is
+        // preserved. Selection-only — the credential is the Connection's.
+        const issueBindingSelector = (issueSource != null || issueBindingScope != null) ? { source: issueSource, bindingScope: issueBindingScope } : undefined;
+        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
         // LIN-1980: stamp before any other logic (incl. the !accessToken early
         // return below) so the fingerprint is present even when this request
         // later 401s from a shared credential another site marked suspect.
@@ -464,7 +469,12 @@ export function createKickoffRoutes({
           maxTasks: maxTasks ?? null,
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks —
           // stored on the run row so the dispatch-factory seam can enforce it.
-          maxSessionsPerTask: maxSessionsPerTask ?? null
+          maxSessionsPerTask: maxSessionsPerTask ?? null,
+          // LIN-3242 (LIN-3126 §4): a scoped kickoff's seam-resolved binding
+          // selector pair. Null for a goal-only run; the STORE persists it
+          // SPARSELY, so an unstamped run row adds no key.
+          issueSource: issueSource ?? null,
+          issueBindingScope: issueBindingScope ?? null
         }
       });
 

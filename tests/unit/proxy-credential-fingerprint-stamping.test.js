@@ -129,7 +129,10 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // LIN-679 Stage 6 (LIN-2540) — three-way split, part 3 of 3, closing: the
     // last direct site (group I recommend-and-dispatch) moved to
     // routes/proxy-dispatch.js, so routes/proxy.js now has 0.
-    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req, \{ intent: [^}]*\}\);/g;
+    // LIN-3242: the intent argument may now carry a trailing `...(selector)`
+    // spread on the dispatch/kickoff sites, so the match spans to the statement
+    // terminator rather than a brace-excluding character class.
+    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req, \{ intent: [\s\S]*?\}\);/g;
     const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
     const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
     const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
