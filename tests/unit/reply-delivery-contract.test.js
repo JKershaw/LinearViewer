@@ -764,6 +764,7 @@ test('F2: recordOnly takes effect BEFORE the issueless dispatch-only path — an
 test('deliverRulingAnswer effect=dispatch (gone default): comment first, then a FRESH composed run — never the follow-up dispatch shape', async () => {
   const commentBodies = [];
   const { window, calls } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) return jsonResponse(true, 200, { hydrated: true, state: { name: 'In Progress', type: 'started' } });
     if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
     throw new Error('a dispatch effect must not use the follow-up /api/dispatch call: ' + url);
   });
@@ -777,7 +778,8 @@ test('deliverRulingAnswer effect=dispatch (gone default): comment first, then a 
   );
 
   assert.equal(calls.filter(c => String(c.url).includes('/api/comments/')).length, 1, 'exactly one comment write');
-  assert.equal(calls.length, 1, 'the fresh run goes through window.dispatchPrompt, not a raw /api/dispatch fetch');
+  assert.equal(calls.filter(c => String(c.url).includes('/api/dashboard/hydrate/')).length, 1, 'the press-time anchor check ran first (G1)');
+  assert.equal(calls.filter(c => String(c.url).includes('/api/dispatch')).length, 0, 'the fresh run goes through window.dispatchPrompt, not a raw /api/dispatch fetch');
   assert.match(commentBodies[0].url, /\/api\/comments\/anchor-1$/);
   assert.deepEqual(commentBodies[0].body, { body: 'the answer', decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1' });
   assert.ok(dispatched, 'a fresh run was started');
@@ -795,6 +797,7 @@ test('deliverRulingAnswer effect=dispatch (gone default): comment first, then a 
 
 test('deliverRulingAnswer effect=dispatch: comment lands but the fresh run fails — durable partial failure with a retry that re-fires ONLY the run', async () => {
   const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) return jsonResponse(true, 200, { hydrated: true, state: { name: 'In Progress', type: 'started' } });
     if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
     throw new Error('unexpected fetch: ' + url);
   });
@@ -812,10 +815,90 @@ test('deliverRulingAnswer effect=dispatch: comment lands but the fresh run fails
   );
 
   assert.equal(fired.onPartialFailure.length, 1, 'the answer is durable; only the run failed');
-  assert.equal(calls.length, 1, 'the comment is written exactly once');
+  assert.equal(calls.filter(c => String(c.url).includes('/api/comments/')).length, 1, 'the comment is written exactly once');
   await fired.onPartialFailure[0].retry();
   assert.equal(dispatchCalls, 2, 'retry re-fires the run');
-  assert.equal(calls.length, 1, 'retry never re-posts the comment');
+  assert.equal(calls.filter(c => String(c.url).includes('/api/comments/')).length, 1, 'retry never re-posts the comment');
+  assert.equal(calls.length, 2, 'only the hydrate + the single comment were fetched (retry uses window.dispatchPrompt)');
+});
+
+test('G1: a dispatch effect on a TERMINAL anchor downgrades to record — no run started, with the note', async () => {
+  const commentBodies = [];
+  const { window, calls } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) return jsonResponse(true, 200, { hydrated: true, state: { name: 'Done', type: 'completed' } });
+    if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
+    throw new Error('a terminal anchor must never dispatch: ' + url);
+  });
+  let dispatched = false;
+  window.dispatchPrompt = async () => { dispatched = true; return { id: 'run-1' }; };
+  const notes = [];
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'dispatch', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', target: 'cli', decisionLoopId: 'lp', decisionId: 'd-gone', prompt: 'the answer', dispatchPrompt: 'composed' },
+    { onCommentFailed: () => { throw new Error('comment should have succeeded'); }, onPartialFailure: () => {}, onDispatchOk: (n) => notes.push(n || null) }
+  );
+
+  assert.equal(dispatched, false, 'no fresh run onto a closed task');
+  assert.equal(commentBodies.length, 1, 'the answer is recorded instead');
+  assert.match(commentBodies[0].url, /\/api\/comments\/anchor-1$/);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0] || '', /now closed/, 'the downgrade note is surfaced');
+  assert.equal(calls.filter(c => String(c.url).includes('/api/dashboard/hydrate/')).length, 1, 'the press-time check ran');
+});
+
+test('G1: a dispatch effect on a FAILED hydrate fails closed to record — no run started, with the note', async () => {
+  const commentBodies = [];
+  const { window } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) return Promise.reject(new TypeError('Failed to fetch'));
+    if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
+    throw new Error('a failed hydrate must not dispatch: ' + url);
+  });
+  let dispatched = false;
+  window.dispatchPrompt = async () => { dispatched = true; return { id: 'run-1' }; };
+  const notes = [];
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'dispatch', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', target: 'cli', decisionLoopId: 'lp', decisionId: 'd-gone', prompt: 'the answer', dispatchPrompt: 'composed' },
+    { onCommentFailed: () => { throw new Error('comment should have succeeded'); }, onPartialFailure: () => {}, onDispatchOk: (n) => notes.push(n || null) }
+  );
+
+  assert.equal(dispatched, false, 'a hydrate failure must never start a run');
+  assert.equal(commentBodies.length, 1, 'the answer is recorded instead');
+  assert.match(notes[0] || '', /could not confirm/, 'the hydration-failure note is surfaced');
+});
+
+test('G3: a declared resume on a non-resumable disposition is delivered as a fresh run, never a followUpTo', async () => {
+  const commentBodies = [];
+  const { window, calls } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) return jsonResponse(true, 200, { hydrated: true, state: { name: 'In Progress', type: 'started' } });
+    if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
+    throw new Error('a reaped resume must not use the follow-up dispatch: ' + url);
+  });
+  let dispatched = null;
+  window.dispatchPrompt = async (opts) => { dispatched = opts; return { id: 'run-1' }; };
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'resume', disposition: 'gone', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', followUpTo: 'reaped-loop', target: 'cli', decisionLoopId: 'lp', decisionId: 'd-gone', prompt: 'the answer', dispatchPrompt: 'composed' },
+    handlers
+  );
+
+  assert.ok(dispatched, 'handled as a fresh run');
+  assert.equal(commentBodies.length, 1);
+  assert.deepEqual({ ...dispatched.issue }, { id: 'anchor-1', identifier: 'LIN-ANCHOR' });
+  assert.equal(dispatched.followUpTo, undefined, 'never a followUpTo into the reaped loop');
+  assert.equal(calls.filter(c => String(c.url).includes('/api/dispatch')).length, 0, 'not the follow-up dispatch shape either');
+  assert.equal(fired.onDispatchOk.length, 1);
+});
+
+test('G4: an issueless dispatch refuses up front with the tab message — no comment, no run', async () => {
+  const { window, calls } = makeSandbox(() => { throw new Error('an issueless dispatch must make no fetch'); });
+  let noLinked = 0;
+  await window.ReplyDelivery.deliverRulingDispatch(
+    { urlKey: 'w', issueId: null, issueIdentifier: null, prompt: 'x', dispatchPrompt: 'c' },
+    { onCommentFailed: () => {}, onPartialFailure: () => {}, onDispatchOk: () => {}, onNoLinkedIssue: () => { noLinked++; } }
+  );
+
+  assert.equal(noLinked, 1, 'refused with the dedicated no-linked-issue handler');
+  assert.equal(calls.length, 0, 'no comment against an empty issue id, no run');
 });
 
 test('deliverRulingAnswer effect=record: comment only (no dispatch), honoring a declared record_on target', async () => {

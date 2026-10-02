@@ -101,18 +101,23 @@
       return recorded ? base + ' Recorded on the task.' : base;
     }
 
-    function onDispatchOk() {
+    function onDispatchOk(note) {
       appendYouBubble(thread, prompt);
       textarea.value = '';
       // The success copy matches what actually happened (LIN-3252 F1): a
       // resume queues a follow-up, a `record` effect only records, and a
-      // `dispatch` effect starts a fresh run.
+      // `dispatch` effect starts a fresh run. A dispatch whose press-time
+      // anchor check downgraded it to record (G1) arrives with a note — say so
+      // rather than claiming a run started.
       if (opts.effect === 'record') {
         feedback.textContent = 'recorded on the task';
         btn.textContent = 'answered ✓';
-      } else if (opts.effect === 'dispatch') {
+      } else if (opts.effect === 'dispatch' && !note) {
         feedback.textContent = 'started a new run';
         btn.textContent = 'started ✓';
+      } else if (opts.effect === 'dispatch') {
+        feedback.textContent = 'recorded on the task — ' + note;
+        btn.textContent = 'answered ✓';
       } else {
         feedback.textContent = queuedCopy(!opts.issueless);
         btn.textContent = 'queued ✓';
@@ -194,7 +199,16 @@
     window.ReplyDelivery.deliverRulingAnswer(opts, {
       onCommentFailed: onDispatchFailed,
       onDispatchFailed: onDispatchFailed,
-      onNoTarget: function () { onDispatchFailed(new Error('no linked issue to record against')); },
+      onNoTarget: function () {
+        feedback.textContent = 'cannot record a reply: no linked issue';
+        feedback.className = 'sess-reply-feedback error';
+        btn.textContent = 'failed';
+      },
+      onNoLinkedIssue: function () {
+        feedback.textContent = 'cannot start a fresh run: no linked issue';
+        feedback.className = 'sess-reply-feedback error';
+        btn.textContent = 'failed';
+      },
       onPartialFailure: onPartialFailure,
       onDispatchOk: onDispatchOk
     }).then(restoreButton);
@@ -433,6 +447,7 @@
           // a paused session — same force semantics as the per-run box (LIN-1252).
           force: card.dataset.disposition === 'resumable' || card.dataset.sessionWaiting === 'true',
           effect: effect,
+          disposition: card.dataset.disposition || '',
           recordOn: card.dataset.recordOn || null,
           sessionWaiting: card.dataset.sessionWaiting === 'true',
           issueId: card.dataset.issueId || issueIdentifier,
@@ -442,9 +457,10 @@
           decisionId: decisionId
         };
 
-        // The agent brief for a `dispatch` effect is composed from what the
+        // The agent brief a `dispatch` answer needs is composed from what the
         // card already renders (question + "why" chunks) through the SAME
-        // shared composer the Rulings tab uses — never a card-local copy.
+        // shared composer the Rulings tab uses — never a card-local copy. Built
+        // for every answer; the shared path ignores it on a resume/record.
         function composeDispatch(prompt) {
           var questionEl = card.querySelector('[data-testid="session-question-card-question"]');
           var chunkEls = card.querySelectorAll('[data-testid="session-question-card-why-chunk"]');
@@ -465,7 +481,7 @@
           }
           opts.optionId = chosen ? (chosen.dataset.optionId || null) : null;
           opts.prompt = prompt;
-          if (effect === 'dispatch') opts.dispatchPrompt = composeDispatch(prompt);
+          opts.dispatchPrompt = composeDispatch(prompt);
           sendReply(opts, btn, textarea, feedback, thread);
         }
 

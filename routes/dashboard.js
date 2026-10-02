@@ -403,19 +403,34 @@ export function deriveSessionWaiting(enrichedLoops) {
  *
  * Pure; exported for unit tests (mirrors `deriveSessionWaiting` above).
  *
+ * LIN-3252 G2: injects the SAME `liveDispatchOnAnchor` predicate the dashboard
+ * rulings feed (`:1830`) and `routes/proxy-rulings.js` use — a live run already
+ * on the anchor means `resolveEffect` branch 3, so a `gone` row answers
+ * `record`, never a second run racing the live one. The source here is the
+ * session's OWN loops (zero new reads); a live run in ANOTHER session on the
+ * same issue is not seen — the residual named in the PR.
+ *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
  * @param {{now?: Date}} [opts]
  * @returns {Array<Object>} `collectUnansweredDecisions` rows
  */
 export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
+  const loops = Array.isArray(enrichedLoops) ? enrichedLoops : [];
   return collectUnansweredDecisions(
     {
-      loops: Array.isArray(enrichedLoops) ? enrichedLoops : [],
+      loops,
       taskDecisions: [],
       shelvedRulings: [],
       newestScanByTask: {}
     },
-    { now: now instanceof Date ? now : new Date() }
+    {
+      now: now instanceof Date ? now : new Date(),
+      // Same shape as the rulings feed's predicate, including the null guard
+      // (LIN-2934): a null anchor must never match another null anchor.
+      liveDispatchOnAnchor: (issueIdentifier) =>
+        issueIdentifier != null &&
+        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+    }
   );
 }
 

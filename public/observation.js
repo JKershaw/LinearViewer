@@ -3025,23 +3025,6 @@ async function bulkAgreeSelected() {
   }
 }
 
-// Mirrors lib/providers/models.js's TERMINAL_TYPES. Duplicated, not
-// imported — this is a plain browser script with no bundler/ESM import, the
-// same tradeoff `REAP_INACTIVITY_MS` (lib/unanswered-decisions.js) already
-// documents for this exact codebase: a small, stable, rarely-changed
-// constant, drift risk accepted rather than routed around here.
-const RECORD_TARGET_TERMINAL_TYPES = ['completed', 'canceled', 'duplicate'];
-
-// The widened hydrate route's URL (LIN-2775 Areas 6/8) — shared by the
-// record_on resolution below and the press-time terminal-anchor check
-// further down; both fetch the SAME anchor identifier, just read different
-// fields off the same response shape (`neighborhood` vs. the top-level
-// `state`), which is exactly why the route was widened in one call rather
-// than split into two.
-function hydrateUrl(pageUrlKey, wsUrlKey, identifier) {
-  return `/workspace/${encodeURIComponent(pageUrlKey)}/api/dashboard/hydrate/${encodeURIComponent(wsUrlKey)}/${encodeURIComponent(identifier)}`;
-}
-
 // LIN-3252 F1: the pure record_on resolver and the composed-dispatch-prompt
 // builder now live in the ONE shared reply-delivery surface
 // (`window.ReplyDelivery`, public/common.js) so the run-page card and this
@@ -3056,11 +3039,6 @@ function resolveRecordTarget(anchor, recordOn, hydrateResult) {
 function composeDispatchPrompt(row, chosenAnswer) {
   return window.ReplyDelivery.composeDispatchPrompt(row, chosenAnswer);
 }
-
-// Press-time downgrade notes (LIN-2775 Area 8): honest about WHY, never
-// implying the operator's answer itself was invalid.
-const PRESS_TIME_DOWNGRADE_NOTE = 'the linked task is now closed — recorded instead of starting a run';
-const PRESS_TIME_HYDRATION_FAILURE_NOTE = 'could not confirm the linked task is still open — recorded instead of starting a run';
 
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
 // caller above already checks it — this is the second, structural guard);
@@ -3352,67 +3330,31 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       return deliverAsRecord(null);
     }
 
-    // Identifier-backed targeting (LIN-1728 review G1) — same root cause as
-    // F4 above, left in place on this sibling branch. `anchor.issueId` is
-    // null for essentially every autopilot-dispatched loop (recommend-and-
-    // dispatch never resolves a provider id); only `anchor.issueIdentifier`
-    // is guaranteed present. Gating on the raw id alone stranded every such
-    // `gone` ruling as "no linked issue" even though the row displays its
-    // identifier. Both call sites below must fall back to the identifier
-    // too, mirroring the `resumable` branch's `issueId || issueIdentifier`.
-    // Checked BEFORE the Area 8 press-time hydrate call below (not just
-    // before the eventual dispatch): with no issueIdentifier at all there is
-    // nothing to hydrate, so this refusal is unaffected by, and unreachable
-    // through, that check.
-    if (!anchor.issueIdentifier) {
-      console.error('Ruling reply: no issue to start a fresh run against, cannot reply for a gone session');
-      restore();
-      setFeedback('cannot start a fresh run: no linked issue', true);
-      return Promise.resolve();
-    }
-
-    // LIN-2775 Area 8 — press-time check. Before this dispatch-effect row
-    // actually composes and sends anything, read the anchor's own current
-    // `state.type` via the SAME widened hydrate route Area 6 uses. Two
-    // outcomes, both specified, neither left implicit: DISAGREEMENT (the
-    // anchor is now terminal) downgrades to record in place; a HYDRATION
-    // FAILURE — every failure mode (no_token/not_found/unavailable)
-    // swallowed identically — fails CLOSED to record too, with the same
-    // visible-note pattern. Never silently dispatch, never silently do
-    // nothing: both outcomes route through `deliverAsRecord` above, so a
-    // downgraded press still comments, stamps, and clears the row.
-    return window.api(hydrateUrl(pageUrlKey, targetUrlKey, anchor.issueIdentifier), { on401: false })
-      .catch(() => ({ hydrated: false, reason: 'unavailable' }))
-      .then((hydrateResult) => {
-        if (!hydrateResult || !hydrateResult.hydrated) {
-          return deliverAsRecord(PRESS_TIME_HYDRATION_FAILURE_NOTE);
-        }
-        const isTerminal = !!(hydrateResult.state && RECORD_TARGET_TERMINAL_TYPES.includes(hydrateResult.state.type));
-        if (isTerminal) {
-          return deliverAsRecord(PRESS_TIME_DOWNGRADE_NOTE);
-        }
-
-        // LIN-3252 F1: the fresh-run delivery is the ONE shared helper
-        // (`window.ReplyDelivery.deliverRulingDispatch`) the run-page card
-        // also uses — comment first (stamping the decision), then the
-        // composed fresh issue-scoped dispatch, with the SAME partial-failure
-        // retry the `resumable` branch above has.
-        return window.ReplyDelivery.deliverRulingDispatch({
-          urlKey: targetUrlKey,
-          issueId: anchor.issueId || anchor.issueIdentifier,
-          issueIdentifier: anchor.issueIdentifier,
-          target: anchor.target || 'cli',
-          decisionLoopId,
-          decisionId,
-          optionId,
-          prompt,
-          dispatchPrompt: composeDispatchPrompt(row, prompt)
-        }, {
-          onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
-          onPartialFailure: makePartialFailureHandler('start a run'),
-          onDispatchOk: onDelivered
-        });
-      });
+    // LIN-3252 G1/G4: the fresh-run delivery is the ONE shared helper the
+    // run-page card also uses. It now owns the press-time anchor check (a
+    // terminal anchor, or a failed hydrate, records instead of dispatching)
+    // and the no-issue refusal, so this tab and the card share one guarded
+    // route. `issueId` falls back to the identifier for targeting; the guard
+    // itself keys on `issueIdentifier`.
+    return window.ReplyDelivery.deliverRulingDispatch({
+      urlKey: targetUrlKey,
+      pageUrlKey,
+      issueId: anchor.issueId || anchor.issueIdentifier,
+      issueIdentifier: anchor.issueIdentifier,
+      target: anchor.target || 'cli',
+      decisionLoopId,
+      decisionId,
+      optionId,
+      prompt,
+      dispatchPrompt: composeDispatchPrompt(row, prompt),
+      recordOn: decision?.on_answer?.record_on || null
+    }, {
+      onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
+      onPartialFailure: makePartialFailureHandler('start a run'),
+      onDispatchOk: onDelivered,
+      onNoTarget: () => { console.error('Ruling reply: no issue to record a comment against, cannot reply for an anchorless run'); restore(); setFeedback('cannot record a reply: no linked issue', true); },
+      onNoLinkedIssue: () => { console.error('Ruling reply: no issue to start a fresh run against, cannot reply for a gone session'); restore(); setFeedback('cannot start a fresh run: no linked issue', true); }
+    });
   }
 
   if (disposition === 'task-bound') {
@@ -4397,8 +4339,6 @@ if (typeof module !== 'undefined' && module.exports) {
     // response with no DOM/network; the note constants and dispatch markers
     // live on window.ReplyDelivery now that both surfaces share them.
     resolveRecordTarget, composeDispatchPrompt,
-    // LIN-2775 Area 8: the press-time check seam.
-    PRESS_TIME_DOWNGRADE_NOTE, PRESS_TIME_HYDRATION_FAILURE_NOTE, hydrateUrl,
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.

@@ -4340,15 +4340,16 @@ describe('GET /observation/session/:sessionId — waiting banner clears after a 
 // decision is subtracted and never reappears. The card RENDER is Beat 2; these pin
 // only the read path.
 describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', () => {
-  function decisionLoop({ loopId, decisionId, terminalStatus = null, answeredDecisions = [] }) {
+  function decisionLoop({ loopId, decisionId, terminalStatus = null, agentState = undefined, issueIdentifier = 'LIN-1', answeredDecisions = [] }) {
     return {
       loopId,
       lineageId: loopId,
       workspaceUrlKey: 'ws-a',
-      issueIdentifier: 'LIN-1',
+      issueIdentifier,
       target: 'cli',
       dispatchedAt: NOW_ISO,
       terminalStatus,
+      agentState,
       decision: { decision_id: decisionId, question: 'Proceed with the migration?', options: [{ id: 'yes', label: 'Yes' }] },
       decisionCase: ['The migration is reversible.'],
       answeredDecisions
@@ -4374,6 +4375,33 @@ describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', (
       { now: new Date() }
     );
     assert.equal(rows.length, 0, 'the answered decision is subtracted by the predicate');
+  });
+
+  test('G2: a gone row with a LIVE run on its anchor resolves effect "record" — the card must not race it', () => {
+    // The decision's own loop is terminal (gone: past the reap window), and a
+    // SEPARATE live loop in the same session carries the same issue — the same
+    // `liveDispatchOnAnchor` predicate the dashboard rulings feed injects.
+    const gone = decisionLoop({ loopId: 'l-gone', decisionId: 'd-gone', terminalStatus: 'done', agentState: 'complete' });
+    const liveOnAnchor = {
+      loopId: 'l-live', lineageId: 'l-live', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone, liveOnAnchor], { now: new Date() });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone');
+    assert.ok(row, 'the gone decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'record', 'a live run on the anchor overrides dispatch with record (resolveEffect branch 3)');
+  });
+
+  test('G2: a gone row with NO live run on its anchor still resolves effect "dispatch"', () => {
+    const gone = decisionLoop({ loopId: 'l-gone', decisionId: 'd-gone', terminalStatus: 'done', agentState: 'complete' });
+    const otherIssue = {
+      loopId: 'l-other', lineageId: 'l-other', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-2', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone, otherIssue], { now: new Date() });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone');
+    assert.equal(row.effect, 'dispatch', 'a live run on a DIFFERENT issue does not suppress dispatch');
   });
 
   test('no task-decisions input means a scan-sourced task-bound ruling stays out', () => {
