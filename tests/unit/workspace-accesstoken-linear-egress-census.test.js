@@ -55,7 +55,15 @@ function count(source, pattern) {
   return (source.match(pattern) || []).length;
 }
 
-// LIN-3219 A3 helpers (pure over `{file, src}` / source, so witnesses can plant).
+// LIN-3219 A3 (M19): the retired count literals are gone. The scanners below are
+// the SINGLE shared implementations the LIVE test and its planted witness both
+// call, so neutering a scanner fails the witness even when the live tree has no
+// offender to find. Relations, not counts.
+
+const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', 'routes/workspace-api.js', 'server.js'];
+const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/proxy-reads.js'];
+
+/** Offender lines: `new GraphQLClient(` not statically Linear-bound. */
 function nonLinearGraphQLSites(files) {
   const out = [];
   for (const [f, src] of files) {
@@ -66,6 +74,11 @@ function nonLinearGraphQLSites(files) {
   return out;
 }
 
+function graphqlClientSiteCount(files) {
+  return files.reduce((n, [, src]) => n + count(src, /new GraphQLClient\(/g), 0);
+}
+
+/** Offender lines: a Linear asset-host allowlist that forgets cdn.linear.app. */
 function loneAssetHostLines(files) {
   const out = [];
   for (const [f, src] of files) {
@@ -76,6 +89,11 @@ function loneAssetHostLines(files) {
   return out;
 }
 
+function assetHostSiteCount(files) {
+  return files.reduce((n, [, src]) => n + count(src, /'uploads\.linear\.app'/g), 0);
+}
+
+/** workspace-api.js: guards must equal the credential-egress sites they protect. */
 function guardCoverageOffenders(source) {
   const guards = (source.match(/isActiveProviderLinear\(workspace\)/g) || []).length;
   const egress = source.split('\n').filter((l) => /\brunAudit\(/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)).length
@@ -93,29 +111,61 @@ function routeFiles() {
     .map((n) => `routes/${n}`);
 }
 
-function unguardedRunAuditCallers(files) {
-  const out = [];
-  for (const [f, src] of files) if (/\brunAudit\(/.test(src) && !/isActiveProviderLinear\(workspace\)/.test(src)) out.push(f);
-  return out.sort();
-}
-
-function unguardedMirrorBearerFiles(files) {
-  const out = [];
-  for (const [f, src] of files) if (MIRROR_BEARER_RE.test(src) && !/isActiveProviderLinear\(workspace\)/.test(src)) out.push(f);
-  return out.sort();
-}
-
-function tokenCallerFiles(files) {
-  return [...files].filter(([, src]) => /\bgetWorkspaceAccessToken\(/.test(src)).map(([f]) => f).sort();
-}
-
-/** Readers of getWorkspaceAccessToken( that do NOT receive it as an injected dep. */
-function uninjectedTokenReaders(files) {
+/** PER-OCCURRENCE: every runAudit( call site must carry the provider guard above it. */
+function unguardedRunAuditCallSites(files) {
   const out = [];
   for (const [f, src] of files) {
-    if (/\bgetWorkspaceAccessToken\(/.test(src) && !/getWorkspaceAccessToken\s*[,=]/.test(src)) out.push(f);
+    const lines = src.split('\n');
+    lines.forEach((line, i) => {
+      if (!/\brunAudit\(/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) return;
+      const window = lines.slice(Math.max(0, i - 8), i).join('\n');
+      if (!/isActiveProviderLinear\(workspace\)/.test(window)) out.push(`${f}:${i + 1}`);
+    });
   }
   return out.sort();
+}
+
+/** PER-OCCURRENCE: every raw-mirror Bearer template must be guarded near it. */
+function unguardedMirrorBearerSites(files) {
+  const out = [];
+  for (const [f, src] of files) {
+    const lines = src.split('\n');
+    lines.forEach((line, i) => {
+      if (!MIRROR_BEARER_RE.test(line)) return;
+      const window = lines.slice(Math.max(0, i - 4), i + 1).join('\n');
+      if (!/isActiveProviderLinear\(workspace\)/.test(window)) out.push(`${f}:${i + 1}`);
+    });
+  }
+  return out.sort();
+}
+
+/**
+ * PER CALL SITE: every `getWorkspaceAccessToken(` hydration read must be consumed
+ * by a `fetchIssueContext(` in the same file. The DI pass-through wrapper
+ * (`getWorkspaceAccessToken: (k) => getWorkspaceAccessToken(k, session)`) is not
+ * a hydration read and is excluded. A fresh hydration read in a file that
+ * already receives the dep (the module-granular weakness) now breaks the balance.
+ */
+function tokenHydrationOffenders(files) {
+  const out = [];
+  for (const [f, src] of files) {
+    const reads = count(src, /\bgetWorkspaceAccessToken\(/g);
+    const wrappers = count(src, /getWorkspaceAccessToken\s*:\s*\([^)]*\)\s*=>\s*getWorkspaceAccessToken\(/g);
+    const hydration = reads - wrappers;
+    if (hydration === 0) continue;
+    const fetches = count(src, /\bfetchIssueContext\(/g);
+    if (hydration !== fetches) out.push(`${f}: ${hydration} getWorkspaceAccessToken( hydration read(s) vs ${fetches} fetchIssueContext( consumption(s)`);
+  }
+  return out;
+}
+
+/** resolveWorkspaceAccess( occurrences outside the resolveProviderAccess chokepoint. */
+function resolveOutsideChokepointSites(src) {
+  const start = src.indexOf('async function resolveProviderAccess');
+  if (start < 0) return ['resolveProviderAccess not found'];
+  const end = src.indexOf('\n  }', start);
+  const sites = [...src.matchAll(/await resolveWorkspaceAccess\(/g)].map((m) => m.index);
+  return sites.filter((i) => i < start || i > end);
 }
 
 // =============================================================================
@@ -144,26 +194,13 @@ function uninjectedTokenReaders(files) {
 //
 // A FIFTH mechanism means a new egress shape that needs its own provider guard.
 
-const GRAPHQL_CLIENT_FILES = ['lib/audit.js', 'lib/providers/linear/index.js', 'routes/proxy.js', 'routes/workspace-api.js', 'server.js'];
-const KNOWN_GRAPHQL_CLIENT_COUNT = 2;
-
-// The two raw-fetch asset relays, anchored by the host allowlist that gates each.
-// routes/proxy-reads.js (LIN-679 Stage 3a / LIN-2536): the attachment relay
-// moved out of routes/proxy.js — widen the file set, never relax the count.
-const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/proxy-reads.js'];
-const KNOWN_ASSET_RELAY_COUNT = 2;
-
 describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', () => {
   test('every GraphQL client construction in the scoped files is statically Linear-bound (no count)', () => {
     // Boundary rule (LIN-3219 A3): a GraphQL client here may only be constructed
     // against the Linear endpoint — anything else would be an unrelated egress.
-    const sites = GRAPHQL_CLIENT_FILES.flatMap((f) => read(f).split('\n')
-      .filter((l) => l.includes('new GraphQLClient('))
-      .map((l) => ({ f, l })));
-    assert.ok(sites.length > 0, 'a zero-client scan would be vacuous');
-    const offenders = sites
-      .filter(({ l }) => !/api\.linear\.app|LINEAR_API_ENDPOINT/.test(l))
-      .map(({ f, l }) => `${f}: ${l.trim()}`);
+    const files = GRAPHQL_CLIENT_FILES.map((f) => [f, read(f)]);
+    assert.ok(graphqlClientSiteCount(files) > 0, 'a zero-client scan would be vacuous');
+    const offenders = nonLinearGraphQLSites(files);
     assert.deepEqual(offenders, [], `non-Linear GraphQL client construction(s): ${offenders.join(' | ')}`);
   });
 
@@ -176,9 +213,8 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
     // Boundary rule (LIN-3219 A3): a relay's host allowlist is the one shape
     // (`uploads` + `cdn`), so a stray single-host allowlist is an offender.
     const files = ASSET_RELAY_FILES.map((f) => [f, read(f)]);
-    const sites = files.flatMap(([f, src]) => src.split('\n').filter((l) => l.includes("'uploads.linear.app'")).map((l) => ({ f, l })));
-    assert.ok(sites.length > 0, 'a zero-relay scan would be vacuous');
-    const offenders = sites.filter(({ l }) => !l.includes("'cdn.linear.app'")).map(({ f, l }) => `${f}: ${l.trim()}`);
+    assert.ok(assetHostSiteCount(files) > 0, 'a zero-relay scan would be vacuous');
+    const offenders = loneAssetHostLines(files);
     assert.deepEqual(offenders, [], `lone uploads.linear.app allowlists: ${offenders.join(' | ')}`);
   });
 
@@ -211,63 +247,64 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
 // (see its header) and excluded by path.
 
 describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
-  test('every route file calling runAudit( guards with isActiveProviderLinear(space) (no count)', () => {
-    // Boundary rule (LIN-3219 A3): runAudit goes straight to a Linear GraphQL
-    // client, so any route file that calls it must carry the provider guard.
-    const callers = routeFiles().filter((f) => /\brunAudit\(/.test(read(f)));
-    assert.ok(callers.length > 0, 'a zero-caller scan would be vacuous');
-    const offenders = callers.filter((f) => !/isActiveProviderLinear\(workspace\)/.test(read(f)));
-    assert.deepEqual(offenders, [], `runAudit( callers without the provider guard: ${offenders.join(', ')}`);
+  const routeFileEntries = () => routeFiles().map((f) => [f, read(f)]);
+  const runAuditCallSiteCount = (files) => files.reduce((n, [, src]) => n
+    + src.split('\n').filter((l) => /\brunAudit\(/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)).length, 0);
+
+  test('every route file calling runAudit( guards with isActiveProviderLinear(space), per call site (no count)', () => {
+    // PER-OCCURRENCE (LIN-3219 A3): runAudit goes straight to a Linear GraphQL
+    // client, so every call site must carry the provider guard above it — a
+    // fresh site in an already-guarded file no longer rides on the file's guard.
+    const files = routeFileEntries();
+    assert.ok(runAuditCallSiteCount(files) > 0, 'a zero-caller scan would be vacuous');
+    const offenders = unguardedRunAuditCallSites(files);
+    assert.deepEqual(offenders, [], `runAudit( call sites without the provider guard: ${offenders.join(', ')}`);
   });
 
-  test('WITNESS: a runAudit( caller without the guard fails', () => {
-    const offenders = unguardedRunAuditCallers(new Map([['routes/zz-audit.js', 'const r = await runAudit(getWorkspaceMirrorToken(workspace));\n']]));
-    assert.ok(offenders.includes('routes/zz-audit.js'), `expected routes/zz-audit.js, got ${JSON.stringify(offenders)}`);
+  test('WITNESS: a runAudit( call site without the guard fails', () => {
+    const offenders = unguardedRunAuditCallSites(new Map([['routes/zz-audit.js', 'const r = await runAudit(getWorkspaceMirrorToken(workspace));\n']]));
+    assert.ok(offenders.includes('routes/zz-audit.js:1'), `expected routes/zz-audit.js:1, got ${JSON.stringify(offenders)}`);
   });
 
-  test('every raw-mirror Bearer template is in a file that guards with isActiveProviderLinear(space) (no count)', () => {
-    // Boundary rule (LIN-3219 A3): a raw-mirror Bearer template must sit in a
-    // file that carries the provider guard. The scanner matches either the
-    // legacy inline read or the S0 accessor.
-    const files = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/dashboard.js'];
-    const holders = files.filter((f) => MIRROR_BEARER_RE.test(read(f)));
-    assert.ok(holders.length > 0, 'a zero-Bearer scan would be vacuous');
-    const offenders = holders.filter((f) => !/isActiveProviderLinear\(workspace\)/.test(read(f)));
+  test('every raw-mirror Bearer template is guarded with isActiveProviderLinear(space) near it (no count)', () => {
+    // PER-OCCURRENCE (LIN-3219 A3): each raw-mirror Bearer template must sit
+    // near the provider guard. The scanner matches either the legacy inline read
+    // or the S0 accessor.
+    const files = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/dashboard.js'].map((f) => [f, read(f)]);
+    assert.ok(files.some(([, src]) => MIRROR_BEARER_RE.test(src)), 'a zero-Bearer scan would be vacuous');
+    const offenders = unguardedMirrorBearerSites(files);
     assert.deepEqual(offenders, [], `raw-mirror Bearer templates without the provider guard: ${offenders.join(', ')}`);
   });
 
-  test('WITNESS: a raw-mirror Bearer template in an unguarded file fails', () => {
-    const offenders = unguardedMirrorBearerFiles(new Map([['routes/zz-mirror.js', 'Authorization: `Bearer ${getWorkspaceMirrorToken(workspace)}`\n']]));
-    assert.ok(offenders.includes('routes/zz-mirror.js'), `expected routes/zz-mirror.js, got ${JSON.stringify(offenders)}`);
+  test('WITNESS: a raw-mirror Bearer template with no guard fails', () => {
+    const offenders = unguardedMirrorBearerSites(new Map([['routes/zz-mirror.js', 'Authorization: `Bearer ${getWorkspaceMirrorToken(workspace)}`\n']]));
+    assert.ok(offenders.includes('routes/zz-mirror.js:1'), `expected routes/zz-mirror.js:1, got ${JSON.stringify(offenders)}`);
   });
 
   test('every resolveWorkspaceAccess( in routes/proxy.js is inside resolveProviderAccess (no count)', () => {
     const src = read('routes/proxy.js');
-    const start = src.indexOf('async function resolveProviderAccess');
-    const end = src.indexOf('\n  }', start);
-    assert.ok(start >= 0 && end > start, 'resolveProviderAccess not found');
     const sites = [...src.matchAll(/await resolveWorkspaceAccess\(/g)].map((m) => m.index);
     assert.ok(sites.length > 0, 'a zero-resolve scan would be vacuous');
-    const outside = sites.filter((i) => i < start || i > end);
+    const outside = resolveOutsideChokepointSites(src);
     assert.deepEqual(outside, [], `resolveWorkspaceAccess( outside the chokepoint at offsets ${JSON.stringify(outside)}`);
   });
 
-  test('every getWorkspaceAccessToken( reader receives it as an injected dependency (no per-file counts)', () => {
-    // Boundary rule (LIN-3219 A3): the symbol is module-private to server.js and
-    // injected into route factories, so a reader that does not receive it as a
-    // dependency (no `getWorkspaceAccessToken,`/`=`) is an offender.
-    const readers = routeFiles().filter((f) => /\bgetWorkspaceAccessToken\(/.test(read(f)));
-    assert.ok(readers.length > 0, 'a zero-reader scan would be vacuous');
-    assert.deepEqual(uninjectedTokenReaders(readers.map((f) => [f, read(f)])), [], 'readers without the injected dependency');
+  test('every getWorkspaceAccessToken( hydration read is balanced by a fetchIssueContext( consumption, per call site', () => {
+    // PER CALL SITE (LIN-3219 A3): the file-level "mentions the injected dep"
+    // rule accepted a fresh hydration read. Each hydration read must now be
+    // consumed by a fetchIssueContext( in the same file; the DI pass-through
+    // wrapper is excluded (it is not a hydration read).
+    const files = routeFileEntries();
+    assert.ok(files.some(([, src]) => /\bgetWorkspaceAccessToken\(/.test(src)), 'a zero-reader scan would be vacuous');
+    const offenders = tokenHydrationOffenders(files);
+    assert.deepEqual(offenders, [], `unbalanced hydration reads: ${offenders.join(', ')}`);
   });
 
-  test('WITNESS: a resolveWorkspaceAccess( outside the chokepoint, and a getWorkspaceAccessToken( reader without the dep, both fail', () => {
+  test('WITNESS: a resolveWorkspaceAccess( outside the chokepoint, and an extra hydration read in an already-injected file, both fail', () => {
     const src = read('routes/proxy.js') + '\nconst t = await resolveWorkspaceAccess(req.proxyUrlKey);\n';
-    const start = src.indexOf('async function resolveProviderAccess');
-    const end = src.indexOf('\n  }', start);
-    const outside = [...src.matchAll(/await resolveWorkspaceAccess\(/g)].map((m) => m.index).filter((i) => i < start || i > end);
-    assert.ok(outside.length > 0, 'the planted out-of-chokepoint resolve must be an offender');
-    const offenders = uninjectedTokenReaders(new Map([['routes/zz-token.js', 'const t = await getWorkspaceAccessToken(k, req.session);\n']]));
-    assert.ok(offenders.includes('routes/zz-token.js'), `expected routes/zz-token.js, got ${JSON.stringify(offenders)}`);
+    assert.ok(resolveOutsideChokepointSites(src).length > 0, 'the planted out-of-chokepoint resolve must be an offender');
+    const dash = read('routes/dashboard.js') + '\nasync function _extra(wsUrlKey) { return getWorkspaceAccessToken(wsUrlKey); }\n';
+    const offenders = tokenHydrationOffenders([['routes/dashboard.js', dash]]);
+    assert.ok(offenders.some((o) => o.startsWith('routes/dashboard.js:')), `expected the planted extra read, got ${JSON.stringify(offenders)}`);
   });
 });

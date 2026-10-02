@@ -1240,24 +1240,27 @@ describe('owner-backfill wiring and source census (LIN-3142 G13)', () => {
     }
   });
 
-  // LIN-3219 A3: boundary rule on WHERE the identity literal may occur.
+  // LIN-3219 A3: boundary rule on WHERE the identity literal may occur. The
+  // live filesystem walk and the planted witness both call this ONE function,
+  // so neutering the filter fails the witness (which has a real offender to
+  // find), not just the live tree (which has none).
+  function identityLiteralHolders(files) {
+    return [...files].filter(([, src]) => src.includes(PIN_LINEAR_SCOPE)).map(([rel]) => rel).sort();
+  }
+
   test('the identity literal value occurs only in lib/owner-backfill.js (boundary, not a count)', () => {
     const root = fileURLToPath(new URL('../../', import.meta.url));
-    const files = [];
+    const files = new Map();
     const walk = (abs) => {
       for (const e of readdirSync(abs, { withFileTypes: true })) {
         const full = join(abs, e.name);
         if (e.isDirectory()) walk(full);
-        else if (e.name.endsWith('.js')) files.push(full);
+        else if (e.name.endsWith('.js')) files.set(relative(root, full), readFileSync(full, 'utf8'));
       }
     };
     for (const rel of ['lib', 'routes']) walk(join(root, rel));
-    files.push(SERVER_PATH);
-    const holders = files
-      .filter((f) => readFileSync(f, 'utf8').includes(PIN_LINEAR_SCOPE))
-      .map((f) => relative(root, f))
-      .sort();
-    assert.deepEqual(holders, ['lib/owner-backfill.js']);
+    files.set(relative(root, SERVER_PATH), readFileSync(SERVER_PATH, 'utf8'));
+    assert.deepEqual(identityLiteralHolders(files), ['lib/owner-backfill.js']);
   });
 
   test('WITNESS: the identity literal planted in a non-permitted file fails the boundary', () => {
@@ -1265,7 +1268,7 @@ describe('owner-backfill wiring and source census (LIN-3142 G13)', () => {
       ['lib/owner-backfill.js', readFileSync(MODULE_PATH, 'utf8')],
       ['lib/zz-leak.js', `const leak = '${PIN_LINEAR_SCOPE}';\n`],
     ]);
-    const holders = [...planted].filter(([, s]) => s.includes(PIN_LINEAR_SCOPE)).map(([f]) => f).sort();
+    const holders = identityLiteralHolders(planted);
     assert.ok(holders.includes('lib/zz-leak.js'), `expected lib/zz-leak.js in ${JSON.stringify(holders)}`);
     assert.notDeepEqual(holders, ['lib/owner-backfill.js']);
   });

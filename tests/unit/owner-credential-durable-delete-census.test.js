@@ -62,70 +62,83 @@ function read(relPath) {
   return readFileSync(join(repoRoot, relPath), 'utf8');
 }
 
-// LIN-3219 A3 (M19): the numeric durable-delete total is gone. The relation is
-// a BOUNDARY on which modules may call the durable-delete verbs: every module
-// that calls `ownerCredentialStore.delete(`/`deleteAll(` must also evict the
-// session cache. A teardown module that durable-deletes without evicting fails.
+// LIN-3219 A3 (M19): the numeric durable-delete total is gone, and the rule is
+// PER OCCURRENCE rather than per module. The old boundary ("every module that
+// durable-deletes also evicts somewhere") accepted a fresh unguarded delete in
+// a module that already evicted elsewhere. Each `ownerCredentialStore.delete(`
+// / `deleteAll(` is now checked on its own: it must sit on a guarded teardown
+// statement (a definitive-revocation / actual-unlink / deleteDurable guard, or
+// the optional-credential-store guard), so a new delete added without a guard
+// fails with no number to bump. The durable-delete is intentionally NOT paired
+// with a session cache eviction: routes/workspace.js pairs them, but
+// server.js's unlink route legitimately revokes a partition with no cache
+// eviction at all — the guard, not the eviction, is the per-occurrence contract.
 const DURABLE_DELETE_RE = /\bownerCredentialStore\.delete(All)?\(/g;
-const EVICT_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/g;
+const DURABLE_GUARD_RE = /if \(isDefinitiveRevocation\(|if \(bindingRemoved\)|if \(removedWorkspace && deleteDurable\)|if \(ownerCredentialStore\)/;
 
 function productionSources() {
-  const files = [
-    'server.js',
+  return new Map([
+    ['server.js', read('server.js')],
     ...readdirSync(join(repoRoot, 'routes'))
       .filter((n) => n.endsWith('.js') && n !== 'test.js')
-      .map((n) => `routes/${n}`),
-  ];
-  return new Map(files.map((rel) => [rel, readFileSync(join(repoRoot, rel), 'utf8')]));
+      .map((n) => [`routes/${n}`, read(`routes/${n}`)]),
+  ]);
 }
 
-function modulesMatching(sources, re) {
+/** All match offsets of a global regex in `source` (lastIndex is reset). */
+function matchPositions(source, re) {
   const out = [];
-  const stateless = new RegExp(re.source, re.flags.replace('g', ''));
-  for (const [rel, src] of sources) if (stateless.test(src)) out.push(rel);
-  return out.sort();
+  let m;
+  re.lastIndex = 0;
+  while ((m = re.exec(source)) !== null) out.push(m.index);
+  return out;
+}
+
+/**
+ * PER-OCCURRENCE relation: every durable-delete occurrence must sit on a
+ * guarded teardown statement. The guard is looked for on the delete's own line
+ * and the few lines above it, so a multi-line `if (...)` is seen but an
+ * unguarded append is not. Returns `file:line` offenders.
+ */
+function unguardedDurableDeletes(sources) {
+  const offenders = [];
+  for (const [rel, src] of sources) {
+    const lines = src.split('\n');
+    lines.forEach((line, i) => {
+      if (!/\bownerCredentialStore\.delete(All)?\(/.test(line)) return;
+      const window = lines.slice(Math.max(0, i - 6), i + 1).join('\n');
+      if (!DURABLE_GUARD_RE.test(window)) offenders.push(`${rel}:${i + 1}`);
+    });
+  }
+  return offenders;
 }
 
 // LIN-1887 N2 gave the store a SECOND delete verb. `delete(accountId, urlKey,
 // provider)` revokes ONE provider partition; `deleteAll(accountId, urlKey)`
-// revokes every partition for a workspace. Whole-workspace teardown needs the
-// latter — a partition-scoped delete there silently orphans the other
-// provider's credential — so a census that counted only `delete(` would go
-// green while three teardown paths stopped revoking anything at all. The
-// census's PURPOSE is unchanged: every teardown path must revoke what it tears
-// down. It now counts both verbs.
-function countDurableDeletes(source) {
-  return (source.match(/\bownerCredentialStore\.delete(All)?\(/g) || []).length;
-}
+// revokes every partition for a workspace. Whole-workspace teardown uses the
+// latter; both are covered per occurrence above by the same guard rule.
 
-const KNOWN_DURABLE_DELETE_COUNT = 7;
-
-describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete module boundary (LIN-3219 A3)', () => {
-  test('every module that durable-deletes also evicts the workspace token cache', () => {
-    // Boundary rule (not a count): a module may call the durable-delete verbs
-    // only if it also evicts. A new teardown module that forgets the eviction
-    // fails here, with no number to bump.
+describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete per-occurrence guard (LIN-3219 A3)', () => {
+  test('every durable-delete occurrence sits on a guarded teardown statement', () => {
     const sources = productionSources();
-    const deleters = modulesMatching(sources, DURABLE_DELETE_RE);
-    const evictors = modulesMatching(sources, EVICT_RE);
-    assert.ok(deleters.length > 0, 'a zero-delete scan would be vacuous');
-    const offenders = deleters.filter((f) => !evictors.includes(f));
-    assert.deepEqual(offenders, [], `durable-delete modules without an eviction: ${offenders.join(', ')}`);
+    const total = [...sources.values()].reduce((n, s) => n + matchPositions(s, DURABLE_DELETE_RE).length, 0);
+    assert.ok(total > 0, 'a zero-delete scan would be vacuous');
+    const offenders = unguardedDurableDeletes(sources);
+    assert.deepEqual(offenders, [], `durable-delete occurrences without a guard: ${offenders.join(', ')}`);
   });
 
-  test('WITNESS: a new durable-delete module with no eviction fails the boundary', () => {
-    const planted = new Map([
-      ...productionSources(),
-      ['routes/new-teardown.js', 'await ownerCredentialStore.delete(accountId, urlKey, provider);\n'],
-    ]);
-    const deleters = modulesMatching(planted, DURABLE_DELETE_RE);
-    const evictors = modulesMatching(planted, EVICT_RE);
-    const offenders = deleters.filter((f) => !evictors.includes(f));
-    assert.ok(offenders.includes('routes/new-teardown.js'), `expected routes/new-teardown.js, got ${JSON.stringify(offenders)}`);
+  test('WITNESS: a new unguarded ownerCredentialStore.delete( in routes/workspace.js (which already durable-deletes) fails', () => {
+    const sources = productionSources();
+    const planted = new Map(sources);
+    planted.set('routes/workspace.js', `${sources.get('routes/workspace.js')}\nasync function _extra(ownerCredentialStore, accountId, urlKey) {\n  await ownerCredentialStore.delete(accountId, urlKey, 'linear');\n}\n`);
+    assert.ok(
+      unguardedDurableDeletes(planted).some((o) => o.startsWith('routes/workspace.js:')),
+      'the planted unguarded durable delete in an already-compliant module must be an offender'
+    );
   });
 
   test('routes/auth.js (/logout) has ZERO ownerCredentialStore.delete( calls — deliberate, not an omission', () => {
-    const count = (read('routes/auth.js').match(/\bownerCredentialStore\.delete(All)?\(/g) || []).length;
+    const count = matchPositions(read('routes/auth.js'), DURABLE_DELETE_RE).length;
     assert.equal(
       count,
       0,

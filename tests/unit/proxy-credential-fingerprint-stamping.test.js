@@ -123,7 +123,13 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // have a stamp since the previous return / function start. The failure path
     // does not return here (it falls through), so every return is a resolving
     // path — LIN-1746's "stamp unconditionally" regression is excluded because
-    // it had no return before the failure branch.
+    // it had no return before the failure branch. The OTHER half of LIN-1746 —
+    // "a resolution failure must never stamp, so it is classified proxy-token,
+    // not provider-lane, and never pollutes providerLaneOccupancy" — is carried
+    // behaviourally by tests/unit/credential-rejection-logging.test.js's
+    // workspace-resolution-failure test (its own file, since it asserts on the
+    // recorded event, not on source shape). This file keeps only the
+    // resolving-return half.
     const offenders = unstampedReturns(providerBody());
     assert.deepEqual(offenders, [], `unstamped return paths at offsets ${JSON.stringify(offenders)}`);
   });

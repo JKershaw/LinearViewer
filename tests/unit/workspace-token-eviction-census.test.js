@@ -24,71 +24,86 @@ function read(relPath) {
   return readFileSync(join(repoRoot, relPath), 'utf8');
 }
 
-// LIN-3219 A3 (M19): the numeric totals are gone. The production corpus (all
-// routes except the routes/test.js harness, plus server.js) is scanned and the
-// relation is a BOUNDARY on which modules may call the teardown symbols:
-//   - every module that calls `session.destroy(` must also evict the workspace
-//     token cache (pairing by module);
-//   - every module that calls `removeWorkspace(` must also evict.
-// A module that tears down without evicting fails, with no number to bump.
+// LIN-3219 A3 (M19): the numeric totals are gone, and the pairing is now PER
+// OCCURRENCE rather than per module. The old rule ("every module that destroys
+// also evicts somewhere") accepted a new unguarded teardown in a module that
+// already carried an eviction elsewhere. The production corpus (server.js plus
+// every route except the routes/test.js harness) is scanned so that EVERY
+// `session.destroy(` / `removeWorkspace(` occurrence must be covered by a
+// token-cache eviction between its neighbouring teardown occurrences — the
+// per-site server.js shape, generalised. A fresh teardown next to an existing
+// eviction no longer rides on the module's other sites.
 const DESTROY_RE = /\bsession\.destroy\(/g;
-const EVICT_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/g;
 const REMOVE_RE = /\bremoveWorkspace\((?!\))/g;
+const EVICT_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/g;
 
 function productionSources() {
-  const files = [
-    'server.js',
+  return new Map([
+    ['server.js', read('server.js')],
     ...readdirSync(join(repoRoot, 'routes'))
       .filter((n) => n.endsWith('.js') && n !== 'test.js')
-      .map((n) => `routes/${n}`),
-  ];
-  return new Map(files.map((rel) => [rel, readFileSync(join(repoRoot, rel), 'utf8')]));
+      .map((n) => [`routes/${n}`, read(`routes/${n}`)]),
+  ]);
 }
 
-function modulesMatching(sources, re) {
+/** All match offsets of a global regex in `source` (lastIndex is reset). */
+function matchPositions(source, re) {
   const out = [];
-  const stateless = new RegExp(re.source, re.flags.replace('g', ''));
-  for (const [rel, src] of sources) if (stateless.test(src)) out.push(rel);
-  return out.sort();
+  let m;
+  re.lastIndex = 0;
+  while ((m = re.exec(source)) !== null) out.push(m.index);
+  return out;
 }
 
-function countDestroys(source) {
-  return (source.match(/\bsession\.destroy\(/g) || []).length;
+/**
+ * PER-OCCURRENCE relation: every teardown occurrence (a `session.destroy(` or a
+ * `removeWorkspace(`) must have an eviction occurrence in the region bounded by
+ * its neighbouring teardown occurrences. One eviction therefore cannot silently
+ * cover a fresh teardown with none of its own, and a new teardown appended
+ * anywhere in an already-evicting module has no eviction in its own region.
+ */
+function teardownEvictionOffenders(sources) {
+  const offenders = [];
+  for (const [rel, src] of sources) {
+    const teardowns = [...matchPositions(src, DESTROY_RE), ...matchPositions(src, REMOVE_RE)].sort((a, b) => a - b);
+    const evictions = matchPositions(src, EVICT_RE);
+    teardowns.forEach((pos, i) => {
+      const prev = i === 0 ? -1 : teardowns[i - 1];
+      const next = i + 1 < teardowns.length ? teardowns[i + 1] : src.length + 1;
+      if (!evictions.some((e) => e > prev && e < next)) offenders.push(`${rel}@${pos}`);
+    });
+  }
+  return offenders;
 }
 
-// The parent LIN-1500's witness-D prose implies SIX destroy paths (it says the
-// census should catch "a seventh"). That is wrong: `grep -c "session.destroy("`
-// across these three files returns server.js:3, routes/workspace.js:1,
-// routes/auth.js:1 — five, verified at LIN-1507's HEAD. The "six" in the plan
-// is the count of *eviction sites* (#13–#18 in the ticket), of which
-// routes/workspace.js:144 (remove-one-of-many) is NOT a destroy at all — the
-// session survives there. Coding to "seventh" would ship a census off by one
-// that silently never fires on a genuinely new sixth destroy path. Pinned at
-// 5 deliberately; a sixth path must fail this test.
-const KNOWN_DESTROY_COUNT = 5;
-
-describe('LIN-1507 witness D(ii) — session.destroy module boundary (LIN-3219 A3)', () => {
-  test('every module that destroys a session also evicts the workspace token cache', () => {
-    // Boundary rule (not a count): a module may call `session.destroy(` only if
-    // it also carries an eviction call. A new teardown module that forgets the
-    // eviction fails here, with no number to bump.
+describe('LIN-1507 witness D(ii) — session.destroy/removeWorkspace per-occurrence eviction (LIN-3219 A3)', () => {
+  test('every teardown occurrence is covered by a workspace-token eviction', () => {
     const sources = productionSources();
-    const destroyers = modulesMatching(sources, DESTROY_RE);
-    const evictors = modulesMatching(sources, EVICT_RE);
-    assert.ok(destroyers.length > 0, 'a zero-destroy scan would be vacuous');
-    const offenders = destroyers.filter((f) => !evictors.includes(f));
-    assert.deepEqual(offenders, [], `destroying modules without an eviction: ${offenders.join(', ')}`);
+    const destroys = [...sources.values()].reduce((n, s) => n + matchPositions(s, DESTROY_RE).length, 0);
+    const removals = [...sources.values()].reduce((n, s) => n + matchPositions(s, REMOVE_RE).length, 0);
+    assert.ok(destroys > 0 && removals > 0, 'a zero-teardown scan would be vacuous');
+    const offenders = teardownEvictionOffenders(sources);
+    assert.deepEqual(offenders, [], `teardown occurrences with no eviction between their neighbours: ${offenders.join(', ')}`);
   });
 
-  test('WITNESS: a new destroy module with no eviction fails the boundary', () => {
-    const planted = new Map([
-      ...productionSources(),
-      ['routes/new-teardown.js', "req.session.destroy(() => res.redirect('/'));\n"],
-    ]);
-    const destroyers = modulesMatching(planted, DESTROY_RE);
-    const evictors = modulesMatching(planted, EVICT_RE);
-    const offenders = destroyers.filter((f) => !evictors.includes(f));
-    assert.ok(offenders.includes('routes/new-teardown.js'), `expected routes/new-teardown.js, got ${JSON.stringify(offenders)}`);
+  test('WITNESS: a new session.destroy( in routes/auth.js (which already evicts) with no local eviction fails', () => {
+    const sources = productionSources();
+    const planted = new Map(sources);
+    planted.set('routes/auth.js', `${sources.get('routes/auth.js')}\nfunction _extra(req, res) { req.session.destroy(() => res.redirect('/')); }\n`);
+    assert.ok(
+      teardownEvictionOffenders(planted).some((o) => o.startsWith('routes/auth.js@')),
+      'the planted unguarded destroy in an already-evicting module must be an offender'
+    );
+  });
+
+  test('WITNESS: a new removeWorkspace( in routes/workspace.js (which already evicts) with no local eviction fails', () => {
+    const sources = productionSources();
+    const planted = new Map(sources);
+    planted.set('routes/workspace.js', `${sources.get('routes/workspace.js')}\nfunction _extra(req, w) { removeWorkspace(req.session, w.id); }\n`);
+    assert.ok(
+      teardownEvictionOffenders(planted).some((o) => o.startsWith('routes/workspace.js@')),
+      'the planted unguarded removal in an already-evicting module must be an offender'
+    );
   });
 });
 
@@ -113,9 +128,7 @@ describe('LIN-1507 witness D(ii) — source assertions for the 3 non-injectable 
     const source = read('server.js');
     const destroyRegex = /\bsession\.destroy\(/g;
     let match;
-    let count = 0;
     while ((match = destroyRegex.exec(source)) !== null) {
-      count++;
       const windowStart = Math.max(0, match.index - 500);
       const preceding = source.slice(windowStart, match.index);
       assert.ok(
@@ -125,7 +138,6 @@ describe('LIN-1507 witness D(ii) — source assertions for the 3 non-injectable 
         'destruction path in server.js must evict its workspace(s)\' cache entries BEFORE destroy() runs (LIN-1507).'
       );
     }
-    assert.equal(count, 3, 'expected exactly 3 session.destroy( sites in server.js — update this test if that count changes');
   });
 });
 
@@ -166,37 +178,10 @@ describe('LIN-1507 witness D(ii) — source assertions for the 3 non-injectable 
  */
 
 // The bare `removeWorkspace()` inside LIN-1507's prose comment in
-// handleWorkspaceRemoval is not a call site, so the lookahead excludes an
-// empty argument list rather than counting mentions in comments.
-function countWorkspaceRemovals(source) {
-  return (source.match(/\bremoveWorkspace\((?!\))/g) || []).length;
-}
+// handleWorkspaceRemoval is not a call site, so the lookahead in REMOVE_RE
+// excludes an empty argument list rather than counting mentions in comments.
 
-const KNOWN_WORKSPACE_REMOVAL_COUNT = 3;
-
-describe('LIN-1518 — removeWorkspace module boundary (LIN-3219 A3)', () => {
-  test('every module that calls removeWorkspace( also evicts the workspace token cache', () => {
-    // Boundary rule (not a count): dropping a workspace from a surviving session
-    // must be paired with an eviction, module by module.
-    const sources = productionSources();
-    const removers = modulesMatching(sources, REMOVE_RE);
-    const evictors = modulesMatching(sources, EVICT_RE);
-    assert.ok(removers.length > 0, 'a zero-removal scan would be vacuous');
-    const offenders = removers.filter((f) => !evictors.includes(f));
-    assert.deepEqual(offenders, [], `removeWorkspace( modules without an eviction: ${offenders.join(', ')}`);
-  });
-
-  test('WITNESS: a new removeWorkspace( module with no eviction fails the boundary', () => {
-    const planted = new Map([
-      ...productionSources(),
-      ['routes/new-remove.js', 'removeWorkspace(req.session, workspace.id);\n'],
-    ]);
-    const removers = modulesMatching(planted, REMOVE_RE);
-    const evictors = modulesMatching(planted, EVICT_RE);
-    const offenders = removers.filter((f) => !evictors.includes(f));
-    assert.ok(offenders.includes('routes/new-remove.js'), `expected routes/new-remove.js, got ${JSON.stringify(offenders)}`);
-  });
-
+describe('LIN-1518 — removeWorkspace per-occurrence eviction (LIN-3219 A3)', () => {
   test('ensureValidToken evicts before its remaining>0 branch, so BOTH arms are covered', () => {
     const source = read('server.js');
     const catchIdx = source.indexOf('} catch (error) {\n    console.error(`Token refresh failed for workspace');
