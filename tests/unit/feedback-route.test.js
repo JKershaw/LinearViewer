@@ -872,7 +872,9 @@ describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
         freeTierStore: freeTier(async () => REFUSED)
       });
 
-      const { status, body } = await submit(app, 'acme', { message: 'hello', ...payload });
+      // An explicit `title` skips the AI title block entirely, so the free-tier
+      // key set above never opens a live OpenRouter socket (LIN-1880 hermetic).
+      const { status, body } = await submit(app, 'acme', { message: 'hello', title: 'feedback ticket', ...payload });
 
       assert.strictEqual(status, 201, JSON.stringify(body));
       assert.strictEqual(body.success, true);
@@ -897,7 +899,7 @@ describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
       freeTierStore: freeTier(async () => UNVERIFIED)
     });
 
-    const { status, body } = await submit(app, 'acme', { message: 'hello', action: 'autopilot' });
+    const { status, body } = await submit(app, 'acme', { message: 'hello', title: 'feedback ticket', action: 'autopilot' });
     assert.strictEqual(status, 201, JSON.stringify(body));
     assert.strictEqual(body.autopilot.launched, false);
     assert.strictEqual(body.autopilot.code, 'RUN_LIMIT_UNVERIFIED');
@@ -914,7 +916,7 @@ describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
       freeTierStore: { checkRun: async () => { throw new Error('must not be called'); } }
     });
 
-    const { status, body } = await submit(app, 'acme', { message: 'hello', action: 'autopilot' });
+    const { status, body } = await submit(app, 'acme', { message: 'hello', title: 'feedback ticket', action: 'autopilot' });
     assert.strictEqual(status, 201, JSON.stringify(body));
     assert.strictEqual(dispatch.items.length, 1, 'a non-free-tier run launches');
     assert.strictEqual(body.autopilot, undefined, 'no refusal key on a successful launch');
