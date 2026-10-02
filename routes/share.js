@@ -14,13 +14,16 @@
  *   4. ownership check cannot answer (throws)           → 503, no content
  *   5. snapshot present and fresh (< SNAPSHOT_TTL_MS)   → serve
  *   6. snapshot present, stale, refresh not ok / throws → serve last-good, "as of"
- *      **PROVISIONAL pending ruling `lin3073-owner-unresolvable`** (see below)
+ *      (ruling `lin3073-owner-unresolvable`: serve-last-good)
  *   7. snapshot null and refresh not ok / unavailable   → 503, no content
  *
  * Refresh is GET-triggered only (no background refresher), single-flight per
  * token, and bounded by `MIN_REFRESH_INTERVAL_MS` after a success and
- * `FAILURE_BACKOFF_MS` after a failure, so anonymous traffic cannot spend the
- * owner's provider rate limit without bound.
+ * `FAILURE_BACKOFF_MS` after a failure. An in-process per-token attempt stamp
+ * (`attempts`, below) also guards the throttle: when a store-write outage
+ * prevents `lastRefreshAttemptAt` from persisting, that stamp still suppresses
+ * repeated reads, so anonymous traffic cannot spend the owner's provider rate
+ * limit without bound.
  *
  * Provider coverage carry-forward (approving verdict (b), Session B): a
  * `kind: 'parent'` share must be REFUSED at create when the workspace's
@@ -93,6 +96,11 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
 
   // Per-token single-flight for refreshes (closure state, one map per router).
   const inflight = new Map();
+  // Per-token last-attempt stamp, in-process only. `lastRefreshAttemptAt` is
+  // persisted by `saveSnapshot`, which is exactly what fails during a
+  // store-write outage, so it cannot be the only guard (LIN-3255). Bounded by
+  // pruning entries older than FAILURE_BACKOFF_MS on write and read.
+  const attempts = new Map();
 
   async function refresh(record) {
     const key = record.tokenHash;
@@ -101,6 +109,12 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
 
     const promise = (async () => {
       const at = new Date();
+      // Stamp before any await so a timeout, build throw or save throw cannot
+      // skip it, and sweep stale entries so the map stays bounded.
+      for (const [k, ts] of attempts) {
+        if (at.getTime() - ts >= FAILURE_BACKOFF_MS) attempts.delete(k);
+      }
+      attempts.set(key, at.getTime());
       let outcome;
       try {
         outcome = await withTimeout(
@@ -175,10 +189,23 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
     }
 
     // A prior attempt NEWER than the last success must have failed → longer backoff.
-    const lastAttemptMs = record.lastRefreshAttemptAt ? new Date(record.lastRefreshAttemptAt).getTime() : null;
+    const recordedAttemptMs = record.lastRefreshAttemptAt ? new Date(record.lastRefreshAttemptAt).getTime() : null;
+    // The in-process stamp is the fallback when a store-write outage prevents
+    // `lastRefreshAttemptAt` from persisting (LIN-3255). Drop it once expired:
+    // past FAILURE_BACKOFF_MS it cannot change any `due` result.
+    let attemptMs = attempts.get(record.tokenHash);
+    if (attemptMs != null && now - attemptMs >= FAILURE_BACKOFF_MS) {
+      attempts.delete(record.tokenHash);
+      attemptMs = null;
+    }
+    const lastAttemptMs = attemptMs == null ? recordedAttemptMs
+      : recordedAttemptMs == null ? attemptMs
+        : Math.max(recordedAttemptMs, attemptMs);
     const lastFailed = lastAttemptMs != null && (snapshotAtMs == null || lastAttemptMs > snapshotAtMs);
     const interval = lastFailed ? FAILURE_BACKOFF_MS : MIN_REFRESH_INTERVAL_MS;
-    const due = lastAttemptMs == null || now - lastAttemptMs >= interval;
+    // `inflight.has` keeps concurrent GETs joining an in-flight refresh even
+    // after the winner stamped an attempt (a null snapshot must not 503).
+    const due = inflight.has(record.tokenHash) || lastAttemptMs == null || now - lastAttemptMs >= interval;
 
     if (due) {
       const result = await refresh(record);
@@ -191,10 +218,9 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
         }));
       }
       if (record.snapshot != null) {
-        // PROVISIONAL (pending ruling `lin3073-owner-unresolvable`): a stale
-        // snapshot whose refresh could not resolve the owner serves last-good,
-        // marked "as of <snapshotAt>". If the ruling changes to 410, ONLY this
-        // branch changes; rows 3, 4 and 7 are unaffected.
+        // A stale snapshot whose refresh failed serves last-good, marked
+        // "as of <snapshotAt>" (ruling `lin3073-owner-unresolvable`:
+        // serve-last-good). Rows 3, 4 and 7 are unaffected.
         return serve(res, record, true);
       }
       return res.status(503).end();                            // row 7
