@@ -19,6 +19,7 @@ import crypto from 'node:crypto';
 import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { renderSessionPage } from '../../lib/render-session.js';
 import { RunProposalsStore } from '../../lib/run-proposals-store.js';
+import { getSessionsForWorkspace } from '../../lib/pipeline-loops.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
 
@@ -179,6 +180,33 @@ describe('LIN-3254 — run proposal Apply', () => {
     assert.strictEqual(first.status, 200);
     assert.strictEqual(second.status, 409);
     assert.strictEqual(addItemCalls.length, 1, 'the second Apply must not dispatch');
+  });
+
+  test('an applied proposal\'s follow-up joins the run\'s session lineage', async () => {
+    const rows = [historyRow()];
+    const { store: dispatchStore } = makeDispatchStore(rows);
+    // Persist the dispatched item where the run page reads follow-ups from: the
+    // dispatch history getSessionsForWorkspace reconstructs the session from.
+    dispatchStore.addItem = async (urlKey, item) => {
+      const rec = { id: 'disp-new-1', _id: 'disp-new-1', dispatchedAt: new Date().toISOString(), status: 'queued', feedback: [], ...item };
+      rows.push(rec);
+      return rec;
+    };
+    const runProposalsStore = new RunProposalsStore({ collection: createMockCollection() });
+    const proposal = await runProposalsStore.create({ urlKey: URL_KEY, runId: RUN_ID, prompt: 'follow-up that shows up' });
+
+    const res = await post(buildApp({ dispatchStore, runProposalsStore }), proposalPath(RUN_ID, proposal.id, 'apply'));
+    assert.strictEqual(res.status, 200);
+
+    const sessions = await getSessionsForWorkspace(URL_KEY, {
+      dispatchStore,
+      agentStatusStore: { listStatus: async () => ({ items: [], total: 0 }) },
+    });
+    const session = sessions.find(s => s.sessionId === RUN_ID);
+    assert.ok(session, 'the run still reconstructs');
+    const followUpLoop = session.loops.find(l => l.loopId === 'disp-new-1');
+    assert.ok(followUpLoop, 'the dispatched follow-up appears in the run\'s own lineage');
+    assert.strictEqual(followUpLoop.followUpTo, RUN_ID);
   });
 
   test('ignores a client-supplied prompt — the STORED prompt is dispatched', async () => {
