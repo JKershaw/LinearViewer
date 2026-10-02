@@ -409,19 +409,40 @@ test.describe('Autopilot Observation page (first-class)', () => {
       const livebar = worker.locator('.livebar');
       await expect(livebar).toHaveCount(1);
 
-      const style = await livebar.evaluate((el) => {
+      // LIN-3198: the 5s feed poll rebuilds the card body (public/observation.js
+      // renderFeeds/applySessionState), so a single `getComputedStyle` read can
+      // land on a node the poll just detached — which reports animationName ''
+      // in Chromium. Read through `expect.poll` instead: the locator re-resolves
+      // each attempt, so a rebuilt node is picked up. `expect.poll` awaits the
+      // generator OUTSIDE its retry try/catch, so a detached-element throw
+      // inside `evaluate` would surface immediately rather than be retried;
+      // catch it and return a sentinel that fails the matcher so the poll
+      // continues on the next tick.
+      const readLivebarStyle = () => livebar.evaluate((el) => {
         const after = getComputedStyle(el, '::after');
+        const afterWidth = parseFloat(after.width);
+        const hostWidth = el.clientWidth;
         return {
           animationName: after.animationName,
           opacity: after.opacity,
-          afterWidth: parseFloat(after.width),
-          hostWidth: el.clientWidth,
+          afterWidth,
+          hostWidth,
+          // Full-width fill, not the 38% animated band.
+          fullWidth: afterWidth > hostWidth * 0.9,
         };
       });
-      expect(style.animationName).toBe('none');
-      expect(style.opacity).toBe('0.5');
-      // Full-width fill, not the 38% animated band.
-      expect(style.afterWidth).toBeGreaterThan(style.hostWidth * 0.9);
+
+      await expect.poll(async () => {
+        try {
+          return await readLivebarStyle();
+        } catch {
+          return { detached: true };
+        }
+      }, { message: 'livebar ::after settles to a static, half-opacity, full-width fill' }).toMatchObject({
+        animationName: 'none',
+        opacity: '0.5',
+        fullWidth: true,
+      });
     });
   });
 

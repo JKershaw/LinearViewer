@@ -8,9 +8,16 @@ import { test, expect } from '../fixtures/test-base.js';
 let URL_KEY;
 let KPIS_URL;
 
-test.beforeEach(({ workerUrlKey }) => {
+test.beforeEach(async ({ page, workerUrlKey }) => {
   URL_KEY = workerUrlKey;
   KPIS_URL = `/workspace/${URL_KEY}/escalation-kpis`;
+  // LIN-3198 Class A: drop the in-process comment-dedupe caches. The resolved-
+  // decision test re-posts the same "Approve" body to the same (workspace,
+  // LIN-KPI-2) every run; the 5-min server-side dedupe window would otherwise
+  // collapse a repeat run's fresh 201 into a deduped 200, making the exact-201
+  // assertion retry-fatal. Global clear (the dedupe key is hashed, so it can't
+  // be urlKey-scoped).
+  await page.request.get('/test/clear-comment-dedupe');
 });
 
 async function clearRuns(page) {

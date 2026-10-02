@@ -13,8 +13,15 @@ import { test, expect } from '../fixtures/test-base.js';
 
 let URL_KEY;
 
-test.beforeEach(({ workerUrlKey }) => {
+test.beforeEach(async ({ page, workerUrlKey }) => {
   URL_KEY = workerUrlKey;
+  // LIN-3198 Class A: drop the in-process comment-dedupe caches. Several tests
+  // here re-post the same comment body to the same (workspace, issue) every run
+  // (e.g. 'recorded' on LIN-1728, 'recording this decision' on LIN-1252); the
+  // 5-min server-side dedupe window would otherwise collapse a repeat run's
+  // fresh 201 into a deduped 200, making the exact-201 assertions retry-fatal.
+  // Global clear (the dedupe key is hashed, so it can't be urlKey-scoped).
+  await page.request.get('/test/clear-comment-dedupe');
 });
 
 async function clearRuns(page) {
@@ -327,12 +334,28 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     const sessionId = await discoverSessionId(page);
 
     // The feed rolls the session up to a waiting status with the blocked message.
-    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
-    const body = await feed.json();
-    const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
-    expect(s.status).toBe('waiting');
-    expect(s.waiting).toBe(true);
-    expect(s.waitingMessage).toContain('need your decision on the auth flow');
+    //
+    // LIN-3198: polled for the same reason as the terminal-gate read below — the
+    // feed is eventually consistent (5s stale-while-revalidate cache + the async
+    // materializer's backfill), and `discoverSessionId` has just warmed the cache
+    // with whatever snapshot the materializer held. A mid-seed snapshot (worker
+    // taken, not yet [blocked]) reads `in-progress`; one read then fails (seen
+    // 1/20 in the seven-spec ×20 run). The assertions are unchanged: the session
+    // must become waiting with the blocked message once the read model settles.
+    await expect.poll(async () => {
+      const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+      const body = await feed.json();
+      const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
+      if (!s) return null;
+      return { status: s.status, waiting: s.waiting, waitingMessage: s.waitingMessage };
+    }, {
+      timeout: 15000,
+      message: 'session feed reflects the [blocked] worker once the async materializer settles',
+    }).toMatchObject({
+      status: 'waiting',
+      waiting: true,
+      waitingMessage: expect.stringContaining('need your decision on the auth flow'),
+    });
 
     // The session page renders the prominent alert banner + follow-up CTA.
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
@@ -354,13 +377,36 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     // Feed: the session is terminal, so the waiting flag is gated off — the card
     // reports done with no waiting flag/message even though a worker is [blocked].
-    const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
-    const body = await feed.json();
-    const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
-    expect(s.terminal).toBe(true);
-    expect(s.status).not.toBe('waiting');
-    expect(s.waiting).toBe(false);
-    expect(s.waitingMessage).toBe(null);
+    //
+    // LIN-3198: the feed is intentionally eventually consistent — a 5s
+    // stale-while-revalidate cache plus an async per-workspace materializer whose
+    // background backfill can race the seed and persist a mid-seed snapshot
+    // (worker already [blocked], anchor not yet [done]). A single read then
+    // asserts against that transient "waiting" doc (observed ~2-3/20, only under
+    // parallel repeats; clean HEAD flakes identically, so it is pre-existing and
+    // not one of the four fix surfaces). Poll the read until the terminal gate is
+    // reflected — the assertion is unchanged (it must become terminal and
+    // not-waiting), only the read outlasts the refresh window.
+    await expect.poll(async () => {
+      const feed = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
+      const body = await feed.json();
+      const s = [...(body.active || []), ...(body.recent || [])].find(x => x.sessionId === sessionId);
+      if (!s) return null;
+      return {
+        terminal: s.terminal,
+        statusIsWaiting: s.status === 'waiting',
+        waiting: s.waiting,
+        waitingMessage: s.waitingMessage,
+      };
+    }, {
+      timeout: 15000,
+      message: 'session feed reflects the terminal gate once the async materializer settles',
+    }).toMatchObject({
+      terminal: true,
+      statusIsWaiting: false,
+      waiting: false,
+      waitingMessage: null,
+    });
 
     // Session page: no "waiting on you" banner on a finished session.
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);

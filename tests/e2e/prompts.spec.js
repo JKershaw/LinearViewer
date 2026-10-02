@@ -666,7 +666,12 @@ test.describe('AI Recommendations', () => {
     let resolveDelay;
     const delayPromise = new Promise(resolve => { resolveDelay = resolve; });
 
-    await page.route(`**/api/recommend/${BLOCKED_ISSUE_ID}/stream`, async (route) => {
+    // LIN-3198: the client appends `?source=<provider>` (public/app.js, LIN-1910),
+    // so a glob ending at `/stream` never matches and the hold is inert — the
+    // "Analyzing…" loading assertion below would pass for the wrong reason (or
+    // race). The trailing `*` matches the query string; same form as the working
+    // sibling at tests/e2e/opened-task-first-screen.spec.js:122.
+    await page.route(`**/api/recommend/*/stream*`, async (route) => {
       // Wait for our signal before continuing with the request
       await delayPromise;
       await route.continue();
