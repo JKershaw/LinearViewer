@@ -243,6 +243,15 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the liveness-alarms per-workspace state index (LIN-3258)', () => {
+    const spec = INDEX_SPECS.find(s =>
+      s.collection === 'liveness-alarms' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, clearedAt: 1, startedAt: -1 })
+    );
+    assert.ok(spec, 'liveness-alarms must have a {urlKey:1, clearedAt:1, startedAt:-1} index');
+    assert.strictEqual(spec.options?.expireAfterSeconds, undefined, 'liveness-alarms must be a plain index, not a TTL');
+  });
+
   test('declares the partial unique one-owner-per-workspace index on account-workspaces (LIN-1892)', () => {
     const spec = INDEX_SPECS.find(s => s.options.name === 'account_workspaces_one_owner');
     assert.ok(spec, 'expected an account_workspaces_one_owner spec');
