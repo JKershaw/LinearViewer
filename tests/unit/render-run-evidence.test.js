@@ -192,14 +192,22 @@ describe('render-run-evidence: P3 close-out box states (LIN-3248)', () => {
     assert.ok(!html.includes('data-testid="run-evidence-closeout-press"'));
   });
 
-  test('merged by you is a distinct recorded state', () => {
-    const html = renderCloseOutBox({ owner: true, status: 'merged', variant: 'standard', message: 'PR #12 merged' });
+  test('merged by you is a distinct recorded state (stop-at-PR person merge)', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'merged', variant: 'standard', mergedByYou: true, message: 'PR #12 merged' });
     assert.match(html, /data-state="merged"/);
+    assert.match(html, /data-merged-by-you="true"/);
     assert.match(html, /data-testid="run-evidence-closeout-merged">✓ merged by you/);
   });
 
+  test('F1: a neutral merged box (non-stop-at or close-out merge) never says "merged by you"', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'merged', variant: 'standard', mergedByYou: false, message: 'the pull request is already merged' });
+    assert.match(html, /data-merged-by-you="false"/);
+    assert.match(html, /data-testid="run-evidence-closeout-neutral">the pull request is already merged/);
+    assert.ok(!html.includes('merged by you'));
+  });
+
   test('multi-PR partial renders the merged·open copy and stays In Progress', () => {
-    const html = renderCloseOutBox({ owner: true, status: 'partial', variant: 'standard', message: 'PR #12 merged · 1 more PR open' });
+    const html = renderCloseOutBox({ owner: true, status: 'partial', variant: 'standard', mergedByYou: true, message: 'PR #12 merged · 1 more PR open' });
     assert.match(html, /data-state="partial"/);
     assert.match(html, /PR #12 merged · 1 more PR open/);
     assert.ok(!html.includes('data-testid="run-evidence-closeout-press"'));

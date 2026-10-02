@@ -72,10 +72,10 @@ async function seedLocalWorkspaceWithEvidence(page) {
 // `variant` field — the promptName is deliberately the SAME generic
 // `Autopilot (LOCAL-CO1)` for both, mirroring a real stepper kickoff, so this
 // proves the N2 copy is driven by the row variant, never by promptName.
-async function seedFinishedRun(page, { variant = 'standard' } = {}) {
+async function seedFinishedRun(page, { variant = 'standard', stopAt = 'pr' } = {}) {
   const promptName = 'Autopilot (LOCAL-CO1)';
   const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'orchestrate', promptName, kind: 'autopilot', issueIdentifier: 'LOCAL-CO1', issueTitle: 'Finished stop-at-PR run', target: 'cli', stopAt: 'pr', variant },
+    data: { prompt: 'orchestrate', promptName, kind: 'autopilot', issueIdentifier: 'LOCAL-CO1', issueTitle: 'Finished stop-at-PR run', target: 'cli', stopAt, variant },
   });
   expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
   const anchorId = (await anchor.json()).item.id;
@@ -193,5 +193,25 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     await expect(page.locator('[data-testid="run-evidence-ledger-open-no-followup"]')).toHaveCount(1);
     // Nothing above the evidence rows.
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
+  });
+
+  test('F1: a non-stop-at-PR merged run reads neutrally and never POSTs check', async ({ page }) => {
+    await seedLocalWorkspaceWithEvidence(page);
+    await seedFinishedRun(page, { stopAt: null });
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: REPO, number: 12, readable: true, state: 'closed', merged: true, headSha: PR_HEAD, checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverSessionId(page);
+
+    const checks = [];
+    page.on('request', r => { if (r.url().includes('/run-evidence/LOCAL-CO1/check')) checks.push(r); });
+    await gotoSession(page, sessionId);
+
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="merged"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout-neutral"]')).toContainText('already merged');
+    await expect(page.locator('[data-testid="run-evidence-closeout-merged"]')).toHaveCount(0);
+    // Give the on-load check a chance to (not) fire.
+    await page.waitForTimeout(600);
+    expect(checks, 'a non-stop-at merged page must not POST check').toHaveLength(0);
   });
 });

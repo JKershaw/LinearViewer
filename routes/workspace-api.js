@@ -4570,35 +4570,71 @@ ${goal}`
       // nothing here.
       if (runStopAt === 'pr') {
         const openItems = countOpenLedgerItems(ledger);
+        let mergedEvent = null;
+        let mergedPrIndex = -1;
         for (let i = 0; i < prUrls.length; i += 1) {
           const status = prStatuses[i];
           if (!(status && status.readable === true && status.merged === true)) continue;
+          const headSha = statusHeadSha(status);
+          // F1: a press already recorded for this head means the close-out
+          // worker merged it — not "by you". Record it as a close-out merge.
+          let by = 'person';
+          if (closeOutEventsStore) {
+            const press = await closeOutEventsStore.getByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url, headSha, by: 'press' });
+            if (press) by = 'close-out';
+          }
           const event = closeOutEventsStore
             ? await closeOutEventsStore.record({
               accountId,
               urlKey: workspace.urlKey,
               issueId: null,
               issueIdentifier,
-              by: 'person',
+              by,
               prUrl: prUrls[i].url,
-              headSha: statusHeadSha(status),
+              headSha,
               merged: true,
               openItems,
             })
             : null;
-          if (event) recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
+          if (event) {
+            recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
+            if (!mergedEvent) { mergedEvent = event; mergedPrIndex = i; }
+          }
         }
 
-        // R1: set Done only when all four bounds hold. A failed write never
-        // blocks the record and is retried on the next check.
-        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prIndex: 0, review: ledger, byPersonCheck: true })) {
-          try {
-            const markDone = seam.markDone || defaultMarkDone;
-            await markDone({ provider, callScope, issueIdentifier });
-            done = true;
-          } catch (err) {
-            doneError = err?.message || 'could not set the task Done';
+        // R1: set Done only when all four bounds hold. F2: write it once per
+        // merge — skip when this merge already carries a successful `doneAt`,
+        // and retry only after a failed attempt.
+        const targetIndex = mergedPrIndex >= 0 ? mergedPrIndex : 0;
+        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prIndex: targetIndex, review: ledger, byPersonCheck: true })) {
+          if (mergedEvent && mergedEvent.doneAt) {
+            done = true; // already written for this merge; never repeat the provider write
+          } else {
+            try {
+              const markDone = seam.markDone || defaultMarkDone;
+              await markDone({ provider, callScope, issueIdentifier });
+              done = true;
+              if (mergedEvent && closeOutEventsStore) {
+                mergedEvent = await closeOutEventsStore.stampDone({
+                  urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: new Date(), doneError: null,
+                }) || mergedEvent;
+              }
+            } catch (err) {
+              doneError = err?.message || 'could not set the task Done';
+              if (mergedEvent && closeOutEventsStore) {
+                await closeOutEventsStore.stampDone({
+                  urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: null, doneError,
+                });
+              }
+            }
           }
+        }
+
+        // F1: show a press-then-merge as a close-out merge, not "by you".
+        if (mergedEvent && mergedEvent.by === 'close-out') {
+          state.mergedByYou = false;
+          state.mergedBy = 'close-out';
+          state.message = 'the pull request was merged by close-out';
         }
       }
 

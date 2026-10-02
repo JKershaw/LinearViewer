@@ -743,11 +743,20 @@
 
   function applyCloseOutState(box, state) {
     if (!box || !state || !state.status) return;
-    if (box.getAttribute('data-state') === state.status) return;
+    var prevYou = box.getAttribute('data-merged-by-you') === 'true';
+    var nextYou = !!state.mergedByYou;
+    // Repaint when the state or the "by you" claim changes (F1: a close-out
+    // merge found on check replaces the server-rendered "merged by you").
+    if (box.getAttribute('data-state') === state.status && prevYou === nextYou) return;
     box.setAttribute('data-state', state.status);
+    box.setAttribute('data-merged-by-you', nextYou ? 'true' : 'false');
     if (state.status === 'ready') return;
     if (state.status === 'merged' || state.status === 'partial') {
-      paintCloseOut(box, 'run-evidence-closeout-merged', '✓ merged by you' + (state.message ? ' · ' + state.message : ''));
+      if (nextYou) {
+        paintCloseOut(box, 'run-evidence-closeout-merged', '✓ merged by you' + (state.message ? ' · ' + state.message : ''));
+      } else {
+        paintCloseOut(box, 'run-evidence-closeout-neutral', state.message || 'the pull request is already merged');
+      }
     } else if (state.status === 'not-ready' || state.status === 'no-pr' || state.status === 'multiple-prs' || state.status === 'closed') {
       paintCloseOut(box, 'run-evidence-closeout-setup', '○ set up ›');
     } else {
@@ -759,6 +768,9 @@
     var ctx = closeOutContext();
     if (!ctx || !ctx.urlKey || !ctx.issueIdentifier) return;
     var state = ctx.box.getAttribute('data-state');
+    // Stop-at-PR runs only (LIN-3248 review F1): an ordinary run's merged page
+    // must not POST check at all (it writes nothing and costs live GitHub reads).
+    if (ctx.box.getAttribute('data-stop-at') !== 'pr') return;
     // `ready` catches a merge that happened since load; `merged`/`partial`
     // catch a reload/revisit that already saw the merge server-side — without
     // this the person's self-merge would never be recorded and Done never set

@@ -317,6 +317,38 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.match(res.jsonBody.doneError, /provider write failed/);
     assert.equal((await rows(built.collection)).length, 1);
   });
+
+  test('F1: a press recorded for the head makes the merge a close-out merge, not "by you"', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      statuses: { 41: mergedStatus(41) },
+    });
+    const pressRes = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-1' } }));
+    assert.equal(pressRes.statusCode, 201, JSON.stringify(pressRes.jsonBody));
+
+    const res = await check(built);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.recorded.length, 1);
+    assert.equal(res.jsonBody.recorded[0].by, 'close-out');
+    assert.equal(res.jsonBody.state.mergedByYou, false);
+    assert.match(res.jsonBody.state.message, /merged by close-out/);
+    // R1's Done path is unchanged for this case.
+    assert.equal(res.jsonBody.done, true);
+    assert.equal(built.calls.markDone, 1);
+  });
+
+  test('F2: repeated checks after a merge call markDone exactly once (Done written once per merge)', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      statuses: { 41: mergedStatus(41) },
+    });
+    const first = await check(built);
+    assert.equal(first.jsonBody.done, true);
+    await check(built);
+    await check(built);
+    assert.equal(built.calls.markDone, 1);
+    assert.equal((await rows(built.collection)).length, 1);
+  });
 });
 
 describe('POST /api/run-evidence/:issueIdentifier/close-out-press', () => {

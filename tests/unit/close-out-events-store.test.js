@@ -47,8 +47,8 @@ before(() => harness.connect());
 after(() => harness.close());
 
 describe('vocabulary + validation', () => {
-  test('CLOSE_OUT_BY is frozen and exactly person/press', () => {
-    assert.deepStrictEqual([...CLOSE_OUT_BY], ['person', 'press']);
+  test('CLOSE_OUT_BY is frozen and exactly person/press/close-out', () => {
+    assert.deepStrictEqual([...CLOSE_OUT_BY], ['person', 'press', 'close-out']);
     assert.ok(Object.isFrozen(CLOSE_OUT_BY));
   });
 
@@ -93,11 +93,13 @@ describe('CloseOutEventsStore.record', () => {
     const doc = await store.record(personMerge());
     const [stored] = await db.collection('close-out-events').find({}).toArray();
     assert.deepStrictEqual(Object.keys(stored).sort(), [
-      '_id', 'accountId', 'at', 'by', 'dispatchId', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openItems', 'prUrl', 'urlKey'
+      '_id', 'accountId', 'at', 'by', 'dispatchId', 'doneAt', 'doneError', 'headSha', 'issueId', 'issueIdentifier', 'merged', 'openItems', 'prUrl', 'urlKey'
     ]);
     assert.strictEqual(stored._id, doc._id);
     assert.strictEqual(stored.by, 'person');
     assert.strictEqual(stored.dispatchId, null);
+    assert.strictEqual(stored.doneAt, null);
+    assert.strictEqual(stored.doneError, null);
     assert.strictEqual(stored.merged, true);
     assert.deepStrictEqual(stored.openItems, { inside: 1, outside: 2, unknown: 0, total: 3 });
     assert.ok(new Date(stored.at).getTime() >= before);
@@ -138,6 +140,17 @@ describe('CloseOutEventsStore.record', () => {
     await store.record(personMerge());
     await store.record(personMerge({ headSha: 'def5678' }));
     assert.strictEqual((await db.collection('close-out-events').find({}).toArray()).length, 2);
+  });
+
+  test('F2: stampDone records the Done outcome in place without a second row', async () => {
+    await store.record(personMerge());
+    const ok = await store.stampDone({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'person', doneAt: new Date('2026-07-03T00:00:00Z'), doneError: null });
+    assert.ok(ok.doneAt);
+    assert.strictEqual(ok.doneError, null);
+    const failed = await store.stampDone({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'person', doneAt: null, doneError: 'provider down' });
+    assert.strictEqual(failed.doneAt, null);
+    assert.strictEqual(failed.doneError, 'provider down');
+    assert.strictEqual((await db.collection('close-out-events').find({}).toArray()).length, 1);
   });
 
   test('an invalid event is not stored, returns null and does not throw', async () => {

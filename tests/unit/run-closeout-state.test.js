@@ -169,6 +169,7 @@ describe('deriveCloseOutState — truth table', () => {
       review: approve(),
       runnerReady: true,
       owner: true,
+      stopAt: 'pr',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.PARTIAL);
     assert.strictEqual(state.mergedCount, 1);
@@ -177,6 +178,34 @@ describe('deriveCloseOutState — truth table', () => {
     assert.strictEqual(state.setDone, false);
     assert.strictEqual(state.pr.number, 41);
     assert.match(state.message, /PR #41 merged · 1 more PR open/);
+  });
+
+  test('F1: a non-stop-at-PR merged run reads neutrally — mergedByYou false, main\'s copy', () => {
+    const state = deriveCloseOutState({
+      prs: [pr(41)],
+      prStatuses: [mergedStatus()],
+      review: approve(),
+      runnerReady: true,
+      owner: true,
+      stopAt: null,
+      byPersonCheck: true,
+    });
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
+    assert.strictEqual(state.mergedByYou, false);
+    assert.match(state.message, /the pull request is already merged/);
+  });
+
+  test('F1: a non-stop-at-PR partial merge also reads mergedByYou false', () => {
+    const state = deriveCloseOutState({
+      prs: [pr(41), pr(42)],
+      prStatuses: [mergedStatus(), openStatus()],
+      review: approve(),
+      runnerReady: true,
+      owner: true,
+      stopAt: null,
+    });
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.PARTIAL);
+    assert.strictEqual(state.mergedByYou, false);
   });
 
   test('a partial merge with two remaining PRs pluralises the remainder', () => {
@@ -227,6 +256,7 @@ describe('deriveCloseOutState — truth table', () => {
       review: approve(),
       runnerReady: true,
       owner: true,
+      stopAt: 'pr',
       byPersonCheck: true,
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
