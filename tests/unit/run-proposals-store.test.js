@@ -159,6 +159,24 @@ describe('RunProposalsStore (LIN-3254)', () => {
     assert.strictEqual((await store.get(URL_KEY, RUN_ID, created.id)).status, 'declined');
   });
 
+  test('recordAppliedItem refines an applied row; revert returns a failed Apply to proposed', async () => {
+    const created = await store.create(base);
+
+    await store.apply(URL_KEY, RUN_ID, created.id, null);
+    const recorded = await store.recordAppliedItem(URL_KEY, RUN_ID, created.id, 'dispatch-9');
+    assert.strictEqual(recorded.status, 'applied');
+    assert.strictEqual(recorded.appliedItemId, 'dispatch-9');
+
+    const reverted = await store.revert(URL_KEY, RUN_ID, created.id);
+    assert.strictEqual(reverted.status, 'proposed');
+    assert.strictEqual(reverted.decidedAt, null);
+    assert.strictEqual(reverted.appliedItemId, null);
+
+    // Revert only matches an applied row; a second revert is a no-op.
+    assert.strictEqual(await store.revert(URL_KEY, RUN_ID, created.id), null);
+    assert.strictEqual(await store.recordAppliedItem(URL_KEY, RUN_ID, created.id, 'x'), null);
+  });
+
   test('a prompt over the follow-up path\'s cap is rejected on write, nothing stored', async () => {
     const tooLong = 'x'.repeat(MAX_PROMPT_LENGTH + 1);
 

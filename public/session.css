@@ -631,6 +631,57 @@
   margin-top: 0.4rem;
 }
 
+/* ── Proposed-in-chat rows (LIN-3254) ─────────────────────────────────────────
+   Lives in the same actions region as the inline reply box; a pending row
+   carries Apply / Decline, a decided row a quiet one-line state. */
+.sess-proposals {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line-soft);
+}
+.sess-proposals-title {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+.sess-proposal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.sess-proposal {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+}
+.sess-proposal-prompt {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--text);
+  word-break: break-word;
+}
+.sess-proposal-actions {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+.sess-proposal-state {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.sess-proposal-error {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  color: var(--amber);
+}
+
 /* ── Small-screen polish (LIN-1024) ───────────────────────────────────────────
    Basic readability/spacing tightening for the reported surface (360px Android
    Chrome): reclaim horizontal room, keep the waiting banner, reply box, inline

@@ -40,6 +40,8 @@
 
 import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
+import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
+import { dispatchQueueLimiter } from './dispatch.js';
 import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
 import { buildRunView } from '../lib/run-view.js';
@@ -554,6 +556,13 @@ export function createDashboardRoutes({
   // null -> the estimate degrades to `unknown` via the `.catch(() => null)`
   // below, same degrade-gracefully convention as the stores above.
   llmCallLogStore = null,
+  // Run proposals (LIN-3254): the "Proposed in chat" rows on the run page and
+  // the Apply / Decline actions. Default null → no rows render and Apply /
+  // Decline 503, same degrade-gracefully convention as the stores above.
+  runProposalsStore = null,
+  // Credential store the Apply dispatch finishes with (dispatchSessionFollowUp),
+  // same provisioning posture as approve-follow-up (LIN-3134/LIN-3139).
+  proxyTokenStore = null,
   // DI seam (LIN-2706), defaulting to the real renderer: this module has no
   // module-mock story (mock.module needs --experimental-test-module-mocks,
   // not opted into anywhere in this repo — same constraint documented in
@@ -1202,13 +1211,111 @@ export function createDashboardRoutes({
       // The run view model is built ONCE here (the renderer only formats it).
       const runView = buildRunView(session, { now: new Date() });
 
+      // LIN-3254: the run's proposals, newest-first. Empty when the feature's
+      // store is unwired; never a page-load failure.
+      const proposals = runProposalsStore
+        ? await runProposalsStore.list(workspace.urlKey, sessionId)
+        : [];
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals },
         pageOptions
       );
       res.send(html);
     } catch (error) {
       next(error);
+    }
+  });
+
+  /**
+   * Apply a run proposal (LIN-3254): dispatch the STORED prompt to the run's
+   * lineage tail. Session-auth + the shared dispatch limiter; the request body
+   * is ignored entirely (a client-supplied prompt is never trusted).
+   *
+   * Ordering: the compare-and-set `proposed → applied` runs FIRST as the
+   * dispatch-once gate (a double POST loses the CAS and never reaches the
+   * dispatch), then the dispatch runs; a failed or refused dispatch REVERTS the
+   * row to `proposed`, so a proposal is never left `applied` with nothing
+   * dispatched. `appliedItemId` is recorded once the dispatch lands.
+   */
+  router.post('/workspace/:urlKey/api/run/:runId/proposals/:id/apply', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const dispatchedBy = req.session && req.session.accountId;
+    if (!dispatchedBy) {
+      return jsonError(res, 401, 'Authentication required to apply a proposal');
+    }
+    if (!runProposalsStore || !dispatchQueueStore || !agentStatusStore) {
+      return jsonError(res, 503, 'Run proposals are not configured for this workspace');
+    }
+
+    const { runId, id } = req.params;
+    try {
+      const proposal = await runProposalsStore.get(workspace.urlKey, runId, id);
+      if (!proposal) return jsonError(res, 404, `Proposal ${id} not found`);
+      // The run's session, scoped to THIS workspace — another workspace's run
+      // is refused before anything is claimed or dispatched.
+      const session = await loadSessionWithTranscript(workspace.urlKey, runId);
+      if (!session) return jsonError(res, 404, `Run ${runId} not found`);
+
+      const claimed = await runProposalsStore.apply(workspace.urlKey, runId, id);
+      if (!claimed) return jsonError(res, 409, 'Proposal already decided');
+
+      try {
+        const outcome = await dispatchSessionFollowUp({
+          dispatchQueueStore,
+          agentStatusStore,
+          workspacePreferencesStore,
+          proxyTokenStore,
+          urlKey: workspace.urlKey,
+          sessionId: runId,
+          prompt: proposal.prompt,
+          baseUrl: `${req.protocol}://${req.get('host')}`,
+          dispatchedBy,
+        });
+        if (outcome.status !== 200) {
+          await runProposalsStore.revert(workspace.urlKey, runId, id);
+          return res.status(outcome.status).json(outcome.body);
+        }
+        await runProposalsStore.recordAppliedItem(workspace.urlKey, runId, id, outcome.body.itemId);
+        return res.json({ applied: true, itemId: outcome.body.itemId });
+      } catch (dispatchError) {
+        console.error('Run proposal apply dispatch error:', dispatchError);
+        await runProposalsStore.revert(workspace.urlKey, runId, id);
+        return jsonError(res, 502, 'Failed to dispatch the proposal');
+      }
+    } catch (error) {
+      console.error('Run proposal apply error:', error);
+      return jsonError(res, 502, 'Failed to apply the proposal');
+    }
+  });
+
+  /**
+   * Decline a run proposal (LIN-3254): compare-and-set `proposed → declined.
+   * Dispatches nothing.
+   */
+  router.post('/workspace/:urlKey/api/run/:runId/proposals/:id/decline', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const dispatchedBy = req.session && req.session.accountId;
+    if (!dispatchedBy) {
+      return jsonError(res, 401, 'Authentication required to decline a proposal');
+    }
+    if (!runProposalsStore) {
+      return jsonError(res, 503, 'Run proposals are not configured for this workspace');
+    }
+
+    const { runId, id } = req.params;
+    try {
+      const declined = await runProposalsStore.decline(workspace.urlKey, runId, id);
+      if (!declined) {
+        const existing = await runProposalsStore.get(workspace.urlKey, runId, id);
+        return existing
+          ? jsonError(res, 409, 'Proposal already decided')
+          : jsonError(res, 404, `Proposal ${id} not found`);
+      }
+      return res.json({ declined: true });
+    } catch (error) {
+      console.error('Run proposal decline error:', error);
+      return jsonError(res, 502, 'Failed to decline the proposal');
     }
   });
 
