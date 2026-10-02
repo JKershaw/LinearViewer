@@ -1439,3 +1439,134 @@ describe('render-session: run-page header money (LIN-3250)', () => {
     assert.match(goalHtml, /data-testid="session-progress"[^>]*>2 steps so far</);
   });
 });
+
+// ── LIN-3250 rework: F2 per-row cost wording + plain-word step summaries ─────
+
+// One loop in the reconstructed-session shape, carrying an optional `[usage]`.
+function costLoop(overrides = {}) {
+  const id = overrides.loopId || 'loop';
+  return {
+    loopId: id,
+    lineageId: overrides.lineageId ?? id,
+    kind: overrides.kind || 'implementation',
+    issueIdentifier: 'LIN-900',
+    issueId: 'uuid-900',
+    issueTitle: 'Task title',
+    iteration: overrides.iteration ?? 1,
+    sessionId: 'sess-abc',
+    dispatchedAt: '2026-07-04T10:00:00.000Z',
+    terminalStatus: 'done',
+    feedback: [],
+    telemetry: { runtime: { ms: 1000 }, metrics: [], producedArtifacts: [] },
+    ...overrides,
+  };
+}
+
+// The `<div data-testid="session-step-summary">…</div>` text for the first step.
+function stepSummaryText(html) {
+  return /data-testid="session-step-summary">([^<]*)</.exec(html)?.[1] ?? null;
+}
+
+// The `<li class="sess-run" data-loop-id="…">…</li>` block for one loop.
+function runBlock(html, loopId) {
+  const marker = `data-loop-id="${loopId}"`;
+  const start = html.lastIndexOf('<li class="sess-run"', html.indexOf(marker));
+  assert.notEqual(start, -1, `no run block for ${loopId}`);
+  const next = html.indexOf('<li class="sess-run"', start + 1);
+  return next === -1 ? html.slice(start) : html.slice(start, next);
+}
+
+describe('render-session: per-row cost wording (LIN-3250 F2)', () => {
+  test('a priced lineage: earlier rows read "included in the step total", the final row carries the figure', () => {
+    const session = fixtureSession({
+      loops: [
+        costLoop({ loopId: 'r1', lineageId: 'R', iteration: 1, telemetry: { runtime: { ms: 1000 }, model: 'claude-opus-4-8', usage: { harness: 'claude-code', model: 'claude-opus-4-8', costUsd: 5 } } }),
+        costLoop({ loopId: 'r2', lineageId: 'R', iteration: 2, followUpTo: 'r1', telemetry: { runtime: { ms: 1000 }, model: 'claude-opus-4-8', usage: { harness: 'claude-code', model: 'claude-opus-4-8', costUsd: 7 } } }),
+      ],
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(runBlock(html, 'r1'), /data-testid="session-run-cost">included in the step total</);
+    assert.match(runBlock(html, 'r2'), /data-testid="session-run-cost">\$7\.00</);
+    assert.match(stepSummaryText(html), /Build · done · premium · \$7\.00/, 'the step summary carries the lineage figure and tier');
+  });
+
+  test('an unpriced lineage: rows and summary read "not reported", with the tier still shown', () => {
+    const session = fixtureSession({
+      loops: [costLoop({ loopId: 'i1', lineageId: 'I', telemetry: { runtime: { ms: 1000 }, model: 'claude-sonnet-4-6', usage: { harness: 'claude-code', model: 'claude-sonnet-4-6', costUsd: null } } })],
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(runBlock(html, 'i1'), /data-testid="session-run-cost">not reported</);
+    assert.match(stepSummaryText(html), /Build · done · standard · not reported/, 'tier still shown beside the withheld figure');
+    assert.ok(!/\$\d/.test(html), 'no dollar figure anywhere');
+  });
+
+  test('a harness-only [usage] reads "not reported" on both the row and the summary', () => {
+    const session = fixtureSession({
+      loops: [costLoop({ loopId: 'i1', lineageId: 'I', telemetry: { runtime: { ms: 1000 }, usage: { harness: 'claude-code' } } })],
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(runBlock(html, 'i1'), /session-run-cost">not reported</);
+    assert.match(stepSummaryText(html), /not reported/);
+    assert.ok(!/\$\d/.test(html));
+  });
+
+  test('a per-turn harness figure row carries its "as reported" qualifier, and the header total is withheld', () => {
+    const session = fixtureSession({
+      loops: [costLoop({ loopId: 'i1', lineageId: 'I', telemetry: { runtime: { ms: 1000 }, model: 'claude-opus-4-8', usage: { harness: 'opencode', model: 'claude-opus-4-8', costUsd: 1.25 } } })],
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(runBlock(html, 'i1'), /session-run-cost">\$1\.25 as reported</);
+    assert.match(stepSummaryText(html), /Build · done · premium · \$1\.25 as reported/);
+    assert.ok(!html.includes('data-testid="session-cost"'), 'per-turn harness withholds the header total');
+  });
+});
+
+describe('render-session: plain-word step summaries (LIN-3250 nit)', () => {
+  test('operator kinds are replaced by plain words in step summaries', () => {
+    const session = fixtureSession({
+      loops: [
+        costLoop({ loopId: 'a1', lineageId: 'a1', kind: 'autopilot' }),
+        costLoop({ loopId: 'w1', lineageId: 'w1', kind: 'wake', terminalStatus: null }),
+        costLoop({ loopId: 'p1', lineageId: 'p1', kind: 'plan' }),
+        costLoop({ loopId: 'i1', lineageId: 'i1', kind: 'implementation' }),
+        costLoop({ loopId: 'r1', lineageId: 'r1', kind: 'review' }),
+        costLoop({ loopId: 'c1', lineageId: 'c1', kind: 'close-out' }),
+      ],
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    const summaries = [...html.matchAll(/data-testid="session-step-summary">([^<]*)</g)].map(m => m[1]);
+    assert.deepEqual(summaries, [
+      'Kick-off · done · not reported',
+      'Check-in · in progress · not reported',
+      'Plan · done · not reported',
+      'Build · done · not reported',
+      'Review · done · not reported',
+      'Close-out · done · not reported',
+    ]);
+    for (const s of summaries) {
+      assert.ok(!/autopilot|wake ·/.test(s), `operator kind leaked into summary: ${s}`);
+    }
+  });
+});
+
+describe('render-session: a real-shaped stepped single-lineage session (LIN-3250 ledger item 5)', () => {
+  test('with close-out still running, one lineage renders 3 of 4 with Next: close-out and intact rows', () => {
+    const session = fixtureSession({
+      sessionId: 'stepped-1',
+      completedAt: null,
+      loops: [
+        costLoop({ loopId: 'l1', lineageId: 'L', kind: 'plan', iteration: 1 }),
+        costLoop({ loopId: 'l2', lineageId: 'L', kind: 'implementation', iteration: 2, followUpTo: 'l1' }),
+        costLoop({ loopId: 'l3', lineageId: 'L', kind: 'review', iteration: 3, followUpTo: 'l2' }),
+        costLoop({ loopId: 'l4', lineageId: 'L', kind: 'implementation', iteration: 4, followUpTo: 'l3' }),
+        costLoop({ loopId: 'l5', lineageId: 'L', kind: 'close-out', iteration: 5, followUpTo: 'l4', terminalStatus: null }),
+      ],
+    });
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    assert.match(html, /data-testid="session-progress"[^>]*>3 of 4 stages</);
+    assert.match(html, /data-testid="session-next"[^>]*>Next: close-out</);
+    assert.match(stepSummaryText(html), /^Close-out · in progress/, 'the active loop decides the step kind/status');
+    assert.equal((html.match(/data-testid="session-step"/g) || []).length, 1, 'one lineage → one step');
+    assert.equal((html.match(/data-testid="session-run"/g) || []).length, 5, 'all five loops keep their rows');
+  });
+});

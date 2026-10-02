@@ -3488,10 +3488,14 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 .status-pill--error   .status-pill__dot { background: var(--red); }
 .status-pill--queued  .status-pill__dot { background: var(--slate); }
 
-/* The running dot pulses to read as "live"; it inherits the global
-   prefers-reduced-motion neutralizer (no new animation machinery). */
-.status-pill--running .status-pill__dot {
-  animation: pulse var(--motion-pulse) ease-in-out infinite;
+/* The running dot pulses to read as "live". This is the ONE pulse rule for the
+   whole app, gated by prefers-reduced-motion: no-preference — a reduced-motion
+   user gets no animation at all (not merely a zeroed duration via the global
+   neutralizer). No page-local duplicate. */
+@media (prefers-reduced-motion: no-preference) {
+  .status-pill--running .status-pill__dot {
+    animation: pulse var(--motion-pulse) ease-in-out infinite;
+  }
 }
 
 /* =============================================================================
