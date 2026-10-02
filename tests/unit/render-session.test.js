@@ -1462,6 +1462,24 @@ function costLoop(overrides = {}) {
   };
 }
 
+// ─── LIN-3247: the run-evidence mount (the one seam LIN-2948 lifts out) ───────
+
+function runEvidenceFixture(overrides = {}) {
+  return {
+    state: { status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', repo: 'acme/widget', number: 12, headSha: 'deadbeef', checksUrl: 'https://github.com/acme/widget/pull/12/checks' }, message: null },
+    evidence: {
+      asked: 'Do the thing', done: 'PR #12',
+      checked: {
+        review: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234' },
+        now: { state: 'passing', checks: [], headSha: 'deadbeef', prUrl: 'https://github.com/acme/widget/pull/12', checksUrl: 'https://github.com/acme/widget/pull/12/checks', headMoved: false },
+      },
+    },
+    ledger: { verdict: 'approve-conditional', verdictText: 'Approve — conditional on close-out discharging the ledger.', ciLine: 'CI is green.', at: '2026-07-02T00:00:00.000Z', sha: 'abc1234', ledger: { present: true, empty: false, unparsed: false, items: [{ id: 'L1', claim: 'a claim', scope: 'inside', discharge: 'check it', dischargedBy: null, discharged: false, followUp: null, raw: '' }], raw: '' } },
+    closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', number: 12 }, message: null },
+    ...overrides,
+  };
+}
+
 // The `<div data-testid="session-step-summary">…</div>` text for the first step.
 function stepSummaryText(html) {
   return /data-testid="session-step-summary">([^<]*)</.exec(html)?.[1] ?? null;
@@ -1568,5 +1586,33 @@ describe('render-session: a real-shaped stepped single-lineage session (LIN-3250
     assert.match(stepSummaryText(html), /^Close-out · in progress/, 'the active loop decides the step kind/status');
     assert.equal((html.match(/data-testid="session-step"/g) || []).length, 1, 'one lineage → one step');
     assert.equal((html.match(/data-testid="session-run"/g) || []).length, 5, 'all five loops keep their rows');
+  });
+});
+
+describe('render-session: run-evidence mount (LIN-3247)', () => {
+  test('mounts the evidence fragment and the close-out box at the top of the page', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [], runEvidence: runEvidenceFixture(),
+    });
+    assert.match(html, /data-testid="run-evidence-mount"/);
+    assert.match(html, /data-testid="run-evidence-checked"/);
+    assert.match(html, /data-testid="run-evidence-closeout"/);
+    // Mounted above the run-header section (the LIN-2948 seam position).
+    assert.ok(html.indexOf('data-testid="run-evidence-mount"') < html.indexOf('sess-run-header'));
+  });
+
+  test('no runEvidence renders no mount — the existing page is unchanged', () => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
+    assert.ok(!html.includes('data-testid="run-evidence-mount"'));
+    assert.ok(!html.includes('data-testid="run-evidence"'));
+  });
+
+  test('a guest viewer gets the evidence rows but no close-out box', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [],
+      runEvidence: runEvidenceFixture({ closeOut: { owner: false, status: 'ready', pr: { url: 'https://github.com/acme/widget/pull/12', number: 12 }, message: null } }),
+    });
+    assert.match(html, /data-testid="run-evidence-checked"/);
+    assert.ok(!html.includes('data-testid="run-evidence-closeout"'));
   });
 });
