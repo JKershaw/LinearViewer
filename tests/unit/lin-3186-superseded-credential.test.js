@@ -563,7 +563,7 @@ describe('P5 — isDanglingReferent auth-swallow logging', () => {
 // ---------------------------------------------------------------------------
 
 describe('P6.7 — lib/superseded-selection.js contains exactly one selectOwnerWorkspaceToken( call', () => {
-  test('source-text pin: exactly one call, so off-session-readers stays at 7', () => {
+  test('source-text pin: exactly one selectOwnerWorkspaceToken( call (one-call uniqueness invariant; no A3 count)', () => {
     const src = readFileSync(join(__dirname, '../../lib/superseded-selection.js'), 'utf8');
     const calls = src.match(/selectOwnerWorkspaceToken\(/g) || [];
     assert.equal(calls.length, 1, `expected exactly one selectOwnerWorkspaceToken( call, found ${calls.length}`);

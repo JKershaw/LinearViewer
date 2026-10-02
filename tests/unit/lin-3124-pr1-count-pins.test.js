@@ -1,22 +1,29 @@
 /**
- * LIN-3124 PR1 (G) — baseline count pins (T5).
+ * LIN-3124 PR1 (G) — credential-surface boundary relations (T5).
  *
- * The D6 §4 baselines, each an exact-equality count over the production source
- * roots (`lib`, `routes`, `server.js`), each with a +1 and a −1 planted
- * offender that must move the count. A count that regresses means a new site in
- * one of the credential surfaces the plan pins.
- *
- * The retired no-read-switch guard's arm (b) pinned the raw-session readers
- * statically; that pin lives here (5 off-session readers).
+ * LIN-3219 A3 (LIN-3201 M19): the nine hardcoded `expected` baselines are gone.
+ * Each credential surface is now guarded by a RELATION over source, not a
+ * literal that every bump has to repair:
+ *   - every site of the surface lies in a module that reaches the surface's
+ *     credential entry through the import graph (`reaches`), and
+ *   - the surface's scanner finds at least one site (`> 0`, so it never passes
+ *     on a zero surface), and
+ *   - the +1 / −1 planted offenders are kept as sensitivity witnesses: they
+ *     must still move the scanner.
+ * `provider-auth-edges` is import-edge-shaped, so it is guarded by a true
+ * derived-set equality between the source regex edge set and the import-graph
+ * edge set (which is dynamic-`import()`-aware), with a dynamic witness.
  *
  * Run with: node --test tests/unit/lin-3124-pr1-count-pins.test.js
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadRawSources, loadStrippedSources } from '../fixtures/connection-access-guards.js';
+import { buildImportGraph } from './lib/import-graph.js';
 
 const RAW = loadRawSources();
 const REAL = loadStrippedSources();
+const GRAPH = buildImportGraph(RAW);
 
 function total(sources, re) {
   let n = 0;
@@ -82,14 +89,6 @@ function countBindingWriters(sources) {
 
 const countRawAccessTokenWriters = (s) => total(s, /\.accessToken *=[^=]/g);
 
-/**
- * LIN-3125 Phase 3 (F8): account↔workspace edge writers — every
- * `bindAccountToWorkspace(` CALL (never the method definition in
- * lib/account-workspace-store.js). 3 -> 4: the held `mode=new` picker arm writes
- * the new workspace's owner edge DIRECTLY (no `establishAccount`, so no
- * identityAuthenticatedAt freshness stamp). The reason is stated here and at the
- * call site in routes/held-connection.js.
- */
 function countWorkspaceEdgeWriters(sources) {
   let n = 0;
   for (const src of sources.values()) {
@@ -100,15 +99,6 @@ function countWorkspaceEdgeWriters(sources) {
   return n;
 }
 
-/**
- * LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters — every
- * `withHeldMarker(` CALL (never the definition in lib/held-connection-entry.js).
- * Byte-stable at exactly 4: the switcher add row, Settings "as a new
- * workspace", and the two server.js add-source redirects (github,
- * github-projects). A fifth call site means an entry the plan did not approve is
- * being captured (or a bare emitter was marked) — the exact F1 class the marker
- * exists to bound.
- */
 function countHeldMarkerEmitters(sources) {
   let n = 0;
   for (const src of sources.values()) {
@@ -120,15 +110,17 @@ function countHeldMarkerEmitters(sources) {
 }
 
 // ---------------------------------------------------------------------------
-// The pins: value + (check, plus, minus)
+// The surfaces: scanner + +1/−1 plants + the credential boundary (a symbol the
+// site module must reach, derived from the import graph — never a file list).
 // ---------------------------------------------------------------------------
 
 const PINS = [
   {
     id: 'test-token-guards',
     label: "accessToken === 'test-token' guards",
-    expected: 38,
     sources: RAW,
+    re: /accessToken === 'test-token'/g,
+    surface: ['linkProvider'],
     count: countTestTokenGuards,
     plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
     minus: (s) => countTestTokenGuards(withoutFirstMatch(s, /accessToken === 'test-token'/)),
@@ -136,8 +128,9 @@ const PINS = [
   {
     id: 'urlkey-lookups',
     label: 'hand-rolled `w.urlKey === urlKey` lookups',
-    expected: 16,
     sources: REAL,
+    re: /w\??\.urlKey === urlKey/g,
+    surface: ['getWorkspaceCallScope'],
     count: countUrlKeyLookups,
     plus: (s) => countUrlKeyLookups(withLine(s, 'lib/workspace.js', 'if (w.urlKey === urlKey) {}')),
     minus: (s) => countUrlKeyLookups(withoutFirstMatch(s, /w\??\.urlKey === urlKey/)),
@@ -145,8 +138,9 @@ const PINS = [
   {
     id: 'provider-auth-edges',
     label: 'upward provider index.js -> routes/*-auth import edges (LIN-675)',
-    expected: 4,
     sources: REAL,
+    re: /^import .*routes\/[a-z-]*auth/gm,
+    surface: null, // guarded by the derived-set equality below
     count: countProviderAuthEdges,
     plus: (s) => countProviderAuthEdges(withLine(s, 'lib/providers/local/index.js', "import '../routes/auth.js';")),
     minus: (s) => countProviderAuthEdges(withoutFirstMatch(s, /^import .*routes\/[a-z-]*auth/, /^lib\/providers\/[^/]+\/index\.js$/)),
@@ -154,38 +148,29 @@ const PINS = [
   {
     id: 'off-session-readers',
     label: 'off-session raw-session credential readers',
-    // LIN-3124 PR3 checkpoint C: 5 -> 6 — the connection-first arm's
-    // owner-scoped provider selection (ownerHeadlessProvider) reads the owner's
-    // session row, exactly as D12 specifies. Deliberate growth, not a
-    // hand-rolled session scan.
-    expected: 7,
     sources: REAL,
+    re: /(selectOwnerWorkspaceToken|selectOwnerWorkspaceRow|selectExpiredOwnerRow|selectOwnerSessionRow|selectAllOwnerSessionRows)\(/g,
+    surface: ['linkProvider'],
     count: countOffSessionReaders,
     plus: (s) => countOffSessionReaders(withLine(s, 'lib/workspace.js', 'const r = selectOwnerSessionRow(s, u, o);')),
     minus: (s) => countOffSessionReaders(withoutFirstMatch(s, /select(OwnerSessionRow|OwnerWorkspaceRow|ExpiredOwnerRow|OwnerWorkspaceToken|AllOwnerSessionRows)\(/, /^(?!lib\/workspace-token-resolver\.js).*/)),
   },
   {
     id: 'binding-writers',
-    label: 'binding writers (linkProvider 12 + upsertWorkspace 7)',
-    // LIN-3125 Phase 3 (F3): upsertWorkspace 6 -> 7. The held `mode=new` picker
-    // arm (`routes/held-connection.js`) builds a fresh container and upserts it
-    // before persisting the held binding — the plan's deliberate +1. linkProvider
-    // is unchanged at 12 (held mode never calls it; the converter rewrites the
-    // binding directly). Reason stated at the call site too.
-    expected: { link: 12, upsert: 7, total: 19 },
+    label: 'binding writers (linkProvider + upsertWorkspace)',
     sources: REAL,
+    re: /(^|[^a-zA-Z])(linkProvider|upsertWorkspace)\(/g,
+    surface: ['linkProvider'],
     count: countBindingWriters,
     plus: (s) => countBindingWriters(withLine(withLine(s, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});"), 'lib/workspace.js', 'upsertWorkspace(sess, w);')),
     minus: (s) => countBindingWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])linkProvider\(/, /^(?!lib\/workspace\.js).*/)),
   },
   {
-    // LIN-3125 Phase 3 (F8): the account↔workspace edge writers. 3 -> 4 (the
-    // held new-workspace owner edge). Deliberate new pin; reason in
-    // `countWorkspaceEdgeWriters` and at the call site.
     id: 'workspace-edge-writers',
     label: 'account<->workspace edge writers (bindAccountToWorkspace)',
-    expected: 4,
     sources: REAL,
+    re: /(^|[^a-zA-Z])bindAccountToWorkspace\(/g,
+    surface: ['AccountStore', 'AccountWorkspaceStore', 'establishAccount', 'linkProvider', 'upsertWorkspace', 'getWorkspaceCallScope'],
     count: countWorkspaceEdgeWriters,
     plus: (s) => countWorkspaceEdgeWriters(withLine(s, 'lib/workspace.js', "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');")),
     minus: (s) => countWorkspaceEdgeWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])bindAccountToWorkspace\(/, /^(?!lib\/account-workspace-store\.js).*/)),
@@ -193,46 +178,83 @@ const PINS = [
   {
     id: 'raw-accesstoken-writers',
     label: 'raw .accessToken assignments',
-    expected: 4,
     sources: REAL,
+    re: /\.accessToken *=[^=]/g,
+    surface: ['getWorkspaceCallScope'],
     count: countRawAccessTokenWriters,
     plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),
     minus: (s) => countRawAccessTokenWriters(withoutFirstMatch(s, /\.accessToken *=[^=]/)),
   },
   {
-    // LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters. Exactly 4 —
-    // navbar switcher add row, render-settings "as a new workspace", and the two
-    // server.js add-source redirects. Deliberate new pin (the plan's
-    // `held-marker-emitters`); the reason is stated here and in §D-F1.
     id: 'held-marker-emitters',
     label: 'explicit held-entry marker emitters (LIN-3125 F1)',
-    expected: 4,
     sources: REAL,
+    re: /(^|[^.\w])withHeldMarker\(/g,
+    surface: ['withHeldMarker'],
     count: countHeldMarkerEmitters,
     plus: (s) => countHeldMarkerEmitters(withLine(s, 'lib/workspace.js', "const u = withHeldMarker('/auth/github', p);")),
     minus: (s) => countHeldMarkerEmitters(withoutFirstMatch(s, /(^|[^.\w])withHeldMarker\(/, /^(?!lib\/held-connection-entry\.js).*/)),
   },
 ];
 
-describe('LIN-3124 PR1 T5 — baseline count pins', () => {
+/** The set of files in a source map containing a match of `re`. */
+function filesMatching(sources, re) {
+  const out = new Set();
+  const stateless = new RegExp(re.source, re.flags.replace('g', ''));
+  for (const [rel, src] of sources) if (stateless.test(src)) out.add(rel);
+  return [...out].sort();
+}
+
+describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3)', () => {
   for (const pin of PINS) {
-    test(`pin ${pin.id}: ${pin.label} is exactly ${JSON.stringify(pin.expected)}`, () => {
-      assert.deepEqual(pin.count(pin.sources), pin.expected);
+    test(`pin ${pin.id}: every ${pin.label} site lies in the credential surface`, () => {
+      const files = filesMatching(pin.sources, pin.re);
+      assert.ok(files.length > 0, `${pin.id}: a zero-finding scan would be vacuous`);
+      const base = pin.count(pin.sources);
+      const n = typeof base === 'number' ? base : base.total;
+      assert.ok(n > 0, `${pin.id}: the scanner must find at least one site`);
+      if (pin.surface) {
+        // Boundary rule: each site module must reach the surface's credential
+        // entry (a symbol derived from the import graph — no file allow-list).
+        const outside = files.filter((f) => !pin.surface.some((sym) => GRAPH.reaches(f, sym)));
+        assert.deepEqual(outside, [], `${pin.id}: sites outside the ${pin.surface.join('|')} credential boundary: ${outside.join(', ')}`);
+      }
     });
 
-    test(`pin ${pin.id}: planted +1 fails`, () => {
-      assert.notDeepEqual(pin.plus(pin.sources), pin.expected);
+    test(`pin ${pin.id}: the scanner moves on a planted +1 site (kept sensitivity witness)`, () => {
+      assert.notDeepEqual(pin.plus(pin.sources), pin.count(pin.sources), `${pin.id} +1 plant did not move the scanner`);
     });
 
-    test(`pin ${pin.id}: planted −1 fails`, () => {
-      assert.notDeepEqual(pin.minus(pin.sources), pin.expected);
+    test(`pin ${pin.id}: the scanner moves on a planted −1 site (kept sensitivity witness)`, () => {
+      assert.notDeepEqual(pin.minus(pin.sources), pin.count(pin.sources), `${pin.id} −1 plant did not move the scanner`);
     });
   }
+});
 
-  test('meta: every pin has both a +1 and a −1 plant that move the count', () => {
-    for (const pin of PINS) {
-      assert.notDeepEqual(pin.plus(pin.sources), pin.expected, `${pin.id} +1 plant did not move the count`);
-      assert.notDeepEqual(pin.minus(pin.sources), pin.expected, `${pin.id} −1 plant did not move the count`);
-    }
+describe('LIN-3124 PR1 T5 — provider-auth edges: derived-set equality (regex vs import-graph)', () => {
+  const providerFiles = () => [...RAW.keys()].filter((f) => /^lib\/providers\/[^/]+\/index\.js$/.test(f)).sort();
+  const regexEdge = (src) => /^import .*routes\/[a-z-]*auth/m.test(src);
+  const graphEdge = (g, f) => g.importsOf(f).some((r) => r.resolved && /^routes\/[a-z-]*auth\.js$/.test(r.resolved));
+
+  test('the set of provider index.js files with a routes/*-auth edge is the same textually and via the import graph', () => {
+    const textual = providerFiles().filter((f) => regexEdge(RAW.get(f))).sort();
+    const derived = providerFiles().filter((f) => graphEdge(GRAPH, f)).sort();
+    assert.ok(derived.length > 0, 'a zero-edge derivation would be vacuous');
+    assert.deepEqual(textual, derived, 'the textual and import-graph provider->auth edge sets must agree');
+  });
+
+  test('witness: a DYNAMIC provider -> routes/*-auth import is caught by the graph and missed by the regex', () => {
+    // The reviewer's LIN-3232 failure mode: `await import('../routes/x-auth.js')`
+    // in a provider index.js. The source regex requires a static `^import `, so
+    // it misses the edge; the (extended) import graph sees it — the derived-set
+    // equality therefore fails, which is the catch.
+    const fake = 'lib/providers/fake/index.js';
+    const modules = new Map([...RAW, [fake, "export async function build() { return (await import('../../../routes/fake-auth.js')).x; }\n"]]);
+    const g = buildImportGraph(modules);
+    assert.equal(regexEdge(modules.get(fake)), false, 'the static regex must not see a dynamic import');
+    assert.equal(graphEdge(g, fake), true, 'the import graph must see the dynamic provider->auth edge');
+    const textual = [fake].filter((f) => regexEdge(modules.get(f))).sort();
+    const derived = [fake].filter((f) => graphEdge(g, f)).sort();
+    assert.notDeepEqual(textual, derived, 'the derived-set equality must fail on the dynamic edge');
   });
 });

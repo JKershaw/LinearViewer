@@ -227,14 +227,18 @@ describe('LIN-3124 PR3 N1 + D4', () => {
       assert.deepEqual(evicted, []);
     });
 
-    test('every census call site passes the per-referent evict (server.js ×5, routes/workspace.js ×2; census 7 after review blocker 3)', () => {
+    test('every releaseConnectionCredential call site passes the per-referent evict (LIN-3219 A3: boundary, no census)', () => {
+      // The per-file census total ("7 after review blocker 3") is gone: the
+      // boundary rule IS the assertion — every `releaseConnectionCredential({…})`
+      // call in the two files passes an `evict:` hook. A new call that omits it
+      // fails; a new call that passes it needs no count bump.
       const re = /releaseConnectionCredential\(\{[^\n]*\}\)/g;
       const sites = [];
       for (const rel of ['server.js', 'routes/workspace.js']) {
         const src = readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
         for (const m of src.match(re) || []) sites.push([rel, m]);
       }
-      assert.equal(sites.length, 7);
+      assert.ok(sites.length > 0, 'a zero-finding scan would be vacuous');
       for (const [rel, call] of sites) assert.match(call, /evict: /, `${rel}: ${call}`);
     });
   });

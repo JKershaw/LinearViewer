@@ -647,7 +647,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     assert.equal(await w.real.ownerStore.collection.countDocuments({}), 1);
   });
 
-  test('pins: finalizePromotion / copyToConnection have one caller (the seam); the durable-delete census is 7 (review blocker 3)', () => {
+  test('pins: finalizePromotion / copyToConnection have one caller (the seam)', () => {
     const src = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
     const seam = src('lib/connection-credential.js');
     assert.equal((seam.match(/\.finalizePromotion\(/g) || []).length, 1);
@@ -655,8 +655,10 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     for (const rel of ['routes/jira-auth.js', 'server.js', 'routes/auth.js', 'lib/github-install-flow.js', 'routes/account-merge.js']) {
       assert.doesNotMatch(src(rel), /\.(finalizePromotion|copyToConnection)\(/, rel);
     }
-    const census = src('tests/unit/connection-access-guard.test.js');
-    assert.match(census, /const KNOWN_CONNECTION_RELEASE_COUNT = 7;/);
+    // LIN-3219 A3: the cross-file `KNOWN_CONNECTION_RELEASE_COUNT = 7` literal
+    // pin is dropped; the durable-release boundary (every
+    // releaseConnectionCredential call passes an `evict:` hook) is guarded in
+    // lin-3124-pr3-n1-d4.test.js, and the guard file keeps its own constant.
     // The Jira route awaits the finalize thunk only AFTER the session save.
     const jira = src('routes/jira-auth.js');
     const save = jira.indexOf('await saveSession(req.session)\n    await conversion.finalize()');

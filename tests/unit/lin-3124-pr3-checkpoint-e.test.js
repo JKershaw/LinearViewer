@@ -604,26 +604,29 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
     // lives there (one guarded call serving all three sites) instead of three
     // inline calls in `lib/github-install-flow.js`; the other seven seams are
     // unchanged. The guarantees are preserved below, relocated to the new seam.
-    const SEAMS = {
-      'routes/auth.js': 2,
-      'routes/jira-auth.js': 4,
-      'routes/account-merge.js': 1,
-      'lib/persist-binding.js': 1,
-    };
+    // LIN-3219 A3: the per-file counts and the total (8) are gone; the boundary
+    // rule is the assertion — every `await writeConnection(` in these files is
+    // guarded as the legacy fallback. The file list stays (it is the seam
+    // surface, not a growing inventory), the numbers do not.
+    const SEAM_FILES = [
+      'routes/auth.js',
+      'routes/jira-auth.js',
+      'routes/account-merge.js',
+      'lib/persist-binding.js',
+    ];
     const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 
     test('each seam file keeps its writeConnection calls, every one guarded as the legacy fallback', () => {
-      let total = 0;
-      for (const [rel, n] of Object.entries(SEAMS)) {
+      for (const rel of SEAM_FILES) {
         const src = read(rel);
         const calls = src.split('\n').filter(l => /await writeConnection\(/.test(l));
-        total += calls.length;
-        assert.equal(calls.length, n, rel);
         const guarded = calls.filter(l => /!conversion\.connectionBacked/.test(l)).length;
         const blockGuards = (src.match(/if \(!conversion\.connectionBacked\) \{/g) || []).length;
-        assert.ok(guarded + blockGuards >= n, `${rel}: every legacy write sits behind the conversion result`);
+        assert.ok(
+          guarded + blockGuards >= calls.length,
+          `${rel}: every legacy write sits behind the conversion result (${calls.length} calls, ${guarded + blockGuards} guards)`
+        );
       }
-      assert.equal(total, 8);
       // LIN-3125 Phase 2: the flow drives all three GitHub sites through the
       // shared seam and keeps no inline legacy write of its own.
       const flow = read('lib/github-install-flow.js');
@@ -690,7 +693,15 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
       const fixtures = read('routes/test.js');
       assert.ok(guard.includes("'routes/test.js'"));
       for (const call of fixtures.match(/await convertFixtureBinding\(/g) || []) assert.ok(call);
-      assert.equal((fixtures.match(/if \(connectionBacked\) \{/g) || []).length, 3, 'github, github-projects, jira: opt-in only');
+      // LIN-3219 A3: the `=== 3` opt-in count is replaced by a structural
+      // relation — every `if (connectionBacked) {` guard wraps a
+      // convertFixtureBinding call, so a dropped guard fails and a new opt-in
+      // site needs no bump.
+      const blocks = fixtures.split('if (connectionBacked) {').slice(1);
+      assert.ok(blocks.length > 0, 'the fixtures must carry at least one opt-in guard');
+      for (const block of blocks) {
+        assert.match(block.slice(0, 400), /convertFixtureBinding\(/, 'every connectionBacked opt-in guard wraps a convertFixtureBinding call');
+      }
       assert.match(fixtures, /if \(!b \|\| b\.connectionBacked !== true\) return b;/, 'local extras: opt-in per binding');
     });
   });
