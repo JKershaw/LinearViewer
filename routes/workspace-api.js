@@ -1903,7 +1903,8 @@ ${goal}`
       // binding instead, via resolveIssueBinding — bounded to this workspace's
       // OWN bindings, so it can only select among credentials the caller
       // already has access to (LIN-1904).
-      const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
+      const detailSelector = issueBindingSelector(req.query.source, req.query.bindingScope)
+      const issueBinding = resolveIssueBinding(workspace, detailSelector)
       if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
       const { provider, callScope } = issueBinding
 
@@ -1919,6 +1920,18 @@ ${goal}`
         }
       } else {
         issue = await provider.fetchIssueFields(callScope, issueId)
+      }
+
+      // LIN-3240 (review F1): the fan-out stamp (`issue.bindingScope`) is applied
+      // at the source rows, but this provider re-fetch returns a fresh issue with
+      // none — so every `bindingScopeAttr(issue)` and the edit/chat hrefs in
+      // `renderDetailsContent` emitted nothing and downstream fetches re-resolved
+      // source-only (422 on a two-repo workspace). Once a `bindingScope` selector
+      // has validated, carry the validated scope onto the rendered issue so the
+      // whole fragment keeps THIS issue's binding. Only when a scope was
+      // validated: an unstamped/single-binding request stays byte-identical.
+      if (detailSelector?.bindingScope) {
+        issue = { ...issue, bindingScope: detailSelector.bindingScope.trim() }
       }
 
       // Custom prompts (non-blocking, fallback to empty) — matches the homepage.

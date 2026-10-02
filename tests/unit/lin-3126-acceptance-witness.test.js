@@ -23,6 +23,7 @@ import assert from 'node:assert/strict';
 import {
   REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace, buildWorkspaceApiApp, withServer,
 } from './lin-3126-harness.js';
+import { setBindingCredential } from '../../lib/connection-binding.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -57,5 +58,57 @@ describe('LIN-3240 acceptance witness (a) — drill-down honours the issue\'s ow
     assert.equal(body.code, 'BINDING_REQUIRED');
     assert.deepEqual(body.bindings, [REPO_A, REPO_B]);
     assert.equal(calls.filter(c => c.method === 'fetchIssueFields').length, 0);
+  });
+});
+
+describe('LIN-3240 review F1 — the /api/detail fragment keeps the validated bindingScope', () => {
+  /** One connection-backed binding on repoA (single-binding workspace). */
+  function makeSingleRepoWorkspace() {
+    const binding = { provider: 'github', scope: REPO_A, connectionId: 'conn-1' };
+    setBindingCredential(binding, { installationId: '99', token: 'tok-a' });
+    return {
+      urlKey: 'acme',
+      provider: 'github',
+      bindings: [binding],
+      activeBinding: { provider: 'github', scope: REPO_A },
+    };
+  }
+
+  test('a validated bindingScope rides onto the rendered issue: data-binding-scope attrs and the edit/chat hrefs', async () => {
+    installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A, [REPO_B]: ISSUE_B } });
+    const workspace = makeTwoRepoWorkspace();
+    const app = buildWorkspaceApiApp({ workspace, features: { taskChat: true } });
+
+    const { status, body } = await withServer(app, ({ get }) =>
+      get(`/workspace/acme/api/detail/1?source=github&bindingScope=${encodeURIComponent(REPO_B)}`));
+
+    assert.equal(status, 200);
+    assert.ok(body.html.includes(ISSUE_B.description), 'repoB\'s fields are rendered');
+    assert.match(body.html, /data-binding-scope="octo\/repoB"/, 'the rendered issue carries its binding scope');
+    assert.ok(
+      body.html.includes('/workspace/acme/task/1/edit?source=github&amp;bindingScope=octo%2FrepoB'),
+      'the Edit href carries the validated bindingScope beside source'
+    );
+    assert.ok(
+      body.html.includes('/workspace/acme/task-chat?task=GB-1&amp;source=github&amp;bindingScope=octo%2FrepoB'),
+      'the task-chat href carries the validated bindingScope beside source'
+    );
+  });
+
+  test('an unstamped (single-binding) request stays byte-identical: no data-binding-scope, no bindingScope in links', async () => {
+    installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A, [REPO_B]: ISSUE_B } });
+    const workspace = makeSingleRepoWorkspace();
+    const app = buildWorkspaceApiApp({ workspace, features: { taskChat: true } });
+
+    const { status, body } = await withServer(app, ({ get }) => get('/workspace/acme/api/detail/1?source=github'));
+
+    assert.equal(status, 200);
+    assert.ok(body.html.includes(ISSUE_A.description), 'repoA\'s fields are rendered');
+    assert.ok(!body.html.includes('data-binding-scope'), 'no stamp is emitted when no bindingScope was validated');
+    assert.ok(!body.html.includes('bindingScope='), 'links must not gain a bindingScope when none was validated');
+    assert.ok(
+      body.html.includes('/workspace/acme/task/1/edit?source=github'),
+      'the Edit href stays byte-identical to the pre-LIN-3240 source-only form'
+    );
   });
 });
