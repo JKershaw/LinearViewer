@@ -13,6 +13,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { parseRunLedger, readRunLedger, latestReviewComment } from '../../lib/run-ledger.js';
 import { RUN_LEDGER_COMMENTS } from '../fixtures/run-ledger-comments.js';
+import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
 
 const fixture = name => RUN_LEDGER_COMMENTS[name].comment;
 
@@ -112,6 +113,29 @@ describe('run-ledger: ledger items and their marks', () => {
   });
 });
 
+describe('run-ledger: the ledger heading is anchored to a line start (R3)', () => {
+  test('a heading mentioned inside prose/backticks does not start the ledger', () => {
+    const body = [
+      '## Review — draft',
+      '',
+      'An earlier review quoted the heading `### What CI Did Not Prove` in backticks.',
+      '- S13: a bullet that is not ledger content',
+      '- Scope held: a second non-ledger bullet',
+      '',
+      '### What CI Did Not Prove',
+      '',
+      '- L1: the real first item, *Inside*',
+      '- L2: the real second item, *Outside*',
+      '',
+      '**Verdict: Approve.**',
+    ].join('\n');
+    const { ledger } = parseRunLedger({ body });
+    assert.strictEqual(ledger.present, true);
+    assert.deepStrictEqual(ledger.items.map(i => i.id), ['L1', 'L2'], 'only the real ledger items are read');
+    assert.doesNotMatch(ledger.raw, /S13|Scope held/, 'the prose bullets must not be captured as ledger content');
+  });
+});
+
 describe('run-ledger: the empty ledger is a distinct state', () => {
   test('an explicit "(none ...)" ledger is empty, not unparsed and not absent', () => {
     const { ledger } = parseRunLedger(fixture('empty-ledger'));
@@ -167,5 +191,43 @@ describe('run-ledger: latest review comment selection', () => {
     assert.strictEqual(latestReviewComment([]), null);
     assert.strictEqual(latestReviewComment([{ id: 'x', body: 'nothing review-like' }]), null);
     assert.strictEqual(readRunLedger([]).verdict, 'unknown');
+  });
+});
+
+describe('run-ledger: real finished-run trails (R1/R2)', () => {
+  const trail = name => RUN_COMMENT_TRAILS[name].comments;
+
+  test('LIN-3245: picks the review, not the close-out or autopilot wrap-up that shadow it', () => {
+    const comments = trail('lin-3245');
+    assert.strictEqual(comments.length, 10);
+    const picked = latestReviewComment(comments);
+    assert.strictEqual(picked?.id, '3e984ba9-c93e-4fea-83b8-9890af4e107b', 'the review summary must win');
+    assert.notStrictEqual(picked?.id, '6522575f-ad97-4465-9345-20d397144673', 'the close-out must not shadow the review');
+    assert.notStrictEqual(picked?.id, '4222f717-02b0-4dee-a915-f5e80ab9a41f', 'the autopilot wrap-up must not shadow the review');
+  });
+
+  test('LIN-3245: the reader yields Approve with the ledger, not an unknown verdict', () => {
+    const model = readRunLedger(trail('lin-3245'));
+    assert.strictEqual(model.verdict, 'approve');
+    assert.strictEqual(model.ledger.present, true);
+    assert.strictEqual(model.ledger.items.length, 5);
+  });
+
+  test('LIN-3245: In/Out table cells keep their mark, including the "Out (P1b)" suffix', () => {
+    const { ledger } = readRunLedger(trail('lin-3245'));
+    assert.deepStrictEqual(
+      ledger.items.map(i => i.scope),
+      ['inside', 'outside', 'outside', 'inside', 'outside'],
+    );
+    assert.strictEqual(ledger.items[2].scope, 'outside', 'the "Out (P1b)" suffix must still read as outside');
+    assert.strictEqual(ledger.items.at(-1).scope, 'outside', 'the run-page item stays outside');
+    assert.ok(ledger.items.every(i => i.scope !== 'unknown'), 'no item may lose its mark');
+  });
+
+  test('LIN-3247: picks this review out of its own beat/autopilot trail', () => {
+    const comments = trail('lin-3247');
+    assert.strictEqual(comments.length, 6);
+    assert.strictEqual(latestReviewComment(comments)?.id, '3f374473-e5e4-4914-98ea-25bbfd7b7bf9');
+    assert.strictEqual(readRunLedger(comments).verdict, 'request-changes');
   });
 });
