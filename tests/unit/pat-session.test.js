@@ -163,12 +163,33 @@ describe('createEnsurePATSession', () => {
 
   test('skips auth/test/logout/legal routes even with no session workspaces', async () => {
     const middleware = createEnsurePATSession(freshStores());
-    for (const path of ['/auth/linear', '/logout', '/test/set-session', '/privacy', '/terms', '/styleguide']) {
+    for (const path of ['/auth/linear', '/logout', '/test/set-session', '/privacy', '/terms', '/styleguide', '/s/abc']) {
       const { req, res } = makeReqRes({ path });
       let nextCalled = false;
       await middleware(req, res, () => { nextCalled = true; });
       assert.strictEqual(nextCalled, true, `next() called for ${path}`);
       assert.strictEqual(req.session.workspaces, undefined, `no PAT session created for ${path}`);
+    }
+  });
+
+  test('exempts /s/ so an anonymous share GET never mints a session or reads the provider (LIN-3243 F1)', async () => {
+    class CountingLinearProvider extends ProviderInterface {
+      constructor() { super(); this.name = 'linear'; this.calls = 0; }
+      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
+      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
+    }
+    const counting = new CountingLinearProvider();
+    registerProvider(counting);
+    try {
+      const middleware = createEnsurePATSession(freshStores());
+      const { req, res } = makeReqRes({ path: `/s/${'a'.repeat(43)}` });
+      let nextCalled = false;
+      await middleware(req, res, () => { nextCalled = true; });
+      assert.strictEqual(nextCalled, true);
+      assert.strictEqual(counting.calls, 0, 'zero provider reads on an anonymous share GET');
+      assert.strictEqual(req.session.workspaces, undefined, 'no PAT session minted');
+    } finally {
+      registerProvider(new FakeLinearProvider());
     }
   });
 

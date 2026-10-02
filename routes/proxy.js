@@ -377,7 +377,7 @@ const RECOMMEND_DESCENT_BUDGET_MS = LLM_TIMEOUT_MS;
  * live-path unit files ~25 s each. Promise.race already swallows the timeout's
  * later settle, so clearing changes no response semantics.
  */
-function withTimeout(promise, ms) {
+export function withTimeout(promise, ms) {
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => {

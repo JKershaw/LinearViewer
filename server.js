@@ -111,7 +111,10 @@ import { resolveEmailTransportKind, resolveEmailTransportRefusal, resolveEmailLi
 import { createOpenRouterAuthRoutes } from './routes/openrouter-auth.js'
 import { createDispatchRoutes } from './routes/dispatch.js'
 import { createTaskModeRoutes } from './routes/task-mode.js'
-import { createProxyRoutes, commentDedupe } from './routes/proxy.js'
+import { createShareRoutes } from './routes/share.js'
+import { ShareStore } from './lib/share-store.js'
+import { createReadOwnerIssues } from './lib/share-owner-reader.js'
+import { createProxyRoutes, commentDedupe, withTimeout } from './routes/proxy.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes, shouldMockAi, decisionStampDedupe } from './routes/workspace-api.js'
@@ -655,6 +658,11 @@ const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collec
 // count dispatch rows, not these.
 const taskModeEventsCollection = db.collection('task-mode-events')
 const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
+
+// Public share links (LIN-3243, Session A of LIN-3073). One store over the
+// `shares` collection; the route is mounted below and receives the store plus
+// the owner-reader/owner-check seams by injection (see lib/share-owner-reader.js).
+const shareStore = new ShareStore({ collection: db.collection('shares') })
 
 // Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
 // epic). One current, versioned state document per observer instance, advanced by
@@ -1267,7 +1275,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis' || req.path === '/templates') {
+  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis' || req.path === '/templates' || req.path.startsWith('/s/')) {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -2196,6 +2204,18 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
+
+// Public share route (LIN-3243). `readOwnerIssues` composes the hardened
+// `resolveWorkspaceAccess(urlKey, ownerAccountId)` (never UNSCOPED) with the
+// provider's `fetchProjects(scope ?? token)`. It is NOT the title resolver
+// (which reads a live session row and skips the credential hardening). The
+// route imports none of the credential stores — both seams are injected.
+const readOwnerIssues = createReadOwnerIssues({
+  resolveWorkspaceAccess,
+  getProviderForWorkspace,
+  getTestMockData: () => testMockData
+})
+app.use(createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerCheck, withTimeout }))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions
