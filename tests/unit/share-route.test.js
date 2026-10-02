@@ -11,7 +11,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { createShareRoutes, createShareLimiters } from '../../routes/share.js';
+import { createShareRoutes, createShareLimiters, FAILURE_BACKOFF_MS, SHARE_REFRESH_TIMEOUT_MS } from '../../routes/share.js';
 
 const TOKEN = `${'A'.repeat(43)}`;
 const OWNER_OK = async () => ({ status: 'owner' });
@@ -68,7 +68,7 @@ async function request(app, path) {
   const server = app.listen(0, '127.0.0.1');
   try {
     await new Promise(resolve => server.once('listening', resolve));
-    const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`);
+    const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { signal: AbortSignal.timeout(5000) });
     const body = await res.text();
     return { status: res.status, headers: res.headers, body };
   } finally {
@@ -241,3 +241,84 @@ describe('GET /s/:token — security, throttle, single-flight, limiter', () => {
     assert.equal((await request(app, `/s/${TOKEN}`)).status, 429);
   });
 });
+
+// =============================================================================
+// Review ledger L1 / L2 / L4 (LIN-3243 corrective).
+//
+// These pin behaviours the first-round mutation check found were NOT actually
+// load-bearing: the 5-minute failure backoff (M5), the injected timeout (M9),
+// and a throwing store write inside refresh() (L4).
+// =============================================================================
+describe('GET /s/:token — backoff, timeout and store-write failure', () => {
+  test('L1: a failed attempt 120s old is still inside FAILURE_BACKOFF_MS → zero provider reads', async () => {
+    assert.equal(FAILURE_BACKOFF_MS, 300_000, 'the backoff window is 5 minutes');
+    const now = Date.now();
+    // A failed attempt (attempt newer than the last success) 120s ago: past the
+    // 60s minimum, well inside the 300s failure backoff.
+    const store = makeStore(baseRecord({
+      snapshotAt: new Date(now - 200_000),
+      lastRefreshAttemptAt: new Date(now - 120_000)
+    }));
+    let reads = 0;
+    const app = buildApp({ store, readOwnerIssues: async () => { reads++; return { reason: 'ok', issues: [] }; } });
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 200);
+    assert.ok(res.body.includes('OLD'), 'last-good is served');
+    assert.equal(reads, 0, '120s-old failure must still back off — no provider read');
+  });
+
+  test('L1: a failed attempt 301s old is due → exactly one provider read', async () => {
+    const now = Date.now();
+    const store = makeStore(baseRecord({
+      snapshotAt: new Date(now - 400_000),
+      lastRefreshAttemptAt: new Date(now - 301_000)
+    }));
+    let reads = 0;
+    const app = buildApp({ store, readOwnerIssues: async () => { reads++; return { reason: 'ok', issues: [] }; } });
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 200);
+    assert.equal(reads, 1, 'past the 300s backoff the refresh runs once');
+  });
+
+  test('L2: refresh is bounded by the injected withTimeout(…, SHARE_REFRESH_TIMEOUT_MS); row 7 → 503', async () => {
+    assert.equal(SHARE_REFRESH_TIMEOUT_MS, 50_000, 'the refresh budget is the proxy multi-request budget');
+    const store = makeStore(baseRecord({ snapshot: null, snapshotAt: null }));
+    const calls = [];
+    const withTimeout = (promise, ms) => { calls.push(ms); return Promise.reject(new Error('timed out')); };
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }), withTimeout });
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 503, 'null snapshot + a timed-out refresh → row 7');
+    assert.deepEqual(calls, [SHARE_REFRESH_TIMEOUT_MS], 'withTimeout receives the refresh budget');
+  });
+
+  test('L2: row 6 holds when the injected timeout rejects — stale snapshot serves last-good', async () => {
+    const store = makeStore(baseRecord({ snapshotAt: new Date(Date.now() - 120_000) }));
+    const calls = [];
+    const withTimeout = (promise, ms) => { calls.push(ms); return Promise.reject(new Error('timed out')); };
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }), withTimeout });
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 200);
+    assert.ok(res.body.includes('OLD'), 'last-good is served on a timed-out refresh');
+    assert.deepEqual(calls, [SHARE_REFRESH_TIMEOUT_MS]);
+  });
+
+  test('L4: a throwing saveSnapshot with a null snapshot → 503 (row 7), not 500', async () => {
+    const store = makeStore(baseRecord({ snapshot: null, snapshotAt: null }));
+    store.saveSnapshot = async () => { throw new Error('mongo down'); };
+    const issues = [{ identifier: 'LIN-9', title: 'x', state: { type: 'started' }, priority: 0, updatedAt: 'x', labels: [{ name: 'bug' }] }];
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues }) });
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 503);
+    assert.equal(res.body, '');
+  });
+
+  test('L4: a throwing saveSnapshot with a stale snapshot → 200 last-good (row 6)', async () => {
+    const store = makeStore(baseRecord({ snapshotAt: new Date(Date.now() - 120_000) }));
+    store.saveSnapshot = async () => { throw new Error('mongo down'); };
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }) });
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 200);
+    assert.ok(res.body.includes('OLD'));
+  });
+});
+

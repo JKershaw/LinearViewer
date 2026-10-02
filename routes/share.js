@@ -112,20 +112,27 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
       }
 
       const ok = outcome != null && outcome.issues != null && outcome.reason === 'ok';
-      if (!ok) {
-        // A failed attempt still stamps `lastRefreshAttemptAt` (row 7 backoff)
-        // but must never disturb the last good snapshot (row 6).
-        await shareStore.saveSnapshot(key, null, { at });
-        return { ok: false, reason: outcome?.reason ?? 'refresh_error' };
-      }
+      // A store write or snapshot build failure is a REFRESH failure, not an
+      // unhandled rejection: the handler then serves last-good (row 6) or 503
+      // (row 7). Without this the rejection escapes and production returns 500.
+      try {
+        if (!ok) {
+          // A failed attempt still stamps `lastRefreshAttemptAt` (row 7 backoff)
+          // but must never disturb the last good snapshot (row 6).
+          await shareStore.saveSnapshot(key, null, { at });
+          return { ok: false, reason: outcome?.reason ?? 'refresh_error' };
+        }
 
-      const snapshot = buildShareSnapshot({
-        subject: record.subject,
-        issues: outcome.issues,
-        includeDescriptions: record.includeDescriptions
-      });
-      await shareStore.saveSnapshot(key, snapshot, { at });
-      return { ok: true, snapshot, snapshotAt: at, reason: outcome.reason };
+        const snapshot = buildShareSnapshot({
+          subject: record.subject,
+          issues: outcome.issues,
+          includeDescriptions: record.includeDescriptions
+        });
+        await shareStore.saveSnapshot(key, snapshot, { at });
+        return { ok: true, snapshot, snapshotAt: at, reason: outcome.reason };
+      } catch (err) {
+        return { ok: false, reason: 'refresh_error' };
+      }
     })().finally(() => { inflight.delete(key); });
 
     inflight.set(key, promise);

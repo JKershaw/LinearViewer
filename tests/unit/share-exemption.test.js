@@ -1,32 +1,47 @@
 /**
- * Server root-route exemption guard for /s/ (LIN-3243, Session A of LIN-3073).
+ * Root-route exemption behaviour for /s/ (LIN-3243, Session A of LIN-3073;
+ * corrective review L3).
  *
  * Run with: node --test tests/unit/share-exemption.test.js
  *
- * `server.js`'s global token-refresh middleware and `lib/pat-session.js`'s
- * skip list must each exempt `/s/` — and the exemption must be the trailing-
- * slash prefix so sibling roots (`/swipe`, `/settings`, `/styleguide`) are NOT
- * swept in. These are read straight from source: the middleware is inline in
- * server.js and the unit suite never boots it.
+ * The first round used a source-literal guard, which could not tell
+ * `startsWith('/s/')` from the over-broad `startsWith('/s')` (M34). The
+ * predicate now lives in `lib/root-route-exemption.js` and is tested
+ * BEHAVIOURALLY: `/s/` is exempt, and sibling roots that merely start with `s`
+ * (`/swipe`, `/settings`, `/ship`, `/swim`) still reach `ensureValidToken`.
+ * A light static check keeps `server.js` delegating to that predicate.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { isTokenRefreshExempt } from '../../lib/root-route-exemption.js';
 
 const serverSrc = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
 const patSrc = readFileSync(new URL('../../lib/pat-session.js', import.meta.url), 'utf8');
 
-test('server.js exempts the /s/ prefix in the token-refresh middleware', () => {
-  const match = serverSrc.match(/\n\s*if \(req\.path\.startsWith\('\/auth\/'\)[^\n]*/);
-  assert.ok(match, 'the token-refresh middleware condition is present');
-  assert.ok(match[0].includes("req.path.startsWith('/s/')"), '/s/ is exempt');
+test('isTokenRefreshExempt exempts the /s/ share prefix', () => {
+  for (const path of ['/s/', '/s/x', `/s/${'a'.repeat(43)}`]) {
+    assert.equal(isTokenRefreshExempt(path), true, `${path} must skip token refresh`);
+  }
 });
 
-test('the /s/ exemption is not so broad that /swipe or /settings are swept in', () => {
-  const match = serverSrc.match(/\n\s*if \(req\.path\.startsWith\('\/auth\/'\)[^\n]*/);
-  assert.ok(match, 'the token-refresh middleware condition is present');
-  assert.ok(!match[0].includes("'/swipe'"), '/swipe must not be exempt');
-  assert.ok(!match[0].includes("'/settings'"), '/settings must not be exempt');
+test('isTokenRefreshExempt does NOT sweep in sibling s-roots', () => {
+  // /styleguideX is deliberately included: it starts with '/s' but is neither
+  // the share prefix nor the exact /styleguide root.
+  for (const path of ['/s', '/swipe', '/swipe/LIN-1', '/settings', '/ship', '/swim', '/styleguideX']) {
+    assert.equal(isTokenRefreshExempt(path), false, `${path} must still reach ensureValidToken`);
+  }
+});
+
+test('isTokenRefreshExempt keeps the pre-existing auth-free roots exempt', () => {
+  for (const path of ['/auth/linear', '/logout', '/privacy', '/terms', '/styleguide', '/kpis', '/templates']) {
+    assert.equal(isTokenRefreshExempt(path), true, `${path} stays exempt`);
+  }
+});
+
+test('server.js delegates the root-route exemption to isTokenRefreshExempt', () => {
+  assert.match(serverSrc, /isTokenRefreshExempt\(req\.path\)/, 'the middleware calls the extracted predicate');
+  assert.ok(!/req\.path\.startsWith\('\/s/.test(serverSrc), 'no inline /s prefix remains in server.js to diverge');
 });
 
 test('lib/pat-session.js exempts the /s/ prefix in its skip list', () => {

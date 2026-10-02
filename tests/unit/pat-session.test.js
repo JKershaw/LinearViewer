@@ -193,8 +193,30 @@ describe('createEnsurePATSession', () => {
     }
   });
 
-  // LIN-1892 (N1): an email-only signed-in session (accountId, zero
-  // workspaces) is not a signed-out visitor. Keep the guard if S2 is reverted.
+  test('does NOT exempt /swipe or /settings — they still run the identity path and mint a PAT session (LIN-3243 L3)', async () => {
+    class CountingLinearProvider extends ProviderInterface {
+      constructor() { super(); this.name = 'linear'; this.calls = 0; }
+      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
+      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
+    }
+    for (const path of ['/swipe', '/settings']) {
+      const counting = new CountingLinearProvider();
+      registerProvider(counting);
+      try {
+        const middleware = createEnsurePATSession(freshStores());
+        const { req, res } = makeReqRes({ path });
+        let nextCalled = false;
+        await middleware(req, res, () => { nextCalled = true; });
+        assert.strictEqual(nextCalled, true);
+        assert.ok(counting.calls > 0, `${path} must still reach the provider (not exempt)`);
+        assert.strictEqual(req.session.workspaces.length, 1, `${path} mints a PAT session`);
+      } finally {
+        registerProvider(new FakeLinearProvider());
+      }
+    }
+  });
+
+
   describe('N1: a signed-in account with zero workspaces is never auto-logged-in (LIN-1892)', () => {
     class CountingLinearProvider extends ProviderInterface {
       constructor() { super(); this.name = 'linear'; this.calls = 0; }

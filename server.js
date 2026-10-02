@@ -114,6 +114,7 @@ import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createShareRoutes } from './routes/share.js'
 import { ShareStore } from './lib/share-store.js'
 import { createReadOwnerIssues } from './lib/share-owner-reader.js'
+import { isTokenRefreshExempt } from './lib/root-route-exemption.js'
 import { createProxyRoutes, commentDedupe, withTimeout } from './routes/proxy.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
@@ -1275,7 +1276,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis' || req.path === '/templates' || req.path.startsWith('/s/')) {
+  if (isTokenRefreshExempt(req.path)) {
     return next();
   }
   ensureValidToken(req, res, next);
