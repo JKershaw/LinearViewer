@@ -16,6 +16,7 @@ import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { TaskModeStore } from '../../lib/task-mode-store.js';
 import { FunnelEventStore } from '../../lib/funnel-event-store.js';
 import { buildCanonicalMap, isPullRequestUrl, stepsForAccountGroup, collectMilestoneFunnel, STEP_STATES } from '../../lib/milestone-funnel.js';
+import { isFreshRun } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const harness = createMangoTmpdir('lin-2952-milestone-');
@@ -181,6 +182,18 @@ describe('isPullRequestUrl', () => {
   });
 });
 
+describe('isFreshRun — the single LIN-2955 Q1 predicate (LIN-2952 consumes it)', () => {
+  test('a plain row is fresh; every continuation shape is not', () => {
+    assert.equal(isFreshRun({ dispatchedAt: new Date() }), true, 'a bare fresh dispatch is a Go');
+    assert.equal(isFreshRun({ followUpTo: 'parent-1' }), false, 'a follow-up continues a run');
+    assert.equal(isFreshRun({ sessionId: 'run-1' }), false, 'a worker continues its orchestrator run');
+    assert.equal(isFreshRun({ cascade: true }), false, 'a cascade emits aborts, not runs');
+    assert.equal(isFreshRun({ kind: 'wake' }), false, 'a wake continues a run');
+    assert.equal(isFreshRun({ abort: true }), false, 'an abort closes a session');
+    assert.equal(isFreshRun(null), false);
+  });
+});
+
 describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
   const readSteps = (w, accountIds, overrides = {}) => stepsForAccountGroup({
     accountIds,
@@ -244,16 +257,43 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
     assert.equal(steps.prOpened.state, STEP_STATES.NOT_REACHED);
   });
 
-  test('first Go excludes abort rows and token-created (non-account) rows', async () => {
+  test('first Go is one fresh Go press — follow-up, worker, cascade, wake and abort rows are continuations, not a Go', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
-    await w.dispatchQueue.insertOne(dispatchRow(a._id, PAST(5000), { abort: true }));
-    await w.dispatchQueue.insertOne(dispatchRow('token-created-row', PAST(4000)));
+    await w.dispatchQueue.insertOne(dispatchRow(a._id, PAST(6000), { abort: true }));
+    await w.dispatchQueue.insertOne(dispatchRow(a._id, PAST(5000), { followUpTo: 'parent-1' }));
+    await w.dispatchQueue.insertOne(dispatchRow(a._id, PAST(4500), { sessionId: 'run-1' }));
+    await w.dispatchQueue.insertOne(dispatchRow(a._id, PAST(4000), { cascade: true }));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(3500), { kind: 'wake' }));
     const goAt = PAST(1000);
     await w.dispatchHistory.insertOne(dispatchRow(a._id, goAt));
 
     const { steps } = await readSteps(w, [a._id]);
-    assert.equal(steps.firstGo.at, goAt.toISOString(), 'the abort and the token row are both skipped');
+    assert.equal(steps.firstGo.at, goAt.toISOString(), 'only the fresh Go press counts as first Go');
+  });
+
+  test('G1a: a lone follow-up row is not a Go — firstGo is not-reached', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(2000), { followUpTo: 'parent-1' }));
+
+    const { steps } = await readSteps(w, [a._id]);
+    assert.equal(steps.firstGo.state, STEP_STATES.NOT_REACHED, 'a continuation is not a Go press');
+    assert.equal(steps.firstGo.at, null);
+  });
+
+  test('PR opened is not narrowed: evidence on a follow-up/worker continuation still counts', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const prAt = PAST(1000);
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(2000), {
+      followUpTo: 'parent-1',
+      feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/9', timestamp: prAt }]
+    }));
+
+    const { steps } = await readSteps(w, [a._id]);
+    assert.equal(steps.firstGo.state, STEP_STATES.NOT_REACHED, 'the follow-up run is a continuation, not a Go');
+    assert.equal(steps.prOpened.at, prAt.toISOString(), 'PR evidence rides the run\'s later continuation rows');
   });
 
   test('PR opened requires an EVIDENCE entry whose url is a PR', async () => {
@@ -345,6 +385,24 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     const noDispatch = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchQueue: null, dispatchHistory: null });
     assert.equal(noDispatch.steps.firstGo.state, 'no-signal');
     assert.equal(noDispatch.steps.firstGo.count, null);
+  });
+
+  test('G1a: continuations never inflate firstGo — a world of follow-up/worker/cascade/wake rows counts 0', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(4000), { followUpTo: 'parent-1' }));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(3000), { sessionId: 'run-1' }));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(2000), { cascade: true }));
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000), { kind: 'wake' }));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.firstGo.state, 'reached');
+    assert.equal(result.steps.firstGo.count, 0, 'no fresh Go press among the continuations');
+
+    // One real fresh row on top of the continuations is exactly one Go.
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(500)));
+    const withGo = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(withGo.steps.firstGo.count, 1);
   });
 
   test('publishes the notReady subset of the mode entry rungs', async () => {
