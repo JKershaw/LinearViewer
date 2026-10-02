@@ -36,6 +36,7 @@ import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { bindingRefusalResponse, BINDING_INTENT } from '../../lib/workspace.js';
+import { attemptSuspectCredentialRefresh } from '../../lib/suspect-credential-refresh.js';
 import { makeHoldingCache } from './lin-3126-proxy-harness.js';
 import { encodeAttachmentHandle } from '../../lib/proxy-wire.js';
 
@@ -737,6 +738,35 @@ describe('(F3) refreshConnectionForSuspect projects the binding scope, never the
     assert.equal(out.token, 'tok-new');
     assert.deepEqual(out.scope, { token: 'tok-new', repo: REPO_A });
     assert.notEqual(out.scope.repo, INSTALLATION_ID, 'a recovered GitHub credential must not regress to the installation id');
+  });
+
+  // L1: the F3 row above enters below the production hop — it calls
+  // `refreshConnectionForSuspect` directly with its own `loadSessions`, so it
+  // cannot see whether `attemptSuspectCredentialRefresh` forwards the thunk into
+  // `refreshConnection`. Without that forwarding,
+  // `bindingScopeForOwnerConnection` gets no loader and falls back to
+  // `connection.unitId` (mutant M-C). This asserts the forwarded argument.
+  test('(L1) attemptSuspectCredentialRefresh forwards loadSessions into refreshConnection', async () => {
+    let received = null;
+    await attemptSuspectCredentialRefresh({
+      fingerprint: 'fp-rejected',
+      urlKey: 'acme',
+      ownerAccountId: 'acct',
+      provider: 'github',
+      loadSessions: async () => [],
+      registry: { isSuspect: () => true, shouldAttemptRefresh: () => true },
+      store: { get: async () => null },
+      lifecycleEventStore: { recordEvent: async () => {} },
+      refreshAccessToken: async () => ({}),
+      persistSession: async () => {},
+      resolveProvider: () => ({}),
+      refreshConnection: async (args) => {
+        received = args;
+        return { token: 'tok-new', expiresAt: future(), provider: 'github' };
+      },
+    });
+    assert.equal(typeof received?.loadSessions, 'function',
+      'the F3 hop must forward loadSessions into refreshConnection, or the recovered scope regresses to connection.unitId');
   });
 });
 
