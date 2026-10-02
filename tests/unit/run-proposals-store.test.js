@@ -13,7 +13,7 @@
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { RunProposalsStore } from '../../lib/run-proposals-store.js';
-import { CHAT_MESSAGE_MAX_LENGTH } from '../../lib/chat-request.js';
+import { MAX_PROMPT_LENGTH } from '../../lib/dispatch-validation.js';
 
 // Minimal in-memory mock of the collection surface the store uses. Supports the
 // equality predicates the store issues: _id, urlKey, runId, status.
@@ -159,10 +159,12 @@ describe('RunProposalsStore (LIN-3254)', () => {
     assert.strictEqual((await store.get(URL_KEY, RUN_ID, created.id)).status, 'declined');
   });
 
-  test('the prompt is capped at the shared chat-message length', async () => {
-    const created = await store.create({ ...base, prompt: 'x'.repeat(CHAT_MESSAGE_MAX_LENGTH + 500) });
+  test('a prompt over the follow-up path\'s cap is rejected on write, nothing stored', async () => {
+    const tooLong = 'x'.repeat(MAX_PROMPT_LENGTH + 1);
 
-    assert.strictEqual(created.prompt.length, CHAT_MESSAGE_MAX_LENGTH);
+    await assert.rejects(() => store.create({ ...base, prompt: tooLong }),
+      /prompt exceeds maximum length/);
+    assert.strictEqual(collection._docs.length, 0);
   });
 
   test('a prompt that scans as a secret is rejected on write, nothing stored', async () => {
