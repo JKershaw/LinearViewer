@@ -83,6 +83,7 @@ import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
 import { SavedChatStore } from './lib/saved-chat-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
+import { TaskModeStore } from './lib/task-mode-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
@@ -646,6 +647,13 @@ const connectionStore = new ConnectionStore({ collection: connectionsCollection 
 // omitted.
 const credentialLifecycleEventsCollection = db.collection('credential-lifecycle-events')
 const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collection: credentialLifecycleEventsCollection })
+
+// Task-mode events (LIN-2942): append-only record of which ladder rung a person
+// took a task on (copy / run this step / run the whole task), per account per
+// task, for the milestone-5 funnel. A measurement, never a gate — run limits
+// count dispatch rows, not these.
+const taskModeEventsCollection = db.collection('task-mode-events')
+const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
 
 // Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
 // epic). One current, versioned state document per observer instance, advanced by
