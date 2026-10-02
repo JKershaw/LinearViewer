@@ -35,6 +35,15 @@
  * NAMED RELAXATION: a new sink inside a GATED mount no longer needs a table
  * edit. The gate relation plus this reach-vs-call relation, not a head-count,
  * are the contract.
+ *
+ * RETIREMENT BOUND / DEPENDENCY (LIN-3219 review #4): this reach-vs-call
+ * relation is FILE-granular. A PARTIAL move — one of several sinks in a route
+ * moved behind a wrapper while the route still keeps a direct call — does not
+ * change REACHING or CALL_SITES, so it is caught ONLY by
+ * lin-3134-declared-mint-census's call roster (the `missing === []` check over
+ * the declared createDispatchItem call sites), not here. If that roster is ever
+ * retired, this relaxation must be re-derived with an occurrence-level
+ * reach-vs-call relation first.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

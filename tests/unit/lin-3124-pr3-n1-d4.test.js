@@ -28,6 +28,19 @@ function eventRecorder() {
   return { events, store: { async recordEvent(e) { events.push(e); return e; } } };
 }
 
+/**
+ * LIN-3219 A3: every `releaseConnectionCredential({…})` occurrence must pass the
+ * per-referent `evict:` hook. Shared by the live test and its planted witness.
+ */
+function missingEvictOffenders(files) {
+  const re = /releaseConnectionCredential\(\{[^\n]*\}\)/g;
+  const out = [];
+  for (const [rel, src] of files) {
+    for (const call of src.match(re) || []) if (!/evict: /.test(call)) out.push(`${rel}: ${call}`);
+  }
+  return out;
+}
+
 describe('LIN-3124 PR3 N1 + D4', () => {
   let dbDir;
   let client;
@@ -232,14 +245,22 @@ describe('LIN-3124 PR3 N1 + D4', () => {
       // boundary rule IS the assertion — every `releaseConnectionCredential({…})`
       // call in the two files passes an `evict:` hook. A new call that omits it
       // fails; a new call that passes it needs no count bump.
-      const re = /releaseConnectionCredential\(\{[^\n]*\}\)/g;
-      const sites = [];
-      for (const rel of ['server.js', 'routes/workspace.js']) {
-        const src = readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
-        for (const m of src.match(re) || []) sites.push([rel, m]);
-      }
+      const files = ['server.js', 'routes/workspace.js'].map((rel) => [rel, readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8')]);
+      const sites = files.flatMap(([, src]) => src.match(/releaseConnectionCredential\(\{[^\n]*\}\)/g) || []);
       assert.ok(sites.length > 0, 'a zero-finding scan would be vacuous');
-      for (const [rel, call] of sites) assert.match(call, /evict: /, `${rel}: ${call}`);
+      assert.deepEqual(missingEvictOffenders(files), [], 'every releaseConnectionCredential( site must pass an evict: hook');
+    });
+
+    test('WITNESS: a releaseConnectionCredential( site with no evict hook fails', () => {
+      // Persistent in-test witness (LIN-3219 A3, review #7): the planted call is
+      // in routes/workspace.js — a module that already satisfies the rule — and
+      // omits the per-referent `evict:` hook. It must fail the SAME live function.
+      const files = ['server.js', 'routes/workspace.js'].map((rel) => [rel, readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8')]);
+      const planted = files.map(([rel, src]) => (rel === 'routes/workspace.js'
+        ? [rel, `${src}\nreleaseConnectionCredential({ connectionStore, ownerCredentialStore, mode: 'remove' })\n`]
+        : [rel, src]));
+      const off = missingEvictOffenders(planted);
+      assert.ok(off.some((m) => m.startsWith('routes/workspace.js')), `expected a no-evict offender, got ${JSON.stringify(off)}`);
     });
   });
 });

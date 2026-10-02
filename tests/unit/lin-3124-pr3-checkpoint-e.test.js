@@ -616,22 +616,52 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
     ];
     const read = (rel) => readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8');
 
-    test('each seam file keeps its writeConnection calls, every one guarded as the legacy fallback', () => {
-      for (const rel of SEAM_FILES) {
-        const src = read(rel);
-        const calls = src.split('\n').filter(l => /await writeConnection\(/.test(l));
-        const guarded = calls.filter(l => /!conversion\.connectionBacked/.test(l)).length;
+    /**
+     * LIN-3219 A3: every `await writeConnection(` occurrence must be guarded as
+     * the legacy fallback (the inline `!conversion.connectionBacked` guard or an
+     * `if (!conversion.connectionBacked) {` block). Shared by the live test and
+     * its planted witness.
+     */
+    function unguardedWriteConnectionOffenders(seams) {
+      const out = [];
+      for (const [rel, src] of seams) {
+        const calls = src.split('\n').filter((l) => /await writeConnection\(/.test(l)).length;
+        const inlineGuards = src.split('\n').filter((l) => /await writeConnection\(/.test(l) && /!conversion\.connectionBacked/.test(l)).length;
         const blockGuards = (src.match(/if \(!conversion\.connectionBacked\) \{/g) || []).length;
-        assert.ok(
-          guarded + blockGuards >= calls.length,
-          `${rel}: every legacy write sits behind the conversion result (${calls.length} calls, ${guarded + blockGuards} guards)`
-        );
+        if (!(inlineGuards + blockGuards >= calls)) out.push(`${rel}: ${calls} calls, ${inlineGuards + blockGuards} guards`);
       }
+      return out;
+    }
+
+    /** LIN-3219 A3: every `if (connectionBacked) {` opt-in guard wraps a convertFixtureBinding( call. */
+    function unwrappedOptInGuards(src) {
+      return src.split('if (connectionBacked) {').slice(1).filter((b) => !/convertFixtureBinding\(/.test(b.slice(0, 400)));
+    }
+
+    test('each seam file keeps its writeConnection calls, every one guarded as the legacy fallback', () => {
+      const seams = SEAM_FILES.map((rel) => [rel, read(rel)]);
+      const calls = seams.reduce((n, [, src]) => n + src.split('\n').filter((l) => /await writeConnection\(/.test(l)).length, 0);
+      assert.ok(calls > 0, 'a zero-finding scan would be vacuous');
+      assert.deepEqual(unguardedWriteConnectionOffenders(seams), [], 'every await writeConnection( must sit behind the conversion result');
       // LIN-3125 Phase 2: the flow drives all three GitHub sites through the
       // shared seam and keeps no inline legacy write of its own.
       const flow = read('lib/github-install-flow.js');
       assert.equal((flow.match(/await persistBinding\(/g) || []).length, 3, 'the three GitHub sites call the shared seam');
       assert.equal((flow.match(/await writeConnection\(/g) || []).length, 0, 'the GitHub legacy writes moved into the shared seam');
+    });
+
+    test('WITNESS: an unguarded await writeConnection( in a seam file fails', () => {
+      // Persistent in-test witness (LIN-3219 A3, review #7): lib/persist-binding.js
+      // already satisfies the rule; a fresh unguarded write must fail the SAME
+      // live function.
+      const seams = SEAM_FILES.map((rel) => [rel, read(rel)]);
+      const planted = seams.map(([rel, src]) => (rel === 'lib/persist-binding.js'
+        ? [rel, `${src}\n  await writeConnection(accountId, workspace, binding)\n`]
+        : [rel, src]));
+      assert.ok(
+        unguardedWriteConnectionOffenders(planted).some((m) => m.startsWith('lib/persist-binding.js')),
+        'the planted unguarded legacy write must be an offender'
+      );
     });
 
     test('in every seam the conversion runs after the establishAccount refusal return', () => {
@@ -699,10 +729,15 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
       // site needs no bump.
       const blocks = fixtures.split('if (connectionBacked) {').slice(1);
       assert.ok(blocks.length > 0, 'the fixtures must carry at least one opt-in guard');
-      for (const block of blocks) {
-        assert.match(block.slice(0, 400), /convertFixtureBinding\(/, 'every connectionBacked opt-in guard wraps a convertFixtureBinding call');
-      }
+      assert.deepEqual(unwrappedOptInGuards(fixtures), [], 'every connectionBacked opt-in guard wraps a convertFixtureBinding call');
       assert.match(fixtures, /if \(!b \|\| b\.connectionBacked !== true\) return b;/, 'local extras: opt-in per binding');
+    });
+
+    test('WITNESS: a connectionBacked opt-in guard without a convertFixtureBinding call fails', () => {
+      // Persistent in-test witness (LIN-3219 A3, review #7): the planted guard
+      // wraps nothing, so the SAME live function must report it.
+      const planted = read('routes/test.js') + "\nif (connectionBacked) {\n  doLegacyThing();\n}\n";
+      assert.ok(unwrappedOptInGuards(planted).length > 0, 'the planted empty opt-in guard must be an offender');
     });
   });
 });

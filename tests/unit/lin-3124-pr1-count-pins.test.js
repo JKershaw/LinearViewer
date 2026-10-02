@@ -1,23 +1,40 @@
 /**
  * LIN-3124 PR1 (G) — credential-surface boundary relations (T5).
  *
- * LIN-3219 A3 (LIN-3201 M19): the nine hardcoded `expected` baselines are gone.
- * Each surface is guarded by a RELATION that can FAIL, with an in-test planted
- * offender per surface proving it is not vacuous. The scanner-moves checks are
- * kept only as auxiliary sensitivity tests (they are not the witnesses).
+ * LIN-3219 A3 (LIN-3201 M19), review-fix beat 2: the first A3 attempt used a
+ * `reaches(<credential entry>)` module boundary for every surface. The
+ * implementation review (LIN-3219 comment `2812bf89`, finding #1) showed that
+ * each entry (`linkProvider`, `getWorkspaceCallScope`, `readBindingCredential`,
+ * the account set) is reached by 128–132 of 323 production modules, so
+ * "the site's module reaches the entry" is not a credential boundary: a fresh
+ * site inside any already-reaching module passed. This rewrite makes each
+ * surface an OCCURRENCE-level relation that actually separates:
  *
- * Relation kinds (plan rev 4 §Strategy option (1)/(2)):
- *   - `boundary`: every site of the surface lies in a module that reaches the
- *     surface's credential entry through the import graph (`reaches`). The entry
- *     symbol is deliberately DIFFERENT from what the scanner matches, so a
- *     planted site in a module that does not import the credential path fails.
+ *   - `boundary`: the occurrence's module must reach the credential entry **and**
+ *     the occurrence must sit inside a function body (a module-top-level
+ *     occurrence is not a runtime call site — the shape every old +1 plant had).
+ *   - `owner`: the occurrence's module must be in an EXPLICITLY DERIVED owner set
+ *     — the symbols' defining module(s) plus their direct importers — **and**
+ *     the occurrence must sit inside a function body. Used for `binding-writers`,
+ *     where the defining module (lib/workspace.js) legitimately holds the
+ *     symbols' own call sites but a fresh top-level call must still fail.
+ *   - `shape` (per occurrence, applied alongside the module relation):
+ *       * `test-token-guards`: the `accessToken === 'test-token'` short-circuit
+ *         is only valid when gated by `process.env.NODE_ENV === 'test'`.
+ *       * `raw-accesstoken-writers`: a raw `.accessToken =` write is only valid
+ *         alongside its `.tokenExpiresAt =` mirror companion.
  *   - `callerImporter`: derived-set equality between the modules that CALL the
- *     symbols and the modules that IMPORT them (via `directImportersOf`). Used
- *     for `held-marker-emitters`, whose scanner matches its boundary symbol
- *     itself (a `reaches` boundary would be vacuous there).
- *   - `provider-auth-edges` is import-edge-shaped: a true derived-set equality
- *     between the source regex edge set and the (dynamic-aware) import-graph
- *     edge set, with a dynamic `import()` witness.
+ *     symbols and the modules that IMPORT them (`held-marker-emitters`).
+ *   - `providerAuth`: a true derived-set equality between the source regex edge
+ *     set and the (dynamic-aware) import-graph edge set.
+ *
+ * Allowed-module-set sizes (vs 323): `binding-writers` owner 9,
+ * `test-token-guards` boundary-reach 128, `urlkey-lookups` 128,
+ * `off-session-readers` 128, `workspace-edge-writers` 128,
+ * `raw-accesstoken-writers` 128, `held-marker-emitters` caller==importer
+ * (6 callers / 3 importers). The 128-reach surfaces do NOT separate at module
+ * granularity — their separating axis is the per-occurrence function-shape rule;
+ * this is stated rather than papered over.
  *
  * Run with: node --test tests/unit/lin-3124-pr1-count-pins.test.js
  */
@@ -28,7 +45,6 @@ import { buildImportGraph } from './lib/import-graph.js';
 
 const RAW = loadRawSources();
 const REAL = loadStrippedSources();
-const GRAPH = buildImportGraph(RAW);
 
 function total(sources, re) {
   let n = 0;
@@ -59,7 +75,7 @@ function withoutFirstMatch(sources, re, fileRe = null) {
 }
 
 // ---------------------------------------------------------------------------
-// Count functions (the scanners)
+// Count functions (the scanners, kept as auxiliary sensitivity checks)
 // ---------------------------------------------------------------------------
 
 const countTestTokenGuards = (s) => total(s, /accessToken === 'test-token'/g);
@@ -115,7 +131,7 @@ function countHeldMarkerEmitters(sources) {
 }
 
 // ---------------------------------------------------------------------------
-// Relations (each returns the list of offenders; empty when clean)
+// Occurrence helpers
 // ---------------------------------------------------------------------------
 
 /** The set of files in a source map containing a match of `re`. */
@@ -126,25 +142,103 @@ function filesMatching(sources, re) {
   return [...out].sort();
 }
 
-/**
- * Boundary rule: every site module must reach one of the surface's credential
- * entry symbols. `symbols` are DELIBERATELY not the symbols the scanner matches,
- * so the relation is falsifiable: a planted site in a module that does not
- * import the credential path fails.
- */
-function boundaryOffenders(sources, re, symbols, graph = buildImportGraph(sources)) {
-  return filesMatching(sources, re)
-    .filter((f) => !symbols.some((sym) => graph.reaches(f, sym)))
-    .map((f) => `${f}: site outside the ${symbols.join('|')} credential boundary`);
+/** Brace nesting depth at `offset`, ignoring comments and string/template literals. */
+function braceDepthAt(source, offset) {
+  let depth = 0;
+  let i = 0;
+  while (i < offset) {
+    const c = source[i];
+    if (c === '\n') { i++; continue; }
+    if (c === '/' && source[i + 1] === '/') { while (i < offset && source[i] !== '\n') i++; continue; }
+    if (c === '/' && source[i + 1] === '*') {
+      i += 2;
+      while (i < offset && !(source[i] === '*' && source[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') {
+      const q = c;
+      i++;
+      while (i < offset && source[i] !== q) { if (source[i] === '\\') i++; i++; }
+      i++;
+      continue;
+    }
+    if (c === '{') depth++;
+    else if (c === '}') depth--;
+    i++;
+  }
+  return depth;
 }
+
+/**
+ * Every match of `re`, as `{ rel, index, line, lineIndex, depth, src }`.
+ * Comment lines and `excludeLine`/`excludeFiles` matches are skipped, so the
+ * shape checks see call sites, not prose or the symbol's own definition.
+ */
+function scanSites(sources, re, { excludeFiles = [], excludeLine = null } = {}) {
+  const out = [];
+  for (const [rel, src] of sources) {
+    if (excludeFiles.includes(rel)) continue;
+    const st = new RegExp(re.source, 'g');
+    let m;
+    while ((m = st.exec(src))) {
+      const lineStart = src.lastIndexOf('\n', m.index - 1) + 1;
+      let lineEnd = src.indexOf('\n', m.index);
+      if (lineEnd === -1) lineEnd = src.length;
+      const line = src.slice(lineStart, lineEnd);
+      if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;
+      if (excludeLine && excludeLine.test(line)) continue;
+      out.push({
+        rel,
+        index: m.index,
+        line,
+        lineIndex: src.slice(0, lineStart).split('\n').length - 1,
+        depth: braceDepthAt(src, m.index),
+        src,
+      });
+    }
+  }
+  return out;
+}
+
+/** The test-token short-circuit is only legitimate gated by NODE_ENV === 'test'. */
+function nodeEnvGated(site) {
+  const lines = site.src.split('\n');
+  const cur = lines[site.lineIndex] || '';
+  const prev = lines[site.lineIndex - 1] || '';
+  return /process\.env\.NODE_ENV === 'test'/.test(cur) || /process\.env\.NODE_ENV === 'test'/.test(prev);
+}
+
+/** A raw `.accessToken =` write must be accompanied by its `.tokenExpiresAt =`. */
+function expiryPaired(site) {
+  const lines = site.src.split('\n');
+  const win = lines.slice(site.lineIndex, site.lineIndex + 8).join('\n');
+  return /\.tokenExpiresAt\s*=/.test(win);
+}
+
+/**
+ * EXPLICITLY DERIVED owner set: the defining module(s) of `symbols` plus the
+ * modules that directly import any of them. No hand-listed allowlist.
+ */
+function derivedOwnerSet(graph, symbols) {
+  const owner = new Set();
+  for (const sym of symbols) {
+    for (const imp of graph.directImportersOf(sym)) owner.add(imp);
+    for (const p of graph.paths()) if (graph.exportedNamesOf(p).includes(sym)) owner.add(p);
+  }
+  return owner;
+}
+
+// ---------------------------------------------------------------------------
+// Relations (each returns the list of offenders; empty when clean)
+// ---------------------------------------------------------------------------
 
 /**
  * Derived-set equality: the modules that CALL the surface symbols equal the
  * modules that IMPORT them. Used where the scanner matches the boundary symbol
  * itself (a `reaches` boundary would be vacuous). `definers` are excluded from
  * the caller set (a defining module legitimately holds the symbol without
- * importing it). Both directions offend: a caller without an import, and an
- * import without a caller.
+ * importing it). Both directions offend.
  */
 function callerImporterOffenders(sources, re, symbols, definers = [], graph = buildImportGraph(sources)) {
   const callers = filesMatching(sources, re).filter((f) => !definers.includes(f)).sort();
@@ -159,6 +253,8 @@ function callerImporterOffenders(sources, re, symbols, definers = [], graph = bu
 // The surfaces
 // ---------------------------------------------------------------------------
 
+const ACCOUNT_SURFACE = ['AccountStore', 'AccountWorkspaceStore', 'establishAccount', 'linkProvider', 'upsertWorkspace', 'getWorkspaceCallScope'];
+
 const PINS = [
   {
     id: 'test-token-guards',
@@ -166,9 +262,8 @@ const PINS = [
     sources: RAW,
     re: /accessToken === 'test-token'/g,
     relation: 'boundary',
-    // scanner matches a property comparison; boundary entry is the credential
-    // entry symbol — different symbol, so the relation is falsifiable.
     surface: ['linkProvider'],
+    shape: 'nodeEnv',
     plant: "const g = w.accessToken === 'test-token';\n",
     count: countTestTokenGuards,
     plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
@@ -199,14 +294,15 @@ const PINS = [
   },
   {
     id: 'off-session-readers',
-    // scanner matches owner-session selector CALLS; boundary entry is the
-    // credential entry (different symbol), so a planted call in a module that
-    // does not import the credential path fails.
+    // scanner matches owner-session selector CALLS; the definer file is excluded
+    // (its own definitions are not readers). Occurrence-level relation: the
+    // module must reach the credential entry AND the call must be inside a body.
     label: 'off-session raw-session credential readers',
     sources: REAL,
     re: /(selectOwnerWorkspaceToken|selectOwnerWorkspaceRow|selectExpiredOwnerRow|selectOwnerSessionRow|selectAllOwnerSessionRows)\(/g,
     relation: 'boundary',
     surface: ['linkProvider'],
+    excludeFiles: ['lib/workspace-token-resolver.js'],
     plant: 'const r = selectOwnerSessionRow(s, u, o);\n',
     count: countOffSessionReaders,
     plus: (s) => countOffSessionReaders(withLine(s, 'lib/workspace.js', 'const r = selectOwnerSessionRow(s, u, o);')),
@@ -214,14 +310,16 @@ const PINS = [
   },
   {
     id: 'binding-writers',
-    // scanner matches linkProvider/upsertWorkspace CALLS; boundary entry is the
-    // account<->workspace edge writer (a different symbol the files reach), so
-    // the relation is not the scanner's own symbol.
+    // scanner matches linkProvider/upsertWorkspace CALLS. Owner set = the
+    // defining module (lib/workspace.js) plus direct importers; the definer's
+    // own legitimate calls are the reason the occurrence also has to sit in a
+    // function body (a fresh top-level call there must still fail).
     label: 'binding writers (linkProvider + upsertWorkspace)',
     sources: REAL,
     re: /(^|[^a-zA-Z])(linkProvider|upsertWorkspace)\(/g,
-    relation: 'boundary',
-    surface: ['readBindingCredential'],
+    relation: 'owner',
+    ownerSymbols: ['linkProvider', 'upsertWorkspace'],
+    excludeLine: /function\s+(linkProvider|upsertWorkspace)/,
     plant: "linkProvider(ws, 'x', 'y', {});\n",
     count: countBindingWriters,
     plus: (s) => countBindingWriters(withLine(withLine(s, 'lib/workspace.js', "linkProvider(ws, 'x', 'y', {});"), 'lib/workspace.js', 'upsertWorkspace(sess, w);')),
@@ -229,11 +327,15 @@ const PINS = [
   },
   {
     id: 'workspace-edge-writers',
+    // scanner matches bindAccountToWorkspace CALLS; the method definition is
+    // excluded. Occurrence-level relation: the module must reach the account
+    // set AND the call must be inside a body.
     label: 'account<->workspace edge writers (bindAccountToWorkspace)',
     sources: REAL,
     re: /(^|[^a-zA-Z])bindAccountToWorkspace\(/g,
     relation: 'boundary',
-    surface: ['AccountStore', 'AccountWorkspaceStore', 'establishAccount', 'linkProvider', 'upsertWorkspace', 'getWorkspaceCallScope'],
+    surface: ACCOUNT_SURFACE,
+    excludeLine: /(function|async)\s+bindAccountToWorkspace/,
     plant: "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');\n",
     count: countWorkspaceEdgeWriters,
     plus: (s) => countWorkspaceEdgeWriters(withLine(s, 'lib/workspace.js', "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');")),
@@ -241,11 +343,15 @@ const PINS = [
   },
   {
     id: 'raw-accesstoken-writers',
+    // scanner matches raw `.accessToken =` writes. Occurrence-level relation:
+    // the module must reach the credential entry, the write must be inside a
+    // body, AND it must carry its `.tokenExpiresAt =` mirror companion.
     label: 'raw .accessToken assignments',
     sources: REAL,
     re: /\.accessToken *=[^=]/g,
     relation: 'boundary',
     surface: ['getWorkspaceCallScope'],
+    shape: 'expiryPair',
     plant: "ws.accessToken = 'x';\n",
     count: countRawAccessTokenWriters,
     plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),
@@ -268,12 +374,24 @@ const PINS = [
   },
 ];
 
-/** Run a pin's relation over a source map (the thing the witnesses assert on). */
+/** Run a pin's relation over a source map (the thing the live test + witnesses assert on). */
 function relationOffenders(pin, sources) {
   const graph = buildImportGraph(sources);
-  if (pin.relation === 'boundary') return boundaryOffenders(sources, pin.re, pin.surface, graph);
+  if (pin.relation === 'providerAuth') return [];
   if (pin.relation === 'callerImporter') return callerImporterOffenders(sources, pin.re, pin.surface, pin.definers || [], graph);
-  return [];
+  const owner = pin.relation === 'owner' ? derivedOwnerSet(graph, pin.ownerSymbols) : null;
+  const out = [];
+  for (const s of scanSites(sources, pin.re, pin)) {
+    if (pin.relation === 'owner') {
+      if (!owner.has(s.rel)) out.push(`${s.rel}: module outside the ${pin.ownerSymbols.join('|')} derived owner set`);
+    } else if (pin.surface) {
+      if (!pin.surface.some((sym) => graph.reaches(s.rel, sym))) out.push(`${s.rel}: site outside the ${pin.surface.join('|')} credential boundary`);
+    }
+    if (s.depth === 0) out.push(`${s.rel}: occurrence at module top level (not inside a function body)`);
+    if (pin.shape === 'nodeEnv' && !nodeEnvGated(s)) out.push(`${s.rel}: test-token guard not gated by process.env.NODE_ENV === 'test'`);
+    if (pin.shape === 'expiryPair' && !expiryPaired(s)) out.push(`${s.rel}: .accessToken write without its .tokenExpiresAt companion`);
+  }
+  return out;
 }
 
 describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3)', () => {
@@ -287,13 +405,15 @@ describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3
     });
 
     if (pin.relation !== 'providerAuth') {
-      test(`pin ${pin.id}: WITNESS — a planted new ${pin.label} site outside the relation fails it`, () => {
-        const planted = new Map([...pin.sources, [`lib/zz-plant-${pin.id}.js`, pin.plant]]);
+      test(`pin ${pin.id}: WITNESS — a planted new ${pin.label} site inside an already-reached module fails it`, () => {
+        // Planted INSIDE a module that reaches the credential entry (the old
+        // module-level rule's weak point) and at module top level, exactly the
+        // reviewer's +1 shapes. The live assertion function must report it.
+        const planted = withLine(pin.sources, 'lib/workspace.js', pin.plant);
         const off = relationOffenders(pin, planted);
-        assert.ok(off.length > 0, `${pin.id}: the planted offender must fail the relation, got none`);
         assert.ok(
-          off.some((m) => m.includes(`lib/zz-plant-${pin.id}.js`)),
-          `${pin.id}: expected lib/zz-plant-${pin.id}.js in the offenders, got ${JSON.stringify(off)}`
+          off.some((m) => m.startsWith('lib/workspace.js')),
+          `${pin.id}: the planted top-level site in an already-reached module must fail, got ${JSON.stringify(off)}`
         );
       });
     }
@@ -310,18 +430,17 @@ describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3
   // The −1 relation witness exists where the relation is caller==importer
   // (removing a call while its import remains MUST fail). For the boundary
   // surfaces a removed site is not relation-expressible without a count: the
-  // boundary guards which modules may hold a site, not how many each holds.
+  // relation guards which occurrences are allowed, not how many a module holds.
   // What covers removal there: the auxiliary sensitivity test above (the
-  // scanner moves) plus the `> 0` floor (emptying the class fails). See notes
-  // §17; plan rev 4 §Strategy option (3) (deletion only with a cited witness).
+  // scanner moves) plus the `> 0` floor (emptying the class fails).
   test('pin binding-writers: WITNESS — the upsertWorkspace baseline half also fails the relation', () => {
     // The plan's "9 baselines" counts this row as TWO baselines (linkProvider,
     // upsertWorkspace; `total` is derived). The generic witness plants a
     // linkProvider site; this one plants the upsertWorkspace half.
     const pin = PINS.find((p) => p.id === 'binding-writers');
-    const planted = new Map([...pin.sources, ['lib/zz-plant-binding-writers-upsert.js', 'upsertWorkspace(sess, w);\n']]);
+    const planted = withLine(pin.sources, 'lib/workspace.js', 'upsertWorkspace(sess, w);\n');
     const off = relationOffenders(pin, planted);
-    assert.ok(off.some((m) => m.includes('lib/zz-plant-binding-writers-upsert.js')), `expected the upsert plant, got ${JSON.stringify(off)}`);
+    assert.ok(off.some((m) => m.startsWith('lib/workspace.js')), `expected the upsert plant, got ${JSON.stringify(off)}`);
   });
 
   test('pin held-marker-emitters: WITNESS — a removed call with its import left behind fails', () => {
@@ -341,7 +460,7 @@ describe('LIN-3124 PR1 T5 — provider-auth edges: derived-set equality (regex v
 
   test('the set of provider index.js files with a routes/*-auth edge is the same textually and via the import graph', () => {
     const textual = providerFiles().filter((f) => regexEdge(RAW.get(f))).sort();
-    const derived = providerFiles().filter((f) => graphEdge(GRAPH, f)).sort();
+    const derived = providerFiles().filter((f) => graphEdge(buildImportGraph(RAW), f)).sort();
     assert.ok(derived.length > 0, 'a zero-edge derivation would be vacuous');
     assert.deepEqual(textual, derived, 'the textual and import-graph provider->auth edge sets must agree');
   });
