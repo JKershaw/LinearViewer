@@ -74,6 +74,8 @@ import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sw
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
 import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
 import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
+import { RunParagraphStore } from './lib/run-paragraph-store.js'
+import { createRunParagraphPrecompute, resolvePrecomputeApiKey } from './lib/run-paragraph-hook.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
@@ -453,19 +455,40 @@ const sessionSummaryCacheStore = new SessionSummaryCacheStore({
   collection: sessionSummaryCacheCollection
 })
 
-// Background session-summary precompute (LIN-632). Late-wired into the observation
-// materializer now that both the summary cache and the run-summary cache exist:
-// whenever a session is (re)materialized AND is terminal, generate its one-sentence
-// rollup ahead of time so the first user click is a cache hit. This runs at WRITE
-// time with NO user session, so it resolves an OpenRouter key server-side
-// (OPENROUTER_API_KEY → free-tier) and SKIPS cleanly when neither is configured —
-// never blocking, never throwing into the read-model write it rode in on.
+// Run paragraph store (LIN-3253, LIN-2948 S3): the durable home for the one
+// plain-language paragraph per run, keyed `${urlKey}:${runId}`. NO TTL —
+// dispatch evidence is lifetime-retained (LIN-3163), so the paragraph must
+// outlive the 7- and 30-day caches. Modelled on the session-summary cache minus
+// the TTL; the `{urlKey, runId}` pair is a declared unique index.
+const runParagraphCollection = db.collection('run-paragraph')
+const runParagraphStore = new RunParagraphStore({
+  collection: runParagraphCollection
+})
+const precomputeRunParagraph = createRunParagraphPrecompute({
+  runParagraphStore,
+  isTerminal: sessionIsTerminal
+})
+
+// Background session-summary precompute (LIN-632) plus the run-paragraph
+// precompute (LIN-3253). Late-wired into the observation materializer once the
+// stores exist: whenever a session is (re)materialized, generate its run
+// paragraph (step end or close-out, gated on inputHash), and — for a terminal
+// session — its one-sentence rollup ahead of time so the first user click is a
+// cache hit. This runs at WRITE time with NO user session, so it resolves an
+// OpenRouter key server-side (OPENROUTER_API_KEY → free-tier) and SKIPS cleanly
+// when neither is configured — never blocking, never throwing into the read-model
+// write it rode in on.
 observationMaterializer.precomputeSessionSummary = async (urlKey, session) => {
-  if (!sessionSummaryCacheStore || !session?.sessionId) return;
-  if (process.env.NODE_ENV === 'test') return;       // tests stay offline (no LLM)
+  if (!session?.sessionId) return;
+  const apiKey = resolvePrecomputeApiKey();            // offline / no key → skip
+  if (!apiKey) return;
+
+  // Run paragraph: runs for a running OR terminal session — the summary's own
+  // terminal gate below must not suppress it.
+  await precomputeRunParagraph(urlKey, session, { apiKey });
+
+  if (!sessionSummaryCacheStore) return;
   if (!sessionIsTerminal(session)) return;            // only terminal sessions are cacheable
-  const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENROUTER_FREE_TIER_KEY;
-  if (!apiKey) return;                                // no server-side key → skip gracefully
 
   // Skip if a fresh summary for this exact input is already cached.
   const inputHash = hashSession(session)
@@ -2873,7 +2896,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
