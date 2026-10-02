@@ -80,15 +80,59 @@ const DISPATCH_SITE_ENDPOINTS = [
   '/api/proxy/recommend-and-dispatch',
 ];
 
+// LIN-3219 A3 (M19): the count literals are gone; the relations below can fail.
+
+/** Return-path offsets in a function body with no preceding fingerprint stamp. */
+function unstampedReturns(body) {
+  const clean = body.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  const offenders = [];
+  const re = /\breturn\b/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(clean))) {
+    if (!/req\.resolvedCredentialFingerprint\s*=/.test(clean.slice(last, m.index))) offenders.push(m.index);
+    last = m.index + m[0].length;
+  }
+  return offenders;
+}
+
+const DIRECT_CALL = /const \{ token(?:: accessToken)?, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
+
+/** Every direct call site whose following window lacks a `!accessToken`/`!token` guard. */
+function directUnguardedOffenders(files) {
+  const offenders = [];
+  for (const { file, src } of files) {
+    for (const m of src.matchAll(DIRECT_CALL)) {
+      const window = src.slice(m.index, m.index + 400);
+      if (!window.includes('if (!accessToken)') && !window.includes('if (!token)')) offenders.push(file);
+    }
+  }
+  return offenders;
+}
+
 describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () => {
-  test('resolveProviderAccess (the provider-lane chokepoint, fronting ~24 sites as ONE surface) stamps req.resolvedCredentialFingerprint on every return path that resolves a credential, including the TEST_LOCAL_URL_KEY short-circuit — but NOT on a resolveWorkspaceAccess failure (LIN-1746: an earlier revision stamped unconditionally, which misfiled a workspace-resolution 503 as stage:"provider-lane")', () => {
+  const providerBody = () => {
     const start = PROXY_SRC.indexOf('async function resolveProviderAccess');
     assert.ok(start >= 0, 'resolveProviderAccess not found');
     const end = PROXY_SRC.indexOf('\n  }', start); // closes at the 2-space method-body indent inside createProxyRoutes
-    const body = PROXY_SRC.slice(start, end);
+    return PROXY_SRC.slice(start, end);
+  };
 
-    const stampCount = (body.match(/req\.resolvedCredentialFingerprint\s*=/g) || []).length;
-    assert.equal(stampCount, 2, 'expected exactly 2 stamps: the TEST_LOCAL_URL_KEY short-circuit and the real resolveWorkspaceAccess path');
+  test('every return path of resolveProviderAccess that resolves a credential is preceded by a req.resolvedCredentialFingerprint stamp', () => {
+    // Boundary rule (not a count): every `return` in the chokepoint's body must
+    // have a stamp since the previous return / function start. The failure path
+    // does not return here (it falls through), so every return is a resolving
+    // path — LIN-1746's "stamp unconditionally" regression is excluded because
+    // it had no return before the failure branch.
+    const offenders = unstampedReturns(providerBody());
+    assert.deepEqual(offenders, [], `unstamped return paths at offsets ${JSON.stringify(offenders)}`);
+  });
+
+  test('WITNESS: a planted unstamped return path fails', () => {
+    const opener = 'async function resolveProviderAccess(urlKey, ownerAccountId, req) {';
+    const planted = providerBody().replace(opener, `${opener}\n    return { provider: localProvider, token: urlKey, reason: 'ok' };`);
+    assert.ok(planted.includes(opener), 'the opener was actually planted');
+    assert.ok(unstampedReturns(planted).length > 0, 'the planted unstamped return must be an offender');
   });
 
   // LIN-679 Stage 3a / LIN-2536 (F4): derived from the filesystem rather than
@@ -114,53 +158,22 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     assert.deepEqual(missingReq, [], `every resolveProviderAccess(...) call must end in ", req)" so the chokepoint can stamp — offenders: ${JSON.stringify(missingReq)}`);
   });
 
-  test('each of the 9 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites destructures `provider` (LIN-2044) — the manual per-site stamp is gone because resolveProviderAccess now stamps internally, proven by the chokepoint test above', () => {
-    // Pre-LIN-2044 this pinned a DIFFERENT shape: a raw resolveWorkspaceAccess(...)
-    // call destructuring `credentialFingerprint`, immediately followed by a manual
-    // `req.resolvedCredentialFingerprint = credentialFingerprint ?? null;` line.
-    // LIN-2044 routed all 9 of these sites onto resolveProviderAccess (passing `req`
-    // as the third arg so ITS internal stamp, already pinned above, lands on this
-    // request) and deleted the now-redundant manual stamp line at each site.
-    //
-    // LIN-679 Stage 4 (LIN-2538) — three-way split, part 1 of 3: 7 of the 9
-    // sites moved to routes/proxy-compute.js.
-    // LIN-679 Stage 5 (LIN-2539) — three-way split, part 2 of 3: 1 more
-    // (group H kickoff) moved to routes/proxy-kickoff.js.
-    // LIN-679 Stage 6 (LIN-2540) — three-way split, part 3 of 3, closing: the
-    // last direct site (group I recommend-and-dispatch) moved to
-    // routes/proxy-dispatch.js, so routes/proxy.js now has 0.
-    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
-    const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
-    const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
-    const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
-    const proxyMatches = PROXY_SRC.match(pattern) || [];
-    assert.equal(
-      computeMatches.length,
-      7,
-      `expected 7 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in routes/proxy-compute.js, found ${computeMatches.length}.`
-    );
-    assert.equal(
-      kickoffMatches.length,
-      1,
-      `expected 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site in routes/proxy-kickoff.js, found ${kickoffMatches.length}.`
-    );
-    assert.equal(
-      dispatchMatches.length,
-      1,
-      `expected 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site in routes/proxy-dispatch.js, found ${dispatchMatches.length}.`
-    );
-    assert.equal(
-      proxyMatches.length,
-      0,
-      `expected 0 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites remaining in routes/proxy.js, found ${proxyMatches.length}. ` +
-      'A count above 0 means a site did not move with group I, or a NEW direct site was added — update this pin\'s expected counts only after also ' +
-      'updating the "expected exactly 1" resolveWorkspaceAccess( count pinned in workspace-accesstoken-linear-egress-census.test.js.'
-    );
-    assert.equal(
-      computeMatches.length + kickoffMatches.length + dispatchMatches.length,
-      9,
-      'F=7 + H=1 + I=1 = 9 — the resolveProviderAccess direct-site count must now be expressible as a partition across exactly 3 modules, not a moving target'
-    );
+  test('every direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site destructures the token shape and is immediately followed by its !accessToken guard (no per-file counts)', () => {
+    // LIN-3219 A3: the F=7 + H=1 + I=1 = 9 per-file counts are gone. The
+    // relation is derived from the filesystem-discovered proxy route files and
+    // can fail: a direct site with no following guard is an offender.
+    const files = proxyRouteFiles.map((file) => ({ file, src: readFileSync(join(routesDir, file), 'utf8') }));
+    const sites = files.flatMap(({ file, src }) => [...src.matchAll(DIRECT_CALL)].map(() => file));
+    assert.ok(sites.length > 0, 'a zero-site scan would be vacuous');
+    assert.deepEqual(directUnguardedOffenders(files), [], 'direct sites without a !token guard');
+  });
+
+  test('WITNESS: a direct call site with no following guard fails', () => {
+    const planted = [{
+      file: 'routes/zz-direct.js',
+      src: "const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);\n// no guard follows\n",
+    }];
+    assert.ok(directUnguardedOffenders(planted).includes('routes/zz-direct.js'), 'expected the planted unguarded site to be an offender');
   });
 
   // Belt-and-braces on the ordering claim itself (not just presence): since
@@ -179,7 +192,8 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
   // run it over routes/proxy-dispatch.js (1 site, group I
   // recommend-and-dispatch) and the complementary 0-site no-op over
   // routes/proxy.js (valid per the function's own loop-over-zero-matches shape).
-  function assertOrderingGuard(source, expectedCount, label) {
+  /** Check every direct site in `source`; returns the number of sites checked. */
+  function assertOrderingGuard(source, label) {
     const resolveIdx = [];
     let cursor = 0;
     const needle = 'const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);';
@@ -189,8 +203,6 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       resolveIdx.push(idx);
       cursor = idx + needle.length;
     }
-    assert.equal(resolveIdx.length, expectedCount, `expected ${expectedCount} direct sites in ${label}, found ${resolveIdx.length}`);
-
     for (const idx of resolveIdx) {
       // Bounded by the NEXT resolve site (or EOF) rather than a fixed char
       // count, so a comment of any length between the resolve call and its
@@ -204,13 +216,15 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       assert.equal(strippedOfComments, '',
         `unexpected non-comment code between the resolve call and its !accessToken guard in ${label} (offset ${idx}): ${JSON.stringify(between)}`);
     }
+    return resolveIdx.length;
   }
 
-  test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
-    assertOrderingGuard(PROXY_COMPUTE_SRC, 7, 'routes/proxy-compute.js');
-    assertOrderingGuard(PROXY_KICKOFF_SRC, 1, 'routes/proxy-kickoff.js');
-    assertOrderingGuard(PROXY_DISPATCH_SRC, 1, 'routes/proxy-dispatch.js');
-    assertOrderingGuard(PROXY_SRC, 0, 'routes/proxy.js');
+  test('at every direct site, nothing but the LIN-1980 comment sits between the resolveProviderAccess(...) call and its !accessToken guard (no per-file counts)', () => {
+    const total = assertOrderingGuard(PROXY_COMPUTE_SRC, 'routes/proxy-compute.js')
+      + assertOrderingGuard(PROXY_KICKOFF_SRC, 'routes/proxy-kickoff.js')
+      + assertOrderingGuard(PROXY_DISPATCH_SRC, 'routes/proxy-dispatch.js')
+      + assertOrderingGuard(PROXY_SRC, 'routes/proxy.js');
+    assert.ok(total > 0, 'a zero-site scan would be vacuous');
   });
 
   test('endpoint coverage sanity: every endpoint tag this ticket\'s plan named for the 9 direct sites is actually present in its own file', () => {

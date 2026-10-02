@@ -314,6 +314,16 @@ describe('LIN-3124 PR1 T5 — credential-surface boundary relations (LIN-3219 A3
   // What covers removal there: the auxiliary sensitivity test above (the
   // scanner moves) plus the `> 0` floor (emptying the class fails). See notes
   // §17; plan rev 4 §Strategy option (3) (deletion only with a cited witness).
+  test('pin binding-writers: WITNESS — the upsertWorkspace baseline half also fails the relation', () => {
+    // The plan's "9 baselines" counts this row as TWO baselines (linkProvider,
+    // upsertWorkspace; `total` is derived). The generic witness plants a
+    // linkProvider site; this one plants the upsertWorkspace half.
+    const pin = PINS.find((p) => p.id === 'binding-writers');
+    const planted = new Map([...pin.sources, ['lib/zz-plant-binding-writers-upsert.js', 'upsertWorkspace(sess, w);\n']]);
+    const off = relationOffenders(pin, planted);
+    assert.ok(off.some((m) => m.includes('lib/zz-plant-binding-writers-upsert.js')), `expected the upsert plant, got ${JSON.stringify(off)}`);
+  });
+
   test('pin held-marker-emitters: WITNESS — a removed call with its import left behind fails', () => {
     const pin = PINS.find((p) => p.id === 'held-marker-emitters');
     const rel = 'lib/render-settings.js';

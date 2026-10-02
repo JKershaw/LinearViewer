@@ -19,9 +19,9 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { MangoClient } from '@jkershaw/mangodb';
@@ -1176,18 +1176,34 @@ describe('owner-backfill wiring and source census (LIN-3142 G13)', () => {
 
   // Anchored on top-level statements (column 0), so a comment that names
   // either call cannot stand in for it.
-  test('server.js awaits runOwnerBackfill({ db }) after ensureIndexes(db) and before app.listen(', () => {
-    const src = readFileSync(SERVER_PATH, 'utf8');
+  // LIN-3219 A3 (M19): the ordering is checked for EVERY top-level match (not
+  // just the first), so a second, misordered boot call is caught.
+  function ownerBackfillOrderingOffenders(src) {
     const ensure = src.search(/^await ensureIndexes\(db\)/m);
-    const calls = [...src.matchAll(/^await runOwnerBackfill\(\{ db \}\)/gm)];
     const listen = src.search(/^const server = app\.listen\(/m);
-    assert.notStrictEqual(ensure, -1, 'await ensureIndexes(db) is present');
-    assert.notStrictEqual(listen, -1, 'app.listen( is present');
-    assert.strictEqual(calls.length, 1, 'exactly one top-level await runOwnerBackfill({ db })');
-    assert.ok(calls[0].index > ensure, 'after await ensureIndexes(db)');
-    assert.ok(calls[0].index < listen, 'before app.listen(');
-    const codeCalls = src.split('\n').filter(l => /\brunOwnerBackfill\(/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l));
-    assert.strictEqual(codeCalls.length, 1, 'boot calls it once, in the default write mode (no write flag)');
+    const off = [];
+    if (ensure === -1) off.push('await ensureIndexes(db) is missing');
+    if (listen === -1) off.push('app.listen( is missing');
+    const calls = [...src.matchAll(/^await runOwnerBackfill\(\{ db \}\)/gm)];
+    if (calls.length === 0) off.push('no top-level await runOwnerBackfill({ db })');
+    for (const c of calls) {
+      if (ensure !== -1 && !(c.index > ensure)) off.push(`runOwnerBackfill at offset ${c.index} is not after ensureIndexes(db)`);
+      if (listen !== -1 && !(c.index < listen)) off.push(`runOwnerBackfill at offset ${c.index} is not before app.listen(`);
+    }
+    if (calls.length !== 1) off.push(`expected exactly one top-level await runOwnerBackfill({ db }), found ${calls.length}`);
+    return off;
+  }
+
+  test('server.js awaits runOwnerBackfill({ db }) after ensureIndexes(db) and before app.listen( — for every match', () => {
+    assert.deepEqual(ownerBackfillOrderingOffenders(readFileSync(SERVER_PATH, 'utf8')), []);
+  });
+
+  test('WITNESS: a second, misordered runOwnerBackfill call fails the ordering relation', () => {
+    const src = readFileSync(SERVER_PATH, 'utf8');
+    assert.ok(src.includes('await ensureIndexes(db)'), 'anchor present');
+    const planted = src.replace('await ensureIndexes(db)', 'await runOwnerBackfill({ db });\nawait ensureIndexes(db)');
+    const off = ownerBackfillOrderingOffenders(planted);
+    assert.ok(off.some((m) => m.includes('not after ensureIndexes')), `expected a misordered offender, got ${JSON.stringify(off)}`);
   });
 
   test('lib/owner-backfill.js reads no env var and imports nothing from scripts/', () => {
@@ -1222,5 +1238,35 @@ describe('owner-backfill wiring and source census (LIN-3142 G13)', () => {
         `only as the identity lookup/count value: ${line.trim()}`
       );
     }
+  });
+
+  // LIN-3219 A3: boundary rule on WHERE the identity literal may occur.
+  test('the identity literal value occurs only in lib/owner-backfill.js (boundary, not a count)', () => {
+    const root = fileURLToPath(new URL('../../', import.meta.url));
+    const files = [];
+    const walk = (abs) => {
+      for (const e of readdirSync(abs, { withFileTypes: true })) {
+        const full = join(abs, e.name);
+        if (e.isDirectory()) walk(full);
+        else if (e.name.endsWith('.js')) files.push(full);
+      }
+    };
+    for (const rel of ['lib', 'routes']) walk(join(root, rel));
+    files.push(SERVER_PATH);
+    const holders = files
+      .filter((f) => readFileSync(f, 'utf8').includes(PIN_LINEAR_SCOPE))
+      .map((f) => relative(root, f))
+      .sort();
+    assert.deepEqual(holders, ['lib/owner-backfill.js']);
+  });
+
+  test('WITNESS: the identity literal planted in a non-permitted file fails the boundary', () => {
+    const planted = new Map([
+      ['lib/owner-backfill.js', readFileSync(MODULE_PATH, 'utf8')],
+      ['lib/zz-leak.js', `const leak = '${PIN_LINEAR_SCOPE}';\n`],
+    ]);
+    const holders = [...planted].filter(([, s]) => s.includes(PIN_LINEAR_SCOPE)).map(([f]) => f).sort();
+    assert.ok(holders.includes('lib/zz-leak.js'), `expected lib/zz-leak.js in ${JSON.stringify(holders)}`);
+    assert.notDeepEqual(holders, ['lib/owner-backfill.js']);
   });
 });

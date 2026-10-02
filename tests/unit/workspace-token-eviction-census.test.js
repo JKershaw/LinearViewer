@@ -13,7 +13,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -22,6 +22,34 @@ const repoRoot = join(__dirname, '..', '..');
 
 function read(relPath) {
   return readFileSync(join(repoRoot, relPath), 'utf8');
+}
+
+// LIN-3219 A3 (M19): the numeric totals are gone. The production corpus (all
+// routes except the routes/test.js harness, plus server.js) is scanned and the
+// relation is a BOUNDARY on which modules may call the teardown symbols:
+//   - every module that calls `session.destroy(` must also evict the workspace
+//     token cache (pairing by module);
+//   - every module that calls `removeWorkspace(` must also evict.
+// A module that tears down without evicting fails, with no number to bump.
+const DESTROY_RE = /\bsession\.destroy\(/g;
+const EVICT_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/g;
+const REMOVE_RE = /\bremoveWorkspace\((?!\))/g;
+
+function productionSources() {
+  const files = [
+    'server.js',
+    ...readdirSync(join(repoRoot, 'routes'))
+      .filter((n) => n.endsWith('.js') && n !== 'test.js')
+      .map((n) => `routes/${n}`),
+  ];
+  return new Map(files.map((rel) => [rel, readFileSync(join(repoRoot, rel), 'utf8')]));
+}
+
+function modulesMatching(sources, re) {
+  const out = [];
+  const stateless = new RegExp(re.source, re.flags.replace('g', ''));
+  for (const [rel, src] of sources) if (stateless.test(src)) out.push(rel);
+  return out.sort();
 }
 
 function countDestroys(source) {
@@ -39,27 +67,28 @@ function countDestroys(source) {
 // 5 deliberately; a sixth path must fail this test.
 const KNOWN_DESTROY_COUNT = 5;
 
-describe('LIN-1507 witness D(ii) — session.destroy( census', () => {
-  test('the total count of session.destroy( across server.js + routes/auth.js + routes/workspace.js is exactly 5', () => {
-    const counts = {
-      'server.js': countDestroys(read('server.js')),
-      'routes/auth.js': countDestroys(read('routes/auth.js')),
-      'routes/workspace.js': countDestroys(read('routes/workspace.js')),
-    };
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+describe('LIN-1507 witness D(ii) — session.destroy module boundary (LIN-3219 A3)', () => {
+  test('every module that destroys a session also evicts the workspace token cache', () => {
+    // Boundary rule (not a count): a module may call `session.destroy(` only if
+    // it also carries an eviction call. A new teardown module that forgets the
+    // eviction fails here, with no number to bump.
+    const sources = productionSources();
+    const destroyers = modulesMatching(sources, DESTROY_RE);
+    const evictors = modulesMatching(sources, EVICT_RE);
+    assert.ok(destroyers.length > 0, 'a zero-destroy scan would be vacuous');
+    const offenders = destroyers.filter((f) => !evictors.includes(f));
+    assert.deepEqual(offenders, [], `destroying modules without an eviction: ${offenders.join(', ')}`);
+  });
 
-    assert.equal(
-      total,
-      KNOWN_DESTROY_COUNT,
-      `Found ${total} session.destroy( call site(s) (${JSON.stringify(counts)}), expected exactly ${KNOWN_DESTROY_COUNT}. ` +
-      'A NEW session-destruction path needs a matching cache eviction, per LIN-1507: cached workspace tokens ' +
-      'must not outlive the session row that granted them. Before touching KNOWN_DESTROY_COUNT in this test, add ' +
-      '(or remove) a matching evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, accountId) call immediately ' +
-      "before the new/removed destroy() — capturing urlKey/accountId into locals BEFORE calling destroy(), since " +
-      "destroy()'s callback runs after the session data is gone. See lib/workspace-token-cache.js's " +
-      'evictWorkspaceTokenPair and the existing sites: server.js (ensureValidToken, handleWorkspaceRemoval, ' +
-      'handleUnauthorizedError), routes/auth.js (/logout), routes/workspace.js (/workspace/:urlKey/remove).'
-    );
+  test('WITNESS: a new destroy module with no eviction fails the boundary', () => {
+    const planted = new Map([
+      ...productionSources(),
+      ['routes/new-teardown.js', "req.session.destroy(() => res.redirect('/'));\n"],
+    ]);
+    const destroyers = modulesMatching(planted, DESTROY_RE);
+    const evictors = modulesMatching(planted, EVICT_RE);
+    const offenders = destroyers.filter((f) => !evictors.includes(f));
+    assert.ok(offenders.includes('routes/new-teardown.js'), `expected routes/new-teardown.js, got ${JSON.stringify(offenders)}`);
   });
 });
 
@@ -145,26 +174,27 @@ function countWorkspaceRemovals(source) {
 
 const KNOWN_WORKSPACE_REMOVAL_COUNT = 3;
 
-describe('LIN-1518 — removeWorkspace( census (the "session survives" half of the class)', () => {
-  test('the total count of removeWorkspace( call sites across server.js + routes/workspace.js is exactly 3', () => {
-    const counts = {
-      'server.js': countWorkspaceRemovals(read('server.js')),
-      'routes/workspace.js': countWorkspaceRemovals(read('routes/workspace.js')),
-    };
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+describe('LIN-1518 — removeWorkspace module boundary (LIN-3219 A3)', () => {
+  test('every module that calls removeWorkspace( also evicts the workspace token cache', () => {
+    // Boundary rule (not a count): dropping a workspace from a surviving session
+    // must be paired with an eviction, module by module.
+    const sources = productionSources();
+    const removers = modulesMatching(sources, REMOVE_RE);
+    const evictors = modulesMatching(sources, EVICT_RE);
+    assert.ok(removers.length > 0, 'a zero-removal scan would be vacuous');
+    const offenders = removers.filter((f) => !evictors.includes(f));
+    assert.deepEqual(offenders, [], `removeWorkspace( modules without an eviction: ${offenders.join(', ')}`);
+  });
 
-    assert.equal(
-      total,
-      KNOWN_WORKSPACE_REMOVAL_COUNT,
-      `Found ${total} removeWorkspace( call site(s) (${JSON.stringify(counts)}), expected exactly ` +
-      `${KNOWN_WORKSPACE_REMOVAL_COUNT}. A NEW path that drops a workspace from session.workspaces needs a ` +
-      'matching evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, accountId), per LIN-1518: a cached ' +
-      'workspace token must not outlive the workspace\'s membership of the session that granted it — including ' +
-      'when the session SURVIVES the removal (the remaining>0 arms), which the session.destroy( census above ' +
-      'cannot see. Capture urlKey/accountId into locals BEFORE removeWorkspace(, which drops the workspace. ' +
-      'Existing sites: server.js (ensureValidToken catch, handleWorkspaceRemoval) and routes/workspace.js ' +
-      '(/workspace/:urlKey/remove, remove-one-of-many).'
-    );
+  test('WITNESS: a new removeWorkspace( module with no eviction fails the boundary', () => {
+    const planted = new Map([
+      ...productionSources(),
+      ['routes/new-remove.js', 'removeWorkspace(req.session, workspace.id);\n'],
+    ]);
+    const removers = modulesMatching(planted, REMOVE_RE);
+    const evictors = modulesMatching(planted, EVICT_RE);
+    const offenders = removers.filter((f) => !evictors.includes(f));
+    assert.ok(offenders.includes('routes/new-remove.js'), `expected routes/new-remove.js, got ${JSON.stringify(offenders)}`);
   });
 
   test('ensureValidToken evicts before its remaining>0 branch, so BOTH arms are covered', () => {

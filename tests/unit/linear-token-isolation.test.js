@@ -462,28 +462,35 @@ describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source
     // "serve what was already selected" return. Both new sites carry
     // `scope: recovered.scope`, same as their neighbours.
     const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
-    const lines = body.split('\n');
 
-    // The SUCCESS returns (cache-hit x2, selector x2, refresh-on-resolve) all
-    // carry the literal `reason: 'ok'` — unlike the failure-path return
-    // further down, which forwards a variable `reason` instead. That literal
-    // is what distinguishes them without hard-coding line numbers. Excludes
-    // the NODE_ENV=test shortcut's own `reason: 'ok'` return (`'test-token'`)
-    // — deliberately out of the plan's edits, a hard-coded Linear-shaped test
-    // fixture with no session/cache path to widen.
-    const successReturnLines = lines.filter(l => l.includes('return {') && l.includes("reason: 'ok'") && !l.includes("'test-token'"));
-    assert.equal(successReturnLines.length, 5, `expected exactly 5 token-bearing success returns, found ${successReturnLines.length}`);
-    for (const line of successReturnLines) {
-      assert.match(line, /scope:/, `success return missing scope: ${line.trim()}`);
-    }
+    // LIN-3219 A3 (M19): the two count literals ("exactly 5") are gone. The
+    // boundary relation is the assertion: every success return (`reason: 'ok'`,
+    // excluding the hard-coded Linear test fixture) and every workspace-token
+    // cache write carries `scope:`. A dropped field at any site fails.
+    const scopeOffenders = (text) => {
+      const out = [];
+      for (const l of text.split('\n')) {
+        if (l.includes('return {') && l.includes("reason: 'ok'") && !l.includes("'test-token'") && !l.includes('scope:')) out.push(`return without scope: ${l.trim()}`);
+        if (l.includes('workspaceTokenCache.set(') && !l.includes('scope:')) out.push(`cache write without scope: ${l.trim()}`);
+      }
+      return out;
+    };
+    const successReturnLines = body.split('\n').filter(l => l.includes('return {') && l.includes("reason: 'ok'") && !l.includes("'test-token'"));
+    const cacheWriteLines = body.split('\n').filter(l => l.includes('workspaceTokenCache.set('));
+    assert.ok(successReturnLines.length > 0, 'a zero-success-return scan would be vacuous');
+    assert.ok(cacheWriteLines.length > 0, 'a zero-cache-write scan would be vacuous');
+    assert.deepEqual(scopeOffenders(body), [], 'every token-bearing success return and cache write must carry scope:');
 
-    // All workspaceTokenCache.set(...) calls. LIN-3124 PR3 checkpoint C added a
-    // fifth: the connection-first arm's own cache write (carries arm.result.scope).
-    const cacheWriteLines = lines.filter(l => l.includes('workspaceTokenCache.set('));
-    assert.equal(cacheWriteLines.length, 5, `expected exactly 5 cache writes, found ${cacheWriteLines.length}`);
-    for (const line of cacheWriteLines) {
-      assert.match(line, /scope:/, `cache write missing scope: ${line.trim()}`);
-    }
+    // WITNESSES: a scope-less success return, and a scope-less cache write, each
+    // fail the relation.
+    assert.ok(
+      scopeOffenders("      return { token: recovered.token, reason: 'ok', provider: recovered.provider };\n").length > 0,
+      'a planted scope-less success return must fail'
+    );
+    assert.ok(
+      scopeOffenders('      workspaceTokenCache.set(cacheKey, { token: selected.token, provider: selected.provider });\n').length > 0,
+      'a planted scope-less cache write must fail'
+    );
   });
 });
 

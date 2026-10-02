@@ -51,7 +51,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -60,6 +60,30 @@ const repoRoot = join(__dirname, '..', '..');
 
 function read(relPath) {
   return readFileSync(join(repoRoot, relPath), 'utf8');
+}
+
+// LIN-3219 A3 (M19): the numeric durable-delete total is gone. The relation is
+// a BOUNDARY on which modules may call the durable-delete verbs: every module
+// that calls `ownerCredentialStore.delete(`/`deleteAll(` must also evict the
+// session cache. A teardown module that durable-deletes without evicting fails.
+const DURABLE_DELETE_RE = /\bownerCredentialStore\.delete(All)?\(/g;
+const EVICT_RE = /(evictWorkspaceTokenPair\(evictWorkspaceToken|evictAllWorkspaceTokens\(evictWorkspaceToken)/g;
+
+function productionSources() {
+  const files = [
+    'server.js',
+    ...readdirSync(join(repoRoot, 'routes'))
+      .filter((n) => n.endsWith('.js') && n !== 'test.js')
+      .map((n) => `routes/${n}`),
+  ];
+  return new Map(files.map((rel) => [rel, readFileSync(join(repoRoot, rel), 'utf8')]));
+}
+
+function modulesMatching(sources, re) {
+  const out = [];
+  const stateless = new RegExp(re.source, re.flags.replace('g', ''));
+  for (const [rel, src] of sources) if (stateless.test(src)) out.push(rel);
+  return out.sort();
 }
 
 // LIN-1887 N2 gave the store a SECOND delete verb. `delete(accountId, urlKey,
@@ -76,31 +100,32 @@ function countDurableDeletes(source) {
 
 const KNOWN_DURABLE_DELETE_COUNT = 7;
 
-describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete( census', () => {
-  test('the total count of ownerCredentialStore.delete( across server.js + routes/workspace.js is exactly 7', () => {
-    const counts = {
-      'server.js': countDurableDeletes(read('server.js')),
-      'routes/workspace.js': countDurableDeletes(read('routes/workspace.js')),
-    };
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+describe('LIN-1524 close-out Finding #1 — ownerCredentialStore.delete module boundary (LIN-3219 A3)', () => {
+  test('every module that durable-deletes also evicts the workspace token cache', () => {
+    // Boundary rule (not a count): a module may call the durable-delete verbs
+    // only if it also evicts. A new teardown module that forgets the eviction
+    // fails here, with no number to bump.
+    const sources = productionSources();
+    const deleters = modulesMatching(sources, DURABLE_DELETE_RE);
+    const evictors = modulesMatching(sources, EVICT_RE);
+    assert.ok(deleters.length > 0, 'a zero-delete scan would be vacuous');
+    const offenders = deleters.filter((f) => !evictors.includes(f));
+    assert.deepEqual(offenders, [], `durable-delete modules without an eviction: ${offenders.join(', ')}`);
+  });
 
-    assert.equal(
-      total,
-      KNOWN_DURABLE_DELETE_COUNT,
-      `Found ${total} ownerCredentialStore.delete( call site(s) (${JSON.stringify(counts)}), expected exactly ` +
-      `${KNOWN_DURABLE_DELETE_COUNT}. A NEW workspace/session-disconnect path needs a matching durable delete, ` +
-      'per LIN-1524 close-out Finding #1: a durable Linear credential must not outlive the workspace connection ' +
-      "that granted it. Before touching KNOWN_DURABLE_DELETE_COUNT, add (or remove) a matching " +
-      'ownerCredentialStore.delete(accountId, urlKey, provider) call for the new/removed teardown path. See the existing ' +
-      'sites: server.js (ensureValidToken — non-destructive arm + catch, both per-partition; handleUnauthorizedError — non-destructive arm, per-partition; ' +
-      'handleWorkspaceRemoval — deleteAll; providers/remove — per-partition) and routes/workspace.js ' +
-      '(/workspace/:urlKey/remove, both arms). Do NOT add one for a plain logout — durable credentials must ' +
-      'survive human logout by design (see the /logout test below).'
-    );
+  test('WITNESS: a new durable-delete module with no eviction fails the boundary', () => {
+    const planted = new Map([
+      ...productionSources(),
+      ['routes/new-teardown.js', 'await ownerCredentialStore.delete(accountId, urlKey, provider);\n'],
+    ]);
+    const deleters = modulesMatching(planted, DURABLE_DELETE_RE);
+    const evictors = modulesMatching(planted, EVICT_RE);
+    const offenders = deleters.filter((f) => !evictors.includes(f));
+    assert.ok(offenders.includes('routes/new-teardown.js'), `expected routes/new-teardown.js, got ${JSON.stringify(offenders)}`);
   });
 
   test('routes/auth.js (/logout) has ZERO ownerCredentialStore.delete( calls — deliberate, not an omission', () => {
-    const count = countDurableDeletes(read('routes/auth.js'));
+    const count = (read('routes/auth.js').match(/\bownerCredentialStore\.delete(All)?\(/g) || []).length;
     assert.equal(
       count,
       0,

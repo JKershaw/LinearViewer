@@ -40,7 +40,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -53,6 +53,69 @@ function read(relPath) {
 
 function count(source, pattern) {
   return (source.match(pattern) || []).length;
+}
+
+// LIN-3219 A3 helpers (pure over `{file, src}` / source, so witnesses can plant).
+function nonLinearGraphQLSites(files) {
+  const out = [];
+  for (const [f, src] of files) {
+    for (const l of src.split('\n')) {
+      if (l.includes('new GraphQLClient(') && !/api\.linear\.app|LINEAR_API_ENDPOINT/.test(l)) out.push(`${f}: ${l.trim()}`);
+    }
+  }
+  return out;
+}
+
+function loneAssetHostLines(files) {
+  const out = [];
+  for (const [f, src] of files) {
+    for (const l of src.split('\n')) {
+      if (l.includes("'uploads.linear.app'") && !l.includes("'cdn.linear.app'")) out.push(`${f}: ${l.trim()}`);
+    }
+  }
+  return out;
+}
+
+function guardCoverageOffenders(source) {
+  const guards = (source.match(/isActiveProviderLinear\(workspace\)/g) || []).length;
+  const egress = source.split('\n').filter((l) => /\brunAudit\(/.test(l) && !/^\s*(\/\/|\*|\/\*)/.test(l)).length
+    + (source.match(/Bearer \$\{getWorkspaceMirrorToken\(workspace\)\}/g) || []).length;
+  if (egress === 0) return ['no credential-egress site found'];
+  if (guards !== egress) return [`guards (${guards}) != credential-egress sites (${egress})`];
+  return [];
+}
+
+const MIRROR_BEARER_RE = /Bearer \$\{(?:workspace\.accessToken|getWorkspaceMirrorToken\(workspace\))\}/;
+
+function routeFiles() {
+  return readdirSync(join(__dirname, '../../routes'))
+    .filter((n) => n.endsWith('.js') && n !== 'test.js')
+    .map((n) => `routes/${n}`);
+}
+
+function unguardedRunAuditCallers(files) {
+  const out = [];
+  for (const [f, src] of files) if (/\brunAudit\(/.test(src) && !/isActiveProviderLinear\(workspace\)/.test(src)) out.push(f);
+  return out.sort();
+}
+
+function unguardedMirrorBearerFiles(files) {
+  const out = [];
+  for (const [f, src] of files) if (MIRROR_BEARER_RE.test(src) && !/isActiveProviderLinear\(workspace\)/.test(src)) out.push(f);
+  return out.sort();
+}
+
+function tokenCallerFiles(files) {
+  return [...files].filter(([, src]) => /\bgetWorkspaceAccessToken\(/.test(src)).map(([f]) => f).sort();
+}
+
+/** Readers of getWorkspaceAccessToken( that do NOT receive it as an injected dep. */
+function uninjectedTokenReaders(files) {
+  const out = [];
+  for (const [f, src] of files) {
+    if (/\bgetWorkspaceAccessToken\(/.test(src) && !/getWorkspaceAccessToken\s*[,=]/.test(src)) out.push(f);
+  }
+  return out.sort();
 }
 
 // =============================================================================
@@ -91,52 +154,49 @@ const ASSET_RELAY_FILES = ['routes/workspace-api.js', 'routes/proxy.js', 'routes
 const KNOWN_ASSET_RELAY_COUNT = 2;
 
 describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', () => {
-  test('exactly 2 statically Linear-bound GraphQL clients are constructed outside tests', () => {
-    const counts = Object.fromEntries(
-      GRAPHQL_CLIENT_FILES.map(f => [f, count(read(f), /new GraphQLClient\(/g)])
-    );
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-
-    assert.equal(
-      total,
-      KNOWN_GRAPHQL_CLIENT_COUNT,
-      `Found ${total} GraphQL client construction(s) (${JSON.stringify(counts)}), expected exactly ` +
-      `${KNOWN_GRAPHQL_CLIENT_COUNT} (lib/audit.js and lib/providers/linear/index.js). A NEW one is a NEW ` +
-      'Linear egress mechanism: whatever feeds it a workspace credential must be provider-guarded with ' +
-      'isActiveProviderLinear(workspace) (lib/workspace.js) before the call, or the mirror will carry a ' +
-      "non-Linear provider's credential to api.linear.app (LIN-1899)."
-    );
+  test('every GraphQL client construction in the scoped files is statically Linear-bound (no count)', () => {
+    // Boundary rule (LIN-3219 A3): a GraphQL client here may only be constructed
+    // against the Linear endpoint — anything else would be an unrelated egress.
+    const sites = GRAPHQL_CLIENT_FILES.flatMap((f) => read(f).split('\n')
+      .filter((l) => l.includes('new GraphQLClient('))
+      .map((l) => ({ f, l })));
+    assert.ok(sites.length > 0, 'a zero-client scan would be vacuous');
+    const offenders = sites
+      .filter(({ l }) => !/api\.linear\.app|LINEAR_API_ENDPOINT/.test(l))
+      .map(({ f, l }) => `${f}: ${l.trim()}`);
+    assert.deepEqual(offenders, [], `non-Linear GraphQL client construction(s): ${offenders.join(' | ')}`);
   });
 
-  test('exactly 2 raw-fetch relays to Linear asset hosts exist under routes/', () => {
-    const counts = Object.fromEntries(
-      ASSET_RELAY_FILES.map(f => [f, count(read(f), /'uploads\.linear\.app'/g)])
-    );
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-
-    assert.equal(
-      total,
-      KNOWN_ASSET_RELAY_COUNT,
-      `Found ${total} Linear asset-host allowlist(s) under routes/ (${JSON.stringify(counts)}), expected exactly ` +
-      `${KNOWN_ASSET_RELAY_COUNT}: the image proxy (routes/workspace-api.js, guarded by LIN-1899) and the ` +
-      'attachment relay (routes/proxy-reads.js, guarded by LIN-1891). A THIRD relay must withhold its Authorization ' +
-      'header for a non-Linear active binding — asset relays degrade (serve the asset, drop the credential); ' +
-      'capability endpoints refuse with 422 CAPABILITY_NOT_SUPPORTED.'
-    );
+  test('WITNESS: a non-Linear GraphQL client construction fails', () => {
+    const offenders = nonLinearGraphQLSites(new Map([['lib/audit.js', "const c = new GraphQLClient('https://example.com', {});\n"]]));
+    assert.ok(offenders.length > 0, 'the planted non-Linear client must be an offender');
   });
 
-  test('both LIN-1899 guard sites still call the shared predicate', () => {
-    // Cheap backstop for the one mutation the counts above cannot see: a guard
-    // deleted while its call site stays put. Presence only — the behavioural
-    // proof lives in the two egress-observing test files named at the top.
+  test('every Linear asset-host allowlist in the relay files also allows cdn.linear.app (one allowlist shape, no count)', () => {
+    // Boundary rule (LIN-3219 A3): a relay's host allowlist is the one shape
+    // (`uploads` + `cdn`), so a stray single-host allowlist is an offender.
+    const files = ASSET_RELAY_FILES.map((f) => [f, read(f)]);
+    const sites = files.flatMap(([f, src]) => src.split('\n').filter((l) => l.includes("'uploads.linear.app'")).map((l) => ({ f, l })));
+    assert.ok(sites.length > 0, 'a zero-relay scan would be vacuous');
+    const offenders = sites.filter(({ l }) => !l.includes("'cdn.linear.app'")).map(({ f, l }) => `${f}: ${l.trim()}`);
+    assert.deepEqual(offenders, [], `lone uploads.linear.app allowlists: ${offenders.join(' | ')}`);
+  });
+
+  test('WITNESS: a lone uploads.linear.app allowlist (no cdn) fails', () => {
+    const offenders = loneAssetHostLines(new Map([['routes/workspace-api.js', "const allowedHosts = new Set(['uploads.linear.app'])\n"]]));
+    assert.ok(offenders.length > 0, 'the planted lone host must be an offender');
+  });
+
+  test('workspace-api.js carries one isActiveProviderLinear(space) guard per credential-egress site (no count)', () => {
+    // Derived relation (LIN-3219 A3): guards must equal the egress sites they
+    // protect — a new runAudit/Bearer-mirror site with no guard breaks it.
     const source = read('routes/workspace-api.js');
-    assert.equal(
-      count(source, /isActiveProviderLinear\(workspace\)/g),
-      2,
-      'expected exactly 2 isActiveProviderLinear(workspace) guards in routes/workspace-api.js — the audit ' +
-      'route (refuses 422) and the image proxy (withholds the header). If a guard was intentionally removed, ' +
-      'the consumer it protected must no longer read workspace.accessToken on a Linear-bound path (LIN-1899).'
-    );
+    assert.deepEqual(guardCoverageOffenders(source), []);
+  });
+
+  test('WITNESS: an extra egress site with no guard fails', () => {
+    const source = read('routes/workspace-api.js') + '\nconst r = await runAudit(getWorkspaceMirrorToken(workspace));\n';
+    assert.ok(guardCoverageOffenders(source).length > 0, 'the planted unguarded egress site must be an offender');
   });
 });
 
@@ -151,85 +211,63 @@ describe('LIN-1899 census (a) — credential-bearing Linear egress mechanisms', 
 // (see its header) and excluded by path.
 
 describe('LIN-1899 census (b) — scalar feeds, by owner', () => {
-  test('routes/ has exactly 1 runAudit call site (LIN-1899, guarded)', () => {
-    // NOTE the two-part count. A bare /runAudit\(/ match over raw source returns
-    // 2 at this HEAD: the call itself plus the prose mention inside the
-    // test-mock comment above it ("runAudit() goes straight to GraphQL"). The
-    // eviction-census template counts with a bare regex, which would pin a
-    // number that is really "1 call + 1 comment" and drift the moment either
-    // moves. So the call sites are counted on non-comment lines only, and the
-    // total is asserted alongside it to keep the raw grep honest.
-    const source = read('routes/workspace-api.js');
-    const callSites = source
-      .split('\n')
-      .filter(line => /runAudit\(/.test(line) && !/^\s*(\/\/|\*|\/\*)/.test(line));
-
-    assert.equal(
-      callSites.length,
-      1,
-      `Found ${callSites.length} runAudit call site(s) in routes/workspace-api.js, expected exactly 1 ` +
-      '(GET /workspace/:urlKey/api/audit). runAudit goes straight to a Linear GraphQL client, so a SECOND ' +
-      'caller needs its own isActiveProviderLinear(workspace) guard — otherwise a Jira-active workspace ' +
-      'discloses its raw API token to api.linear.app (LIN-1899).'
-    );
-    assert.equal(
-      count(source, /runAudit\(/g),
-      2,
-      'expected 2 raw runAudit( occurrences in routes/workspace-api.js: 1 call site + 1 mention in the ' +
-      'test-mock comment. If this drifts, re-check which of the two moved before touching the pinned counts.'
-    );
+  test('every route file calling runAudit( guards with isActiveProviderLinear(space) (no count)', () => {
+    // Boundary rule (LIN-3219 A3): runAudit goes straight to a Linear GraphQL
+    // client, so any route file that calls it must carry the provider guard.
+    const callers = routeFiles().filter((f) => /\brunAudit\(/.test(read(f)));
+    assert.ok(callers.length > 0, 'a zero-caller scan would be vacuous');
+    const offenders = callers.filter((f) => !/isActiveProviderLinear\(workspace\)/.test(read(f)));
+    assert.deepEqual(offenders, [], `runAudit( callers without the provider guard: ${offenders.join(', ')}`);
   });
 
-  test('routes/ templates the raw mirror into a Bearer header exactly once (LIN-1899, guarded)', () => {
-    // LIN-3124 PR1 (S0) routed the image-proxy site through the raw-mirror
-    // accessor `getWorkspaceMirrorToken(workspace)`, so this class now matches
-    // EITHER the legacy inline raw read or the S0 accessor. The SET is
-    // unchanged: exactly one Bearer template, still the image proxy.
-    const BEARER_MIRROR = /Bearer \$\{(?:workspace\.accessToken|getWorkspaceMirrorToken\(workspace\))\}/g;
-    const counts = {
-      'routes/workspace-api.js': count(read('routes/workspace-api.js'), BEARER_MIRROR),
-      'routes/proxy.js': count(read('routes/proxy.js'), BEARER_MIRROR),
-      'routes/dashboard.js': count(read('routes/dashboard.js'), BEARER_MIRROR),
-    };
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-
-    assert.equal(
-      total,
-      1,
-      `Found ${total} raw-mirror \`Bearer\` template(s) (${JSON.stringify(counts)}), expected ` +
-      'exactly 1: the image proxy, whose header object is now conditional on isActiveProviderLinear(workspace) ' +
-      '(and, from LIN-3124 PR1 S0, reads through getWorkspaceMirrorToken(workspace)). ' +
-      'A new one sends whatever credential the active binding holds — Jira, GitHub, or a local urlKey — to ' +
-      'whatever host it is pointed at (LIN-1899).'
-    );
+  test('WITNESS: a runAudit( caller without the guard fails', () => {
+    const offenders = unguardedRunAuditCallers(new Map([['routes/zz-audit.js', 'const r = await runAudit(getWorkspaceMirrorToken(workspace));\n']]));
+    assert.ok(offenders.includes('routes/zz-audit.js'), `expected routes/zz-audit.js, got ${JSON.stringify(offenders)}`);
   });
 
-  test('routes/proxy.js\'s 9 accessor-fed consumers are now discharged (LIN-2044); routes/dashboard.js\'s 2 remain LIN-1912\'s, not yet guarded', () => {
-    // Pinned as a HANDOVER UPDATE: LIN-2044 routed every one of routes/proxy.js's
-    // former 9 raw resolveWorkspaceAccess( sites through resolveProviderAccess,
-    // which resolves the workspace's ACTIVE provider and hands its call sites
-    // that provider's own client — never a hardcoded Linear one. The only
-    // resolveWorkspaceAccess( call left in the file is resolveProviderAccess's
-    // own internal read, so the count below is now 1, not 10.
-    const proxyResolves = count(read('routes/proxy.js'), /resolveWorkspaceAccess\(/g);
-    const dashboardReads = count(read('routes/dashboard.js'), /getWorkspaceAccessToken\(/g);
+  test('every raw-mirror Bearer template is in a file that guards with isActiveProviderLinear(space) (no count)', () => {
+    // Boundary rule (LIN-3219 A3): a raw-mirror Bearer template must sit in a
+    // file that carries the provider guard. The scanner matches either the
+    // legacy inline read or the S0 accessor.
+    const files = ['routes/workspace-api.js', 'routes/proxy.js', 'routes/dashboard.js'];
+    const holders = files.filter((f) => MIRROR_BEARER_RE.test(read(f)));
+    assert.ok(holders.length > 0, 'a zero-Bearer scan would be vacuous');
+    const offenders = holders.filter((f) => !/isActiveProviderLinear\(workspace\)/.test(read(f)));
+    assert.deepEqual(offenders, [], `raw-mirror Bearer templates without the provider guard: ${offenders.join(', ')}`);
+  });
 
-    assert.equal(
-      proxyResolves,
-      1,
-      `Found ${proxyResolves} resolveWorkspaceAccess( sites in routes/proxy.js (expected exactly 1: ` +
-      'resolveProviderAccess\'s own internal call). LIN-2044 discharged the other 9 by routing them through ' +
-      'resolveProviderAccess instead. A count above 1 means a NEW raw resolveWorkspaceAccess( site was added, ' +
-      'reintroducing the same disclosure defect LIN-1899 named — it needs the same provider-routing fix, not a ' +
-      'guard. A count of 0 means resolveProviderAccess itself was restructured and this pin needs re-grounding.'
-    );
-    assert.equal(
-      dashboardReads,
-      2,
-      `Found ${dashboardReads} getWorkspaceAccessToken( sites in routes/dashboard.js (expected 2, both ` +
-      'LIN-1912\'s, unaffected by LIN-2044 — that ticket scoped routes/proxy.js only). routes/dashboard.js:829 ' +
-      'fires on a POLL with no user action, making it the most reachable member of this class — more so than ' +
-      'the audit route this ticket was filed for.'
-    );
+  test('WITNESS: a raw-mirror Bearer template in an unguarded file fails', () => {
+    const offenders = unguardedMirrorBearerFiles(new Map([['routes/zz-mirror.js', 'Authorization: `Bearer ${getWorkspaceMirrorToken(workspace)}`\n']]));
+    assert.ok(offenders.includes('routes/zz-mirror.js'), `expected routes/zz-mirror.js, got ${JSON.stringify(offenders)}`);
+  });
+
+  test('every resolveWorkspaceAccess( in routes/proxy.js is inside resolveProviderAccess (no count)', () => {
+    const src = read('routes/proxy.js');
+    const start = src.indexOf('async function resolveProviderAccess');
+    const end = src.indexOf('\n  }', start);
+    assert.ok(start >= 0 && end > start, 'resolveProviderAccess not found');
+    const sites = [...src.matchAll(/await resolveWorkspaceAccess\(/g)].map((m) => m.index);
+    assert.ok(sites.length > 0, 'a zero-resolve scan would be vacuous');
+    const outside = sites.filter((i) => i < start || i > end);
+    assert.deepEqual(outside, [], `resolveWorkspaceAccess( outside the chokepoint at offsets ${JSON.stringify(outside)}`);
+  });
+
+  test('every getWorkspaceAccessToken( reader receives it as an injected dependency (no per-file counts)', () => {
+    // Boundary rule (LIN-3219 A3): the symbol is module-private to server.js and
+    // injected into route factories, so a reader that does not receive it as a
+    // dependency (no `getWorkspaceAccessToken,`/`=`) is an offender.
+    const readers = routeFiles().filter((f) => /\bgetWorkspaceAccessToken\(/.test(read(f)));
+    assert.ok(readers.length > 0, 'a zero-reader scan would be vacuous');
+    assert.deepEqual(uninjectedTokenReaders(readers.map((f) => [f, read(f)])), [], 'readers without the injected dependency');
+  });
+
+  test('WITNESS: a resolveWorkspaceAccess( outside the chokepoint, and a getWorkspaceAccessToken( reader without the dep, both fail', () => {
+    const src = read('routes/proxy.js') + '\nconst t = await resolveWorkspaceAccess(req.proxyUrlKey);\n';
+    const start = src.indexOf('async function resolveProviderAccess');
+    const end = src.indexOf('\n  }', start);
+    const outside = [...src.matchAll(/await resolveWorkspaceAccess\(/g)].map((m) => m.index).filter((i) => i < start || i > end);
+    assert.ok(outside.length > 0, 'the planted out-of-chokepoint resolve must be an offender');
+    const offenders = uninjectedTokenReaders(new Map([['routes/zz-token.js', 'const t = await getWorkspaceAccessToken(k, req.session);\n']]));
+    assert.ok(offenders.includes('routes/zz-token.js'), `expected routes/zz-token.js, got ${JSON.stringify(offenders)}`);
   });
 });
