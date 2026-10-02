@@ -1379,15 +1379,17 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     // The per-call read scope: the bare token for Linear/local (byte-identical),
     // or a { token, repo } credential for a GitHub App binding so the provider
     // builds a request-time client from the installation token (LIN-713) — the
-    // boot client is never configured in production.
-    const bindingScope = getBindingCallScope(binding);
+    // boot client is never configured in production. Renamed from `bindingScope`
+    // (LIN-3240): the string `bindingScope` is now the row STAMP (`binding.scope`),
+    // a selection key only — never a credential.
+    const bindingCallScope = getBindingCallScope(binding);
     // Use mock data in test mode to avoid hitting the provider API
     const isTestMode = process.env.NODE_ENV === 'test' && bindingToken === 'test-token';
 
     // Fetch teams (primary binding only)
     const bindingTeams = isTestMode
       ? testMockTeams
-      : await provider.fetchTeams(bindingScope);
+      : await provider.fetchTeams(bindingCallScope);
 
     if (isPrimary) {
       resolvedTeamId = matchTeamId(bindingTeams, teamId);
@@ -1399,7 +1401,7 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
     // full query.
     let { organizationName: orgName, projects, issues, truncated: bindingTruncated } = isTestMode
       ? (mockOverride || testMockData)
-      : await provider.fetchProjects(bindingScope, resolvedTeamId, { slim });
+      : await provider.fetchProjects(bindingCallScope, resolvedTeamId, { slim });
 
     // In test mode, manually filter issues by team
     if (isTestMode && resolvedTeamId) {
@@ -1411,7 +1413,20 @@ async function fetchAndPrepareProjects(workspace, teamId = null, mockOverride = 
       organizationName = orgName;
     }
     mergedProjects.push(...projects);
-    mergedIssues.push(...issues);
+    // LIN-3240 (LIN-3126 §0/§2): stamp each row of a connection-backed binding
+    // with `bindingScope` (`binding.scope`) in a MULTI-binding workspace, so the
+    // merged tree can key `source[@bindingScope]:id`, the client can forward the
+    // selector, and the resolver can address the issue's OWN binding. The stamp
+    // is a selection key only — never a credential (the call scope above is
+    // `getBindingCallScope(binding)`). A single-binding workspace and every
+    // legacy connection-less workspace stay UNSTAMPED, so their output is
+    // byte-identical (the `@scope` parts downstream appear only when stamped).
+    const bindingScopeStamp = (bindings.length > 1 && isConnectionBacked(binding))
+      ? binding.scope
+      : null;
+    mergedIssues.push(...(bindingScopeStamp
+      ? issues.map(issue => ({ ...issue, bindingScope: bindingScopeStamp }))
+      : issues));
     truncated = truncated || !!bindingTruncated;
   }
 
