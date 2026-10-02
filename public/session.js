@@ -714,6 +714,113 @@
     tick(); // one initial fetch for every run, live or finished
   }
 
+  // ── Close-out box (LIN-3248, P3 of LIN-2949) ──────────────────────────────
+  // Self-merge detection on read + the press, off the box the run-evidence
+  // fragment renders. The press reuses the ordinary dispatch path — it fetches
+  // the close-out prompt and calls window.dispatchPrompt (no new dispatch
+  // route) — then records the press through beat 2's route. Detection calls
+  // the check route on load and on tab focus, only while the state is ready.
+  function closeOutContext() {
+    var box = document.querySelector('[data-testid="run-evidence-closeout"]');
+    if (!box) return null;
+    var reply = document.querySelector('[data-testid="session-inline-reply"][data-issue-id]');
+    var urlKey = (reply && reply.getAttribute('data-url-key')) || box.getAttribute('data-url-key') || '';
+    var issueId = reply ? (reply.getAttribute('data-issue-id') || '') : '';
+    var issueIdentifier = (reply && reply.getAttribute('data-issue-identifier'))
+      || box.getAttribute('data-issue-identifier') || '';
+    return { box: box, urlKey: urlKey, issueId: issueId, issueIdentifier: issueIdentifier };
+  }
+
+  // Replace the box's dynamic content with a single line, built via textContent
+  // so a server-provided message can never inject markup.
+  function paintCloseOut(box, testId, line) {
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var p = document.createElement('p');
+    p.setAttribute('data-testid', testId);
+    p.textContent = line;
+    box.appendChild(p);
+  }
+
+  function applyCloseOutState(box, state) {
+    if (!box || !state || !state.status) return;
+    if (box.getAttribute('data-state') === state.status) return;
+    box.setAttribute('data-state', state.status);
+    if (state.status === 'ready') return;
+    if (state.status === 'merged' || state.status === 'partial') {
+      paintCloseOut(box, 'run-evidence-closeout-merged', '✓ merged by you' + (state.message ? ' · ' + state.message : ''));
+    } else if (state.status === 'not-ready' || state.status === 'no-pr' || state.status === 'multiple-prs' || state.status === 'closed') {
+      paintCloseOut(box, 'run-evidence-closeout-setup', '○ set up ›');
+    } else {
+      paintCloseOut(box, 'run-evidence-closeout-withheld', state.message || 'the pull request could not be read — not checked');
+    }
+  }
+
+  function runCloseOutCheck() {
+    var ctx = closeOutContext();
+    if (!ctx || !ctx.urlKey || !ctx.issueIdentifier) return;
+    if (ctx.box.getAttribute('data-state') !== 'ready') return;
+    window.api(
+      '/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/run-evidence/' + encodeURIComponent(ctx.issueIdentifier) + '/check',
+      { method: 'POST', body: JSON.stringify({}) }
+    ).then(function (result) {
+      applyCloseOutState(ctx.box, result && result.state);
+    }).catch(function () { /* fail open: the box keeps its last state */ });
+  }
+
+  function pressCloseOut(btn) {
+    var ctx = closeOutContext();
+    if (!ctx || !ctx.urlKey || !ctx.issueId || !ctx.issueIdentifier) return;
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'closing out…';
+    window.api('/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/prompt/' + encodeURIComponent(ctx.issueId) + '/close-out')
+      .then(function (result) {
+        return window.dispatchPrompt({
+          urlKey: ctx.urlKey,
+          prompt: result.prompt,
+          promptName: result.promptName || 'close-out',
+          kind: 'close-out',
+          issue: { id: ctx.issueId, identifier: ctx.issueIdentifier, title: result.issueTitle || '' },
+          entryRung: 'run-step'
+        });
+      })
+      .then(function (dispatch) {
+        var dispatchId = (dispatch && dispatch.item && dispatch.item.id)
+          || (dispatch && dispatch.id) || null;
+        return window.api(
+          '/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/run-evidence/' + encodeURIComponent(ctx.issueIdentifier) + '/close-out-press',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              prUrl: ctx.box.getAttribute('data-pr-url') || null,
+              headSha: ctx.box.getAttribute('data-head-sha') || null,
+              dispatchId: dispatchId
+            })
+          }
+        );
+      })
+      .then(function () {
+        btn.textContent = 'close-out sent ✓';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = original;
+        console.error('Close-out press failed:', err && err.message);
+      });
+  }
+
+  function initCloseOut() {
+    if (!document.querySelector('[data-testid="run-evidence-closeout"]')) return;
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-action="closeout-press"]') : null;
+      if (!btn) return;
+      e.preventDefault();
+      pressCloseOut(btn);
+    });
+    runCloseOutCheck();
+    document.addEventListener('focus', function () { runCloseOutCheck(); }, true);
+  }
+
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     // Per-run transcripts must render before toggle init so content is visible.
@@ -724,6 +831,7 @@
     initProposals();
     initContextWidgets();
     initPrState();
+    initCloseOut();
     tickClocks();
     setInterval(tickClocks, 1000);
   });

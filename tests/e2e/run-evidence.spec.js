@@ -62,6 +62,7 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
   const resp = await page.request.post('/test/set-local-session', {
     data: {
       urlKey: URL_KEY,
+      features: { dispatch: true },
       projects: [{ id: id('rev-proj'), name: 'Evidence Project', content: `repo=${REPO}`, sortOrder: 1 }],
       issues: [{
         id: id('rev-issue'), identifier: 'LOCAL-EV1', title: 'Finished run evidence', description: 'Seeded run-evidence task',
@@ -78,7 +79,7 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
 // resolves to it and the run reconstructs with a transcript.
 async function seedFinishedRun(page) {
   const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LOCAL-EV1', issueTitle: 'Finished run evidence', target: 'cli' },
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LOCAL-EV1', issueTitle: 'Finished run evidence', target: 'cli', stopAt: 'pr' },
   });
   expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
   const anchorId = (await anchor.json()).item.id;
