@@ -441,3 +441,113 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     });
   });
 });
+// =============================================================================
+// LIN-2942 — the ladder records which way the task was taken.
+//
+// Each press on the opened task's ladder is recorded per account per task: a
+// copy, a press on a "○ set up ›" rung (intent, with what it needs, and still no
+// dispatch), and a run-step dispatch (recorded server-side, linked to the item
+// by dispatchId). GET …/api/task-mode/:identifier reads it back for the session
+// account. Red-first: authored before the client hooks existed.
+// =============================================================================
+test.describe('LIN-2942 — the ladder records its mode', () => {
+  async function openTopTask(page, seedLocal, urlKey, options) {
+    await seedLocal(workspaceApiLocalSeed, options);
+    await page.goto(`/test/clear-task-mode-events?urlKey=${urlKey}`);
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await openPrompts(page);
+    const identifier = (await page.locator('.swipe-card-identifier').textContent()).trim();
+    return { component: page.locator('.prompt-section').first(), identifier };
+  }
+
+  async function pickTemplate(component) {
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+  }
+
+  async function readMode(page, urlKey, identifier) {
+    const res = await page.request.get(`/workspace/${urlKey}/api/task-mode/${encodeURIComponent(identifier)}`);
+    expect(res.status()).toBe(200);
+    return res.json();
+  }
+
+  /** Poll the mode until it holds `count` events (the client record is fire-and-forget). */
+  async function modeWithEvents(page, urlKey, identifier, count) {
+    let mode;
+    await expect.poll(async () => {
+      mode = await readMode(page, urlKey, identifier);
+      return mode.events.length;
+    }, { timeout: 5000 }).toBe(count);
+    return mode;
+  }
+
+  test('(a) a copy records copy/copy', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true });
+    await pickTemplate(component);
+
+    await component.locator('[data-action="copy"]').first().click();
+    await expect(component.locator('[data-action="copy"]').first()).toHaveText('copied!');
+
+    const mode = await modeWithEvents(page, localWorkerUrlKey, identifier, 1);
+    expect(mode.events[0]).toMatchObject({ rung: 'copy', act: 'copy', ready: true, needs: null, surface: 'swipe' });
+  });
+
+  test('(b) a press on a not-set-up run-step records ready:false, needs:dispatch, and sends no dispatch', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const dispatches = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/api/dispatch')) dispatches.push(req.url());
+    });
+    const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true });
+
+    const rung = component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]');
+    await expect(rung).toHaveAttribute('data-setup-needs', 'dispatch');
+    await rung.click();
+    await expect(component.locator('.opened-task-setup-notice')).toContainText(/dispatch runner set up/i);
+
+    const mode = await modeWithEvents(page, localWorkerUrlKey, identifier, 1);
+    expect(mode.events[0]).toMatchObject({ rung: 'run-step', ready: false, needs: 'dispatch', act: 'press', dispatchId: null });
+    expect(dispatches).toEqual([]);
+  });
+
+  test('(c) a ready run-step records an event whose dispatchId is the created item', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true, features: { dispatch: true } });
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+    await page.request.get(`/test/clear-dispatch-history?urlKey=${localWorkerUrlKey}`);
+    await pickTemplate(component);
+
+    const [dispatchRes] = await Promise.all([
+      page.waitForResponse((res) => res.request().method() === 'POST' && new URL(res.url()).pathname.endsWith('/api/dispatch')),
+      component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]').click(),
+    ]);
+    expect(dispatchRes.status()).toBe(201);
+    expect(dispatchRes.request().postDataJSON().entryRung).toBe('run-step');
+    const { item } = await dispatchRes.json();
+
+    const mode = await modeWithEvents(page, localWorkerUrlKey, identifier, 1);
+    expect(mode.events[0]).toMatchObject({ rung: 'run-step', ready: true, act: 'dispatch', dispatchId: item.id });
+    expect(mode.taken).toMatchObject({ rung: 'run-step', dispatchId: item.id });
+  });
+
+  test('(d) GET returns the account\'s entry for the task', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true });
+
+    // Entered on "run the whole task" (not set up), then fell back to copy.
+    await component.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').click();
+    await modeWithEvents(page, localWorkerUrlKey, identifier, 1);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await pickTemplate(component);
+    await component.locator('[data-action="copy"]').first().click();
+
+    const mode = await modeWithEvents(page, localWorkerUrlKey, identifier, 2);
+    expect(mode.entry).toMatchObject({ rung: 'run-task', ready: false });
+    expect(mode.taken).toMatchObject({ rung: 'copy' });
+    expect(mode.furthest).toBe('run-task');
+    expect(mode.coverage).toEqual({ surfaces: ['swipe'] });
+
+    // Another task has no mode for this account.
+    const other = await readMode(page, localWorkerUrlKey, 'TEST-404');
+    expect(other.entry).toBeNull();
+  });
+});

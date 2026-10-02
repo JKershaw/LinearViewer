@@ -696,13 +696,14 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {string} [opts.presetId]                  Selected dispatch preset id (LIN-1391); blank/omitted sends no presetId, so the consumer's own default resolution applies unchanged (LIN-1094/1390)
  * @param {number} [opts.maxTasks]                  Task-budget scope bound (LIN-1737/LIN-1751); blank/omitted sends no maxTasks, so the run stays unbounded exactly as before this field existed
  * @param {number} [opts.maxSessionsPerTask]         Sibling per-task session bound (LIN-2934); blank/omitted sends nothing, same optional pass-through as maxTasks
+ * @param {string} [opts.entryRung]                LIN-2942: the ladder rung this dispatch was pressed from ('run-step' | 'run-task'); the server records the mode, linked to the created item. Blank/omitted sends nothing
  * @param {string} [opts.composedRunMarker]         LIN-2775 Area 8: the scoped structural marker for a composed-run dispatch (a real agent brief, not a raw pressed-option label) — activates routes/dispatch.js's terminal-anchor guard server-side. Blank/omitted sends nothing, so an ordinary dispatch is completely unaffected.
  * @returns {Promise<Object>} Parsed JSON response body
  * @throws {Error} on missing required args or a non-ok response. The thrown
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -753,6 +754,8 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // dispatch (today: a ruling reply's real agent brief) sets this; every
   // other dispatch surface sends nothing and is unaffected.
   if (composedRunMarker) payload.composedRunMarker = composedRunMarker;
+  // LIN-2942: truthy gate — only the opened task's ladder sends a rung.
+  if (entryRung) payload.entryRung = entryRung;
 
   // on401:false — dispatch surfaces (swipe etc.) branch on err.status rather
   // than redirecting, so the 401 is thrown like any other error.

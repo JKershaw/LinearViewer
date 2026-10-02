@@ -53,9 +53,10 @@ import { convertToConnectionBacked, isConnectionBacked } from '../lib/connection
  * @param {Object|null} [options.emailTransport] - The capture email transport (LIN-1892), or null when email sign-in isn't in capture mode
  * @param {Object|null} [options.commentDedupe] - In-process comment dedupe cache (LIN-3198 reset seam), or null when not wired
  * @param {Object|null} [options.decisionStampDedupe] - In-process decision-stamp dedupe cache (LIN-3198), or null
+ * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -869,6 +870,17 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         credentialFingerprint: req.query.credentialFingerprint || null
       })
       res.json({ id: event._id, status: event.status, note: event.note, stage: event.stage, credentialFingerprint: event.credentialFingerprint })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // Endpoint to clear task-mode events for testing (LIN-2942): the ladder's
+  // mode record is append-only, so each spec starts its workspace from none.
+  router.get('/test/clear-task-mode-events', async (req, res) => {
+    try {
+      await taskModeStore.clear(req.query.urlKey || 'test-workspace')
+      res.send('ok')
     } catch (err) {
       res.status(500).json({ error: err.message })
     }

@@ -335,3 +335,13 @@ describe('TaskModeStore.countByEntryRung', () => {
     assert.deepStrictEqual(counts.byRung.map(r => r.entries), [0, 1, 0]);
   });
 });
+
+describe('TaskModeStore.clear', () => {
+  test('deletes only the named workspace\'s events (the test-only clear seam)', async () => {
+    const store = new TaskModeStore({ collection: harness.freshDb().collection('task-mode-events') });
+    await recordInOrder(store, [copyAct(), copyAct({ urlKey: 'other-ws' })]);
+    assert.strictEqual(await store.clear('ws'), 1);
+    assert.deepStrictEqual((await store.listForAccount(['acct-1'])).map(e => e.urlKey), ['other-ws']);
+    assert.strictEqual(await store.clear(''), 0);
+  });
+});
