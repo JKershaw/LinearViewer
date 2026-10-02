@@ -31,7 +31,7 @@ import { UNSCOPED, selectOwnerSessionRow, classifyWorkspaceFailure, describeWork
 import { selectOwnerWorkspaceTokenExcludingSuperseded } from './lib/superseded-selection.js'
 import { refreshOwnerWorkspaceToken, refreshOwnerCredential } from './lib/workspace-token-refresh.js'
 import { attemptSuspectCredentialRefresh as attemptSuspectCredentialRefreshImpl } from './lib/suspect-credential-refresh.js'
-import { createWorkspaceTokenCache, workspaceTokenCacheKey, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
+import { createWorkspaceTokenCache, workspaceTokenCacheKey, workspaceTokenCacheBypasses, evictWorkspaceTokenPair, evictAllWorkspaceTokens } from './lib/workspace-token-cache.js'
 import { CREDENTIAL_SOURCES, fingerprintCredential } from './lib/credential-diagnostics.js'
 import { createRejectedCredentialRegistry } from './lib/rejected-credentials.js'
 import { createRefreshOnResolveGate } from './lib/refresh-on-resolve-gate.js'
@@ -346,10 +346,15 @@ localProvider.configure({ store: localStore })
 const dispatchQueueCollection = db.collection('dispatch-queue')
 const dispatchTokensCollection = db.collection('dispatch-tokens')
 const dispatchHistoryCollection = db.collection('dispatch-history')
+// LIN-3257 (M1 shadow): additive, optional storage for the wake-shadow verdict,
+// per-day tally and per-edge prior. Nothing on the delivery path reads it — the
+// write is best-effort and the proxy reads are read-only. Absent ⇒ no-op.
+const wakeShadowCollection = db.collection('wake_shadow')
 
 const dispatchQueueStore = new DispatchQueueStore({
   collection: dispatchQueueCollection,
   historyCollection: dispatchHistoryCollection,
+  wakeShadowCollection,
   ttl: 24 * 60 * 60 // 24 hours
 })
 
@@ -2469,7 +2474,7 @@ const connectionAccess = createConnectionAccess({
 // paths that read it (lib/workspace.js's mirror writers, routes/workspace-api.js
 // → lib/audit.js) are untouched and out of this fix's remit — the cross-provider
 // credential disclosure there is LIN-1899's, not closed by anything here.
-async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
+async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options) {
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     // LIN-1980: this is a credential-bearing return path like every other
     // below (plan-review round 2, F2) — stamped so a test exercising the
@@ -2477,6 +2482,16 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // `credentialFingerprint: undefined` on this short-circuit.
     return { token: 'test-token', reason: 'ok', provider: 'linear', credentialFingerprint: fingerprintCredential('test-token') };
   }
+
+  // LIN-3241 (B, parent LIN-3126 §3; ruling lin3126-plan-loop-f1-eviction (a),
+  // PROVISIONAL). ISSUE-intent and any selector-bearing resolution bypass the
+  // cache entirely — no get, no set. Only a no-selector CREATE/WORKSPACE
+  // resolution uses the base owner-scoped entry, so `evictWorkspaceTokenPair`
+  // (LIN-1507) keeps covering every cached credential exactly as before and no
+  // new cache-key variant can escape its tombstone. `options` ABSENT (every
+  // non-proxy caller) keeps caching, byte-identical to before — see
+  // workspaceTokenCacheBypasses.
+  const bypassTokenCache = workspaceTokenCacheBypasses(options);
 
   // LIN-2234 (L3 of the LIN-2231 design): canonicalize ownerAccountId BEFORE
   // the cache key — the single chokepoint every downstream consumer of this
@@ -2505,7 +2520,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   // Check cache first — the factory already applies TTL internally and
   // returns undefined on a miss/expiry, so only the freshness-vs-expiry
   // check (business logic, not cache mechanics) stays here.
-  const cached = workspaceTokenCache.get(cacheKey);
+  const cached = bypassTokenCache ? undefined : workspaceTokenCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
     const cachedFingerprint = fingerprintCredential(cached.scope ?? cached.token);
     // LIN-1980: the cache-hit path needs the SAME suspect check the
@@ -2522,7 +2537,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
       loadSessions: () => sessionsCollection.find({}).toArray(),
     });
     if (recovered) {
-      workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
+      if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
       rejectedCredentialRegistry.accept(cachedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
       return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
     }
@@ -2540,9 +2555,9 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // (D16/LIN-1448), and an arm result is never cached under the owner-blind
     // key. Falls through to the scan when no authorized Connection matches.
     if (ownerAccountId !== UNSCOPED) {
-      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions });
+      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions, intent: options?.intent, selector: options?.selector });
       if (arm?.result) {
-        workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
+        if (!bypassTokenCache && arm.result.token) workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
         return arm.result;
       }
       connectionSummary = arm?.connectionSummary || null;
@@ -2562,11 +2577,11 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         loadSessions: () => Promise.resolve(sessions),
       });
       if (recovered) {
-        workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
+        if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
         rejectedCredentialRegistry.accept(selectedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
         return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
       }
-      workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
+      if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
       return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt, credentialFingerprint: selectedFingerprint };
     }
 
@@ -2619,7 +2634,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
             lifecycleEventStore: credentialLifecycleEventStore
           });
           if (refreshed) {
-            workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
+            if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
             return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) };
           }
         } catch (err) {

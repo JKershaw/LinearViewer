@@ -84,7 +84,7 @@ import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPIL
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, bindingRefusalResponse, BINDING_INTENT } from '../lib/workspace.js';
 import {
   parseSourceNamespace,
   resolveStateRef,
@@ -286,6 +286,29 @@ const proxyTokenCreationLimiter = rateLimit({
 // tests/fixtures/local-harness.js; kept inline (not imported) so production code
 // never depends on a test fixture. Only consulted under NODE_ENV==='test'.
 const TEST_LOCAL_URL_KEY = 'local-workspace';
+
+// LIN-3241 (B/F): the three declared resolver intents. A missing or unrecognised
+// intent fails closed as ISSUE — a route that forgets to declare cannot silently
+// guess on an issue read. Every call site passes a literal `BINDING_INTENT.*`
+// (pinned by tests/unit/lin-3126-proxy-selector.test.js's census).
+const DECLARED_BINDING_INTENTS = new Set(Object.values(BINDING_INTENT));
+function normalizeBindingIntent(intent) {
+  return DECLARED_BINDING_INTENTS.has(intent) ? intent : BINDING_INTENT.ISSUE;
+}
+
+/**
+ * The ISSUE selector is read from the request query (`source`, `bindingScope`),
+ * the row-stamp fields slice 1 forwards from the client. WORKSPACE never reads a
+ * selector; CREATE takes one only from the declared options, so neither gains an
+ * input surface here. Absent both query fields, the selector is undefined and
+ * {@link selectIssueBinding} applies its no-selector ambiguity rule.
+ */
+function issueSelectorFromQuery(req) {
+  const source = req?.query?.source;
+  const bindingScope = req?.query?.bindingScope;
+  if (source === undefined && bindingScope === undefined) return undefined;
+  return { source, bindingScope };
+}
 
 // LIN-1175: fail-closed 503 message for a claude-code dispatch whose out-of-band
 // bootstrap token could not be minted. attachProxyContext refuses (throws with
@@ -669,7 +692,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *
    * @returns {Promise<{provider: Object, token: (string|Object|null), reason: string}>}
    */
-  async function resolveProviderAccess(urlKey, ownerAccountId, req) {
+  async function resolveProviderAccess(urlKey, ownerAccountId, req, { intent, selector } = {}) {
     if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
       if (req) {
         req.resolvedCredentialFingerprint = null;
@@ -684,7 +707,26 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       }
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
-    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
+    // LIN-3241 (B/F): the intent is threaded to the resolver so ISSUE/selector
+    // resolutions can bypass workspaceTokenCache and select the named binding.
+    // A missing or unrecognised intent fails closed as ISSUE. The ISSUE selector
+    // comes from the request query; other intents use the declared options
+    // selector (WORKSPACE ignores it).
+    const intentResolved = normalizeBindingIntent(intent);
+    const effectiveSelector = selector !== undefined
+      ? selector
+      : (intentResolved === BINDING_INTENT.ISSUE ? issueSelectorFromQuery(req) : undefined);
+    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint, bindings } = await resolveWorkspaceAccess(urlKey, ownerAccountId, { intent: intentResolved, selector: effectiveSelector });
+    if (req && (reason === 'binding_required' || reason === 'unknown_binding')) {
+      // The refusal's public detail rides on `req` for workspaceUnavailable (and
+      // the dispatch referent guard) to translate into the 422 envelope. It is
+      // set only on the refusal branch, so a resolved request never carries it.
+      req.proxyBindingRefusal = {
+        reason,
+        provider: providerName ?? null,
+        bindings: Array.isArray(bindings) ? bindings : [],
+      };
+    }
     if (req && token) {
       req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       // LIN-2216: stamped alongside the fingerprint, on THIS request object —
@@ -1122,6 +1164,22 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * 30-day window; the envelope already returns it, so this widens no exposure.
    */
   function workspaceUnavailable(req, res, endpoint, reason) {
+    // LIN-3241 (C, parent LIN-3126 §3): a binding refusal is a 422, not a
+    // provider-lane 503. `resolveProviderAccess` stages the public detail
+    // ({provider, bindings}) on `req`; translate it through the same
+    // bindingRefusalResponse the session-lane resolvers use, so the consumer
+    // gets the identical {code, provider, bindings} shape and no provider-lane
+    // occupancy is polluted (a refusal returns before any credential stamp).
+    if (reason === 'binding_required' || reason === 'unknown_binding') {
+      const refusal = req?.proxyBindingRefusal || {};
+      const { status, body } = bindingRefusalResponse({
+        code: reason === 'unknown_binding' ? 'UNKNOWN_BINDING' : 'BINDING_REQUIRED',
+        provider: refusal.provider ?? null,
+        bindings: refusal.bindings ?? [],
+      });
+      logEvent(req, endpoint, status, reason);
+      return res.status(status).json(body);
+    }
     logEvent(req, endpoint, 503, reason);
     return res.status(503).json(workspaceUnavailableEnvelope(reason, req.proxyUrlKey));
   }
@@ -1393,7 +1451,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // neutral-degrade contract.
     let requiresTeam = false;
     try {
-      const { provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       declaredDisplayName = declaredProviderDisplayName(req);
       isDeclaredLinear = req.resolvedProvider?.declared === 'linear';
       requiresTeam = provider.createFields().includes('teamId');

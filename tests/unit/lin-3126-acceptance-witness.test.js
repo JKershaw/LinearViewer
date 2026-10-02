@@ -16,6 +16,19 @@
  * fields (or 404'd), never repoB's. The selector/`bindingScope` param was also
  * unknown to the route, so it was dropped.
  *
+ * Slice-2 `describe` below — acceptance witness, assertion (b): the PROXY issue
+ * read. Fails before (the slice-2 seam, reproduced by making
+ * `routes/proxy.js` `issueSelectorFromQuery` return `undefined` — i.e. with no
+ * query-selector input path):
+ *     AssertionError [ERR_ASSERTION]: {"code":"BINDING_REQUIRED","provider":"github","bindings":["octo/repoA","octo/repoB"]}
+ *     actual: 422
+ *     expected: 200
+ *   Without the selector input path the repoB request cannot reach the
+ *   resolver's selector and is refused; the no-selector assertion already
+ *   expects 422, so it stays green. (The earlier arm characterization in
+ *   `lin-3126-proxy-selector.test.js` records the pre-slice-2 served-scope fail
+ *   as `{token:'tok-a', repo:'99'}` instead of `repo:'octo/repoA'`.)
+ *
  * Run with: node --test tests/unit/lin-3126-acceptance-witness.test.js
  */
 import { test, describe, before } from 'node:test';
@@ -23,6 +36,7 @@ import assert from 'node:assert/strict';
 import {
   REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace, buildWorkspaceApiApp, withServer,
 } from './lin-3126-harness.js';
+import { makeTwoRepoResolver, buildProxyApp, callProxy, issueDetailProvider } from './lin-3126-proxy-harness.js';
 import { setBindingCredential } from '../../lib/connection-binding.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
@@ -110,5 +124,39 @@ describe('LIN-3240 review F1 — the /api/detail fragment keeps the validated bi
       body.html.includes('/workspace/acme/task/1/edit?source=github'),
       'the Edit href stays byte-identical to the pre-LIN-3240 source-only form'
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3241 (LIN-3126 slice 2) acceptance witness, assertion (b): the proxy
+// issue read. The plan names THIS file for the slice-2 describe; it drives the
+// REAL proxy route over the REAL server.js resolveWorkspaceAccess body + the
+// REAL connection-first arm (lin-3126-proxy-harness.js).
+// ---------------------------------------------------------------------------
+
+describe('LIN-3241 acceptance witness (b) — proxy issue read honours the issue\'s own binding', () => {
+  test('?source=github&bindingScope=repoB asks repoB with call scope {repo:repoB}', async () => {
+    const calls = [];
+    const { fn } = makeTwoRepoResolver();
+    const { app } = buildProxyApp({ resolveWorkspaceAccess: fn, provider: issueDetailProvider(calls) });
+
+    const res = await callProxy(app, 'GET', `/api/proxy/issues/1?source=github&bindingScope=${encodeURIComponent(REPO_B)}`);
+
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.deepEqual(calls.map(c => c.repo), [REPO_B], 'the provider saw only repoB');
+    assert.equal(calls[0].token, 'tok-a', 'the token is the Connection credential');
+  });
+
+  test('without a selector on the two-binding workspace: 422 BINDING_REQUIRED and ZERO provider calls', async () => {
+    const calls = [];
+    const { fn } = makeTwoRepoResolver();
+    const { app } = buildProxyApp({ resolveWorkspaceAccess: fn, provider: issueDetailProvider(calls) });
+
+    const res = await callProxy(app, 'GET', '/api/proxy/issues/1');
+
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'BINDING_REQUIRED');
+    assert.deepEqual(res.body.bindings, [REPO_A, REPO_B]);
+    assert.equal(calls.length, 0, 'no provider call on a refusal');
   });
 });

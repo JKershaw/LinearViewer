@@ -66,6 +66,9 @@ function makeDispatchStore() {
     listItems: async () => [],
     listHistory: async () => ({ items: [], total: 0 }),
     getItemStatus: async () => null,
+    // LIN-3257: the shadow read is a no-op on a store with no shadow
+    // collection — an empty, well-formed summary.
+    getWakeShadowTally: async () => ({ days: [], totals: { minted: 0, wouldSkip: 0, share: 0, byReason: {} } }),
     historyTtl: 30 * 24 * 60 * 60, // seconds
   };
 }
@@ -99,7 +102,7 @@ function runnerApp(overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// 75 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
+// 76 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
 // own group letter. `run` builds the app + issues the one deterministic
 // offline request and returns { status }.
 // ---------------------------------------------------------------------------
@@ -469,6 +472,12 @@ const ROWS = [
     expectBody: { error: 'Dispatch item not found' },
     run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/dispatch/d1/prompt'),
   },
+  {
+    group: 'I', method: 'GET', url: '/api/proxy/wake-shadow', expect: 200,
+    note: 'LIN-3257: read-only shadow tally; makeDispatchStore() has no shadow collection, so the empty no-op summary',
+    expectBody: { days: [], totals: { minted: 0, wouldSkip: 0, share: 0, byReason: {} } },
+    run: () => call(buildApp({ dispatchQueueStore: makeDispatchStore() }), 'GET', '/api/proxy/wake-shadow'),
+  },
 
   // --- Group J: Flight Companion turn (LIN-2620, routes/proxy-flight-companion.js) ---
   {
@@ -489,7 +498,7 @@ const ROWS = [
   // POST .../suggest-dismissal, POST .../suggest-answer) — a bounded,
   // documented gap from LIN-2444, which updated the DI census
   // (tests/unit/proxy-di-witness.test.js) but not this file. Fixing that
-  // gap is out of scope here; this comment exists so 75 below is read as
+  // gap is out of scope here; this comment exists so 76 below is read as
   // "75 covered forms, 3 known-uncovered", never as "the whole surface".
   {
     group: 'K', method: 'GET', url: '/api/proxy/dispatch/halt', expect: 200,
@@ -640,7 +649,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (75 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (76 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();

@@ -31,6 +31,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { sendSSE } from '../lib/sse.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
+import { BINDING_INTENT } from '../lib/workspace.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog } from '../lib/chat-tools.js';
@@ -179,7 +180,7 @@ export function createProxyFlightCompanionRoutes({
     proxyTurnHourlyLimiter,
     proxyTurnDailyLimiter,
     async (req, res) => {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!accessToken) {
         return workspaceUnavailable(req, res, ENDPOINT, reason);
       }

@@ -24,7 +24,7 @@ import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/supersed
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
-import { workspaceTokenCacheKey as realWorkspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
+import { workspaceTokenCacheKey as realWorkspaceTokenCacheKey, workspaceTokenCacheBypasses as realWorkspaceTokenCacheBypasses } from '../../lib/workspace-token-cache.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -247,6 +247,10 @@ async function runResolveWorkspaceAccess({
       cacheKeyCalls.push(ownerAccountId);
       return realWorkspaceTokenCacheKey(urlKey, ownerAccountId);
     },
+    // LIN-3241 (B): the extracted body's cache-bypass decision. These harnesses
+    // call the resolver with no options (options undefined), so the real
+    // predicate returns false and the cache path is unchanged.
+    workspaceTokenCacheBypasses: realWorkspaceTokenCacheBypasses,
     sessionsCollection: { find: () => ({ toArray: async () => sessions }) },
     workspaceTokenCache,
     ownerCredentialStore: { get: async () => null },

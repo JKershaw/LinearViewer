@@ -66,3 +66,7 @@ see the [degraded-mode runbook](../runbooks/harbour-degraded.md).
 
 **See [docs/proxy-integration.md](docs/proxy-integration.md)** for the full consumer integration guide.
 
+## Wake shadow (LIN-3257, M1 shadow)
+
+Harbour classifies every wake it mints at the `addFeedback` seam (`classifyWake`, `lib/dispatch-wake.js`) and records the verdict plus a per-day tally in the additive, optional `wake_shadow` collection (`lib/wake-shadow.js`, `wakeShadowCollection`). This is a **measurement only**: nothing is suppressed, delivery is byte-identical, and no code path reads the result to hold a wake back. The two read-only surfaces are the `wakeShadow` field on `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/wake-shadow`; the full contract lives in the [Wake-Shadow Tally section of the integration guide](../proxy-integration.md#read-the-wake-shadow-tally), not here.
+
