@@ -9,6 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   FEATURES,
@@ -124,5 +125,17 @@ describe('footer feedback surface (LIN-635)', () => {
   test('is omitted when there is no workspace urlKey', () => {
     const html = renderPageFooter({ urlKey: null, featureFlags: { feedbackWidget: true } });
     assert.doesNotMatch(html, /feedback-widget-root/);
+  });
+});
+
+describe('feedback widget — run-limit refusal message (LIN-3238)', () => {
+  test('handles data.triage like data.autopilot so a refused triage shows its message', () => {
+    const src = readFileSync(new URL('../../public/feedback-widget.js', import.meta.url), 'utf8');
+    // A refused triage must not read as a bare "Filed".
+    assert.match(src, /data\.triage && data\.triage\.launched === false/);
+    assert.match(src, /Triage was not started: \$\{data\.triage\.message\}/);
+    // The autopilot branch is unchanged and still present.
+    assert.match(src, /data\.autopilot && data\.autopilot\.launched === false/);
+    assert.match(src, /Autopilot was not started: \$\{data\.autopilot\.message\}/);
   });
 });

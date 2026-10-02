@@ -226,6 +226,23 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the run-count indexes on both dispatch collections (LIN-3238)', () => {
+    // Backs countFreshRunsSince: a per-account attached range scan over the UTC
+    // day, in the queue and (after the archive hop) in history. Plain, non-TTL.
+    for (const collection of ['dispatch-queue', 'dispatch-history']) {
+      const spec = INDEX_SPECS.find(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
+      );
+      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index (LIN-3238)`);
+      assert.strictEqual(
+        spec.options?.expireAfterSeconds,
+        undefined,
+        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
+      );
+    }
+  });
+
   test('declares the partial unique one-owner-per-workspace index on account-workspaces (LIN-1892)', () => {
     const spec = INDEX_SPECS.find(s => s.options.name === 'account_workspaces_one_owner');
     assert.ok(spec, 'expected an account_workspaces_one_owner spec');

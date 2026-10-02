@@ -45,6 +45,8 @@ import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { DISPATCH_RUNGS } from '../lib/task-mode-store.js';
+import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
+import { resolveAccountGroup } from '../lib/account-group.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -146,7 +148,7 @@ const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null }) {
   const router = Router();
 
   // =========================================================================
@@ -508,6 +510,17 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // client does NOT ask, we pass the plain prompt and no finalizePrompt, byte-for-
       // byte the pre-LIN-1162 path (and the copy/download flows still append client-side).
       const baseUrl = `${req.protocol}://${req.get('host')}`;
+      // Free-tier run gate (LIN-3238): only a free-tier session is gated.
+      // `buildRunGate` returns null for a paid/own key and for a null account
+      // (null attribution is not gated), so every other caller stays ungated.
+      // The factory invokes it only on a fresh row (step 1.55).
+      const { isFreeTier: dispatchIsFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
+      const runGate = buildRunGate({
+        isFreeTier: dispatchIsFreeTier,
+        freeTierStore,
+        accountId: req.session?.accountId,
+        accountStore
+      });
       const item = await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
@@ -522,6 +535,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         effort,
         dispatchTokenStore,
         proxyTokenStore,
+        runGate,
         // LIN-3200 P5: plan block for the file-pointer pilot on the session/UI
         // dispatch path. Closes over this route's own provider resolution (the
         // same getProviderForWorkspace + getWorkspaceCallScope pair the
@@ -816,6 +830,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         res.set('Retry-After', String(err.duplicateDispatch.retryAfter));
         return jsonError(res, 409, err.message, err.duplicateDispatch);
       }
+      // Free-tier run-limit refusal (LIN-3238): the body is built once by
+      // `createDispatchItem` (step 1.55) and carried on `err.runLimit` —
+      // `{ error, code, freeTier, retryAfter }`. A 429 for an exhausted limit
+      // (with `Retry-After` to `resetsAt`); a 503 when the count could not be
+      // read (fail closed). This route is session-auth'd, so no audit log.
+      if (err && err.runLimit) {
+        const status = err.runLimit.code === 'RUN_LIMIT_UNVERIFIED' ? 503 : 429;
+        if (status === 429) {
+          res.set('Retry-After', String(err.runLimit.retryAfter));
+        }
+        return jsonError(res, status, err.runLimit.error, {
+          code: err.runLimit.code,
+          freeTier: err.runLimit.freeTier,
+          retryAfter: err.runLimit.retryAfter
+        });
+      }
       // Task-budget refusal (LIN-1751): same tagged-throw relay convention as
       // the duplicate guard above, distinct `code` (BUDGET_EXHAUSTED) so a
       // caller branching on 409 bodies can tell the two refusals apart. No
@@ -908,6 +938,35 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     } catch (err) {
       console.error('Count dispatch items error:', err.message);
       jsonError(res, 500, 'Failed to count dispatch items');
+    }
+  });
+
+  /**
+   * GET /workspace/:urlKey/api/dispatch/quota
+   * The caller's own free-tier run usage (LIN-3238 Q6): `{ limited, runsUsed,
+   * limit, remaining, resetsAt }`. Scoped to the session account's merge group
+   * only — never another account's or instance-wide figures. `limited:false`
+   * when the caller is not free tier (or has no attributable account).
+   */
+  router.get('/workspace/:urlKey/api/dispatch/quota', workspaceFromUrl, async (req, res) => {
+    try {
+      const accountId = req.session?.accountId;
+      const { isFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
+      if (!isFreeTier || !accountId) {
+        return res.json({ limited: false, runsUsed: null, limit: null, remaining: null, resetsAt: null });
+      }
+      const accountIds = await resolveAccountGroup(accountStore, accountId);
+      const usage = await freeTierStore.getRunUsage(accountIds);
+      return res.json({
+        limited: true,
+        runsUsed: usage.runsUsed,
+        limit: usage.limit,
+        remaining: usage.remaining,
+        resetsAt: usage.resetsAt
+      });
+    } catch (err) {
+      console.error('Read dispatch quota error:', err.message);
+      jsonError(res, 500, 'Failed to read dispatch quota');
     }
   });
 

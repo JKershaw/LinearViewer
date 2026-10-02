@@ -70,7 +70,7 @@ function fakeProxyTokenStore(token = 'minted-rw-token') {
   };
 }
 
-function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore, workspacePreferencesStore: wsPrefs } = {}) {
+function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore, workspacePreferencesStore: wsPrefs, freeTierStore, accountStore = null } = {}) {
   registerProvider(provider);
   const app = express();
   // Mirror the production global JSON parser (250kb, application/json only) so
@@ -89,7 +89,8 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
     dispatchQueueStore,
     proxyTokenStore,
     // Unused by the feedback route but part of the factory signature.
-    freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+    freeTierStore: freeTierStore || {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+    accountStore,
     workspacePreferencesStore: wsPrefs ?? { getWorkspacePreferences: async () => ({}) },
     customPromptsStore: {}, recapCacheStore: {},
     briefCacheStore: {}, reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {}
@@ -835,5 +836,87 @@ describe('feedback submit (LIN-635)', () => {
     assert.strictEqual(dispatch.items.length, 1);
     assert.strictEqual(dispatch.items[0].item.model, null);
     assert.strictEqual(dispatch.items[0].item.harness, 'claude-code');
+  });
+});
+
+describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
+  let savedFreeKey;
+  let savedPaidKey;
+  beforeEach(() => {
+    savedFreeKey = process.env.OPENROUTER_FREE_TIER_KEY;
+    savedPaidKey = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_FREE_TIER_KEY = 'free-tier-test-key';
+  });
+  afterEach(() => {
+    if (savedFreeKey === undefined) delete process.env.OPENROUTER_FREE_TIER_KEY; else process.env.OPENROUTER_FREE_TIER_KEY = savedFreeKey;
+    if (savedPaidKey === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedPaidKey;
+  });
+
+  const REFUSED = { allowed: false, reason: 'limit', runsUsed: 10, limit: 10, remaining: 0, resetsAt: '2026-10-03T00:00:00.000Z' };
+  const UNVERIFIED = { allowed: false, reason: 'unverified', runsUsed: null, limit: 10, remaining: 0, resetsAt: '2026-10-03T00:00:00.000Z' };
+  const freeTier = (checkRun) => ({ checkRun });
+
+  for (const [name, payload] of [
+    ["action:'triage'", { action: 'triage' }],
+    ['legacy flag-on triage', {}],
+    ["action:'autopilot'", { action: 'autopilot' }],
+  ]) {
+    test(`${name}: an exhausted free-tier account still files the ticket, enqueues nothing, mints nothing, and reports the refusal`, async () => {
+      const { provider, calls } = makeFakeProvider();
+      const dispatch = capturingDispatchStore();
+      const proxyTokenStore = fakeProxyTokenStore();
+      const app = buildApp({
+        provider, dispatchQueueStore: dispatch, proxyTokenStore,
+        features: { feedbackTriage: true },
+        freeTierStore: freeTier(async () => REFUSED)
+      });
+
+      const { status, body } = await submit(app, 'acme', { message: 'hello', ...payload });
+
+      assert.strictEqual(status, 201, JSON.stringify(body));
+      assert.strictEqual(body.success, true);
+      assert.strictEqual(calls.createIssue.length, 1, 'the ticket is still filed');
+      assert.strictEqual(dispatch.items.length, 0, 'nothing is enqueued on refusal');
+      assert.strictEqual(proxyTokenStore.grantCalls.length, 0, 'no bootstrap credential is minted');
+      assert.strictEqual(proxyTokenStore.calls.length, 0);
+
+      const refusalKey = payload.action === 'autopilot' ? 'autopilot' : 'triage';
+      assert.strictEqual(body[refusalKey].launched, false);
+      assert.strictEqual(body[refusalKey].code, 'RUN_LIMIT_REACHED');
+      assert.strictEqual(body[refusalKey].retryable, false);
+      assert.match(body[refusalKey].message, /Daily run limit reached/);
+    });
+  }
+
+  test("action:'autopilot': an unverified count is retryable RUN_LIMIT_UNVERIFIED", async () => {
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore(),
+      freeTierStore: freeTier(async () => UNVERIFIED)
+    });
+
+    const { status, body } = await submit(app, 'acme', { message: 'hello', action: 'autopilot' });
+    assert.strictEqual(status, 201, JSON.stringify(body));
+    assert.strictEqual(body.autopilot.launched, false);
+    assert.strictEqual(body.autopilot.code, 'RUN_LIMIT_UNVERIFIED');
+    assert.strictEqual(body.autopilot.retryable, true);
+    assert.strictEqual(dispatch.items.length, 0);
+  });
+
+  test('a non-free-tier account launches normally (no gate)', async () => {
+    delete process.env.OPENROUTER_FREE_TIER_KEY;
+    const { provider } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({
+      provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore(),
+      freeTierStore: { checkRun: async () => { throw new Error('must not be called'); } }
+    });
+
+    const { status, body } = await submit(app, 'acme', { message: 'hello', action: 'autopilot' });
+    assert.strictEqual(status, 201, JSON.stringify(body));
+    assert.strictEqual(dispatch.items.length, 1, 'a non-free-tier run launches');
+    assert.strictEqual(body.autopilot, undefined, 'no refusal key on a successful launch');
   });
 });

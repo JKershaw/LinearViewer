@@ -25,6 +25,7 @@ import { isValidIssueId, UUID_REGEX } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
+import { buildRunGate } from '../lib/chat-request.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -193,6 +194,9 @@ export function createDispatchRoutes({
   RECOMMEND_DESCENT_BUDGET_MS,
   refuseIfBudgetExhausted,
   refuseIfDuplicateDispatch,
+  refuseIfRunLimit = () => false,
+  freeTierStore = null,
+  accountStore = null,
   requireGrant,
   requireWriteScope,
   resolvePromptIssueContext,
@@ -478,6 +482,17 @@ export function createDispatchRoutes({
       // callback: the factory hands it the resolved harness, it runs the append,
       // and returns { prompt, bootstrapToken } to carry on the item. An abort item
       // carries no prompt, so the append stays guarded on prompt presence (LIN-743).
+      // Free-tier run gate (LIN-3238): the token creator's own OpenRouter key
+      // decides free tier; `buildRunGate` returns null otherwise (and for a null
+      // creator). Built here so the factory sees it only on a fresh row (1.55).
+      const dispatchSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+      const { isFreeTier: dispatchIsFreeTier } = resolveProxyLLM(dispatchSessionApiKey);
+      const runGate = buildRunGate({
+        isFreeTier: dispatchIsFreeTier,
+        freeTierStore,
+        accountId: req.proxyCreatedBy,
+        accountStore
+      });
       const item = await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: req.proxyUrlKey,
@@ -489,6 +504,7 @@ export function createDispatchRoutes({
         harness,
         terminal,
         effort,
+        runGate,
         // LIN-3200 P5: plan block for the file-pointer pilot. The named issue's
         // description is resolved through the SAME provider access the
         // dangling-referent guard already obtained above (no second provider
@@ -644,6 +660,9 @@ export function createDispatchRoutes({
       if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/dispatch')) return;
       // Task-budget refusal (LIN-1751) — see the responder.
       if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/dispatch')) return;
+      // Free-tier run-limit refusal (LIN-3238) — 429 RUN_LIMIT_REACHED, or 503
+      // RUN_LIMIT_UNVERIFIED when the count could not be read.
+      if (refuseIfRunLimit(err, req, res, '/api/proxy/dispatch')) return;
       // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/dispatch', 503);
@@ -956,6 +975,15 @@ export function createDispatchRoutes({
           // runs inside finalizePrompt AFTER the harness is resolved (LIN-1155), so
           // it can gate its MCP-token-vs-prose branch on it and hand back the
           // bootstrapToken to carry as a field. Opt out with appendProxyContext:false.
+          // Free-tier run gate (LIN-3238): token creator's key decides free tier.
+          const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+          const { isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
+          const runGate = buildRunGate({
+            isFreeTier: overrideIsFreeTier,
+            freeTierStore,
+            accountId: req.proxyCreatedBy,
+            accountStore
+          });
           const item = await createDispatchItem({
             store: dispatchQueueStore,
             urlKey: req.proxyUrlKey,
@@ -966,6 +994,7 @@ export function createDispatchRoutes({
             model,
             harness,
             effort,
+            runGate,
             // LIN-3200 P5: the override branch already holds `issue` from
             // resolvePromptIssueContext — return its description with no refetch.
             readPlanBlock: async () => issue?.description || null,
@@ -1098,6 +1127,8 @@ export function createDispatchRoutes({
           if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
           // Task-budget refusal (LIN-1751) — same plain-`res` arm as above.
           if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
+          // Free-tier run-limit refusal (LIN-3238) — plain-`res` arm (no keepalive armed).
+          if (refuseIfRunLimit(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
@@ -1247,6 +1278,14 @@ export function createDispatchRoutes({
         // inside finalizePrompt AFTER the harness is resolved (LIN-1155), so it can
         // gate its MCP-token-vs-prose branch on it and hand back the bootstrapToken
         // to carry as a field. Opt out with appendProxyContext:false.
+        // Free-tier run gate (LIN-3238): same token-creator-derived isFreeTier
+        // the recommendation credential gate above computed.
+        const runGate = buildRunGate({
+          isFreeTier,
+          freeTierStore,
+          accountId: req.proxyCreatedBy,
+          accountStore
+        });
         const item = await createDispatchItem({
           store: dispatchQueueStore,
           urlKey: req.proxyUrlKey,
@@ -1257,6 +1296,7 @@ export function createDispatchRoutes({
           model,
           harness,
           effort,
+          runGate,
           // LIN-3200 P5: plan block for the file-pointer pilot on the
           // recommendation-derived arm. The terminal issue's context was
           // consumed inside computeRecommendation and is not carried on `rec`,
@@ -1409,6 +1449,9 @@ export function createDispatchRoutes({
         if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // Task-budget refusal (LIN-1751) — same keepalive-armed arm as above.
         if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
+        // Free-tier run-limit refusal (LIN-3238) — keepalive-armed arm: the 429
+        // (with `Retry-After`) or 503 rides `keepalive.send`, same as above.
+        if (refuseIfRunLimit(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
