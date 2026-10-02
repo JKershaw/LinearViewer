@@ -358,12 +358,11 @@
     }
   }
 
-  // ── In-progress elapsed time (LIN-1163 item 4) ─────────────────────────────
-  // A non-terminal run/session renders a static "in progress" placeholder
-  // server-side (lib/render-session.js); this fills in the elapsed time since
-  // dispatchedAt, computed client-side (one-time, on load — matches the
-  // ticket's "elapsed time can be derived client-side" assumption; it does not
-  // live-tick).
+  // ── Live clocks (LIN-1163 item 4; LIN-3250 live ticking) ───────────────────
+  // The server renders each clock's current value and the timestamps it needs;
+  // this re-derives them once a second so an open run's wall clock and waiting
+  // clock keep moving without a reload. Per-run in-progress rows keep the
+  // original one-line "in progress · Xs" shape.
   function formatElapsed(ms) {
     if (!(ms >= 0)) return null;
     var totalSec = Math.round(ms / 1000);
@@ -376,16 +375,38 @@
     return rm ? h + 'h ' + rm + 'm' : h + 'h';
   }
 
-  function fillElapsedTimes() {
-    var els = document.querySelectorAll('[data-testid="session-run-elapsed"], [data-testid="session-elapsed"]');
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      var dispatchedAt = el.dataset.dispatchedAt;
-      if (!dispatchedAt) continue;
-      var dispatchedMs = Date.parse(dispatchedAt);
-      if (isNaN(dispatchedMs)) continue;
-      var elapsed = formatElapsed(Date.now() - dispatchedMs);
-      if (elapsed) el.textContent = 'in progress · ' + elapsed;
+  // Elapsed for one element: a fixed `data-end` is static; an open clock ticks
+  // against now. Accepts `data-start` (session wall clock) or the legacy
+  // `data-dispatched-at` (per-run in-progress rows).
+  function clockElapsed(el) {
+    var start = el.dataset.start || el.dataset.dispatchedAt;
+    if (!start) return null;
+    var startMs = Date.parse(start);
+    if (isNaN(startMs)) return null;
+    var endMs = el.dataset.end ? Date.parse(el.dataset.end) : NaN;
+    var ms = isNaN(endMs) ? Date.now() - startMs : endMs - startMs;
+    return formatElapsed(ms);
+  }
+
+  function tickClocks() {
+    var runEls = document.querySelectorAll('[data-testid="session-run-elapsed"]');
+    for (var i = 0; i < runEls.length; i++) {
+      var runElapsed = clockElapsed(runEls[i]);
+      if (runElapsed) runEls[i].textContent = 'in progress · ' + runElapsed;
+    }
+    var wallEls = document.querySelectorAll('[data-testid="session-elapsed"]');
+    for (var j = 0; j < wallEls.length; j++) {
+      var wallElapsed = clockElapsed(wallEls[j]);
+      if (wallElapsed) wallEls[j].textContent = wallElapsed;
+    }
+    var waitEls = document.querySelectorAll('[data-testid="session-waiting-clock"]');
+    for (var k = 0; k < waitEls.length; k++) {
+      var since = waitEls[k].dataset.since;
+      if (!since) continue;
+      var sinceMs = Date.parse(since);
+      if (isNaN(sinceMs)) continue;
+      var waitElapsed = formatElapsed(Date.now() - sinceMs);
+      if (waitElapsed) waitEls[k].textContent = 'waiting ' + waitElapsed;
     }
   }
 
@@ -396,6 +417,7 @@
     initRunToggles();
     initInlineReplies();
     initContextWidgets();
-    fillElapsedTimes();
+    tickClocks();
+    setInterval(tickClocks, 1000);
   });
 })();

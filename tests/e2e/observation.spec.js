@@ -674,7 +674,11 @@ test.describe('Sessions tab — in-flight standalone sessions (LIN-1194)', () =>
     // The dedicated per-session page renders the standalone session with no new
     // plumbing (it resolves by the session's own dispatch id).
     expect(page.url()).toMatch(sessionPathRe);
-    await expect(page.locator('.page-header')).toContainText(/Session|session/);
+    // LIN-3250: the page heading is now the task title + "Run <id>", so anchor
+    // on the run-page surfaces rather than the old "Session" heading text.
+    await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-title"]')).toContainText('Standalone drill-in');
+    await expect(page.locator('[data-testid="session-run-id"]')).toContainText('Run ');
   });
 });
 

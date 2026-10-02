@@ -644,3 +644,29 @@
   .sess-inline-reply-input { min-height: 4rem; }
   .sess-run-tx { --chat-thread-max-height: 280px; }
 }
+
+/* ── Run page header + steps (LIN-3250) ────────────────────────────────────────
+   The heading's human title (sans) with a small mono run id; an empty paragraph
+   slot reserved for S3; and one-line per-step summaries above the existing run
+   rows. Dark-theme tokens only. */
+.sess-heading-title { font-family: var(--font-content); }
+.sess-run-id {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sess-paragraph-slot:empty { display: none; }
+.sess-step { margin-bottom: var(--space-4); }
+.sess-step-summary {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+
+/* Feels alive: the running step's status dot pulses. That pulse is the ONE
+   global `.status-pill--running .status-pill__dot` rule in style.css, gated
+   there by prefers-reduced-motion — no page-local duplicate here. */
+.sess-run-cost { color: var(--muted); }

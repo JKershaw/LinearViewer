@@ -4181,7 +4181,8 @@ describe('GET /observation/session/:sessionId — brief/recap join (LIN-1003)', 
     // (autopilotHistoryItem('sess-ctx', 'LIN-900') here), carrying issueTitle
     // 'Title LIN-900' — distinct from the session's bare seedIssue 'LIN-900'.
     assert.match(html, /data-testid="session-seed-title"[^>]*>Title LIN-900</);
-    assert.match(html, /<h1>Session · LIN-900 — Title LIN-900<\/h1>/);
+    assert.match(html, /data-testid="session-title"[^>]*>Title LIN-900</);
+    assert.match(html, /data-testid="session-run-id"[^>]*>Run sess-ctx</);
   });
 });
 

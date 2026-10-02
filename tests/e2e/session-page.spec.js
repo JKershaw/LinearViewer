@@ -130,6 +130,52 @@ async function seedWarmSession(page) {
   expect(progress.status(), `progress feedback failed: ${await progress.text()}`).toBe(200);
 }
 
+// LIN-3250 ledger item 5: a real-shaped stepped single-lineage run — the ticket's
+// own "one warm session, in-session follow-ups" shape. An autopilot anchor plus
+// one implementation lineage built from follow-ups (implementation, rework,
+// review, rework) whose close-out is still running. Progress must read
+// "3 of 4" with "Next: close-out".
+async function seedSteppedLineageSession(page) {
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-3250', issueTitle: 'Stepped run', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+  const dispatch = async (data) => {
+    const res = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { issueIdentifier: 'LIN-3250', issueTitle: 'Stepped run', target: 'cli', sessionId: anchorId, ...data }
+    });
+    expect(res.status(), `dispatch ${data.kind} failed: ${await res.text()}`).toBe(201);
+    return (await res.json()).item.id;
+  };
+  const finish = async (id) => {
+    const take = await page.request.post(`/api/dispatch/take/${id}`, { headers: auth });
+    expect(take.status(), `take ${id} failed: ${await take.text()}`).toBe(200);
+    const fb = await page.request.post(`/api/dispatch/feedback/${id}`, { headers: auth, data: { message: '[done] landed' } });
+    expect(fb.status(), `feedback ${id} failed: ${await fb.text()}`).toBe(200);
+  };
+
+  const impl1 = await dispatch({ prompt: 'implement', promptName: 'implementation', kind: 'implementation' });
+  await finish(impl1);
+  const impl2 = await dispatch({ prompt: 'rework', promptName: 'implementation', kind: 'implementation', followUpTo: impl1 });
+  await finish(impl2);
+  const review = await dispatch({ prompt: 'review', promptName: 'review', kind: 'review', followUpTo: impl2 });
+  await finish(review);
+  const rework = await dispatch({ prompt: 'rework after review', promptName: 'implementation', kind: 'implementation', followUpTo: review });
+  await finish(rework);
+  const closeOut = await dispatch({ prompt: 'close out', promptName: 'close-out', kind: 'close-out', followUpTo: rework });
+  // close-out: taken but deliberately left running (no terminal marker).
+  const takeClose = await page.request.post(`/api/dispatch/take/${closeOut}`, { headers: auth });
+  expect(takeClose.status(), `close-out take failed: ${await takeClose.text()}`).toBe(200);
+
+  return { anchorId, impl1, closeOut };
+}
+
 // Seed a FINISHED autopilot session (anchor driven to [done]) that still has a
 // worker left in a [blocked] state — the LIN-1005 session-level terminal-gate
 // case: the session is terminal, so it must NOT surface as waiting even though a
@@ -251,7 +297,9 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     // The page shell rendered.
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
-    await expect(page.locator('.page-header.sess-header h1')).toContainText('Session');
+    // LIN-3250: the heading is the task title + a short "Run <id>".
+    await expect(page.locator('[data-testid="session-title"]')).toContainText('Session-page seed');
+    await expect(page.locator('[data-testid="session-run-id"]')).toContainText('Run ');
 
     // Tasks-touched surface carries the seeded task.
     await expect(page.locator('[data-testid="session-tasks"]')).toContainText('LIN-1003');
@@ -832,6 +880,172 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // On the swipe page the Observation tab is a clickable anchor (not active).
     const tabHref = await page.locator('[data-testid="nav-view-observation"]').getAttribute('href');
     expect(tabHref).toBe(`/workspace/${URL_KEY}/observation`);
+  });
+
+  // ── LIN-3250: the rewritten run page (header strip, steps, live clocks) ────
+  test('renders the header strip and per-step summaries, with no money when unpriced (LIN-3250)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // Header strip: the one progress number, active time, and the wall clock.
+    await expect(page.locator('[data-testid="session-progress"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-active-time"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-elapsed"]')).toBeVisible();
+    // Reserved paragraph slot for S3 is present (empty).
+    await expect(page.locator('[data-testid="session-paragraph"]')).toBeAttached();
+
+    // Steps: each lineage gets a one-line summary above its existing run rows.
+    const steps = page.locator('[data-testid="session-step"]');
+    await expect(steps.first()).toBeVisible();
+    await expect(page.locator('[data-testid="session-step-summary"]').first()).toBeVisible();
+    // Every step's summary sits above that step's own run rows.
+    await expect(steps.first().locator('[data-testid="session-run"]').first()).toBeVisible();
+
+    // The seeded run carries no usage → the header total is not reported, so
+    // there is NO money markup at all (never a zero/placeholder).
+    await expect(page.locator('[data-testid="session-cost"]')).toHaveCount(0);
+  });
+
+  test('the wall clock and waiting clock carry the timestamps the client ticks from (LIN-3250)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedBlockedSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // The session is waiting: the waiting clock is rendered with its since stamp.
+    const waiting = page.locator('[data-testid="session-waiting-clock"]');
+    await expect(waiting).toBeVisible();
+    await expect(waiting).toHaveAttribute('data-since', /.+/);
+    // The wall clock carries its start (and no end while the run is open).
+    const wall = page.locator('[data-testid="session-elapsed"]');
+    await expect(wall).toHaveAttribute('data-start', /.+/);
+    await expect(wall).toHaveAttribute('data-end', '');
+  });
+
+  test('reduced motion leaves the running step dot static (LIN-3250)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedWarmSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const dot = page.locator('[data-testid="session-run"][data-status="running"] .status-pill__dot').first();
+    await expect(dot).toBeVisible();
+    // The ONE pulse rule (the global `.status-pill--running .status-pill__dot`
+    // in style.css) is gated behind prefers-reduced-motion: no-preference, so
+    // under `reduce` it does not apply at all — the dot has NO animation (name
+    // `none`), not merely a neutralized duration. Removing the gate makes this
+    // read `pulse` and fails.
+    const reducedName = await dot.evaluate((el) => getComputedStyle(el).animationName);
+    expect(reducedName).toBe('none');
+    const reducedDuration = await dot.evaluate((el) => getComputedStyle(el).animationDuration);
+    expect(parseFloat(reducedDuration)).toBeLessThan(0.01);
+
+    // With motion allowed the same dot pulses (real animation, real seconds).
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.reload({ waitUntil: 'networkidle' });
+    const pulsingName = await dot.evaluate((el) => getComputedStyle(el).animationName);
+    expect(pulsingName).toBe('pulse');
+    const pulsingDuration = await dot.evaluate((el) => getComputedStyle(el).animationDuration);
+    expect(parseFloat(pulsingDuration)).toBeGreaterThan(1);
+  });
+
+  test('the new header strip and step summaries clear AA contrast in the dark theme (LIN-3250)', async ({ page }) => {
+    // Dark is the opt-in `.theme-dark` hook driven by the `theme` cookie.
+    await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('html')).toHaveClass(/theme-dark/);
+
+    // WCAG 2.x relative-luminance contrast, resolved against the element's
+    // effective (first opaque ancestor) background — the same maths
+    // tests/unit/theme.test.js uses over the tokens, here on the live computed
+    // style of the new strip + step summaries.
+    const results = await page.evaluate((selectors) => {
+      const parse = (c) => {
+        const m = /rgba?\(([^)]+)\)/.exec(c || '');
+        if (!m) return null;
+        const p = m[1].split(',').map(s => parseFloat(s.trim()));
+        return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+      };
+      const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+      const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+      const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); const hi = Math.max(l1, l2), lo = Math.min(l1, l2); return (hi + 0.05) / (lo + 0.05); };
+      const bgOf = (el) => {
+        // Composite every semi-transparent background layer (dark `--inset` is
+        // `rgba(255,255,255,0.05)`) over the opaque page surface, outermost
+        // first, so the ratio reflects what the eye sees.
+        const layers = [];
+        let n = el;
+        while (n) { layers.push(parse(getComputedStyle(n).backgroundColor)); n = n.parentElement; }
+        let base = { r: 255, g: 255, b: 255, a: 1 };
+        for (let i = layers.length - 1; i >= 0; i--) {
+          const c = layers[i];
+          if (!c || c.a === 0) continue;
+          base = {
+            r: c.r * c.a + base.r * (1 - c.a),
+            g: c.g * c.a + base.g * (1 - c.a),
+            b: c.b * c.a + base.b * (1 - c.a),
+            a: 1,
+          };
+        }
+        return { r: Math.round(base.r), g: Math.round(base.g), b: Math.round(base.b), a: 1 };
+      };
+      return selectors.map((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return { sel, missing: true };
+        const fg = parse(getComputedStyle(el).color);
+        const bg = bgOf(el);
+        return { sel, ratio: ratio(fg, bg), color: getComputedStyle(el).color, bg: `rgb(${bg.r}, ${bg.g}, ${bg.b})` };
+      });
+    }, ['[data-testid="session-progress"]', '[data-testid="session-active-time"]', '[data-testid="session-elapsed"]', '[data-testid="session-step-summary"]']);
+
+    for (const r of results) {
+      expect(r.missing, `no element for ${r.sel}`).toBeFalsy();
+      expect(r.ratio, `${r.sel}: ${r.color} on ${r.bg} = ${r.ratio}`).toBeGreaterThanOrEqual(4.5);
+    }
+
+    await page.screenshot({ path: test.info().outputPath('session-run-dark.png'), fullPage: true });
+  });
+
+  test('a real stepped single-lineage run reads 3 of 4 with Next: close-out while close-out runs (LIN-3250)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const { anchorId } = await seedSteppedLineageSession(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(anchorId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // The headline number is monotone through the whole rework chain: the
+    // finished plan/implementation/review stages count even though the running
+    // close-out is the active loop.
+    await expect(page.locator('[data-testid="session-progress"]')).toHaveText('3 of 4 stages');
+    await expect(page.locator('[data-testid="session-next"]')).toHaveText('Next: close-out');
+
+    // The implementation lineage is one step with all five loops' rows intact.
+    const lineageStep = page.locator('[data-testid="session-step"]').filter({ has: page.locator('[data-testid="session-lineage"]') });
+    await expect(lineageStep).toHaveCount(1);
+    await expect(lineageStep.locator('[data-testid="session-run"]')).toHaveCount(5);
+    // Its one-line summary is plain words, computed from the active (close-out) loop.
+    await expect(lineageStep.locator('[data-testid="session-step-summary"]')).toHaveText('Close-out · in progress · not reported');
+
+    await page.screenshot({ path: test.info().outputPath('session-run-stepped.png'), fullPage: true });
   });
 });
 
