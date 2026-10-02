@@ -2231,7 +2231,14 @@ const readOwnerIssues = createReadOwnerIssues({
   getProviderForWorkspace,
   getTestMockData: () => testMockData
 })
-app.use(createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerCheck, withTimeout }))
+app.use(createShareRoutes({
+  shareStore,
+  readOwnerIssues,
+  workspaceOwnerCheck,
+  workspaceFromUrl,
+  getProviderForWorkspace,
+  withTimeout
+}))
 
 // Mount proxy routes
 // resolveWorkspaceAccess: looks up a workspace access token from active sessions

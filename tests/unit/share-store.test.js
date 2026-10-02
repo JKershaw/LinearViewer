@@ -162,4 +162,24 @@ describe('share-store', () => {
     assert.strictEqual(fetched.snapshotAt.getTime(), firstSnapshotAt);
     assert.strictEqual(fetched.lastRefreshAttemptAt.toISOString(), '2030-01-01T00:00:00.000Z');
   });
+
+  // --- Session B (LIN-3244): owner revoke by record id ---
+
+  test('revokeById scopes to the workspace and is idempotent', async () => {
+    const store = freshStore();
+    const { record } = await store.create({ urlKey: 'ws-9', ownerAccountId: 'acct', subject: SUBJECT });
+
+    // A mismatched workspace refuses and leaves the row untouched.
+    assert.strictEqual(await store.revokeById(record._id, 'ws-other'), null);
+    const untouched = await store.collection.findOne({ _id: record._id });
+    assert.strictEqual(untouched.revokedAt, null);
+
+    const first = await store.revokeById(record._id, 'ws-9');
+    assert.ok(first.revokedAt instanceof Date);
+    const stamp = first.revokedAt.getTime();
+
+    const second = await store.revokeById(record._id, 'ws-9');
+    assert.strictEqual(second.revokedAt.getTime(), stamp, 'a second revoke preserves the timestamp');
+    assert.strictEqual(await store.revokeById('missing-id', 'ws-9'), null);
+  });
 });
