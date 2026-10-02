@@ -422,7 +422,7 @@ function renderCard(direction) {
   // the anchor of the Work group. Only available when authenticated.
   if (urlKey) {
     const cached = window.PromptSection && window.PromptSection.getCached
-      ? window.PromptSection.getCached(issue.id, urlKey)
+      ? window.PromptSection.getCached(issue.id, urlKey, issue.bindingScope)
       : null;
     const hint = cached ? ` <span class="swipe-prompts-cache-hint">· ${_esc(cached.name || cached.label)} cached</span>` : '';
     groups.work.push(`
@@ -729,7 +729,8 @@ function handleAccordionClick(e) {
         window.RecapSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          source: issue.source
+          source: issue.source,
+          bindingScope: issue.bindingScope
         });
       }
     }
@@ -744,7 +745,8 @@ function handleAccordionClick(e) {
         window.BriefSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          source: issue.source
+          source: issue.source,
+          bindingScope: issue.bindingScope
         });
       }
     }
@@ -759,7 +761,8 @@ function handleAccordionClick(e) {
         window.ScanSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          source: issue.source
+          source: issue.source,
+          bindingScope: issue.bindingScope
         });
       }
     }

@@ -148,7 +148,7 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
     // queue length, or any other pool-internal state, which could all agree
     // with each other while the underlying code is wrong.
     let calls = 0;
-    const postScan = async (urlKey, id, source, { signal }) => {
+    const postScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
       calls++;
       return new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
@@ -232,7 +232,7 @@ test.describe('startBulkScan — client-side abort-signal propagation (Witness 3
     // one threaded into postScan's `init` — never that the in-flight HTTP
     // call was cancelled on the server. It must not be read as such.
     let capturedSignal = null;
-    const postScan = async (urlKey, id, source, { signal }) => {
+    const postScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
       capturedSignal = signal;
       return new Promise(() => {}); // never resolves — only the signal identity/state matters
     };
@@ -266,7 +266,7 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
     // run's own runOne()/pump() closures can only ever touch THEIR OWN
     // inFlight/queue, never a newer run's.
     let run1Calls = 0;
-    const run1PostScan = async (urlKey, id, source, { signal }) => {
+    const run1PostScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
       run1Calls++;
       return new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
@@ -327,7 +327,7 @@ test.describe('startBulkScan — two live runs are unreachable (Witness 6, LIN-2
     let inFlight = 0;
     let peak = 0;
     let capturedSignal = null;
-    const postScan = async (urlKey, id, source, { signal }) => {
+    const postScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
       calls++;
       inFlight++;
       peak = Math.max(peak, inFlight);

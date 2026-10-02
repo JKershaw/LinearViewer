@@ -17,7 +17,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { buildForest, nodeKey } from '../../lib/tree.js';
 import { renderPage } from '../../lib/render.js';
-import { flattenTrees } from '../../lib/render-swipe.js';
+import { flattenTrees, renderSwipePage } from '../../lib/render-swipe.js';
 
 function ghIssue(overrides = {}) {
   return {
@@ -167,5 +167,45 @@ describe('LIN-3240 swipe card stamp (sparse)', () => {
     const byScope = new Map(cards.map(c => [c.bindingScope, c.title]));
     assert.equal(byScope.get('octo/repoA'), 'A');
     assert.equal(byScope.get('octo/repoB'), 'B');
+  });
+});
+
+describe('LIN-3240 swipe page de-dupe (binding-aware)', () => {
+  function swipeIssues(html) {
+    const m = html.match(/window\.__SWIPE_DATA__ = (.*);<\/script>/s);
+    assert.ok(m, 'embedded __SWIPE_DATA__ not found');
+    return JSON.parse(m[1]).issues;
+  }
+
+  function renderSwipe(projectTrees) {
+    return renderSwipePage(
+      { projectTrees, inProgressTrees: [], recentActivityTrees: [] },
+      { urlKey: 'ws', workspaces: [{ id: 'w1', name: 'WS', urlKey: 'ws' }] }
+    );
+  }
+
+  test('two stamped same-number issues both produce cards (repoA#1 and repoB#1 survive)', () => {
+    const issues = swipeIssues(renderSwipe([
+      projectTree([
+        ghIssue({ id: '1', title: 'A', bindingScope: 'octo/repoA' }),
+        ghIssue({ id: '1', title: 'B', bindingScope: 'octo/repoB' }),
+      ]),
+    ]));
+    const ones = issues.filter(i => i.id === '1');
+    assert.equal(ones.length, 2);
+    assert.deepEqual(ones.map(i => i.bindingScope).sort(), ['octo/repoA', 'octo/repoB']);
+  });
+
+  test('an unstamped single card is unchanged (and same-number unstamped ids still collapse, as before)', () => {
+    const single = swipeIssues(renderSwipe([projectTree([ghIssue({ id: '1', title: 'A' })])]));
+    assert.equal(single.length, 1);
+    assert.ok(!('bindingScope' in single[0]));
+
+    const pair = swipeIssues(renderSwipe([projectTree([
+      ghIssue({ id: '1', title: 'A' }),
+      ghIssue({ id: '1', title: 'B' }),
+    ])]));
+    // Pre-existing collision shape: without a stamp the raw-id key collapses them.
+    assert.equal(pair.length, 1);
   });
 });

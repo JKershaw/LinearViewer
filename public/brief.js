@@ -29,22 +29,25 @@
   // lib/render.js) forwards as `?source=` so the fetch resolves THIS issue's
   // own binding instead of the workspace's active provider. Optional — a
   // caller with no source (or a same-binding workspace) gets no query change.
-  function briefUrl(urlKey, identifier, source) {
+  // LIN-3240: `bindingScope` (the row's stamp) rides beside `source` when present,
+  // so an unstamped request is byte-identical.
+  function briefUrl(urlKey, identifier, source, bindingScope) {
     const base = `/workspace/${encodeURIComponent(urlKey)}/api/brief/${encodeURIComponent(identifier)}`;
-    if (!source) return base;
+    if (!source && !bindingScope) return base;
     const params = new URLSearchParams();
-    params.set('source', source);
+    if (source) params.set('source', source);
+    if (bindingScope) params.set('bindingScope', bindingScope);
     return `${base}?${params.toString()}`;
   }
 
   // on401:false — brief errors (incl. 401) throw with .status/.body so the
   // inline renderError path shows them, rather than redirecting to /logout.
-  async function fetchBriefStatus(urlKey, identifier, source) {
-    return window.api(briefUrl(urlKey, identifier, source), { on401: false });
+  async function fetchBriefStatus(urlKey, identifier, source, bindingScope) {
+    return window.api(briefUrl(urlKey, identifier, source, bindingScope), { on401: false });
   }
 
-  async function postBrief(urlKey, identifier, source) {
-    return window.api(briefUrl(urlKey, identifier, source), { method: 'POST', on401: false });
+  async function postBrief(urlKey, identifier, source, bindingScope) {
+    return window.api(briefUrl(urlKey, identifier, source, bindingScope), { method: 'POST', on401: false });
   }
 
   function header(label, meta, refreshLabel) {
@@ -112,22 +115,25 @@
     return !!err && err.status === 503 && !!err.body && err.body.code === 'AI_NOT_CONFIGURED';
   }
 
-  function wireRefresh(container, urlKey, identifier, source) {
+  function wireRefresh(container, urlKey, identifier, source, bindingScope) {
     const btn = container.querySelector('[data-brief-refresh]');
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      await refresh(container, urlKey, identifier, source);
+      await refresh(container, urlKey, identifier, source, { bindingScope });
     });
   }
 
   // LIN-1016: `opts.autoOpen` scopes the AI-unconfigured fallback to the
   // auto-open call from init()'s `missing` branch — a manual click (wireRefresh
   // above, which never passes opts) still shows the error banner, so an
-  // explicit user action is never silently swallowed.
+  // explicit user action is never silently swallowed. LIN-3240: `opts.bindingScope`
+  // carries the row's binding stamp (kept in opts so the public `refresh`
+  // signature stays `(container, urlKey, identifier, source, opts)`).
   async function refresh(container, urlKey, identifier, source, opts) {
+    const bindingScope = opts && opts.bindingScope;
     applyState(container, renderGenerating(), 'generating');
     try {
-      const data = await postBrief(urlKey, identifier, source);
+      const data = await postBrief(urlKey, identifier, source, bindingScope);
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
       if (opts && opts.autoOpen && isAiNotConfigured(err)) {
@@ -136,7 +142,7 @@
         applyState(container, renderError(err && err.message), 'error');
       }
     }
-    wireRefresh(container, urlKey, identifier, source);
+    wireRefresh(container, urlKey, identifier, source, bindingScope);
   }
 
   /**
@@ -147,15 +153,16 @@
    * @param {string} opts.urlKey - Workspace url key.
    * @param {string} opts.identifier - Linear issue id (UUID) or identifier (LIN-123).
    * @param {string} [opts.source] - Resolved provider name (LIN-1910), forwarded as `?source=`.
+   * @param {string} [opts.bindingScope] - Row binding stamp (LIN-3240), forwarded beside `source`.
    */
   async function init(container, opts) {
     if (!container || !opts || !opts.urlKey || !opts.identifier) return;
     container.classList.add('brief-section');
     applyState(container, renderGenerating(), 'loading');
-    const { urlKey, identifier, source } = opts;
+    const { urlKey, identifier, source, bindingScope } = opts;
 
     try {
-      const data = await fetchBriefStatus(urlKey, identifier, source);
+      const data = await fetchBriefStatus(urlKey, identifier, source, bindingScope);
       if (data.status === 'fresh') {
         applyState(container, renderFresh(data), 'fresh');
       } else if (data.status === 'stale') {
@@ -169,13 +176,13 @@
         // re-spend on every reopen. `refresh()` renders generating→fresh/error
         // and wires its own button, so return before the shared wireRefresh
         // below to avoid double-wiring the refresh handler.
-        await refresh(container, urlKey, identifier, source, { autoOpen: true });
+        await refresh(container, urlKey, identifier, source, { bindingScope, autoOpen: true });
         return;
       }
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');
     }
-    wireRefresh(container, urlKey, identifier, source);
+    wireRefresh(container, urlKey, identifier, source, bindingScope);
   }
 
   window.BriefSection = { init, refresh };

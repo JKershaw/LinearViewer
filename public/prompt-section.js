@@ -25,18 +25,21 @@
   const MEMORY_PREFIX = 'harbour:prompt-memory:';
   const MEMORY_VERSION = 1;
 
-  function memoryKey(urlKey, issueId) {
-    return `${MEMORY_PREFIX}${urlKey || ''}:${issueId}`;
+  // LIN-3240: an optional third argument — the row's binding stamp. Appended as
+  // `@<bindingScope>` ONLY when present, so every already-stored localStorage
+  // entry (single-binding / legacy) keeps its exact key and hydration.
+  function memoryKey(urlKey, issueId, bindingScope) {
+    return `${MEMORY_PREFIX}${urlKey || ''}:${issueId}${bindingScope ? '@' + bindingScope : ''}`;
   }
 
   // Read compatibility: an old-shape/foreign record that is malformed or lacks a
   // usable `raw` is treated as absent (no crash, no partial hydrate). A record
   // missing the newer fields (generatedAt/kind/proxyForce/warning) still
   // restores — those fields simply stay undefined.
-  function loadPromptMemory(urlKey, issueId) {
+  function loadPromptMemory(urlKey, issueId, bindingScope) {
     try {
       if (!window.localStorage) return null;
-      const stored = window.localStorage.getItem(memoryKey(urlKey, issueId));
+      const stored = window.localStorage.getItem(memoryKey(urlKey, issueId, bindingScope));
       if (!stored) return null;
       const parsed = JSON.parse(stored);
       if (!parsed || typeof parsed !== 'object' || typeof parsed.raw !== 'string') return null;
@@ -46,7 +49,7 @@
     }
   }
 
-  function savePromptMemory(urlKey, issueId, entry) {
+  function savePromptMemory(urlKey, issueId, entry, bindingScope) {
     if (!entry || typeof entry.raw !== 'string') return;
     try {
       if (!window.localStorage) return;
@@ -64,7 +67,7 @@
       for (const key of Object.keys(record)) {
         if (record[key] === undefined) delete record[key];
       }
-      window.localStorage.setItem(memoryKey(urlKey, issueId), JSON.stringify(record));
+      window.localStorage.setItem(memoryKey(urlKey, issueId, bindingScope), JSON.stringify(record));
     } catch {
       // Best-effort: memory is an optimisation, never load-bearing.
     }
@@ -484,7 +487,7 @@
     // replaced by the persisted record, so a mount hydrates from storage, not
     // from a process-global Map. Durable restore re-renders `html` from `raw`
     // (the record never carries markup) and re-seeds the in-session hint maps.
-    const memory = loadPromptMemory(opts.urlKey, issueId);
+    const memory = loadPromptMemory(opts.urlKey, issueId, issue.bindingScope);
     if (memory) {
       const hydrated = {
         label: memory.label,
@@ -600,6 +603,7 @@
           // resolves recommend against its OWN binding, not the active one.
           const params = new URLSearchParams();
           if (issue.source) params.set('source', issue.source);
+          if (issue.bindingScope) params.set('bindingScope', issue.bindingScope);
           const query = params.toString() ? `?${params.toString()}` : '';
           const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream${query}`, { signal: ac.signal });
           if (!response.ok) {
@@ -620,6 +624,7 @@
             issueId,
             variant,
             source: issue.source || undefined,
+            bindingScope: issue.bindingScope || undefined,
             signal: ac.signal,
             on401: false
           });
@@ -632,16 +637,17 @@
           const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, generatedAt: Date.now() };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
-          savePromptMemory(opts.urlKey, issueId, entry);
+          savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
           enterPhase('fresh');
           state.result = entry;
           render();
         } else {
           // LIN-2944 addendum 1 (LIN-1916 row 1): thread `source` on the template
           // fetch too, via URLSearchParams (the LIN-2046 shape). The URL is
-          // unchanged when the issue has no source.
+          // unchanged when the issue has no source. LIN-3240 adds bindingScope.
           const params = new URLSearchParams();
           if (issue.source) params.set('source', issue.source);
+          if (issue.bindingScope) params.set('bindingScope', issue.bindingScope);
           const query = params.toString() ? `?${params.toString()}` : '';
           const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
@@ -649,7 +655,7 @@
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, generatedAt: Date.now() };
           promptCache.set(`${issueId}:${label}`, entry);
           lastPromptLabel.set(issueId, label);
-          savePromptMemory(opts.urlKey, issueId, entry);
+          savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
           enterPhase('fresh');
           state.result = entry;
           render();
@@ -770,7 +776,7 @@
       };
       promptCache.set(`${issueId}:${label}`, entry);
       lastPromptLabel.set(issueId, label);
-      savePromptMemory(opts.urlKey, issueId, entry);
+      savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
       enterPhase('fresh');
       state.result = entry;
       render();
@@ -1023,13 +1029,15 @@
    * it only the in-session hint is available.
    * @param {string} issueId
    * @param {string} [urlKey]
+   * @param {string} [bindingScope] - Row binding stamp (LIN-3240); keeps the
+   *   durable-memory lookup per-binding.
    * @returns {{label: string, name: string} | null}
    */
-  function getCached(issueId, urlKey) {
+  function getCached(issueId, urlKey, bindingScope) {
     const l = lastPromptLabel.get(issueId);
     const entry = l ? promptCache.get(`${issueId}:${l}`) : null;
     if (entry) return { label: l, name: entry.name };
-    const memory = urlKey ? loadPromptMemory(urlKey, issueId) : null;
+    const memory = urlKey ? loadPromptMemory(urlKey, issueId, bindingScope) : null;
     return memory ? { label: memory.label, name: memory.name } : null;
   }
 

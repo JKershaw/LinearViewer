@@ -4076,7 +4076,7 @@ function classifyBulkScanError(err) {
  * doubling global in-flight past BULK_SCAN_CONCURRENCY. See LIN-2700's
  * hand-off (ledger item 4) and LIN-2701 §B.7.
  *
- * @param {Array<{urlKey:string, identifier:string, source?:string}>} items
+ * @param {Array<{urlKey:string, identifier:string, source?:string, bindingScope?:string}>} items
  * @param {{onTeardown?: (results: Array) => void, onResult?: (entry: object) => void}} [opts]
  * @returns {{refused:true, reason:'run-in-progress'}
  *          |{refused:true, limit:number, requested:number, message:string}
@@ -4129,7 +4129,7 @@ function startBulkScan(items, { onTeardown, onResult } = {}) {
   async function runOne(item) {
     let entry;
     try {
-      const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
+      const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, item.bindingScope, { signal: controller.signal });
       entry = { item, outcome: 'fulfilled', value };
     } catch (err) {
       entry = { item, outcome: classifyBulkScanError(err), error: err };
