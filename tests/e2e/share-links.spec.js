@@ -80,6 +80,38 @@ test.describe('Share link — guest view (LIN-3244)', () => {
     await guest.close();
   });
 
+  test('a parent share renders priority and last-updated, and descriptions only when opted in', async ({ page, browser, workerUrlKey }) => {
+    await createSession(page, { urlKey: workerUrlKey });
+    const parentId = 'p-1';
+    const issues = [
+      { id: parentId, identifier: 'PAR-1', title: 'Parent', description: 'Parent body', state: { type: 'started' }, priority: 0, updatedAt: '2026-01-01T00:00:00Z' },
+      { id: 'c-open', identifier: 'PAR-2', title: 'Open child', description: 'Child body', parent: { id: parentId }, state: { type: 'started' }, priority: 2, updatedAt: '2026-01-02T00:00:00Z' }
+    ];
+    const on = await seedShare(page.request, workerUrlKey, { subject: { kind: 'parent', id: parentId }, includeDescriptions: true, issues });
+    const off = await seedShare(page.request, workerUrlKey, { subject: { kind: 'parent', id: parentId }, includeDescriptions: false, issues });
+
+    const guest = await browser.newContext();
+
+    const onPage = await guest.newPage();
+    expect((await onPage.goto(`/s/${on.token}`)).status()).toBe(200);
+    await expect(onPage.locator('.share-description')).toHaveText('Parent body');
+    await expect(onPage.locator('.task-description')).toHaveText('Child body');
+    await expect(onPage.locator('[data-testid="share-task-priority"]')).toHaveText('High');
+    const time = onPage.locator('time.task-updated');
+    await expect(time).toHaveAttribute('datetime', '2026-01-02T00:00:00.000Z');
+    await expect(time).toHaveText('2026-01-02');
+
+    const offPage = await guest.newPage();
+    expect((await offPage.goto(`/s/${off.token}`)).status()).toBe(200);
+    await expect(offPage.locator('.share-description')).toHaveCount(0);
+    await expect(offPage.locator('.task-description')).toHaveCount(0);
+    // Priority and last-updated are unconditional fields, present either way.
+    await expect(offPage.locator('[data-testid="share-task-priority"]')).toHaveText('High');
+    await expect(offPage.locator('time.task-updated')).toHaveText('2026-01-02');
+
+    await guest.close();
+  });
+
   test('a parent share lists only the live children — canceled and duplicate are absent', async ({ page, browser, workerUrlKey }) => {
     await createSession(page, { urlKey: workerUrlKey });
     const issues = [
