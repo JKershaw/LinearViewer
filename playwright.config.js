@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 // freshly generated, PEM-valid App key.
 const { privateKey: heldKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const HELD_GITHUB_PEM = heldKey.export({ type: 'pkcs1', format: 'pem' });
-const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN=';
+const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN=';
 
 export default defineConfig({
   testDir: './tests/e2e',

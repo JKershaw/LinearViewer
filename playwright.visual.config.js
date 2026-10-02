@@ -42,7 +42,7 @@ export default defineConfig({
     // page instead — and dark would equal light there (the authed shell reads
     // the theme cookie, not prefers-color-scheme). Authenticated captures use
     // /test/set-session (mock fixtures), which is independent of PAT mode.
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright LINEAR_ACCESS_TOKEN= OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_DAILY_LIMIT=5 node server.js',
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright LINEAR_ACCESS_TOKEN= OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= node server.js',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
