@@ -133,7 +133,7 @@ function isValidSubjectInput(subject) {
  * from a client (LIN-3244: "list never returns the token or hash"); it is
  * non-reversible and cannot be turned into a working `/s/` link.
  */
-function publicShareId(tokenHash) {
+export function publicShareId(tokenHash) {
   return createHash('sha256').update(`share-management:${tokenHash}`).digest('hex');
 }
 

@@ -262,7 +262,7 @@ function renderShareList(container, shares) {
       ? ''
       : `<button type="button" class="action-btn share-revoke" data-share-id="${escapeHtml(s.id)}">revoke</button>`
     return `
-      <div class="node share-item" data-share-id="${escapeHtml(s.id)}">
+      <div class="node share-item" data-share-id="${escapeHtml(s.id)}" data-revoked="${s.revokedAt ? 'true' : 'false'}">
         <div class="line">
           <span class="field-label">${escapeHtml(kind)}:</span>
           <span class="settings-value share-subject">${escapeHtml(s.subjectId || '')}</span>
