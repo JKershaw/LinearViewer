@@ -1415,6 +1415,24 @@ describe('createDispatchItem — run-boundary seam guard (LIN-3245)', () => {
     assert.equal(err.budgetExhausted?.code, 'BUDGET_EXHAUSTED', 'sequenced after the budget guard');
     assert.ok(!err.closeOutRefusal);
   });
+
+  // M7 (LIN-3245 review 3e984ba9): the `closeOutGuardApplies` freshness carve-out
+  // (`fields.followUpTo == null && fields.abort !== true`) means a follow-up- or
+  // abort-shaped close-out is NOT the fresh person's press the boundary refuses.
+  // Nothing pinned this, so a future guard edit could start refusing the
+  // orchestrator's own follow-up / abort on a stop-at-PR run. Pin both shapes.
+  test('a close-out with followUpTo under a stopAt:pr run is ADMITTED (not a fresh dispatch)', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1', followUpTo: 'beat-1' } });
+    assert.equal(item.kind, 'close-out');
+    assert.ok(item.stopAt == null, 'a follow-up close-out is not itself a boundary-bearing fresh run row');
+  });
+
+  test('a close-out with abort under a stopAt:pr run is ADMITTED (not a fresh dispatch)', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'close-out', fields: { sessionId: 'run-1', abort: true } });
+    assert.equal(item.kind, 'close-out');
+  });
 });
 
 describe('createDispatchItem — child-autopilot stopAt inheritance (LIN-3245 N1)', () => {

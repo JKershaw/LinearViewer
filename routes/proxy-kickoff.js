@@ -298,12 +298,28 @@ export function createKickoffRoutes({
         resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
       }
 
+      // Child-autopilot prompt inheritance (LIN-3246 / LIN-2949 P1b): a fresh
+      // child autopilot launched under a parent run that declared `stopAt: 'pr'`
+      // carries the SAME stop block in its PROMPT, so a descendant of a
+      // stop-at-PR run stops too. The parent fact is read from the same run row
+      // (`getItemStatus`, keyed on the body's `sessionId`) that the dispatch
+      // factory reads to stamp the child ROW (lib/dispatch-factory.js's shared
+      // `run` read), so the prompt and the row can never disagree. Fail-open to
+      // null on an absent/unreadable lookup — the factory's own shared read does
+      // `.catch(() => null)`, so a kickoff that works today never gains a new
+      // failure mode. This verb has NO body-level `stopAt`; it only inherits.
+      const parentRun = (sessionId && typeof dispatchQueueStore.getItemStatus === 'function')
+        ? await Promise.resolve(dispatchQueueStore.getItemStatus(req.proxyUrlKey, sessionId)).catch(() => null)
+        : null;
+      const inheritedStopAt = parentRun?.stopAt === 'pr' ? 'pr' : null;
+
       const kickoff = buildAutopilotKickoff({
         baseUrl,
         issue,
         goal: typeof goal === 'string' ? goal : '',
         mode: resolvedMode,
         variant: resolvedVariant,
+        stopAt: inheritedStopAt,
         maxTasks: maxTasks ?? null,
         maxSessionsPerTask: maxSessionsPerTask ?? null,
         // LIN-2804: only resolved when this was a SCOPED kickoff (see the
