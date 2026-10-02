@@ -15,7 +15,7 @@ import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
-import { isValidIssueId } from '../lib/workspace.js';
+import { isValidIssueId, BINDING_INTENT } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { buildRunGate } from '../lib/chat-request.js';
@@ -277,7 +277,7 @@ export function createKickoffRoutes({
       let issue = null;
       let resolvedRepo = repo || null;
       if (issueIdentifier) {
-        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
         // LIN-1980: stamp before any other logic (incl. the !accessToken early
         // return below) so the fingerprint is present even when this request
         // later 401s from a shared credential another site marked suspect.

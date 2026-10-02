@@ -21,7 +21,7 @@ import {
 } from '../lib/proxy-wire.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
-import { UUID_REGEX, isValidIssueId, requireTeamMembership, TeamNotFoundError } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, requireTeamMembership, TeamNotFoundError, BINDING_INTENT } from '../lib/workspace.js';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
 import { fetchKnownRepos } from '../lib/dispatch-repo-guard.js';
 
@@ -49,7 +49,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/me', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/me', reason);
       }
@@ -124,7 +124,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/teams', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/teams', reason);
       }
@@ -145,7 +145,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/projects', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/projects', reason);
       }
@@ -182,7 +182,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/known-repos', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/known-repos', reason);
       }
@@ -211,7 +211,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/issues', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
@@ -262,7 +262,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -310,7 +310,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/search', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/search', reason);
       }
@@ -343,7 +343,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/states/:teamId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/states', reason);
       }
@@ -371,7 +371,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/labels', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/labels', reason);
       }
@@ -405,7 +405,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/cycles', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycles', reason);
       }
@@ -440,7 +440,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get(['/api/proxy/cycles/:cycleId', '/api/proxy/cycle/:cycleId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/cycle', reason);
       }
@@ -476,7 +476,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get(['/api/proxy/issues/:issueId/relations', '/api/proxy/relations/:issueId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }
@@ -607,7 +607,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       // capability (422 CAPABILITY_NOT_SUPPORTED for a provider with no
       // formal-attachment node — GitHub Issues included, since it correctly
       // never mints `att:` handles), then look up the attachment.
-      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (denyIfUnsupported(resolved.provider, 'fetchAttachment', req, res, endpoint)) return;
       if (!resolved.token) {
         return workspaceUnavailable(req, res, endpoint, resolved.reason);
@@ -690,7 +690,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
       // Redirect-safe relaying of those is owned by S5; `user-images.
       // githubusercontent.com` serves bytes directly and works today.
       isGithubAssetHost = GITHUB_UPLOAD_HOSTS.includes(urlObj.hostname);
-      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const resolved = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.WORKSPACE });
       if (!isGithubAssetHost && !resolved.token) {
         return workspaceUnavailable(req, res, endpoint, resolved.reason);
       }

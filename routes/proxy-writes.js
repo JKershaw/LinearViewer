@@ -21,7 +21,7 @@ import { canonicalPriorityToLinear } from '../lib/providers/models.js';
 import { isTrashed } from '../lib/trashed-signal.js';
 import { extractPeriodicalGateId, checkPeriodicalReportGate } from '../lib/periodical-report-gate.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
-import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, BINDING_INTENT } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -77,7 +77,7 @@ export function createProxyWriteRoutes({
    */
   router.post('/api/proxy/issues', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.CREATE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues', reason);
       }
@@ -235,7 +235,7 @@ export function createProxyWriteRoutes({
 
   router.patch('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -360,7 +360,7 @@ export function createProxyWriteRoutes({
    * recur. `merge` may throw DescriptionEditError for a loud 422.
    */
   async function applyDescriptionEdit(req, res, endpoint, merge) {
-    const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+    const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
     if (!token) {
       return workspaceUnavailable(req, res, endpoint, reason);
     }
@@ -488,7 +488,7 @@ export function createProxyWriteRoutes({
    */
   router.post(['/api/proxy/issues/:issueId/comments', '/api/proxy/comments/:issueId'], proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -604,7 +604,7 @@ export function createProxyWriteRoutes({
    */
   router.delete('/api/proxy/issues/:issueId/comments/:commentId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -640,7 +640,7 @@ export function createProxyWriteRoutes({
    */
   router.patch('/api/proxy/issues/:issueId/comments/:commentId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/comments', reason);
       }
@@ -718,7 +718,7 @@ export function createProxyWriteRoutes({
   router.post('/api/proxy/issues/:issueId/attachments', proxyLimiter, authenticateProxyToken, requireWriteScope, attachmentUploadBodyParser, async (req, res) => {
     const endpoint = '/api/proxy/issues/:id/attachments';
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, endpoint, reason);
       }
@@ -837,7 +837,7 @@ export function createProxyWriteRoutes({
    */
   router.post('/api/proxy/issues/:issueId/relations', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
@@ -886,7 +886,7 @@ export function createProxyWriteRoutes({
    */
   router.delete('/api/proxy/issues/:issueId/relations/:relationId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/relations', reason);
       }
@@ -925,7 +925,7 @@ export function createProxyWriteRoutes({
    */
   router.post('/api/proxy/issues/:issueId/labels', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
@@ -987,7 +987,7 @@ export function createProxyWriteRoutes({
    */
   router.delete('/api/proxy/issues/:issueId/labels/:labelId', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/labels', reason);
       }
