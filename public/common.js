@@ -920,6 +920,7 @@ window.ReplyDelivery = (function () {
    * @param {string} [opts.target]               'cli' | 'web'.
    * @param {boolean} [opts.force]
    * @param {boolean} [opts.issueless]
+   * @param {boolean} [opts.recordOnly]          LIN-3252 S2: write the comment/stamp only, never dispatch (a non-resumable/gone decision's answer).
    * @param {string} [opts.decisionLoopId]        LIN-1728 Phase 2: the decision-bearing loop id, forwarded to postComment.
    * @param {string} [opts.decisionId]            LIN-1728 Phase 2: the decision_id being answered, forwarded to postComment.
    * @param {string} prompt                      Already-trimmed reply text.
@@ -959,6 +960,24 @@ window.ReplyDelivery = (function () {
       ).catch(function () {});
     }
 
+    // LIN-3252 S2 (C2 mirror): a RECORD-ONLY answer writes the durable comment
+    // (and the decision stamp the route performs alongside it) but must NOT
+    // dispatch a follow-up. Used when the decision's loop is no longer
+    // resumable — `gone`/ended work — where `sendReply`'s ordinary
+    // comment-then-dispatch chain would otherwise dispatch into finished work.
+    // Same {ok,status,data} + callback routing as the full chain, minus the
+    // dispatch half; reached only on the issue-bound path (an issueless run
+    // returned above, and has no comment to record against).
+    if (opts.recordOnly) {
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId }).then(
+        function (commentResult) {
+          if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
+          onDispatchOk();
+        },
+        function (commentErr) { onCommentFailed(commentErr); }
+      ).catch(function () {});
+    }
+
     // Two-argument .then, not .then(...).catch(...) — a rejection of
     // postComment itself (a network-layer fetch failure: offline, DNS,
     // connection reset) must route to onCommentFailed, not be swallowed
@@ -985,7 +1004,60 @@ window.ReplyDelivery = (function () {
     }).catch(function () {});
   }
 
-  return { deliverReply: deliverReply, postComment: postComment, errorFromResult: errorFromResult };
+  /**
+   * Dismiss a loop-backed ruling (LIN-3252 S2 item 5) — the run-page card's
+   * "this wasn't worth asking". Posts the EXISTING dashboard dismiss route
+   * (`routes/dashboard.js`, which stamps `outcome: 'dismissed'` and clears the
+   * feed cache; no new server route), then applies condition C2:
+   *
+   *   after the stamp succeeds, send the follow-up ONLY when the decision's loop
+   *   disposition is `resumable` (still waiting). In every other disposition
+   *   (`gone`/ended) dismiss ONLY stamps — a follow-up there would dispatch into
+   *   finished work. The follow-up reuses `deliverReply` with NO
+   *   `decisionLoopId`/`decisionId`/`optionId`: with them the comment route
+   *   stamps the decision `answered` and corrupts the false-escalation KPI.
+   *
+   * Returns a promise that settles after the stamp (and, when resumable, after
+   * the follow-up is dispatched). Rejects if the dismiss write fails.
+   *
+   * @param {Object} opts
+   * @param {string} opts.urlKey
+   * @param {string} opts.stampLoopId      the loop the stamp writes to
+   * @param {string} opts.decisionId
+   * @param {string} [opts.followUpTo]      reply/resume target (defaults to stampLoopId)
+   * @param {string} [opts.target]          'cli' | 'web'
+   * @param {string} [opts.issueId]         for the follow-up comment write
+   * @param {string} opts.disposition       resolveDisposition's value; only 'resumable' follows up
+   * @param {string} opts.prompt            the follow-up text
+   * @param {Object} handlers               the same four deliverReply handlers, used only on the resumable follow-up
+   * @returns {Promise<void>}
+   */
+  function dismissRuling(opts, handlers) {
+    var body = { decisionLoopId: opts.stampLoopId || opts.followUpTo, decisionId: opts.decisionId };
+    return fetch('/workspace/' + encodeURIComponent(opts.urlKey) + '/api/dashboard/rulings/dismiss', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    }).then(function (resp) {
+      return resp.json().catch(function () { return {}; }).then(function (data) {
+        if (!resp.ok) throw errorFromResult({ status: resp.status, data: data });
+        return data;
+      });
+    }).then(function () {
+      if (opts.disposition !== 'resumable') return;
+      // C2: resumable only. No decision ids ride the follow-up — see the JSDoc.
+      return deliverReply({
+        urlKey: opts.urlKey,
+        issueId: opts.issueId,
+        followUpTo: opts.followUpTo || opts.stampLoopId,
+        target: opts.target,
+        force: true
+      }, opts.prompt, handlers);
+    });
+  }
+
+  return { deliverReply: deliverReply, postComment: postComment, dismissRuling: dismissRuling, errorFromResult: errorFromResult };
 })();
 
 // =============================================================================

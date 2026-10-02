@@ -80,7 +80,9 @@
   // An issueless run (opts.issueless) skips the comment call entirely and keeps
   // the pre-existing dispatch-only behavior byte-for-byte.
   function sendReply(opts, btn, textarea, feedback, thread) {
-    var prompt = (textarea.value || '').trim();
+    // The pinned question card supplies its own prompt (a choice's label or the
+    // typed "own answer"); the per-run reply box reads the textarea. Same flow.
+    var prompt = (typeof opts.prompt === 'string' && opts.prompt ? opts.prompt : (textarea.value || '')).trim();
     if (!prompt) {
       feedback.textContent = 'enter a reply';
       feedback.className = 'sess-reply-feedback error';
@@ -102,9 +104,9 @@
     function onDispatchOk() {
       appendYouBubble(thread, prompt);
       textarea.value = '';
-      feedback.textContent = queuedCopy(!opts.issueless);
+      feedback.textContent = opts.recordOnly ? 'recorded on the task' : queuedCopy(!opts.issueless);
       feedback.className = 'sess-reply-feedback';
-      btn.textContent = 'queued ✓';
+      btn.textContent = opts.recordOnly ? 'answered ✓' : 'queued ✓';
     }
 
     // Comment-write failure and issueless-dispatch failure are two distinct
@@ -334,6 +336,116 @@
     }
   }
 
+  // ── Pinned question cards (LIN-3252 S2) ────────────────────────────────────
+  // One card per unanswered decision (plus a bare-BLOCKED card). Answer goes
+  // through the SAME Send-and-continue plumbing as the per-run box — comment
+  // write then the existing dispatch follow-up — with the decision ids and the
+  // chosen option forwarded through window.ReplyDelivery. A read-only card
+  // renders no answer button/textarea, so it is skipped here.
+  // The follow-up text a dismiss sends to a still-waiting run (S2.5). It carries
+  // NO decision ids — the comment route would otherwise stamp it `answered`.
+  var DISMISS_PROMPT = 'not worth asking: proceed on your best judgment';
+  // window.ReplyDelivery.deliverReply requires all four handlers; a dismiss
+  // removes its own card, so the follow-up's outcome is UI-silent.
+  var DISMISS_NOOP_HANDLERS = {
+    onCommentFailed: function () {},
+    onDispatchFailed: function () {},
+    onPartialFailure: function () {},
+    onDispatchOk: function () {}
+  };
+
+  // Dismiss a decision card: stamp via the existing dashboard route, then apply
+  // condition C2 (the follow-up is sent only for a `resumable` decision, from
+  // window.ReplyDelivery). Remove the card on success; it never comes back.
+  function dismissQuestionCard(card, dismissBtn, answerBtn, feedback) {
+    var urlKey = card.dataset.urlKey;
+    if (dismissBtn) dismissBtn.disabled = true;
+    if (answerBtn) answerBtn.disabled = true;
+    if (feedback) { feedback.textContent = 'dismissing…'; feedback.className = 'sess-qcard-feedback sess-reply-feedback'; }
+
+    window.ReplyDelivery.dismissRuling({
+      urlKey: urlKey,
+      stampLoopId: card.dataset.stampLoopId,
+      decisionId: card.dataset.decisionId,
+      followUpTo: card.dataset.loopId,
+      target: card.dataset.target === 'web' ? 'web' : 'cli',
+      issueId: card.dataset.issueId || card.dataset.issueIdentifier || '',
+      disposition: card.dataset.disposition,
+      prompt: DISMISS_PROMPT
+    }, DISMISS_NOOP_HANDLERS).then(function () {
+      if (card.parentNode) card.parentNode.removeChild(card);
+    }).catch(function (e) {
+      if (dismissBtn) dismissBtn.disabled = false;
+      if (answerBtn) answerBtn.disabled = false;
+      if (feedback) {
+        feedback.textContent = 'dismiss failed: ' + e.message;
+        feedback.className = 'sess-qcard-feedback sess-reply-feedback error';
+      }
+    });
+  }
+
+  function initQuestionCards() {
+    var cards = document.querySelectorAll('[data-testid="session-question-card"]');
+    for (var i = 0; i < cards.length; i++) {
+      (function (card) {
+        var btn = card.querySelector('[data-testid="session-question-card-answer"]');
+        var textarea = card.querySelector('[data-testid="session-question-card-input"]');
+        var feedback = card.querySelector('.sess-qcard-feedback');
+        var dismissBtn = card.querySelector('[data-testid="session-question-card-dismiss"]');
+        if (!btn || !textarea || !feedback) return; // read-only card
+        if (dismissBtn) {
+          dismissBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            dismissQuestionCard(card, dismissBtn, btn, feedback);
+          });
+        }
+        var thread = card.querySelector('[data-testid="session-question-card-thread"]');
+        var issueIdentifier = card.dataset.issueIdentifier || '';
+        var decisionId = card.dataset.decisionId || null;
+
+        var opts = {
+          urlKey: card.dataset.urlKey,
+          followUpTo: card.dataset.loopId,
+          target: card.dataset.target === 'web' ? 'web' : 'cli',
+          // Force for a resumable decision (blocked-live or freshly terminal) or
+          // a paused session — same force semantics as the per-run box (LIN-1252).
+          force: card.dataset.disposition === 'resumable' || card.dataset.sessionWaiting === 'true',
+          // C2 mirror (LIN-3252 S2): a decision whose loop is no longer
+          // resumable (gone/ended) is recorded only — never dispatched into
+          // finished work.
+          recordOnly: card.dataset.disposition !== 'resumable',
+          sessionWaiting: card.dataset.sessionWaiting === 'true',
+          issueId: card.dataset.issueId || issueIdentifier,
+          issueless: !issueIdentifier,
+          decisionLoopId: decisionId ? card.dataset.stampLoopId : null,
+          decisionId: decisionId
+        };
+
+        function submit() {
+          var chosen = card.querySelector('.sess-qcard-option-input:checked');
+          var typed = (textarea.value || '').trim();
+          var prompt = typed || (chosen ? chosen.value : '');
+          if (!prompt) {
+            feedback.textContent = 'enter a reply';
+            feedback.className = 'sess-qcard-feedback sess-reply-feedback error';
+            return;
+          }
+          opts.optionId = chosen ? (chosen.dataset.optionId || null) : null;
+          opts.prompt = prompt;
+          sendReply(opts, btn, textarea, feedback, thread);
+        }
+
+        btn.addEventListener('click', function (e) { e.preventDefault(); submit(); });
+        textarea.addEventListener('keydown', function (e) {
+          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            submit();
+          }
+        });
+      })(cards[i]);
+    }
+  }
+
   // ── BriefSection / RecapSection widget init (LIN-1133) ────────────────────
   function initContextWidgets() {
     var briefs = document.querySelectorAll('.sess-ctx-panel.brief-section');
@@ -466,6 +578,7 @@
     // Per-run transcripts must render before toggle init so content is visible.
     renderRunTranscripts();
     initRunToggles();
+    initQuestionCards();
     initInlineReplies();
     initProposals();
     initContextWidgets();

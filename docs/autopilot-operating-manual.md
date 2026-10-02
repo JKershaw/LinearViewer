@@ -472,11 +472,12 @@ human reconstruct it. Cover, in the case itself: **what** is blocked and **why**
 obstacle, not a generic failure; **the decision**, stated as a decision, not a symptom; **the
 options**, each with your recommendation and your reasoning for it; **the cost of each option**, and
 **the cost of doing nothing** — what continues, what halts, what it costs to wait. When you emit the
-`DECISION:` block, per-option cost belongs in the option's own wording (`options[].cost` only accepts
-a number and silently drops prose); the cost of doing nothing belongs in `if_unanswered`, while
-an optional sibling field, `on_answer: {"effect": "resume"|"dispatch"|"record"}`, declares what
-should happen once the decision IS answered — though live evidence at press time (an
-already-resumable session, or a run already in progress on the same task) can still override it.
+`DECISION:` block, per-option cost belongs in the option's wording (`options[].cost` takes numbers
+only, dropping prose); every `DECISION:` carries `if_unanswered: {"summary": "..."}` (what
+continues, what halts), which the person's card always shows. `on_answer: {"effect":
+"resume"|"dispatch"|"record"}` optionally declares what happens once it IS answered — though live
+evidence at press time (a resumable session, or a run already in progress on that task) can still
+override it.
 When the decision concerns a finding, bound the options by where it falls: a finding inside a
 bounded class may only be **do it here** or **drop it, with the reason** — offer **file** only for
 a finding outside every bounded class.

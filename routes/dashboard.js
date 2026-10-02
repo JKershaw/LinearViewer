@@ -387,6 +387,57 @@ export function deriveSessionWaiting(enrichedLoops) {
 }
 
 /**
+ * The run page's pinned-question-card read (LIN-3252 S2): every UNANSWERED,
+ * session-scoped decision, whether or not the session is `waiting` — including
+ * after it has finished. This is what lifts the LIN-2184 waiting-only render
+ * gate: the predicate here never consults `waiting`, so a completion-path
+ * decision (or one on a finished session) still reaches the card.
+ *
+ * Scope is session MEMBERSHIP — the caller hands this the session's own enriched
+ * loops, so there is no workspace-wide filter and no operator shelf is passed
+ * (`shelvedRulings: []`): an operator's shelve must never hide the person's
+ * card. Scan-sourced task-bound rulings have no loop and stay out
+ * (`taskDecisions: []`). `collectUnansweredDecisions` remains the single
+ * unanswered-decision predicate, so an answered/dismissed decision is already
+ * subtracted and never reappears.
+ *
+ * Pure; exported for unit tests (mirrors `deriveSessionWaiting` above).
+ *
+ * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
+ * @param {{now?: Date}} [opts]
+ * @returns {Array<Object>} `collectUnansweredDecisions` rows
+ */
+export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
+  return collectUnansweredDecisions(
+    {
+      loops: Array.isArray(enrichedLoops) ? enrichedLoops : [],
+      taskDecisions: [],
+      shelvedRulings: [],
+      newestScanByTask: {}
+    },
+    { now: now instanceof Date ? now : new Date() }
+  );
+}
+
+/**
+ * The latest `kind: 'assistant-text'` message on a loop, or null. LIN-3252 S2.7:
+ * a bare `[blocked]` loop has no `decisionCase` (that correlation needs a
+ * decision entry), so its card's "why is Harbour asking?" falls back to what the
+ * worker was last saying. Pure; reads the non-lean session's `feedback[]`.
+ *
+ * @param {Object} loop
+ * @returns {string|null}
+ */
+function latestAssistantText(loop) {
+  const feedback = Array.isArray(loop && loop.feedback) ? loop.feedback : [];
+  for (let i = feedback.length - 1; i >= 0; i--) {
+    const entry = feedback[i];
+    if (entry && entry.kind === 'assistant-text' && entry.message) return String(entry.message);
+  }
+  return null;
+}
+
+/**
  * Most-relevant activity timestamp for a run, used to sort the merged feed.
  * Prefers the truthful completion time (terminal feedback marker) so a run that
  * just finished sorts above an older still-running one.
@@ -1201,6 +1252,12 @@ export function createDashboardRoutes({
       const waiting = !sessionTerminal && rawWaiting;
       const waitingMessage = waiting ? rawWaitingMessage : null;
 
+      // Pinned question card (LIN-3252 S2): the session's unanswered decisions,
+      // read independently of `waiting` so the card shows on a non-waiting or
+      // finished session too. Session-membership scope; no shelves, no
+      // task-decisions — see `deriveSessionDecisions`.
+      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date() });
+
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
       // box): gated to cli/web sessions (never dash/local — the dispatch route
       // rejects followUpTo for those anyway). Each run's own box replies via its
@@ -1242,8 +1299,23 @@ export function createDashboardRoutes({
         ? ((await runParagraphStore.get(workspace.urlKey, sessionId))?.paragraph || null)
         : null;
 
+      // Bare-BLOCKED card inputs (LIN-3252 S2.7): the waiting producer loop
+      // carries the reply target/issue the follow-up must resume and the latest
+      // assistant text its "why" falls back to when there is no `decisionCase`.
+      const producerLoop = producerLoopId
+        ? enrichedLoops.find(l => l.loopId === producerLoopId) || null
+        : null;
+      const lastAssistantText = latestAssistantText(producerLoop);
+      const producer = producerLoop ? {
+        loopId: producerLoop.loopId || null,
+        target: producerLoop.target || null,
+        issueId: producerLoop.issueId || null,
+        issueIdentifier: producerLoop.issueIdentifier || null,
+        case: lastAssistantText ? [lastAssistantText] : []
+      } : null;
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, decisions: sessionDecisions, producer, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView, proposals, runEvidence, runParagraph },
         pageOptions
       );
       res.send(html);

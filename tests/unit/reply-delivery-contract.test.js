@@ -90,9 +90,121 @@ test('window.ReplyDelivery loads with the documented surface', () => {
   assert.equal(typeof window.ReplyDelivery, 'object', 'window.ReplyDelivery is exported');
   assert.equal(typeof window.ReplyDelivery.deliverReply, 'function');
   assert.equal(typeof window.ReplyDelivery.postComment, 'function');
+  assert.equal(typeof window.ReplyDelivery.dismissRuling, 'function');
   assert.equal(typeof window.ReplyDelivery.errorFromResult, 'function');
   assert.equal(window.ReplyDelivery.postDispatch, undefined,
     'postDispatch stays private — reachable only via deliverReply/retryDispatch (I4\'s guard against a caller-side reimplementation)');
+});
+
+test('recordOnly (LIN-3252 S2, C2 mirror): the comment/stamp is written once and dispatch is NEVER called', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    throw new Error('recordOnly must never dispatch a follow-up into finished work');
+  });
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli', recordOnly: true, decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1' },
+    'the answer',
+    handlers
+  );
+
+  assert.equal(calls.length, 1, 'exactly one fetch — the comment write');
+  assert.match(calls[0].url, /\/api\/comments\/i1$/);
+  // The decision ids AND the chosen option ride the comment, so the route can
+  // stamp the answer durably.
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { body: 'the answer', decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1' });
+  assert.equal(fired.onDispatchOk.length, 1);
+  assert.equal(fired.onCommentFailed.length, 0);
+  assert.equal(fired.onPartialFailure.length, 0);
+  assert.equal(fired.onDispatchFailed.length, 0);
+});
+
+test('recordOnly: a comment-write failure routes to onCommentFailed and still never dispatches', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(false, 502, { error: 'comment down' });
+    throw new Error('recordOnly must never dispatch');
+  });
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli', recordOnly: true },
+    'the answer',
+    handlers
+  );
+
+  assert.equal(calls.length, 1, 'only the failing comment write was attempted');
+  assert.equal(fired.onCommentFailed.length, 1);
+  assert.equal(fired.onCommentFailed[0].message, 'comment down');
+  assert.equal(fired.onDispatchOk.length, 0);
+});
+
+test('dismissRuling (LIN-3252 S2/C2): a resumable decision — one dismissed stamp, one follow-up with NO decision ids (zero answers)', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/dashboard/rulings/dismiss')) return jsonResponse(true, 200, { success: true });
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    if (String(url).includes('/api/dispatch')) return jsonResponse(true, 200, { success: true });
+    throw new Error('unexpected fetch: ' + url);
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.dismissRuling(
+    { urlKey: 'w', stampLoopId: 'lp', decisionId: 'd-wait', followUpTo: 'lp', target: 'cli', issueId: 'i1', disposition: 'resumable', prompt: 'proceed on your best judgment' },
+    handlers
+  );
+
+  const dismissCalls = calls.filter(c => String(c.url).includes('/api/dashboard/rulings/dismiss'));
+  const commentCalls = calls.filter(c => String(c.url).includes('/api/comments/'));
+  const dispatchCalls = calls.filter(c => String(c.url).includes('/api/dispatch'));
+  assert.equal(dismissCalls.length, 1, 'exactly one dismissed stamp');
+  assert.deepEqual(JSON.parse(dismissCalls[0].opts.body), { decisionLoopId: 'lp', decisionId: 'd-wait' });
+  assert.equal(dispatchCalls.length, 1, 'exactly one follow-up dispatch on a resumable decision');
+  assert.equal(commentCalls.length, 1, 'the follow-up is the ordinary comment+dispatch sendReply chain');
+  // THE KPI GUARD: the follow-up comment carries NO decision ids, so the
+  // comment route never stamps this decision `answered`.
+  const followUpBody = JSON.parse(commentCalls[0].opts.body);
+  assert.equal(followUpBody.decisionLoopId, undefined, 'no decisionLoopId on the dismiss follow-up');
+  assert.equal(followUpBody.decisionId, undefined, 'no decisionId on the dismiss follow-up');
+  assert.equal(followUpBody.optionId, undefined, 'no optionId on the dismiss follow-up');
+  const followUpDispatch = JSON.parse(dispatchCalls[0].opts.body);
+  assert.equal(followUpDispatch.force, true, 'a resumable (possibly finished-within-reap) follow-up forces');
+});
+
+test('dismissRuling (LIN-3252 S2/C2): a NON-resumable (ended/gone) decision stamps and dispatches NOTHING', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/dashboard/rulings/dismiss')) return jsonResponse(true, 200, { success: true });
+    throw new Error('a non-resumable dismiss must never reach the comment or dispatch endpoint');
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.dismissRuling(
+    { urlKey: 'w', stampLoopId: 'lp', decisionId: 'd-gone', followUpTo: 'lp', target: 'cli', issueId: 'i1', disposition: 'gone', prompt: 'proceed on your best judgment' },
+    handlers
+  );
+
+  assert.equal(calls.length, 1, 'exactly one fetch — the dismiss stamp');
+  assert.match(calls[0].url, /\/api\/dashboard\/rulings\/dismiss$/);
+});
+
+test('dismissRuling: a failed dismiss write rejects and sends no follow-up', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/dashboard/rulings/dismiss')) return jsonResponse(false, 404, { error: 'No matching ruling to dismiss' });
+    throw new Error('no follow-up may be attempted when the stamp failed');
+  });
+  const { handlers } = trackedHandlers();
+
+  let rejected = null;
+  try {
+    await window.ReplyDelivery.dismissRuling(
+      { urlKey: 'w', stampLoopId: 'lp', decisionId: 'd-x', followUpTo: 'lp', target: 'cli', disposition: 'resumable', prompt: 'x' },
+      handlers
+    );
+    assert.fail('dismissRuling should reject when the dismiss write fails');
+  } catch (e) {
+    rejected = e;
+  }
+  assert.equal(rejected.message, 'No matching ruling to dismiss');
+  assert.equal(calls.length, 1, 'only the failed dismiss write was attempted');
 });
 
 test('comment failure blocks dispatch entirely (I1/I3): dispatch endpoint never called, only onCommentFailed fires', async () => {

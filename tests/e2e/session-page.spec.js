@@ -268,7 +268,7 @@ async function seedSessionWithDecision(page) {
   });
   expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
   const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
-    headers: auth, data: { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed with option A?' }) }
+    headers: auth, data: { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed with option A?', options: [{ id: 'a', label: 'Approve' }] }) }
   });
   expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
   return { workerId, decisionId };
@@ -375,7 +375,7 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     }
   });
 
-  test('shows the "waiting on you" banner for a [blocked] (paused) session (LIN-1005)', async ({ page }) => {
+  test('shows the pinned question card for a bare [blocked] (paused) session (LIN-3252 S2.7)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     await seedBlockedSession(page);
@@ -405,16 +405,19 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
       waitingMessage: expect.stringContaining('need your decision on the auth flow'),
     });
 
-    // The session page renders the prominent alert banner + follow-up CTA.
+    // The session page renders the pinned question card for the bare blocker —
+    // the worker's message, a free-text box and "Answer", with no dismiss.
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
-    const banner = page.locator('[data-testid="session-waiting-banner"]');
-    await expect(banner).toBeVisible();
-    await expect(banner).toContainText('Waiting on you');
-    await expect(page.locator('[data-testid="session-waiting-message"]')).toContainText('need your decision on the auth flow');
-    // LIN-1163: the page-level box the banner used to point at is gone; the
-    // copy now points at the per-run reply box.
-    await expect(page.locator('[data-testid="session-waiting-cta"]')).toContainText('own reply box');
+    const card = page.locator('[data-testid="session-question-card"]');
+    await expect(card).toBeVisible();
+    await expect(page.locator('[data-testid="session-question-card-question"]')).toContainText('need your decision on the auth flow');
+    await expect(page.locator('[data-testid="session-question-card-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-question-card-answer"]')).toHaveText('Answer');
+    // Bare blocker: no options, no dismiss.
+    await expect(page.locator('[data-testid="session-question-card-options"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="session-question-card-dismiss"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="session-question-card-if-unanswered"]')).toContainText('Harbour keeps waiting for your answer');
   });
 
   test('a finished session with a lingering blocked worker is NOT waiting — no banner (LIN-1005 terminal gate)', async ({ page }) => {
@@ -456,11 +459,11 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
       waitingMessage: null,
     });
 
-    // Session page: no "waiting on you" banner on a finished session.
+    // Session page: a finished session with no decision renders no question card.
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
-    await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
   });
 
   // LIN-1163: the page-level reply box was removed — every reply now goes
@@ -733,42 +736,39 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     expect(dispatchFired).toBe(false);
   });
 
-  test('data-decision-id is threaded into Save\'s comment write (LIN-1728 Phase 2)', async ({ page }) => {
+  test('the pinned card answers a decision: comment carries the decision ids + chosen option, and the run resumes (LIN-3252 S2)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
-    const { decisionId } = await seedSessionWithDecision(page);
+    const { workerId, decisionId } = await seedSessionWithDecision(page);
     const sessionId = await discoverSessionId(page);
 
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    const run = await expandRun(page, 'Decision worker');
-    const box = run.locator('[data-testid="session-inline-reply"]');
-    await expect(box).toHaveAttribute('data-decision-id', decisionId);
-    const loopId = await box.getAttribute('data-loop-id');
-    const saveBtn = box.locator('[data-testid="session-inline-reply-save"]');
+    const card = page.locator('[data-testid="session-question-card"]');
+    await expect(card).toBeVisible();
+    // Choose a declared option (leaving the "own answer" box empty) so the
+    // option id rides the write.
+    await card.locator('[data-testid="session-question-card-option"]').first().click();
 
-    // This session carries an unanswered decision, so it rolls up to the
-    // session-level "waiting on you" banner — Save's own LIN-2154 OQ5 confirm
-    // gate fires; accept it to proceed (this test is about the decision-id
-    // threading, not the waiting-confirm behavior, which is covered elsewhere).
-    page.on('dialog', (dialog) => dialog.accept());
-
-    const [request] = await Promise.all([
+    const [commentReq, dispatchReq] = await Promise.all([
       page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
-      (async () => {
-        await box.locator('textarea').fill('proceeding with option A');
-        await saveBtn.click();
-      })()
+      page.waitForRequest(r => r.url().includes('/api/dispatch') && r.method() === 'POST'),
+      card.locator('[data-testid="session-question-card-answer"]').click()
     ]);
-    const payload = request.postDataJSON();
-    expect(payload.decisionLoopId).toBe(loopId);
-    expect(payload.decisionId).toBe(decisionId);
-    const resp = await request.response();
-    expect(resp.status()).toBe(201);
+
+    const commentBody = commentReq.postDataJSON();
+    expect(commentBody.decisionLoopId).toBe(workerId);
+    expect(commentBody.decisionId).toBe(decisionId);
+    expect(commentBody.optionId).toBe('a');
+    expect((await commentReq.response()).status()).toBe(201);
+
+    // Answer → the run resumes: the follow-up dispatch targets the decision's loop.
+    expect(dispatchReq.postDataJSON().followUpTo).toBe(workerId);
+    expect((await dispatchReq.response()).status()).toBeLessThan(300);
   });
 
-  test('data-decision-id is threaded into Save-and-continue\'s comment write (LIN-1728 Phase 2)', async ({ page }) => {
+  test('the pinned card dismisses a decision and the false-escalation KPI counts it (LIN-3252 S2/C2)', async ({ page }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
     await clearRuns(page);
     const { decisionId } = await seedSessionWithDecision(page);
@@ -777,22 +777,24 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
     await page.waitForLoadState('networkidle');
 
-    const run = await expandRun(page, 'Decision worker');
-    const box = run.locator('[data-testid="session-inline-reply"]');
-    const loopId = await box.getAttribute('data-loop-id');
-
-    const [request] = await Promise.all([
-      page.waitForRequest(r => r.url().includes('/api/comments/') && r.method() === 'POST'),
-      (async () => {
-        await box.locator('textarea').fill('proceeding with option A, continue');
-        await box.locator('[data-testid="session-inline-reply-send"]').click();
-      })()
+    const card = page.locator('[data-testid="session-question-card"]');
+    await expect(card).toBeVisible();
+    const [dismissReq] = await Promise.all([
+      page.waitForRequest(r => r.url().includes('/api/dashboard/rulings/dismiss') && r.method() === 'POST'),
+      card.locator('[data-testid="session-question-card-dismiss"]').click()
     ]);
-    const payload = request.postDataJSON();
-    expect(payload.decisionLoopId).toBe(loopId);
-    expect(payload.decisionId).toBe(decisionId);
-    const resp = await request.response();
-    expect(resp.status()).toBe(201);
+    expect(dismissReq.postDataJSON().decisionId).toBe(decisionId);
+    expect((await dismissReq.response()).status()).toBe(200);
+
+    // The card goes away and does not come back.
+    await expect(page.locator('[data-testid="session-question-card"]')).toHaveCount(0);
+
+    // The dismissal is counted by the false-escalation KPI.
+    const kpiResp = await page.request.get(`/workspace/${URL_KEY}/api/escalation-kpis`);
+    expect(kpiResp.status()).toBe(200);
+    const kpi = await kpiResp.json();
+    expect(kpi.falseEscalation.dismissed).toBe(1);
+    expect(kpi.falseEscalation.total).toBe(1);
   });
 
   test('a decision-answer stamp in a run\'s transcript never renders as a chat bubble (LIN-1728 Phase 2, F6)', async ({ page }) => {
