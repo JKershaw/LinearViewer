@@ -580,7 +580,7 @@ describe('S0 — projection source bodies are spread-free and token-free', () =>
 // Class F (LIN-3134 rev 3 / LIN-2884 rev 4 B2): 6 calls carry `followUpTo`;
 // 4 of those also carry an attach branch. The ten branches are:
 //   pbt (6)   proxy-dispatch:543 (POST /dispatch), :961 (override), :1232 (LLM),
-//             dispatch.js:546 (session), flight-companion.js:956, chat-tools.js:2090
+//             dispatch.js:546 (session), follow-up-dispatch.js (dispatchSessionFollowUp), chat-tools.js:2090
 //   attach (4) proxy-dispatch:497 (POST /dispatch), :936 (override), :1207 (LLM),
 //             dispatch.js:490 (session)
 // plus the wake (wake-credential.js:91 via addFeedback). Every route branch
@@ -875,7 +875,7 @@ function fcApp({ anchorStatus = null } = {}) {
 }
 
 describe('S0 — flight-companion approve-follow-up branch (pbt)', () => {
-  // B5 — routes/flight-companion.js:956 (pbt)
+  // B5 — lib/follow-up-dispatch.js dispatchSessionFollowUp (pbt), reached via approve-follow-up
   test('B5 MCP anchor: golden mint; prompt verbatim; token as field', async () => {
     const { app, captured } = fcApp({ anchorStatus: { harness: 'claude-code' } });
     const res = await callRoute(app, 'post', FC_PATH, { sessionId: 'sess-done', prompt: 'next beat' });

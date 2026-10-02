@@ -83,17 +83,15 @@ import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../li
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
 import { buildModelOptions } from '../lib/openrouter-catalog.js';
-import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS, deriveFollowUpDispatch } from '../lib/chat-tools.js';
+import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
-import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
-import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
+import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
-import { badRequest, unauthorized, notFound, jsonError, serverError } from '../lib/errors.js';
+import { badRequest, unauthorized, jsonError, serverError } from '../lib/errors.js';
 // LIN-2631 item 2: one shared writer, so LIN-2620's proxy turn does not become
 // a fourth copy of the frame format.
 import { sendSSE } from '../lib/sse.js';
@@ -911,89 +909,21 @@ export function createFlightCompanionRoutes({
     }
 
     try {
-      // Same read `send_follow_up`'s executor uses (lib/chat-tools.js).
-      const sessions = await getSessionsForWorkspace(
-        workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore }
-      );
-      const session = sessions.find(s => s.sessionId === sessionId);
-
-      // The route's OWN guard, ahead of derivation: deriveFollowUpDispatch
-      // dereferences session.loops/session.sessionId unguarded by design
-      // (LIN-2433's review ledger, item 3) — without this check here, an
-      // unknown sessionId becomes a 500 instead of a clean 404.
-      if (!session) {
-        return notFound.json(res, `Session ${sessionId} not found`);
-      }
-
-      let followUpTo, target, force;
-      try {
-        ({ followUpTo, target, force } = deriveFollowUpDispatch(session));
-      } catch (deriveError) {
-        // deriveFollowUpDispatch throws for a dash/local anchor target
-        // (LIN-2433's review ledger, item 4). 422, not 409: this is not a
-        // transient state conflict a retry could resolve — a dash/local
-        // session structurally can never support a follow-up dispatch, the
-        // same "well-formed request, unsupported for this resource" shape
-        // routes/proxy.js's CAPABILITY_NOT_SUPPORTED already uses 422 for.
-        return jsonError(res, 422, deriveError.message);
-      }
-
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const item = await createDispatchItem({
-        store: dispatchQueueStore,
-        urlKey: workspace.urlKey,
+      const outcome = await dispatchSessionFollowUp({
+        dispatchQueueStore,
+        agentStatusStore,
         workspacePreferencesStore,
         proxyTokenStore,
-        applyDefaultHarness: false,
+        urlKey: workspace.urlKey,
+        sessionId,
         prompt,
-        // Byte-for-byte mirror of send_follow_up's own finalizePrompt
-        // (lib/chat-tools.js). Always a follow-up (`followUpTo` is derived
-        // server-side), so the whole finalize is the one resume helper
-        // (LIN-3134 T2-ii): the credential comes from the persisted parent
-        // record, declared or plain. `mint` keeps the load-bearing
-        // shouldUseMcpTokenField guard (LIN-1431 S3 #2) — minting for a prose
-        // harness that never rewrites the prompt would strand an
-        // unreferenceable credential on the item.
-        finalizePrompt: (resolvedHarness) => provisionResumeCredential({
-          proxyTokenStore,
-          dispatchStore: dispatchQueueStore,
-          urlKey: workspace.urlKey,
-          baseUrl,
-          label: 'dispatch-bootstrap',
-          harness: resolvedHarness,
-          followUpTo,
-          createdBy: dispatchedBy,
-          prompt,
-          mint: shouldUseMcpTokenField(resolvedHarness)
-        }),
-        fields: {
-          followUpTo,
-          target,
-          force,
-          dispatchedBy,
-        }
+        baseUrl,
+        dispatchedBy,
       });
-
-      res.json({
-        queued: true,
-        itemId: item._id,
-        sessionId: session.sessionId,
-        target,
-        force,
-      });
+      res.status(outcome.status).json(outcome.body);
     } catch (error) {
       console.error('Flight Companion approve-follow-up error:', error);
-      // LIN-3134 (NB2): only the CODED transient refusal is a retryable 503 —
-      // any other error, including an uncoded mint failure that carries
-      // `proxyAttachFailed`, keeps the 500 below.
-      if (error && error.code === 'OWNER_CHECK_UNAVAILABLE') {
-        return jsonError(res, 503, error.message, { code: error.code, retryable: true });
-      }
-      // A structural refusal is 422, never 403: public/flight-companion.js
-      // treats 403 as flag-off and stops the cadence (LIN-2771).
-      if (isStructuralGrantRefusal(error)) {
-        return jsonError(res, 422, error.message, { code: error.code, retryable: false });
-      }
       serverError.json(res, 'Failed to approve follow-up');
     }
   });

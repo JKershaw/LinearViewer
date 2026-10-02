@@ -308,7 +308,7 @@ const FOLLOWUP_SITES = [
   { name: 'override arm', key: 'routes/proxy-dispatch.js | POST /api/proxy/recommend-and-dispatch | kind', predicate: 'isFollowUp', hasAttachArm: true },
   { name: 'LLM arm', key: 'routes/proxy-dispatch.js | POST /api/proxy/recommend-and-dispatch | kind: effectiveKind', predicate: 'isFollowUp', hasAttachArm: true },
   { name: 'dispatch session', key: 'routes/dispatch.js | POST /workspace/:urlKey/api/dispatch | kind', predicate: 'followUpTo', hasAttachArm: true },
-  { name: 'flight-companion approve-follow-up', key: 'routes/flight-companion.js | POST /workspace/:urlKey/api/flight-companion/approve-follow-up | (none)', predicate: null, hasAttachArm: false },
+  { name: 'follow-up-dispatch dispatchSessionFollowUp', key: 'lib/follow-up-dispatch.js | function dispatchSessionFollowUp | (none)', predicate: null, hasAttachArm: false },
   { name: 'chat-tools send_follow_up', key: 'lib/chat-tools.js | tool send_follow_up | (none)', predicate: null, hasAttachArm: false }
 ];
 
@@ -445,7 +445,7 @@ const MINT_SITE_TABLE = [
   { key: `${PD_OVERRIDE} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'override arm follow-up gate' },
   { key: `${PD_LLM} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'LLM arm follow-up gate' },
   { key: `${SESSION} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'session route follow-up arm of the arming ternary' },
-  { key: 'routes/flight-companion.js | POST /workspace/:urlKey/api/flight-companion/approve-follow-up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'approve-follow-up: a follow-up by construction' },
+  { key: 'lib/follow-up-dispatch.js | function dispatchSessionFollowUp [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'dispatchSessionFollowUp: a follow-up by construction (approve-follow-up + Apply)' },
   { key: 'lib/chat-tools.js | tool send_follow_up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'send_follow_up: a follow-up by construction' },
   { key: 'lib/wake-credential.js | function buildWakeCredentialProvisioner | - | provisionResumeCredential', count: 1, cls: 'wake-helper', reason: 'the wake (Class F eleventh member)' },
   { key: 'routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential', count: 1, cls: 'refire-helper', reason: 'declared refire re-mint, R2 (LIN-3135)' },
