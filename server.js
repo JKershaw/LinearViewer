@@ -2161,7 +2161,20 @@ async function refreshKpiStats() {
     recapCache: recapCacheCollection,
     briefCache: briefCacheCollection,
     reportHistory: reportHistoryCollection
-  }, { dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb' })
+  }, {
+    dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb',
+    // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch
+    // collections), passed in OPTIONS so the aggregate never re-reads through
+    // `collections.dispatchHistory`.
+    milestoneFunnelDeps: {
+      taskModeStore,
+      accountStore,
+      accountWorkspaceStore,
+      funnelEventStore,
+      dispatchQueue: dispatchQueueCollection,
+      dispatchHistory: dispatchHistoryCollection
+    }
+  })
   const ms = Date.now() - startedAt
   if (ms > 5000) console.warn(`KPI stats collection slow: ${ms}ms`)
   else console.log(`KPI stats collected in ${ms}ms`)

@@ -15,7 +15,7 @@ import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { TaskModeStore } from '../../lib/task-mode-store.js';
 import { FunnelEventStore } from '../../lib/funnel-event-store.js';
-import { buildCanonicalMap, isPullRequestUrl, stepsForAccountGroup, STEP_STATES } from '../../lib/milestone-funnel.js';
+import { buildCanonicalMap, isPullRequestUrl, stepsForAccountGroup, collectMilestoneFunnel, STEP_STATES } from '../../lib/milestone-funnel.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const harness = createMangoTmpdir('lin-2952-milestone-');
@@ -37,11 +37,21 @@ function freshWorld() {
   return {
     accountStore: new AccountStore({ collection: db.collection('accounts') }),
     accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+    taskModeStore: new TaskModeStore({ collection: db.collection('task-mode-events') }),
     dispatchQueue: db.collection('dispatch-queue'),
     dispatchHistory: db.collection('dispatch-history'),
     funnelEventStore: new FunnelEventStore({ collection: db.collection('funnel-events') })
   };
 }
+
+const aggDeps = (w) => ({
+  taskModeStore: w.taskModeStore,
+  accountStore: w.accountStore,
+  accountWorkspaceStore: w.accountWorkspaceStore,
+  funnelEventStore: w.funnelEventStore,
+  dispatchQueue: w.dispatchQueue,
+  dispatchHistory: w.dispatchHistory
+});
 
 const PAST = (msAgo) => new Date(Date.now() - msAgo);
 const dispatchRow = (accountId, dispatchedAt, over = {}) => ({
@@ -294,5 +304,81 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
     assert.equal(steps.firstGo.state, STEP_STATES.NOT_REACHED);
     assert.equal(steps.prOpened.state, STEP_STATES.NOT_REACHED);
     assert.equal(steps.mergeClicked.state, STEP_STATES.NO_SIGNAL);
+  });
+});
+
+describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => {
+  const WINDOW_START = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const taskModeEntry = (accountId, over = {}) => ({
+    accountId, urlKey: 'ws', issueId: null, issueIdentifier: 'LIN-1',
+    rung: 'copy', ready: true, needs: null, act: 'copy', surface: 'swipe', ...over
+  });
+
+  test('counts distinct canonical people — a person split across two accounts counts once', async () => {
+    const w = freshWorld();
+    const canonical = await w.accountStore.createAccount();
+    const merged = await w.accountStore.createAccount();
+    assert.equal((await w.accountStore.mergeAccounts(canonical._id, merged._id)).ok, true);
+    // The same person's dispatches AND mode entry under BOTH recorded ids.
+    await w.dispatchHistory.insertOne(dispatchRow(canonical._id, PAST(2000)));
+    await w.dispatchHistory.insertOne(dispatchRow(merged._id, PAST(1000)));
+    await w.taskModeStore.record(taskModeEntry(canonical._id));
+    await w.taskModeStore.record(taskModeEntry(merged._id));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.firstGo.state, 'reached');
+    assert.equal(result.steps.firstGo.count, 1, 'one canonical person, not two');
+    assert.equal(result.mode.total, 1, 'the mode count folds the merge too');
+  });
+
+  test('no-signal vs zero: an absent instrument is never a zero count', async () => {
+    const w = freshWorld();
+    await w.accountStore.createAccount();
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(result.steps.firstGo.state, 'reached');
+    assert.equal(result.steps.firstGo.count, 0, 'an instrument present with no events is an honest zero');
+    assert.equal(result.steps.mergeClicked.state, 'no-signal');
+    assert.equal(result.steps.mergeClicked.count, null, 'an absent instrument is no-signal, never 0');
+
+    // With no dispatch deps at all, firstGo degrades to no-signal (not 0).
+    const noDispatch = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchQueue: null, dispatchHistory: null });
+    assert.equal(noDispatch.steps.firstGo.state, 'no-signal');
+    assert.equal(noDispatch.steps.firstGo.count, null);
+  });
+
+  test('publishes the notReady subset of the mode entry rungs', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.taskModeStore.record(taskModeEntry(a._id, { rung: 'copy', ready: false, needs: 'prompt', act: 'press' }));
+
+    const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    const copy = result.mode.byRung.find(r => r.rung === 'copy');
+    assert.equal(copy.entries, 1);
+    assert.equal(copy.notReady, 1, 'the not-ready subset is published alongside the entry count');
+  });
+
+  test('a missing dep degrades to no-signal, never a crash', async () => {
+    const result = await collectMilestoneFunnel({ since: WINDOW_START });
+    for (const key of ['login', 'connected', 'firstGo', 'prOpened', 'mergeClicked']) {
+      assert.equal(result.steps[key].state, STEP_STATES.NO_SIGNAL, `${key} must be no-signal`);
+      assert.equal(result.steps[key].count, null);
+    }
+    assert.equal(result.mode, null);
+  });
+
+  test('carries counts and labels only — no account id, workspace key, issue id or PR url', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.accountWorkspaceStore.bindAccountToWorkspace(a._id, 'SECRET-WSID');
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1000), {
+      urlKey: 'SECRET-WSKEY', issueIdentifier: 'SECRET-ISSUE',
+      feedback: [{ kind: 'evidence', url: 'https://github.com/SECRET-OWNER/SECRET-REPO/pull/9', timestamp: PAST(500) }]
+    }));
+
+    const serialized = JSON.stringify(await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) }));
+    for (const canary of [a._id, 'SECRET-WSID', 'SECRET-WSKEY', 'SECRET-ISSUE', 'SECRET-OWNER', '/pull/9']) {
+      assert.ok(!serialized.includes(canary), `${canary} leaked into the aggregate`);
+    }
   });
 });
