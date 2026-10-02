@@ -56,6 +56,7 @@ import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OBSERVATION_JS_SRC = readFileSync(join(__dirname, '../../public/observation.js'), 'utf8');
+const COMMON_JS_SRC = readFileSync(join(__dirname, '../../public/common.js'), 'utf8');
 
 // ─── Minimal DOM shim ───────────────────────────────────────────────────────
 // Just enough of `document`/Element for deliverRulingReply's own usage:
@@ -209,13 +210,6 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements 
           return 'no action available yet';
         }
       },
-      ReplyDelivery: {
-        postComment,
-        deliverReply,
-        errorFromResult: (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`)
-      },
-      dispatchPrompt,
-      api: api || (async () => { throw new Error('window.api not stubbed for this test'); })
     },
     document: {
       createElement: (tag) => new FakeElement(tag),
@@ -232,6 +226,17 @@ function makeSandbox({ postComment, dispatchPrompt, deliverReply, api, elements 
     console: { warn() {}, error() {}, log() {} },
   };
   vm.createContext(sandbox);
+  // LIN-3252 F1: the REAL common.js loads first, so observation.js's delegated
+  // record/dispatch delivery (window.ReplyDelivery.deliverRulingRecord /
+  // deliverRulingDispatch) is the same shared code the run-page card uses —
+  // then the per-test fetch seams are overridden on top, keeping every
+  // existing assertion about the calls actually made meaningful.
+  vm.runInContext(COMMON_JS_SRC, sandbox, { filename: 'common.js' });
+  sandbox.window.ReplyDelivery.postComment = postComment;
+  sandbox.window.ReplyDelivery.deliverReply = deliverReply;
+  sandbox.window.ReplyDelivery.errorFromResult = (r) => new Error((r.data && r.data.error) || `HTTP ${r.status}`);
+  sandbox.window.dispatchPrompt = dispatchPrompt;
+  sandbox.window.api = api || (async () => { throw new Error('window.api not stubbed for this test'); });
   vm.runInContext(OBSERVATION_JS_SRC, sandbox, { filename: 'observation.js' });
   return sandbox;
 }
@@ -342,12 +347,14 @@ describe('deliverRulingReply — gone disposition (LIN-1728 review F1/F2)', () =
   // raw-reply-text behaviour; confirmed red-first (see beat 3's own report).
   test('HEADLINE: the composed dispatch prompt carries the question, the chosen answer, and the decisionCase recap — never just the raw pressed text', async () => {
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const sandbox = makeSandbox({
       postComment: async () => ({ ok: true, status: 201, data: {} }),
       dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
       api: nonTerminalHydrateApi()
     });
-    const { deliverRulingReply, RULING_COMPOSED_RUN_MARKER } = module.exports;
+    const { module } = sandbox;
+    const { deliverRulingReply } = module.exports;
+    const { RULING_COMPOSED_RUN_MARKER } = sandbox.window.ReplyDelivery;
     const li = makeLi();
 
     const row = makeRow({
@@ -949,12 +956,14 @@ describe('deliverRulingReply — press-time check (LIN-2775 Area 8)', () => {
   test('a non-terminal anchor confirmed at press time proceeds to the ordinary dispatch path, composedRunMarker included', async () => {
     let commentCalls = 0;
     let capturedOpts = null;
-    const { module } = makeSandbox({
+    const sandbox = makeSandbox({
       postComment: async () => { commentCalls += 1; return { ok: true, status: 201, data: {} }; },
       dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
       api: async () => hydrateOk({}, { name: 'In Progress', type: 'started' })
     });
-    const { deliverRulingReply, RULING_COMPOSED_RUN_MARKER } = module.exports;
+    const { module } = sandbox;
+    const { deliverRulingReply } = module.exports;
+    const { RULING_COMPOSED_RUN_MARKER } = sandbox.window.ReplyDelivery;
     const li = makeLi();
 
     deliverRulingReply(makeRow({ decision: { decision_id: 'd-presstime-ok' } }), 'Approve', li);
@@ -3363,7 +3372,11 @@ describe('rulingEffectOverride lifecycle (LIN-2775 Area 5)', () => {
 // ─── resolveRecordTarget (LIN-2775 Area 6) — pure, no DOM/network ──────────
 describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
   function sandboxExports() {
-    return makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) }).module.exports;
+    // LIN-3252 F1: the pure resolver/composer now live on window.ReplyDelivery
+    // (shared with the run-page card); merge both seams so the note constants
+    // resolve alongside observation.js's own exports.
+    const sb = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) });
+    return Object.assign({}, sb.module.exports, sb.window.ReplyDelivery);
   }
 
   test('no record_on declared → the anchor, no note', () => {
@@ -3432,7 +3445,11 @@ describe('resolveRecordTarget (LIN-2775 Area 6)', () => {
 // ─── composeDispatchPrompt (LIN-2775 Area 7) — pure, no DOM/network ────────
 describe('composeDispatchPrompt (LIN-2775 Area 7)', () => {
   function sandboxExports() {
-    return makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) }).module.exports;
+    // LIN-3252 F1: the pure resolver/composer now live on window.ReplyDelivery
+    // (shared with the run-page card); merge both seams so the note constants
+    // resolve alongside observation.js's own exports.
+    const sb = makeSandbox({ postComment: async () => ({ ok: true, status: 201, data: {} }) });
+    return Object.assign({}, sb.module.exports, sb.window.ReplyDelivery);
   }
 
   test('carries the question, the chosen answer, and the full decisionCase recap', () => {

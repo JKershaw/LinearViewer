@@ -201,16 +201,18 @@ describe('render-session: pinned question card (LIN-3252 S2)', () => {
   // `data.decisions`), so these exercise the render contract the route feeds.
   function decisionRow({
     loopId = 'loop-1', decisionId = 'd-1', question = 'Proceed with the migration?',
-    options = [], ifUnanswered = null, disposition = 'resumable', canReply = true, decisionCase = []
+    options = [], ifUnanswered = null, disposition = 'resumable', canReply = true, decisionCase = [],
+    effect = 'resume', recordOn = null
   } = {}) {
     const decision = { decision_id: decisionId };
     if (question != null) decision.question = question;
     if (options.length) decision.options = options;
     if (ifUnanswered) decision.if_unanswered = ifUnanswered;
+    if (recordOn) decision.on_answer = { record_on: recordOn };
     return {
       decision, decisionCase,
       anchor: { loopId, issueId: 'uuid-900', issueIdentifier: 'LIN-900', workspaceUrlKey: 'ws-a', target: 'cli', followUpTo: null },
-      stampLoopId: loopId, disposition, canReply
+      stampLoopId: loopId, disposition, canReply, effect
     };
   }
 
@@ -281,8 +283,12 @@ describe('render-session: pinned question card (LIN-3252 S2)', () => {
   });
 
   test('a read-only disposition shows that Harbour is still working and offers NO input', () => {
+    // F3: isolate the disposition path — `canReply` at BOTH the page and row
+    // level is true, so the read-only rendering is guaranteed by
+    // `readOnly` alone. A mutation setting `readOnly = false` now turns this
+    // test red instead of being masked by a page-level `canReply: false`.
     const html = renderSessionPage(
-      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], waiting: false, decisions: [decisionRow({ disposition: 'mid-turn', canReply: false })] },
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false, decisions: [decisionRow({ disposition: 'mid-turn', canReply: true })] },
       {}
     );
     assert.match(html, /data-testid="session-question-card-readonly"[^>]*>Harbour is still working; you can answer when it pauses\.</);
@@ -290,6 +296,38 @@ describe('render-session: pinned question card (LIN-3252 S2)', () => {
     assert.ok(!html.includes('data-testid="session-question-card-answer"'), 'no Answer verb for a read-only disposition');
     assert.ok(!html.includes('data-testid="session-question-card-options"'), 'no options for a read-only disposition');
     assert.ok(!html.includes('session-question-card-dismiss'), 'no dismiss where no input is offered');
+  });
+
+  test('emits the resolved effect and record_on the card branches on (LIN-3252 F1)', () => {
+    const html = renderSessionPage(
+      {
+        session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: false,
+        decisions: [
+          decisionRow({ loopId: 'l-res', decisionId: 'd-res', disposition: 'resumable', effect: 'resume' }),
+          decisionRow({ loopId: 'l-gone', decisionId: 'd-gone', disposition: 'gone', effect: 'dispatch' }),
+          decisionRow({ loopId: 'l-rec', decisionId: 'd-rec', disposition: 'gone', effect: 'record', recordOn: 'LIN-SIB' })
+        ]
+      },
+      {}
+    );
+    // Each card carries its OWN resolved effect — the gone run must not
+    // collapse to a record-only answer.
+    const cards = html.match(/data-testid="session-question-card"[^>]*/g) || [];
+    assert.equal(cards.length, 3);
+    assert.match(cards.find(c => c.includes('data-decision-id="d-res"')), /data-effect="resume"/);
+    assert.match(cards.find(c => c.includes('data-decision-id="d-gone"')), /data-effect="dispatch"/);
+    assert.match(cards.find(c => c.includes('data-decision-id="d-rec"')), /data-effect="record"/);
+    // The declared record_on target rides the card so a `record` answer can
+    // resolve it the way the Rulings tab does.
+    assert.match(cards.find(c => c.includes('data-decision-id="d-rec"')), /data-record-on="LIN-SIB"/);
+  });
+
+  test('a bare [blocked] card carries effect="resume" (its only delivery)', () => {
+    const html = renderSessionPage(
+      { session: fixtureSession(), urlKey: 'ws-a', issueContext: [], canReply: true, waiting: true, waitingMessage: 'blocked', decision: null, decisions: [], producer: { loopId: 'loop-w' } },
+      {}
+    );
+    assert.match(html, /data-testid="session-question-card"[^>]*data-effect="resume"/);
   });
 
   test('the card renders on a non-waiting session that carries a decision', () => {

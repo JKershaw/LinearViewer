@@ -953,28 +953,35 @@ window.ReplyDelivery = (function () {
       return doDispatch(opts, prompt);
     }
 
-    if (opts.issueless) {
-      return doDispatch(opts, prompt).then(
-        function () { onDispatchOk(); },
-        function (dispatchErr) { onDispatchFailed(dispatchErr); }
-      ).catch(function () {});
-    }
-
-    // LIN-3252 S2 (C2 mirror): a RECORD-ONLY answer writes the durable comment
-    // (and the decision stamp the route performs alongside it) but must NOT
-    // dispatch a follow-up. Used when the decision's loop is no longer
+    // LIN-3252 S2 (C2 mirror) / F2: a RECORD-ONLY answer writes the durable
+    // comment (and the decision stamp the route performs alongside it) but must
+    // NOT dispatch a follow-up. Used when the decision's loop is no longer
     // resumable — `gone`/ended work — where `sendReply`'s ordinary
     // comment-then-dispatch chain would otherwise dispatch into finished work.
-    // Same {ok,status,data} + callback routing as the full chain, minus the
-    // dispatch half; reached only on the issue-bound path (an issueless run
-    // returned above, and has no comment to record against).
+    //
+    // This check MUST precede the `issueless` dispatch-only path below: an
+    // issueless non-resumable answer has no issue to record a comment against,
+    // but it must still never dispatch `followUpTo` into finished work. (An
+    // issueless run cannot stamp `answered` through the comment route either —
+    // that pre-existing half is shared with the Rulings tab and out of scope.)
     if (opts.recordOnly) {
+      if (opts.issueless) {
+        onCommentFailed(new Error('cannot record an answer with no linked issue'));
+        return Promise.resolve();
+      }
       return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
         },
         function (commentErr) { onCommentFailed(commentErr); }
+      ).catch(function () {});
+    }
+
+    if (opts.issueless) {
+      return doDispatch(opts, prompt).then(
+        function () { onDispatchOk(); },
+        function (dispatchErr) { onDispatchFailed(dispatchErr); }
       ).catch(function () {});
     }
 
@@ -1057,7 +1064,177 @@ window.ReplyDelivery = (function () {
     });
   }
 
-  return { deliverReply: deliverReply, postComment: postComment, dismissRuling: dismissRuling, errorFromResult: errorFromResult };
+  // ── LIN-3252 F1: shared ruling-answer effect delivery ─────────────────────
+  //
+  // Both the pinned question card (public/session.js) and the Rulings tab
+  // (public/observation.js) answer an unanswered ruling row, and the row's
+  // resolved `effect` (lib/unanswered-decisions.js's resolveEffect) decides
+  // what actually happens. This is the ONE implementation of the non-resume
+  // effects, so neither surface can drift:
+  //
+  //   resume   → the ordinary comment + follow-up resume (`deliverReply`)
+  //   record   → record only: the durable comment/stamp, honoring the
+  //              declared `on_answer.record_on` target exactly as the Rulings
+  //              tab does (`resolveRecordTarget`), never a dispatch
+  //   dispatch → comment first, then a FRESH issue-scoped run through the
+  //              shared `window.dispatchPrompt` — the Rulings tab's gone path
+  //
+  // DOM-free, same discipline as deliverReply: every caller supplies its own
+  // UI through the handlers.
+  var RECORD_TARGET_TERMINAL_TYPES = ['completed', 'canceled', 'duplicate'];
+  var RECORD_TARGET_OUTSIDE_NOTE = 'outside the checked neighbourhood';
+  var RECORD_TARGET_TERMINAL_NOTE = 'the declared target is already closed';
+  var RULING_DISPATCH_PROMPT_NAME = 'Ruling reply';
+  var RULING_DISPATCH_KIND = 'custom';
+  var RULING_COMPOSED_RUN_MARKER = 'ruling-composed-run';
+
+  function hydrateUrlFor(pageUrlKey, wsUrlKey, identifier) {
+    return '/workspace/' + encodeURIComponent(pageUrlKey) + '/api/dashboard/hydrate/' + encodeURIComponent(wsUrlKey) + '/' + encodeURIComponent(identifier);
+  }
+
+  // Pure, advisory resolution of a declared `on_answer.record_on` target
+  // (LIN-2775 Area 6), moved here verbatim from observation.js so both
+  // surfaces share one resolver. Fails safe in every unresolved case: no
+  // recordOn, the target absent from the neighbourhood, found but itself
+  // terminal, or the hydrate failed — all return the ANCHOR as the target.
+  function resolveRecordTarget(anchor, recordOn, hydrateResult) {
+    var fallback = {
+      issueId: anchor && anchor.issueId ? anchor.issueId : null,
+      issueIdentifier: anchor && anchor.issueIdentifier ? anchor.issueIdentifier : null,
+      note: null
+    };
+    if (!recordOn) return fallback;
+
+    var neighborhood = hydrateResult && hydrateResult.hydrated ? hydrateResult.neighborhood : null;
+    var candidates = neighborhood
+      ? [neighborhood.parent].concat(neighborhood.siblings || [], neighborhood.children || [], neighborhood.cousins || []).filter(Boolean)
+      : [];
+    var match = null;
+    for (var i = 0; i < candidates.length; i++) {
+      if (candidates[i].identifier === recordOn) { match = candidates[i]; break; }
+    }
+
+    if (!match) return { issueId: fallback.issueId, issueIdentifier: fallback.issueIdentifier, note: RECORD_TARGET_OUTSIDE_NOTE };
+    if (match.state && RECORD_TARGET_TERMINAL_TYPES.indexOf(match.state.type) !== -1) {
+      return { issueId: fallback.issueId, issueIdentifier: fallback.issueIdentifier, note: RECORD_TARGET_TERMINAL_NOTE };
+    }
+    return { issueId: match.id || null, issueIdentifier: match.identifier, note: null };
+  }
+
+  // Compose the real agent brief for a `dispatch`-effect ruling answer
+  // (LIN-2775 Area 7): the decision question, the chosen answer, and the
+  // decisionCase recap — never the raw reply text as the agent's whole brief.
+  function composeDispatchPrompt(row, chosenAnswer) {
+    var question = row && row.decision && row.decision.question;
+    var caseText = row && Array.isArray(row.decisionCase) ? row.decisionCase.join(' ').trim() : '';
+    var parts = [];
+    if (question) parts.push('Decision: ' + question);
+    parts.push('Chosen answer: ' + chosenAnswer);
+    if (caseText) parts.push('Context:\n' + caseText);
+    return parts.join('\n\n');
+  }
+
+  /**
+   * `record` effect: the durable comment/stamp only, honoring the declared
+   * `on_answer.record_on` target. Never dispatches. `handlers.onDispatchOk`
+   * receives the record-note (record_on fallback / retarget, plus any
+   * `opts.downgradeNote`); `handlers.onNoTarget` fires when there is no issue
+   * to record against; `handlers.onCommentFailed` on a failed/refused write.
+   *
+   * @param {Object} opts  {urlKey, pageUrlKey?, issueId?, issueIdentifier?,
+   *                        decisionLoopId?, decisionId?, optionId?, recordOn?,
+   *                        prompt, downgradeNote?}
+   */
+  function deliverRulingRecord(opts, handlers) {
+    var anchor = { issueId: opts.issueId || null, issueIdentifier: opts.issueIdentifier || null };
+    var recordOn = opts.recordOn || null;
+    var pageUrlKey = opts.pageUrlKey || opts.urlKey;
+    var targetContext = (recordOn && opts.issueIdentifier)
+      ? window.api(hydrateUrlFor(pageUrlKey, opts.urlKey, opts.issueIdentifier), { on401: false })
+          .catch(function () { return { hydrated: false }; })
+      : Promise.resolve(null);
+
+    return targetContext
+      .then(function (hydrateResult) { return resolveRecordTarget(anchor, recordOn, hydrateResult); })
+      .then(function (resolved) {
+        var targetId = resolved.issueId || resolved.issueIdentifier;
+        if (!targetId) {
+          if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
+          return;
+        }
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId })
+          .then(function (commentResult) {
+            if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
+            var recordOnNote = resolved.note
+              ? resolved.note + ' — recorded to ' + opts.issueIdentifier
+              : (resolved.issueIdentifier && resolved.issueIdentifier !== opts.issueIdentifier ? 'to ' + resolved.issueIdentifier : null);
+            handlers.onDispatchOk([opts.downgradeNote, recordOnNote].filter(Boolean).join('; ') || null);
+          });
+      })
+      .catch(function (err) { handlers.onCommentFailed(err); });
+  }
+
+  /**
+   * `dispatch` effect: comment-first (stamping the decision), then a FRESH
+   * issue-scoped run through `window.dispatchPrompt` — the Rulings tab's gone
+   * path. `handlers.onPartialFailure(err, retry)` fires when the comment
+   * landed but the run could not start; `retry` re-fires ONLY the run.
+   *
+   * @param {Object} opts  {urlKey, issueId?, issueIdentifier, target?,
+   *                        decisionLoopId?, decisionId?, optionId?, prompt,
+   *                        dispatchPrompt}
+   */
+  function deliverRulingDispatch(opts, handlers) {
+    return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId })
+      .then(function (commentResult) {
+        if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
+        function startRun() {
+          return window.dispatchPrompt({
+            urlKey: opts.urlKey,
+            prompt: opts.dispatchPrompt,
+            promptName: RULING_DISPATCH_PROMPT_NAME,
+            kind: RULING_DISPATCH_KIND,
+            composedRunMarker: RULING_COMPOSED_RUN_MARKER,
+            issue: { id: opts.issueId || opts.issueIdentifier, identifier: opts.issueIdentifier },
+            target: opts.target || 'cli'
+          });
+        }
+        return startRun().then(
+          function () { handlers.onDispatchOk(); },
+          function (dispatchErr) { handlers.onPartialFailure(dispatchErr, startRun); }
+        );
+      }, function (commentErr) { handlers.onCommentFailed(commentErr); })
+      .catch(function () {});
+  }
+
+  /**
+   * Answer a ruling row by its resolved `effect` — the single entry point both
+   * the run-page card and the Rulings tab use. `resume` (or an absent/unknown
+   * effect) is the ordinary comment + follow-up chain; `record` and `dispatch`
+   * route to the helpers above.
+   */
+  function deliverRulingAnswer(opts, handlers) {
+    if (opts.effect === 'record') return deliverRulingRecord(opts, handlers);
+    if (opts.effect === 'dispatch') return deliverRulingDispatch(opts, handlers);
+    return deliverReply(opts, opts.prompt, handlers);
+  }
+
+  return {
+    deliverReply: deliverReply,
+    postComment: postComment,
+    dismissRuling: dismissRuling,
+    deliverRulingAnswer: deliverRulingAnswer,
+    deliverRulingRecord: deliverRulingRecord,
+    deliverRulingDispatch: deliverRulingDispatch,
+    resolveRecordTarget: resolveRecordTarget,
+    composeDispatchPrompt: composeDispatchPrompt,
+    RECORD_TARGET_OUTSIDE_NOTE: RECORD_TARGET_OUTSIDE_NOTE,
+    RECORD_TARGET_TERMINAL_NOTE: RECORD_TARGET_TERMINAL_NOTE,
+    RULING_DISPATCH_PROMPT_NAME: RULING_DISPATCH_PROMPT_NAME,
+    RULING_DISPATCH_KIND: RULING_DISPATCH_KIND,
+    RULING_COMPOSED_RUN_MARKER: RULING_COMPOSED_RUN_MARKER,
+    errorFromResult: errorFromResult
+  };
 })();
 
 // =============================================================================

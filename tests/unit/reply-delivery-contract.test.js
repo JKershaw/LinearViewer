@@ -729,3 +729,175 @@ test('the helper block is DOM-free — no document.* or window.ChatUI reference,
   assert.doesNotMatch(block, /document\./, 'no DOM access inside the helper');
   assert.doesNotMatch(block, /ChatUI/, 'no window.ChatUI reference inside the helper');
 });
+
+// ── LIN-3252 F1: answering a ruling row by its resolved `effect` ────────────
+// One shared implementation (`deliverRulingAnswer`) is used by both the
+// run-page card and the Rulings tab. These tests pin each effect branch —
+// especially `gone`+`dispatch`, which previously had no coverage at any level.
+
+test('deliverRulingAnswer surface: exported with the shared effect helpers', () => {
+  const { window } = makeSandbox(() => { throw new Error('no fetch expected'); });
+  assert.equal(typeof window.ReplyDelivery.deliverRulingAnswer, 'function');
+  assert.equal(typeof window.ReplyDelivery.deliverRulingRecord, 'function');
+  assert.equal(typeof window.ReplyDelivery.deliverRulingDispatch, 'function');
+  assert.equal(typeof window.ReplyDelivery.resolveRecordTarget, 'function');
+  assert.equal(typeof window.ReplyDelivery.composeDispatchPrompt, 'function');
+});
+
+test('F2: recordOnly takes effect BEFORE the issueless dispatch-only path — an issueless non-resumable answer never dispatches', async () => {
+  const { window, calls } = makeSandbox(() => { throw new Error('recordOnly+issueless must make no fetch at all'); });
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueless: true, followUpTo: 'lp', target: 'cli', recordOnly: true },
+    'the answer',
+    handlers
+  );
+
+  assert.equal(calls.length, 0, 'no dispatch into finished work, and no bogus comment against a null issue');
+  assert.equal(fired.onCommentFailed.length, 1, 'refused honestly when there is no issue to record against');
+  assert.equal(fired.onCommentFailed[0].message, 'cannot record an answer with no linked issue');
+  assert.equal(fired.onDispatchFailed.length, 0);
+  assert.equal(fired.onDispatchOk.length, 0);
+});
+
+test('deliverRulingAnswer effect=dispatch (gone default): comment first, then a FRESH composed run — never the follow-up dispatch shape', async () => {
+  const commentBodies = [];
+  const { window, calls } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
+    throw new Error('a dispatch effect must not use the follow-up /api/dispatch call: ' + url);
+  });
+  let dispatched = null;
+  window.dispatchPrompt = async (opts) => { dispatched = opts; return { id: 'run-1' }; };
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'dispatch', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', target: 'web', decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1', prompt: 'the answer', dispatchPrompt: 'Decision: Q\n\nChosen answer: the answer' },
+    handlers
+  );
+
+  assert.equal(calls.filter(c => String(c.url).includes('/api/comments/')).length, 1, 'exactly one comment write');
+  assert.equal(calls.length, 1, 'the fresh run goes through window.dispatchPrompt, not a raw /api/dispatch fetch');
+  assert.match(commentBodies[0].url, /\/api\/comments\/anchor-1$/);
+  assert.deepEqual(commentBodies[0].body, { body: 'the answer', decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1' });
+  assert.ok(dispatched, 'a fresh run was started');
+  assert.equal(dispatched.prompt, 'Decision: Q\n\nChosen answer: the answer', 'the agent brief is the composed prompt, never the raw comment text');
+  assert.equal(dispatched.promptName, window.ReplyDelivery.RULING_DISPATCH_PROMPT_NAME);
+  assert.equal(dispatched.kind, 'custom');
+  assert.equal(dispatched.composedRunMarker, window.ReplyDelivery.RULING_COMPOSED_RUN_MARKER);
+  assert.deepEqual({ ...dispatched.issue }, { id: 'anchor-1', identifier: 'LIN-ANCHOR' });
+  assert.equal(dispatched.target, 'web');
+  assert.equal(dispatched.followUpTo, undefined, 'a fresh run is NOT a follow-up into the finished loop');
+  assert.equal(fired.onDispatchOk.length, 1);
+  assert.equal(fired.onCommentFailed.length, 0);
+  assert.equal(fired.onPartialFailure.length, 0);
+});
+
+test('deliverRulingAnswer effect=dispatch: comment lands but the fresh run fails — durable partial failure with a retry that re-fires ONLY the run', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    throw new Error('unexpected fetch: ' + url);
+  });
+  let dispatchCalls = 0;
+  window.dispatchPrompt = async () => {
+    dispatchCalls++;
+    if (dispatchCalls === 1) throw new Error('queue unavailable');
+    return { id: 'run-1' };
+  };
+  const { fired, handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'dispatch', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', target: 'cli', decisionLoopId: 'lp', decisionId: 'd-gone', prompt: 'the answer', dispatchPrompt: 'composed' },
+    handlers
+  );
+
+  assert.equal(fired.onPartialFailure.length, 1, 'the answer is durable; only the run failed');
+  assert.equal(calls.length, 1, 'the comment is written exactly once');
+  await fired.onPartialFailure[0].retry();
+  assert.equal(dispatchCalls, 2, 'retry re-fires the run');
+  assert.equal(calls.length, 1, 'retry never re-posts the comment');
+});
+
+test('deliverRulingAnswer effect=record: comment only (no dispatch), honoring a declared record_on target', async () => {
+  const commentBodies = [];
+  const hydrateHits = [];
+  const { window, calls } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) { hydrateHits.push(String(url)); return jsonResponse(true, 200, { hydrated: true, neighborhood: { parent: null, siblings: [{ id: 'sib-id', identifier: 'LIN-SIB', state: { type: 'started' } }], children: [], cousins: [] } }); }
+    if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
+    throw new Error('a record effect must never start a run: ' + url);
+  });
+  window.dispatchPrompt = async () => { throw new Error('record effect must never dispatch'); };
+  const notes = [];
+  const handlers = {
+    onCommentFailed: () => { throw new Error('comment should have succeeded'); },
+    onDispatchFailed: () => { throw new Error('no dispatch path here'); },
+    onPartialFailure: () => { throw new Error('no dispatch path here'); },
+    onDispatchOk: (note) => notes.push(note || null)
+  };
+
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'record', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1', recordOn: 'LIN-SIB', prompt: 'the answer' },
+    handlers
+  );
+
+  assert.equal(hydrateHits.length, 1, 'the declared record_on target is resolved through the shared hydrate call');
+  assert.equal(commentBodies.length, 1);
+  assert.match(commentBodies[0].url, /\/api\/comments\/sib-id$/, 'the answer is recorded to the declared target, not the anchor');
+  assert.deepEqual(commentBodies[0].body, { body: 'the answer', decisionLoopId: 'lp', decisionId: 'd-gone', optionId: 'opt-1' });
+  assert.deepEqual(notes, ['to LIN-SIB']);
+  assert.equal(calls.filter(c => String(c.url).includes('/api/dispatch')).length, 0);
+});
+
+test('deliverRulingAnswer effect=record: no record_on → records to the anchor with no hydrate call', async () => {
+  const commentBodies = [];
+  const { window, calls } = makeSandbox((url, opts) => {
+    if (String(url).includes('/api/dashboard/hydrate/')) throw new Error('no record_on means no hydrate call');
+    if (String(url).includes('/api/comments/')) { commentBodies.push({ url: String(url), body: JSON.parse(opts.body) }); return jsonResponse(true, 201, { success: true }); }
+    throw new Error('unexpected fetch: ' + url);
+  });
+  const handlers = { onCommentFailed: () => {}, onDispatchFailed: () => {}, onPartialFailure: () => {}, onDispatchOk: () => {} };
+
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'record', urlKey: 'w', issueId: 'anchor-1', issueIdentifier: 'LIN-ANCHOR', decisionLoopId: 'lp', decisionId: 'd-gone', prompt: 'the answer' },
+    handlers
+  );
+
+  assert.equal(calls.length, 1);
+  assert.match(commentBodies[0].url, /\/api\/comments\/anchor-1$/);
+});
+
+test('deliverRulingAnswer effect=record: no issue at all → onNoTarget, no comment, no dispatch', async () => {
+  const { window, calls } = makeSandbox(() => { throw new Error('an anchorless record must make no fetch'); });
+  let noTarget = 0;
+  const handlers = { onCommentFailed: () => {}, onDispatchFailed: () => {}, onPartialFailure: () => {}, onDispatchOk: () => {}, onNoTarget: () => { noTarget++; } };
+
+  await window.ReplyDelivery.deliverRulingAnswer(
+    { effect: 'record', urlKey: 'w', issueId: null, issueIdentifier: null, decisionLoopId: 'lp', decisionId: 'd-gone', prompt: 'the answer' },
+    handlers
+  );
+
+  assert.equal(noTarget, 1);
+  assert.equal(calls.length, 0);
+});
+
+test('deliverRulingAnswer effect=resume (and an absent effect): the ordinary comment + follow-up chain', async () => {
+  for (const effect of ['resume', undefined]) {
+    const { window, calls } = makeSandbox((url) => {
+      if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+      if (String(url).includes('/api/dispatch')) return jsonResponse(true, 200, { success: true });
+      throw new Error('unexpected fetch: ' + url);
+    });
+    const { fired, handlers } = trackedHandlers();
+
+    await window.ReplyDelivery.deliverRulingAnswer(
+      { effect, urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli', force: true, prompt: 'the answer' },
+      handlers
+    );
+
+    assert.equal(calls.length, 2, `effect=${effect}: comment then follow-up dispatch`);
+    assert.match(calls[0].url, /\/api\/comments\//);
+    assert.match(calls[1].url, /\/api\/dispatch$/);
+    assert.equal(fired.onDispatchOk.length, 1);
+  }
+});
+

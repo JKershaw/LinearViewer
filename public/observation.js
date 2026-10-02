@@ -3042,96 +3042,25 @@ function hydrateUrl(pageUrlKey, wsUrlKey, identifier) {
   return `/workspace/${encodeURIComponent(pageUrlKey)}/api/dashboard/hydrate/${encodeURIComponent(wsUrlKey)}/${encodeURIComponent(identifier)}`;
 }
 
-// Client-side, advisory-only resolution of a declared `on_answer.record_on`
-// target (LIN-2775 Area 6). Pure — takes the widened hydrate route's already-
-// fetched response for the ANCHOR issue, never fetches anything itself, so it
-// is directly unit-testable. Fails safe in every unresolved case (no
-// `recordOn` declared, the target not found in the neighbourhood, found but
-// itself terminal, or the hydrate call failed/unavailable): all of those
-// return the ANCHOR as the target. Server-side guards are unchanged — this
-// only decides what the comment call below composes, never gates it.
-//
-// The note text deliberately does not say record_on was INVALID — a
-// legitimate sibling can simply sit beyond SIBLING_CAP/COUSIN_CAP
-// (lib/openrouter.js) and never appear in the neighbourhood at all, so
-// "outside the checked neighbourhood" is honest where "invalid target" would
-// not be.
-const RECORD_TARGET_OUTSIDE_NOTE = 'outside the checked neighbourhood';
-// A SEPARATE note for the found-but-terminal case (beat 3 correction): the
-// declared target WAS in the checked neighbourhood, so reusing the
-// not-found note here would itself be the exact kind of false claim this
-// ticket exists to eliminate. Same non-invalidity-implying register as the
-// note above — the target isn't wrong, it's just already closed.
-const RECORD_TARGET_TERMINAL_NOTE = 'the declared target is already closed';
-
+// LIN-3252 F1: the pure record_on resolver and the composed-dispatch-prompt
+// builder now live in the ONE shared reply-delivery surface
+// (`window.ReplyDelivery`, public/common.js) so the run-page card and this
+// Rulings tab use the same implementation. These thin wrappers keep this
+// file's `module.exports` test seams (`resolveRecordTarget`,
+// `composeDispatchPrompt`) resolving to the shared code, read at CALL time so
+// a sandbox without common.js still loads this script.
 function resolveRecordTarget(anchor, recordOn, hydrateResult) {
-  const fallback = { issueId: anchor?.issueId || null, issueIdentifier: anchor?.issueIdentifier || null, note: null };
-  if (!recordOn) return fallback;
-
-  const neighborhood = hydrateResult && hydrateResult.hydrated ? hydrateResult.neighborhood : null;
-  const candidates = neighborhood
-    ? [neighborhood.parent, ...(neighborhood.siblings || []), ...(neighborhood.children || []), ...(neighborhood.cousins || [])].filter(Boolean)
-    : [];
-  const match = candidates.find(c => c.identifier === recordOn);
-
-  if (!match) return { ...fallback, note: RECORD_TARGET_OUTSIDE_NOTE };
-  if (match.state && RECORD_TARGET_TERMINAL_TYPES.includes(match.state.type)) {
-    return { ...fallback, note: RECORD_TARGET_TERMINAL_NOTE };
-  }
-  // The rendered target identifier is a stated, un-eliminated residual's
-  // entire mitigation (S15): an in-neighbourhood-but-wrong sibling can still
-  // receive the human's words if the agent names it, so the caller MUST
-  // surface `issueIdentifier` back to the operator, not silently swallow it.
-  return { issueId: match.id || null, issueIdentifier: match.identifier, note: null };
+  return window.ReplyDelivery.resolveRecordTarget(anchor, recordOn, hydrateResult);
 }
 
-// LIN-2775 Area 7 — this ticket's headline defect. `kind` is
-// DISPATCH_KIND_DEFAULT (lib/prompt-templates.js) — 'custom' — since nothing
-// more specific is derivable from a ruling row today: `anchor`
-// (lib/unanswered-decisions.js) carries no promptName/kind from the loop
-// that raised the decision, only loopId/issueId/issueIdentifier/
-// workspaceUrlKey/target/followUpTo.
-const RULING_DISPATCH_PROMPT_NAME = 'Ruling reply';
-const RULING_DISPATCH_KIND = 'custom';
+function composeDispatchPrompt(row, chosenAnswer) {
+  return window.ReplyDelivery.composeDispatchPrompt(row, chosenAnswer);
+}
 
-// LIN-2775 Area 8 — the scoped structural marker threaded through a
-// composed-run dispatch call specifically. Presence (not any particular
-// string content) activates routes/dispatch.js's server-side terminal-
-// anchor guard; every other client-side dispatch surface never sends this
-// field and is completely unaffected. Deliberately NOT named/valued
-// "terminal" — that already names an unrelated opaque dispatch field
-// (LIN-2452, the runner's terminal-emulator driver).
-const RULING_COMPOSED_RUN_MARKER = 'ruling-composed-run';
-
-// Press-time downgrade notes (LIN-2775 Area 8) — the SAME visible-note
-// pattern Area 6 established (RECORD_TARGET_OUTSIDE_NOTE/
-// RECORD_TARGET_TERMINAL_NOTE above): honest about WHY, never implying the
-// operator's answer itself was invalid.
+// Press-time downgrade notes (LIN-2775 Area 8): honest about WHY, never
+// implying the operator's answer itself was invalid.
 const PRESS_TIME_DOWNGRADE_NOTE = 'the linked task is now closed — recorded instead of starting a run';
 const PRESS_TIME_HYDRATION_FAILURE_NOTE = 'could not confirm the linked task is still open — recorded instead of starting a run';
-
-// Compose a REAL agent brief for a `dispatch`-effect ruling reply, copying
-// public/next-run.js's explicit-promptName/kind `dispatchPrompt` pattern.
-// Pure — no DOM/network — so directly unit-testable. Before this, the `gone`
-// branch dispatched the RAW reply text as the agent's entire prompt: tapping
-// "preserve" launched an agent whose whole brief was the word "preserve".
-//
-// `chosenAnswer` is the pressed option's LABEL or the operator's free text —
-// exactly what `deliverRulingReply`'s own `prompt` parameter already
-// carries, so it is passed straight through, never re-derived. `row`
-// supplies the decision's `question` and the `decisionCase` recap the row
-// already renders (`.obs-ruling-case`) — the FULL case here, not that
-// UI's DECISION_EXCERPT_CHARS-bounded preview: a screen-space excerpt is
-// the wrong budget for what an agent actually needs to act correctly.
-function composeDispatchPrompt(row, chosenAnswer) {
-  const question = row?.decision?.question;
-  const caseText = Array.isArray(row?.decisionCase) ? row.decisionCase.join(' ').trim() : '';
-  const parts = [];
-  if (question) parts.push(`Decision: ${question}`);
-  parts.push(`Chosen answer: ${chosenAnswer}`);
-  if (caseText) parts.push(`Context:\n${caseText}`);
-  return parts.join('\n\n');
-}
 
 // Rulings-row press handler (LIN-1728 Phase 4). Per-row `canReply` gate (the
 // caller above already checks it — this is the second, structural guard);
@@ -3402,49 +3331,22 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
     // trigger, is prepended to the record_on note (if any) rather than
     // replacing it: a press-time downgrade AND a record_on fallback can both
     // be true of the same delivery, and both are worth telling the operator.
-    const deliverAsRecord = (downgradeNote) => {
-      const recordOn = decision?.on_answer?.record_on || null;
-      const targetContext = recordOn
-        ? window.api(hydrateUrl(pageUrlKey, targetUrlKey, anchor.issueIdentifier), { on401: false })
-            .catch(() => ({ hydrated: false }))
-        : Promise.resolve(null);
-
-      return targetContext
-        .then((hydrateResult) => resolveRecordTarget(anchor, recordOn, hydrateResult))
-        .then((resolved) => {
-          const targetId = resolved.issueId || resolved.issueIdentifier;
-          // T1: an anchorless anchor (no issueId/issueIdentifier of its own,
-          // and no record_on match) resolves `targetId` to null here — the
-          // `!anchor.issueIdentifier` refusal below only guards the dispatch
-          // branch, so without this check a null-anchored 'record' effect
-          // would reach `postComment` with a null target and fail loudly
-          // against `/api/comments/null`.
-          if (!targetId) {
-            console.error('Ruling reply: no issue to record a comment against, cannot reply for an anchorless run');
-            restore();
-            setFeedback('cannot record a reply: no linked issue', true);
-            return Promise.resolve();
-          }
-          // `optionId` (LIN-2792 round 3, F2): this literal is one of the
-          // three silently-dropped call sites the delivery-pipeline thread
-          // found — a fresh `{decisionLoopId, decisionId}` object built
-          // locally rather than reusing a wider one.
-          return window.ReplyDelivery.postComment(targetUrlKey, targetId, prompt, { decisionLoopId, decisionId, optionId })
-            .then((commentResult) => {
-              if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
-              // The resolved target identifier is shown to the operator here
-              // — the rendered identifier IS the mitigation for the stated,
-              // un-eliminated residual (S15): an in-neighbourhood-but-wrong
-              // sibling can still receive the human's words if the agent
-              // named it.
-              const recordOnNote = resolved.note
-                ? `${resolved.note} — recorded to ${anchor.issueIdentifier}`
-                : (resolved.issueIdentifier && resolved.issueIdentifier !== anchor.issueIdentifier ? `to ${resolved.issueIdentifier}` : null);
-              onDelivered([downgradeNote, recordOnNote].filter(Boolean).join('; ') || null);
-            });
-        })
-        .catch((err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); });
-    };
+    const deliverAsRecord = (downgradeNote) => window.ReplyDelivery.deliverRulingRecord({
+      urlKey: targetUrlKey,
+      pageUrlKey,
+      issueId: anchor.issueId || null,
+      issueIdentifier: anchor.issueIdentifier || null,
+      decisionLoopId,
+      decisionId,
+      optionId,
+      recordOn: decision?.on_answer?.record_on || null,
+      prompt,
+      downgradeNote
+    }, {
+      onCommentFailed: (err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
+      onNoTarget: () => { console.error('Ruling reply: no issue to record a comment against, cannot reply for an anchorless run'); restore(); setFeedback('cannot record a reply: no linked issue', true); },
+      onDispatchOk: onDelivered
+    });
 
     if (effectiveEffect === 'record') {
       return deliverAsRecord(null);
@@ -3490,43 +3392,26 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
           return deliverAsRecord(PRESS_TIME_DOWNGRADE_NOTE);
         }
 
-        // Anchor confirmed non-terminal at press time — proceed to the
-        // ordinary dispatch path, unchanged from Area 7 except for the new
-        // `composedRunMarker` (Area 8): the scoped signal that activates
-        // routes/dispatch.js's server-side terminal-anchor guard for THIS
-        // call specifically, never inferred from `kind`.
-        //
-        // `optionId` (LIN-2792 round 3, F2): the second of the three
-        // silently-dropped call sites.
-        return window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, { decisionLoopId, decisionId, optionId })
-          .then((commentResult) => {
-            if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
-            // Deliberately NOT window.ReplyDelivery.deliverReply — that call's
-            // built-in dispatch is scoped to the follow-up shape only (see the
-            // LIN-2200 banner in common.js); a `gone` reply starts a FRESH
-            // issue-scoped dispatch instead, so it composes its own comment-then-
-            // dispatch chain here, using the SAME shared partial-failure handler
-            // as the `resumable` branch above (review F2) rather than the bare
-            // "reply failed" catch this branch had before.
-            //
-            // LIN-2775 Area 7: the DISPATCHED prompt is the composed brief
-            // (question + chosen answer + decisionCase recap), never the raw
-            // `prompt` the comment above just posted — the comment is for a
-            // human reading the issue thread, the dispatch prompt is the
-            // agent's brief, and conflating the two was the ticket's headline
-            // defect (a bare option label as an agent's entire brief).
-            const startRun = () => window.dispatchPrompt({
-              urlKey: targetUrlKey,
-              prompt: composeDispatchPrompt(row, prompt),
-              promptName: RULING_DISPATCH_PROMPT_NAME,
-              kind: RULING_DISPATCH_KIND,
-              composedRunMarker: RULING_COMPOSED_RUN_MARKER,
-              issue: { id: anchor.issueId || anchor.issueIdentifier, identifier: anchor.issueIdentifier },
-              target: anchor.target || 'cli'
-            });
-            return startRun().then(onDelivered, (dispatchErr) => makePartialFailureHandler('start a run')(dispatchErr, startRun));
-          })
-          .catch((err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); });
+        // LIN-3252 F1: the fresh-run delivery is the ONE shared helper
+        // (`window.ReplyDelivery.deliverRulingDispatch`) the run-page card
+        // also uses — comment first (stamping the decision), then the
+        // composed fresh issue-scoped dispatch, with the SAME partial-failure
+        // retry the `resumable` branch above has.
+        return window.ReplyDelivery.deliverRulingDispatch({
+          urlKey: targetUrlKey,
+          issueId: anchor.issueId || anchor.issueIdentifier,
+          issueIdentifier: anchor.issueIdentifier,
+          target: anchor.target || 'cli',
+          decisionLoopId,
+          decisionId,
+          optionId,
+          prompt,
+          dispatchPrompt: composeDispatchPrompt(row, prompt)
+        }, {
+          onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
+          onPartialFailure: makePartialFailureHandler('start a run'),
+          onDispatchOk: onDelivered
+        });
       });
   }
 
@@ -4506,15 +4391,14 @@ if (typeof module !== 'undefined' && module.exports) {
     // both renderRulings and renderRulingRow, and the flip control's
     // re-render-in-place behaviour is only reachable through the latter.
     rulingEffectOverride, renderRulingRow,
-    // LIN-2775 Area 6: the pure record_on resolver, directly unit-testable
-    // against a hand-built hydrate-route response with no DOM/network.
-    resolveRecordTarget, RECORD_TARGET_OUTSIDE_NOTE, RECORD_TARGET_TERMINAL_NOTE,
-    // LIN-2775 Area 7: the composed-dispatch-prompt seam, directly
-    // unit-testable against the headline "raw reply text as entire brief"
-    // regression.
-    composeDispatchPrompt, RULING_DISPATCH_PROMPT_NAME, RULING_DISPATCH_KIND,
+    // LIN-2775 Area 6 / LIN-3252 F1: the pure record_on resolver (now the
+    // shared window.ReplyDelivery implementation) and the composed-dispatch
+    // prompt seam, directly unit-testable against a hand-built hydrate-route
+    // response with no DOM/network; the note constants and dispatch markers
+    // live on window.ReplyDelivery now that both surfaces share them.
+    resolveRecordTarget, composeDispatchPrompt,
     // LIN-2775 Area 8: the press-time check seam.
-    RULING_COMPOSED_RUN_MARKER, PRESS_TIME_DOWNGRADE_NOTE, PRESS_TIME_HYDRATION_FAILURE_NOTE, hydrateUrl,
+    PRESS_TIME_DOWNGRADE_NOTE, PRESS_TIME_HYDRATION_FAILURE_NOTE, hydrateUrl,
     // LIN-2444 Phase 3/4: the extracted dismiss-request core (also driven by
     // Agree), the Agree/Keep handlers themselves, and the widened
     // control-disable set — each unit-testable without simulating a DOM click.

@@ -104,9 +104,20 @@
     function onDispatchOk() {
       appendYouBubble(thread, prompt);
       textarea.value = '';
-      feedback.textContent = opts.recordOnly ? 'recorded on the task' : queuedCopy(!opts.issueless);
+      // The success copy matches what actually happened (LIN-3252 F1): a
+      // resume queues a follow-up, a `record` effect only records, and a
+      // `dispatch` effect starts a fresh run.
+      if (opts.effect === 'record') {
+        feedback.textContent = 'recorded on the task';
+        btn.textContent = 'answered ✓';
+      } else if (opts.effect === 'dispatch') {
+        feedback.textContent = 'started a new run';
+        btn.textContent = 'started ✓';
+      } else {
+        feedback.textContent = queuedCopy(!opts.issueless);
+        btn.textContent = 'queued ✓';
+      }
       feedback.className = 'sess-reply-feedback';
-      btn.textContent = opts.recordOnly ? 'answered ✓' : 'queued ✓';
     }
 
     // Comment-write failure and issueless-dispatch failure are two distinct
@@ -137,9 +148,10 @@
     // window.ReplyDelivery's own closure over this same opts/prompt — not a
     // caller-side reimplementation of postDispatch.
     function onPartialFailure(dispatchErr, retryDispatch) {
+      var deliveryVerb = opts.effect === 'dispatch' ? 'start a run' : 'deliver to the session';
       appendYouBubble(thread, prompt);
       textarea.value = '';
-      feedback.textContent = 'Recorded on the task. Could not deliver to the session: ' + dispatchErr.message + '. ';
+      feedback.textContent = 'Recorded on the task. Could not ' + deliveryVerb + ': ' + dispatchErr.message + '. ';
       feedback.className = 'sess-reply-feedback error';
       var retryBtn = document.createElement('button');
       retryBtn.type = 'button';
@@ -150,10 +162,10 @@
         feedback.textContent = 'retrying delivery…';
         feedback.className = 'sess-reply-feedback';
         retryDispatch().then(function () {
-          feedback.textContent = queuedCopy(true);
+          feedback.textContent = opts.effect === 'dispatch' ? 'started a new run' : queuedCopy(true);
           feedback.className = 'sess-reply-feedback';
         }).catch(function (e2) {
-          feedback.textContent = 'Still could not deliver: ' + e2.message + '. ';
+          feedback.textContent = 'Still could not ' + deliveryVerb + ': ' + e2.message + '. ';
           feedback.className = 'sess-reply-feedback error';
           feedback.appendChild(retryBtn);
           retryBtn.disabled = false;
@@ -173,9 +185,16 @@
     // issue.id+issue.identifier (this box only ever carries one) and fires
     // window.updateQueueBadge, a UI side effect this reply flow must not own.
     // Full reasoning: the banner note on window.ReplyDelivery (common.js).
-    window.ReplyDelivery.deliverReply(opts, prompt, {
+    //
+    // LIN-3252 F1: the answer is delivered by its resolved `effect` through
+    // the ONE shared helper both this card and the Rulings tab use — resume
+    // (comment + follow-up), record (comment only, honoring record_on), or
+    // dispatch (comment then a fresh run). Never a card-local parallel path.
+    opts.prompt = prompt;
+    window.ReplyDelivery.deliverRulingAnswer(opts, {
       onCommentFailed: onDispatchFailed,
       onDispatchFailed: onDispatchFailed,
+      onNoTarget: function () { onDispatchFailed(new Error('no linked issue to record against')); },
       onPartialFailure: onPartialFailure,
       onDispatchOk: onDispatchOk
     }).then(restoreButton);
@@ -402,6 +421,9 @@
         var thread = card.querySelector('[data-testid="session-question-card-thread"]');
         var issueIdentifier = card.dataset.issueIdentifier || '';
         var decisionId = card.dataset.decisionId || null;
+        // LIN-3252 F1: the row's resolved effect, emitted server-side
+        // (lib/render-session.js) exactly as the Rulings tab's row carries it.
+        var effect = card.dataset.effect || 'resume';
 
         var opts = {
           urlKey: card.dataset.urlKey,
@@ -410,16 +432,27 @@
           // Force for a resumable decision (blocked-live or freshly terminal) or
           // a paused session — same force semantics as the per-run box (LIN-1252).
           force: card.dataset.disposition === 'resumable' || card.dataset.sessionWaiting === 'true',
-          // C2 mirror (LIN-3252 S2): a decision whose loop is no longer
-          // resumable (gone/ended) is recorded only — never dispatched into
-          // finished work.
-          recordOnly: card.dataset.disposition !== 'resumable',
+          effect: effect,
+          recordOn: card.dataset.recordOn || null,
           sessionWaiting: card.dataset.sessionWaiting === 'true',
           issueId: card.dataset.issueId || issueIdentifier,
+          issueIdentifier: issueIdentifier,
           issueless: !issueIdentifier,
           decisionLoopId: decisionId ? card.dataset.stampLoopId : null,
           decisionId: decisionId
         };
+
+        // The agent brief for a `dispatch` effect is composed from what the
+        // card already renders (question + "why" chunks) through the SAME
+        // shared composer the Rulings tab uses — never a card-local copy.
+        function composeDispatch(prompt) {
+          var questionEl = card.querySelector('[data-testid="session-question-card-question"]');
+          var chunkEls = card.querySelectorAll('[data-testid="session-question-card-why-chunk"]');
+          var chunks = [];
+          for (var k = 0; k < chunkEls.length; k++) chunks.push(chunkEls[k].textContent || '');
+          var row = { decision: { question: questionEl ? (questionEl.textContent || '') : '' }, decisionCase: chunks };
+          return window.ReplyDelivery.composeDispatchPrompt(row, prompt);
+        }
 
         function submit() {
           var chosen = card.querySelector('.sess-qcard-option-input:checked');
@@ -432,6 +465,7 @@
           }
           opts.optionId = chosen ? (chosen.dataset.optionId || null) : null;
           opts.prompt = prompt;
+          if (effect === 'dispatch') opts.dispatchPrompt = composeDispatch(prompt);
           sendReply(opts, btn, textarea, feedback, thread);
         }
 
@@ -585,4 +619,11 @@
     tickClocks();
     setInterval(tickClocks, 1000);
   });
+
+  // Test seam (observation.js's own pattern): the pinned card's Answer routing
+  // is unit-tested directly, so the effect branch it hands to
+  // window.ReplyDelivery is pinned without a full browser DOM.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { initQuestionCards };
+  }
 })();
