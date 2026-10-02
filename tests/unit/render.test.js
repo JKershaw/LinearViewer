@@ -27,6 +27,75 @@ import '../../lib/providers/github-projects/index.js';
 import '../../lib/providers/jira/index.js';
 
 // =============================================================================
+// renderDisplayLabels Tests
+// =============================================================================
+//
+// `renderDisplayLabels` is still live (Home's Details metadata, the periodicals
+// path). These cases were lost when the dead `renderLabels` combiner was removed
+// (LIN-2944 P1 addendum 7); restored unchanged against `renderDisplayLabels`.
+
+describe('renderDisplayLabels', () => {
+  test('renders regular label as plain text', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: { nodes: [{ name: 'feature' }] },
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), 'feature');
+  });
+
+  test('renders multiple regular labels comma-separated', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: { nodes: [{ name: 'feature' }, { name: 'priority' }] },
+      state: { type: 'completed' }
+    };
+    const result = renderDisplayLabels(issue);
+    assert.ok(result.includes('feature'));
+    assert.ok(result.includes('priority'));
+    assert.strictEqual(result, 'feature, priority');
+  });
+
+  test('returns empty string for no labels', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: { nodes: [] },
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), '');
+  });
+
+  test('handles missing labels gracefully', () => {
+    const issue = {
+      id: 'issue-1',
+      labels: null,
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), '');
+  });
+
+  test('handles an empty labels object', () => {
+    const issue = {
+      id: 'issue-undef',
+      labels: {},
+      state: { type: 'completed' }
+    };
+    assert.strictEqual(renderDisplayLabels(issue), '');
+  });
+
+  test('escapes HTML in label names', () => {
+    const issue = {
+      id: 'issue-xss',
+      labels: { nodes: [{ name: '<script>alert("xss")</script>' }] },
+      state: { type: 'completed' }
+    };
+    const result = renderDisplayLabels(issue);
+    assert.ok(!result.includes('<script>'));
+    assert.ok(result.includes('&lt;script&gt;'));
+  });
+});
+
+// =============================================================================
 // renderPage Description Tests (LIN-151)
 // =============================================================================
 

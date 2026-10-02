@@ -366,6 +366,31 @@ test.describe('Streaming AI Recommendations - UI', () => {
     await expect(component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]')).toBeEnabled();
   });
 
+  test('↻ change cancels an in-flight stream back to idle', async ({ page }) => {
+    // Gate the shared reader: emit the reasoning, then hold until the test acts.
+    await page.evaluate(() => {
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      window.__releaseStream = () => release();
+      window.readSSEStream = async (response, onEvent) => {
+        if (response.body) response.body.cancel().catch(() => {});
+        onEvent('message', { phase: 'reasoning' });
+        onEvent('message', { section: 'reasoning', content: 'Working it out.\n' });
+        await gate;
+      };
+    });
+
+    const component = await pressGo(page);
+    await expect(component).toHaveClass(/streaming/);
+    // Mid-stream the reasoning streams INTO the body ([data-prompt-body]).
+    await expect(component.locator('[data-prompt-body]')).toContainText('Working it out');
+
+    // ↻ change mid-stream aborts the request and returns to idle.
+    await component.locator('[data-action="change"]').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'idle');
+    await expect(component).not.toHaveClass(/streaming/);
+  });
+
   test('↻ change dismisses the generated prompt back to idle', async ({ page }) => {
     const component = await pressGo(page);
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });

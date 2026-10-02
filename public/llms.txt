@@ -180,11 +180,11 @@ relationship between the tasks, not as a label.
 - `bug`: "Could someone implement a fix based on this?"
 
 **DOM Selectors:**
-- `.label-prompt[data-issue-id][data-label]` - clickable label that generates a prompt
-- `.prompt-container[data-prompt-for="{id}"]` - container for generated prompt
+- `.prompt-container[data-prompt-for="{id}"]` - container for a generated prompt (periodical Mint / Setup Prompt rows)
 - `.prompt-text` - the prompt text (inside container)
 - `.prompt-copy` - copy button (inside container)
 - `.prompt-download` - download button (inside container); saves the prompt as a `.md` file. Use this instead of copy for very large prompts (e.g. retro on an epic) that exceed clipboard limits. The file matches what copy yields, including the `+proxy` block when that toggle is on. Filename: `<identifier>-<promptName>.md`.
+- **Opened-task component (Home & Swipe):** `[data-prompt-mount]` → `.prompt-section`; the ✦ action is `[data-testid="opened-task-go"]`, templates are `[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="<key>"]`, the prompt text is `[data-prompt-body]`, reasoning is `[data-testid="opened-task-reasoning"]` (visible by default), and copy/download are `.swipe-prompt-copy` / `.swipe-prompt-download`.
 
 ### Available Prompt Templates (17 total)
 
@@ -215,26 +215,25 @@ All 17 templates above (never the meta-prompt) are also published, unauthenticat
 
 ### More Prompts Inline
 Access additional prompt templates from any issue, regardless of its labels or state.
-A "more" link appears after visible prompts; clicking reveals all remaining prompts inline.
-Prompts (including `retro`) are available on completed/canceled issues too.
+A "more" control appears in the opened-task component's "other prompts" group; clicking reveals the remaining templates inline.
+Templates (including `retro`) are available on completed/canceled issues too.
 
 **DOM Selectors:**
-- `.more-toggle[data-issue-id]` - "more" link (appears after visible prompts)
-- `[data-more-for="{id}"]` - hidden span containing additional prompt links
+- `[data-testid="other-prompts"] [data-prompt="__more__"]` - "more ▾" toggle (reveals hidden templates)
+- `[data-testid="other-prompts"] .swipe-more-prompts` - hidden group containing additional template buttons
 
 **Usage:**
-1. Expand any issue with promptable labels
-2. Click "more" link at end of labels row
-3. Additional prompts appear inline (same comma-separated format)
-4. Click any prompt to load it into the prompt container
+1. Expand an issue and open "Prompts ▶"
+2. Click "more ▾" in the "other prompts" group
+3. Additional template buttons appear inline
+4. Click any template to load it into the component
 
-### AI Recommendation Selectors
-- `.suggest-btn` - AI suggest button (in Prompts section, requires OpenRouter)
-- `.recommend-container[data-recommend-for="{id}"]` - recommendation result container
-- `.recommend-reasoning` - AI reasoning text
-- `.recommend-prompt` - generated prompt text
-- `.free-tier-info` / `[data-testid="free-tier-info"]` - free tier usage info below recommendation
-- `.free-tier-limit-reached` - error message when daily limit exceeded
+### AI Recommendation Selectors (shared opened-task component)
+- `[data-testid="opened-task-go"]` - ✦ next step (AI-tailored prompt; requires OpenRouter or free tier)
+- `[data-testid="opened-task-primary-reason"]` - plain-words reason when the action is disabled
+- `[data-testid="opened-task-reasoning"]` - AI reasoning text (visible by default)
+- `[data-prompt-body]` - generated prompt text
+- `[data-testid="opened-task-ladder"]` - copy → run-this-step → run-whole-task ladder
 - `[data-free-tier-status]` - free tier status on settings page
 - `[data-free-tier-usage]` - free tier usage display on settings page
 
@@ -667,8 +666,8 @@ main.lc-page[data-url-key]                    - page container
 5. **Search for issues**: Click "search" in nav bar (or press "/"), type keywords to filter issues across all sections
 6. **Open in provider**: Expand task, click the "View in {provider} →" link (text is dynamic, e.g. "View in Linear")
 7. **View task details**: Expand task, click "Details ▶" to show description and metadata
-8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal prompt buttons, click a prompt button, copy the generated prompt
-9. **Get AI recommendation**: Expand task, click "Prompts ▶", click "AI suggest" button (free tier: 20/day per workspace)
+8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal the shared opened-task component, click a template under "other prompts", copy the generated prompt
+9. **Get the next step (AI)**: Expand task, click "Prompts ▶", click the "✦ next step" button (free tier: 20/day per workspace)
 
 ## Limitations
 

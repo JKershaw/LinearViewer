@@ -998,3 +998,32 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
     assert.equal(calls.fetch.length, 0, 'no recommend request from a disabled primary');
   });
 });
+
+// =============================================================================
+// LIN-836 / LIN-2944 P1: the Autopilot proxy gate, re-pinned on the shared
+// component. The old render.test.js pinned "proxy on ⇒ classic + stepper
+// anchors render; proxy off ⇒ neither". The classic entry is now the ladder's
+// "run the whole task" rung; the stepper is the "other prompts" sibling.
+// =============================================================================
+describe('LIN-836 / LIN-2944 P1: the Autopilot proxy gate', () => {
+  const issue = { id: 'issue-ap', identifier: 'LIN-AP', title: 'A task', state: { type: 'started' }, labels: { nodes: [] } };
+  const mount = (extra) => {
+    const { PromptSection } = loadPromptSection();
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(issue, extra));
+    return container;
+  };
+
+  test('proxy on ⇒ both Autopilot entries render (ladder run-task + stepper sibling)', () => {
+    const container = mount({ proxyEnabled: true, hasAutopilot: true });
+    assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-prompt="__autopilot__"/, 'classic entry is the enabled run-task rung');
+    assert.match(container.innerHTML, /data-prompt="__autopilot_stepper__"/, 'stepper sibling renders under other prompts');
+  });
+
+  test('proxy off ⇒ neither Autopilot entry acts (run-task is a set-up rung, no stepper)', () => {
+    const container = mount({ proxyEnabled: false, hasAutopilot: false });
+    assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'run-task shows ○ set up');
+    assert.equal(container.innerHTML.includes('data-prompt="__autopilot__"'), false, 'no enabled Autopilot rung');
+    assert.equal(container.innerHTML.includes('data-prompt="__autopilot_stepper__"'), false, 'no stepper sibling');
+  });
+});

@@ -2516,55 +2516,13 @@ body.is-landing {
 }
 
 /* =============================================================================
-   Promptable Labels & Prompt Container
+   Prompt Container
    =============================================================================
-   Labels with AI prompts are rendered as clickable links.
-   Clicking opens a prompt container with copyable text.
+   `renderPromptContainer` remains for the periodical Mint / Mint+Autopilot rows
+   and the landing/description "Setup Prompt". The opened-task prompt UI moved to
+   the shared `PromptSection` component (LIN-2944 P1), whose styles live in
+   public/swipe.css; the old `.label-prompt*` / `.suggest-btn` rules were retired.
 */
-
-/* Promptable label buttons within metadata */
-.label-prompt {
-  display: inline-block;
-  background: none;
-  border: 1px solid var(--border);
-  padding: 0.15rem 0.4rem;
-  font-family: var(--font-content);
-  font-size: 0.8em;
-  color: var(--fg-dim);
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  margin-right: 0.3rem;
-  margin-bottom: 0.4rem;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.label-prompt:hover {
-  border-color: var(--fg-dim);
-  color: var(--fg);
-  background: rgba(0, 0, 0, 0.03);
-}
-
-/* "more" link keeps simple link styling */
-.label-prompt.more-toggle {
-  background: none;
-  border: none;
-  padding: 0;
-  margin-right: 0;
-  color: var(--fg-dim);
-  font-size: inherit;
-}
-
-.label-prompt.more-toggle:hover {
-  text-decoration: underline;
-  border-color: transparent;
-}
-
-/* Custom prompt buttons - dashed border to distinguish from built-in */
-.label-prompt.custom-prompt-btn {
-  border-style: dashed;
-}
 
 /* Prompt container - appears below metadata when label is clicked */
 .prompt-container {
@@ -2845,12 +2803,11 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
    Markdown Rendering in Prompts and Reasoning
    =============================================================================
    Styles for rendered markdown content (via marked.js library).
-   Applied to both .prompt-text and .recommend-reasoning containers.
+   Applied to .prompt-text containers.
 */
 
 /* Shared markdown container styles */
-.prompt-text,
-.recommend-reasoning {
+.prompt-text {
   font-family: var(--font-content);
   font-size: 0.9em;
   line-height: 1.5;
@@ -2858,9 +2815,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 /* Headers - h1 rendered as h2 size, h2 as h3, etc. */
 .prompt-text h1,
-.prompt-text h2,
-.recommend-reasoning h1,
-.recommend-reasoning h2 {
+.prompt-text h2 {
   font-family: var(--font-content);
   font-size: var(--font-size-base);
   font-weight: 600;
@@ -2871,16 +2826,12 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 .prompt-text h1:first-child,
-.prompt-text h2:first-child,
-.recommend-reasoning h1:first-child,
-.recommend-reasoning h2:first-child {
+.prompt-text h2:first-child {
   margin-top: 0;
 }
 
 .prompt-text h3,
-.prompt-text h4,
-.recommend-reasoning h3,
-.recommend-reasoning h4 {
+.prompt-text h4 {
   font-family: var(--font-content);
   font-size: 0.95em;
   font-weight: 600;
@@ -2889,39 +2840,32 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* Paragraphs */
-.prompt-text p,
-.recommend-reasoning p {
+.prompt-text p {
   margin: 0.5em 0;
 }
 
-.prompt-text p:first-child,
-.recommend-reasoning p:first-child {
+.prompt-text p:first-child {
   margin-top: 0;
 }
 
-.prompt-text p:last-child,
-.recommend-reasoning p:last-child {
+.prompt-text p:last-child {
   margin-bottom: 0;
 }
 
 /* Bullet and numbered lists */
 .prompt-text ul,
-.prompt-text ol,
-.recommend-reasoning ul,
-.recommend-reasoning ol {
+.prompt-text ol {
   margin: 0.5em 0;
   padding-left: 1.5em;
 }
 
-.prompt-text li,
-.recommend-reasoning li {
+.prompt-text li {
   margin: 0.2em 0;
   line-height: 1.4;
 }
 
 /* Code blocks */
-.prompt-text pre,
-.recommend-reasoning pre {
+.prompt-text pre {
   background: var(--bg);
   border: 1px solid var(--fg-vdim);
   border-radius: var(--radius-sm);
@@ -2930,8 +2874,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
   overflow-x: auto;
 }
 
-.prompt-text pre code,
-.recommend-reasoning pre code {
+.prompt-text pre code {
   font-family: var(--font-structural);
   font-size: 0.9em;
   color: var(--fg);
@@ -2941,8 +2884,7 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* Inline code */
-.prompt-text code,
-.recommend-reasoning code {
+.prompt-text code {
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
   background: var(--bg);
@@ -2952,20 +2894,17 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 }
 
 /* Bold text */
-.prompt-text strong,
-.recommend-reasoning strong {
+.prompt-text strong {
   font-weight: 600;
 }
 
 /* Links */
-.prompt-text a,
-.recommend-reasoning a {
+.prompt-text a {
   color: var(--blue);
   text-decoration: none;
 }
 
-.prompt-text a:hover,
-.recommend-reasoning a:hover {
+.prompt-text a:hover {
   text-decoration: underline;
 }
 
@@ -2975,172 +2914,6 @@ body[data-proxy-active="true"] .prompt-proxy-toggle {
 
 .more-prompts.hidden {
   display: none;
-}
-
-/* =============================================================================
-   AI Recommendation Feature
-   =============================================================================
-   "AI suggest" button and recommendation container for AI-powered suggestions.
-*/
-
-/* Suggest button - inherits layout from .label-prompt, only overrides colors */
-.label-prompt.suggest-btn {
-  border-color: var(--blue);
-  color: var(--blue);
-}
-
-.label-prompt.suggest-btn:hover {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: white;
-}
-
-.label-prompt.suggest-btn.loading {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: white;
-  opacity: 0.7;
-}
-
-/* Recommendation container */
-.recommend-container {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: linear-gradient(135deg, #f0f7ff 0%, var(--bg-muted) 100%);
-  border: 1px solid var(--blue);
-  border-left: 3px solid var(--blue);
-  border-radius: 4px;
-}
-
-/* Streaming phase indicator (LIN-185) */
-.streaming-phase {
-  font-family: var(--font-content);
-  font-size: 0.8em;
-  color: var(--blue);
-  padding: var(--space-1) 0;
-  margin-bottom: var(--space-1);
-}
-
-.streaming-phase::before {
-  content: '● ';
-  animation: phase-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes phase-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-.recommend-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-2);
-}
-
-.recommend-title {
-  font-family: var(--font-content);
-  font-weight: 500;
-  font-size: 0.9em;
-  color: var(--blue);
-}
-
-.recommend-close {
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-content);
-  font-size: 0.8em;
-  color: var(--fg-dim);
-  cursor: pointer;
-}
-
-.recommend-close:hover {
-  color: var(--fg);
-}
-
-.recommend-header-actions {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.reasoning-toggle {
-  background: none;
-  border: none;
-  padding: var(--space-1) var(--space-2);
-  font-family: var(--font-content);
-  font-size: 0.8em;
-  color: var(--blue);
-  cursor: pointer;
-}
-
-.reasoning-toggle:hover {
-  text-decoration: underline;
-}
-
-.recommend-reasoning {
-  font-family: var(--font-content);
-  font-size: 0.9em;
-  line-height: 1.5;
-  color: var(--fg);
-  margin: 0 0 0.75rem 0;
-}
-
-.recommend-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* Generated prompt display within recommendation */
-.recommend-prompt {
-  margin-top: var(--space-2);
-}
-
-.recommend-prompt .prompt-header {
-  margin-bottom: var(--space-1);
-}
-
-.recommend-prompt .prompt-text {
-  background: white;
-  padding: 0.75rem;
-  border-radius: var(--radius-sm);
-  max-height: 300px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-}
-
-.free-tier-info {
-  margin-top: var(--space-2);
-  padding: var(--space-1) 0;
-  font-size: 0.8em;
-  color: var(--fg-dim);
-}
-
-.free-tier-info .free-tier-limit-reached {
-  color: var(--red);
-}
-
-.free-tier-info a {
-  color: var(--blue);
-}
-
-/* Mobile adjustments */
-@media (max-width: 640px) {
-  .recommend-container {
-    padding: var(--space-2);
-  }
-
-  .recommend-reasoning {
-    font-size: var(--font-size-sm);
-  }
-
-  .recommend-prompt .prompt-text {
-    max-height: 200px;
-  }
 }
 
 /* =============================================================================

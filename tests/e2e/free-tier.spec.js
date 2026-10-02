@@ -195,10 +195,14 @@ test.describe('Free Tier UI', () => {
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
     await expect(component.locator('[data-prompt-body]')).not.toBeEmpty();
 
-    // The free-tier allowance is disclosed in the footer.
+    // The free-tier allowance is disclosed in the footer with its real count.
+    // The recommend consumed one of the fixture's 5, so a reload (which re-reads
+    // /api/recommend/status) shows 4/5.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
     const footerStatus = page.locator('.footer-ai-status.free');
     await expect(footerStatus).toBeVisible();
-    await expect(footerStatus).toContainText('free');
+    await expect(footerStatus).toHaveText('ai: \u25cf free (4/5)');
   });
 
   test('disables the ✦ primary with the quota message when the limit is exhausted', async ({ page, localWorkerUrlKey }) => {

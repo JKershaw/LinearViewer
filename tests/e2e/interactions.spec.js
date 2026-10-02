@@ -208,8 +208,9 @@ test.describe('Detail Section Toggles', () => {
     await expect(promptsContent).not.toHaveClass(/hidden/);
     await expect(promptsToggle).toContainText('Prompts ▼');
 
-    // Prompt buttons should be visible inside
-    await expect(promptsContent.locator('.label-prompt').first()).toBeVisible();
+    // The shared opened-task component (and its template picker) is visible inside.
+    await expect(promptsContent.locator('.prompt-section')).toBeVisible();
+    await expect(promptsContent.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first()).toBeVisible();
   });
 
   test('Details and Prompts toggles work independently', async ({ page }) => {
