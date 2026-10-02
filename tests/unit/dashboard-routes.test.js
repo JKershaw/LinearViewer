@@ -14,7 +14,7 @@
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert';
-import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus } from '../../routes/dashboard.js';
+import { createDashboardRoutes, buildTestSummary, buildTestSessionSummary, deriveSessionStatus, deriveSessionDecisions } from '../../routes/dashboard.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { InMemorySessionSummaryCacheStore } from '../../lib/session-summary-cache.js';
@@ -4328,6 +4328,128 @@ describe('GET /observation/session/:sessionId — waiting banner clears after a 
     assert.ok(html, 'the page rendered');
     assert.ok(!html.includes('session-waiting-banner'), 'no waiting banner once the reply cleared the block');
     assert.ok(html.includes('data-session-waiting="false"'), 'the waiting flag threaded to the client is false');
+  });
+});
+
+// ─── LIN-3252 S2: the pinned question card read ────────────────────────────────
+//
+// The run page's card data comes from `deriveSessionDecisions` over the session's
+// OWN enriched loops (session-membership scope, no shelves, no task-decisions),
+// and is returned whether or not the session is `waiting` — including after it
+// finished. `collectUnansweredDecisions` stays the one predicate, so an answered
+// decision is subtracted and never reappears. The card RENDER is Beat 2; these pin
+// only the read path.
+describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', () => {
+  function decisionLoop({ loopId, decisionId, terminalStatus = null, agentState = undefined, issueIdentifier = 'LIN-1', answeredDecisions = [] }) {
+    return {
+      loopId,
+      lineageId: loopId,
+      workspaceUrlKey: 'ws-a',
+      issueIdentifier,
+      target: 'cli',
+      dispatchedAt: NOW_ISO,
+      terminalStatus,
+      agentState,
+      decision: { decision_id: decisionId, question: 'Proceed with the migration?', options: [{ id: 'yes', label: 'Yes' }] },
+      decisionCase: ['The migration is reversible.'],
+      answeredDecisions
+    };
+  }
+
+  test('returns an unanswered decision on a non-waiting (live) loop', () => {
+    const rows = deriveSessionDecisions([decisionLoop({ loopId: 'l-live', decisionId: 'd-live' })], { now: new Date() });
+    assert.equal(rows.length, 1, 'the live loop decision is returned');
+    assert.equal(rows[0].decision.decision_id, 'd-live');
+    assert.equal(rows[0].stampLoopId, 'l-live');
+  });
+
+  test('returns an unanswered decision on a FINISHED session (no waiting gate)', () => {
+    const rows = deriveSessionDecisions([decisionLoop({ loopId: 'l-done', decisionId: 'd-done', terminalStatus: 'done' })], { now: new Date() });
+    assert.equal(rows.length, 1, 'a finished session still surfaces its decision to the card');
+    assert.equal(rows[0].decision.decision_id, 'd-done');
+  });
+
+  test('an answered decision does not reappear', () => {
+    const rows = deriveSessionDecisions(
+      [decisionLoop({ loopId: 'l-ans', decisionId: 'd-ans', terminalStatus: 'done', answeredDecisions: [{ decisionId: 'd-ans' }] })],
+      { now: new Date() }
+    );
+    assert.equal(rows.length, 0, 'the answered decision is subtracted by the predicate');
+  });
+
+  test('G2: a gone row with a LIVE run on its anchor resolves effect "record" — the card must not race it', () => {
+    // The decision's own loop is terminal (gone: past the reap window), and a
+    // SEPARATE live loop in the same session carries the same issue — the same
+    // `liveDispatchOnAnchor` predicate the dashboard rulings feed injects.
+    const gone = decisionLoop({ loopId: 'l-gone', decisionId: 'd-gone', terminalStatus: 'done', agentState: 'complete' });
+    const liveOnAnchor = {
+      loopId: 'l-live', lineageId: 'l-live', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone, liveOnAnchor], { now: new Date() });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone');
+    assert.ok(row, 'the gone decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'record', 'a live run on the anchor overrides dispatch with record (resolveEffect branch 3)');
+  });
+
+  test('G2: a gone row with NO live run on its anchor still resolves effect "dispatch"', () => {
+    const gone = decisionLoop({ loopId: 'l-gone', decisionId: 'd-gone', terminalStatus: 'done', agentState: 'complete' });
+    const otherIssue = {
+      loopId: 'l-other', lineageId: 'l-other', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-2', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone, otherIssue], { now: new Date() });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone');
+    assert.equal(row.effect, 'dispatch', 'a live run on a DIFFERENT issue does not suppress dispatch');
+  });
+
+  test('no task-decisions input means a scan-sourced task-bound ruling stays out', () => {
+    const rows = deriveSessionDecisions([], { now: new Date() });
+    assert.deepEqual(rows, [], 'no loops → no card rows, regardless of scan store');
+  });
+});
+
+// ─── LIN-3252 S2.7: the bare-BLOCKED card's producer routing ───────────────────
+//
+// A waiting loop with no DECISION row makes no ruling row, so the card's second
+// source is the waiting producer loop itself. The route must thread that loop's
+// own target/issue (so the follow-up resumes THAT run, not a hard-defaulted cli
+// target) and its latest assistant text (the "why" fallback, since a bare
+// blocker has no decisionCase).
+describe('GET /observation/session/:sessionId — bare-BLOCKED card routing (LIN-3252 S2.7)', () => {
+  test('threads the producer loop\'s target/issue and latest assistant text into the card', async () => {
+    const blockedWorker = {
+      id: 'w-bare', sessionId: 'sess-bare', target: 'web', issueIdentifier: 'LIN-461', issueId: 'uuid-461',
+      issueTitle: 'Blocked worker', promptName: 'implementation', prompt: 'p',
+      dispatchedAt: NOW_ISO, resolvedAt: NOW_ISO, status: 'taken',
+      feedback: [
+        { kind: 'assistant-text', message: 'I compared the two rollout strategies and they diverge.', timestamp: NOW_ISO },
+        { message: '[blocked] need your decision', timestamp: NOW_ISO }
+      ]
+    };
+    const perWorkspace = {
+      'ws-a': { live: [autopilotLiveItem('sess-bare', 'LIN-460')], history: [blockedWorker], agentStatus: [] }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: 'sess-bare' }
+    });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200, 'the page rendered');
+    const html = res.sentBody;
+    assert.match(html, /data-testid="session-question-card"/, 'the bare-blocked card rendered');
+    assert.match(html, /data-testid="session-question-card-question"[^>]*>\[blocked\] need your decision</);
+    assert.match(html, /data-testid="session-question-card-why-chunk"[^>]*>I compared the two rollout strategies and they diverge\.</, 'why falls back to the latest assistant text');
+    assert.match(html, /data-testid="session-question-card"[^>]*data-loop-id="w-bare"/);
+    assert.match(html, /data-testid="session-question-card"[^>]*data-target="web"/, 'the producer\'s real target, not a hard-defaulted cli');
+    assert.match(html, /data-testid="session-question-card"[^>]*data-issue-id="uuid-461"/);
+    assert.match(html, /data-testid="session-question-card"[^>]*data-issue-identifier="LIN-461"/);
+    assert.ok(!html.includes('session-question-card-dismiss'), 'no dismiss on a bare blocker');
   });
 });
 

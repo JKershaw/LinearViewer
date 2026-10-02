@@ -169,3 +169,24 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
       'scripts/eval/meta-prompt.baseline.txt is stale — run `node scripts/eval/regen-baseline.mjs`');
   });
 });
+
+describe('autopilot manual: the if_unanswered rule (LIN-3252 S2.3i)', () => {
+  test('the manual names if_unanswered, states the every-DECISION rule, and keeps the no-re-raise phrase', () => {
+    // The manual is the single source for `DECISION:` guidance — the rule lives
+    // here, not duplicated into a second prompt surface.
+    assert.ok(autopilotManualSource.includes('if_unanswered'), 'the manual names if_unanswered');
+    assert.match(
+      autopilotManualSource,
+      /every `DECISION:` carries `if_unanswered: \{"summary": "\.\.\."\}`/,
+      'the manual states that every DECISION carries if_unanswered.summary'
+    );
+    assert.ok(
+      autopilotManualSource.includes('which the person\'s card always shows'),
+      'the manual says the person\'s card always shows it'
+    );
+    assert.ok(
+      autopilotManualSource.includes('open, answered, dismissed, or withdrawn'),
+      'the no-re-raise phrase stays untouched'
+    );
+  });
+});

@@ -65,63 +65,44 @@
   border-bottom: 1px solid var(--line);
 }
 
-/* ── "Waiting on you" alert banner (LIN-1005) ─────────────────────────────────
-   Prominent, amber running-family (no new status colour). Shown at the top of a
-   session that is paused on a human; directs to the Phase 2 follow-up box. */
-.sess-waiting {
-  margin: 0 0 1.5rem;
+/* ── Pinned question card (LIN-3252 S2) ─────────────────────────────────────
+   The run page's ONE answer surface, replacing the LIN-1005 waiting banner and
+   the decision half of the per-run reply box. Amber running-family accent (no
+   new status colour); pinned above the steps, whether or not the session is
+   waiting. A dismiss control will sit in `.sess-qcard-actions` (beat 3). */
+.sess-qcards {
+  margin: 0 0 1.25rem;
+  display: grid;
+  gap: 0.75rem;
+}
+.sess-qcard {
   padding: 0.85rem 1rem;
   border: 1px solid var(--amber);
   border-left-width: 4px;
   border-radius: 4px;
   background: color-mix(in srgb, var(--amber) 10%, var(--card));
+  display: grid;
+  gap: 0.6rem;
 }
-.sess-waiting-head {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.sess-qcard-question {
+  margin: 0;
   font-family: var(--font-content);
   font-weight: 600;
+  font-size: 0.95rem;
   color: var(--text);
 }
-.sess-waiting-icon { color: var(--amber); }
-.sess-waiting-title { font-size: 1rem; }
-.sess-waiting-msg {
-  margin: 0.5rem 0 0;
-  font-family: var(--font-structural);
-  font-size: 0.9rem;
-  color: var(--text);
-  white-space: pre-wrap;
-}
-.sess-waiting-cta {
-  margin: 0.5rem 0 0;
+.sess-qcard-why-summary {
+  cursor: pointer;
   font-family: var(--font-content);
   font-size: 0.85rem;
   color: var(--muted);
 }
-
-/* Decision case (LIN-2184/H5) — renders inside the banner, between the plain
-   `.sess-waiting-msg` and the CTA, when the rollup carries a `decision`. Full
-   prose is intentional here (see renderWaitingBanner's doc comment); the grid
-   gaps below are what was missing pre-repair — the global `* { margin: 0 }`
-   reset otherwise butts the question/case/options against each other. */
-.sess-waiting-decision {
-  margin: 0.75rem 0 0;
-  display: grid;
-  gap: 0.5rem;
-}
-.sess-waiting-decision-question {
-  margin: 0;
-  font-family: var(--font-content);
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-.sess-waiting-decision-case {
+.sess-qcard-case {
+  margin-top: 0.4rem;
   display: grid;
   gap: 0.4rem;
 }
-.sess-waiting-decision-case-chunk {
+.sess-qcard-case-chunk {
   margin: 0;
   font-family: var(--font-structural);
   font-size: 0.9rem;
@@ -130,7 +111,7 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.sess-waiting-decision-options {
+.sess-qcard-options {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -138,14 +119,62 @@
   flex-wrap: wrap;
   gap: 0.4rem;
 }
-.sess-waiting-decision-option {
+.sess-qcard-option-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   font-family: var(--font-structural);
   font-size: var(--font-size-sm);
-  padding: 0.05rem 0.4rem;
+  padding: 0.15rem 0.5rem;
   color: var(--text);
   background: var(--inset);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.sess-qcard-option-input { accent-color: var(--brand); }
+.sess-qcard-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-structural);
+  font-size: 0.9rem;
+  padding: 0.4rem 0.5rem;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+.sess-qcard-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* A quiet text button — the card's deliberate "no" is secondary to Answer. */
+.sess-qcard-dismiss {
+  background: none;
+  border: none;
+  padding: 0.15rem 0.25rem;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.sess-qcard-dismiss:hover:not(:disabled) { color: var(--text); }
+.sess-qcard-dismiss:disabled { opacity: 0.5; cursor: default; }
+.sess-qcard-readonly {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.sess-qcard-if-unanswered {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 /* ── Overview ─────────────────────────────────────────────────────────────── */
@@ -684,13 +713,13 @@
 
 /* ── Small-screen polish (LIN-1024) ───────────────────────────────────────────
    Basic readability/spacing tightening for the reported surface (360px Android
-   Chrome): reclaim horizontal room, keep the waiting banner, reply box, inline
+   Chrome): reclaim horizontal room, keep the question card, reply box, inline
    reply, and expanded transcript comfortable to read and tap. */
 @media (max-width: 480px) {
   .sess-page { padding: 0 0.75rem 2.5rem; }
   .sess-kv { grid-template-columns: 6.5rem 1fr; gap: 0.5rem; }
-  .sess-waiting { padding: 0.75rem 0.85rem; }
-  .sess-waiting-msg { line-height: 1.5; }
+  .sess-qcard { padding: 0.75rem 0.85rem; }
+  .sess-qcard-case-chunk { line-height: 1.5; }
   .sess-reply-input { min-height: 5.5rem; }
   .sess-inline-reply-input { min-height: 4rem; }
   .sess-run-tx { --chat-thread-max-height: 280px; }
