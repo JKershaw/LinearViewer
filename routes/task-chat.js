@@ -24,7 +24,7 @@ import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib
 import { createChatToolCatalog } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
-import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
+import { resolveIssueBinding, bindingRefusalResponse, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
@@ -382,8 +382,16 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
   router.post('/workspace/:urlKey/api/task-chat/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
-    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+    // LIN-3240: row tier — the issue's OWN binding, strict (`source`+`bindingScope`).
+    const issueBinding = resolveIssueBinding(workspace, {
+      source: typeof req.query.source === 'string' && req.query.source ? req.query.source : undefined,
+      bindingScope: typeof req.query.bindingScope === 'string' && req.query.bindingScope ? req.query.bindingScope : undefined,
+    });
+    if (issueBinding.error) {
+      const { status, body } = bindingRefusalResponse(issueBinding);
+      return res.status(status).json(body);
+    }
+    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.taskChat !== true) {

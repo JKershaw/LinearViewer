@@ -21,6 +21,9 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
+import {
+  REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace, buildWorkspaceApiApp, withServer as withHarnessServer,
+} from './lin-3126-harness.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -270,5 +273,52 @@ describe('GET /workspace/:urlKey/api/autopilot-prompt/:issueId — binding-scope
     assert.equal(status, 200);
     assert.ok(body.prompt.includes(ACTIVE_ISSUE.identifier));
     assert.deepEqual(activeContextScopes, ['active-token']);
+  });
+});
+
+// LIN-3240 (LIN-3126 slice 1) strict-mode extension: on a CONNECTION-BACKED
+// same-provider pair (two GitHub repos on one Connection), a provider-name-only
+// `source` is ambiguous and must fail closed; `source`+`bindingScope` resolves
+// the issue's own binding. Mixed-provider/legacy and single-binding behaviour is
+// pinned by the suites above (unchanged).
+describe('GET /api/detail — strict mode on a connection-backed same-provider pair (LIN-3240)', () => {
+  const ISSUE_A = { id: '1', identifier: 'GA-1', title: 'Repo A', description: 'REPO_A_MARKER', state: { name: 'Todo', type: 'unstarted' } };
+  const ISSUE_B = { id: '1', identifier: 'GB-1', title: 'Repo B', description: 'REPO_B_MARKER', state: { name: 'Todo', type: 'unstarted' } };
+
+  test('a bare `source` on a two-repo connection-backed workspace refuses 422 BINDING_REQUIRED (never active/matches[0])', async () => {
+    const { calls } = installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A, [REPO_B]: ISSUE_B } });
+    const app = buildWorkspaceApiApp({ workspace: makeTwoRepoWorkspace() });
+    const { status, body } = await withHarnessServer(app, ({ get }) => get('/workspace/acme/api/detail/1?source=github'));
+    assert.equal(status, 422);
+    assert.deepEqual(body, { code: 'BINDING_REQUIRED', provider: 'github', bindings: [REPO_A, REPO_B] });
+    assert.equal(calls.filter(c => c.method === 'fetchIssueFields').length, 0);
+  });
+
+  test('a `source`+`bindingScope` selector resolves repoB and only queries repoB', async () => {
+    const { calls } = installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A, [REPO_B]: ISSUE_B } });
+    const app = buildWorkspaceApiApp({ workspace: makeTwoRepoWorkspace() });
+    const { status, body } = await withHarnessServer(app, ({ get }) => get(`/workspace/acme/api/detail/1?source=github&bindingScope=${encodeURIComponent(REPO_B)}`));
+    assert.equal(status, 200);
+    assert.ok(body.html.includes(ISSUE_B.description));
+    assert.deepEqual(calls.filter(c => c.method === 'fetchIssueFields').map(c => c.scope.repo), [REPO_B]);
+  });
+
+  test('an unknown `bindingScope` refuses 422 UNKNOWN_BINDING', async () => {
+    installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A, [REPO_B]: ISSUE_B } });
+    const app = buildWorkspaceApiApp({ workspace: makeTwoRepoWorkspace() });
+    const { status, body } = await withHarnessServer(app, ({ get }) => get('/workspace/acme/api/detail/1?source=github&bindingScope=octo/ghost'));
+    assert.equal(status, 422);
+    assert.deepEqual(body, { code: 'UNKNOWN_BINDING', provider: 'github', bindings: [REPO_A, REPO_B] });
+  });
+
+  test('a single-binding connection-backed workspace is unchanged (no selector -> active pair, no 422)', async () => {
+    const { calls } = installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A } });
+    const workspace = makeTwoRepoWorkspace();
+    workspace.bindings = [workspace.bindings[0]]; // one binding only; marker still points at repoA
+    const app = buildWorkspaceApiApp({ workspace });
+    const { status, body } = await withHarnessServer(app, ({ get }) => get('/workspace/acme/api/detail/1'));
+    assert.equal(status, 200);
+    assert.ok(body.html.includes(ISSUE_A.description));
+    assert.deepEqual(calls.filter(c => c.method === 'fetchIssueFields').map(c => c.scope.repo), [REPO_A]);
   });
 });
