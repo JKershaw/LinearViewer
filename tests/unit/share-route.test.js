@@ -414,3 +414,77 @@ describe('GET /s/:token — backoff, timeout and store-write failure', () => {
   });
 });
 
+describe('LIN-3255 review: success must not read as failure', () => {
+  // Interleaving: A getByToken -> A owner -> A due -> A refresh (stamp, read starts)
+  //   -> B getByToken (pre-save record) -> B owner check (held)
+  //   -> A read resolves, saveSnapshot succeeds, inflight cleared, A responds
+  //   -> B owner check released -> B due: inflight empty, Map stamp > B's record.snapshotAt
+  for (const kind of ['null', 'stale']) {
+    test(`a GET holding a pre-save record, checking due after the winner succeeded, does not back off (${kind} snapshot)`, async () => {
+      const store = makeStore(baseRecord(kind === 'null'
+        ? { snapshot: null, snapshotAt: null }
+        : { snapshotAt: new Date(Date.now() - 120_000) }));
+      let releaseRead, bRecordRead, aDone;
+      const readGate = new Promise(r => { releaseRead = r; });
+      const bHasRecord = new Promise(r => { bRecordRead = r; });
+      const aFinished = new Promise(r => { aDone = r; });
+      const getByToken = store.getByToken.bind(store);
+      store.getByToken = async () => {
+        const rec = await getByToken();
+        if (store.calls.getByToken === 2) bRecordRead();
+        return rec;
+      };
+      let ownerCalls = 0;
+      let reads = 0;
+      const app = buildApp({
+        store,
+        workspaceOwnerCheck: async () => { if (++ownerCalls === 2) await aFinished; return { status: 'owner' }; },
+        readOwnerIssues: async () => {
+          reads++;
+          await readGate;
+          return { reason: 'ok', issues: [{ identifier: 'LIN-9', title: 'New', state: { type: 'started' }, priority: 0, updatedAt: 'x', labels: [{ name: 'bug' }] }] };
+        }
+      });
+      const server = app.listen(0, '127.0.0.1');
+      try {
+        await new Promise(resolve => server.once('listening', resolve));
+        const url = `http://127.0.0.1:${server.address().port}/s/${TOKEN}`;
+        const get = () => fetch(url).then(async r => ({ status: r.status, body: await r.text() }));
+        const a = get();
+        while (reads === 0) await new Promise(r => setImmediate(r));   // A is in its read
+        const b = get();
+        await bHasRecord;                                              // B holds the pre-save record
+        releaseRead();
+        const aRes = await a;
+        aDone();
+        const bRes = await b;
+        assert.equal(aRes.status, 200);
+        assert.ok(aRes.body.includes('New'));
+        assert.equal(bRes.status, 200, 'B must not 503 / back off after a SUCCESS');
+        assert.ok(!bRes.body.includes('OLD'), 'B must not serve last-good after a SUCCESS');
+      } finally {
+        await new Promise(resolve => server.close(resolve));
+      }
+    });
+  }
+
+  test('60s post-success interval is unchanged by the in-process stamp', async () => {
+    const now = Date.now();
+    mock.timers.enable({ apis: ['Date'], now });
+    try {
+      const store = makeStore(baseRecord({ snapshotAt: new Date(now - 120_000) }));
+      let reads = 0;
+      const app = buildApp({ store, readOwnerIssues: async () => { reads++; return { reason: 'ok', issues: [] }; } });
+      assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+      assert.equal(reads, 1);
+      mock.timers.tick(30_000);
+      await request(app, `/s/${TOKEN}`);
+      assert.equal(reads, 1, 'inside 60s: fresh, no read');
+      mock.timers.tick(31_000);
+      assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+      assert.equal(reads, 2, 'past 60s after a success: refresh is due (not the 300s backoff)');
+    } finally {
+      mock.timers.reset();
+    }
+  });
+});

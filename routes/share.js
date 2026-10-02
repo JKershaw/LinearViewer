@@ -143,6 +143,8 @@ export function createShareRoutes({ shareStore, readOwnerIssues, workspaceOwnerC
           includeDescriptions: record.includeDescriptions
         });
         await shareStore.saveSnapshot(key, snapshot, { at });
+        // Success persisted the stamp; a stale-record GET must not read this as a failure.
+        attempts.delete(key);
         return { ok: true, snapshot, snapshotAt: at, reason: outcome.reason };
       } catch (err) {
         return { ok: false, reason: 'refresh_error' };
