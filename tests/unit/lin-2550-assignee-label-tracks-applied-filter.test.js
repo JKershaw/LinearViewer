@@ -93,6 +93,10 @@ function baseContext(calls, appliedAssigneeName, assigneeState) {
     userPreferencesStore: { setSelectedTeam: async () => {}, getSelectedTeam: async () => null },
     customPromptsStore: { list: async () => [] },
     fetchAndPrepareProjects: async () => fetchResult(appliedAssigneeName),
+    // LIN-2944 P1: both dashboard render paths derive Home's top task over the
+    // fetched trees via the shared ordering helper. These fixtures assert the
+    // assignee LABEL, so an empty order (no top task) is the faithful stub.
+    orderIssuesForSwipe: () => [],
     renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => {
       calls.renderPageCallCount++;
       calls.renderPageOptions = options;

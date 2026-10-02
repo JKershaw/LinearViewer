@@ -61,6 +61,10 @@ async function runRenderDashboardAfterRefresh({ fetchResult }) {
     customPromptsStore: { list: async () => [] },
     getDeployInfo: () => ({}),
     fetchAndPrepareProjects: async () => fetchResult,
+    // LIN-2944 P1: the render tail now derives Home's top task over the fetched
+    // trees via the shared ordering helper. This suite pins only `truncated`, so
+    // an empty order (no top task) is the faithful stub.
+    orderIssuesForSwipe: () => [],
     renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => {
       calls.renderPageOptions = options;
       return '<html/>';
@@ -158,6 +162,10 @@ async function runPrimaryDashboardRoute({ fetchResult }) {
     userPreferencesStore: { setSelectedTeam: async () => {}, getSelectedTeam: async () => null },
     customPromptsStore: { list: async () => [] },
     fetchAndPrepareProjects: async () => fetchResult,
+    // LIN-2944 P1: the route derives Home's top task over the fetched trees via
+    // the shared ordering helper; this suite pins `truncated`, so stub an empty
+    // order (no top task).
+    orderIssuesForSwipe: () => [],
     renderPage: (trees, inProgressTrees, recentActivityTrees, organizationName, options) => {
       calls.renderPageCallCount++;
       calls.renderPageOptions = options;

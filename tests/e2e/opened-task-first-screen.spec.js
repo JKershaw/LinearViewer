@@ -551,3 +551,38 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
     expect(other.entry).toBeNull();
   });
 });
+
+// =============================================================================
+// LIN-2944 P1 F3 — Home marks the deck's front card as the top task.
+//
+// The first screen (Home) must show the same task the Swipe deck shows first,
+// with the same one-line why. The canonical local seed's front card is TEST-13
+// — a boostable bug in Todo — so it is NOT in Home's In Progress section; its
+// row is in the project tree, and that is where the mark must land.
+// =============================================================================
+
+test.describe('LIN-2944 P1 — Home top-task mark', () => {
+  test("Home's marked top task equals Swipe's first card, id and why (F3)", async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/`);
+    await page.waitForLoadState('networkidle');
+
+    const marked = page.locator('[data-top-task="1"]');
+    await expect(marked).toHaveCount(1);
+    const homeId = await marked.getAttribute('data-id');
+    const homeWhy = await marked.getAttribute('data-why');
+    const homeSection = await marked.getAttribute('data-section');
+
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    const first = await page.evaluate(() => {
+      const i = window.__SWIPE_DATA__.issues[0];
+      return { id: i.id, why: i.why };
+    });
+
+    expect(homeId).toBe(first.id);
+    expect(JSON.parse(homeWhy || '[]')).toEqual(first.why);
+    expect(homeSection).toBe('project');
+  });
+});
