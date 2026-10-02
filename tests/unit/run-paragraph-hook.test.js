@@ -5,9 +5,10 @@
  *
  * Fully offline: the generator is stubbed. These tests pin the trigger contract
  * the materializer hook carries into server.js — unchanged input makes ZERO
- * generator calls, a new finished step makes exactly ONE, a session turning
- * terminal stamps `final: true`, and the shared offline/no-key guard skips the
- * call entirely.
+ * generator calls, a new finished step makes exactly ONE, a step starting or a
+ * wait-for-answer toggling makes ZERO (the gate is ended steps only), a session
+ * turning terminal stamps `final: true`, and the shared offline/no-key guard
+ * skips the call entirely.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -32,7 +33,7 @@ function makeSession({ sessionId = RUN_ID, steps = [] } = {}) {
       terminalStatus: s.terminalStatus ?? null,
       iteration: 1,
       telemetry: {},
-      feedback: []
+      feedback: s.feedback ?? []
     }))
   };
 }
@@ -101,6 +102,39 @@ describe('run-paragraph precompute', () => {
       { apiKey: 'k' }
     );
     assert.equal(calls.length, 2, 'the changed finished-step set triggers exactly one regeneration');
+  });
+
+  test('a newly started (not ended) step makes ZERO generator calls', async () => {
+    const { calls, hook } = makeRig();
+    await hook(URL_KEY, makeSession({ steps: [{ kind: 'plan', terminalStatus: 'done' }] }), { apiKey: 'k' });
+    assert.equal(calls.length, 1);
+
+    await hook(
+      URL_KEY,
+      makeSession({
+        steps: [
+          { kind: 'plan', terminalStatus: 'done' },
+          { kind: 'implementation', terminalStatus: null }
+        ]
+      }),
+      { apiKey: 'k' }
+    );
+    assert.equal(calls.length, 1, 'a step start is not a step end → no regeneration');
+  });
+
+  test('a wait-for-answer toggle makes ZERO generator calls', async () => {
+    const { calls, hook } = makeRig();
+    const running = { kind: 'implementation', terminalStatus: null };
+
+    await hook(
+      URL_KEY,
+      makeSession({ steps: [{ ...running, feedback: [{ message: '[blocked] need a call' }] }] }),
+      { apiKey: 'k' }
+    );
+    assert.equal(calls.length, 1);
+
+    await hook(URL_KEY, makeSession({ steps: [{ ...running, feedback: [] }] }), { apiKey: 'k' });
+    assert.equal(calls.length, 1, 'the waiting toggle is not an ended step → no regeneration');
   });
 
   test('a session turning terminal writes final: true (and does not regenerate again)', async () => {

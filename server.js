@@ -72,10 +72,10 @@ import { createObserverPassRun } from './lib/observer-pass.js'
 import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
-import { SessionSummaryCacheStore, hashSession } from './lib/session-summary-cache.js'
-import { generateSessionSummary, childLoops, DEFAULT_SESSION_SUMMARY_MODEL } from './lib/session-summary.js'
+import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { RunParagraphStore } from './lib/run-paragraph-store.js'
-import { createRunParagraphPrecompute, resolvePrecomputeApiKey } from './lib/run-paragraph-hook.js'
+import { createRunParagraphPrecompute } from './lib/run-paragraph-hook.js'
+import { createSessionSummaryPrecompute, createMaterializerPrecompute } from './lib/session-materializer-precompute.js'
 import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
@@ -477,37 +477,18 @@ const precomputeRunParagraph = createRunParagraphPrecompute({
 // cache hit. This runs at WRITE time with NO user session, so it resolves an
 // OpenRouter key server-side (OPENROUTER_API_KEY → free-tier) and SKIPS cleanly
 // when neither is configured — never blocking, never throwing into the read-model
-// write it rode in on.
-observationMaterializer.precomputeSessionSummary = async (urlKey, session) => {
-  if (!session?.sessionId) return;
-  const apiKey = resolvePrecomputeApiKey();            // offline / no key → skip
-  if (!apiKey) return;
+// write it rode in on. The composition itself lives in
+// lib/session-materializer-precompute.js so it is testable (review R2).
+const precomputeSessionSummary = createSessionSummaryPrecompute({
+  sessionSummaryStore: sessionSummaryCacheStore,
+  isTerminal: sessionIsTerminal,
+  runSummaryStore: runSummaryCacheStore
+})
 
-  // Run paragraph: runs for a running OR terminal session — the summary's own
-  // terminal gate below must not suppress it.
-  await precomputeRunParagraph(urlKey, session, { apiKey });
-
-  if (!sessionSummaryCacheStore) return;
-  if (!sessionIsTerminal(session)) return;            // only terminal sessions are cacheable
-
-  // Skip if a fresh summary for this exact input is already cached.
-  const inputHash = hashSession(session)
-  const cached = await sessionSummaryCacheStore.get(urlKey, session.sessionId)
-  if (cached && cached.inputHash === inputHash) return
-
-  // Gather already-cached child run-summary outcomes for richer context — never
-  // generate per child (the one-LLM-call cost contract).
-  const childOutcomes = {}
-  if (runSummaryCacheStore) {
-    for (const loop of childLoops(session)) {
-      const c = await runSummaryCacheStore.get(urlKey, loop.loopId)
-      if (c?.summary?.outcome) childOutcomes[loop.loopId] = c.summary.outcome
-    }
-  }
-
-  const { summary, model } = await generateSessionSummary(session, { apiKey, model: DEFAULT_SESSION_SUMMARY_MODEL, childOutcomes })
-  await sessionSummaryCacheStore.put(urlKey, session.sessionId, { inputHash, summary, model })
-}
+observationMaterializer.precomputeSessionSummary = createMaterializerPrecompute({
+  precomputeRunParagraph,
+  precomputeSessionSummary
+})
 
 // Brief cache: AI-generated current-state task briefs, keyed on context hash
 const briefCacheCollection = db.collection('brief-cache')
