@@ -1,15 +1,18 @@
 /**
- * LIN-689 — the global hourly cap in FreeTierStore.
+ * LIN-689 / LIN-3239 — the global hourly cap in FreeTierStore.
  *
- * `tryUse` built the hourly key as `global:<hour>` and then prefixed it again on
- * write (`global:global:<hour>`), so the row it incremented was never the row
- * the guard read: `hourCount` stayed 0 and the global hourly cap could not fire
- * on any lane that went through `tryUse` (the actual-request path). `canUse`
- * (read-only) and `recordUsage` built the correct key, which is why the bug was
- * invisible to the read-only status endpoint and to test-helper writes.
+ * `tryUse` originally built the hourly key as `global:<hour>` and then prefixed
+ * it again on write (`global:global:<hour>`), so the row it incremented was
+ * never the row the guard read: `hourCount` stayed 0 and the global hourly cap
+ * could not fire on the actual-request path. LIN-689 fixed the key; LIN-3239
+ * made the increment atomic (the only prompt refusal left) and turned the
+ * per-workspace daily doc into a best-effort count that never refuses.
  *
- * Case 1 fails on the unfixed code and passes once the key is built once through
- * a shared helper. Cases 2 and 3 are the rest of LIN-689's adopted coverage.
+ * Case 1 fails on the unfixed key and passes once the key is built once through
+ * a shared helper. Case 2 is the concurrency proof: exactly `hourlyLimit`
+ * allowed and the stored hourly count lands on `hourlyLimit`, which a
+ * check-then-increment mutant cannot satisfy. Case 3 is the daily counter's
+ * never-refuse contract (the KPI chart reads those docs). Case 4 is fail-closed.
  *
  * The store is exercised on a REAL MangoDB tmpdir (not the inline collection
  * doubles), so `findOne`/`findOneAndUpdate` with upsert + `returnDocument`
@@ -25,7 +28,7 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-describe('LIN-689 — FreeTierStore hourly cap', () => {
+describe('LIN-689 / LIN-3239 — FreeTierStore hourly cap', () => {
   const harness = createMangoTmpdir('lin-689-free-tier-');
   before(() => harness.connect());
   after(() => harness.close());
@@ -37,10 +40,8 @@ describe('LIN-689 — FreeTierStore hourly cap', () => {
 
   test('case 1: hourlyLimit+1 calls across distinct urlKeys — the last is refused "Service busy"', async () => {
     const hourlyLimit = 3;
-    const store = new FreeTierStore({ collection, dailyLimit: 100, hourlyLimit });
+    const store = new FreeTierStore({ collection, hourlyLimit });
 
-    // Each workspace is well under its (high) daily limit, so only the shared
-    // global hourly bucket can refuse. The first `hourlyLimit` must be allowed.
     for (let i = 0; i < hourlyLimit; i++) {
       const res = await store.tryUse(`ws-${i}`);
       assert.equal(res.allowed, true, `call ${i + 1} of ${hourlyLimit} should be allowed`);
@@ -50,34 +51,68 @@ describe('LIN-689 — FreeTierStore hourly cap', () => {
     assert.equal(denied.allowed, false);
     assert.equal(denied.reason, 'Service busy, try again later');
     assert.equal(denied.remaining, 0);
-    assert.equal(denied.limit, 100);
+    assert.equal(denied.limit, hourlyLimit);
   });
 
-  test('case 2: dailyLimit+1 calls for one workspace — denied and the stored count stops at dailyLimit', async () => {
-    const dailyLimit = 2;
-    const store = new FreeTierStore({ collection, dailyLimit, hourlyLimit: 1000 });
+  test('case 2: concurrent tryUse across distinct urlKeys — exactly hourlyLimit allowed, stored count === hourlyLimit', async () => {
+    const hourlyLimit = 5;
+    const extra = 5;
+    const store = new FreeTierStore({ collection, hourlyLimit });
 
-    assert.equal((await store.tryUse('acme')).allowed, true);
-    assert.equal((await store.tryUse('acme')).allowed, true);
+    const results = await Promise.all(
+      Array.from({ length: hourlyLimit + extra }, (_, i) => store.tryUse(`ws-${i}`))
+    );
 
-    const denied = await store.tryUse('acme');
-    assert.equal(denied.allowed, false);
-    assert.equal(denied.reason, 'Daily limit reached, resets at midnight UTC');
+    const allowed = results.filter(r => r.allowed).length;
+    assert.equal(allowed, hourlyLimit, `exactly ${hourlyLimit} of ${hourlyLimit + extra} concurrent calls may be allowed`);
+
+    const hourDoc = await collection.findOne({ _id: store._getGlobalHourKey() });
+    assert.equal(hourDoc.count, hourlyLimit, 'the hourly bucket must land exactly on hourlyLimit after rollbacks');
+  });
+
+  test('case 3: the daily counter keeps incrementing and never refuses (KPI pin)', async () => {
+    // A tiny hourly cap that is never reached here: only the daily doc is under
+    // test. Every call must be allowed however many times it runs.
+    const store = new FreeTierStore({ collection, hourlyLimit: 1000 });
+
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await store.tryUse('acme')).allowed, true, `daily call ${i + 1} must be allowed`);
+    }
 
     const doc = await collection.findOne({ _id: `acme:${todayKey()}` });
-    assert.equal(doc.count, dailyLimit);
+    assert.equal(doc.count, 5, 'the daily counter keeps incrementing');
+    // The fields the KPI chart reads (lib/kpi-stats.js:1235-1242).
+    assert.equal(doc.urlKey, 'acme');
+    assert.equal(doc.date, todayKey());
+    assert.ok(doc.expiresAt instanceof Date, 'the daily doc carries an expiresAt for TTL cleanup');
   });
 
-  test('case 3: a failing count read resolves refused, never rejects', async () => {
+  test('case 4: a failing hourly increment resolves refused, never rejects', async () => {
     const store = new FreeTierStore({
-      collection: { findOne: async () => { throw new Error('db down'); } },
-      dailyLimit: 5,
+      collection: { findOneAndUpdate: async () => { throw new Error('db down'); } },
       hourlyLimit: 5
     });
 
     const res = await store.tryUse('acme');
     assert.equal(res.allowed, false);
     assert.equal(res.reason, 'Unable to verify usage limits, try again later');
+  });
+
+  test('case 5: a failing daily write never turns an allowed prompt into a denial', async () => {
+    const hourlyLimit = 5;
+    let calls = 0;
+    const collection = {
+      async findOneAndUpdate(filter, update, options) {
+        calls++;
+        if (calls > 1) throw new Error('daily write down');
+        return { _id: filter._id, count: 1 };
+      }
+    };
+    const store = new FreeTierStore({ collection, hourlyLimit });
+
+    const res = await store.tryUse('acme');
+    assert.equal(res.allowed, true, 'the hourly charge succeeded, so the prompt proceeds');
+    assert.equal(res.limit, hourlyLimit);
   });
 });
 
