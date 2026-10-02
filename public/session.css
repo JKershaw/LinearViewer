@@ -644,3 +644,33 @@
   .sess-inline-reply-input { min-height: 4rem; }
   .sess-run-tx { --chat-thread-max-height: 280px; }
 }
+
+/* ── Run page header + steps (LIN-3250) ────────────────────────────────────────
+   The heading's human title (sans) with a small mono run id; an empty paragraph
+   slot reserved for S3; and one-line per-step summaries above the existing run
+   rows. Dark-theme tokens only. */
+.sess-heading-title { font-family: var(--font-content); }
+.sess-run-id {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.sess-paragraph-slot:empty { display: none; }
+.sess-step { margin-bottom: var(--space-4); }
+.sess-step-summary {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+}
+
+/* Feels alive: exactly one pulse, on the running step's status dot. The global
+   reduced-motion neutralizer in style.css keeps it static when the user asks
+   for less motion (the explicit guard here documents the contract). */
+@media (prefers-reduced-motion: no-preference) {
+  .sess-run[data-status="running"] .status-pill__dot {
+    animation: pulse var(--motion-pulse) ease-in-out infinite;
+  }
+}

@@ -42,6 +42,7 @@ import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
 import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
 import { renderSessionPage } from '../lib/render-session.js';
+import { buildRunView } from '../lib/run-view.js';
 import { getLoopsForWorkspace, getLoopsForIssue, getSessionsForWorkspace, getSessionsForIssues, deriveIssueGraph, resolvedDecisionEvents, firstRaisedAt } from '../lib/pipeline-loops.js';
 import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
@@ -1198,8 +1199,11 @@ export function createDashboardRoutes({
       // `listCredentialHealth`; nothing here re-derives it.
       const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
 
+      // The run view model is built ONCE here (the renderer only formats it).
+      const runView = buildRunView(session, { now: new Date() });
+
       const html = renderSessionPage(
-        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle },
+        { session, sessionId, issueContext, waiting, waitingMessage, producerLoopId, decision, decisionCase, urlKey: workspace.urlKey, canReply, sessionTerminal, credentialByToken, anchorIssueTitle, runView },
         pageOptions
       );
       res.send(html);
