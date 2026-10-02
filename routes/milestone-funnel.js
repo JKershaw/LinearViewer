@@ -11,6 +11,10 @@
  * only that group's data is read — never another account's. This is the
  * per-account seam, so it MAY carry the account's own task identifiers (the
  * cross-account KPI aggregate must not).
+ *
+ * The funnel is ACCOUNT-WIDE by design: login and connected are account-level,
+ * so the steps span every workspace the person has, not just `:urlKey`. The
+ * echoed `urlKey` is the REQUEST's workspace, not a scope on the data.
  */
 
 import { Router } from 'express';
