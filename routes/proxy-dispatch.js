@@ -393,7 +393,17 @@ export function createDispatchRoutes({
       }
 
       if (!isAbort && issueIdentifier) {
-        const { token: referentToken, provider: referentProvider } = providerAccess;
+        const { token: referentToken, provider: referentProvider, reason: referentReason } = providerAccess;
+        // LIN-3241 (D, parent LIN-3126 §3): an explicit binding refusal must
+        // surface BEFORE isDanglingReferent. That guard is deliberately
+        // permissive on a null token (lib/dispatch-referent-guard.js returns
+        // false), so without this branch a refusal would be swallowed and the
+        // dispatch would proceed on the wrong repo. workspaceUnavailable maps
+        // the refusal to the 422 envelope, reusing the same path as every
+        // ISSUE read site.
+        if (referentReason === 'binding_required' || referentReason === 'unknown_binding') {
+          return workspaceUnavailable(req, res, '/api/proxy/dispatch', referentReason);
+        }
         if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
           logEvent(req, '/api/proxy/dispatch', 422, `${ISSUE_NOT_FOUND_CODE} ${issueIdentifier}`);
           return jsonError(res, 422, DANGLING_REFERENT_MESSAGE, {
