@@ -294,6 +294,37 @@ describe('owner create — L9 subject.id matches fetchProjects issue.parent.id',
     assert.equal(record.subject.id, PARENT_ID, 'subject.id is stored verbatim (the provider issue id)');
     assert.deepEqual(record.snapshot.items.map(i => i.identifier), ['LIN-2']);
   });
+
+  test('a parent input may be the human identifier and resolves to the provider id', async () => {
+    const issues = [
+      { id: PARENT_ID, identifier: 'LIN-1', title: 'Parent', state: { type: 'started' }, priority: 1, updatedAt: 'x' },
+      { id: 'child-uuid', identifier: 'LIN-2', title: 'Child', parent: { id: PARENT_ID }, state: { type: 'unstarted' }, priority: 2, updatedAt: 'y' }
+    ];
+    const store = makeStore();
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues }) });
+
+    const res = await request(app, '/workspace/ws-1/shares', {
+      method: 'POST',
+      body: { subject: { kind: 'parent', id: 'LIN-1' } }
+    });
+    assert.equal(res.status, 201);
+
+    const record = [...store.byId.values()][0];
+    assert.equal(record.subject.id, PARENT_ID, 'the identifier is resolved to the provider-native id');
+    assert.deepEqual(record.snapshot.items.map(i => i.identifier), ['LIN-2']);
+  });
+
+  test('a parent input that matches no issue is kept verbatim (already a provider id)', async () => {
+    const store = makeStore();
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }) });
+
+    const res = await request(app, '/workspace/ws-1/shares', {
+      method: 'POST',
+      body: { subject: { kind: 'parent', id: 'orphan-uuid' } }
+    });
+    assert.equal(res.status, 201);
+    assert.equal([...store.byId.values()][0].subject.id, 'orphan-uuid');
+  });
 });
 
 describe('owner list', () => {

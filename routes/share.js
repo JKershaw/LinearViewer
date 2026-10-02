@@ -364,7 +364,11 @@ export function createShareRoutes({
       // L9: `id` is the provider-native key. For a parent it is the parent
       // issue's `id`, the exact value `fetchProjects` emits as `issue.parent.id`
       // (Linear: the issue UUID), so the snapshot's `parent.id === subject.id`
-      // membership test matches. It is stored verbatim, never resolved.
+      // membership test matches. The form lets the owner type the human
+      // identifier (`LIN-3057`) OR the id; a parent input is resolved below
+      // against the issue set this request already fetched, using the codebase's
+      // existing id-or-identifier idiom (routes/proxy.js:163,
+      // routes/workspace-api.js:2196). No new resolver route is added.
       const normalized = { type: 'collection', kind: subject.kind, id: subject.id.trim() };
 
       // Approving verdict (b): refuse a parent share when the provider cannot
@@ -394,6 +398,16 @@ export function createShareRoutes({
       if (outcome == null || outcome.issues == null || outcome.reason !== 'ok') {
         return jsonError(res, 503, 'Could not read the collection to share; nothing was created. Try again.',
           { code: 'SHARE_SNAPSHOT_UNAVAILABLE', reason: outcome?.reason ?? 'refresh_error' });
+      }
+
+      // L9 (cont.): map a parent's human identifier to its provider-native id.
+      // A value that matches no issue is kept verbatim — it may already be the
+      // provider id of a parent that is not in this set (e.g. archived).
+      if (normalized.kind === 'parent') {
+        const needle = normalized.id.toLowerCase();
+        const parent = outcome.issues.find(i =>
+          i.id === normalized.id || (i.identifier || '').toLowerCase() === needle);
+        if (parent) normalized.id = parent.id;
       }
 
       let created;

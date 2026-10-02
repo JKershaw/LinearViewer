@@ -215,6 +215,188 @@ function initDispatchPresets() {
   })
 }
 
+// =============================================================================
+// Share links (LIN-3244, Session B of LIN-3073)
+//
+// Create/list/revoke go through the owner routes in routes/share.js. The
+// created `{ token, url }` is displayed once here and never persisted in the
+// list; the list only ever carries the opaque management id. Owner-gate and
+// validation refusals are mapped to readable messages rather than swallowed.
+// =============================================================================
+
+// Route refusal `code` → human sentence. The codes are the shared owner-mint
+// vocabulary (lib/owner-mint-refusals.js) plus the share-specific refusals.
+const SHARE_REFUSAL_MESSAGES = {
+  GRANT_OWNER_ONLY: 'Only this workspace’s owner can manage share links.',
+  WORKSPACE_OWNER_UNSET: 'This workspace has no recorded owner, so share links cannot be managed.',
+  GRANT_OWNERLESS: 'This session has no account owner, so share links cannot be managed.',
+  OWNER_CHECK_UNAVAILABLE: 'Owner verification is temporarily unavailable. Try again shortly.',
+  PARENT_SHARES_UNSUPPORTED: 'This workspace’s provider has no subtasks, so a parent share would be empty. Share a label instead.',
+  SHARE_SNAPSHOT_UNAVAILABLE: 'Could not read the collection to share; nothing was created. Try again.'
+}
+
+function showShareMessage(text) {
+  const node = document.querySelector('[data-testid="share-message-node"]')
+  const el = document.querySelector('[data-testid="share-message"]')
+  if (node) node.hidden = !text
+  if (el) el.textContent = text || ''
+}
+
+function shareErrorMessage(e) {
+  const code = e && e.body && e.body.code
+  if (code && SHARE_REFUSAL_MESSAGES[code]) return SHARE_REFUSAL_MESSAGES[code]
+  if (e && e.status === 429) return 'Too many share requests — wait a moment and try again.'
+  return (e && e.message) || 'Something went wrong.'
+}
+
+function renderShareList(container, shares) {
+  if (!shares.length) {
+    container.innerHTML = '<div class="node"><div class="line"><span class="settings-value share-list-empty" data-testid="share-list-empty">No share links yet</span></div></div>'
+    return
+  }
+  container.innerHTML = shares.map((s) => {
+    const created = s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''
+    const kind = s.kind === 'parent' ? 'parent task' : 'label'
+    const revoked = s.revokedAt ? ' · revoked' : ''
+    const revokeBtn = s.revokedAt
+      ? ''
+      : `<button type="button" class="action-btn share-revoke" data-share-id="${escapeHtml(s.id)}">revoke</button>`
+    return `
+      <div class="node share-item" data-share-id="${escapeHtml(s.id)}">
+        <div class="line">
+          <span class="field-label">${escapeHtml(kind)}:</span>
+          <span class="settings-value share-subject">${escapeHtml(s.subjectId || '')}</span>
+          <span class="share-meta">created ${escapeHtml(created)}${revoked}</span>
+          ${revokeBtn}
+        </div>
+      </div>`
+  }).join('')
+}
+
+async function loadShareLinks(urlKey) {
+  const listEl = document.querySelector('[data-testid="share-list"]')
+  if (!listEl) return
+  try {
+    const { shares } = await api(`/workspace/${encodeURIComponent(urlKey)}/shares`, { on401: false })
+    renderShareList(listEl, shares || [])
+  } catch (e) {
+    console.error('Failed to load share links:', e)
+    listEl.innerHTML = `<div class="node"><div class="line"><span class="settings-value share-list-empty">${escapeHtml(shareErrorMessage(e))}</span></div></div>`
+  }
+}
+
+function showCreatedShare(url) {
+  const wrap = document.querySelector('[data-testid="share-created"]')
+  const valueEl = document.querySelector('[data-testid="share-created-url"]')
+  if (!wrap || !valueEl) return
+  valueEl.textContent = url
+  wrap.hidden = false
+  const copyBtn = document.querySelector('[data-testid="share-copy-btn"]')
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url)
+        copyBtn.textContent = 'copied!'
+        setTimeout(() => { copyBtn.textContent = 'copy' }, 1500)
+      } catch (err) {
+        console.error('Failed to copy share link:', err)
+        copyBtn.textContent = 'failed'
+        setTimeout(() => { copyBtn.textContent = 'copy' }, 1500)
+      }
+    }
+  }
+}
+
+async function createShareLink(urlKey, root) {
+  const kind = (root.querySelector('.share-kind-select') || {}).value || 'label'
+  const input = root.querySelector('.share-subject-input')
+  const value = input ? input.value.trim() : ''
+  const includeDescriptions = !!(root.querySelector('.share-descriptions-input') || {}).checked
+  const btn = root.querySelector('.share-create-btn')
+
+  showShareMessage('')
+  if (!value) {
+    showShareMessage(kind === 'parent' ? 'Enter the parent task’s id or identifier (e.g. LIN-3057).' : 'Enter a label name.')
+    return
+  }
+
+  const originalText = btn ? btn.textContent : null
+  try {
+    if (btn) { btn.textContent = 'creating…'; btn.disabled = true }
+    const { url } = await api(`/workspace/${encodeURIComponent(urlKey)}/shares`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: { kind, id: value }, includeDescriptions }),
+      on401: false
+    })
+    // Absolute URL so the copied link works from anywhere.
+    showCreatedShare(new URL(url, window.location.origin).href)
+    if (input) input.value = ''
+    await loadShareLinks(urlKey)
+  } catch (e) {
+    console.error('Failed to create share link:', e)
+    showShareMessage(shareErrorMessage(e))
+  } finally {
+    if (btn) { btn.textContent = originalText; btn.disabled = false }
+  }
+}
+
+async function revokeShareLink(urlKey, id) {
+  showShareMessage('')
+  try {
+    await api(`/workspace/${encodeURIComponent(urlKey)}/shares/${encodeURIComponent(id)}/revoke`, {
+      method: 'POST',
+      on401: false
+    })
+    await loadShareLinks(urlKey)
+  } catch (e) {
+    console.error('Failed to revoke share link:', e)
+    showShareMessage(shareErrorMessage(e))
+  }
+}
+
+function initShareLinks() {
+  const root = document.querySelector('[data-testid="share-links"]')
+  if (!root) return
+  const urlKey = root.dataset.urlKey
+
+  loadShareLinks(urlKey)
+
+  const createBtn = root.querySelector('.share-create-btn')
+  if (createBtn) {
+    createBtn.addEventListener('click', (e) => {
+      e.preventDefault()
+      createShareLink(urlKey, root)
+    })
+  }
+
+  // Keep the input's placeholder honest for the selected kind.
+  const kindSelect = root.querySelector('.share-kind-select')
+  const input = root.querySelector('.share-subject-input')
+  if (kindSelect && input) {
+    const syncPlaceholder = () => {
+      input.placeholder = kindSelect.value === 'parent' ? 'e.g. LIN-3057 or the task id' : 'label name'
+    }
+    kindSelect.addEventListener('change', syncPlaceholder)
+    syncPlaceholder()
+  }
+
+  const list = root.querySelector('[data-testid="share-list"]')
+  if (list) {
+    list.addEventListener('click', (e) => {
+      const btn = e.target.closest('.share-revoke')
+      if (!btn) return
+      e.preventDefault()
+      // Native confirm() is the ratified destructive-action primitive
+      // (LIN-511); see docs/ui-divergences.md.
+      if (confirm('Revoke this share link? Anyone holding the URL will immediately lose access.')) {
+        revokeShareLink(urlKey, btn.dataset.shareId)
+      }
+    })
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initDispatchPresets()
+  initShareLinks()
 })
