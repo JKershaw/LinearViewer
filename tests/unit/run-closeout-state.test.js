@@ -191,6 +191,35 @@ describe('deriveCloseOutState — truth table', () => {
     assert.match(state.message, /PR #41 merged · 2 more PRs open/);
   });
 
+  test('N-b: a merged PR beside a readable closed-unmerged PR names that, not "could not be read"', () => {
+    const closed = { readable: true, repo: REPO, number: 42, state: 'closed', merged: false, head: { ref: 'f', sha: 'bbbbbbb' }, ref: 'bbbbbbb', checks: [] };
+    const state = deriveCloseOutState({
+      prs: [pr(41), pr(42)],
+      prStatuses: [mergedStatus(), closed],
+      review: approve(),
+      runnerReady: true,
+      owner: true,
+      byPersonCheck: true,
+    });
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.PARTIAL);
+    assert.match(state.message, /PR #41 merged · 1 more PR not merged/);
+    assert.ok(!/could not be read/.test(state.message));
+    assert.strictEqual(state.setDone, false);
+  });
+
+  test('N-b: a merged PR beside an unreadable remaining PR still fails open', () => {
+    const state = deriveCloseOutState({
+      prs: [pr(41), pr(42)],
+      prStatuses: [mergedStatus(), unknownStatus()],
+      review: approve(),
+      runnerReady: true,
+      owner: true,
+      byPersonCheck: true,
+    });
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.UNKNOWN);
+    assert.match(state.message, /could not be read/);
+  });
+
   test('a merged PR (own check) is merged and Done is set', () => {
     const state = deriveCloseOutState({
       prs: [pr(41)],

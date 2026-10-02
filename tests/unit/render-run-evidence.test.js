@@ -177,6 +177,14 @@ describe('render-run-evidence: P3 close-out box states (LIN-3248)', () => {
     assert.match(html, /data-testid="run-evidence-closeout-press"/);
   });
 
+  test('M9: an unknown variant (missing/legacy row) withholds the promise — never coerced to standard', () => {
+    const html = renderCloseOutBox(readyState({ variant: 'unknown' }));
+    assert.match(html, /data-variant="unknown"/);
+    assert.ok(!html.includes('Harbour never merges on its own'));
+    assert.ok(!html.includes('data-testid="run-evidence-closeout-promise"'));
+    assert.match(html, /data-testid="run-evidence-closeout-press"/);
+  });
+
   test('not-ready shows ○ set up › and is never hidden', () => {
     const html = renderCloseOutBox({ owner: true, status: 'not-ready', variant: 'standard', message: 'no runner is set up for this workspace yet' });
     assert.match(html, /data-state="not-ready"/);

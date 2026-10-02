@@ -79,6 +79,38 @@ function makeRouter({
   return { router, collection, calls };
 }
 
+// A router whose `closeOut` seam omits `markDone`, so the route exercises the
+// production `defaultMarkDone` against a stubbed provider.
+function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
+  const collection = harness.freshDb().collection('close-out-events');
+  const store = new CloseOutEventsStore({ collection });
+  const calls = { updateIssue: [] };
+  const provider = {
+    async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')]; },
+    async fetchProjects() { return { projects: [{ id: 'p1', name: 'P', content: 'repo=acme/widget' }], issues: [] }; },
+    async fetchIssueContext() { return { issue: { id: 'issue-uuid', identifier: 'LIN-1', team: { id: 'team-1' } } }; },
+    async issueWriteGuard() { return { team: { id: 'team-1' } }; },
+    async states() { return [{ id: 'st-open', name: 'In Progress', type: 'started' }, { id: 'st-done', name: 'Done', type: 'completed' }]; },
+    async updateIssue(_scope, id, input) {
+      calls.updateIssue.push({ id, input });
+      if (throwOnUpdate) throw new Error('provider write failed');
+      return { success: true, issue: { id } };
+    },
+  };
+  const router = createWorkspaceApiRoutes({
+    workspaceFromUrl: (req, res, next) => next(),
+    closeOutEventsStore: store,
+    closeOut: {
+      resolveProvider: () => ({ provider, callScope: 'scope' }),
+      readPrStatus: async ({ number }) => (number === 41 ? mergedStatus(41) : unknownStatus(number)),
+      isStopAtRun: async () => 'pr',
+      runnerReady: () => true,
+      // deliberately no `markDone`: exercise the production default
+    },
+  });
+  return { router, collection, calls };
+}
+
 function baseReq(over = {}) {
   return {
     session: { accountId: 'acct-1', workspaces: ['ws'] },
@@ -250,6 +282,40 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(second.jsonBody.done, true);
     assert.equal((await rows(built.collection)).length, 1); // still idempotent
     assert.equal(built.calls.markDone, 2);
+  });
+
+  test('M7: a merged PR on a non-stop-at-PR run records nothing and never sets Done', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      statuses: { 41: mergedStatus(41) },
+      isStopAtRun: async () => null,
+    });
+    const res = await check(built);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.deepEqual(res.jsonBody.recorded, []);
+    assert.equal(res.jsonBody.done, false);
+    assert.equal(built.calls.markDone, 0);
+    assert.equal((await rows(built.collection)).length, 0);
+  });
+
+  test('ledger 5: the default markDone resolves the completed state and calls updateIssue with its stateId', async () => {
+    const built = makeDefaultMarkDoneRouter();
+    const res = await check(built);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.done, true);
+    assert.equal(built.calls.updateIssue.length, 1);
+    assert.equal(built.calls.updateIssue[0].id, 'issue-uuid');
+    assert.equal(built.calls.updateIssue[0].input.stateId, 'st-done');
+    assert.equal((await rows(built.collection)).length, 1);
+  });
+
+  test('ledger 5: a failing provider write does not throw past the recorded event', async () => {
+    const built = makeDefaultMarkDoneRouter({ throwOnUpdate: true });
+    const res = await check(built);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.done, false);
+    assert.match(res.jsonBody.doneError, /provider write failed/);
+    assert.equal((await rows(built.collection)).length, 1);
   });
 });
 

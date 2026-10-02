@@ -111,11 +111,27 @@ describe('CloseOutEventsStore.record', () => {
     assert.strictEqual(stored.merged, false);
   });
 
-  test('is idempotent on urlKey + prUrl + headSha: a repeat returns the first doc, no second row', async () => {
+  test('is idempotent on urlKey + prUrl + headSha + by: a repeat returns the first doc, no second row', async () => {
     const first = await store.record(personMerge());
     const second = await store.record(personMerge({ accountId: 'acct-2', openItems: { inside: 9, outside: 0, unknown: 0, total: 9 } }));
     assert.strictEqual(second._id, first._id);
     assert.strictEqual((await db.collection('close-out-events').find({}).toArray()).length, 1);
+  });
+
+  test('B2: a press followed by a person merge on the same head records TWO docs, and the merge carries merged + open counts', async () => {
+    const press = await store.record(pressEvent({ merged: false }));
+    const merge = await store.record(personMerge({ merged: true, openItems: { inside: 2, outside: 1, unknown: 0, total: 3 } }));
+    assert.notStrictEqual(merge._id, press._id);
+    const docs = await db.collection('close-out-events').find({}).toArray();
+    assert.strictEqual(docs.length, 2);
+    const mergeDoc = docs.find(d => d.by === 'person');
+    assert.strictEqual(mergeDoc.merged, true);
+    assert.deepStrictEqual(mergeDoc.openItems, { inside: 2, outside: 1, unknown: 0, total: 3 });
+    // The key is scoped by `by`: each kind answers for itself on the same head.
+    const personHit = await store.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'person' });
+    const pressHit = await store.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'press' });
+    assert.strictEqual(personHit._id, merge._id);
+    assert.strictEqual(pressHit._id, press._id);
   });
 
   test('a different headSha is a new event', async () => {
@@ -152,9 +168,9 @@ describe('CloseOutEventsStore reads', () => {
 
   test('getByPr finds the idempotency key, scoped to the workspace', async () => {
     await store.record(personMerge());
-    const found = await store.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234' });
+    const found = await store.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'person' });
     assert.strictEqual(found.by, 'person');
-    assert.strictEqual(await store.getByPr({ urlKey: 'other', prUrl: PR_URL, headSha: 'abc1234' }), null);
+    assert.strictEqual(await store.getByPr({ urlKey: 'other', prUrl: PR_URL, headSha: 'abc1234', by: 'person' }), null);
   });
 
   test('listForIssue returns the task\'s events oldest-first', async () => {
@@ -168,7 +184,7 @@ describe('CloseOutEventsStore reads', () => {
 
   test('a failing collection never throws: reads return null / empty', async () => {
     const failing = new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); }, findOne: () => { throw new Error('db down'); } } });
-    assert.strictEqual(await failing.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234' }), null);
+    assert.strictEqual(await failing.getByPr({ urlKey: 'ws', prUrl: PR_URL, headSha: 'abc1234', by: 'person' }), null);
     assert.deepStrictEqual(await failing.listForIssue({ urlKey: 'ws', issueIdentifier: 'LIN-42' }), []);
   });
 });

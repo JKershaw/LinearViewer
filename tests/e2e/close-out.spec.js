@@ -164,14 +164,23 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toBeVisible();
   });
 
-  test('merged by you: the box records the self-merge and open ledger items stay visible as open at merge', async ({ page }) => {
+  test('merged by you: a reload records the self-merge (check fires for merged) and sets Done', async ({ page }) => {
     await seedLocalWorkspaceWithEvidence(page);
     await seedFinishedRun(page);
     await page.request.post('/test/seed-pr-status', {
       data: { repo: REPO, number: 12, readable: true, state: 'closed', merged: true, headSha: PR_HEAD, checks: [{ name: 'unit', conclusion: 'success' }] },
     });
     const sessionId = await discoverSessionId(page);
+
+    // B1: a page load that already sees the merge must still call `check`, so the
+    // `{by:'person'}` record is made and Done is set — not just the rendered text.
+    const checkResponse = page.waitForResponse(r =>
+      r.url().includes('/run-evidence/LOCAL-CO1/check') && r.request().method() === 'POST');
     await gotoSession(page, sessionId);
+    const checkBody = await (await checkResponse).json();
+    expect(checkBody.recorded, 'the self-merge is recorded on load').toHaveLength(1);
+    expect(checkBody.recorded[0].by).toBe('person');
+    expect(checkBody.done, 'R1 sets Done within its bounds').toBe(true);
 
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="merged"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout-merged"]')).toContainText('merged by you');

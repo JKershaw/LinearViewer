@@ -190,13 +190,14 @@ describe('db-indexes', () => {
 
   test('declares the close-out-events idempotency and per-task indexes, neither a TTL (LIN-3248)', () => {
     // The unique key is the record's idempotency contract (urlKey + prUrl +
-    // headSha); the per-task key backs listForIssue's oldest-first read. The
-    // log is lifetime-retained, so neither may be a TTL.
+    // headSha + by — a press and the person's later merge are distinct); the
+    // per-task key backs listForIssue's oldest-first read. The log is
+    // lifetime-retained, so neither may be a TTL.
     const unique = INDEX_SPECS.find(s =>
       s.collection === 'close-out-events' &&
-      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, prUrl: 1, headSha: 1 })
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, prUrl: 1, headSha: 1, by: 1 })
     );
-    assert.ok(unique, 'close-out-events must have a {urlKey:1,prUrl:1,headSha:1} index');
+    assert.ok(unique, 'close-out-events must have a {urlKey:1,prUrl:1,headSha:1,by:1} index');
     assert.deepStrictEqual(unique.options, { unique: true });
     assert.strictEqual(unique.options?.expireAfterSeconds, undefined);
 

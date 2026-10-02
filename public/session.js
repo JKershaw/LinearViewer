@@ -758,13 +758,29 @@
   function runCloseOutCheck() {
     var ctx = closeOutContext();
     if (!ctx || !ctx.urlKey || !ctx.issueIdentifier) return;
-    if (ctx.box.getAttribute('data-state') !== 'ready') return;
+    var state = ctx.box.getAttribute('data-state');
+    // `ready` catches a merge that happened since load; `merged`/`partial`
+    // catch a reload/revisit that already saw the merge server-side — without
+    // this the person's self-merge would never be recorded and Done never set
+    // (LIN-3248 review B1). The check is idempotent, so a repeat is safe.
+    if (state !== 'ready' && state !== 'merged' && state !== 'partial') return;
     window.api(
       '/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/run-evidence/' + encodeURIComponent(ctx.issueIdentifier) + '/check',
       { method: 'POST', body: JSON.stringify({}) }
     ).then(function (result) {
       applyCloseOutState(ctx.box, result && result.state);
     }).catch(function () { /* fail open: the box keeps its last state */ });
+  }
+
+  // Debounce tab-return so one return fires one check, not one per focused
+  // element (LIN-3248 review N-a).
+  var closeOutCheckTimer = null;
+  function scheduleCloseOutCheck() {
+    if (closeOutCheckTimer) return;
+    closeOutCheckTimer = setTimeout(function () {
+      closeOutCheckTimer = null;
+      runCloseOutCheck();
+    }, 300);
   }
 
   function pressCloseOut(btn) {
@@ -818,7 +834,13 @@
       pressCloseOut(btn);
     });
     runCloseOutCheck();
-    document.addEventListener('focus', function () { runCloseOutCheck(); }, true);
+    // Tab return only: `window` focus plus visible `visibilitychange`, debounced
+    // (LIN-3248 review N-a) — never the capture-phase document focus that fired
+    // on every element.
+    window.addEventListener('focus', scheduleCloseOutCheck);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) scheduleCloseOutCheck();
+    });
   }
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
