@@ -1417,6 +1417,40 @@ describe('createDispatchItem — run-boundary seam guard (LIN-3245)', () => {
   });
 });
 
+describe('createDispatchItem — child-autopilot stopAt inheritance (LIN-3245 N1)', () => {
+  test('a fresh autopilot under a stopAt:pr run is stamped stopAt:pr (one shared run-row read)', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'autopilot', fields: { sessionId: 'run-1' } });
+    assert.equal(item.stopAt, 'pr');
+    assert.equal(store.getItemStatusCalls, 1, 'the parent row is read once, shared with the guards');
+  });
+
+  test('a fresh autopilot under a run without stopAt is not stamped', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: null } } });
+    const item = await freshDispatch(store, { kind: 'autopilot', fields: { sessionId: 'run-1' } });
+    assert.ok(!('stopAt' in item) || item.stopAt === null, 'no boundary inherited');
+  });
+
+  test('an autopilot with no sessionId inherits nothing and never reads a run row', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'autopilot', fields: {} });
+    assert.ok(!('stopAt' in item) || item.stopAt === null, 'no boundary supplied or inherited');
+    assert.equal(store.getItemStatusCalls, 0);
+  });
+
+  test('a caller-supplied stopAt is preserved, not overwritten by inheritance', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: null } } });
+    const item = await freshDispatch(store, { kind: 'autopilot', fields: { sessionId: 'run-1', stopAt: 'pr' } });
+    assert.equal(item.stopAt, 'pr');
+  });
+
+  test('a followUpTo autopilot beat does not inherit (freshness rule)', async () => {
+    const store = budgetStore({ runs: { 'run-1': { stopAt: 'pr' } } });
+    const item = await freshDispatch(store, { kind: 'autopilot', fields: { sessionId: 'run-1', followUpTo: 'anchor-1' } });
+    assert.ok(!('stopAt' in item) || item.stopAt === null, 'a follow-up beat is not a fresh child launch');
+  });
+});
+
 describe('createDispatchItem — budgetPosition snapshot (LIN-2934)', () => {
   test('budgetPosition is absent (not just null) when no budget is declared', async () => {
     const store = budgetStore({ runs: { 'run-1': {} } });

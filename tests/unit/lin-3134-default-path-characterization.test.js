@@ -83,7 +83,7 @@ const ADD_ITEM_DOC_KEYS = [
   'maxSessionsPerTask', 'maxTasks', 'model', 'periodicalId', 'presetConfig',
   'presetName', 'producingItemAttempt', 'producingItemId', 'prompt', 'promptName',
   'queueIfBusy', 'repo', 'rootItemId', 'sessionGroupId', 'sessionId',
-  'subscription', 'target', 'terminal', 'urlKey', 'waitForFollowUps'
+  'stopAt', 'subscription', 'target', 'terminal', 'urlKey', 'waitForFollowUps'
 ];
 
 const ARCHIVE_HISTORY_DOC_KEYS = [
@@ -93,7 +93,8 @@ const ARCHIVE_HISTORY_DOC_KEYS = [
   'issueTitle', 'issueUrl', 'kind', 'maxSessionsPerTask', 'maxTasks', 'model',
   'periodicalId', 'presetConfig', 'presetName', 'producingItemAttempt',
   'producingItemId', 'prompt', 'promptName', 'queueIfBusy', 'repo', 'resolvedAt',
-  'rootItemId', 'sessionGroupId', 'sessionId', 'status', 'subscription',
+  'rootItemId', 'sessionGroupId', 'sessionId', 'status', 'stopAt',
+  'subscription',
   'takenByTokenId', 'takenByTokenLabel', 'target', 'terminal', 'trimHistory',
   'urlKey', 'waitForFollowUps'
 ];
@@ -104,8 +105,8 @@ const FORMAT_ITEM_KEYS = [
   'harness', 'id', 'issueId', 'issueIdentifier', 'issueTitle', 'issueUrl',
   'kind', 'maxSessionsPerTask', 'maxTasks', 'model', 'periodicalId',
   'presetConfig', 'presetName', 'prompt', 'promptName', 'queueIfBusy', 'repo',
-  'rootItemId', 'sessionGroupId', 'sessionId', 'subscription', 'target',
-  'terminal', 'trimHistory', 'waitForFollowUps', 'workspace'
+  'rootItemId', 'sessionGroupId', 'sessionId', 'stopAt', 'subscription',
+  'target', 'terminal', 'trimHistory', 'waitForFollowUps', 'workspace'
 ];
 
 const FORMAT_HISTORY_ITEM_KEYS = [
@@ -115,7 +116,7 @@ const FORMAT_HISTORY_ITEM_KEYS = [
   'issueTitle', 'issueUrl', 'kind', 'maxSessionsPerTask', 'maxTasks', 'model',
   'periodicalId', 'presetConfig', 'presetName', 'prompt', 'promptName',
   'queueIfBusy', 'repo', 'resolvedAt', 'rootItemId', 'sessionGroupId',
-  'sessionId', 'status', 'subscription', 'takenByTokenLabel', 'target',
+  'sessionId', 'status', 'stopAt', 'subscription', 'takenByTokenLabel', 'target',
   'terminal', 'trimHistory', 'waitForFollowUps'
 ];
 
