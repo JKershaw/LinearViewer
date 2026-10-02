@@ -186,10 +186,10 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.equal(roadmapCallCount, 2, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly TWICE — roadmap-chat (LIN-2970) and roadmap-generate/resolveRoadmapLLM (LIN-2978, credential only; chargeRoadmapLayer stays its own per-layer charge, outside this module)');
   });
 
-  test('routes/workspace-api.js: resolveChatCredential is called exactly 7 times, and the old duplicated ternary shape is gone entirely (LIN-2978)', () => {
+  test('routes/workspace-api.js: resolveChatCredential is called exactly 8 times, and the old duplicated ternary shape is gone entirely (LIN-2978, LIN-3238)', () => {
     const src = read('routes/workspace-api.js');
     const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(callCount, 7, `expected exactly 7 resolveChatCredential calls in routes/workspace-api.js (the six full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire — plus the credential-only feedback-title site), found ${callCount}`);
+    assert.equal(callCount, 8, `expected exactly 8 resolveChatCredential calls in routes/workspace-api.js (the six full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire — plus the credential-only feedback-title site, plus the LIN-3238 feedback dispatch-point re-derivation for the free-tier run gate), found ${callCount}`);
     assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
   });
 

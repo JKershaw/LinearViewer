@@ -18,6 +18,7 @@ import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff
 import { isValidIssueId } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { buildRunGate } from '../lib/chat-request.js';
 
 /**
  * @param {Object} deps
@@ -60,6 +61,11 @@ export function createKickoffRoutes({
   resolvePromptIssueContext,
   refuseIfDuplicateDispatch,
   refuseIfBudgetExhausted,
+  refuseIfRunLimit = () => false,
+  freeTierStore = null,
+  accountStore = null,
+  getWorkspaceOpenRouterKey = null,
+  resolveProxyLLM = null,
   graphqlErrorStatus,
   VALID_PROXY_DISPATCH_TARGETS,
   PROXY_ATTACH_FAILED_MESSAGE,
@@ -298,12 +304,28 @@ export function createKickoffRoutes({
         resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
       }
 
+      // Child-autopilot prompt inheritance (LIN-3246 / LIN-2949 P1b): a fresh
+      // child autopilot launched under a parent run that declared `stopAt: 'pr'`
+      // carries the SAME stop block in its PROMPT, so a descendant of a
+      // stop-at-PR run stops too. The parent fact is read from the same run row
+      // (`getItemStatus`, keyed on the body's `sessionId`) that the dispatch
+      // factory reads to stamp the child ROW (lib/dispatch-factory.js's shared
+      // `run` read), so the prompt and the row can never disagree. Fail-open to
+      // null on an absent/unreadable lookup — the factory's own shared read does
+      // `.catch(() => null)`, so a kickoff that works today never gains a new
+      // failure mode. This verb has NO body-level `stopAt`; it only inherits.
+      const parentRun = (sessionId && typeof dispatchQueueStore.getItemStatus === 'function')
+        ? await Promise.resolve(dispatchQueueStore.getItemStatus(req.proxyUrlKey, sessionId)).catch(() => null)
+        : null;
+      const inheritedStopAt = parentRun?.stopAt === 'pr' ? 'pr' : null;
+
       const kickoff = buildAutopilotKickoff({
         baseUrl,
         issue,
         goal: typeof goal === 'string' ? goal : '',
         mode: resolvedMode,
         variant: resolvedVariant,
+        stopAt: inheritedStopAt,
         maxTasks: maxTasks ?? null,
         maxSessionsPerTask: maxSessionsPerTask ?? null,
         // LIN-2804: only resolved when this was a SCOPED kickoff (see the
@@ -345,6 +367,20 @@ export function createKickoffRoutes({
       // is resolved so it can gate its MCP-token-vs-prose branch on it (LIN-1155),
       // and hands back the bootstrapToken to carry as a structured field. Opt out
       // with appendProxyContext:false.
+      // Free-tier run gate (LIN-3238): the token creator's own OpenRouter key
+      // decides free tier; `buildRunGate` returns null otherwise. Only a fresh
+      // kickoff row reaches step 1.55 (a child kickoff carrying `sessionId` is a
+      // continuation and is never gated).
+      const kickoffSessionApiKey = getWorkspaceOpenRouterKey
+        ? await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy)
+        : null;
+      const { isFreeTier: kickoffIsFreeTier } = resolveProxyLLM(kickoffSessionApiKey);
+      const runGate = buildRunGate({
+        isFreeTier: kickoffIsFreeTier,
+        freeTierStore,
+        accountId: req.proxyCreatedBy,
+        accountStore
+      });
       const item = await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: req.proxyUrlKey,
@@ -352,6 +388,7 @@ export function createKickoffRoutes({
         dispatchPresetsStore,
         dispatchTokenStore,
         proxyTokenStore,
+        runGate,
         presetId: presetId || null,
         kind: 'autopilot',
         model,
@@ -466,6 +503,9 @@ export function createKickoffRoutes({
       // under a budgeted sessionId), but a child-autopilot kickoff dispatched
       // with `sessionId` set to a coordinator's budgeted run can be.
       if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/autopilot/kickoff')) return;
+      // Free-tier run-limit refusal (LIN-3238) — 429 RUN_LIMIT_REACHED or 503
+      // RUN_LIMIT_UNVERIFIED when the count could not be read.
+      if (refuseIfRunLimit(err, req, res, '/api/proxy/autopilot/kickoff')) return;
       // Fail closed (LIN-1175): a claude-code dispatch whose out-of-band bootstrap
       // token could not be minted must be REFUSED, never launched credential-less.
       // attachProxyContext flags this as proxyAttachFailed (same convention as the

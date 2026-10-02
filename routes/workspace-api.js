@@ -21,7 +21,7 @@ import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-for
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
-import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, buildRunGate } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
@@ -352,7 +352,7 @@ function sendBindingRefusal(res, refusal) {
  * @param {Function} [options.adoptConnectionCredential] - LIN-3124 PR3 (D7): connection-keyed adopt read (injected; protected module imports no connection seam)
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -665,6 +665,19 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const stepper = variant === 'stepper'
     const baseUrl = `${req.protocol}://${req.get('host')}`
 
+    // Run boundary (LIN-3246 / LIN-2949 P1b): optional `?stopAt=pr`. Query params
+    // are always strings, so blank/whitespace-only is ABSENT, not an error — the
+    // same rule maxTasks follows on the general twin below. Only the literal 'pr'
+    // is valid; any other non-blank value is a 400, matching the dispatch route's
+    // contract (`routes/dispatch.js`).
+    let stopAt = null
+    if (typeof req.query.stopAt === 'string' && req.query.stopAt.trim() !== '') {
+      if (req.query.stopAt.trim() !== 'pr') {
+        return badRequest.json(res, "stopAt must be 'pr'")
+      }
+      stopAt = 'pr'
+    }
+
     try {
       // Use mock data in test mode
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
@@ -679,6 +692,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           issue: { identifier, title: mockIssue.title },
           mode,
           variant,
+          stopAt,
           standalone: true
         })
         return sendPromptResult(req, res, {
@@ -705,6 +719,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         issue: { identifier: issue.identifier, title: issue.title },
         mode,
         variant,
+        stopAt,
         standalone: true,
         // LIN-2804: mirrors the identical generatePrompt pattern already at
         // lines 948/1299/1388 in this file — issueProvider is the actually
@@ -3647,6 +3662,22 @@ ${goal}`
     }
   }
 
+  // Map a factory run-limit refusal (LIN-3238) to the M4 feedback-widget shape
+  // `{ launched:false, code, retryable, message }`: RUN_LIMIT_REACHED is
+  // terminal (retryable:false), RUN_LIMIT_UNVERIFIED (the count could not be
+  // read) is retryable. Returns null for any other error so the caller keeps its
+  // existing logging path. The ticket is already filed; this only says why no
+  // run started.
+  function runLimitRefusal(err) {
+    if (!err || !err.runLimit) return null;
+    return {
+      launched: false,
+      code: err.runLimit.code,
+      retryable: err.runLimit.code === 'RUN_LIMIT_UNVERIFIED',
+      message: err.runLimit.error
+    };
+  }
+
   // Best-effort triage follow-up after a feedback ticket is filed (LIN-635 S6).
   // Non-fatal: a failure here must not fail the submission — the ticket already
   // exists. Reuses the existing dispatch substrate (no separate queue).
@@ -3698,6 +3729,10 @@ ${goal}`
         workspacePreferencesStore,
         proxyTokenStore,
         kind: 'triage',
+        // Free-tier run gate (LIN-3238): the route builds it at the dispatch
+        // point (the title block's isFreeTier is scoped). Only a fresh triage row
+        // reaches step 1.55; a refusal leaves the filed ticket intact.
+        runGate: overrides.runGate || null,
         // Optional per-dispatch override from the feedback widget (LIN-1132).
         // Blank/absent falls through to the factory's default resolution
         // (workspace dispatchDefaults → claude-code interpose), byte-identical to
@@ -3731,8 +3766,15 @@ ${goal}`
           target: 'cli'
         }
       });
+      return null;
     } catch (err) {
+      const refusal = runLimitRefusal(err);
+      if (refusal) {
+        console.warn(`Feedback triage not launched: ${refusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
+        return refusal;
+      }
       console.error('Feedback triage enqueue failed:', err.message);
+      return null;
     }
   }
 
@@ -3788,6 +3830,9 @@ ${goal}`
         workspacePreferencesStore,
         proxyTokenStore,
         kind: 'autopilot',
+        // Free-tier run gate (LIN-3238): built by the route at the dispatch
+        // point. A refusal leaves the filed ticket intact and no bootstrap minted.
+        runGate: overrides.runGate || null,
         // Optional per-dispatch override from the feedback widget (LIN-1132).
         // Blank/absent falls through to the factory's default resolution
         // (workspace dispatchDefaults → claude-code interpose), byte-identical to
@@ -3828,6 +3873,14 @@ ${goal}`
       });
       return { launched: true };
     } catch (err) {
+      // Free-tier run-limit refusal (LIN-3238) — ahead of the grant-refusal
+      // branch, since a run-limit THROW is not a coded grant refusal. The ticket
+      // is already filed; report why no run started.
+      const runRefusal = runLimitRefusal(err);
+      if (runRefusal) {
+        console.warn(`Feedback autopilot not launched: ${runRefusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
+        return runRefusal;
+      }
       if (isCodedGrantRefusal(err)) {
         const refusal = codedGrantRefusalResponse(err, 'an autopilot launch credential');
         console.warn(`Feedback autopilot not launched: ${refusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
@@ -4030,21 +4083,29 @@ ${goal}`
       // With no explicit action (the legacy plain send) we preserve the old
       // behaviour: triage only when the per-user `feedbackTriage` flag is on.
       const baseUrl = `${req.protocol}://${req.get('host')}`;
+      // Free-tier run gate (LIN-3238 Q10): the title block's `isFreeTier` above
+      // is scoped to that block, so re-derive it here at the dispatch point. The
+      // gate is passed through `overrides` to both feedback enqueue helpers; a
+      // refusal leaves the filed ticket intact and reports why no run started.
+      const { isFreeTier: feedbackIsFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
+      const runGate = buildRunGate({ isFreeTier: feedbackIsFreeTier, freeTierStore, accountId: req.session?.accountId, accountStore });
       let autopilot = null;
+      let triage = null;
       if (action === 'triage') {
-        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness });
+        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate });
       } else if (action === 'autopilot') {
-        autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness });
+        autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness, runGate });
       } else if (!action && getFeatureFlags(req.session).feedbackTriage) {
-        await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness });
+        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate });
       }
 
-      // LIN-3136 M4: the ticket is filed either way; a refused autopilot launch
-      // is reported so the widget can say why. Every other outcome keeps the
-      // response exactly as it was.
+      // LIN-3136 M4 / LIN-3238: the ticket is filed either way; a refused run
+      // launch (autopilot keeps its key, triage gets a new one) is reported so
+      // the widget can say why. Every other outcome keeps the response as it was.
       return res.status(201).json({
         success: true,
         issue: result.issue,
+        ...(triage && triage.launched === false ? { triage } : {}),
         ...(autopilot && autopilot.launched === false ? { autopilot } : {})
       });
     } catch (error) {

@@ -46,7 +46,7 @@ import {
   MAX_NAME_LENGTH,
   DANGEROUS_CHARS_REGEX,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE, CLOSE_OUT_IS_THE_PERSONS_CODE } from '../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE, CLOSE_OUT_IS_THE_PERSONS_CODE, RUN_LIMIT_UNVERIFIED_CODE } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
@@ -475,7 +475,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null }) {
   const router = Router();
 
   /**
@@ -903,6 +903,43 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       keepalive.send(409, { error: err.message, ...refusal });
     } else {
       jsonError(res, 409, err.message, refusal);
+    }
+    return true;
+  }
+
+  /**
+   * Shared refusal responder for the free-tier run-limit guard (LIN-3238),
+   * mirroring `refuseIfDuplicateDispatch`/`refuseIfBudgetExhausted` above: one
+   * construction site so every creating proxy route replies identically.
+   *
+   * The body is built once, in `createDispatchItem` (step 1.55), and carried on
+   * `err.runLimit` — `{ error, code, freeTier: { used, remaining, limit,
+   * resetsAt, runsUsed }, retryAfter }`. `RUN_LIMIT_REACHED` is a 429;
+   * `RUN_LIMIT_UNVERIFIED` (the count could not be read) is a 503. `Retry-After`
+   * duplicates the body's `retryAfter` for standards-friendly clients, and is
+   * set only while headers are still open (a keepalive-armed caller may have
+   * already committed the 200).
+   *
+   * @param {*} err - the caught error (a non-run-limit error passes straight through)
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {string} endpoint - audit-log endpoint tag
+   * @param {{send: Function}} [keepalive] - pass when the handler armed one
+   * @returns {boolean} true if a refusal was sent (caller returns early)
+   */
+  function refuseIfRunLimit(err, req, res, endpoint, keepalive = null) {
+    if (!err || !err.runLimit) return false;
+    const refusal = err.runLimit;
+    const status = refusal.code === RUN_LIMIT_UNVERIFIED_CODE ? 503 : 429;
+    logEvent(req, endpoint, status, refusal.code);
+    const body = { code: refusal.code, freeTier: refusal.freeTier, retryAfter: refusal.retryAfter };
+    if (status === 429 && !res.headersSent) {
+      res.set('Retry-After', String(refusal.retryAfter));
+    }
+    if (keepalive) {
+      keepalive.send(status, { error: refusal.error, ...body });
+    } else {
+      jsonError(res, status, refusal.error, body);
     }
     return true;
   }
@@ -1619,11 +1656,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, getWorkspaceOpenRouterKey, resolveProxyLLM, freeTierStore, accountStore, refuseIfRunLimit, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, refuseIfRunLimit, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
   // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch

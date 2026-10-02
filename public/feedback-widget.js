@@ -483,6 +483,12 @@
           // LIN-3136 (M4): the ticket was filed but its autopilot launch was
           // refused (e.g. a non-owner). Say why, and stay open so it is read —
           // the draft is still cleared, since resubmitting would file a duplicate.
+          // LIN-3238: the triage lane reports the same way (a free-tier run-limit
+          // refusal), so a refused triage shows its reason instead of a bare "Filed".
+          if (data.triage && data.triage.launched === false) {
+            setStatus(`${filed}. Triage was not started: ${data.triage.message}`, 'error');
+            return;
+          }
           if (data.autopilot && data.autopilot.launched === false) {
             setStatus(`${filed}. Autopilot was not started: ${data.autopilot.message}`, 'error');
             return;

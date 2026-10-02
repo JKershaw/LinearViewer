@@ -72,6 +72,30 @@ async function call(app, method, path, body) {
   }
 }
 
+// Run several requests against ONE live server so the kickoff body's embedded
+// `${baseUrl}` (host:port) is identical across them — a fresh port per request
+// would diff only on the port and mask a real regression.
+async function withServer(app, fn) {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  const { port } = server.address();
+  const post = async (path, body) => {
+    const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer anything', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { status: res.status, body: parsed };
+  };
+  try {
+    return await fn(post);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+}
+
 const DISPATCH = '/api/proxy/dispatch';
 const KICKOFF = '/api/proxy/autopilot/kickoff';
 
@@ -151,4 +175,51 @@ describe('LIN-3245 N1 — child autopilot stopAt inheritance', () => {
     assert.equal(closeOut.status, 409, JSON.stringify(closeOut.body));
     assert.equal(closeOut.body.code, 'CLOSE_OUT_IS_THE_PERSONS');
   });
+});
+
+// LIN-3246 / LIN-2949 P1b: the fused kickoff verb passes the parent boundary into
+// the child's PROMPT too, reading the same run row (`getItemStatus` by sessionId)
+// the factory reads to stamp the child ROW — so the prompt and the row can never
+// disagree. No body-level `stopAt`; it only inherits.
+describe('LIN-3246 P1b — child autopilot stopAt PROMPT inheritance', () => {
+  // addItem appends the child's own session-id self-ref block (whose id differs
+  // per child), so compare the base prompt before that block.
+  const basePrompt = (prompt) => prompt.split('\n\n---\n\n## Your autopilot session id')[0];
+
+  test('parent without stopAt: the child prompt is byte-identical to the no-sessionId kickoff, both without the stop block', async () => {
+    const store = makeStore();
+    const app = buildApp({ dispatchQueueStore: store });
+    const parentId = await seedParent(store, null);
+
+    const { withParent, withoutParent } = await withServer(app, async (post) => ({
+      withParent: await post(KICKOFF, { goal: 'ship it', target: 'cli', sessionId: parentId }),
+      withoutParent: await post(KICKOFF, { goal: 'ship it', target: 'cli' }),
+    }));
+    assert.equal(withParent.status, 201, JSON.stringify(withParent.body));
+    assert.equal(withoutParent.status, 201, JSON.stringify(withoutParent.body));
+
+    const a = basePrompt((await store.getItemStatus('acme', withParent.body.id)).prompt);
+    const b = basePrompt((await store.getItemStatus('acme', withoutParent.body.id)).prompt);
+    assert.equal(a, b, 'no parent stopAt must not change the child prompt');
+    assert.ok(a.includes("## The finish line: dispatch the close, don't merge inline"));
+    assert.ok(!a.includes('including as a stepped beat'));
+  });
+
+  for (const variant of ['standard', 'stepper']) {
+    test(`parent with stopAt:pr → the ${variant} child prompt carries the stop block and the row is stamped`, async () => {
+      const store = makeStore();
+      const app = buildApp({ dispatchQueueStore: store });
+      const parentId = await seedParent(store, 'pr');
+
+      const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', sessionId: parentId, variant });
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      const child = await store.getItemStatus('acme', res.body.id);
+      assert.equal(child.stopAt, 'pr', 'the child row is stamped from the same parent fact');
+      assert.match(child.prompt, /stop at the PR/);
+      assert.match(child.prompt, /including as a stepped beat/);
+      assert.match(child.prompt, /ready for close-out/);
+      assert.doesNotMatch(child.prompt, /dispatch the `close-out` step/);
+      if (variant === 'stepper') assert.match(child.prompt, /STEPPER/);
+    });
+  }
 });

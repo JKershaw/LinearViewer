@@ -19,6 +19,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { badRequest, jsonError, unauthorized } from '../lib/errors.js';
 import { CLIENT_ACTS, validateTaskModeEvent } from '../lib/task-mode-store.js';
+import { resolveAccountGroup } from '../lib/account-group.js';
 
 // PROVISIONAL (LIN-2942, for John): the POST appends to a lifetime-retained
 // collection on every press, so it gets its own per-IP budget. 60 a minute is
@@ -32,27 +33,6 @@ const taskModeLimiter = rateLimit({
   // Skip rate limiting in test mode
   skip: () => process.env.NODE_ENV === 'test'
 });
-
-/**
- * The session account's merge group: its canonical account plus every account
- * merged into it, and the id as written in the session.
- *
- * PROVISIONAL (LIN-2942, for John): when canonicalization fails (a corrupt
- * mergedInto chain), the read narrows to the session's own account rather than
- * guessing at a group — it can under-report, never show another account's
- * events.
- */
-async function resolveAccountGroup(accountStore, accountId) {
-  if (!accountStore) return [accountId];
-  try {
-    const canonicalId = await accountStore.resolveCanonicalAccountId(accountId);
-    const merged = await accountStore.listMergedAccounts(canonicalId);
-    return [...new Set([canonicalId, ...merged.map(account => account._id), accountId])];
-  } catch (err) {
-    console.error('Error resolving account merge group for task mode:', err.message);
-    return [accountId];
-  }
-}
 
 /**
  * @param {Object} deps
