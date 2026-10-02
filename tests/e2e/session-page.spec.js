@@ -251,7 +251,9 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
 
     // The page shell rendered.
     await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
-    await expect(page.locator('.page-header.sess-header h1')).toContainText('Session');
+    // LIN-3250: the heading is the task title + a short "Run <id>".
+    await expect(page.locator('[data-testid="session-title"]')).toContainText('Session-page seed');
+    await expect(page.locator('[data-testid="session-run-id"]')).toContainText('Run ');
 
     // Tasks-touched surface carries the seeded task.
     await expect(page.locator('[data-testid="session-tasks"]')).toContainText('LIN-1003');
@@ -832,6 +834,78 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // On the swipe page the Observation tab is a clickable anchor (not active).
     const tabHref = await page.locator('[data-testid="nav-view-observation"]').getAttribute('href');
     expect(tabHref).toBe(`/workspace/${URL_KEY}/observation`);
+  });
+
+  // ── LIN-3250: the rewritten run page (header strip, steps, live clocks) ────
+  test('renders the header strip and per-step summaries, with no money when unpriced (LIN-3250)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // Header strip: the one progress number, active time, and the wall clock.
+    await expect(page.locator('[data-testid="session-progress"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-active-time"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-elapsed"]')).toBeVisible();
+    // Reserved paragraph slot for S3 is present (empty).
+    await expect(page.locator('[data-testid="session-paragraph"]')).toBeAttached();
+
+    // Steps: each lineage gets a one-line summary above its existing run rows.
+    const steps = page.locator('[data-testid="session-step"]');
+    await expect(steps.first()).toBeVisible();
+    await expect(page.locator('[data-testid="session-step-summary"]').first()).toBeVisible();
+    // Every step's summary sits above that step's own run rows.
+    await expect(steps.first().locator('[data-testid="session-run"]').first()).toBeVisible();
+
+    // The seeded run carries no usage → the header total is not reported, so
+    // there is NO money markup at all (never a zero/placeholder).
+    await expect(page.locator('[data-testid="session-cost"]')).toHaveCount(0);
+  });
+
+  test('the wall clock and waiting clock carry the timestamps the client ticks from (LIN-3250)', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedBlockedSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    // The session is waiting: the waiting clock is rendered with its since stamp.
+    const waiting = page.locator('[data-testid="session-waiting-clock"]');
+    await expect(waiting).toBeVisible();
+    await expect(waiting).toHaveAttribute('data-since', /.+/);
+    // The wall clock carries its start (and no end while the run is open).
+    const wall = page.locator('[data-testid="session-elapsed"]');
+    await expect(wall).toHaveAttribute('data-start', /.+/);
+    await expect(wall).toHaveAttribute('data-end', '');
+  });
+
+  test('reduced motion leaves the running step dot static (LIN-3250)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedWarmSession(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const dot = page.locator('[data-testid="session-run"][data-status="running"] .status-pill__dot').first();
+    await expect(dot).toBeVisible();
+    // The global reduced-motion neutralizer collapses the pulse's duration to
+    // ~0, so the dot is static (the animation NAME stays `pulse`).
+    const reducedDuration = await dot.evaluate((el) => getComputedStyle(el).animationDuration);
+    expect(parseFloat(reducedDuration)).toBeLessThan(0.01);
+
+    // With motion allowed the same dot pulses (duration is real seconds).
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.reload({ waitUntil: 'networkidle' });
+    const pulsingDuration = await dot.evaluate((el) => getComputedStyle(el).animationDuration);
+    expect(parseFloat(pulsingDuration)).toBeGreaterThan(1);
   });
 });
 
