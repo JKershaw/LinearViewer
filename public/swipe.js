@@ -29,8 +29,9 @@ const hasAutopilot = data.hasAutopilot || false;
 const dispatchEnabled = data.dispatchEnabled || false;
 const proxyEnabled = data.proxyEnabled || false;
 const isLocalhost = data.isLocalhost || false;
-// LIN-2944: AI state + free-tier flag drive the shared component's disabled
-// primary-action wording (F9 / addendum 5); promptButtons hides templates.
+// LIN-2944: AI state drives the shared component's disabled primary-action
+// wording (F9 / addendum 5); promptButtons hides templates. LIN-3239: the
+// free-tier flag tells the ladder to read the caller's own run allowance.
 const aiState = data.aiState || null;
 const freeTier = data.freeTier === true;
 const promptButtons = data.promptButtons !== false;
