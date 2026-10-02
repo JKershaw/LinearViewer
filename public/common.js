@@ -1243,6 +1243,23 @@ window.ReplyDelivery = (function () {
   }
 
   /**
+   * The effect that will ACTUALLY be delivered for these opts — the declared
+   * `effect` after the G3 rewrite. A declared `resume` on a non-resumable
+   * disposition is not a resume: the loop is reaped, so it is delivered as a
+   * fresh run (`dispatch`), exactly as the tab branches on disposition.
+   *
+   * Exported (LIN-3252 H1) so the surfaces' success copy and delivery verbs
+   * describe what was delivered, not what was declared: `deliverRulingAnswer`
+   * and the run-page card both read this ONE rewrite, so the card can no
+   * longer say "queued" while a fresh run actually started.
+   */
+  function deliveredEffect(opts) {
+    var effect = opts && opts.effect;
+    if (effect === 'resume' && opts.disposition && opts.disposition !== 'resumable') return 'dispatch';
+    return effect;
+  }
+
+  /**
    * Answer a ruling row by its resolved `effect` — the single entry point both
    * the run-page card and the Rulings tab use. `resume` (or an absent/unknown
    * effect) is the ordinary comment + follow-up chain; `record` and `dispatch`
@@ -1253,8 +1270,7 @@ window.ReplyDelivery = (function () {
    * branches on disposition, so no `followUpTo` goes into reaped work.
    */
   function deliverRulingAnswer(opts, handlers) {
-    var effect = opts.effect;
-    if (effect === 'resume' && opts.disposition && opts.disposition !== 'resumable') effect = 'dispatch';
+    var effect = deliveredEffect(opts);
     if (effect === 'record') return deliverRulingRecord(opts, handlers);
     if (effect === 'dispatch') return deliverRulingDispatch(opts, handlers);
     return deliverReply(opts, opts.prompt, handlers);
@@ -1267,6 +1283,7 @@ window.ReplyDelivery = (function () {
     deliverRulingAnswer: deliverRulingAnswer,
     deliverRulingRecord: deliverRulingRecord,
     deliverRulingDispatch: deliverRulingDispatch,
+    deliveredEffect: deliveredEffect,
     resolveRecordTarget: resolveRecordTarget,
     composeDispatchPrompt: composeDispatchPrompt,
     RECORD_TARGET_OUTSIDE_NOTE: RECORD_TARGET_OUTSIDE_NOTE,

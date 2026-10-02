@@ -32,7 +32,7 @@ function makeEl(over = {}) {
   }, over);
 }
 
-function makeCard({ effect, recordOn = '', question = 'Ship it?', chunks = [], typed = 'my answer', issueIdentifier = 'LIN-1', issueId = 'i1' }) {
+function makeCard({ effect, recordOn = '', question = 'Ship it?', chunks = [], typed = 'my answer', issueIdentifier = 'LIN-1', issueId = 'i1', disposition }) {
   const btn = makeEl();
   const textarea = makeEl({ value: typed });
   const feedback = makeEl();
@@ -41,7 +41,7 @@ function makeCard({ effect, recordOn = '', question = 'Ship it?', chunks = [], t
   const card = makeEl({
     dataset: {
       urlKey: 'w', loopId: 'lp', stampLoopId: 'sp', decisionId: 'd1', target: 'cli',
-      issueId, issueIdentifier, disposition: effect === 'resume' ? 'resumable' : 'gone',
+      issueId, issueIdentifier, disposition: disposition || (effect === 'resume' ? 'resumable' : 'gone'),
       effect, recordOn, sessionWaiting: 'false'
     },
     querySelector(sel) {
@@ -63,6 +63,11 @@ function makeSandbox(cards) {
     window: {
       ReplyDelivery: {
         deliverRulingAnswer(opts, handlers) { captured.push({ opts, handlers }); handlers.onDispatchOk(); return Promise.resolve(); },
+        deliveredEffect(opts) {
+          const e = opts.effect;
+          if (e === 'resume' && opts.disposition && opts.disposition !== 'resumable') return 'dispatch';
+          return e;
+        },
         composeDispatchPrompt(row, chosenAnswer) {
           const parts = [];
           if (row.decision.question) parts.push('Decision: ' + row.decision.question);
@@ -149,6 +154,39 @@ test('G1 card-level: answering a dispatch card whose anchor is TERMINAL records 
   assert.equal(comments.length, 1, 'the answer is recorded instead');
   assert.match(fixture.feedback.textContent, /recorded on the task/);
   assert.match(fixture.feedback.textContent, /now closed/, 'the downgrade note is surfaced to the person');
+  assert.equal(fixture.btn.textContent, 'answered ✓');
+});
+
+// H1 (pass 3): a declared `resume` on a reaped loop (`gone`) is delivered as a
+// fresh run (G3). The card's copy must describe the delivered effect, not the
+// declared one, or it claims "queued" while a run actually started.
+test('H1 card-level: gone + declared resume reports the delivered fresh run, not a queued resume', async () => {
+  const fixture = makeCard({ effect: 'resume', disposition: 'gone', typed: 'go ahead' });
+  const { sandbox, calls, dispatched } = makeRealDeliverySandbox([fixture], {
+    hydrate: { hydrated: true, state: { name: 'Backlog', type: 'backlog' } }
+  });
+  sandbox.module.exports.initQuestionCards();
+  fixture.btn.click();
+  await flush();
+
+  assert.equal(dispatched.length, 1, 'the reaped resume is delivered as one fresh run');
+  assert.match(fixture.feedback.textContent, /started a new run/, 'the copy matches what was delivered');
+  assert.doesNotMatch(fixture.feedback.textContent, /queued/);
+  assert.equal(fixture.btn.textContent, 'started ✓');
+});
+
+test('H1 card-level: gone + declared resume on a TERMINAL anchor reports recorded with the closed note', async () => {
+  const fixture = makeCard({ effect: 'resume', disposition: 'gone', typed: 'go ahead' });
+  const { sandbox, dispatched } = makeRealDeliverySandbox([fixture], {
+    hydrate: { hydrated: true, state: { name: 'Done', type: 'completed' } }
+  });
+  sandbox.module.exports.initQuestionCards();
+  fixture.btn.click();
+  await flush();
+
+  assert.equal(dispatched.length, 0, 'no run onto a closed task (G1 downgrade)');
+  assert.match(fixture.feedback.textContent, /recorded on the task/);
+  assert.match(fixture.feedback.textContent, /now closed/, 'the downgrade note is not dropped');
   assert.equal(fixture.btn.textContent, 'answered ✓');
 });
 

@@ -109,13 +109,19 @@
       // `dispatch` effect starts a fresh run. A dispatch whose press-time
       // anchor check downgraded it to record (G1) arrives with a note — say so
       // rather than claiming a run started.
-      if (opts.effect === 'record') {
+      //
+      // H1: read the DELIVERED effect, not the declared one. `deliverRulingAnswer`
+      // rewrites a declared `resume` on a reaped loop (G3) to a fresh run, so a
+      // card that branched on `opts.effect` would claim "queued" while a run
+      // actually started.
+      var effect = window.ReplyDelivery.deliveredEffect(opts);
+      if (effect === 'record') {
         feedback.textContent = 'recorded on the task';
         btn.textContent = 'answered ✓';
-      } else if (opts.effect === 'dispatch' && !note) {
+      } else if (effect === 'dispatch' && !note) {
         feedback.textContent = 'started a new run';
         btn.textContent = 'started ✓';
-      } else if (opts.effect === 'dispatch') {
+      } else if (effect === 'dispatch') {
         feedback.textContent = 'recorded on the task — ' + note;
         btn.textContent = 'answered ✓';
       } else {
@@ -153,7 +159,8 @@
     // window.ReplyDelivery's own closure over this same opts/prompt — not a
     // caller-side reimplementation of postDispatch.
     function onPartialFailure(dispatchErr, retryDispatch) {
-      var deliveryVerb = opts.effect === 'dispatch' ? 'start a run' : 'deliver to the session';
+      var delivered = window.ReplyDelivery.deliveredEffect(opts);
+      var deliveryVerb = delivered === 'dispatch' ? 'start a run' : 'deliver to the session';
       appendYouBubble(thread, prompt);
       textarea.value = '';
       feedback.textContent = 'Recorded on the task. Could not ' + deliveryVerb + ': ' + dispatchErr.message + '. ';
@@ -167,7 +174,7 @@
         feedback.textContent = 'retrying delivery…';
         feedback.className = 'sess-reply-feedback';
         retryDispatch().then(function () {
-          feedback.textContent = opts.effect === 'dispatch' ? 'started a new run' : queuedCopy(true);
+          feedback.textContent = delivered === 'dispatch' ? 'started a new run' : queuedCopy(true);
           feedback.className = 'sess-reply-feedback';
         }).catch(function (e2) {
           feedback.textContent = 'Still could not ' + deliveryVerb + ': ' + e2.message + '. ';
