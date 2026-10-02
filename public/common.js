@@ -1470,6 +1470,10 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  *   the resolved provider's name, so the issue-scoped kickoff resolves THAT
  *   issue's own binding instead of the workspace's active provider. No-op
  *   (and unused) on the goal-scoped kickoff, which has no single issue to bind.
+ * @param {string} [opts.bindingScope]          Optional `?bindingScope=<scope>` query param
+ *   (LIN-3240): the issue row's binding stamp, forwarded beside `source` so the
+ *   kickoff resolves THIS issue's own binding. Forwarded only when present, so an
+ *   unstamped kickoff stays byte-identical.
  * @param {number} [opts.maxTasks]              Optional task-budget scope bound (LIN-1737/LIN-1751):
  *   `?maxTasks=<n>` query param on the general (goal-scoped) kickoff only — the
  *   issue-scoped kickoff has no budget concept, so this is a no-op there.
@@ -1479,7 +1483,7 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, maxSessionsPerTask, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, bindingScope, maxTasks, maxSessionsPerTask, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
@@ -1487,9 +1491,11 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
   if (issueId) {
     // LIN-1904: built via URLSearchParams (not string concatenation) so a
     // second param (`source`) alongside `variant` gets correct `?`/`&` joining.
+    // LIN-3240: `bindingScope` rides beside `source` when stamped.
     const params = new URLSearchParams();
     if (variant) params.set('variant', variant);
     if (source) params.set('source', source);
+    if (bindingScope) params.set('bindingScope', bindingScope);
     const issueQuery = params.toString() ? `?${params.toString()}` : '';
     url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt/${encodeURIComponent(issueId)}${issueQuery}`;
   } else {

@@ -24,7 +24,7 @@ import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib
 import { createChatToolCatalog } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
-import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
+import { resolveIssueBinding, bindingRefusalResponse, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
@@ -254,6 +254,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // alongside (lib/render.js's chatHref) — the client drops it the moment
       // the user types a different task id (see public/task-chat.js).
       const rawSource = typeof req.query.source === 'string' ? req.query.source.trim().slice(0, 64) : '';
+      // LIN-3240 (review F2): the binding stamp rides beside the source hint so
+      // the page can prefill it; without this hop (route -> render -> client) the
+      // client's `prefillBindingScope` was always '' and a two-repo chat turn
+      // re-resolved source-only (422). Absent/empty keeps the unstamped page
+      // byte-identical.
+      const rawBindingScope = typeof req.query.bindingScope === 'string' ? req.query.bindingScope.trim().slice(0, 200) : '';
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
       // Saved chats require a user identity (accountId). Absent only for a
       // genuinely anonymous session — local/GitHub sessions carry an accountId
@@ -261,7 +267,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // explicit empty-state and omits the save affordance when it is (LIN-1008).
       const savedChatsAvailable = !!req.session.accountId;
       const html = renderTaskChatPage(
-        { defaultTask: rawTask, defaultSource: rawSource, aiConfigured, savedChatsAvailable },
+        { defaultTask: rawTask, defaultSource: rawSource, defaultBindingScope: rawBindingScope, aiConfigured, savedChatsAvailable },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,
@@ -382,8 +388,24 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
   router.post('/workspace/:urlKey/api/task-chat/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
-    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, requestedSource);
+    // LIN-3240 (review R1): the DECLARED source, restored. This was dropped when
+    // the selector moved inline, leaving the LIN-2371 persona block below reading
+    // an undeclared `requestedSource` behind `typeof` — which silently yielded
+    // `undefined`, so the persona always named `workspace.provider` on a
+    // mixed-provider workspace (the exact false-provider class LIN-2371 fixed).
+    // Declared here from the SAME query field the selector consumes, so the
+    // persona names the row's actual provider.
+    const requestedSource = typeof req.query.source === 'string' && req.query.source ? req.query.source : null;
+    // LIN-3240: row tier — the issue's OWN binding, strict (`source`+`bindingScope`).
+    const issueBinding = resolveIssueBinding(workspace, {
+      source: requestedSource ?? undefined,
+      bindingScope: typeof req.query.bindingScope === 'string' && req.query.bindingScope ? req.query.bindingScope : undefined,
+    });
+    if (issueBinding.error) {
+      const { status, body } = bindingRefusalResponse(issueBinding);
+      return res.status(status).json(body);
+    }
+    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.taskChat !== true) {

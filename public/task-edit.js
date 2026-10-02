@@ -88,8 +88,14 @@
     // workspaces still gain the query param (harmless — the sole binding
     // matches either way).
     var source = form.dataset.source;
+    // LIN-3240: forward the issue's binding stamp beside source (present only
+    // when stamped), so the PATCH resolves THIS issue's own binding.
+    var bindingScope = form.dataset.bindingScope;
+    var patchParams = [];
+    if (source) patchParams.push('source=' + encodeURIComponent(source));
+    if (bindingScope) patchParams.push('bindingScope=' + encodeURIComponent(bindingScope));
     var patchUrl = '/workspace/' + encodeURIComponent(urlKey) + '/api/issues/' + encodeURIComponent(issueId) +
-      (source ? '?source=' + encodeURIComponent(source) : '');
+      (patchParams.length ? '?' + patchParams.join('&') : '');
 
     try {
       setStatus('Saving…');

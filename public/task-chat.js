@@ -17,6 +17,8 @@
   // holds the SAME identifier it was minted for — see send() below.
   var prefillTask = data.defaultTask || '';
   var prefillSource = data.defaultSource || '';
+  // LIN-3240: the issue's binding stamp beside the source hint.
+  var prefillBindingScope = data.defaultBindingScope || '';
 
   var idInput = document.getElementById('task-chat-id');
   var questionInput = document.getElementById('task-chat-question');
@@ -328,7 +330,14 @@
     // it no longer describes the row the link was generated for, so it's
     // dropped rather than carried along.
     var sourceHint = (taskId === prefillTask) ? prefillSource : '';
-    var sourceQuery = sourceHint ? ('?source=' + encodeURIComponent(sourceHint)) : '';
+    // LIN-3240: bindingScope rides beside source, and is dropped under the same
+    // "still the prefilled task" rule. String concatenation (not URLSearchParams)
+    // keeps the unstamped `?source=` form byte-identical.
+    var bindingScopeHint = (taskId === prefillTask) ? prefillBindingScope : '';
+    var sourceParts = [];
+    if (sourceHint) sourceParts.push('source=' + encodeURIComponent(sourceHint));
+    if (bindingScopeHint) sourceParts.push('bindingScope=' + encodeURIComponent(bindingScopeHint));
+    var sourceQuery = sourceParts.length ? ('?' + sourceParts.join('&')) : '';
 
     // Raw fetch carve-out: Server-Sent Events stream consumed via readSSEStream
     // (public/common.js); window.api() parses the body as JSON and would break

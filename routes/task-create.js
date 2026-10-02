@@ -29,8 +29,7 @@ import { Router } from 'express';
 import { renderTaskCreatePage } from '../lib/render-task-create.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { getProviderForWorkspace } from '../lib/providers/registry.js';
-import { getWorkspaceCallScope } from '../lib/workspace.js';
+import { resolveDefaultBinding } from '../lib/workspace.js';
 
 /**
  * Best-effort option list for a capability-gated read. Two independent guards,
@@ -83,10 +82,12 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
       featureFlags: getFeatureFlags(req.session)
     };
 
-    // Create is scoped to the workspace's ACTIVE provider (unlike task-edit,
-    // which resolves a per-issue binding — there is no issue yet to carry a
-    // `source` stamp, so this mirrors POST /api/issues' own provider selection).
-    const provider = getProviderForWorkspace(workspace);
+    // LIN-3240 (LIN-3126 §2): creation is scoped to the EXPLICIT default binding
+    // (the LIN-3124 active marker's binding), never a silent pick on a
+    // multi-binding workspace. There is no issue yet to carry a `source` stamp;
+    // the form lists the default binding's teams/projects.
+    const defaultBinding = resolveDefaultBinding(workspace);
+    const provider = defaultBinding.provider;
     pageOptions.ui = provider?.ui || {};
 
     // Capability gate: `ui.inlineCreate` (derived from the provider's real
@@ -106,7 +107,7 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
       // in-tree provider — inside the try anyway so a misbehaving provider
       // renders the error page below instead of crashing the request.
       const fields = provider.createFields();
-      const scope = getWorkspaceCallScope(workspace);
+      const scope = defaultBinding.callScope;
 
       const [teams, projects] = await Promise.all([
         fields.includes('teamId') ? loadOptionList(provider, 'fetchTeams', scope, [], 'teams') : Promise.resolve([]),

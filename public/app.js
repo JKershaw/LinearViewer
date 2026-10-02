@@ -84,6 +84,22 @@ function downloadMarkdown(text, filename) {
 // relativeTime is the same "Behavior B" format this page's local copy seeded.
 
 /**
+ * LIN-3240: the `?source=...&bindingScope=...` query for an issue-scoped fetch.
+ * `bindingScope` is the row's own binding stamp (`data-binding-scope`); it is
+ * forwarded only when present, so an unstamped single-binding/legacy request
+ * stays byte-identical to the pre-slice `?source=...`.
+ * @param {string} [source] - resolved provider name
+ * @param {string} [bindingScope] - binding selector stamp
+ * @returns {string} a leading-`?` query string, or ''
+ */
+function sourceBindingQuery(source, bindingScope) {
+  const parts = []
+  if (source) parts.push(`source=${encodeURIComponent(source)}`)
+  if (bindingScope) parts.push(`bindingScope=${encodeURIComponent(bindingScope)}`)
+  return parts.length ? `?${parts.join('&')}` : ''
+}
+
+/**
  * Load and render comments for an issue
  * LIN-156: Fetches comments from API on first expand
  * @param {HTMLElement} toggle - The toggle element containing issue ID and urlKey
@@ -94,8 +110,9 @@ async function loadComments(toggle, content) {
   const urlKey = toggle.dataset.urlKey
   // LIN-1904: forward the resolved provider (stamped server-side in
   // lib/render.js) so the fetch resolves THIS issue's own binding instead of
-  // the workspace's active provider.
+  // the workspace's active provider. LIN-3240: forward its binding stamp too.
   const source = toggle.dataset.source
+  const bindingScope = toggle.dataset.bindingScope
 
   if (!issueId || !urlKey) {
     console.error('Missing issueId or urlKey for comments')
@@ -111,7 +128,7 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
+    const sourceQuery = sourceBindingQuery(source, bindingScope)
     const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}${sourceQuery}`)
     const comments = (data && data.comments) || []
 
@@ -189,8 +206,9 @@ function loadLazySection(type, toggle, content) {
   const urlKey = toggle.dataset.urlKey
   // LIN-1910: forward the resolved provider (stamped server-side in
   // lib/render.js) so Brief/Recap resolve THIS issue's own binding instead of
-  // the workspace's active provider.
+  // the workspace's active provider. LIN-3240: forward its binding stamp too.
   const source = toggle.dataset.source
+  const bindingScope = toggle.dataset.bindingScope
   if (!identifier || !urlKey) return
 
   // Guard against re-init on a later expand (init is idempotent but a re-fetch
@@ -201,19 +219,19 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-brief-placeholder="1"]')
     if (placeholder && window.BriefSection) {
       placeholder.removeAttribute('data-brief-placeholder')
-      window.BriefSection.init(placeholder, { urlKey, identifier, source })
+      window.BriefSection.init(placeholder, { urlKey, identifier, source, bindingScope })
     }
   } else if (type === 'recap') {
     const placeholder = content.querySelector('[data-recap-placeholder="1"]')
     if (placeholder && window.RecapSection) {
       placeholder.removeAttribute('data-recap-placeholder')
-      window.RecapSection.init(placeholder, { urlKey, identifier, source })
+      window.RecapSection.init(placeholder, { urlKey, identifier, source, bindingScope })
     }
   } else if (type === 'scan') {
     const placeholder = content.querySelector('[data-scan-placeholder="1"]')
     if (placeholder && window.ScanSection) {
       placeholder.removeAttribute('data-scan-placeholder')
-      window.ScanSection.init(placeholder, { urlKey, identifier, source })
+      window.ScanSection.init(placeholder, { urlKey, identifier, source, bindingScope })
     }
   } else if (type === 'sessions') {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
@@ -225,7 +243,9 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-context-placeholder="1"]')
     if (placeholder && window.ContextSection) {
       placeholder.removeAttribute('data-context-placeholder')
-      window.ContextSection.init(placeholder, { urlKey, identifier })
+      // LIN-3240 (review F3): forward the row's provider + binding stamp so the
+      // context read resolves THIS issue's own binding, not the active one.
+      window.ContextSection.init(placeholder, { urlKey, identifier, source, bindingScope })
     }
   }
 }
@@ -252,11 +272,14 @@ async function loadDetails(details) {
   const section = details.dataset.section || ''
   // Forward the issue's own provenance too (LIN-1903), so the server can
   // resolve THIS issue's own binding in a merged multi-binding workspace
-  // instead of always resolving the workspace's active provider.
+  // instead of always resolving the workspace's active provider. LIN-3240 adds
+  // the binding stamp beside it (absent for an unstamped row).
   const source = details.dataset.source || ''
+  const bindingScope = details.dataset.bindingScope || ''
   const params = new URLSearchParams()
   if (section) params.set('section', section)
   if (source) params.set('source', source)
+  if (bindingScope) params.set('bindingScope', bindingScope)
   const query = params.toString()
   const detailQuery = query ? `?${query}` : ''
 
@@ -1015,8 +1038,10 @@ function initPrompts() {
       const apiPrefix = urlKey ? `/workspace/${encodeURIComponent(urlKey)}` : ''
       // LIN-1904: forward the resolved provider (stamped server-side in
       // lib/render.js) so the fetch resolves THIS issue's own binding.
+      // LIN-3240: forward its binding stamp too.
       const source = promptContainer.dataset.source
-      const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
+      const bindingScope = promptContainer.dataset.bindingScope
+      const sourceQuery = sourceBindingQuery(source, bindingScope)
       const data = await window.api(
         `${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(labelName)}${sourceQuery}`,
         { signal: abortController.signal }
@@ -1792,8 +1817,10 @@ function initRecommendations() {
       // LIN-1910: forward the resolved provider (stamped server-side in
       // lib/render.js) so the recommend stream resolves THIS issue's own
       // binding instead of the workspace's active provider.
+      // LIN-3240: forward its binding stamp too.
       const source = recommendContainer.dataset.source
-      const sourceQuery = source ? `?source=${encodeURIComponent(source)}` : ''
+      const bindingScope = recommendContainer.dataset.bindingScope
+      const sourceQuery = sourceBindingQuery(source, bindingScope)
       // Deliberately raw fetch (NOT window.api): this is an SSE stream read via
       // response.body.getReader() (readSSEStream, public/common.js). api() consumes
       // the body as JSON, so streaming readers stay on raw fetch. (api() carve-out.)
@@ -2227,12 +2254,15 @@ function initAutopilot() {
       const urlKey = container.dataset.urlKey
       // LIN-1904: forward the resolved provider (stamped server-side in
       // lib/render.js) so the kickoff fetch resolves THIS issue's own binding.
+      // LIN-3240: forward its binding stamp too.
       const source = container.dataset.source
+      const bindingScope = container.dataset.bindingScope
       const data = await window.fetchAutopilotKickoff({
         urlKey,
         issueId,
         variant: variant || undefined,
         source: source || undefined,
+        bindingScope: bindingScope || undefined,
         signal: abortController.signal
       })
 

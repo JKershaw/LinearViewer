@@ -53,7 +53,7 @@ describe('public/scan.js: postScan optional abort signal (LIN-2702)', () => {
     const { ScanSection, calls } = loadScanSection();
     const ac = new AbortController();
 
-    await ScanSection.postScan('ws', 'LIN-1', 'local', { signal: ac.signal });
+    await ScanSection.postScan('ws', 'LIN-1', 'local', undefined, { signal: ac.signal });
 
     assert.equal(calls.length, 1);
     assert.equal(calls[0].url, '/workspace/ws/api/scan/LIN-1?source=local');
@@ -78,7 +78,7 @@ describe('public/scan.js: postScan optional abort signal (LIN-2702)', () => {
     const { ScanSection, calls } = loadScanSection();
     const ac = new AbortController();
 
-    await ScanSection.postScan('ws', 'LIN-1', 'local', { signal: ac.signal });
+    await ScanSection.postScan('ws', 'LIN-1', 'local', undefined, { signal: ac.signal });
     await ScanSection.postScan('ws', 'LIN-1', 'local');
 
     assert.equal(calls[0].url, '/workspace/ws/api/scan/LIN-1?source=local');
