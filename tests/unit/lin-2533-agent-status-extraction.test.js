@@ -38,7 +38,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import express from 'express';
@@ -48,34 +48,58 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 const agentStatusSource = readFileSync(join(__dirname, '../../routes/proxy-agent-status.js'), 'utf8');
 
-function occurrenceCount(source, needle) {
-  return source.split(needle).length - 1;
+// LIN-3218 (LIN-3201 A1): every route file the proxy surface lives in, derived
+// from the filesystem — never a hand list. Used for presence/absence relations
+// (which file carries a registration or store call) instead of exact counts.
+function proxyRouteFiles() {
+  return [
+    'routes/proxy.js',
+    ...readdirSync(join(__dirname, '../../routes'))
+      .filter((name) => /^proxy-.*\.js$/.test(name))
+      .map((name) => `routes/${name}`),
+  ].sort();
+}
+
+function routeFilesContaining(needle) {
+  return proxyRouteFiles()
+    .filter((rel) => readFileSync(join(__dirname, '../..', rel), 'utf8').includes(needle))
+    .sort();
 }
 
 describe('LIN-2533: agent-status registrations + store calls moved out of routes/proxy.js', () => {
   const ALIAS_PAIR = "['/api/proxy/agent/status', '/api/proxy/foreman/status']";
 
-  test('routes/proxy-agent-status.js carries both array-path registrations', () => {
-    assert.equal(occurrenceCount(agentStatusSource, ALIAS_PAIR), 2,
-      'expected exactly 2 registrations (POST + GET) carrying the canonical/deprecated-alias pair');
-  });
-  test('routes/proxy.js carries zero array-path registrations (moved out)', () => {
-    assert.equal(occurrenceCount(proxySource, ALIAS_PAIR), 0,
-      'a copy was left behind, or reintroduced, in routes/proxy.js');
+  test('routes/proxy-agent-status.js carries the canonical/deprecated alias pair on both method arms', () => {
+    // Derived-set relation: the array-path registrations in this file, and the
+    // HTTP methods they are bound to, must be exactly {GET, POST} and every one
+    // of them must carry the alias pair. A dropped arm fails the method-set
+    // equality; a stray array-path registration without the pair fails the
+    // "every" bound.
+    const arrayRegistrations = agentStatusSource.match(/router\.(post|get)\(\s*\[[^\]]*\]/g) || [];
+    const methods = arrayRegistrations
+      .filter((reg) => reg.includes(ALIAS_PAIR))
+      .map((reg) => reg.match(/router\.(post|get)/)[1]);
+    assert.deepEqual(
+      [...new Set(methods)].sort(), ['get', 'post'],
+      'the alias pair must be registered on exactly the GET and POST arms'
+    );
+    assert.ok(
+      arrayRegistrations.every((reg) => reg.includes(ALIAS_PAIR)),
+      'every array-path registration in routes/proxy-agent-status.js must carry the canonical/deprecated alias pair'
+    );
   });
 
-  test('routes/proxy-agent-status.js calls agentStatusStore.recordStatus( exactly once', () => {
-    assert.equal(occurrenceCount(agentStatusSource, 'agentStatusStore.recordStatus('), 1);
-  });
-  test('routes/proxy.js calls agentStatusStore.recordStatus( zero times (moved out)', () => {
-    assert.equal(occurrenceCount(proxySource, 'agentStatusStore.recordStatus('), 0);
+  test('routes/proxy.js carries no array-path agent-status registration (moved out, never reintroduced)', () => {
+    assert.ok(!proxySource.includes(ALIAS_PAIR),
+      'the alias-pair registration was left behind, or reintroduced, in routes/proxy.js');
   });
 
-  test('routes/proxy-agent-status.js calls agentStatusStore.listStatus( exactly once', () => {
-    assert.equal(occurrenceCount(agentStatusSource, 'agentStatusStore.listStatus('), 1);
+  test('agentStatusStore.recordStatus( is reached from exactly routes/proxy-agent-status.js', () => {
+    assert.deepEqual(routeFilesContaining('agentStatusStore.recordStatus('), ['routes/proxy-agent-status.js']);
   });
-  test('routes/proxy.js calls agentStatusStore.listStatus( zero times (moved out)', () => {
-    assert.equal(occurrenceCount(proxySource, 'agentStatusStore.listStatus('), 0);
+
+  test('agentStatusStore.listStatus( is reached from exactly routes/proxy-agent-status.js', () => {
+    assert.deepEqual(routeFilesContaining('agentStatusStore.listStatus('), ['routes/proxy-agent-status.js']);
   });
 });
 

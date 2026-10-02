@@ -38,6 +38,7 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DUPLICATE_DISPATCH_CODE } from '../../lib/dispatch-factory.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -133,31 +134,53 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
 });
 
 describe('assertion 3: DUPLICATE_DISPATCH named consistently across the three sources', () => {
-  // Authoritative source is the quoted literal in lib/dispatch-factory.js —
-  // exactly one occurrence, at the DUPLICATE_DISPATCH_CODE definition. The
-  // bare token appears 7x in that file (6 are DUPLICATE_DISPATCH_WINDOW_MS /
-  // DUPLICATE_DISPATCH_CODE), so a bare-token match would survive renaming
-  // the actual value (plan-review note 3) — assert the quoted form.
-  test("lib/dispatch-factory.js defines the quoted 'DUPLICATE_DISPATCH' literal exactly once", () => {
-    const quoted = factorySource.match(/'DUPLICATE_DISPATCH'/g) || [];
-    assert.strictEqual(quoted.length, 1, 'expected exactly one quoted DUPLICATE_DISPATCH literal (the authoritative definition)');
-    assert.match(factorySource, /DUPLICATE_DISPATCH_CODE\s*=\s*'DUPLICATE_DISPATCH'/);
+  // LIN-3218 (LIN-3201 A1): the exact-count pins are replaced by a derived
+  // relation — the authoritative value is the exported `DUPLICATE_DISPATCH_CODE`
+  // constant, and EVERY quoted / named DUPLICATE literal across the three
+  // sources must equal it. A stray or misspelt spelling (e.g.
+  // DUPLICATE_DISPATCH_OLD) fails; a bare-token match can no longer pass by
+  // accidentally containing the right substring. LIN-3218 close-out (review
+  // ledger M6b): the token charset includes digits (`[A-Z0-9_]`), so a
+  // digit-bearing stray such as `DUPLICATE_DISPATCH_V2` is visible and fails
+  // rather than being silently skipped by the matcher.
+  const CODE = DUPLICATE_DISPATCH_CODE;
+
+  test('lib/dispatch-factory.js exports DUPLICATE_DISPATCH_CODE and every quoted DUPLICATE literal equals it', () => {
+    assert.match(
+      factorySource,
+      new RegExp(`DUPLICATE_DISPATCH_CODE\\s*=\\s*'${CODE}'`),
+      `the exported constant must be the authoritative quoted literal '${CODE}'`
+    );
+    const quoted = [...factorySource.matchAll(/'DUPLICATE[A-Z0-9_]*'/g)].map((m) => m[0].slice(1, -1));
+    assert.ok(quoted.length > 0, 'the factory must quote the code at least once');
+    for (const token of quoted) {
+      assert.equal(
+        token, CODE,
+        `lib/dispatch-factory.js quotes '${token}', which is not the exported DUPLICATE_DISPATCH_CODE ('${CODE}')`
+      );
+    }
   });
 
-  // The runner doc's Step 7 names the same code. Exact-count, not existence:
-  // a bare `match` stays green if 1 of the doc's 2 mentions is renamed away
-  // (existence-check blind spot, same class as assertion 5 below).
-  test('docs/passage-runner-prompt.md names DUPLICATE_DISPATCH in exactly 2 places', () => {
-    const occurrences = (docsSource.match(/\bDUPLICATE_DISPATCH\b/g) || []).length;
-    assert.strictEqual(occurrences, 2, 'docs/passage-runner-prompt.md DUPLICATE_DISPATCH mention count drifted');
+  test('every DUPLICATE token named in docs/passage-runner-prompt.md equals the exported constant', () => {
+    const tokens = docsSource.match(/DUPLICATE[A-Z0-9_]*/g) || [];
+    assert.ok(tokens.length > 0, 'the runner doc must name the code');
+    for (const token of tokens) {
+      assert.equal(
+        token, CODE,
+        `docs/passage-runner-prompt.md names ${token}, not the exported code ${CODE}`
+      );
+    }
   });
 
-  // The consumer integration guide names the same code. Exact-count for the
-  // same reason: a bare `match` stays green if 1 of the doc's 4 mentions is
-  // renamed away.
-  test('docs/proxy-integration.md names DUPLICATE_DISPATCH in exactly 4 places', () => {
-    const occurrences = (integrationSource.match(/\bDUPLICATE_DISPATCH\b/g) || []).length;
-    assert.strictEqual(occurrences, 4, 'docs/proxy-integration.md DUPLICATE_DISPATCH mention count drifted');
+  test('every DUPLICATE token named in docs/proxy-integration.md equals the exported constant', () => {
+    const tokens = integrationSource.match(/DUPLICATE[A-Z0-9_]*/g) || [];
+    assert.ok(tokens.length > 0, 'the integration doc must name the code');
+    for (const token of tokens) {
+      assert.equal(
+        token, CODE,
+        `docs/proxy-integration.md names ${token}, not the exported code ${CODE}`
+      );
+    }
   });
 });
 
@@ -178,50 +201,74 @@ describe('assertion 4: north-star reading.state/roadmap.state match the handler 
   });
 });
 
-describe('assertion 5: /dispatch status enum — prose<->prose only (known limit, see comment)', () => {
-  // This is a coupling check between two prose copies, not a code-side pin.
-  // Each source's occurrence count is pinned exactly (not an existence
-  // check), so it fails loud if a single copy drops a value OR if the two
-  // docs disagree with each other — dropping/diverging even one of the
-  // five real copies (3 in lib/proxy-instructions.js, 2 in
-  // docs/proxy-integration.md) goes red. It still does NOT catch a
-  // code-side derivation change to the enum (exactly what 7c6d811d was,
-  // adding `blocked`) unless that change also reaches a prose copy — that
-  // limit is real and stays undisclosed only in the sense that no
-  // code-side pin exists at all, which is honest.
-  // The runner doc has no status enum of its own — its blocks/blocked-by
-  // vocabulary is an unrelated sense and is not a source for this assertion.
-  // LIN-2245: the 3 copies used to live inline in routes/proxy.js's
-  // /api/proxy/instructions catalog; that catalog moved verbatim to
-  // lib/proxy-instructions.js, so routes/proxy.js now carries zero copies.
+describe('assertion 5: /dispatch status enum — every occurrence parses to the canonical set', () => {
+  // LIN-3218 (LIN-3201 A1): the prose<->prose exact-count pins are replaced by
+  // a derived relation. Every enum-shaped run in each source is parsed to a set
+  // and must deep-equal the canonical STATUS_ENUM. This now DOES catch a
+  // code-side derivation change that reaches any copy (a dropped/added member),
+  // which the old count could not. The runner doc has no status enum of its own
+  // — its blocks/blocked-by vocabulary is an unrelated sense and is not swept in
+  // (see the `queued`+`taken` anchor below). LIN-2245: the copies moved verbatim
+  // from routes/proxy.js's /api/proxy/instructions catalog to
+  // lib/proxy-instructions.js, so routes/proxy.js carries none.
   const STATUS_ENUM = 'queued|taken|done|failed|blocked|aborted';
+  const STATUS_SET = [...STATUS_ENUM.split('|')].sort();
 
-  function occurrenceCount(source, needle) {
-    return source.split(needle).length - 1;
+  // Selection rule (deliberately not anchored on any single member, so a run
+  // that itself drops `queued` or `taken` is still selected and still fails the
+  // set equality): a pipe-run is dispatch-status-enum-shaped iff it has at least
+  // two members drawn from the canonical status vocabulary AND is not drawn
+  // entirely from the terminal-marker vocabulary. The second clause excludes the
+  // unrelated `done|failed|aborted|skipped` terminal run by the principled fact
+  // that it uses only terminal markers — not by an exception list of literals.
+  const TERMINAL_MARKERS = new Set(['done', 'failed', 'aborted', 'skipped', 'complete']);
+  function statusEnumRuns(source) {
+    return [...source.matchAll(/[a-z]+(?:\|[a-z]+)+/g)]
+      .map((m) => m[0])
+      .filter((run) => {
+        const parts = run.split('|');
+        const canonical = parts.filter((p) => STATUS_SET.includes(p)).length;
+        const allTerminal = parts.every((p) => TERMINAL_MARKERS.has(p));
+        return canonical >= 2 && !allTerminal;
+      });
   }
 
-  test('routes/proxy.js prose states the enum in exactly 0 places (moved to lib/proxy-instructions.js)', () => {
-    assert.strictEqual(
-      occurrenceCount(proxySource, STATUS_ENUM),
-      0,
-      'routes/proxy.js prose enum copy count drifted — a copy was added back, or the LIN-2245 move regressed'
+  // STATED BOUND (LIN-3218 close-out, review ledger B1/B2): the selection rule
+  // above needs at least two canonical members, so a prose copy that is DELETED
+  // outright, or renamed wholesale to a vocabulary with fewer than two canonical
+  // members (e.g. `pending|running`), is not detected as an enum-shaped run at
+  // all. B1 (a deleted docs enum copy) was caught by the retired exact-count pin;
+  // this derived relation states the bound rather than re-pinning a number.
+
+  test('routes/proxy.js carries no dispatch status enum copy (the LIN-2245 move holds)', () => {
+    assert.deepEqual(
+      statusEnumRuns(proxySource), [],
+      'routes/proxy.js gained a prose enum copy back — a copy was added or the LIN-2245 move regressed'
     );
   });
 
-  test('lib/proxy-instructions.js prose states the enum in exactly 3 places', () => {
-    assert.strictEqual(
-      occurrenceCount(instructionsSource, STATUS_ENUM),
-      3,
-      'lib/proxy-instructions.js prose enum copy count drifted — a copy was added, dropped, or diverged'
-    );
+  test('every dispatch status enum in lib/proxy-instructions.js parses to the canonical set', () => {
+    const runs = statusEnumRuns(instructionsSource);
+    // Non-vacuity is proven by the planted-offender witness in the PR (drop a
+    // member from the lib enum and this test goes red), not by this guard alone.
+    assert.ok(runs.length > 0, 'no enum-shaped run found in lib/proxy-instructions.js');
+    for (const run of runs) {
+      assert.deepEqual(
+        [...run.split('|')].sort(), STATUS_SET,
+        `lib/proxy-instructions.js enum "${run}" drifted from the canonical STATUS_ENUM`
+      );
+    }
   });
 
-  test('docs/proxy-integration.md prose states the same enum in exactly 2 places', () => {
-    assert.strictEqual(
-      occurrenceCount(integrationSource, STATUS_ENUM),
-      2,
-      'docs/proxy-integration.md prose enum copy count drifted — a copy was added, dropped, or diverged'
-    );
+  test('every dispatch status enum in docs/proxy-integration.md parses to the canonical set', () => {
+    const runs = statusEnumRuns(integrationSource);
+    assert.ok(runs.length > 0, 'no enum-shaped run found in docs/proxy-integration.md');
+    for (const run of runs) {
+      assert.deepEqual(
+        [...run.split('|')].sort(), STATUS_SET,
+        `docs/proxy-integration.md enum "${run}" drifted from the canonical STATUS_ENUM`
+      );
+    }
   });
 });
 
@@ -233,13 +280,21 @@ describe('claim 2 (honestly weak pin): /cost stays a single per-identifier route
   // SAME route instead — a `?rollup=1` query param or an internal branch —
   // since that would leave the route's registration, and this count, wholly
   // unchanged. Nothing can honestly pin more than that from source alone.
-  // LIN-679 Stage 4 (LIN-2538): /cost moved wholesale to routes/proxy-compute.js.
-  test('routes/proxy-compute.js registers exactly one cost route, with no sibling roll-up path', () => {
-    const routeRegistrations = proxyComputeSource.match(/router\.(?:get|post|put|patch|delete)\((?:\[[^\]]*\]|'[^']*')/g) || [];
-    const costRegistrations = routeRegistrations.filter(r => r.includes('cost'));
-    assert.strictEqual(costRegistrations.length, 1, 'expected exactly one cost-related route registration — a new sibling path was added');
-    assert.match(costRegistrations[0], /'\/api\/proxy\/issues\/:identifier\/cost'/);
-    assert.match(costRegistrations[0], /'\/api\/proxy\/cost\/:identifier'/);
+  // LIN-3218 (LIN-3201 A1): the `length === 1` count is replaced by a derived
+  // set equality — the registrations in routes/proxy-compute.js that carry a
+  // cost path must be exactly the one array-path registration covering both
+  // paths. A second distinct cost registration (a sibling roll-up) adds another
+  // element and fails. Still honestly weak: a roll-up folded INTO this same
+  // route leaves the registration set unchanged.
+  test('routes/proxy-compute.js registers the two cost paths in one registration, no sibling cost registration (weak absence-claim)', () => {
+    const costRegistrations = [...proxyComputeSource.matchAll(/router\.(?:get|post|put|patch|delete)\(\s*(\[[^\]]*\]|'[^']*')/g)]
+      .map((m) => m[1])
+      .filter((paths) => paths.includes('cost'));
+    assert.deepEqual(
+      costRegistrations,
+      ["['/api/proxy/issues/:identifier/cost', '/api/proxy/cost/:identifier']"],
+      'expected exactly the one array-path cost registration — a new sibling cost registration was added'
+    );
   });
 });
 

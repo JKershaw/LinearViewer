@@ -45,7 +45,7 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 // LIN-2543: BASE_DEPS/buildApp/call moved to tests/unit/lib/proxy-fake-deps.js
@@ -584,14 +584,55 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // landing directly in the new routes/proxy-runner-prompt.js via
   // router.use(), mounted BEFORE createProxyRunnerRoutes — routes/proxy.js's
   // OWN registration count is still 1; total 74 -> 75.
-  test('routes/proxy.js has exactly 1 router.* registration (75 URL forms across the whole proxy surface)', () => {
-    const src = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
-    const matches = src.match(/^\s{2}router\.(get|post|put|patch|delete)\(/gm) || [];
-    assert.equal(matches.length, 1,
-      `expected 1 route registration in routes/proxy.js, found ${matches.length} — ` +
-      `this file's 75-row ROWS table must be re-derived from source before trusting it`);
-    assert.equal(ROWS.length, 75,
-      `this file's ROWS table must cover exactly 75 URL forms (1 in routes/proxy.js + 2 in routes/proxy-agent-status.js + 5 in routes/proxy-tokens-admin.js + 1 in routes/proxy-token-exchange.js + 14 in routes/proxy-reads.js + 12 in routes/proxy-writes.js + 12 in routes/proxy-compute.js + 4 in routes/proxy-kickoff.js + 5 in routes/proxy-dispatch.js + 2 in routes/proxy-flight-companion.js + 3 in routes/proxy-halt.js + 1 in routes/proxy-runner-prompt.js + 3 in routes/proxy-runner.js + 10 array-path aliases) — still deliberately excluding the 3 pre-existing routes/proxy-rulings.js forms (LIN-2444's documented, bounded gap; see the Group K comment above), found ${ROWS.length}`);
+  // LIN-3218 (LIN-3201 A1): the numeric corpus total ("exactly 1 registration
+  // here / 75 URL forms") is gone. The table's coverage is instead derived from
+  // source: every proxy route file's `router.<verb>(` registrations, minus the
+  // documented LIN-2444 `routes/proxy-rulings.js` gap, plus one extra URL form
+  // per array-path alias, must equal the number of rows below. A new
+  // registration in any proxy file (or a dropped/added alias) changes the
+  // derived figure and fails here until the table is re-derived — the same
+  // mechanical guard `router.stack` used to give, without a literal every
+  // LIN-679 stage had to bump. The 75 behavioural rows themselves are unchanged.
+  test('the ROWS table covers exactly the URL forms derived from the proxy route sources', () => {
+    const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
+    const subRouterFiles = readdirSync(join(__dirname, '../../routes'))
+      .filter((name) => /^proxy-.*\.js$/.test(name))
+      .map((name) => `routes/${name}`);
+    const allFiles = ['routes/proxy.js', ...subRouterFiles];
+    const countRegistrations = (src) => (src.match(/router\.(get|post|put|patch|delete)\(/g) || []).length;
+    const countAliasRegistrations = (src) => (src.match(/router\.(get|post|put|patch|delete)\(\s*\[/g) || []).length;
+
+    let totalRegistrations = 0;
+    let aliasRegistrations = 0;
+    for (const rel of allFiles) {
+      const src = read(rel);
+      totalRegistrations += countRegistrations(src);
+      aliasRegistrations += countAliasRegistrations(src);
+    }
+    // The 3 forms in routes/proxy-rulings.js are the documented, bounded gap
+    // (LIN-2444) deliberately excluded from this table; the count is read from
+    // that file, not pinned.
+    const rulingsRegistrations = countRegistrations(read('routes/proxy-rulings.js'));
+    const expectedForms = totalRegistrations - rulingsRegistrations + aliasRegistrations;
+
+    assert.ok(expectedForms > 0, 'the derivation must find at least one registration, never pass on a zero surface');
+    assert.equal(
+      ROWS.length, expectedForms,
+      `the ROWS table must cover exactly ${expectedForms} URL forms derived from source ` +
+      `(${totalRegistrations} registrations - ${rulingsRegistrations} documented rulings forms + ${aliasRegistrations} array-path aliases); found ${ROWS.length}`
+    );
+
+    // The composer's OWN registrations (the ones not moved to a sub-router)
+    // must each have a covering row — this replaces the old "routes/proxy.js has
+    // exactly 1 registration" count with a coverage relation.
+    const proxyOwn = read('routes/proxy.js').match(/router\.(?:get|post|put|patch|delete)\(\s*'([^']+)'/g) || [];
+    for (const reg of proxyOwn) {
+      const path = reg.match(/'([^']+)'/)[1];
+      assert.ok(
+        ROWS.some((row) => row.url.endsWith(path)),
+        `routes/proxy.js registers ${path} but no ROWS row covers it — the table drifted from the composer`
+      );
+    }
   });
 });
 
