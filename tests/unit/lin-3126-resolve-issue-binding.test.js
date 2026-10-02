@@ -296,6 +296,31 @@ describe('LIN-3240 resolveDefaultBinding', () => {
     });
     assert.equal(resolved.callScope, undefined);
   });
+
+  // LIN-3240 review F8 / autopilot ruling: a source-only selector must NOT newly
+  // 422 a single-binding workspace, must never refuse for ambiguity, and must
+  // still refuse a genuinely unknown provider.
+  test('F8(a): source-only names a provider with exactly one binding → that binding', () => {
+    const sole = fakeProvider('fake-lin3240-f8-single');
+    const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, sole.name, 'sole-scope', { token: 'sole-token' });
+    const resolved = resolveDefaultBinding(ws, { source: sole.name });
+    assert.deepEqual(resolved, { provider: sole, callScope: getWorkspaceCallScope(ws) });
+    assert.equal(resolved.error, undefined);
+  });
+
+  test('F8(b): source-only names a provider with >1 bindings → the default binding, never an ambiguity refusal', () => {
+    const { ws } = twoRepoConnectionWorkspace();
+    const resolved = resolveDefaultBinding(ws, { source: 'github' });
+    assert.equal(resolved.error, undefined, 'never refuses for ambiguity');
+    assert.deepEqual(resolved.callScope, { token: 'tok-a', repo: REPO_A }, 'falls back to the active/default binding');
+  });
+
+  test('F8(c): source-only names a provider with no binding → UNKNOWN_BINDING', () => {
+    const { ws } = twoRepoConnectionWorkspace();
+    const resolved = resolveDefaultBinding(ws, { source: 'gitlab' });
+    assert.deepEqual(resolved.error, { code: 'UNKNOWN_BINDING', provider: 'gitlab', bindings: [] });
+    assert.equal(resolved.callScope, undefined);
+  });
 });
 
 describe('LIN-3240 bindingRefusalResponse', () => {

@@ -14,6 +14,8 @@
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { createTaskCreateRoutes } from '../../routes/task-create.js';
+import { createTaskChatRoutes } from '../../routes/task-chat.js';
+import { createTaskEditRoutes } from '../../routes/task-edit.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { setBindingCredential } from '../../lib/connection-binding.js';
 
@@ -96,6 +98,52 @@ export function buildWorkspaceApiApp({ workspace, features = {}, taskDecisionsSt
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {},
     dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
     taskDecisionsStore,
+  }));
+  return app;
+}
+
+/**
+ * A connection-backed workspace bound to a SINGLE repo (review F8's
+ * "single-binding workspace" and the F1 byte-identity case), hydrated with its
+ * own token.
+ */
+export function makeSingleRepoWorkspace({ scope = REPO_A, connectionId = 'conn-1' } = {}) {
+  const binding = { provider: 'github', scope, connectionId };
+  setBindingCredential(binding, { installationId: '99', token: 'tok-a' });
+  return {
+    urlKey: 'acme',
+    provider: 'github',
+    bindings: [binding],
+    activeBinding: { provider: 'github', scope },
+  };
+}
+
+/** The task-chat HTML page + SSE turn router, on a seeded session. */
+export function buildTaskChatApp({ workspace, features = { taskChat: true }, sessionOverrides = {}, ...deps } = {}) {
+  const app = express();
+  app.use(express.json());
+  app.use(createTaskChatRoutes({
+    workspaceFromUrl: (req, _res, next) => {
+      req.workspace = workspace;
+      req.session = { ...sessionFor(workspace, features), ...sessionOverrides };
+      next();
+    },
+    getOpenRouterSource: () => null,
+    getDeployInfo: () => ({}),
+    savedChatStore: { list: async () => [], create: async () => ({}), get: async () => null, delete: async () => false },
+    ...deps,
+  }));
+  return app;
+}
+
+/** The task-edit HTML page router. */
+export function buildTaskEditApp({ workspace, features = {} } = {}) {
+  const app = express();
+  app.use(express.json());
+  app.use(createTaskEditRoutes({
+    workspaceFromUrl: (req, _res, next) => { req.workspace = workspace; req.session = sessionFor(workspace, features); next(); },
+    getOpenRouterSource: () => null,
+    getDeployInfo: () => ({}),
   }));
   return app;
 }

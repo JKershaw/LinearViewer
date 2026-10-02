@@ -32,6 +32,16 @@
     return `${MEMORY_PREFIX}${urlKey || ''}:${issueId}${bindingScope ? '@' + bindingScope : ''}`;
   }
 
+  // LIN-3240 (review F5): the in-session `promptCache` / `lastPromptLabel` maps
+  // use the SAME stamp shape as `memoryKey` — `issueId@<bindingScope>` only when
+  // the row carries a scope. Without the stamp, repoA#1 and repoB#1 (same iss
+  // NUMBER across bindings) shared one in-session slot, so repoB#1 could show
+  // repoA#1's "cached" hint. An unstamped key stays the bare issueId
+  // (byte-identical).
+  function sessionPromptKey(issueId, bindingScope) {
+    return `${issueId}${bindingScope ? '@' + bindingScope : ''}`;
+  }
+
   // Read compatibility: an old-shape/foreign record that is malformed or lacks a
   // usable `raw` is treated as absent (no crash, no partial hydrate). A record
   // missing the newer fields (generatedAt/kind/proxyForce/warning) still
@@ -504,8 +514,8 @@
       state.result = hydrated;
       state.activeLabel = hydrated.label;
       if (hydrated.label) {
-        promptCache.set(`${issueId}:${hydrated.label}`, hydrated);
-        lastPromptLabel.set(issueId, hydrated.label);
+        promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${hydrated.label}`, hydrated);
+        lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), hydrated.label);
       }
     }
 
@@ -635,8 +645,8 @@
           // this autopilot result forces proxy context (copy/download/dispatch) and
           // suppresses the now-inert +proxy toggle. Every other result stays unforced.
           const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, generatedAt: Date.now() };
-          promptCache.set(`${issueId}:${label}`, entry);
-          lastPromptLabel.set(issueId, label);
+          promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), label);
           savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
           enterPhase('fresh');
           state.result = entry;
@@ -653,8 +663,8 @@
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, generatedAt: Date.now() };
-          promptCache.set(`${issueId}:${label}`, entry);
-          lastPromptLabel.set(issueId, label);
+          promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), label);
           savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
           enterPhase('fresh');
           state.result = entry;
@@ -774,8 +784,8 @@
         label, name: 'AI Recommendation', raw: displayText,
         html: finalHtml, reasoning: reasoningRaw, warning, generatedAt: Date.now()
       };
-      promptCache.set(`${issueId}:${label}`, entry);
-      lastPromptLabel.set(issueId, label);
+      promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);
+      lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), label);
       savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
       enterPhase('fresh');
       state.result = entry;
@@ -1015,8 +1025,9 @@
         container.removeEventListener('click', handleClick);
       },
       getCachedLabel() {
-        const l = lastPromptLabel.get(issueId);
-        const entry = l ? promptCache.get(`${issueId}:${l}`) : null;
+        const key = sessionPromptKey(issueId, issue.bindingScope);
+        const l = lastPromptLabel.get(key);
+        const entry = l ? promptCache.get(`${key}:${l}`) : null;
         return entry ? { label: l, name: entry.name } : null;
       }
     };
@@ -1034,8 +1045,9 @@
    * @returns {{label: string, name: string} | null}
    */
   function getCached(issueId, urlKey, bindingScope) {
-    const l = lastPromptLabel.get(issueId);
-    const entry = l ? promptCache.get(`${issueId}:${l}`) : null;
+    const key = sessionPromptKey(issueId, bindingScope);
+    const l = lastPromptLabel.get(key);
+    const entry = l ? promptCache.get(`${key}:${l}`) : null;
     if (entry) return { label: l, name: entry.name };
     const memory = urlKey ? loadPromptMemory(urlKey, issueId, bindingScope) : null;
     return memory ? { label: memory.label, name: memory.name } : null;

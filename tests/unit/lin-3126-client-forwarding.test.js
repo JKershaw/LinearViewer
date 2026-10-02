@@ -191,6 +191,59 @@ describe('LIN-3240 brief/recap/scan URL builders', () => {
 });
 
 // ---------------------------------------------------------------------------
+// LIN-3240 review F3: the Context section forwards the row's source+bindingScope
+// (context.js URL builder, plus the two mounting callers).
+// ---------------------------------------------------------------------------
+describe('LIN-3240 context forwarding (F3)', () => {
+  const contextSrc = read('public/context.js');
+  const appSrc = read('public/app.js');
+  const swipeSrc = read('public/swipe.js');
+
+  test('contextUrl: byte-identical unstamped, `source` then `bindingScope` when stamped', () => {
+    assert.equal(
+      evalFunction(contextSrc, 'function contextUrl(', 'contextUrl', ['ws', 'LIN-1']),
+      '/workspace/ws/api/context/LIN-1'
+    );
+    assert.equal(
+      evalFunction(contextSrc, 'function contextUrl(', 'contextUrl', ['ws', 'LIN-1', 'github']),
+      '/workspace/ws/api/context/LIN-1?source=github'
+    );
+    assert.equal(
+      evalFunction(contextSrc, 'function contextUrl(', 'contextUrl', ['ws', 'LIN-1', 'github', 'octo/repoB']),
+      '/workspace/ws/api/context/LIN-1?source=github&bindingScope=octo%2FrepoB'
+    );
+  });
+
+  test('app.js loadLazySection forwards source+bindingScope to ContextSection', () => {
+    assert.match(appSrc, /ContextSection\.init\(placeholder, \{ urlKey, identifier, source, bindingScope \}\)/);
+  });
+
+  test('swipe.js context accordion forwards the card source+bindingScope', () => {
+    assert.match(swipeSrc, /ContextSection\.init\(placeholder, \{[\s\S]*?source: issue\.source,[\s\S]*?bindingScope: issue\.bindingScope/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3240 review F5: the in-session hint maps are keyed by the stamped shape.
+// ---------------------------------------------------------------------------
+describe('LIN-3240 F5 in-session prompt cache keys', () => {
+  test('a repoB-hydrated in-session hint is never served for an unstamped repoA#1 lookup', () => {
+    const store = makeStore({
+      'harbour:prompt-memory:ws:1@octo/repoB': JSON.stringify({ v: 1, label: 'plan', name: 'RepoB Plan', raw: 'b' }),
+    });
+    const loaded = loadPromptSection({ localStorage: store });
+    const container = makeContainer();
+    loaded.container = container;
+    loaded.PromptSection.init(container, baseOpts({ id: '1', identifier: 'GB-1', source: 'github', bindingScope: 'octo/repoB' }));
+
+    // The stamped slot hydrates repoB …
+    assert.equal(loaded.PromptSection.getCached('1', 'ws', 'octo/repoB').name, 'RepoB Plan');
+    // … and the unstamped in-session slot (repoA#1's) does NOT alias it (F5).
+    assert.equal(loaded.PromptSection.getCached('1', 'ws'), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // common.js — fetchAutopilotKickoff sliced (house pattern).
 // ---------------------------------------------------------------------------
 const COMMON_SRC = read('public/common.js');

@@ -12,7 +12,7 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace,
+  REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace, makeSingleRepoWorkspace,
   buildWorkspaceApiApp, buildTaskCreateApp, withServer,
 } from './lin-3126-harness.js';
 
@@ -55,6 +55,29 @@ describe('LIN-3240 creation — explicit default binding', () => {
     assert.equal(body.code, 'UNKNOWN_BINDING');
     assert.deepEqual(body.bindings, [REPO_A, REPO_B]);
     assert.equal(calls.filter(c => c.method === 'createIssue').length, 0);
+  });
+
+  // LIN-3240 review F8 / autopilot ruling: a source-only selector is a valid
+  // creation hint and must not newly 422 a single-binding workspace.
+  test('POST /api/issues?source=github on a SINGLE-binding workspace creates on that binding (no 422) (F8)', async () => {
+    const { calls } = installGitHubProvider({ repoIssues: { [REPO_A]: ISSUE_A } });
+    const workspace = makeSingleRepoWorkspace();
+    const app = buildWorkspaceApiApp({ workspace });
+    const { status } = await withServer(app, ({ post }) =>
+      post('/workspace/acme/api/issues?source=github', { title: 'New task' }));
+    assert.equal(status, 201);
+    const creates = calls.filter(c => c.method === 'createIssue');
+    assert.deepEqual(creates.map(c => c.scope.repo), [REPO_A]);
+  });
+
+  test('POST /api/issues?source=github on a TWO-repo workspace creates on the default binding, no ambiguity 422 (F8)', async () => {
+    const { calls, workspace } = recorder();
+    const app = buildWorkspaceApiApp({ workspace });
+    const { status } = await withServer(app, ({ post }) =>
+      post('/workspace/acme/api/issues?source=github', { title: 'New task' }));
+    assert.equal(status, 201);
+    const creates = calls.filter(c => c.method === 'createIssue');
+    assert.deepEqual(creates.map(c => c.scope.repo), [REPO_A]);
   });
 
   test('POST /api/feedback with no selector creates on the DEFAULT binding (repoA)', async () => {

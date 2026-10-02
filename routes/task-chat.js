@@ -254,6 +254,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // alongside (lib/render.js's chatHref) — the client drops it the moment
       // the user types a different task id (see public/task-chat.js).
       const rawSource = typeof req.query.source === 'string' ? req.query.source.trim().slice(0, 64) : '';
+      // LIN-3240 (review F2): the binding stamp rides beside the source hint so
+      // the page can prefill it; without this hop (route -> render -> client) the
+      // client's `prefillBindingScope` was always '' and a two-repo chat turn
+      // re-resolved source-only (422). Absent/empty keeps the unstamped page
+      // byte-identical.
+      const rawBindingScope = typeof req.query.bindingScope === 'string' ? req.query.bindingScope.trim().slice(0, 200) : '';
       const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
       // Saved chats require a user identity (accountId). Absent only for a
       // genuinely anonymous session — local/GitHub sessions carry an accountId
@@ -261,7 +267,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // explicit empty-state and omits the save affordance when it is (LIN-1008).
       const savedChatsAvailable = !!req.session.accountId;
       const html = renderTaskChatPage(
-        { defaultTask: rawTask, defaultSource: rawSource, aiConfigured, savedChatsAvailable },
+        { defaultTask: rawTask, defaultSource: rawSource, defaultBindingScope: rawBindingScope, aiConfigured, savedChatsAvailable },
         {
           deployInfo: getDeployInfo(),
           urlKey: workspace.urlKey,

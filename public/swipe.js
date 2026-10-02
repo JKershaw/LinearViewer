@@ -777,6 +777,10 @@ function handleAccordionClick(e) {
         window.ContextSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
+          // LIN-3240 (review F3): forward the card's provider + binding stamp so
+          // the context read resolves THIS card's own binding, not the active one.
+          source: issue.source,
+          bindingScope: issue.bindingScope,
           // Jump to the task within the deck when it's present; otherwise fall
           // through to the node's link (the task's provider URL).
           onNavigate: (identifier) => navigateToIdentifier(identifier)

@@ -243,7 +243,9 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-context-placeholder="1"]')
     if (placeholder && window.ContextSection) {
       placeholder.removeAttribute('data-context-placeholder')
-      window.ContextSection.init(placeholder, { urlKey, identifier })
+      // LIN-3240 (review F3): forward the row's provider + binding stamp so the
+      // context read resolves THIS issue's own binding, not the active one.
+      window.ContextSection.init(placeholder, { urlKey, identifier, source, bindingScope })
     }
   }
 }
