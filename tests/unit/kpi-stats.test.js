@@ -1905,3 +1905,28 @@ describe('collectKpiStats — 30-day read horizon bounds (LIN-3161 / LIN-3157 A1
     assert.strictEqual(kinds.plan, 1);
   });
 });
+
+/**
+ * LIN-2952 characterization: `collectKpiStats` reads its deps from the options
+ * argument, not from `collections`. The funnel aggregate adds its store deps to
+ * that same options object, so the current option contract is pinned here
+ * before the addition: `dbBackend` defaults to null, passes a supplied label
+ * through untouched, and the call tolerates no third positional argument.
+ */
+describe('LIN-2952 characterization — collectKpiStats option contract', () => {
+  test('dbBackend defaults to null and a supplied label passes through to vanity', async () => {
+    const defaulted = await collectKpiStats(buildCollections(), { now: NOW });
+    assert.strictEqual(defaulted.vanity.dbBackend, null);
+
+    const labelled = await collectKpiStats(buildCollections(), { now: NOW, dbBackend: 'mongodb' });
+    assert.strictEqual(labelled.vanity.dbBackend, 'mongodb');
+  });
+
+  test('the work funnel stays under `funnel` with its pinned shape', async () => {
+    const stats = await collectKpiStats(buildCollections(), { now: NOW });
+    assert.deepStrictEqual(stats.funnel, {
+      dispatched: 0, taken: 0, reported: 0, completed: 0,
+      reportedIsLowerBound: true, completedIsLowerBound: true
+    });
+  });
+});
