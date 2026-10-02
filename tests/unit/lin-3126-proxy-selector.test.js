@@ -29,13 +29,15 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { fingerprintCredential, CREDENTIAL_SOURCES } from '../../lib/credential-diagnostics.js';
-import { workspaceTokenCacheKey, workspaceTokenCacheBypasses } from '../../lib/workspace-token-cache.js';
+import { workspaceTokenCacheKey, workspaceTokenCacheBypasses, evictWorkspaceTokenPair } from '../../lib/workspace-token-cache.js';
 import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
 import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { bindingRefusalResponse, BINDING_INTENT } from '../../lib/workspace.js';
+import { makeHoldingCache } from './lin-3126-proxy-harness.js';
+import { encodeAttachmentHandle } from '../../lib/proxy-wire.js';
 
 // The proxy limiter is a process-global module-scope instance (60/min) that
 // skips only when NODE_ENV==='test'. The ISSUE inverse row drives all 21 sites
@@ -467,6 +469,93 @@ describe('(B behavioural) ISSUE/selector resolutions make zero cache calls; no-s
     const { fn, cache } = makeVmResolver({ sessions: legacyLinearSessions() });
     await fn('acme', 'acct');
     assert.deepEqual(cache.gets, [workspaceTokenCacheKey('acme', 'acct')]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (LIN-1507) the three cache rows, on a cache that ACTUALLY HOLDS entries
+//
+// Review F2: the earlier spy cache always missed on `get`, so the warm-entry,
+// eviction and repoA-never-serves-repoB properties were unexercised. These rows
+// use a real `createWorkspaceTokenCache` under a recording wrapper.
+// ---------------------------------------------------------------------------
+
+describe('(LIN-1507) a warm base entry never serves an ISSUE/selector read, and eviction covers every key', () => {
+  const baseKey = workspaceTokenCacheKey('acme', 'acct');
+  const blindKey = workspaceTokenCacheKey('acme');
+
+  function twoRepoConnectionAccessLocal() {
+    return createConnectionAccess({
+      connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+      ownerCredentialStore: { getByConnection: async () => null },
+      refreshConnection: async () => null,
+      resolveCanonicalAccountId: async (id) => id,
+      selectOwnerSessionRow: () => twoRepoOwnerRow(),
+      normalizeProvider: (ws) => ws?.provider || 'linear',
+      fingerprintCredential,
+      gate: { shouldAttempt: () => true },
+      lifecycleEventStore: { recordEvent: async () => {} },
+      bufferMs: BUFFER,
+    });
+  }
+
+  function resolverWithHoldingCache() {
+    const cache = makeHoldingCache();
+    const ownerRow = twoRepoOwnerRow();
+    const ownerSession = { accountId: 'acct', workspaces: ownerRow.session.workspaces };
+    const { fn } = makeVmResolver({
+      sessions: [{ _id: 'sid', session: ownerSession }],
+      connectionAccess: twoRepoConnectionAccessLocal(),
+      cache,
+    });
+    return { fn, cache };
+  }
+
+  test('(i) a base entry pre-warmed by a no-selector WORKSPACE read does not let a following ISSUE read skip BINDING_REQUIRED', async () => {
+    const { fn, cache } = resolverWithHoldingCache();
+    const warm = await fn('acme', 'acct', { intent: 'WORKSPACE' });
+    assert.deepEqual(warm.scope, { token: 'tok-a', repo: REPO_A }, 'the WORKSPACE read served repoA');
+    assert.deepEqual(cache.sets.map(s => s.key), [baseKey], 'the WORKSPACE read warmed the base key');
+    cache.gets.length = 0;
+    cache.sets.length = 0;
+
+    const issue = await fn('acme', 'acct', { intent: 'ISSUE' });
+
+    assert.equal(issue.token, null);
+    assert.equal(issue.reason, 'binding_required', 'the ISSUE read still refuses despite the warm entry');
+    assert.deepEqual(cache.gets, [], 'an ISSUE read must NOT read the warm base entry');
+    assert.deepEqual(cache.sets, [], 'an ISSUE read must not write');
+    assert.ok(cache.inner.get(baseKey), 'the warm base entry is untouched');
+  });
+
+  test('(ii) after evictWorkspaceTokenPair every probed key misses (owner-scoped + owner-blind; no new variant survives)', async () => {
+    const { cache } = resolverWithHoldingCache();
+    const entry = { token: 'tok-a', expiresAt: Date.now() + 3_600_000 };
+    assert.equal(cache.set(baseKey, entry), true);
+    assert.equal(cache.set(blindKey, entry), true);
+    assert.ok(cache.inner.get(baseKey), 'precondition: base key holds');
+    assert.ok(cache.inner.get(blindKey), 'precondition: owner-blind key holds');
+
+    evictWorkspaceTokenPair((key) => cache.evict(key), 'acme', 'acct');
+
+    assert.deepEqual([...cache.evicts].sort(), [baseKey, blindKey].sort(), 'both the owner-scoped and owner-blind keys are evicted');
+    for (const key of [baseKey, blindKey, `${baseKey}::github`, `${blindKey}::repoB`]) {
+      assert.equal(cache.inner.get(key), undefined, `key ${key} must miss after eviction`);
+    }
+    assert.equal(cache.set(baseKey, entry), false, 'the tombstone refuses a post-evict write');
+  });
+
+  test('(iii) a repoB selector resolution is served repoB, never from the warm repoA entry', async () => {
+    const { fn, cache } = resolverWithHoldingCache();
+    await fn('acme', 'acct', { intent: 'WORKSPACE' }); // warm the repoA base entry
+    cache.gets.length = 0;
+    cache.sets.length = 0;
+
+    const out = await fn('acme', 'acct', { intent: 'ISSUE', selector: { source: 'github', bindingScope: REPO_B } });
+
+    assert.deepEqual(out.scope, { token: 'tok-a', repo: REPO_B }, 'the selector resolution asks repoB');
+    assert.deepEqual(cache.gets, [], 'the selector resolution never reads the (repoA) cache entry');
+    assert.deepEqual(cache.sets, [], 'the selector resolution never writes');
   });
 });
 
@@ -1007,7 +1096,7 @@ describe('(F) census pin — every resolveProviderAccess call site declares a li
 function permissiveGitHubProvider() {
   return {
     name: 'github',
-    supports: (cap) => cap !== 'fetchAttachment',
+    supports: () => true,
     createFields: () => [],
     viewer: async () => ({ id: 'u1' }),
     fetchTeams: async () => [],
@@ -1022,6 +1111,9 @@ function permissiveGitHubProvider() {
     cycleDetail: async () => ({ id: 'cyc-1' }),
     issueDetail: async () => null,
     relations: async () => null,
+    // The `att:` attachments branch resolves the seam, then (with no formal
+    // attachment) 404s — a reachable seam call with no egress.
+    fetchAttachment: async () => null,
   };
 }
 
@@ -1094,6 +1186,17 @@ describe('LIN-3241 matrix — every WORKSPACE-intent route with no selector serv
     ['GET', '/api/proxy/cycles/00000000-0000-0000-0000-000000000000', 200],
     ['GET', '/api/proxy/stack', 200],
     ['GET', '/api/proxy/instructions', 200],
+    // `/attachments/:id` (`proxy-reads.js:610`/`:693`) — the `att:` branch
+    // (site :610) resolves the seam, then 404s because the fake provider has no
+    // formal attachment. Its "normal status" here is 404.
+    //
+    // The `md:` branch (site :693) is deliberately NOT driven: after the seam it
+    // proceeds to a REAL egress fetch of the relayed bytes (`customFetch` /
+    // `createProxyFetch()`), which the off-network hermetic harness forbids (and
+    // the hermetic:proxy arm would route through the configured proxy endpoint).
+    // Its seam call is nonetheless pinned as WORKSPACE by the census table, and
+    // it shares the exact same intent/selector logic as the driven `att:` path.
+    ['GET', `/api/proxy/attachments/${encodeURIComponent(encodeAttachmentHandle('att', 'a1'))}`, 404],
     // The repo-only dispatch takes the WORKSPACE branch of the conditional site.
     ['POST', '/api/proxy/dispatch', 201, { prompt: 'run me', repo: REPO_A }],
     // Flight Companion turn: resolveProviderAccess runs before the message-length

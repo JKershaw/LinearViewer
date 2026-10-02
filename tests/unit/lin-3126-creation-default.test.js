@@ -15,6 +15,7 @@ import {
   REPO_A, REPO_B, installGitHubProvider, makeTwoRepoWorkspace, makeSingleRepoWorkspace,
   buildWorkspaceApiApp, buildTaskCreateApp, withServer,
 } from './lin-3126-harness.js';
+import { makeTwoRepoResolver, buildProxyApp, callProxy, createIssueProvider } from './lin-3126-proxy-harness.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -132,5 +133,59 @@ describe('LIN-3240 scan-due — workspace-level default', () => {
     assert.equal(status, 200);
     const checks = calls.filter(c => c.method === 'fetchRecommendationContext');
     assert.deepEqual(checks.map(c => c.scope.repo), [REPO_B]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3241 (LIN-3126 slice 2) — the plan's "creation-default proxy row".
+//
+// CREATE-selector decision (LIN-3241 review F2): the plan's §3 per-intent table
+// says a CREATE selector is "honoured only if it validates", but the plan's
+// slice-2 class-bounding row for THIS site is explicit:
+//
+//   "Proxy `POST /issues` (`proxy-writes.js:78-80`) | **Deliberate default**
+//    (S2), `CREATE` intent | Creation keeps the explicit default binding;
+//    never refused for ambiguity"
+//
+// No route provides a CREATE selector: `issueSelectorFromQuery` is ISSUE-only
+// and `proxy-writes.js:80` passes none. Slice 3 (LIN-3242) owns the DISPATCH
+// issue selector pair (`issueSource`/`issueBindingScope`), not
+// `POST /api/proxy/issues`. So the create-selector input is DEFERRED (stated in
+// the PR body) and today's behaviour is pinned: a selector-like query on CREATE
+// is ignored and creation lands on the explicit default.
+// ---------------------------------------------------------------------------
+
+describe('LIN-3241 proxy creation — POST /api/proxy/issues (CREATE) stays on the explicit default', () => {
+  test('with no selector: creates on the default binding (repoA), never refused for ambiguity', async () => {
+    const calls = [];
+    const { fn } = makeTwoRepoResolver();
+    const { app } = buildProxyApp({ resolveWorkspaceAccess: fn, provider: createIssueProvider(calls) });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/issues', { title: 'New task' });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.notEqual(res.body?.code, 'BINDING_REQUIRED');
+    assert.deepEqual(calls.map(c => c.scope.repo), [REPO_A]);
+  });
+
+  test('a selector-like query is IGNORED (CREATE reads no query selector) — still repoA', async () => {
+    const calls = [];
+    const recorded = [];
+    const { fn } = makeTwoRepoResolver();
+    const resolveWorkspaceAccess = async (urlKey, ownerAccountId, options) => {
+      recorded.push(options);
+      return fn(urlKey, ownerAccountId, options);
+    };
+    const { app } = buildProxyApp({ resolveWorkspaceAccess, provider: createIssueProvider(calls) });
+
+    const res = await callProxy(
+      app, 'POST',
+      `/api/proxy/issues?source=github&bindingScope=${encodeURIComponent(REPO_B)}`,
+      { title: 'New task' });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(recorded.at(-1)?.intent, 'CREATE');
+    assert.equal(recorded.at(-1)?.selector, undefined, 'CREATE must not read a selector from the query');
+    assert.deepEqual(calls.map(c => c.scope.repo), [REPO_A]);
   });
 });
