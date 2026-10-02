@@ -11,6 +11,9 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { parseRunLedger, readRunLedger, latestReviewComment } from '../../lib/run-ledger.js';
 import { RUN_LEDGER_COMMENTS } from '../fixtures/run-ledger-comments.js';
 import { RUN_COMMENT_TRAILS } from '../fixtures/run-ledger-trails.js';
@@ -229,5 +232,79 @@ describe('run-ledger: real finished-run trails (R1/R2)', () => {
     assert.strictEqual(comments.length, 6);
     assert.strictEqual(latestReviewComment(comments)?.id, '3f374473-e5e4-4914-98ea-25bbfd7b7bf9');
     assert.strictEqual(readRunLedger(comments).verdict, 'request-changes');
+  });
+});
+
+describe('run-ledger: selection over the real large-dense corpus (R1′)', () => {
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const source = JSON.parse(readFileSync(
+    join(ROOT, 'scripts/eval/fixtures/recommend/_source/large-dense.json'),
+    'utf8',
+  ));
+
+  // The source capture keeps only body/createdAt/user (build-large-dense-fixtures.mjs
+  // strips ids), so give each comment a stable synthetic id from its bundle and
+  // index before asserting which one the selector picks.
+  const commentsFor = bundleId => source.bundles[bundleId].comments
+    .map((c, i) => ({ ...c, id: `${bundleId}#${i}` }));
+
+  // Hand-verified expected review comment per bundle; null = the trail holds no
+  // review. LIN-2149 (breakdown/autopilot only) and LIN-3059 (plan reviews only)
+  // are the two bundles with no review.
+  const EXPECTED = {
+    'LIN-2149': null,
+    'LIN-1892': 'LIN-1892#40',
+    'LIN-2944': 'LIN-2944#34',
+    'LIN-3059': null,
+    'LIN-3098': 'LIN-3098#26',
+    'LIN-3107': 'LIN-3107#15',
+    'LIN-3124': 'LIN-3124#41',
+    'LIN-3135': 'LIN-3135#9',
+    'LIN-2403': 'LIN-2403#4',
+    'LIN-2882': 'LIN-2882#15',
+    'LIN-3125': 'LIN-3125#13',
+  };
+
+  test('every bundle selects its review comment, or nothing when it has none', () => {
+    assert.deepStrictEqual(
+      Object.keys(EXPECTED).sort(),
+      Object.keys(source.bundles).sort(),
+      'the table must cover every bundle in the corpus',
+    );
+    for (const [bundleId, expectedId] of Object.entries(EXPECTED)) {
+      const comments = commentsFor(bundleId);
+      const picked = latestReviewComment(comments);
+      assert.strictEqual(picked?.id ?? null, expectedId, `${bundleId}: selected the wrong comment`);
+
+      const model = readRunLedger(comments);
+      assert.strictEqual(model.commentId, expectedId, `${bundleId}: readRunLedger parsed the wrong comment`);
+      if (expectedId === null) {
+        assert.strictEqual(model.verdict, 'unknown', `${bundleId}: no review must read as unknown`);
+        assert.strictEqual(model.ledger.present, false, `${bundleId}: no review must have no ledger`);
+      } else {
+        assert.strictEqual(model.ledger.present, true, `${bundleId}: the selected review must carry its ledger`);
+      }
+    }
+  });
+
+  test('the two whole-trail fixtures still select their review', () => {
+    assert.strictEqual(
+      latestReviewComment(RUN_COMMENT_TRAILS['lin-3245'].comments)?.id,
+      '3e984ba9-c93e-4fea-83b8-9890af4e107b',
+    );
+    assert.strictEqual(
+      latestReviewComment(RUN_COMMENT_TRAILS['lin-3247'].comments)?.id,
+      '3f374473-e5e4-4914-98ea-25bbfd7b7bf9',
+    );
+  });
+
+  test('a review-titled fix-up with no verdict word or ledger is not selected as the review', () => {
+    const fixUp = source.bundles['LIN-2944'].comments[26];
+    assert.match(fixUp.body.split('\n')[0], /re-review fix-up/);
+    assert.strictEqual(
+      latestReviewComment([{ ...fixUp, id: 'fixup' }]),
+      null,
+      'a title that merely names a review must still carry a verdict or ledger',
+    );
   });
 });
