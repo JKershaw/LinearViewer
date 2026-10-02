@@ -2333,33 +2333,70 @@ export function createDashboardRoutes({
     // set scored cannot drift.
     const identifiers = eligibleIssueIdentifiers({ liveRows, historyRows });
 
-    // One binding for the whole read, resolved from the workspace itself — a
-    // dispatch row carries no per-issue provenance to thread as `source`. On a
-    // multi-binding workspace a foreign-source issue therefore reads against
-    // the wrong provider and fails; that failure is counted as a skip and
-    // DISCLOSED in `completeness` rather than silently dropped, so the page
-    // under-reports honestly instead of mis-attributing. Threading per-issue
-    // provenance would need a `source` on the dispatch row itself.
-    const { provider, callScope } = resolveIssueBinding(workspace, null);
-    const supports = (name) => typeof provider?.supports === 'function' && provider.supports(name);
-    const survivalAvailable = supports('fetchIssueComments');
-    // `description` is what `GATE_DUE_MARKER` matches for gateDue/gateHonoured.
-    // Without it those two fields would render a uniform zero that is not a
-    // measurement, so the compute layer omits them instead.
-    const gateFieldsAvailable = supports('fetchIssueFields');
+    // LIN-3242 (LIN-3126 §4): group the eligible population by the dispatch row's
+    // OWN binding selector (`issueSource`/`issueBindingScope`), not by the
+    // workspace's active binding. Each DISTINCT stamped key resolves ONCE via
+    // slice-1's `resolveIssueBinding`; the call scope/credential always comes from
+    // the hydrated binding, never from `bindingScope` itself (B1/LIN-2473), and
+    // this path adds no `workspaceTokenCache` usage. An UNSTAMPED issue on a
+    // multi-binding connection-backed workspace is NOT guessed from the active
+    // binding: it is counted as skipped and disclosed in `completeness`. So is a
+    // stamped key whose binding no longer resolves. A single-binding/legacy
+    // workspace keeps today's behaviour for unstamped rows exactly (the null
+    // group resolves to the workspace's active pair).
+    const stampByIdentifier = new Map();
+    for (const row of [...liveRows, ...historyRows]) {
+      const id = row.issueIdentifier;
+      if (!id) continue;
+      const stamped = row.issueSource != null && row.issueBindingScope != null;
+      const existing = stampByIdentifier.get(id);
+      if (existing === undefined || (existing === null && stamped)) {
+        stampByIdentifier.set(id, stamped ? { source: row.issueSource, bindingScope: row.issueBindingScope } : null);
+      }
+    }
+    const groups = new Map();
+    for (const identifier of identifiers) {
+      const selector = stampByIdentifier.get(identifier) ?? null;
+      const key = selector ? `${selector.source}\u0000${selector.bindingScope}` : '';
+      let group = groups.get(key);
+      if (!group) {
+        group = { selector, identifiers: [] };
+        groups.set(key, group);
+      }
+      group.identifiers.push(identifier);
+    }
 
+    // Capability flags: the workspace's own default resolution (today's single
+    // read) PLUS every resolved stamped group, so a stamped binding that can serve
+    // comments still lights the survival columns even when the active binding
+    // refuses.
+    const defaultBinding = resolveIssueBinding(workspace, null);
+    const defaultSupports = (name) => typeof defaultBinding.provider?.supports === 'function' && defaultBinding.provider.supports(name);
+    const supportsFns = [defaultSupports];
     const issueContext = new Map();
     let skipped = 0;
 
-    if (survivalAvailable && identifiers.length) {
-      const settled = await settleWithConcurrency(identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
+    for (const group of groups.values()) {
+      const binding = resolveIssueBinding(workspace, group.selector);
+      if (binding.error) {
+        // Unstamped on a multi-binding workspace, or a stale stamped key:
+        // disclose by counting the whole group as skipped, never throw.
+        skipped += group.identifiers.length;
+        continue;
+      }
+      const { provider, callScope } = binding;
+      const supports = (name) => typeof provider?.supports === 'function' && provider.supports(name);
+      supportsFns.push(supports);
+      if (!supports('fetchIssueComments')) continue;
+
+      const settled = await settleWithConcurrency(group.identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
         // `fetchIssueComments` (not `fetchIssueContext`) because the verdict
         // walk needs each comment's own `id` + `createdAt`, which only this
         // reader emits. `fetchIssueFields` supplies the description the gate
         // fields are derived from.
         const [comments, fields] = await Promise.all([
           provider.fetchIssueComments(callScope, identifier),
-          gateFieldsAvailable ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
+          supports('fetchIssueFields') ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
         ]);
         return {
           identifier,
@@ -2384,6 +2421,9 @@ export function createDashboardRoutes({
         skipped += 1;
       }
     }
+
+    const survivalAvailable = supportsFns.some((fn) => fn('fetchIssueComments'));
+    const gateFieldsAvailable = supportsFns.some((fn) => fn('fetchIssueFields'));
 
     return computeEffortReadout({
       liveRows,
