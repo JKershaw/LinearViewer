@@ -192,8 +192,8 @@ if (process.env.NODE_ENV !== 'test') {
 
   // OPENROUTER_API_KEY foot-gun (LIN-961): a present-but-empty/whitespace value
   // is silently treated as unset and every proxy LLM call falls back to the free
-  // tier — surfacing later only as a misleading "Daily limit reached" 429. Catch
-  // it at boot rather than at first 429.
+  // tier — surfacing later only as a misleading "Service busy, try again later"
+  // 429. Catch it at boot rather than at first 429.
   if (process.env.OPENROUTER_API_KEY !== undefined && !getPaidEnvKey()) {
     console.warn('Warning: OPENROUTER_API_KEY is set but empty/whitespace — it will be treated as unset.');
     console.warn('Proxy LLM calls will fall back to the free tier (OPENROUTER_FREE_TIER_KEY) if configured, else fail.');

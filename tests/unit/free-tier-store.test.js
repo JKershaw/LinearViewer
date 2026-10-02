@@ -52,6 +52,11 @@ describe('LIN-689 / LIN-3239 — FreeTierStore hourly cap', () => {
     assert.equal(denied.reason, 'Service busy, try again later');
     assert.equal(denied.remaining, 0);
     assert.equal(denied.limit, hourlyLimit);
+    // LIN-3239 R2: an hourly denial must reset at the top of the next UTC hour,
+    // not at the next UTC midnight (which would overstate the wait by up to 23h).
+    const nextHourTop = new Date();
+    nextHourTop.setUTCHours(nextHourTop.getUTCHours() + 1, 0, 0, 0);
+    assert.equal(denied.resetsAt, nextHourTop.toISOString());
   });
 
   test('case 2: concurrent tryUse across distinct urlKeys — exactly hourlyLimit allowed, stored count === hourlyLimit', async () => {
