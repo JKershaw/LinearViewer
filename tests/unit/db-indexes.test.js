@@ -168,16 +168,23 @@ describe('db-indexes', () => {
     assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
   });
 
-  test('declares the milestone-funnel per-account dispatch indexes (LIN-2952)', () => {
-    // The funnel reads a person's dispatches from BOTH collections by
-    // `dispatchedBy` and takes the earliest by `dispatchedAt`, so each needs
-    // the compound index; without it the read is an unindexed collection scan.
+  test('declares the per-account dispatch indexes on both collections (LIN-2952 + LIN-3238)', () => {
+    // ONE index per collection serves both readers: the milestone funnel reads a
+    // person's dispatches by `dispatchedBy`, earliest `dispatchedAt` first
+    // (lib/milestone-funnel.js, LIN-2952), and countFreshRunsSince range-scans the
+    // UTC day by attribution, queue first then history (LIN-3238). Without it the
+    // read is an unindexed collection scan. Plain, non-TTL.
     for (const collection of ['dispatch-queue', 'dispatch-history']) {
       const spec = INDEX_SPECS.find(s =>
         s.collection === collection &&
         JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
       );
       assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index`);
+      assert.strictEqual(
+        spec.options?.expireAfterSeconds,
+        undefined,
+        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
+      );
     }
   });
 
@@ -248,23 +255,6 @@ describe('db-indexes', () => {
         JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, producingItemId: 1, producingItemAttempt: -1 })
       );
       assert.ok(hasIt, `${collection} must have a {urlKey:1, producingItemId:1, producingItemAttempt:-1} index`);
-    }
-  });
-
-  test('declares the run-count indexes on both dispatch collections (LIN-3238)', () => {
-    // Backs countFreshRunsSince: a per-account attached range scan over the UTC
-    // day, in the queue and (after the archive hop) in history. Plain, non-TTL.
-    for (const collection of ['dispatch-queue', 'dispatch-history']) {
-      const spec = INDEX_SPECS.find(s =>
-        s.collection === collection &&
-        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
-      );
-      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index (LIN-3238)`);
-      assert.strictEqual(
-        spec.options?.expireAfterSeconds,
-        undefined,
-        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
-      );
     }
   });
 

@@ -16,7 +16,7 @@ import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { TaskModeStore } from '../../lib/task-mode-store.js';
 import { FunnelEventStore } from '../../lib/funnel-event-store.js';
 import { buildCanonicalMap, isPullRequestUrl, stepsForAccountGroup, collectMilestoneFunnel, STEP_STATES } from '../../lib/milestone-funnel.js';
-import { isFreshRun } from '../../lib/dispatch-store.js';
+import { isFreshRun, DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const harness = createMangoTmpdir('lin-2952-milestone-');
@@ -191,6 +191,42 @@ describe('isFreshRun — the single LIN-2955 Q1 predicate (LIN-2952 consumes it)
     assert.equal(isFreshRun({ kind: 'wake' }), false, 'a wake continues a run');
     assert.equal(isFreshRun({ abort: true }), false, 'an abort closes a session');
     assert.equal(isFreshRun(null), false);
+  });
+});
+
+describe('isFreshRun agrees with countFreshRunsSince\'s Mongo filter (LIN-3238 #1715 x LIN-2952)', () => {
+  test('the JS predicate and the run-count filter select the same fixture rows', async () => {
+    // #1715 has no exported JS predicate, so isFreshRun (lib/dispatch-store.js) is
+    // the single JS form and countFreshRunsSince's query must state the same
+    // clauses. One fixture row per clause, split across queue and history, plus
+    // out-of-scope (other account, before the window) rows.
+    const db = harness.freshDb();
+    const queue = db.collection('dispatch-queue');
+    const history = db.collection('dispatch-history');
+    const store = new DispatchQueueStore({ collection: queue, historyCollection: history });
+
+    const me = 'acct-me';
+    const since = PAST(60 * 60 * 1000);
+    const rows = [
+      dispatchRow(me, PAST(1000), {}),                        // fresh
+      dispatchRow(me, PAST(2000), { kind: 'implementation' }), // fresh, any kind
+      dispatchRow(me, PAST(3000), { followUpTo: 'p-1' }),     // follow-up
+      dispatchRow(me, PAST(4000), { sessionId: 's-1' }),      // worker continues a run
+      dispatchRow(me, PAST(5000), { cascade: true }),         // cascade
+      dispatchRow(me, PAST(6000), { kind: 'wake' }),          // wake
+      dispatchRow(me, PAST(7000), { abort: true }),           // abort
+      dispatchRow('someone-else', PAST(1500), {}),            // another person
+      dispatchRow(me, PAST(2 * 60 * 60 * 1000), {})           // before the window
+    ];
+    await queue.insertMany(rows.slice(0, 5));
+    await history.insertMany(rows.slice(5));
+
+    const expected = rows
+      .filter(r => r.dispatchedBy === me && r.dispatchedAt >= since)
+      .filter(isFreshRun).length;
+    const counted = await store.countFreshRunsSince([me], since);
+    assert.strictEqual(counted, expected, 'countFreshRunsSince must agree with isFreshRun');
+    assert.strictEqual(counted, 2, 'only the two in-scope fresh rows are a Go');
   });
 });
 
