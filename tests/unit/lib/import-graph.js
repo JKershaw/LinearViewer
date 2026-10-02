@@ -41,7 +41,13 @@
  *                                 re-export names and `export * as ns`)
  *     `bindings`: [{ imported, local }] where `imported` is the source-side
  *     name and `local` the bound/exported name (`*` for namespace imports).
- *     `form`: 'named' | 'default' | 'namespace' | 'side-effect' | 'star'.
+ *     `form`: 'named' | 'default' | 'namespace' | 'side-effect' | 'star' |
+ *     'dynamic'. `'dynamic'` is the ADDITIVE LIN-3219/LIN-3232 extension: an
+ *     executable string-literal relative `import('./x.js')` / `import('../x.js')`
+ *     (incl. `await import(…)` and `import(…).then(…)`), recorded with
+ *     `star: true` and no bindings. Comments are stripped, so a JSDoc
+ *     `import('./x.js')` type position is never an edge; a template-literal
+ *     specifier is deliberately NOT followed (it may interpolate).
  *     Destructured `export const { … } =` names are extracted best-effort.
  *
  * ImportGraph METHODS (all pure, cycle-safe)
@@ -57,7 +63,11 @@
  *                                      sideEffect, bindings }]
  *   dependenciesOf(path)         -> string[]            sorted resolved deps
  *   exportedNamesOf(path)        -> string[]            star-expanded
- *   directImportersOf(symbol)    -> string[]            sorted
+ *   directImportersOf(symbol)    -> string[]            sorted; namespace-aware
+ *                                   (a static `import * as ns` or an executable
+ *                                   dynamic `import()` counts as an importer of
+ *                                   every symbol the target exports; a
+ *                                   star/namespace RE-EXPORT does not)
  *   reaches(fromPath, symbol)    -> boolean
  *   reachingModules(symbol, { from = paths() }) -> string[]
  *
@@ -68,6 +78,8 @@
  *   (route -> lib/wrapper.js -> defining module). It is deliberately module
  *   reachability, not a binding-chain proof: that is what lets A3 count an
  *   enqueue moved behind a `lib/` wrapper. It is cycle-safe via a visited set.
+ *   ADDITIVE (LIN-3219 / LIN-3232): executable relative dynamic `import()`
+ *   edges are now followed too, so a dynamic wrapper hop is reached.
  */
 import { posix } from 'node:path';
 
@@ -211,6 +223,18 @@ export function parseModule(source) {
   while ((m = exportVar.exec(clean))) exportedNames.push(...declaredNames(m[1]));
   if (/^[ \t]*export\s+default\b/m.test(clean)) exportedNames.push('default');
 
+  // ADDITIVE (LIN-3219 / LIN-3232): executable dynamic `import('./x.js')` /
+  // `import('../x.js')` as whole-module edges. `clean` already has comments
+  // stripped, so JSDoc `import('./x.js')` type positions do not reach here. Only
+  // string-literal specifiers are followed; a template-literal specifier may
+  // interpolate and is deliberately left out. Bare specifiers are recorded and
+  // resolve to null (same as static imports). The optional `(?:^|[^\w$.])`
+  // guard keeps `import.meta` and `foo.import(` from matching.
+  const dynamicImport = /(?:^|[^\w$.])import\s*\(\s*(['"])([^'"]+)\1\s*\)/gm;
+  while ((m = dynamicImport.exec(clean))) {
+    imports.push({ specifier: m[2], form: 'dynamic', star: true, sideEffect: false, bindings: [] });
+  }
+
   return { imports, reexports, exportedNames: [...new Set(exportedNames)] };
 }
 
@@ -313,7 +337,20 @@ class ImportGraph {
   directImportersOf(symbol) {
     const out = [];
     for (const path of this.paths()) {
-      const hit = (this._importsByPath.get(path) || []).some((r) => r.bindings.some((b) => b.imported === symbol));
+      const records = this._importsByPath.get(path) || [];
+      const hit = records.some((r) => {
+        if (r.bindings.some((b) => b.imported === symbol)) return true;
+        // ADDITIVE (LIN-3219 / LIN-3232): namespace-aware. A static
+        // `import * as ns from './x.js'` or an executable dynamic `import()`
+        // imports the WHOLE module, so it is an importer of every symbol the
+        // target exports. Re-exports are excluded (`kind === 'import'`), so a
+        // star/namespace RE-EXPORT is still not a "direct named importer" —
+        // A0's documented semantics are preserved.
+        if (r.kind === 'import' && (r.form === 'namespace' || r.form === 'dynamic')) {
+          return r.resolved !== null && this.exportedNamesOf(r.resolved).includes(symbol);
+        }
+        return false;
+      });
       if (hit) out.push(path);
     }
     return out;
