@@ -120,6 +120,7 @@ import { ShareStore } from './lib/share-store.js'
 import { createReadOwnerIssues } from './lib/share-owner-reader.js'
 import { isTokenRefreshExempt } from './lib/root-route-exemption.js'
 import { createProxyRoutes, commentDedupe, withTimeout } from './routes/proxy.js'
+import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes, shouldMockAi, decisionStampDedupe } from './routes/workspace-api.js'
@@ -2257,6 +2258,7 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
+app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
 // Public share route (LIN-3243). `readOwnerIssues` composes the hardened
 // `resolveWorkspaceAccess(urlKey, ownerAccountId)` (never UNSCOPED) with the

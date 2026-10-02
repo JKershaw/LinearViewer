@@ -168,6 +168,19 @@ describe('db-indexes', () => {
     assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
   });
 
+  test('declares the milestone-funnel per-account dispatch indexes (LIN-2952)', () => {
+    // The funnel reads a person's dispatches from BOTH collections by
+    // `dispatchedBy` and takes the earliest by `dispatchedAt`, so each needs
+    // the compound index; without it the read is an unindexed collection scan.
+    for (const collection of ['dispatch-queue', 'dispatch-history']) {
+      const spec = INDEX_SPECS.find(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
+      );
+      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index`);
+    }
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an
