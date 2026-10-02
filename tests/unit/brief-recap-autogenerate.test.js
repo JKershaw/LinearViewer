@@ -72,7 +72,10 @@ function loadSection(file, globalName, responder) {
       return responder(url, method);
     },
   };
-  vm.runInNewContext(src, { window });
+  // URLSearchParams is a host global, not an ECMAScript intrinsic, so a fresh
+  // vm context does not expose it. Supplied here for the case below that
+  // exercises the `?source=&bindingScope=` query path (LIN-2944 P2 ledger).
+  vm.runInNewContext(src, { window, URLSearchParams });
   return { section: window[globalName], calls };
 }
 
@@ -156,5 +159,31 @@ for (const S of SECTIONS) {
 
     assert.equal(calls.filter(c => c.method === 'POST').length, beforeClick + 1, 'the click issued its own POST');
     assert.equal(container.getAttribute('data-state'), 'error', 'a manual click surfaces the reason, never the silent placeholder');
+  });
+
+  // LIN-2944 P2 close-out ledger item 1 (review M3): P2 changed refresh()'s
+  // signature so `bindingScope` is positional (LIN-3240). A manual ✦ generate
+  // click must still forward the row's `source` + `bindingScope` to the POST, or
+  // per-row binding resolution silently breaks. No earlier case passed `source`,
+  // so the vm context never needed URLSearchParams (added in loadSection above).
+  test(`${S.name}: manual ✦ generate forwards source + bindingScope on the POST (LIN-3240)`, async () => {
+    const responder = (url, method) => (method === 'POST' ? S.fresh : { status: 'missing' });
+    const { section, calls } = loadSection(S.file, S.global, responder);
+
+    const container = makeContainer();
+    await section.init(container, {
+      urlKey: 'ws',
+      identifier: 'LIN-998',
+      source: 'github',
+      bindingScope: 'octo/repoB',
+    });
+    assert.equal(container.getAttribute('data-state'), 'missing', 'opens on the manual placeholder');
+
+    await container.clickRefresh();
+
+    const posts = calls.filter(c => c.method === 'POST');
+    assert.equal(posts.length, 1, 'exactly one POST from the click');
+    assert.match(posts[0].url, /[?&]source=github(&|$)/, 'manual POST forwards source');
+    assert.match(posts[0].url, /[?&]bindingScope=octo%2FrepoB(&|$)/, 'manual POST forwards the row bindingScope');
   });
 }
