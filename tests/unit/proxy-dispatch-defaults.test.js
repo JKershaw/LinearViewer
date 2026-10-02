@@ -22,7 +22,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 // LIN-1880: this file opened a live TLS connection to api.linear.app on every
 // run. Never restored — the refusal stands for the whole file, which also
@@ -52,7 +52,7 @@ function createMockCollection() {
   };
 }
 
-function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch, recordedEvents } = {}) {
+function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch, recordedEvents, freeTierStore } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -90,7 +90,7 @@ function buildApp(captured, { workspacePreferencesStore, findRecentFreshDispatch
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore,
-    freeTierStore: { tryUse: async () => ({ allowed: true }) }
+    freeTierStore: freeTierStore || { tryUse: async () => ({ allowed: true }) }
   }));
   return app;
 }
@@ -506,6 +506,116 @@ describe('LIN-1656 — the proxy creation routes surface the duplicate refusal a
       const res = await call(app, 'post', path, body);
       assert.equal(res.status, 201, `${path}: ${JSON.stringify(res.body)}`);
       assert.ok(captured.item, `${path}: the item must be enqueued`);
+    }
+  });
+});
+
+describe('LIN-3238 — proxy lanes relay a free-tier run-limit refusal', () => {
+  let savedFree;
+  let savedPaid;
+  before(() => {
+    savedFree = process.env.OPENROUTER_FREE_TIER_KEY;
+    savedPaid = process.env.OPENROUTER_API_KEY;
+    delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_FREE_TIER_KEY = 'free-tier-test-key';
+  });
+  after(() => {
+    if (savedFree === undefined) delete process.env.OPENROUTER_FREE_TIER_KEY; else process.env.OPENROUTER_FREE_TIER_KEY = savedFree;
+    if (savedPaid === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = savedPaid;
+  });
+
+  const FUTURE = '2026-10-03T00:00:00.000Z';
+
+  for (const [path, body] of [
+    ['/api/proxy/dispatch', { prompt: 'run me', kind: 'implementation' }],
+    ['/api/proxy/autopilot/kickoff', {}]
+  ]) {
+    test(`${path}: an exhausted free-tier creator is refused 429 with Retry-After and enqueues nothing`, async () => {
+      const captured = {};
+      const freeTierStore = {
+        tryUse: async () => ({ allowed: true }),
+        checkRun: async () => ({ allowed: false, reason: 'limit', runsUsed: 10, limit: 10, remaining: 0, resetsAt: FUTURE })
+      };
+      const app = buildApp(captured, { freeTierStore });
+      const res = await call(app, 'post', path, body);
+
+      assert.equal(res.status, 429, JSON.stringify(res.body));
+      assert.equal(res.body.code, 'RUN_LIMIT_REACHED');
+      assert.equal(res.body.freeTier.used, true);
+      assert.equal(res.body.freeTier.runsUsed, 10);
+      assert.equal(res.body.freeTier.limit, 10);
+      assert.equal(res.retryAfterHeader, String(res.body.retryAfter));
+      assert.equal(captured.item, undefined, 'nothing may be enqueued on refusal');
+    });
+  }
+
+  test('/api/proxy/dispatch: an unverified count is 503 RUN_LIMIT_UNVERIFIED', async () => {
+    const captured = {};
+    const freeTierStore = {
+      tryUse: async () => ({ allowed: true }),
+      checkRun: async () => ({ allowed: false, reason: 'unverified', runsUsed: null, limit: 10, remaining: 0, resetsAt: FUTURE })
+    };
+    const app = buildApp(captured, { freeTierStore });
+    const res = await call(app, 'post', '/api/proxy/dispatch', { prompt: 'run me', kind: 'implementation' });
+
+    assert.equal(res.status, 503, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'RUN_LIMIT_UNVERIFIED');
+    assert.equal(captured.item, undefined);
+  });
+
+  const REFUSED = { allowed: false, reason: 'limit', runsUsed: 10, limit: 10, remaining: 0, resetsAt: FUTURE };
+  const UNVERIFIED = { allowed: false, reason: 'unverified', runsUsed: null, limit: 10, remaining: 0, resetsAt: FUTURE };
+
+  test('POST /api/proxy/recommend-and-dispatch — verb-override arm: 429 with Retry-After', async () => {
+    const captured = {};
+    const freeTierStore = { tryUse: async () => ({ allowed: true }), checkRun: async () => REFUSED };
+    const app = buildApp(captured, { freeTierStore });
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-1', kind: 'implementation' });
+
+    assert.equal(res.status, 429, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'RUN_LIMIT_REACHED');
+    assert.equal(res.body.freeTier.used, true);
+    assert.equal(res.retryAfterHeader, String(res.body.retryAfter));
+    assert.equal(captured.item, undefined);
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch — recommendation-derived arm (keepalive armed): 429', async () => {
+    const captured = {};
+    const freeTierStore = { tryUse: async () => ({ allowed: true }), checkRun: async () => REFUSED };
+    const app = buildApp(captured, { freeTierStore });
+    // No `kind`: the descent resolves TEST-14 to the LLM-derived creation seam,
+    // whose catch answers through `keepalive.send`.
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-14' });
+
+    assert.equal(res.status, 429, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'RUN_LIMIT_REACHED');
+    assert.equal(captured.item, undefined);
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch — recommendation-derived arm: unverified is 503', async () => {
+    const captured = {};
+    const freeTierStore = { tryUse: async () => ({ allowed: true }), checkRun: async () => UNVERIFIED };
+    const app = buildApp(captured, { freeTierStore });
+    const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-14' });
+
+    assert.equal(res.status, 503, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'RUN_LIMIT_UNVERIFIED');
+    assert.equal(captured.item, undefined);
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch — a non-free-tier creator is not gated', async () => {
+    const saved = process.env.OPENROUTER_FREE_TIER_KEY;
+    delete process.env.OPENROUTER_FREE_TIER_KEY;
+    try {
+      const captured = {};
+      const app = buildApp(captured, {
+        freeTierStore: { tryUse: async () => ({ allowed: true }), checkRun: async () => { throw new Error('must not be called'); } }
+      });
+      const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', { issueIdentifier: 'TEST-1', kind: 'implementation' });
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.ok(captured.item, 'a non-free-tier creator dispatches');
+    } finally {
+      if (saved === undefined) delete process.env.OPENROUTER_FREE_TIER_KEY; else process.env.OPENROUTER_FREE_TIER_KEY = saved;
     }
   });
 });
