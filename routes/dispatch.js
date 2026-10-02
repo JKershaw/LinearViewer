@@ -242,7 +242,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -402,6 +402,29 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
         if (!issueIdentifier) {
           return badRequest.json(res, 'entryRung requires issueIdentifier');
+        }
+      }
+
+      // Run-boundary fact (LIN-3245 / LIN-2949 P1a): `stopAt: 'pr'` on a fresh
+      // autopilot kickoff means this run stops at its PR — its close-out is the
+      // person's to send. A DEDICATED, validated body field, never derived from
+      // `entryRung` (a browser-sent measurement, not a gate). Only the value
+      // `'pr'` is accepted, and only on a fresh autopilot dispatch for a task;
+      // any modifier that could never carry the boundary is rejected rather than
+      // silently dropped (the entryRung/cascade/abortTo precedent above).
+      const hasStopAt = stopAt !== undefined && stopAt !== null;
+      if (hasStopAt) {
+        if (stopAt !== 'pr') {
+          return badRequest.json(res, "stopAt must be 'pr'");
+        }
+        if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
+          return badRequest.json(res, 'stopAt is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
+        }
+        if (kind !== 'autopilot') {
+          return badRequest.json(res, "stopAt requires kind 'autopilot'");
+        }
+        if (!issueIdentifier) {
+          return badRequest.json(res, 'stopAt requires issueIdentifier');
         }
       }
 
@@ -670,7 +693,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           subscription: subscription ?? DEFAULT_SUBSCRIPTION,
           maxTasks: maxTasks ?? null,
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks.
-          maxSessionsPerTask: maxSessionsPerTask ?? null
+          maxSessionsPerTask: maxSessionsPerTask ?? null,
+          // Run-boundary fact (LIN-3245 / LIN-2949 P1a): stamped only when the
+          // validated `'pr'` value was supplied; null (the default) is
+          // byte-identical to today.
+          stopAt: stopAt ?? null
         }
       });
 
