@@ -233,6 +233,22 @@ describe('run-ledger: real finished-run trails (R1/R2)', () => {
     assert.strictEqual(latestReviewComment(comments)?.id, '3f374473-e5e4-4914-98ea-25bbfd7b7bf9');
     assert.strictEqual(readRunLedger(comments).verdict, 'request-changes');
   });
+
+  test('LIN-3098: the close-out/autopilot title exclusion keeps the S6 review over the autopilot wrap-up that follows it', () => {
+    const comments = trail('lin-3098-pair');
+    assert.strictEqual(comments.length, 2);
+    assert.strictEqual(
+      latestReviewComment(comments)?.id,
+      '81c9f76f-d68a-4f65-b55e-38383ad833eb',
+      'the S6 review must beat the autopilot wrap-up whose title names a review',
+    );
+    assert.notStrictEqual(
+      latestReviewComment(comments)?.id,
+      '4f3ef92a-1203-49d8-a20c-0addd3ddc4e7',
+      'an autopilot-titled comment must not be selected as the review',
+    );
+    assert.strictEqual(readRunLedger(comments).verdict, 'approve-conditional');
+  });
 });
 
 describe('run-ledger: selection over the real large-dense corpus (R1′)', () => {
