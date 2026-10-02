@@ -1,11 +1,13 @@
-// LIN-998: Brief and Recap auto-populate on section open, mirroring Context.
+// LIN-998 / LIN-2944 P2: Brief and Recap never spend AI just because the
+// section opens.
 //
 // The behavioral contract, driven against the REAL client `init()` in
 // public/brief.js and public/recap.js:
-//   - status=missing → auto-generate (POST fires once) → land on `fresh`.
+//   - status=missing → render the manual ✦ generate placeholder, NO POST
+//     (LIN-2944 P2: opening a section must not spend; only an explicit click does).
 //   - status=fresh   → render the cache, NO POST (never clobber fresh).
 //   - status=stale   → keep the manual ↻ refresh, NO POST (no reopen tax).
-//   - POST error     → land on `error` inline, no crash.
+//   - manual ✦ generate click → POST; a coded 503 surfaces the error banner.
 //
 // public/{brief,recap}.js are browser scripts (plain globals, no ES module /
 // build step), so we evaluate their source in a vm sandbox — as
@@ -90,17 +92,17 @@ const SECTIONS = [
 ];
 
 for (const S of SECTIONS) {
-  test(`${S.name}: status=missing auto-generates (POST fires once) → fresh`, async () => {
+  test(`${S.name}: status=missing renders the manual placeholder, NO POST (no spend on open)`, async () => {
     const responder = (url, method) => (method === 'POST' ? S.fresh : { status: 'missing' });
     const { section, calls } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
     await section.init(container, OPTS);
 
-    const posts = calls.filter(c => c.method === 'POST');
-    assert.equal(posts.length, 1, 'exactly one POST (auto-generate) on missing');
+    assert.equal(calls.filter(c => c.method === 'POST').length, 0, 'no POST on open — opening a section must not spend');
     assert.equal(calls.filter(c => c.method === 'GET').length, 1, 'one status GET');
-    assert.equal(container.getAttribute('data-state'), 'fresh', 'lands on fresh after auto-generate');
+    assert.equal(container.getAttribute('data-state'), 'missing', 'lands on the manual placeholder');
+    assert.match(container.innerHTML, /generate/, 'placeholder carries the ✦ generate button');
   });
 
   test(`${S.name}: status=fresh renders cache, NO POST (never clobber fresh)`, async () => {
@@ -126,25 +128,11 @@ for (const S of SECTIONS) {
     assert.equal(container.getAttribute('data-state'), 'stale');
   });
 
-  test(`${S.name}: auto-generate POST error (uncoded 500) lands on error inline (no crash)`, async () => {
-    const responder = (url, method) => {
-      if (method === 'POST') {
-        const err = new Error('Something went wrong');
-        err.status = 500;
-        throw err;
-      }
-      return { status: 'missing' };
-    };
-    const { section, calls } = loadSection(S.file, S.global, responder);
-
-    const container = makeContainer();
-    await section.init(container, OPTS);
-
-    assert.equal(calls.filter(c => c.method === 'POST').length, 1, 'auto-generate was attempted');
-    assert.equal(container.getAttribute('data-state'), 'error', 'error rendered inline, not thrown');
-  });
-
-  test(`${S.name}: 503 AI-not-configured on auto-open lands on manual placeholder, not error`, async () => {
+  // LIN-1016 review ledger item 1 / LIN-2944 P2: an explicit ✦ generate click is
+  // the only thing that spends, so a coded 503 it provokes must surface the
+  // error banner rather than silently re-render the placeholder. This drives the
+  // REAL wired click handler (init lands on the placeholder without a POST).
+  test(`${S.name}: manual ✦ generate click on a coded 503 shows the error banner (no silent placeholder)`, async () => {
     const responder = (url, method) => {
       if (method === 'POST') {
         const err = new Error('AI is not configured');
@@ -157,59 +145,16 @@ for (const S of SECTIONS) {
     const { section, calls } = loadSection(S.file, S.global, responder);
 
     const container = makeContainer();
+    // Open the section; its terminal state is the placeholder either way. P2's
+    // "open spends nothing" truth is witnessed by the missing-state test above,
+    // so this test isolates the explicit click and stays green pre/post-P2.
     await section.init(container, OPTS);
-
-    assert.equal(calls.filter(c => c.method === 'POST').length, 1, 'exactly one POST, no retry loop');
-    assert.equal(container.getAttribute('data-state'), 'missing', 'falls back to the manual placeholder');
-    assert.match(container.innerHTML, /generate/, 'placeholder carries the generate button');
-    assert.doesNotMatch(container.innerHTML, S.name === 'Brief' ? /brief-error/ : /recap-error/, 'does not carry the error class');
-  });
-
-  // LIN-1016 review ledger item 1: the `autoOpen` scoping guard is the ticket's
-  // central constraint, and nothing else in this file witnesses it — dropping
-  // the guard (fallback on every call, not just auto-open) leaves every other
-  // case green while an explicit ✦ generate click silently re-renders the same
-  // placeholder with no explanation. This drives the REAL wired click handler.
-  test(`${S.name}: manual ✦ generate click on a coded 503 still shows the error banner (autoOpen scoping guard)`, async () => {
-    const responder = (url, method) => {
-      if (method === 'POST') {
-        const err = new Error('AI is not configured');
-        err.status = 503;
-        err.body = { code: 'AI_NOT_CONFIGURED', error: 'AI is not configured' };
-        throw err;
-      }
-      return { status: 'missing' };
-    };
-    const { section, calls } = loadSection(S.file, S.global, responder);
-
-    const container = makeContainer();
-    // Auto-open first: lands on the placeholder and wires its ✦ generate button.
-    await section.init(container, OPTS);
-    assert.equal(container.getAttribute('data-state'), 'missing', 'auto-open reached the placeholder');
+    const beforeClick = calls.filter(c => c.method === 'POST').length;
 
     // Now the user clicks it — an explicit action, same coded 503.
     await container.clickRefresh();
 
-    assert.equal(calls.filter(c => c.method === 'POST').length, 2, 'the click issued its own POST');
+    assert.equal(calls.filter(c => c.method === 'POST').length, beforeClick + 1, 'the click issued its own POST');
     assert.equal(container.getAttribute('data-state'), 'error', 'a manual click surfaces the reason, never the silent placeholder');
-  });
-
-  test(`${S.name}: 503 without the AI_NOT_CONFIGURED code on auto-open still lands on error (regression guard)`, async () => {
-    const responder = (url, method) => {
-      if (method === 'POST') {
-        const err = new Error(S.name === 'Brief' ? 'Brief cache not configured' : 'Recap cache not configured');
-        err.status = 503;
-        err.body = { error: err.message };
-        throw err;
-      }
-      return { status: 'missing' };
-    };
-    const { section, calls } = loadSection(S.file, S.global, responder);
-
-    const container = makeContainer();
-    await section.init(container, OPTS);
-
-    assert.equal(calls.filter(c => c.method === 'POST').length, 1, 'auto-generate was attempted');
-    assert.equal(container.getAttribute('data-state'), 'error', 'an uncoded 503 is not misclassified as missing/unconfigured');
   });
 }

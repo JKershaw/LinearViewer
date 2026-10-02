@@ -638,3 +638,44 @@ test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
     expect(clicks).toBe(3);
   });
 });
+
+// =============================================================================
+// LIN-2944 P2 — nothing spends AI when Brief or Recap opens.
+//
+// The opened task's Brief and Recap sections are lazy-mounted on expand. Before
+// P2 they auto-POSTed on that expand (LIN-998); P2 makes them render the manual
+// ✦ generate placeholder instead, so expanding a section spends nothing and only
+// an explicit generate does. This witness pins POST /api/brief/*, POST
+// /api/recap/* and the recommend spend channel to zero across an expand.
+//
+// Its own `test.describe` block because P3 appends a disjoint block to this file.
+// =============================================================================
+test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
+  test('expanding Brief and Recap on the top task issues zero AI requests until generate', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const spend = [];
+    page.on('request', (req) => {
+      let pathname = '';
+      try { pathname = new URL(req.url()).pathname; } catch { return; }
+      const briefRecapPost = (pathname.includes('/api/brief/') || pathname.includes('/api/recap/')) && req.method() === 'POST';
+      if (briefRecapPost || isRecommendSpend(req.url())) spend.push(`${req.method()} ${pathname}`);
+    });
+
+    // openRouterConnected so the surfaces are live and a pre-P2 open WOULD spend.
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('.swipe-accordion-header[data-accordion="brief"]').first().click();
+    await page.locator('.swipe-accordion-header[data-accordion="recap"]').first().click();
+
+    const brief = page.locator('.swipe-accordion-body[data-accordion-body="brief"] .brief-section').first();
+    const recap = page.locator('.swipe-accordion-body[data-accordion-body="recap"] .recap-section').first();
+
+    // P2: each section settles on the manual placeholder, not generated content.
+    await expect(brief).toHaveAttribute('data-state', 'missing');
+    await expect(recap).toHaveAttribute('data-state', 'missing');
+
+    // The expands themselves spent nothing.
+    expect(spend).toEqual([]);
+  });
+});

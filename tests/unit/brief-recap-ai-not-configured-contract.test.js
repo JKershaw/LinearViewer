@@ -1,25 +1,31 @@
 /**
  * LIN-1016 review ledger items 2 and 3 — the SERVER half of the
- * AI-unconfigured contract, and the composed wire between the two halves.
+ * AI-unconfigured contract, and the composed wire through the real client stack.
  *
- * `public/brief.js` / `public/recap.js` fall back to the manual ✦ generate
- * placeholder only when an auto-open POST fails with `status === 503 &&
- * body.code === 'AI_NOT_CONFIGURED'`. Every other test of that behaviour drives
- * a hand-written fixture error, so nothing proved the real routes actually emit
- * that field: rename or drop it server-side and all the client cases stay green
- * while the feature silently reverts to the pre-fix error banner.
+ * NOTE (LIN-2944 P2): the coded `AI_NOT_CONFIGURED` 503 body has **no
+ * brief/recap CLIENT consumer** any more. Before P2, `public/brief.js` /
+ * `public/recap.js` matched the code on an auto-open POST and fell back to the
+ * manual ✦ generate placeholder; P2 removes that auto-open POST (and
+ * `isAiNotConfigured`), so a coded 503 now always surfaces the normal error
+ * banner through the unchanged manual path. The route contract below still
+ * pins the wire body — other surfaces and future consumers read it — but the
+ * old "placeholder on auto-open" assertion is gone with the behaviour it named.
  *
- * Two tiers here, both pinning the ends together:
+ * Every other test of that coded body drives a hand-written fixture error, so
+ * nothing proved the real routes actually emit it: rename or drop it
+ * server-side and the client cases stay green while the wire silently drifts.
+ *
+ * Two tiers here:
  *
  *   1. Route contract (ledger item 2) — the wire body of the two
  *      AI-unconfigured 503s, plus the other half of that contract: the
  *      neighbouring cache-not-configured 503 on the same routes stays UNCODED,
- *      since the client must keep showing the error banner for it.
+ *      since the client keeps showing the error banner for it.
  *   2. Composed wire (ledger item 3) — the whole chain in one test, with no
  *      hand-written error anywhere: real route → real `jsonError` → real HTTP →
- *      the REAL `window.api` from public/common.js parsing the body → `err.body
- *      .code` → the real `refresh()` → `renderMissing()`. Each hop was
- *      previously confirmed only by reading.
+ *      the REAL `window.api` from public/common.js parsing the body → `err.body`
+ *      → the real `refresh()` → the error banner. Each hop was previously
+ *      confirmed only by reading.
  *
  * The 503 returns before any provider or OpenRouter call, so no network stub is
  * needed; the harness follows tests/unit/openrouter-models-endpoint.js's
@@ -205,25 +211,17 @@ for (const S of SECTIONS) {
       'only the AI-unconfigured 503 is coded — an uncoded 503 must keep its error banner');
   });
 
-  // Ledger item 3: the whole chain at once, nothing fabricated. The auto-open
-  // and manual halves run against the same live route, so the placeholder and
-  // the banner are produced by the same real 503 — the difference is only the
-  // `autoOpen` flag, which is exactly the contract.
-  test(`${S.name}: composed wire — real route → real window.api → renderMissing on auto-open, error banner on manual`, async () => {
+  // Ledger item 3: the whole chain at once, nothing fabricated. P2 removed the
+  // auto-open POST, so the only path left is the manual one: the real coded 503
+  // must reach the error banner through the real client stack.
+  test(`${S.name}: composed wire — real route → real window.api → error banner on manual generate`, async () => {
     await withServer(buildApp(), async (origin) => {
       const section = loadWiredSection(S.file, S.global, origin);
-
-      const auto = makeContainer();
-      await section.refresh(auto, 'test-workspace', 'LIN-1016', undefined, { autoOpen: true });
-      assert.equal(auto.getAttribute('data-state'), 'missing',
-        'the real server 503 reached renderMissing() through the real client stack');
-      assert.match(auto.innerHTML, /generate/, 'the placeholder carries the ✦ generate button');
-      assert.doesNotMatch(auto.innerHTML, new RegExp(S.errorClass), 'no error banner on auto-open');
 
       const manual = makeContainer();
       await section.refresh(manual, 'test-workspace', 'LIN-1016', undefined);
       assert.equal(manual.getAttribute('data-state'), 'error',
-        'the same real 503 without autoOpen still surfaces the reason');
+        'the real server 503 surfaces the reason through the real client stack');
       assert.match(manual.innerHTML, new RegExp(S.errorClass), 'the manual path renders the error banner');
     });
   });
