@@ -57,6 +57,7 @@ import { readRunEvidence, buildRunEvidence, summarizeChecks } from '../lib/run-e
 import { fetchPrStatus, resolveRepoAllowlist } from '../lib/github-pr-status.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
+import { resolveRunVariant } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -1773,7 +1774,7 @@ export function createDashboardRoutes({
         asked: anchorIssueTitle || session.seedIssue,
         urlKey: workspace.urlKey,
         stopAt: facts.stopAt || null,
-        variant: facts.variant || 'standard',
+        variant: facts.variant || 'unknown',
         runnerReady: !!facts.runnerReady,
       });
     } catch (err) {
@@ -1784,18 +1785,18 @@ export function createDashboardRoutes({
 
   /**
    * The run's boundary facts for the close-out box, off its own dispatch row(s)
-   * (LIN-3248). `stopAt: 'pr'` is P1a's run fact; the stepper variant shows in
-   * the kickoff row's `promptName` (`Autopilot (stepped) — …`), so N2's copy can
-   * be chosen at render time. Fail-open: any read error yields the standard,
-   * stop-less defaults (never a broken page).
+   * (LIN-3248). `stopAt: 'pr'` is P1a's run fact; the run variant is the row's
+   * own persisted `variant` field (`resolveRunVariant`, never `promptName`), so
+   * N2's copy can be chosen at render time. Fail-open to the safe defaults:
+   * no stop, `unknown` variant (the promise stays closed), never a broken page.
    *
    * @param {Object} store - dispatchQueueStore
    * @param {string} urlKey
    * @param {string|null} issueIdentifier
-   * @returns {Promise<{stopAt: ('pr'|null), variant: ('standard'|'stepper')}>}
+   * @returns {Promise<{stopAt: ('pr'|null), variant: ('standard'|'stepper'|'unknown')}>}
    */
   async function readRunFacts(store, urlKey, issueIdentifier) {
-    const defaults = { stopAt: null, variant: 'standard' };
+    const defaults = { stopAt: null, variant: 'unknown' };
     if (!store || !urlKey || !issueIdentifier) return defaults;
     try {
       const rows = [];
@@ -1805,8 +1806,12 @@ export function createDashboardRoutes({
       const items = Array.isArray(hist) ? hist : (hist && Array.isArray(hist.items) ? hist.items : []);
       rows.push(...items);
       const stopAt = rows.some(row => row && row.stopAt === 'pr') ? 'pr' : null;
-      const kickoff = rows.find(row => row && row.kind === 'autopilot') || rows[0] || null;
-      const variant = /stepped/i.test((kickoff && kickoff.promptName) || '') ? 'stepper' : 'standard';
+      const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
+      // The row's own persisted `variant` is the authoritative source (never
+      // `promptName` — a real stepper kickoff is named `Autopilot (LIN-NNNN)`).
+      // Fail closed: a missing/unknown/non-autopilot row is `unknown`, so N2's
+      // promise is shown only for a positively-standard run.
+      const variant = resolveRunVariant(kickoff);
       return { stopAt, variant };
     } catch (err) {
       console.error('Session page run-facts read failed:', err.message);

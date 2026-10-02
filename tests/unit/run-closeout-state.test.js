@@ -14,6 +14,7 @@ import {
   deriveCloseOutState,
   closeOutSetsDone,
   isApprovedReview,
+  resolveRunVariant,
   CLOSE_OUT_STATUS,
 } from '../../lib/run-closeout-state.js';
 
@@ -33,6 +34,49 @@ const closedStatus = (sha = 'aaaaaaa') => ({
 const unknownStatus = (reason = 'not checked') => ({ repo: REPO, readable: false, state: 'unknown', reason });
 
 const approve = (verdict = 'approve') => ({ verdict, verdictText: verdict === 'approve' ? 'Approve' : 'Approve — conditional', sha: 'aaaaaaa' });
+
+describe('resolveRunVariant — the authoritative row variant, fail-closed', () => {
+  test('a real stepper kickoff row (promptName Autopilot (LIN-NNNN), variant stepper) resolves stepper — the case that caught the bug', () => {
+    // The kickoff row's promptName does NOT say "stepped": the row's own
+    // `variant` is the authoritative fact.
+    assert.strictEqual(resolveRunVariant({ promptName: 'Autopilot (LIN-3248)', variant: 'stepper' }), 'stepper');
+  });
+
+  test('a known standard row resolves standard; no promptName sniffing', () => {
+    assert.strictEqual(resolveRunVariant({ promptName: 'Autopilot (LIN-1)', variant: 'standard' }), 'standard');
+  });
+
+  test('unknown, missing or non-autopilot rows fail closed to unknown (never standard)', () => {
+    assert.strictEqual(resolveRunVariant({ promptName: 'Autopilot (LIN-1)' }), 'unknown');
+    assert.strictEqual(resolveRunVariant({ promptName: 'Autopilot (stepped) — LIN-1' }), 'unknown');
+    assert.strictEqual(resolveRunVariant({ variant: 'mystery' }), 'unknown');
+    assert.strictEqual(resolveRunVariant({}), 'unknown');
+    assert.strictEqual(resolveRunVariant(null), 'unknown');
+    assert.strictEqual(resolveRunVariant(undefined), 'unknown');
+  });
+});
+
+describe('deriveCloseOutState — variant is preserved fail-closed', () => {
+  const readyInput = (over = {}) => ({
+    prs: [pr(41)],
+    prStatuses: [openStatus()],
+    review: approve(),
+    runnerReady: true,
+    owner: true,
+    stopAt: 'pr',
+    ...over,
+  });
+
+  test('a missing/unknown variant is "unknown", never coerced to standard', () => {
+    assert.strictEqual(deriveCloseOutState(readyInput()).variant, 'unknown');
+    assert.strictEqual(deriveCloseOutState(readyInput({ variant: 'mystery' })).variant, 'unknown');
+  });
+
+  test('standard and stepper pass through', () => {
+    assert.strictEqual(deriveCloseOutState(readyInput({ variant: 'standard' })).variant, 'standard');
+    assert.strictEqual(deriveCloseOutState(readyInput({ variant: 'stepper' })).variant, 'stepper');
+  });
+});
 
 describe('isApprovedReview', () => {
   test('accepts Approve and Approve — conditional, nothing else', () => {

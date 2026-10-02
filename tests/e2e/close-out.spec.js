@@ -68,12 +68,14 @@ async function seedLocalWorkspaceWithEvidence(page) {
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
 }
 
-// Seed a finished stop-at-PR run on LOCAL-CO1. `variant` is expressed in the
-// anchor row's promptName, the same fact the renderer reads.
+// Seed a finished stop-at-PR run on LOCAL-CO1. The variant is the row's own
+// `variant` field — the promptName is deliberately the SAME generic
+// `Autopilot (LOCAL-CO1)` for both, mirroring a real stepper kickoff, so this
+// proves the N2 copy is driven by the row variant, never by promptName.
 async function seedFinishedRun(page, { variant = 'standard' } = {}) {
-  const promptName = variant === 'stepper' ? 'Autopilot (stepped) — LOCAL-CO1' : 'autopilot';
+  const promptName = 'Autopilot (LOCAL-CO1)';
   const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'orchestrate', promptName, kind: 'autopilot', issueIdentifier: 'LOCAL-CO1', issueTitle: 'Finished stop-at-PR run', target: 'cli', stopAt: 'pr' },
+    data: { prompt: 'orchestrate', promptName, kind: 'autopilot', issueIdentifier: 'LOCAL-CO1', issueTitle: 'Finished stop-at-PR run', target: 'cli', stopAt: 'pr', variant },
   });
   expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
   const anchorId = (await anchor.json()).item.id;
@@ -99,7 +101,9 @@ async function discoverSessionId(page) {
   const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
   const body = await resp.json();
   const all = [...(body.active || []), ...(body.recent || [])];
-  const seeded = all.find(s => String(s.sessionId || '').length > 0);
+  // Select THIS spec's seeded run, not a stale session left by another local
+  // spec sharing the worker's urlKey.
+  const seeded = all.find(s => s.seedIssue === 'LOCAL-CO1' && String(s.sessionId || '').length > 0);
   expect(seeded, `no reconstructed session: ${JSON.stringify(body.counts)}`).toBeTruthy();
   return seeded.sessionId;
 }

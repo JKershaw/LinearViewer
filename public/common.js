@@ -705,7 +705,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt, surface } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -762,6 +762,10 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // sends the boundary; the server validates it (only 'pr', fresh autopilot
   // dispatch), and every other launcher sends nothing and is unchanged.
   if (stopAt) payload.stopAt = stopAt;
+  // LIN-3248 (N2): the authoritative run variant the run page reads for the
+  // "never merges on its own" promise. Only the ladder's own autopilot run
+  // sends it; the server validates it and every other launcher omits it.
+  if (variant) payload.variant = variant;
   // LIN-2944 P1 (handover d610edd0): the opened-task surface the ladder press
   // came from ('home' | 'swipe'), forwarded so the dispatch route records it.
   // Omitted by every other caller (periodical / Setup Prompt / dispatch page /

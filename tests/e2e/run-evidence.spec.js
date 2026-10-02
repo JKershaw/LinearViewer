@@ -107,7 +107,7 @@ async function discoverSessionId(page) {
   expect(resp.status(), `sessions feed failed: ${await resp.text()}`).toBe(200);
   const body = await resp.json();
   const all = [...(body.active || []), ...(body.recent || [])];
-  const seeded = all.find(s => String(s.sessionId || '').length > 0);
+  const seeded = all.find(s => s.seedIssue === 'LOCAL-EV1' && String(s.sessionId || '').length > 0);
   expect(seeded, `no reconstructed session: ${JSON.stringify(body.counts)}`).toBeTruthy();
   return seeded.sessionId;
 }
