@@ -285,3 +285,65 @@ describe('LIN-3282: the fallback projects the BINDING scope, never connection.un
     assert.notEqual(out.result.scope.repo, '99', 'unitId (installation id) must not leak into the call scope');
   });
 });
+
+describe('LIN-3282: L2 — the fallback reaches WORKSPACE and CREATE intents, not only ISSUE', () => {
+  // Ledger L2: nothing pinned the fallback's WORKSPACE/CREATE reach — an
+  // ISSUE-only mutation left the whole suite green. On a legacy-row-wins
+  // workspace, a no-selector WORKSPACE/CREATE read must serve the same-scope
+  // Connection record. Each case adds a later-expiry WRONG-scope Connection as
+  // a distractor: an ISSUE-only mutation skips the fallback and drops into the
+  // (scope-less) headless path, which would serve the later-expiry org-2
+  // Connection instead — so the token assertion goes red.
+  function legacyWorld() {
+    const row = ownerRow({
+      id: 'ws-1', urlKey: URL_KEY, provider: 'linear',
+      bindings: [legacyBinding('linear', 'org-1', 'DEAD')],
+      accessToken: 'DEAD',
+    });
+    const c1 = connection({ id: `${ACCT}::linear::org-1`, scope: 'org-1', token: 'MIR-1', expiresAt: now() + HOUR });
+    const c2 = connection({ id: `${ACCT}::linear::org-2`, scope: 'org-2', token: 'MIR-2', expiresAt: now() + 5 * HOUR });
+    return {
+      row,
+      connections: [c1, c2],
+      records: {
+        [c1._id]: record(c1._id, 'HEALTHY-1', now() + HOUR),
+        [c2._id]: record(c2._id, 'HEALTHY-2', now() + 5 * HOUR),
+      },
+    };
+  }
+
+  for (const [name, intent] of [['WORKSPACE', BINDING_INTENT.WORKSPACE], ['CREATE', BINDING_INTENT.CREATE]]) {
+    test(`${name} intent, no selector: legacy-row-wins serves the same-scope Connection`, async () => {
+      const access = accessWith(legacyWorld());
+      const out = await resolve(access, { intent });
+      assert.equal(out?.result?.token, 'HEALTHY-1', `${name}: must serve the same-scope Connection, not the later-expiry wrong-scope one`);
+      assert.equal(out.result.source, CREDENTIAL_SOURCES.CONNECTION);
+    });
+  }
+});
+
+describe('LIN-3282: L3 (B3) — a connection-backed workspace with a stale active-binding marker', () => {
+  // B3 shape: the workspace HAS a connection-backed binding, but its
+  // `activeBinding` marker names a (provider, scope) that matches no binding, so
+  // `activeConnectionBackedBinding` is null and ISSUE selection falls through.
+  // No selector, ISSUE intent -> the fallback must still serve the Connection
+  // record. Red under M1 (guard reverted to `return null`) and M6 (the
+  // `legacyFallbackTarget` null-target branch removed).
+  test('B3: stale marker scope, no selector, ISSUE intent -> serves the Connection record', async () => {
+    const conn = connection({ id: `${ACCT}::linear::org-1`, scope: 'org-1', token: 'STALE' });
+    const workspace = {
+      id: 'ws-1', urlKey: URL_KEY, provider: 'linear',
+      bindings: [{ provider: 'linear', scope: 'org-1', connectionId: conn._id }],
+      activeBinding: { provider: 'linear', scope: 'org-STALE' },
+    };
+    const access = accessWith({
+      connections: [conn], row: ownerRow(workspace),
+      records: { [conn._id]: record(conn._id, 'HEALTHY', now() + HOUR) },
+    });
+
+    const out = await resolve(access, { intent: BINDING_INTENT.ISSUE });
+    assert.ok(out?.result, 'the fallback serves the Connection');
+    assert.equal(out.result.token, 'HEALTHY');
+    assert.equal(out.result.source, CREDENTIAL_SOURCES.CONNECTION);
+  });
+});
