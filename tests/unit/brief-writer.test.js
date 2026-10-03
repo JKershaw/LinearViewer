@@ -324,6 +324,15 @@ describe('pure seams', () => {
     assert.equal(await composeRoutedRecommendation(parsed, ISSUE, CONTEXT, {}, null, { apiKey: 'k' }), parsed);
   });
 
+  test('the tone standard: the writer and every stage shape address the agent directly, without persona or scars', () => {
+    const text = [buildBriefWriterPrompt({ kind: 'plan', bundle: 'B' }), ...Object.values(STAGE_IDEALS), ...Object.values(STAGE_INTENT).flat()].join('\n');
+    for (const bad of [/\bwe\b/i, /\bsomeone\b/i, /pair of (eyes|hands)/i, /\bhonestly\b/i, /skilled lead/i, /\bLIN-\d+/]) {
+      const hits = text.split('\n').filter(l => bad.test(l) && !/No "we"/.test(l));
+      assert.deepEqual(hits, [], String(bad));
+    }
+    assert.match(STAGE_INTENT.review.join(' '), /one clear question with your recommendation/, 'escalation is a decision point');
+  });
+
   test('every stage has an ideal shape for the writer', () => {
     assert.deepEqual(Object.keys(STAGE_IDEALS).sort(), Object.keys(PROMPT_TEMPLATES).sort());
   });
