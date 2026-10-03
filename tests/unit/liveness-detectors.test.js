@@ -300,4 +300,144 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     assert.equal(chains[0].shape, 'orphan');
     assert.equal(WAKE_DELIVERY_GRACE_MS, 3 * MIN);
   });
+
+  test('RC7: a chain feeding into a cycle mints one cycle record, not an extra orphan', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000030';
+    const b = 'bbbbbbbb-0000-0000-0000-000000000031';
+    const c = 'cccccccc-0000-0000-0000-000000000032';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on worker dispatch ${b}`, '2026-10-02T09:50:00.000Z')]
+      })]],
+      [b, [row({
+        id: b,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on worker dispatch ${c}`, '2026-10-02T09:51:00.000Z')]
+      })]],
+      [c, [row({
+        id: c,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on worker dispatch ${b}`, '2026-10-02T09:52:00.000Z')]
+      })]]
+    ]);
+    const now = Date.parse('2026-10-02T10:00:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage });
+    assert.equal(chains.length, 1, `one incident record, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+    assert.equal(chains[0].shape, 'cycle');
+    assert.deepEqual(chains[0].members, [a, b, c].sort());
+    // The upstream waiter A is on the record, and no orphan-shaped duplicate exists.
+    assert.ok(chains[0].members.includes(a));
+    assert.equal(chains.filter((x) => x.shape === 'orphan').length, 0);
+  });
+
+  test('RC6: the waiter\'s own ticket and other terminal/live lineages of it never cover the cycle', () => {
+    const parent = '8608873d-0000-0000-0000-000000000040';
+    const child = '2550fd09-0000-0000-0000-000000000041';
+    const terminalSameTicket = 'a0a0a0a0-0000-0000-0000-000000000042';
+    const liveSameTicket = 'b0b0b0b0-0000-0000-0000-000000000043';
+    const rowsByLineage = mapOf([
+      [parent, [row({
+        id: parent,
+        issueIdentifier: 'LIN-3238',
+        dispatchedAt: '2026-10-02T14:14:00.000Z',
+        feedback: [feedback(`[pending] waiting on the LIN-3238 close-out session (dispatch ${child})`, '2026-10-02T15:04:38.966Z')]
+      })]],
+      [child, [row({
+        id: child,
+        kind: 'close-out',
+        sessionId: parent,
+        issueIdentifier: 'LIN-3238',
+        dispatchedAt: '2026-10-02T15:04:00.000Z',
+        feedback: [feedback('[pending] I am waiting on the orchestrator to dispatch an implementation beat', '2026-10-02T15:12:57.700Z')]
+      })]]
+    ]);
+    const now = Date.parse('2026-10-02T15:20:00.000Z');
+    // The sweep's lineageInfo holds every lean loop in the 30-day horizon: a
+    // terminal and an unrelated live lineage of the SAME ticket.
+    const lineageInfo = mapOf([
+      [terminalSameTicket, { loopId: terminalSameTicket, issueIdentifier: 'LIN-3238', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T12:00:00.000Z') }],
+      [liveSameTicket, { loopId: liveSameTicket, issueIdentifier: 'LIN-3238', terminalStatus: null, lineageLastActivityMs: now - MIN }]
+    ]);
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1, `cycle must still fire, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+    assert.equal(chains[0].shape, 'cycle');
+    assert.ok(!chains[0].members.includes(terminalSameTicket));
+    assert.ok(!chains[0].members.includes(liveSameTicket));
+  });
+
+  test('RC6: a wait on a DIFFERENT ticket whose only lineage stopped is an orphan, not a cover', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000050';
+    const stoppedTicket = 'c0c0c0c0-0000-0000-0000-000000000051';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        issueIdentifier: 'LIN-100',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[pending] waiting on the LIN-200 landed session to finish', '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    const lineageInfo = mapOf([
+      [stoppedTicket, { loopId: stoppedTicket, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:00:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1);
+    assert.equal(chains[0].shape, 'orphan');
+  });
+
+  test('RC8 (M12): an answered follow-up that is not a queued wake covers the chain', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000060';
+    const b = 'bbbbbbbb-0000-0000-0000-000000000061';
+    // A mutual wait a <-> b that would be a cycle, except b's wait is answered
+    // by a follow-up row (a done implementation, not a queued/taken wake). With
+    // the `answered` check disabled the cycle alarm fires, so this test is its
+    // mutation witness.
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on worker dispatch ${b}`, '2026-10-02T09:50:00.000Z')]
+      })]],
+      [b, [
+        row({
+          id: b,
+          dispatchedAt: '2026-10-02T09:00:00.000Z',
+          feedback: [feedback(`[pending] waiting on the orchestrator dispatch ${a}`, '2026-10-02T09:51:00.000Z')]
+        }),
+        row({ id: 'd0d0d0d0-0000-0000-0000-000000000062', kind: 'implementation', status: 'done', followUpTo: b, dispatchedAt: '2026-10-02T09:55:00.000Z' })
+      ]]
+    ]);
+    const now = Date.parse('2026-10-02T10:00:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage });
+    assert.equal(chains.length, 0);
+  });
+
+  test('RC8 (M13): a stale (>15 min) heartbeat does not cover a stopped chain', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000070';
+    const b = 'bbbbbbbb-0000-0000-0000-000000000071';
+    const make = (heartbeatAt) => mapOf([
+      [a, [row({
+        id: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on worker dispatch ${b}`, '2026-10-02T09:50:00.000Z')]
+      })]],
+      [b, [row({
+        id: b,
+        sessionId: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[working] heartbeat', heartbeatAt)]
+      })]]
+    ]);
+    const now = Date.parse('2026-10-02T10:00:00.000Z');
+
+    const fresh = detectStoppedOrCircularWait({ now, waiters: waitersFor(make('2026-10-02T09:55:00.000Z')), rowsByLineage: make('2026-10-02T09:55:00.000Z') });
+    assert.equal(fresh.chains.length, 0, 'a fresh heartbeat covers the chain');
+
+    const stale = make('2026-10-02T09:40:00.000Z'); // 20 min old
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(stale), rowsByLineage: stale });
+    assert.equal(chains.length, 1);
+    assert.equal(chains[0].shape, 'orphan');
+  });
 });

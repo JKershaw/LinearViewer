@@ -142,7 +142,6 @@ describe('liveness-alarm-sweep: tick simulator', () => {
     for (let t = Date.parse('2026-10-02T15:00:00Z'); t <= Date.parse('2026-10-02T19:30:00Z'); t += TICK) {
       nowRef.value = t;
       await sweepOneWorkspace(URL_KEY, t, deps);
-      ticks.push({ t: new Date(t).toISOString(), open: (await alarmStore.list(URL_KEY, { state: 'open' })).length });
     }
 
     const all = await alarmStore.list(URL_KEY, { state: 'all' });
@@ -161,10 +160,146 @@ describe('liveness-alarm-sweep: tick simulator', () => {
     assert.ok(firedAt >= '2026-10-02T15:12:57.700Z' && firedAt <= '2026-10-02T15:22:57.700Z', `firedAt ${firedAt} outside one tick of onset`);
     assert.equal(record.startedAt.toISOString(), '2026-10-02T15:12:57.700Z');
 
-    // Cleared on structural resolution (ae989856 at 18:53:23.877Z).
+    // Clear: after 18:53 the parent re-parks on a new target, so the cycle is
+    // no longer detected from 19:00 and the record clears via the 2-tick
+    // confirm at 19:10. (The immediate structural-clear on the FIRST evaluated
+    // tick is pinned by the dedicated RC8 (M3/M6) silence-window test below.)
     assert.ok(record.clearedAt, 'the record cleared once the wait was answered');
     const clearedAt = record.clearedAt.toISOString();
     assert.ok(clearedAt >= '2026-10-02T18:53:23.877Z' && clearedAt <= '2026-10-02T19:10:00.000Z', `clearedAt ${clearedAt}`);
+  });
+
+  test('RC6: fixture 2 plus terminal and live lineages of the same ticket still fires exactly one cycle', async () => {
+    const rows = loadFixture().rows.concat([
+      {
+        id: 'term-lin-3238',
+        kind: 'implementation',
+        status: 'done',
+        sessionId: null,
+        followUpTo: null,
+        issueIdentifier: 'LIN-3238',
+        dispatchedAt: '2026-10-02T11:00:00.000Z',
+        feedback: [{ message: '[done] an earlier LIN-3238 session finished', timestamp: '2026-10-02T12:00:00.000Z' }]
+      },
+      {
+        id: 'live-lin-3238',
+        kind: 'implementation',
+        status: 'taken',
+        sessionId: null,
+        followUpTo: null,
+        issueIdentifier: 'LIN-3238',
+        dispatchedAt: '2026-10-02T11:00:00.000Z',
+        // A heartbeat every tick keeps this unrelated LIN-3238 lineage active
+        // for the whole window: under the RC6 mutation it would cover the
+        // cycle on every tick and no record would ever fire.
+        feedback: [15, 25, 35, 45, 55].map((m) => ({ message: '[working] heartbeat', timestamp: `2026-10-02T15:${String(m).padStart(2, '0')}:00.000Z` }))
+          .concat([5, 15, 25, 35, 45, 55].map((m) => ({ message: '[working] heartbeat', timestamp: `2026-10-02T16:${String(m).padStart(2, '0')}:00.000Z` })))
+          .concat([5, 15, 25, 35, 45, 55].map((m) => ({ message: '[working] heartbeat', timestamp: `2026-10-02T17:${String(m).padStart(2, '0')}:00.000Z` })))
+          .concat([5, 15, 25, 35, 45, 55].map((m) => ({ message: '[working] heartbeat', timestamp: `2026-10-02T18:${String(m).padStart(2, '0')}:00.000Z` })))
+          .concat([5, 15, 25].map((m) => ({ message: '[working] heartbeat', timestamp: `2026-10-02T19:${String(m).padStart(2, '0')}:00.000Z` })))
+      }
+    ]);
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+
+    for (let t = Date.parse('2026-10-02T15:00:00Z'); t <= Date.parse('2026-10-02T19:30:00Z'); t += TICK) {
+      nowRef.value = t;
+      await sweepOneWorkspace(URL_KEY, t, deps);
+    }
+
+    const all = await alarmStore.list(URL_KEY, { state: 'all' });
+    const d2 = all.filter((a) => a.rule === 'stopped-or-circular-wait');
+    assert.equal(d2.length, 1, `exactly one D2 record, got ${JSON.stringify(d2.map((a) => [a.shape, a.members]))}`);
+    assert.equal(d2[0].shape, 'cycle');
+    assert.deepEqual(d2[0].members, [
+      '2550fd09-3567-4416-8eb5-b4d3750a285f',
+      '8608873d-af0f-47fd-8dea-61c36f85d8e5'
+    ].sort());
+    assert.ok(!d2[0].members.includes('term-lin-3238'));
+    assert.ok(!d2[0].members.includes('live-lin-3238'));
+  });
+
+  test('RC8 (M3/M6): a cycle resolving inside a silence window stays open until after the grace tick, then clears immediately', async () => {
+    const parent = '11111111-1111-1111-1111-111111111111';
+    const child = '22222222-2222-2222-2222-222222222222';
+    const answer = '33333333-3333-3333-3333-333333333333';
+    const rows = [
+      {
+        id: parent, kind: 'autopilot', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-1',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${child}`, timestamp: '2026-10-02T10:05:00.000Z' }]
+      },
+      {
+        id: child, kind: 'close-out', status: 'taken', sessionId: parent, followUpTo: null, issueIdentifier: 'LIN-1',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: '[pending] I am waiting on the orchestrator to dispatch a beat', timestamp: '2026-10-02T10:06:00.000Z' }]
+      },
+      {
+        id: answer, kind: 'implementation', status: 'done', sessionId: null, followUpTo: child, issueIdentifier: 'LIN-1',
+        dispatchedAt: '2026-10-02T10:45:00.000Z',
+        feedback: [{ message: '[done] the wait was answered by a landed step', timestamp: '2026-10-02T10:45:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({
+      rows,
+      lastSeen: (t) => new Date(t >= Date.parse('2026-10-02T11:00:00.000Z') ? '2026-10-02T11:00:00.000Z' : '2026-10-02T10:10:00.000Z').toISOString()
+    });
+    deps.alarmStore = alarmStore;
+
+    const stateAtTick = async (iso) => {
+      nowRef.value = Date.parse(iso);
+      await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+      const open = await alarmStore.list(URL_KEY, { state: 'open' });
+      const d2 = open.filter((a) => a.rule === 'stopped-or-circular-wait');
+      return d2[0] || null;
+    };
+
+    // Cycle opens at 10:10 (before silence).
+    assert.ok(await stateAtTick('2026-10-02T10:10:00.000Z'), 'cycle open before silence');
+    await stateAtTick('2026-10-02T10:30:00.000Z');
+    // Silence fires from 10:40; the answer lands at 10:45 — D2 is suppressed,
+    // so the open record must NOT be cleared inside the silence window.
+    assert.ok(await stateAtTick('2026-10-02T10:50:00.000Z'), 'still open while silence fires');
+    assert.ok(await stateAtTick('2026-10-02T11:00:00.000Z'), 'still open on the recovery-grace tick');
+    // 11:10 is the first evaluated tick after the grace tick: clears immediately.
+    const after = await stateAtTick('2026-10-02T11:10:00.000Z');
+    assert.equal(after, null, 'cleared on the first evaluated tick after the grace tick');
+  });
+
+  test('RC8 (M4): a cycle forming during silence opens only after the grace tick', async () => {
+    const parent = '44444444-4444-4444-4444-444444444444';
+    const child = '55555555-5555-5555-5555-555555555555';
+    const rows = [
+      {
+        id: parent, kind: 'autopilot', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-2',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${child}`, timestamp: '2026-10-02T10:35:00.000Z' }]
+      },
+      {
+        id: child, kind: 'close-out', status: 'taken', sessionId: parent, followUpTo: null, issueIdentifier: 'LIN-2',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: '[pending] I am waiting on the orchestrator to dispatch a beat', timestamp: '2026-10-02T10:36:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({
+      rows,
+      lastSeen: (t) => new Date(t >= Date.parse('2026-10-02T11:20:00.000Z') ? '2026-10-02T11:20:00.000Z' : '2026-10-02T10:00:00.000Z').toISOString()
+    });
+    deps.alarmStore = alarmStore;
+
+    const tick = async (iso) => {
+      nowRef.value = Date.parse(iso);
+      await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+      return (await alarmStore.list(URL_KEY, { state: 'open' })).filter((a) => a.rule === 'stopped-or-circular-wait').length;
+    };
+
+    for (let t = Date.parse('2026-10-02T10:00:00Z'); t <= Date.parse('2026-10-02T11:10:00Z'); t += TICK) {
+      nowRef.value = t;
+      await sweepOneWorkspace(URL_KEY, t, deps);
+    }
+    // 11:20 clears S and is the one-tick recovery grace: the cycle must not open.
+    assert.equal(await tick('2026-10-02T11:20:00.000Z'), 0, 'no D2 on the grace tick');
+    assert.equal(await tick('2026-10-02T11:30:00.000Z'), 1, 'D2 opens on the first evaluated tick after the grace');
   });
 
   test('fixture 1: silence fires one dispatcher-silent record in (onset, onset+tick] and clears when polling resumes', async () => {
