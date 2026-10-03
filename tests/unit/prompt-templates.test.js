@@ -932,10 +932,16 @@ describe('generatePrompt bug-already-investigated note (LIN-366)', () => {
   const noComments = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
   test('a bug issue WITH prior comments gets the "Don\'t Loop" note steering to the fix', () => {
-    const result = generatePrompt('bug', baseIssue, withComments);
+    const result = generatePrompt('implementation', baseIssue, withComments);
     assert.ok(/Prior Investigation On Record/i.test(result.prompt), 'the bug-investigated note must be present');
     assert.ok(/do NOT.*investigate again|investigation is DONE|move to implementing the fix/i.test(result.prompt),
       'it must steer toward the fix, not re-investigation');
+  });
+
+  test('the bug investigation stage itself does NOT get the note (it proposes the fix, it does not apply it; LIN-3296)', () => {
+    const result = generatePrompt('bug', baseIssue, withComments);
+    assert.ok(!/Prior Investigation On Record|move to implementing the fix/i.test(result.prompt),
+      'the bug stage stays an investigation; the fix is a separate implementation dispatch');
   });
 
   test('a bug issue with NO comments does NOT get the note (nothing investigated yet)', () => {
@@ -4165,6 +4171,90 @@ describe('cross-path grounding parity (LIN-435)', () => {
 
     const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, terminalBug, ctx);
     assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path matches for the terminal+bug case too');
+  });
+});
+
+// =============================================================================
+// Grounding notes are chosen per stage (LIN-3296). appendGroundingSections used
+// to append every note to every template, so a look-back on a Done ticket was told
+// to "close out", triage to re-ground code it never reads, and the bug
+// investigation to "move to implementing the fix". The expected matrix below is
+// the spec, written independently of the table in lib/prompt-formatters.js:
+// S staleness, T terminal-state, C all-subtasks-complete, B bug-investigated.
+// =============================================================================
+describe('grounding notes chosen per stage (LIN-3296)', () => {
+  const EXPECTED = {
+    implementation: 'STCB',
+    blocked: 'STC', bug: 'STC', plan: 'STC', breakdown: 'STC', research: 'STC',
+    scoping: 'STC', design: 'STC', spike: 'STC', 'plan-review': 'STC',
+    review: 'STC', 'close-out': 'STC',
+    'look-into': 'S', context: 'S',
+    'retrospective-audit': 'S', retro: 'S',
+    triage: ''
+  };
+  const HEADINGS = {
+    S: '## Re-ground the Ticket (staleness check)',
+    T: '## Task Already Complete',
+    C: '## All Subtasks Complete — Close Out the Parent',
+    B: "## Prior Investigation On Record — Don't Loop"
+  };
+  const base = {
+    id: 'issue-g', identifier: 'LIN-3296', title: 'Grounding fixture', description: 'Some work',
+    url: 'https://linear.app/test/issue/LIN-3296', createdAt: '2026-03-01T00:00:00.000Z'
+  };
+  const comment = { body: 'Root cause is X; fix is Y', user: 'Dev', createdAt: '2026-03-02T00:00:00.000Z' };
+  // Done bug with a prior comment: triggers S, T and B.
+  const doneBug = {
+    issue: { ...base, state: { name: 'Done', type: 'completed' }, labels: ['bug'] },
+    context: { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [comment] }
+  };
+  // Open parent whose every subtask is Done: triggers S and C.
+  const kidsDone = {
+    issue: { ...base, state: { name: 'In Progress', type: 'started' }, labels: [] },
+    context: {
+      parent: null, siblings: [], project: { name: 'P' }, comments: [],
+      children: [{ identifier: 'LIN-3297', title: 'c', state: { name: 'Done', type: 'completed' } }]
+    }
+  };
+  const present = (prompt, letter) => prompt.includes(HEADINGS[letter]);
+
+  test('the expected matrix covers every template kind (a new stage must choose its notes)', () => {
+    assert.deepStrictEqual(Object.keys(EXPECTED).sort(), Object.keys(PROMPT_TEMPLATES).sort());
+  });
+
+  for (const [kind, want] of Object.entries(EXPECTED)) {
+    test(`${kind}: handwritten path carries exactly ${want || 'no'} grounding notes`, () => {
+      const a = generatePrompt(kind, doneBug.issue, doneBug.context).prompt;
+      const b = generatePrompt(kind, kidsDone.issue, kidsDone.context).prompt;
+      assert.strictEqual(present(a, 'S'), want.includes('S'), `${kind}: staleness`);
+      assert.strictEqual(present(a, 'T'), want.includes('T'), `${kind}: terminal-state on a Done task`);
+      assert.strictEqual(present(a, 'B'), want.includes('B'), `${kind}: bug-investigated on a bug with comments`);
+      assert.strictEqual(present(b, 'C'), want.includes('C'), `${kind}: children-complete on an open parent`);
+    });
+
+    test(`${kind}: meta path appends the same per-stage grounding as the handwritten path`, () => {
+      const action = PROMPT_TEMPLATES[kind].name;
+      for (const { issue, context } of [doneBug, kidsDone]) {
+        const grounding = appendGroundingSections('', issue, context, kind);
+        const hw = generatePrompt(kind, issue, context).prompt;
+        assert.ok(hw.includes(grounding), `${kind}: handwritten prompt carries the per-stage grounding`);
+        const meta = applyGroundingToRecommendation(
+          { reasoning: `→ **${action}**`, prompt: 'BODY', truncated: false, recommendedAction: action, deferTo: null, completionTokens: 1 },
+          issue, context
+        );
+        assert.strictEqual(meta.prompt, 'BODY' + grounding, `${kind}: meta grounding keyed off recommendedAction "${action}"`);
+      }
+    });
+  }
+
+  test('an unknown kind or unparsed meta action keeps every note (custom prompts unchanged)', () => {
+    const all = appendGroundingSections('', doneBug.issue, doneBug.context);
+    for (const letter of 'STB') assert.ok(present(all, letter), `no kind: ${letter} kept`);
+    assert.strictEqual(appendGroundingSections('', doneBug.issue, doneBug.context, 'custom'), all);
+    assert.strictEqual(appendGroundingSections('', doneBug.issue, doneBug.context, 'toString'), all,
+      'an Object.prototype key is not a table row');
+    const meta = applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: null }, doneBug.issue, doneBug.context);
+    assert.strictEqual(meta.prompt, 'BODY' + all);
   });
 });
 

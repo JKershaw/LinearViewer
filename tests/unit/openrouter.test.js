@@ -2453,6 +2453,35 @@ describe('getRecommendationStream (LIN-346)', () => {
     const done = events.find(e => e.type === 'done');
     assert.strictEqual(done.data.truncated, true, 'done event carries truncated');
   });
+
+  // LIN-3296: grounding is chosen per stage from the recommended action, on both the
+  // streamed and the buffered meta path. A look-back on a Done bug must not be told
+  // to close out or to move to implementing the fix.
+  const DONE_BUG = { ...ISSUE, state: { name: 'Done', type: 'completed' }, labels: ['bug'], createdAt: '2026-01-01T00:00:00.000Z' };
+  const WITH_COMMENT = { ...CONTEXT, comments: [{ body: 'Root cause is X', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }] };
+  const AUDIT_RAW = '## Reasoning\n→ **retrospective-audit**\nMerged and closed.\n## Prompt\nAudit the landed change.';
+
+  test('streamed retrospective-audit on a Done bug carries no close-out or fix note (LIN-3296)', async () => {
+    global.fetch = mock.fn(async () => mockStreamResponse([AUDIT_RAW]));
+    const events = [];
+    const result = await getRecommendationStream(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+    const streamed = events.filter(e => e.type === 'delta' && e.data.section === 'prompt').map(e => e.data.content).join('');
+    const grounding = appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit');
+    assert.strictEqual(streamed, 'Audit the landed change.' + grounding);
+    assert.strictEqual(result.prompt, streamed);
+    assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(streamed), 'look-back keeps its brief');
+    assert.ok(streamed.includes('Re-ground the Ticket'), 'the staleness check still fits an audit of landed code');
+  });
+
+  test('buffered retrospective-audit on a Done bug carries no close-out or fix note (LIN-3296)', async () => {
+    global.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: AUDIT_RAW }, finish_reason: 'stop' }], usage: { completion_tokens: 5 } })
+    }));
+    const result = await getRecommendation(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' });
+    assert.strictEqual(result.prompt, 'Audit the landed change.' + appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit'));
+    assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(result.prompt));
+  });
 });
 
 // =============================================================================
