@@ -334,6 +334,21 @@ describe('TaskModeStore.countByEntryRung', () => {
     assert.strictEqual(counts.total, 1);
     assert.deepStrictEqual(counts.byRung.map(r => r.entries), [0, 1, 0]);
   });
+
+  // LIN-2952 characterization: `countByEntryRung` takes ONE options object, so
+  // the canonical map the funnel adds must be an additive key that defaults to
+  // identity. An unrecognized key (and an empty map) must leave the count
+  // exactly as it is today — grouped by the account as recorded.
+  test('an unrecognized option key does not change the default count', async () => {
+    await recordInOrder(store, [
+      copyAct({ issueIdentifier: 'LIN-1' }),
+      copyAct({ accountId: 'acct-2', issueIdentifier: 'LIN-2' }),
+    ]);
+    const plain = await store.countByEntryRung();
+    const withExtra = await store.countByEntryRung({ canonicalByAccountId: new Map() });
+    assert.deepStrictEqual(withExtra, plain);
+    assert.strictEqual(withExtra.byRung[0].entries, 2, 'the recorded accounts stay separate by default');
+  });
 });
 
 describe('TaskModeStore.clear', () => {

@@ -240,19 +240,20 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       expect(seen).toEqual([]);
     });
 
-    test('free-tier exhausted (429): disabled primary with quota message, zero recommend requests', async ({ page, seedLocal, localWorkerUrlKey }) => {
-      const seen = recommendSpy(page);
+    test('free-tier session: the retired daily prompt quota no longer disables the ✦ primary (LIN-3239)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+      // The old assertion here (an exhausted daily prompt quota disabled the
+      // primary and sent zero recommend requests) pinned behaviour LIN-3239
+      // deliberately removes: prompts are unlimited, so the primary stays
+      // enabled for a free-tier session. The run limit lives on the ladder, not
+      // on the prompt controls (pinned in free-tier.spec.js on the free-tier twin).
       await seedLocal(workspaceApiLocalSeed, { freeTierEnabled: true });
-      // Pre-fill usage to the daily limit before loading the screen.
-      await page.goto(`/test/add-free-tier-usage?count=5&urlKey=${localWorkerUrlKey}`);
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
 
       const component = page.locator('.prompt-section').first();
-      await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/limit|quota/i);
-      await clickDisabledWithoutSpend(page, component);
-      expect(seen).toEqual([]);
+      await expect(component.locator('[data-testid="opened-task-go"]')).toBeEnabled();
+      await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toHaveCount(0);
     });
   });
 
@@ -636,5 +637,56 @@ test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
     expect(clip).toContain('TEST-13');
 
     expect(clicks).toBe(3);
+  });
+});
+
+// =============================================================================
+// LIN-2944 P2 — nothing spends AI when Brief or Recap opens.
+//
+// The opened task's Brief and Recap sections are lazy-mounted on expand. Before
+// P2 they auto-POSTed on that expand (LIN-998); P2 makes them render the manual
+// ✦ generate placeholder instead, so expanding a section spends nothing and only
+// an explicit generate does. This witness pins POST /api/brief/*, POST
+// /api/recap/* and the recommend spend channel to zero across an expand.
+//
+// Its own `test.describe` block because P3 appends a disjoint block to this file.
+// =============================================================================
+test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
+  test('expanding Brief and Recap on the top task issues zero AI requests until generate', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    const spend = [];
+    page.on('request', (req) => {
+      let pathname = '';
+      try { pathname = new URL(req.url()).pathname; } catch { return; }
+      const briefRecapPost = (pathname.includes('/api/brief/') || pathname.includes('/api/recap/')) && req.method() === 'POST';
+      if (briefRecapPost || isRecommendSpend(req.url())) spend.push(`${req.method()} ${pathname}`);
+    });
+
+    // openRouterConnected so the surfaces are live and a pre-P2 open WOULD spend.
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+
+    // The 3001 server's data dir persists across runs, so a prior run may have
+    // cached this task's brief/recap. Clear both so the open below is genuinely
+    // the `missing` state (the state P2 makes non-spending).
+    const topId = await page.evaluate(() => window.__SWIPE_DATA__.issues[0].id);
+    const topIdentifier = (await page.locator('.swipe-card-identifier').first().textContent()).trim();
+    for (const issueId of [topId, topIdentifier]) {
+      await page.request.get(`/test/clear-brief-cache?urlKey=${localWorkerUrlKey}&issueId=${encodeURIComponent(issueId)}`);
+      await page.request.get(`/test/clear-recap-cache?urlKey=${localWorkerUrlKey}&issueId=${encodeURIComponent(issueId)}`);
+    }
+
+    await page.locator('.swipe-accordion-header[data-accordion="brief"]').first().click();
+    await page.locator('.swipe-accordion-header[data-accordion="recap"]').first().click();
+
+    const brief = page.locator('.swipe-accordion-body[data-accordion-body="brief"] .brief-section').first();
+    const recap = page.locator('.swipe-accordion-body[data-accordion-body="recap"] .recap-section').first();
+
+    // P2: each section settles on the manual placeholder, not generated content.
+    await expect(brief).toHaveAttribute('data-state', 'missing');
+    await expect(recap).toHaveAttribute('data-state', 'missing');
+
+    // The expands themselves spent nothing.
+    expect(spend).toEqual([]);
   });
 });

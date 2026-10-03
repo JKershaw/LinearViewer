@@ -271,11 +271,16 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
 
     await jiraNode.locator('[data-toggle="brief"]').first().click();
     const brief = jiraNode.locator('[data-content="brief"] .brief-section');
+    // LIN-2944 P2: a section no longer spends AI when it opens, so the Jira
+    // row's (missing) brief renders the ✦ generate placeholder. Click it to
+    // provoke the POST, then assert the Jira-grounded content.
+    await brief.locator('[data-brief-refresh]').first().click();
     await expect(brief).toContainText('Jira task in progress', { timeout: 5000 });
     await expect(brief).toContainText('ENG-4', { timeout: 5000 });
 
     await jiraNode.locator('[data-toggle="recap"]').first().click();
     const recap = jiraNode.locator('[data-content="recap"] .recap-section');
+    await recap.locator('[data-recap-refresh]').first().click();
     await expect(recap).toContainText('ENG-4', { timeout: 5000 });
   });
 
@@ -337,6 +342,8 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     await localNode.locator('[data-toggle="brief"]').first().click();
 
     const brief = localNode.locator('[data-content="brief"] .brief-section');
+    // LIN-2944 P2: click ✦ generate rather than relying on open-time spend.
+    await brief.locator('[data-brief-refresh]').first().click();
     await expect(brief).toContainText('Local parent task', { timeout: 5000 });
     await expect(brief).not.toContainText('Jira task');
   });

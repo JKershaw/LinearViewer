@@ -108,39 +108,24 @@
     container.setAttribute('data-state', state);
   }
 
-  // LIN-1016: precise match only — no status-only fallback. A bare `status
-  // === 503` would also catch the cache-not-configured and transient-upstream
-  // 503s on this same route, which must keep showing the error banner.
-  function isAiNotConfigured(err) {
-    return !!err && err.status === 503 && !!err.body && err.body.code === 'AI_NOT_CONFIGURED';
-  }
-
   function wireRefresh(container, urlKey, identifier, source, bindingScope) {
     const btn = container.querySelector('[data-brief-refresh]');
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      await refresh(container, urlKey, identifier, source, { bindingScope });
+      await refresh(container, urlKey, identifier, source, bindingScope);
     });
   }
 
-  // LIN-1016: `opts.autoOpen` scopes the AI-unconfigured fallback to the
-  // auto-open call from init()'s `missing` branch — a manual click (wireRefresh
-  // above, which never passes opts) still shows the error banner, so an
-  // explicit user action is never silently swallowed. LIN-3240: `opts.bindingScope`
-  // carries the row's binding stamp (kept in opts so the public `refresh`
-  // signature stays `(container, urlKey, identifier, source, opts)`).
-  async function refresh(container, urlKey, identifier, source, opts) {
-    const bindingScope = opts && opts.bindingScope;
+  // LIN-3240: `bindingScope` (the row's binding stamp) forwards beside `source`
+  // so a manual regenerate resolves the row's own binding; `undefined` keeps the
+  // request byte-identical to an unstamped one.
+  async function refresh(container, urlKey, identifier, source, bindingScope) {
     applyState(container, renderGenerating(), 'generating');
     try {
       const data = await postBrief(urlKey, identifier, source, bindingScope);
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
-      if (opts && opts.autoOpen && isAiNotConfigured(err)) {
-        applyState(container, renderMissing(), 'missing');
-      } else {
-        applyState(container, renderError(err && err.message), 'error');
-      }
+      applyState(container, renderError(err && err.message), 'error');
     }
     wireRefresh(container, urlKey, identifier, source, bindingScope);
   }
@@ -168,16 +153,10 @@
       } else if (data.status === 'stale') {
         applyState(container, renderStale(data), 'stale');
       } else {
-        // Auto-generate on the first open of a missing brief, mirroring the
-        // Context section's populate-on-open behavior (LIN-998). The cheap GET
-        // above already confirmed `missing`, so this is the only branch that
-        // spends an LLM call — `fresh` renders the cache and `stale` keeps its
-        // manual ↻ refresh, so fresh content is never clobbered and we never
-        // re-spend on every reopen. `refresh()` renders generating→fresh/error
-        // and wires its own button, so return before the shared wireRefresh
-        // below to avoid double-wiring the refresh handler.
-        await refresh(container, urlKey, identifier, source, { bindingScope, autoOpen: true });
-        return;
+        // LIN-2944 P2: a missing brief renders the manual ✦ generate
+        // placeholder. Opening the section spends nothing; the shared
+        // wireRefresh below wires the button so only an explicit click POSTs.
+        applyState(container, renderMissing(), 'missing');
       }
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');

@@ -30,7 +30,7 @@ let URL_KEY;
 let SESSION_ID;
 
 // An ~120-char token with no whitespace — the case-chunk overflow fixture
-// (an unbroken token with no break rule overflows its banner at narrow width).
+// (an unbroken token with no break rule overflows its card at narrow width).
 const UNBROKEN_TOKEN = 'https://example.com/investigations/rollout-strategy-comparison-report-detailed-analysis-doc-2026-08-22-final-version-x7';
 
 const DECISION_PAYLOAD = {
@@ -153,27 +153,31 @@ test.beforeEach(async ({ page, workerUrlKey }) => {
 });
 
 test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
-  test('desktop: waiting banner spaces the question/case and resets the options list', async ({ page }) => {
+  test('desktop: the question card spaces the question/case and resets the options list', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(SESSION_ID)}`);
     await page.waitForLoadState('networkidle');
 
-    const question = page.locator('[data-testid="session-waiting-decision-question"]');
-    const kase = page.locator('[data-testid="session-waiting-decision-case"]');
-    const chunks = page.locator('[data-testid="session-waiting-decision-case-chunk"]');
-    const optionsList = page.locator('[data-testid="session-waiting-decision-options"]');
-    const options = page.locator('[data-testid="session-waiting-decision-option"]');
+    const card = page.locator('[data-testid="session-question-card"]');
+    const question = page.locator('[data-testid="session-question-card-question"]');
+    const why = page.locator('[data-testid="session-question-card-why"]');
+    const chunks = page.locator('[data-testid="session-question-card-why-chunk"]');
+    const optionsList = page.locator('[data-testid="session-question-card-options"]');
+    const options = page.locator('[data-testid="session-question-card-option"]');
 
+    await expect(card).toBeVisible();
     await expect(question).toBeVisible();
     await expect(question).not.toHaveText('');
-    await expect(kase).toBeVisible();
+    await expect(why).toBeVisible();
+    // "why is Harbour asking? ›" is an expandable <details> — open it.
+    await why.locator('summary').click();
     await expect(chunks).toHaveCount(2);
     await expect(optionsList).toBeVisible();
     await expect(options).toHaveCount(DECISION_PAYLOAD.options.length);
 
     // Question -> case spacing: the case starts strictly below the question.
-    const [questionBox, caseBox] = await Promise.all([question.boundingBox(), kase.boundingBox()]);
-    expect(caseBox.y - (questionBox.y + questionBox.height)).toBeGreaterThan(0);
+    const [questionBox, whyBox] = await Promise.all([question.boundingBox(), why.boundingBox()]);
+    expect(whyBox.y - (questionBox.y + questionBox.height)).toBeGreaterThan(0);
 
     // Chunk-to-chunk gap: the second chunk starts strictly below the first
     // chunk's bottom edge (the grid-gap repair, LIN-2184).
@@ -198,9 +202,9 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(SESSION_ID)}`);
     await page.waitForLoadState('networkidle');
 
-    const banner = page.locator('[data-testid="session-waiting-banner"]');
-    const options = page.locator('[data-testid="session-waiting-decision-option"]');
-    await expect(banner).toBeVisible();
+    const card = page.locator('[data-testid="session-question-card"]');
+    const options = page.locator('[data-testid="session-question-card-option"]');
+    await expect(card).toBeVisible();
     const optionCount = await options.count();
     expect(optionCount).toBe(DECISION_PAYLOAD.options.length);
 
@@ -214,7 +218,7 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
     for (let i = 0; i < optionCount; i++) {
       const chip = options.nth(i);
       await chip.scrollIntoViewIfNeeded();
-      const bannerBox = await banner.boundingBox();
+      const cardBox = await card.boundingBox();
       const result = await chip.evaluate(el => {
         const rect = el.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
@@ -223,28 +227,30 @@ test.describe('Decision-bearing waiting-session layout (LIN-2193)', () => {
         return { right: rect.right, painted: hit === el || el.contains(hit) };
       });
       expect(result.painted).toBe(true);
-      expect(result.right).toBeLessThanOrEqual(bannerBox.x + bannerBox.width);
+      expect(result.right).toBeLessThanOrEqual(cardBox.x + cardBox.width);
     }
   });
 
-  test('360px: the unbroken token in case prose stays inside the banner', async ({ page }) => {
+  test('360px: the unbroken token in case prose stays inside the card', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 640 });
     await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(SESSION_ID)}`);
     await page.waitForLoadState('networkidle');
 
-    const banner = page.locator('[data-testid="session-waiting-banner"]');
-    const chunks = page.locator('[data-testid="session-waiting-decision-case-chunk"]');
-    await expect(banner).toBeVisible();
+    const card = page.locator('[data-testid="session-question-card"]');
+    const why = page.locator('[data-testid="session-question-card-why"]');
+    const chunks = page.locator('[data-testid="session-question-card-why-chunk"]');
+    await expect(card).toBeVisible();
+    await why.locator('summary').click();
     await expect(chunks).toHaveCount(2);
     await expect(chunks.last()).toContainText(UNBROKEN_TOKEN);
 
-    const bannerBox = await banner.boundingBox();
+    const cardBox = await card.boundingBox();
     // Not scrollWidth/clientWidth on the document or the chunk — both
     // measured dead against this regression (see file header). The honest
-    // signal is whether the chunk's own painted box stays inside the banner.
+    // signal is whether the chunk's own painted box stays inside the card.
     const chunkRights = await chunks.evaluateAll(els => els.map(el => el.getBoundingClientRect().right));
     for (const right of chunkRights) {
-      expect(right).toBeLessThanOrEqual(bannerBox.x + bannerBox.width);
+      expect(right).toBeLessThanOrEqual(cardBox.x + cardBox.width);
     }
   });
 

@@ -1905,11 +1905,11 @@ describe(
           // --- full /kpis output, ONE row per side, so the equality below is non-vacuous ---
           const freshOnlyCollection = freshCollection('lin3012-l1-fresh-only');
           await freshOnlyCollection.insertOne(freshDoc);
-          const freshStats = await collectKpiStats(buildKpiStatsCollections(freshOnlyCollection), { now: NOW });
+          const freshStats = await collectKpiStats(buildKpiStatsCollections(freshOnlyCollection), { now: NOW, milestoneFunnelDeps: {} });
 
           const legacyOnlyCollection = freshCollection('lin3012-l1-legacy-only');
           await legacyOnlyCollection.insertOne(legacyDoc);
-          const legacyStats = await collectKpiStats(buildKpiStatsCollections(legacyOnlyCollection), { now: NOW });
+          const legacyStats = await collectKpiStats(buildKpiStatsCollections(legacyOnlyCollection), { now: NOW, milestoneFunnelDeps: {} });
 
           assert.strictEqual(freshStats.totals.dispatches, 1, `${shape.name}: fresh-only run must be non-vacuous (1 dispatch)`);
           assert.strictEqual(legacyStats.totals.dispatches, 1, `${shape.name}: legacy-only run must be non-vacuous (1 dispatch)`);

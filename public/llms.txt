@@ -124,7 +124,7 @@ Both In Progress and Projects sections use the same nested structure:
 - `.footer-deploy` - deploy information container
 - `.footer-link` - link within deploy info (commit hash or GitHub repo)
 - `.footer-ai-status` - AI connection status indicator
-- `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free (N/20)")
+- `.footer-ai-status.free` - free tier status (yellow, shows "ai: ● free")
 - `[data-ai-source]` - AI source attribute on footer status (`oauth`, `env`, `free`)
 - `.footer-ai-model` / `[data-ai-model]` - workspace LLM model name, filled client-side from `/api/recommend/status`
 - `[data-testid="footer-feedback-toggle"]` - simple "feedback" link in the footer legal row (alongside privacy/terms) that toggles the feedback widget (`data-enabled="true|false"`); persists the per-user `feedbackWidget` flag via `POST /workspace/{urlKey}/settings/features`
@@ -235,7 +235,7 @@ Templates (including `retro`) are available on completed/canceled issues too.
 - `[data-prompt-body]` - generated prompt text
 - `[data-testid="opened-task-ladder"]` - copy → run-this-step → run-whole-task ladder
 - `[data-free-tier-status]` - free tier status on settings page
-- `[data-free-tier-usage]` - free tier usage display on settings page
+- `[data-free-tier-usage]` - free-tier runs-per-day allowance on settings page
 
 ## Dispatched Sessions (Swipe)
 - `GET /workspace/{urlKey}/api/sessions/{identifier}` → `{ sessions: [...] }` (newest-first dispatch loops for one issue, with feedback)
@@ -667,7 +667,7 @@ main.lc-page[data-url-key]                    - page container
 6. **Open in provider**: Expand task, click the "View in {provider} →" link (text is dynamic, e.g. "View in Linear")
 7. **View task details**: Expand task, click "Details ▶" to show description and metadata
 8. **Generate prompt for task**: Expand task, click "Prompts ▶" to reveal the shared opened-task component, click a template under "other prompts", copy the generated prompt
-9. **Get the next step (AI)**: Expand task, click "Prompts ▶", click the "✦ next step" button (free tier: 20/day per workspace)
+9. **Get the next step (AI)**: Expand task, click "Prompts ▶", click the "✦ next step" button (free tier: prompts unlimited; runs per account per day)
 
 ## Limitations
 
