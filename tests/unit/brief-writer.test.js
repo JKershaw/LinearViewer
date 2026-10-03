@@ -27,6 +27,8 @@ import { formatStageContract } from '../../lib/prompt-contract.js';
 import { appendGroundingSections } from '../../lib/prompt-formatters.js';
 import { buildBriefWriterPrompt, STAGE_IDEALS } from '../../lib/prompts/brief-writer.js';
 import { isBriefWriterEnabled, resolveBriefWriter, BRIEF_WRITER_OP_KIND } from '../../lib/brief-writer.js';
+import { AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
+import { AI_OPERATION_LABELS } from '../../lib/render-settings.js';
 
 const ISSUE = {
   id: 'issue-w', identifier: 'LIN-3293', title: 'Writer fixture', description: 'Make the thing work.',
@@ -89,6 +91,11 @@ describe('the switch', () => {
     assert.equal(isBriefWriterEnabled('beta', env), true);
     assert.equal(isBriefWriterEnabled('gamma', env), false);
     assert.equal(isBriefWriterEnabled(null, env), false);
+  });
+
+  test('the writer\'s model is a per-operation setting like the others: a kind with a label', () => {
+    assert.ok(AI_OPERATION_KINDS.includes(BRIEF_WRITER_OP_KIND), 'saved and rendered by the per-operation overrides');
+    assert.ok(AI_OPERATION_LABELS[BRIEF_WRITER_OP_KIND]);
   });
 
   test('model: env, then the workspace recommend-write override, then the router\'s model; free tier clamps', async () => {
