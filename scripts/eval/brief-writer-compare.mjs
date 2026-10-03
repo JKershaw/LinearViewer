@@ -25,9 +25,11 @@
  * finished pairs already in <outDir> are reused. One call per pair, retried once on a
  * transient failure. The run stops before a call that would take total spend past
  * --budget-multiple times the estimated cost of one call on the ladder's priciest model.
+ * Each call's look-ahead assumes the writer spends its whole reasoning headroom on top of a
+ * typical brief, since the app gives every writer that headroom.
  * The key is read from the environment and never written. Each writer call runs with the
- * app's own token budget (briefWriterBudget: a reasoning model gets a reasoning allowance on
- * top of the prose budget), recorded per model in ladder.json. A writer reply that did not
+ * app's own token budget (briefWriterBudget: a reasoning allowance on top of the prose
+ * budget for every model), recorded per model in ladder.json. A writer reply that did not
  * finish falls back as 'truncated' or 'unfinished-<reason>'; an upstream error mid-reply is
  * retried once like the other transient failures.
  */
@@ -43,7 +45,7 @@ const { getProvider } = await lib('providers/registry.js');
 const { generatePrompt, deriveDispatchKind, PROMPT_TEMPLATES } = await lib('prompt-templates.js');
 const {
   DEFAULT_MODEL, getRecommendation, composeRoutedRecommendation, setLlmCallRecorder,
-  splitStageBody, routerFocus, BRIEF_WRITER_FEATURE, briefWriterBudget
+  splitStageBody, routerFocus, BRIEF_WRITER_FEATURE, BRIEF_WRITER_PROSE_TOKENS, briefWriterBudget
 } = await lib('openrouter.js');
 const { formatStageContract } = await lib('prompt-contract.js');
 const { formatStageIntent, buildBriefWriterPrompt } = await lib('prompts/brief-writer.js');
@@ -219,6 +221,9 @@ async function run() {
   // The guard: multiple × one call on the priciest writer, sized on the largest writer prompt.
   const estimate = (id, inBytes, outTokens = 1500) => (inBytes / 3.5) * price(id).inPerM / 1e6 + outTokens * price(id).outPerM / 1e6;
   const priciest = ladder.filter(l => l.writer).sort((a, b) => estimate(b.id, 20000) - estimate(a.id, 20000))[0];
+  // A writer may spend its whole reasoning headroom before the brief, so a call's look-ahead
+  // counts it on top of a typical brief's output.
+  const headroom = (id) => briefWriterBudget(id).maxTokens - BRIEF_WRITER_PROSE_TOKENS;
 
   const calls = [];
   setLlmCallRecorder((rec) => calls.push(rec));
@@ -284,7 +289,7 @@ async function run() {
       let out = null;
       const t0 = Date.now();
       for (let attempt = 0; attempt < 2; attempt++) {
-        const next = estimate(model, Buffer.byteLength(bundleGoal) + 4000);
+        const next = estimate(model, Buffer.byteLength(bundleGoal) + 4000, 1500 + headroom(model));
         if (spent() + attempts.reduce((s, a) => s + (a.cost || 0), 0) + next > budget) {
           stopped = `before ${id} × ${model}: spent $${spent().toFixed(4)}, next ~$${next.toFixed(4)}, budget $${budget.toFixed(3)}`;
           break;
