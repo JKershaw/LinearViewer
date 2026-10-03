@@ -3062,7 +3062,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the marker-preservation mandate is explicit and verbatim');
     assert.ok(/fits one session.*needs multiple sessions/.test(prompt), 'both session-fit phrases are named');
     assert.ok(/`Implementation Plan` heading/.test(prompt), 'the Implementation Plan heading alternative is named');
-    assert.ok(/Two other deterministic readers key on exactly these literals/i.test(prompt),
+    assert.ok(/any `plan-review due:` line/.test(prompt), 'LIN-3296: the plan-review gate marker survives the prune');
+    assert.ok(/Deterministic readers key on these literals/i.test(prompt),
       'the prompt explains WHY the literals matter, so an implementer does not "clean up" the wording');
   });
 
@@ -3121,7 +3122,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/verify the archive landed/i.test(rule), 'meta rule requires verifying the archive before editing');
     assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
       'meta rule carries the same never-prune carve-out');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
+    assert.ok(/"fits one session" \/ "needs multiple sessions"\), any "plan-review due:" line, and any "Implementation Plan" heading/i.test(rule),
       'meta rule carries the same marker-preservation mandate');
     assert.ok(/runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
       'meta rule scopes the step to the all-clear path only');

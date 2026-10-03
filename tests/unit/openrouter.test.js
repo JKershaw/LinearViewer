@@ -1036,7 +1036,7 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the rule must require archiving before pruning');
     assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
       'the rule must carry the never-prune carve-out, including scope');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
+    assert.ok(/"fits one session" \/ "needs multiple sessions"\), any "plan-review due:" line, and any "Implementation Plan" heading/i.test(rule),
       'the rule must carry the verbatim marker-preservation mandate');
     assert.ok(/this step runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
       'the rule must scope the step to the all-clear path only, mirroring the handwritten template');
