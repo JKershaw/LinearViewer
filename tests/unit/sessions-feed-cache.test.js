@@ -215,3 +215,57 @@ describe('sessions-feed-cache: clear (LIN-799 test-reset seam)', () => {
     assert.equal(calls, 4, 'both entries re-produced after a full clear');
   });
 });
+
+describe('sessions-feed-cache: peek (LIN-3260, non-producing read)', () => {
+  // peek() returns the last produced value WITHOUT producing — no cold scan, no
+  // background refresh. The run page uses it to read the workspace-wide loop set
+  // for `liveDispatchOnAnchor`; a producing get() there would re-introduce the
+  // unscoped whole-workspace reconstruction LIN-1021/H12 forbids on the page.
+  //
+  // Stale-vs-fresh choice: peek returns a STALE-but-PRESENT entry, not only a
+  // fresh one. The predicate it feeds (`liveDispatchOnAnchor`) turns a match into
+  // `record` (no dispatch), so over-reporting "live" errs toward NOT offering a
+  // duplicate dispatch; dropping a stale set would fall back to session scope and
+  // could re-expose the race. Staleness stays bounded by the cache's existing
+  // behaviour: the `rulings` entry is revalidated on the ~5s SWR `get` poll, and
+  // `clear(urlKey)` drops it on any decision write.
+  test('returns the warm value WITHOUT invoking the producer', async () => {
+    const cache = createSessionsFeedCache();
+    let calls = 0;
+    await cache.get('k', async () => { calls++; return 'warm'; });
+    assert.equal(cache.peek('k'), 'warm');
+    assert.equal(calls, 1, 'peek never produces');
+  });
+
+  test('returns undefined on a cold miss WITHOUT producing', () => {
+    const cache = createSessionsFeedCache();
+    assert.equal(cache.peek('missing'), undefined);
+  });
+
+  test('returns a STALE-but-present value (never drops a previously-live set)', async () => {
+    let clock = 1000;
+    const cache = createSessionsFeedCache({ ttlMs: 100, now: () => clock });
+    await cache.get('k', async () => 'live-set');
+    clock += 60_000; // far past the TTL, and no get() has revalidated
+    assert.equal(cache.peek('k'), 'live-set', 'a stale-but-present entry is still returned, not dropped');
+  });
+
+  test('clear(urlKey) drops the entry so peek returns undefined (bounded staleness)', async () => {
+    const cache = createSessionsFeedCache();
+    const key = cache.keyFor([{ urlKey: 'ws-a' }], 'rulings');
+    await cache.get(key, async () => 'v');
+    assert.equal(cache.peek(key), 'v');
+    cache.clear('ws-a');
+    assert.equal(cache.peek(key), undefined, 'clear bounds staleness');
+  });
+
+  test('does not surface a cold in-flight (pending) entry', async () => {
+    const cache = createSessionsFeedCache();
+    let release;
+    const gate = new Promise(r => { release = r; });
+    const pending = cache.get('k', async () => { await gate; return 'v'; });
+    assert.equal(cache.peek('k'), undefined, 'a not-yet-produced (pending) entry peeks undefined');
+    release();
+    await pending;
+  });
+});
