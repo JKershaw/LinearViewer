@@ -21,12 +21,13 @@
  * `scripts/steady-base-growth.mjs` (the four-week growth read), so a drift in
  * one instrument is visible in the other:
  *   - Templates source  : lib/prompt-template-defs.js, lib/prompt-templates.js,
- *                         lib/prompt-formatters.js
+ *                         lib/prompt-formatters.js, lib/prompt-contract.js
  *   - Templates rendered: generatePrompt() for each PROMPT_TEMPLATES key under one
  *                         fixed fixture (composed output, catches leaks through a
  *                         source the frozen file does not itself contain)
  *   - Meta-prompt       : lib/prompts/meta-prompt-template.js, source + rendered
  *                         with the same leaf fixture the baseline snapshot uses
+ *   - Brief writer      : lib/prompts/brief-writer.js, source (LIN-3293)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
  *
  * The existing `meta-prompt.baseline.txt` byte-identity guard in
@@ -50,40 +51,54 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 // cap, not an identity pin: shrinking a surface needs no edit here. Growing one
 // needs an equal-or-greater removal elsewhere; see the message on each assert.
 
-/** Templates, source bytes. Same three files `steady-base-growth.mjs` GROUPS as
- * "worker templates". */
+/** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
+ * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
+ * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 133056,
-  'lib/prompt-templates.js': 20984,
-  'lib/prompt-formatters.js': 54812,
+  'lib/prompt-template-defs.js': 128366, // LIN-3293: review files nothing (close-out owns filing), no category list for "large", no checklist or hand-off restating other sections
+  'lib/prompt-templates.js': 20495, // LIN-3292: deriveDispatchKind reads "close out" as close-out; +91, paid by review's LIN-3293 cuts
+  'lib/prompt-formatters.js': 52883, // LIN-3292: the finished-task ask is stage-neutral, its comment shorter
+  'lib/prompt-contract.js': 3481,
 };
 
 /** Templates, rendered bytes for each PROMPT_TEMPLATES key under FIXTURE_ISSUE +
  * FIXTURE_CONTEXT below. The key set is asserted to match the live registry. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 2990,
-  bug: 4420,
-  plan: 15314,
+  bug: 4362,
+  plan: 15433, // LIN-3292: plan, implementation and review carry the stage contract, paid by triage, plan-review and close-out
   'look-into': 1645,
-  triage: 3169,
-  breakdown: 4669,
-  research: 11115,
-  scoping: 2079,
-  design: 2035,
-  spike: 1821,
+  triage: 2499,
+  breakdown: 4637,
+  research: 11070,
+  scoping: 2047,
+  design: 2277, // LIN-3296: design and spike rewritten as briefs, paid by implementation and close-out's LIN-3291 trims
+  spike: 2190,
   context: 1892,
-  'plan-review': 7807,
-  implementation: 7880,
-  review: 19890,
-  'close-out': 19935,
-  'retrospective-audit': 4161,
+  'plan-review': 7704,
+  implementation: 7574,
+  review: 18432, // LIN-3293: as its source, above
+  'close-out': 18455,
+  'retrospective-audit': 4143,
   retro: 4114,
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106905;
+export const META_PROMPT_SOURCE_CEILING = 106015; // LIN-3292: the routing-only switches, from the unallocated total; LIN-3293: review's filing check (5b) gone
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 104526;
+export const META_PROMPT_RENDERED_CEILING = 103532;
+
+/**
+ * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
+ * brief and every stage's ideal shape. New prompt text, paid by removing restated rules from
+ * review and close-out (both paths), lowering every slack ceiling to its size, and the
+ * unallocated remainder of the total. It renders only around a bundle the template
+ * ceilings already measure, so it carries a source ceiling alone. +2018 for the review
+ * fixes (the safety floors review and close-out rest on, owned by code; two cause lines;
+ * a writer brief that names code's sections instead of showing their text), paid by the
+ * template, meta and formatter cuts in the same change (2109 bytes moved, 2239 freed).
+ */
+export const BRIEF_WRITER_SOURCE_CEILING = 8657;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
@@ -184,6 +199,14 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
   });
 
+  test('brief writer source bytes', () => {
+    const actual = sourceBytes('lib/prompts/brief-writer.js');
+    assert.ok(actual <= BRIEF_WRITER_SOURCE_CEILING,
+      `lib/prompts/brief-writer.js is ${actual} bytes, ${actual - BRIEF_WRITER_SOURCE_CEILING} over its ` +
+      `${BRIEF_WRITER_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - BRIEF_WRITER_SOURCE_CEILING} bytes ` +
+      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+  });
+
   test('served runner prompt source bytes', () => {
     const actual = sourceBytes('docs/runner-prompt.md');
     assert.ok(actual <= RUNNER_PROMPT_SOURCE_CEILING,
@@ -217,6 +240,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       ...Object.values(TEMPLATES_RENDERED_CEILINGS),
       META_PROMPT_SOURCE_CEILING,
       META_PROMPT_RENDERED_CEILING,
+      BRIEF_WRITER_SOURCE_CEILING,
       RUNNER_PROMPT_SOURCE_CEILING,
       RUNNER_PROMPT_RENDERED_CEILING,
     ].reduce((sum, n) => sum + n, 0);

@@ -40,7 +40,7 @@ This is the system most relevant to the planned follow-on prompts feature.
 | Ready | `plan`, `code-review` | Issue in backlog/unstarted/started state |
 | Universal | `look-into`, `triage`, `breakdown`, `research`, `scoping`, `design`, `spike`, `context`, `implementation`, `review` | Always available |
 
-Each template receives rich context from Linear (parent task, siblings, children with status, project info including repo URL, comments) and respects feature flags (`linearMcp`, `featureBranches`, `codeReview` sub-toggles). Output is a structured prompt with header, context sections, workflow steps, and completion signals.
+Each template receives rich context from Linear (parent task, siblings, children with status, project info including repo URL, comments) and respects feature flags (`linearMcp`, `codeReview` sub-toggles). Output is a structured prompt with header, context sections, workflow steps, and completion signals.
 
 Formatting helpers in `lib/prompt-formatters.js` produce consistent sections across templates: git workflow instructions, self-review checklists, CI/CD checks, subtask summaries.
 
@@ -102,7 +102,6 @@ into session per-request and synced to MongoDB for cross-device persistence (LIN
 | `dispatch` | **off** | Dispatch queue UI + API |
 | `proxy` | **off** | Proxy token toggle + API |
 | `linearMcp` | on | "in Linear" hints in prompts |
-| `featureBranches` | off | Git branch-per-task workflow in prompts |
 | `codeReview` | off | Nested sub-toggles: self, CI/CD, PR |
 
 ---

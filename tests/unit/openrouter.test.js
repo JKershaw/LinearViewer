@@ -38,6 +38,7 @@ import {
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
 import { appendGroundingSections } from '../../lib/prompt-formatters.js';
+import { formatStageContract } from '../../lib/prompt-contract.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
@@ -1009,8 +1010,11 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
   test('S2 parity — the Plan-prompts quality rule carries the gate and the revision half', () => {
     const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan prompts**'));
     assert.ok(rule, 'the meta-prompt must carry a Plan-prompts quality rule');
-    assert.ok(/plan-review due: yes.*plan-review due: no/is.test(rule),
+    assert.ok(/record in the description whether plan-review is due/i.test(rule),
       'the rule must require the recorded gate decision');
+    // Its exact form is the stage contract's, appended by code on both paths (LIN-3292).
+    assert.ok(/plan-review due: yes.*plan-review due: no/is.test(formatStageContract('plan', 'LIN-1')),
+      'the contract carries the form the router and the round-trip instrument read');
     assert.ok(/placed AFTER the Scope Assessment \/ session-fit step/i.test(rule),
       'the rule must pin the gate BELOW session-fit, since criterion (a) reads that answer');
     assert.ok(/revise against a prior plan-review verdict/i.test(rule),
@@ -1036,8 +1040,9 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the rule must require archiving before pruning');
     assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
       'the rule must carry the never-prune carve-out, including scope');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
-      'the rule must carry the verbatim marker-preservation mandate');
+    // The verbatim marker-preservation mandate is the stage contract's (LIN-3292).
+    assert.ok(/keep word for word any `Implementation Plan` heading, the session-fit phrase \(`fits one session` \/ `needs multiple sessions`\) and any `plan-review due:` line/.test(formatStageContract('close-out', 'LIN-1')),
+      'the close-out contract carries the verbatim marker-preservation mandate');
     assert.ok(/this step runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
       'the rule must scope the step to the all-clear path only, mirroring the handwritten template');
   });
@@ -1089,9 +1094,9 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
 
     test('the Review-prompts rule defines inside by kind (defect/idiom), not by research\'s enumerated list, and limits ruling options', () => {
       const rule = reviewRule();
-      assert.ok(/same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i.test(rule),
+      assert.ok(/its cause included wherever it lives, or the same defect or idiom as a class this ticket bounded, whether or not research's enumeration listed it/i.test(rule),
         'the rule defines inside by kind, not by the research list');
-      assert.ok(/genuinely different kind of problem/i.test(rule), 'outside is a genuinely different kind of problem');
+      assert.ok(/a different problem — not this ticket's or its cause/i.test(rule), 'outside is a different problem, never this ticket\'s cause');
       assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
         'the rule limits ruling options to outside-only filing');
     });
@@ -1121,7 +1126,7 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
       assert.ok(/each gap's inside\/outside mark \(LIN-1871\)/i.test(rule),
         'the rule reads the inside/outside mark from the review comment');
-      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop, warranted only when finishing the item is materially larger than this ticket's own change/is.test(rule),
+      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop, warranted only when finishing the item is a change the team would need to hear about first/is.test(rule),
         'an inside item discharges only by done or a materially-gated explicit drop');
       assert.ok(/filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(rule),
         'filing is explicitly not a discharge for a dropped inside item, and it is never eligible for filing');
@@ -1699,14 +1704,14 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
     );
   });
 
-  test('Bug class check keeps the fix minimal and records the class instead', () => {
+  test('Bug class check proposes the fix at the shared cause, reaching every instance (LIN-3291)', () => {
     const result = build();
     assert.ok(
-      result.includes('the fix stays minimal'),
+      result.includes('the proposed fix is at the shared cause'),
       'a found class must not silently widen the fix'
     );
     assert.ok(
-      result.includes('record the unhandled instances as a comment'),
+      result.includes('reaches every instance found'),
       'unhandled instances must be recorded for follow-up scoping'
     );
   });
@@ -1815,15 +1820,11 @@ describe('buildMetaPromptTemplate class-not-member enumeration rule (LIN-1871, r
     );
   });
 
-  test('Plan-prompts rule carries the LIN-1871 evidence base, not a bare assertion', () => {
+  test('Plan-prompts rule cites LIN-1871 as its basis', () => {
     const result = build();
     assert.ok(
       result.includes('LIN-1871'),
       'the rule should cite the four-ticket evidence base it came from'
-    );
-    assert.ok(
-      result.includes('4+ sessions and zero commits'),
-      'the cost of NOT having the rule is what motivates it'
     );
   });
 
@@ -2103,7 +2104,7 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
       'plan rule must preserve the sequencing guarantee'
     );
     assert.ok(
-      result.includes('names its in-task consumer'),
+      result.includes('names the cause it removes or its in-task consumer'),
       'the blocking-subtask ratchet must be conditioned on a verdict naming its in-task consumer'
     );
     assert.ok(
@@ -2456,6 +2457,35 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.strictEqual(result.truncated, true, 'structured return carries truncated');
     const done = events.find(e => e.type === 'done');
     assert.strictEqual(done.data.truncated, true, 'done event carries truncated');
+  });
+
+  // LIN-3296: grounding is chosen per stage from the recommended action, on both the
+  // streamed and the buffered meta path. A look-back on a Done bug must not be told
+  // to close out or to move to implementing the fix.
+  const DONE_BUG = { ...ISSUE, state: { name: 'Done', type: 'completed' }, labels: ['bug'], createdAt: '2026-01-01T00:00:00.000Z' };
+  const WITH_COMMENT = { ...CONTEXT, comments: [{ body: 'Root cause is X', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }] };
+  const AUDIT_RAW = '## Reasoning\n→ **retrospective-audit**\nMerged and closed.\n## Prompt\nAudit the landed change.';
+
+  test('streamed retrospective-audit on a Done bug carries no close-out or fix note (LIN-3296)', async () => {
+    global.fetch = mock.fn(async () => mockStreamResponse([AUDIT_RAW]));
+    const events = [];
+    const result = await getRecommendationStream(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+    const streamed = events.filter(e => e.type === 'delta' && e.data.section === 'prompt').map(e => e.data.content).join('');
+    const grounding = appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit');
+    assert.strictEqual(streamed, 'Audit the landed change.' + grounding);
+    assert.strictEqual(result.prompt, streamed);
+    assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(streamed), 'look-back keeps its brief');
+    assert.ok(streamed.includes('Re-ground the Ticket'), 'the staleness check still fits an audit of landed code');
+  });
+
+  test('buffered retrospective-audit on a Done bug carries no close-out or fix note (LIN-3296)', async () => {
+    global.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: AUDIT_RAW }, finish_reason: 'stop' }], usage: { completion_tokens: 5 } })
+    }));
+    const result = await getRecommendation(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' });
+    assert.strictEqual(result.prompt, 'Audit the landed change.' + appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit'));
+    assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(result.prompt));
   });
 });
 
@@ -3315,7 +3345,7 @@ describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049
     assert.ok(/Plan-review due: no — covered by <parent>'s approving plan-review \(comment <id>, rev <N>\)/.test(rule),
       'the rule must require the plan-review-due:no line citing the approving verdict');
     assert.ok(/grounding SHA\(s\) the plan cited/.test(rule), 'the rule must require the grounding SHA(s)');
-    assert.ok(/the parent plan is the source of truth; do not redesign/.test(rule),
+    assert.ok(/the parent's approved plan is the starting point, and where to read it in full \(the child sees its parent only as a title\) — follow it, and where the code shows it wrong, change course and say so on the parent/.test(rule),
       'the rule must carry the do-not-redesign line');
   });
 
