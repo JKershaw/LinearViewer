@@ -1677,22 +1677,40 @@ describe('render-session: a real-shaped stepped single-lineage session (LIN-3250
   });
 });
 
-describe('render-session: run-evidence mount (LIN-3247)', () => {
-  test('mounts the evidence fragment and the close-out box at the top of the page', () => {
+describe('render-session: run-evidence mounts (LIN-3247/LIN-3251 §4)', () => {
+  test('renderEvidence mounts after the paragraph (before steps); renderCloseOutBox after the steps (before Task context)', () => {
     const html = renderSessionPage({
       session: fixtureSession(), urlKey: 'ws-a', issueContext: [], runEvidence: runEvidenceFixture(),
     });
-    assert.match(html, /data-testid="run-evidence-mount"/);
+    // LIN-3251 moved the LIN-3247 top-of-page mount into its two §4 slots.
+    assert.ok(!html.includes('data-testid="run-evidence-mount"'), 'the old bundled top mount is gone');
     assert.match(html, /data-testid="run-evidence-checked"/);
     assert.match(html, /data-testid="run-evidence-closeout"/);
-    // Mounted above the run-header section (the LIN-2948 seam position).
-    assert.ok(html.indexOf('data-testid="run-evidence-mount"') < html.indexOf('sess-run-header'));
+    const evidenceIdx = html.indexOf('data-testid="run-evidence"');
+    const closeOutIdx = html.indexOf('data-testid="run-evidence-closeout"');
+    const paragraphIdx = html.indexOf('data-testid="session-paragraph"');
+    const stepsIdx = html.indexOf('sess-steps');
+    const contextIdx = html.indexOf('sess-context-section');
+    assert.ok(paragraphIdx < evidenceIdx, 'evidence after the paragraph');
+    assert.ok(evidenceIdx < stepsIdx, 'evidence before the steps');
+    assert.ok(stepsIdx < closeOutIdx, 'close-out box after the steps');
+    assert.ok(closeOutIdx < contextIdx, 'close-out box before Task context');
   });
 
-  test('no runEvidence renders no mount — the existing page is unchanged', () => {
+  test('no runEvidence renders neither fragment — no mount, no placeholder, no empty box', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
     assert.ok(!html.includes('data-testid="run-evidence-mount"'));
     assert.ok(!html.includes('data-testid="run-evidence"'));
+    assert.ok(!html.includes('data-testid="run-evidence-closeout"'));
+    assert.ok(!/has been merged/i.test(html), 'no merge claim without an open-PR read');
+  });
+
+  test('each fragment renders exactly once', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a', issueContext: [], runEvidence: runEvidenceFixture(),
+    });
+    assert.equal((html.match(/data-testid="run-evidence"/g) || []).length, 1, 'one evidence fragment');
+    assert.equal((html.match(/data-testid="run-evidence-closeout"/g) || []).length, 1, 'one close-out box');
   });
 
   test('a guest viewer gets the evidence rows but no close-out box', () => {
@@ -1702,5 +1720,80 @@ describe('render-session: run-evidence mount (LIN-3247)', () => {
     });
     assert.match(html, /data-testid="run-evidence-checked"/);
     assert.ok(!html.includes('data-testid="run-evidence-closeout"'));
+  });
+});
+
+// ─── LIN-3251: the §4 page order and the header PR line ──────────────────────
+
+describe('render-session: page order (LIN-3251, LIN-2948 §4)', () => {
+  function orderDecisionRow() {
+    return {
+      decision: { decision_id: 'd-1', question: 'Proceed?' },
+      decisionCase: [],
+      anchor: { loopId: 'loop-1', issueId: 'uuid-900', issueIdentifier: 'LIN-900', workspaceUrlKey: 'ws-a', target: 'cli', followUpTo: null },
+      stampLoopId: 'loop-1', disposition: 'resumable', canReply: true, effect: 'resume'
+    };
+  }
+
+  test('heading → header strip → pinned card → paragraph → evidence → steps → close-out → Task context', () => {
+    const html = renderSessionPage({
+      session: fixtureSession(), urlKey: 'ws-a',
+      issueContext: [{ issueIdentifier: 'LIN-900', issueId: 'uuid-900', brief: 'A brief.', recap: null }],
+      decisions: [orderDecisionRow()],
+      runEvidence: runEvidenceFixture(),
+    });
+    const idx = (needle) => {
+      const i = html.indexOf(needle);
+      assert.ok(i > -1, `marker present: ${needle}`);
+      return i;
+    };
+    const heading = idx('data-testid="session-title"');
+    const header = idx('sess-run-header');
+    const pinned = idx('sess-qcards');
+    const paragraph = idx('data-testid="session-paragraph"');
+    // The evidence marker sits inside the evidence section; `run-evidence-closeout`
+    // is only in the close-out box, so it unambiguously marks the later slot.
+    const evidence = idx('data-testid="run-evidence-checked"');
+    const steps = idx('sess-steps');
+    const closeOut = idx('data-testid="run-evidence-closeout"');
+    const context = idx('sess-context-section');
+
+    assert.ok(heading < header, 'heading before header strip');
+    assert.ok(header < pinned, 'header strip before pinned card');
+    assert.ok(pinned < paragraph, 'pinned card before paragraph');
+    assert.ok(paragraph < evidence, 'paragraph before evidence');
+    assert.ok(evidence < steps, 'evidence before steps');
+    assert.ok(steps < closeOut, 'steps before close-out box');
+    assert.ok(closeOut < context, 'close-out box before Task context');
+  });
+});
+
+describe('render-session: PR line (LIN-3251)', () => {
+  const prLine = (data) => {
+    const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [], ...data });
+    return { html, text: /data-testid="session-pr-line">([^<]*)</.exec(html)?.[1] ?? null };
+  };
+
+  test('the four approved copies, exact strings', () => {
+    assert.equal(prLine({ prState: { state: 'none' } }).text, 'No pull request yet.');
+    assert.equal(prLine({ prState: { state: 'open', number: 12, checks: 'passing' } }).text, 'Nothing has been merged. PR #12 is open: checks passing.');
+    assert.equal(prLine({ prState: { state: 'open', number: 12, checks: 'failing' } }).text, 'Nothing has been merged. PR #12 is open: checks failing.');
+    assert.equal(prLine({ prState: { state: 'open', number: 12, checks: 'running' } }).text, 'Nothing has been merged. PR #12 is open: checks running.');
+    assert.equal(prLine({ prState: { state: 'merged', number: 12 } }).text, 'PR #12 was merged.');
+    assert.equal(prLine({ prState: { state: 'unknown', number: 12 } }).text, 'PR #12: state not reported.');
+  });
+
+  test('with no known state the initial line is neutral — it never claims a merge', () => {
+    const { html, text } = prLine({});
+    assert.equal(text, 'Checking for a pull request…');
+    assert.ok(!/has been merged|was merged/i.test(html), 'the neutral initial line makes no merge claim');
+  });
+
+  test('the line carries the poll URL and run liveness for beat 3', () => {
+    const { html } = prLine({});
+    assert.match(html, /data-testid="session-pr-state"[^>]*data-pr-state-url="\/workspace\/ws-a\/api\/run\/sess-abc\/pr-state"/);
+    assert.match(html, /data-testid="session-pr-state"[^>]*data-run-live="true"/);
+    const live = prLine({ sessionTerminal: true }).html;
+    assert.match(live, /data-testid="session-pr-state"[^>]*data-run-live="false"/);
   });
 });

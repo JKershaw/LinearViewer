@@ -126,13 +126,19 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     const sessionId = await discoverSessionId(page);
     await gotoSession(page, sessionId);
 
-    const mount = page.locator('[data-testid="run-evidence-mount"]');
-    await expect(mount).toBeVisible();
+    const evidence = page.locator('[data-testid="run-evidence"]');
+    await expect(evidence).toBeVisible();
 
-    // Mounted at the top: the evidence block precedes the run-header section.
-    const mountBox = await mount.boundingBox();
+    // LIN-3251 §4 slots: evidence after the header strip and before the steps;
+    // the close-out box after the steps. (The paragraph slot is omitted here when
+    // empty, so the evidence/step/box positions are the load-bearing assertion.)
+    const evidenceBox = await evidence.boundingBox();
     const headerBox = await page.locator('.sess-run-header').boundingBox();
-    expect(mountBox.y).toBeLessThan(headerBox.y);
+    const stepsBox = await page.locator('.sess-steps').boundingBox();
+    const closeOutBox = await page.locator('[data-testid="run-evidence-closeout"]').boundingBox();
+    expect(headerBox.y).toBeLessThan(evidenceBox.y);
+    expect(evidenceBox.y).toBeLessThan(stepsBox.y);
+    expect(stepsBox.y).toBeLessThan(closeOutBox.y);
 
     // No straggler waiting/parked flags above it — a finished run is finished.
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
