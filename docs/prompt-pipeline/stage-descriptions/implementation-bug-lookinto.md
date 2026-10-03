@@ -168,7 +168,7 @@ Read at the working tree in `/home/user/LinearViewer` on 2026-10-03. Sources:
 | defs 149 | "Identify reproduction steps, **hypothesize** likely causes, and **suggest a debugging approach**." (This also contradicts step 5, which requires confirmation.) |
 | defs 162 | "7. **Propose fix with minimal scope.** If step 6 found a class, **the fix stays minimal — name the class and list the unhandled instances in your findings comment instead of silently widening the fix**." |
 | meta 301 | "If a class exists, **the fix stays minimal — name the class and record the unhandled instances as a comment rather than silently widening the fix**." |
-| docs/architecture/prompt-system.md:20 | "The directive never expands scope: a found class is named and its instances recorded… while the fix stays minimal". The doc states the same rule as policy. |
+| docs/architecture/prompt-system.md (class-check paragraph, as it read before LIN-3291) | The doc stated the same keep-the-fix-minimal rule as policy. |
 | formatters 343 | "Add findings as a comment and update labels if needed". (This conflicts with "leave the `bug` label" at defs 165.) |
 
 defs 162 and meta 301 are the essay's exact case, "the bug investigation finds the cause and is then told that 'the fix stays minimal'". In both places the class check is followed directly by an order not to act on it.
