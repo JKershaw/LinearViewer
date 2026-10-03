@@ -1397,7 +1397,7 @@ export function createDashboardRoutes({
         ? sessionsFeedCache.peek(sessionsFeedCache.keyFor(sessionWorkspaces, 'rulings'))
         : undefined;
       const liveLoops = Array.isArray(cachedLoopSet)
-        ? cachedLoopSet.filter(l => l && l.workspaceUrlKey === workspace.urlKey)
+        ? enrichedLoops.concat(cachedLoopSet.filter(l => l && l.workspaceUrlKey === workspace.urlKey))
         : enrichedLoops;
       const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date(), liveLoops });
 

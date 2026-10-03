@@ -4751,6 +4751,90 @@ describe('GET /observation/session/:sessionId — cross-session live anchor (LIN
     assert.match(card, /data-effect="record"/, 'the session-local live run still forces record on the cold-cache fallback');
     assert.deepEqual(stores.unscoped, [], 'peek never produces: the run page does no unscoped whole-workspace read (LIN-1021)');
   });
+
+  // E1 (review F1): the warm cached set must be ADDED to the session's own
+  // loops, not REPLACE them. `peek` never revalidates and starting a dispatch
+  // does not `clear()` the entry, so the cached set can be arbitrarily stale and
+  // can be missing a live run in THIS session on the anchor. With a replacement
+  // the card regresses to `dispatch`; the concat keeps the pre-PR `record`.
+  test('E1: a warm-but-stale rulings entry that lacks the session\'s own live loop still renders data-effect="record"', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [], // warmed while the session has NO live run …
+        history: [
+          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
+          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
+        ],
+        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    const cache = createSessionsFeedCache();
+    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
+
+    const warmed = await warmRulings(router);
+    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
+    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
+    // The warm set carries NO live run on LIN-1 (the session had none yet) …
+    assert.ok(!(cache.peek(runPageKey) || []).some(l => l.id === 'a-live'), 'sanity: the cached set is stale, lacking the run below');
+
+    // … then THIS session starts a live run on the anchor, without clearing the
+    // cached set. Only concat with the own loops can see it.
+    perWorkspace['ws-a'].live.push(workerLiveItem('a-live', 'LIN-1', 'sess-A'));
+
+    const res = await renderSession(router, 'sess-A');
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-A');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'E1: the stale cached set must be ADDED to the session own loops, not replace them');
+  });
+
+  // E2 (review M3 survivor): the workspace filter must be pinned. The `rulings`
+  // entry spans every connected workspace, and identifiers are only per-team
+  // unique, so a same-identifier live loop in ANOTHER workspace must NOT force
+  // `record` on this card. Warm the cache over two workspaces with a live loop
+  // on LIN-1 tagged `ws-b`, then render `ws-a`: expect `dispatch`.
+  test('E2: a live loop on the same identifier in a DIFFERENT connected workspace is filtered out (data-effect="dispatch")', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [
+          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
+          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
+        ],
+        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
+      },
+      'ws-b': {
+        live: [workerLiveItem('b-live', 'LIN-1', 'sess-B')],
+        history: [autopilotHistoryItem('sess-B', 'LIN-1', NOW_ISO)],
+        agentStatus: []
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    const cache = createSessionsFeedCache();
+    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
+
+    const twoWsSession = {
+      ...ENABLED,
+      workspaces: [
+        { urlKey: 'ws-a', name: 'Alpha' },
+        { urlKey: 'ws-b', name: 'Beta' }
+      ]
+    };
+    const warmed = await warmRulings(router, twoWsSession);
+    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
+    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }], 'rulings');
+    const snapshot = cache.peek(runPageKey) || [];
+    assert.ok(snapshot.some(l => l.issueIdentifier === 'LIN-1' && l.workspaceUrlKey === 'ws-b'),
+      'the warm set really does carry the ws-b live loop on LIN-1');
+
+    const res = await renderSession(router, 'sess-A', twoWsSession);
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-A');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="dispatch"/,
+      'a same-identifier loop from ANOTHER workspace must not force record (workspace filter pinned)');
+  });
 });
 
 // ─── LIN-1022: the sibling :id-keyed handlers are issue-scoped too ─────────────
