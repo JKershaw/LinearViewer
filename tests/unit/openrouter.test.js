@@ -1089,9 +1089,9 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
 
     test('the Review-prompts rule defines inside by kind (defect/idiom), not by research\'s enumerated list, and limits ruling options', () => {
       const rule = reviewRule();
-      assert.ok(/same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i.test(rule),
+      assert.ok(/its cause included wherever it lives, or the same defect or idiom as a class this ticket bounded, whether or not research's enumeration listed it/i.test(rule),
         'the rule defines inside by kind, not by the research list');
-      assert.ok(/genuinely different kind of problem/i.test(rule), 'outside is a genuinely different kind of problem');
+      assert.ok(/a different problem — not this ticket's or its cause/i.test(rule), 'outside is a different problem, never this ticket\'s cause');
       assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
         'the rule limits ruling options to outside-only filing');
     });
@@ -1121,7 +1121,7 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
       assert.ok(/each gap's inside\/outside mark \(LIN-1871\)/i.test(rule),
         'the rule reads the inside/outside mark from the review comment');
-      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop, warranted only when finishing the item is materially larger than this ticket's own change/is.test(rule),
+      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop, warranted only when finishing the item is a change the team would need to hear about first/is.test(rule),
         'an inside item discharges only by done or a materially-gated explicit drop');
       assert.ok(/filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(rule),
         'filing is explicitly not a discharge for a dropped inside item, and it is never eligible for filing');
@@ -1699,14 +1699,14 @@ describe('buildMetaPromptTemplate class check (LIN-313)', () => {
     );
   });
 
-  test('Bug class check keeps the fix minimal and records the class instead', () => {
+  test('Bug class check proposes the fix at the shared cause, reaching every instance (LIN-3291)', () => {
     const result = build();
     assert.ok(
-      result.includes('the fix stays minimal'),
+      result.includes('the proposed fix is at the shared cause'),
       'a found class must not silently widen the fix'
     );
     assert.ok(
-      result.includes('record the unhandled instances as a comment'),
+      result.includes('reaches every instance found'),
       'unhandled instances must be recorded for follow-up scoping'
     );
   });
@@ -1815,15 +1815,11 @@ describe('buildMetaPromptTemplate class-not-member enumeration rule (LIN-1871, r
     );
   });
 
-  test('Plan-prompts rule carries the LIN-1871 evidence base, not a bare assertion', () => {
+  test('Plan-prompts rule cites LIN-1871 as its basis', () => {
     const result = build();
     assert.ok(
       result.includes('LIN-1871'),
       'the rule should cite the four-ticket evidence base it came from'
-    );
-    assert.ok(
-      result.includes('4+ sessions and zero commits'),
-      'the cost of NOT having the rule is what motivates it'
     );
   });
 
@@ -2103,7 +2099,7 @@ describe('buildMetaPromptTemplate Surface Assessment', () => {
       'plan rule must preserve the sequencing guarantee'
     );
     assert.ok(
-      result.includes('names its in-task consumer'),
+      result.includes('names the cause it removes or its in-task consumer'),
       'the blocking-subtask ratchet must be conditioned on a verdict naming its in-task consumer'
     );
     assert.ok(
@@ -3315,7 +3311,7 @@ describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049
     assert.ok(/Plan-review due: no — covered by <parent>'s approving plan-review \(comment <id>, rev <N>\)/.test(rule),
       'the rule must require the plan-review-due:no line citing the approving verdict');
     assert.ok(/grounding SHA\(s\) the plan cited/.test(rule), 'the rule must require the grounding SHA(s)');
-    assert.ok(/the parent plan is the source of truth; do not redesign/.test(rule),
+    assert.ok(/the parent's approved plan is the starting point — follow it, and where the code shows it wrong, change course and say so on the parent/.test(rule),
       'the rule must carry the do-not-redesign line');
   });
 

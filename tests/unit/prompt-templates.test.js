@@ -514,7 +514,6 @@ describe('bug template', () => {
       '## Goal',
       '**Role**: Act as a software debugger investigating unexpected behavior. You have authority to reproduce issues, trace root causes, and propose fixes, but should not deploy changes without review.',
       'Start by reading any prior investigation notes in comments. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
-      'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.',
       'Investigation process:',
       '1. Reproduce the issue (document exact steps)',
       '2. Validate the acceptance witness: confirm the signal you will call "fixed" (the failing test, log line, assertion, or observable behavior) actually tracks the real outcome. A witness that can read green while the outcome is still wrong (or red while it is already right) must be validated or replaced before you optimize against it. A witness that genuinely tracks the outcome is a valid answer — state it explicitly.',
@@ -526,7 +525,7 @@ describe('bug template', () => {
       '4. Debug systematically (add logging, trace execution)',
       '5. Confirm the cause before building the fix: name the single decisive experiment that disambiguates the leading hypothesis from its rivals, and run it. Evidence the cause is confirmed — not merely plausible — is required before you propose or hand off a fix. An investigation that proposes a fix while stating the decisive experiment was not run is NOT done; a genuinely confirmed cause is a valid answer and must be stated explicitly.',
       '6. Widen the model — isolated, or one of a class? Once the root cause is in hand, check whether the same pattern produces siblings: search for the pattern itself (the failure mode, a shared helper, a parallel code path), not only the symptom the ticket cites. A genuinely isolated issue is a valid answer — state it explicitly.',
-      '7. Propose fix with minimal scope. If step 6 found a class, the fix stays minimal — name the class and list the unhandled instances in your findings comment instead of silently widening the fix.',
+      '7. Propose the fix at the cause: the change that removes it and reaches every instance step 6 found, refactoring where that simplifies the code. A change you would need to tell the team about first goes to the human as a ruling.',
       '8. Verify fix doesn\'t introduce regressions',
       '**When fixed**: Leave the `bug` label in place — moving the task to Done marks it resolved. The label is the lasting record that this was a bug (used by reports and prioritization), so do not remove it.'
     ].join('\n');
@@ -980,10 +979,10 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
     assert.ok(/search for the pattern itself/i.test(result.prompt), 'must search the pattern, not only the cited symptom');
   });
 
-  test('bug class check keeps the fix minimal — instances recorded, not silently fixed', () => {
+  test('bug class check proposes the fix at the cause, reaching every instance (LIN-3291)', () => {
     const result = generatePrompt('bug', bugIssue, ctx);
-    assert.ok(/the fix stays minimal/i.test(result.prompt), 'a found class must not widen the fix');
-    assert.ok(/list the unhandled instances/i.test(result.prompt), 'unhandled instances must be recorded');
+    assert.ok(/Propose the fix at the cause/i.test(result.prompt), 'the proposal is at the cause');
+    assert.ok(/reaches every instance step 6 found/i.test(result.prompt), 'a found class is reached by the fix, not just listed');
   });
 
   test('bug class check guards against manufactured work (isolated is a valid answer)', () => {
@@ -1129,9 +1128,9 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
     assert.ok(classes < surface, 'and precedes the Surface Assessment verdict');
   });
 
-  test('lists the class list among the research comment output', () => {
+  test('lists the class list among the research description output, where research records it', () => {
     const result = generatePrompt('research', researchIssue, ctx);
-    assert.ok(/the class list \(each class named, bounded, and its members\)/i.test(result.prompt),
+    assert.ok(/\*\*Description\*\*: Key findings, the class list/i.test(result.prompt),
       'the Output section must name the class list as a deliverable, not just imply it');
   });
 });
@@ -1993,7 +1992,7 @@ describe('Surface Assessment (handwritten path)', () => {
 
   test('research gates the refactor verdict on necessity, not availability', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Consumer test'), 'must require citing the in-task consumer of the new seam');
+    assert.ok(result.prompt.includes('Cause-or-consumer test'), 'must require the cause removed or the in-task consumer of the new seam');
     assert.ok(result.prompt.includes('Who-pays test'), 'must require a beneficiary-or-bystander accounting per touched consumer');
     assert.ok(
       result.prompt.includes('improvement noticed, not required'),
@@ -2429,7 +2428,7 @@ describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', ()
     assert.ok(/already merged and Done \(close-out has already run\) → recommend `retrospective-audit`/i.test(p),
       'a third bullet routes fully-closed work to retrospective-audit');
     assert.ok(/NOT another `review` or `close-out`/i.test(p), 'it forbids re-recommending review or close-out');
-    assert.ok(/does not change state or file follow-ups/i.test(p), 'the bullet states the read-only contract');
+    assert.ok(/see its quality rule below/i.test(p), 'the bullet defers the audit contract to its quality rule');
   });
 
   test('the retrospective-audit quality rule is present exactly once and mirrors the read-only contract', () => {
@@ -2441,7 +2440,7 @@ describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', ()
     assert.ok(/audit the claims/i.test(p) && /audit test integrity/i.test(p) && /ownership orphans/i.test(p),
       'must cover claims, test integrity, and ownership orphans');
     assert.ok(/forbid changing status, labels/i.test(p), 'must forbid state changes');
-    assert.ok(/forbid filing follow-up tickets/i.test(p), 'must forbid filing follow-ups');
+    assert.ok(/require a linked, self-contained follow-up ticket for each finding that still matters/i.test(p), 'must file follow-ups for findings that matter (LIN-3291)');
   });
 
   test('retrospective-audit is offered in the AI recommendation vocabulary (unlike retro)', () => {
@@ -2551,7 +2550,7 @@ describe('retrospective-audit template', () => {
     const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
     assert.ok(/do not change status, labels/i.test(result.prompt), 'must forbid status/label changes');
     assert.ok(/do not merge or mark anything Done/i.test(result.prompt), 'must forbid merge/Done');
-    assert.ok(/do not file follow-up tickets/i.test(result.prompt), 'must forbid filing follow-ups');
+    assert.ok(/file a follow-up ticket, readable on its own, for each finding that still matters/i.test(result.prompt), 'must file follow-ups for findings that matter (LIN-3291)');
   });
 
   test('reports findings as a comment (read-only workflow), not a Linear write beyond the comment', () => {
@@ -2617,7 +2616,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const { prompt } = generatePrompt('close-out', issue, context);
       assert.ok(/An item marked inside scope.*discharges only by \(a\) cited evidence that it is \*\*done\*\*/is.test(prompt),
         'an inside item discharges by cited evidence of done');
-      assert.ok(/\(b\) an \*\*explicit drop\*\*, warranted only when finishing the item is materially larger than this ticket's own change/i.test(prompt),
+      assert.ok(/\(b\) an \*\*explicit drop\*\*, warranted only when finishing the item is a change you would need to tell the team about first/i.test(prompt),
         'an inside item may also discharge by an explicit drop, gated on the materiality bar');
       assert.ok(/Filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(prompt),
         'filing a ticket for a dropped inside item is explicitly not a discharge and not eligible for filing');
@@ -2669,9 +2668,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('inside is defined by kind (defect/idiom), not by research\'s enumerated list', () => {
       const review = generatePrompt('review', issue, context).prompt;
-      const kindNotList = /same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i;
+      const kindNotList = /its cause included wherever it lives, or the same defect or idiom as a class this ticket bounded, whether or not research\'s enumeration listed it/i;
       assert.ok(kindNotList.test(review), 'review defines inside by kind, not by the research list');
-      assert.ok(/genuinely different kind of problem/i.test(review), 'outside is a genuinely different kind of problem');
+      assert.ok(/a different problem — not this ticket\'s or its cause/i.test(review), 'outside is a different problem, never this ticket\'s cause');
     });
 
     // LIN-3006 review fixup: the kind-not-list rewrite dropped the pre-existing
@@ -2690,7 +2689,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const closeout = generatePrompt('close-out', issue, context).prompt;
       assert.ok(/name the monitor/i.test(review) && /name the rollback/i.test(review), 'review still carries both named lanes');
       assert.ok(/named monitor/i.test(closeout) && /named rollback/i.test(closeout), 'close-out still honours both named lanes');
-      assert.ok(/which are about verification depth, not about whether the work itself is done/i.test(review),
+      assert.ok(/which concern verification depth, not whether the work is done/i.test(review),
         'review states the scope mark is orthogonal to the proportional risk lanes');
     });
   });
@@ -2942,8 +2941,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     // 1. gate on the review verdict — an absent ledger under an Approve is treated as empty (LIN-810)
     assert.ok(/Gate on the review verdict/i.test(prompt),
       'close-out gates on the verdict, treating an absent ledger under an Approve as empty');
-    assert.ok(/treat the absence of such gaps as an empty ledger/i.test(prompt),
-      'an absent ledger under an Approve is read as empty, not a block');
+    assert.ok(/a review with no ledger at all is not empty: hold the close and name `review` next, to confirm empty or missing/i.test(prompt),
+      'a missing ledger under an Approve goes back to review, never read as empty (LIN-3291)');
     // 2. green CI alone never discharges a ledger item
     assert.ok(/Green CI is never evidence for a ledger item/i.test(prompt),
       'green CI never discharges a ledger item');
@@ -2954,7 +2953,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'explicit human acceptance must name the exact precondition');
   });
 
-  test('(f) close-out relaxes the missing-ledger block: verdict-gated, absent-is-empty, only no-verdict routes to review (LIN-810)', () => {
+  test('(f) close-out is verdict-gated; an explicitly empty ledger passes, a missing one goes back to review (LIN-810, LIN-3291)', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     // The old hard block on a missing/unparseable heading is gone.
     assert.ok(!/Missing or unparseable ledger BLOCKS/i.test(prompt),
@@ -2964,8 +2963,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     // Gate on the verdict; absence of flagged gaps under an Approve is an empty ledger.
     assert.ok(/When the latest review records an \*\*Approve\*\*/i.test(prompt),
       'proceeds when the review recorded an Approve');
-    assert.ok(/note that in your summary/i.test(prompt),
-      'records the absence of an explicit ledger in the summary');
+    assert.ok(/An explicitly empty ledger passes through \(say so in your summary\)/i.test(prompt),
+      'an explicitly empty ledger passes and is recorded in the summary');
     // Only a complete lack of a review verdict is unauthorized to close.
     assert.ok(/no review verdict at all is unauthorized to close/i.test(prompt),
       'only a task with no review verdict at all routes back to review');
@@ -4888,7 +4887,7 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const b = section.indexOf('(b) `Session fit: fits one session`');
     const c = section.indexOf('(c) `Plan-review due: no');
     const d = section.indexOf('(d) The grounding commit SHA(s)');
-    const e = section.indexOf('(e) An explicit "the parent\'s plan is the source of truth');
+    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this surface\'s starting point');
     assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
     assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
     // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
