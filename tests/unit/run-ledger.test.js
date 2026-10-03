@@ -116,6 +116,51 @@ describe('run-ledger: ledger items and their marks', () => {
   });
 });
 
+describe('run-ledger: a stated discharge route is not a discharge (LIN-3296)', () => {
+  // The review template asks each item to "state how it can be discharged", so
+  // a route phrase sits in nearly every OPEN item. Only a result reads as
+  // discharged. The item wording mirrors that template; one review per case so
+  // each assertion names the phrase that failed.
+  const ledgerOf = itemText => parseRunLedger({
+    createdAt: '2026-10-03T00:00:00.000Z',
+    body: `## Review\n\n### What CI Did Not Prove\n- L1 (inside): ${itemText}\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**`,
+  }).ledger.items[0];
+
+  test('a route phrase ("<modal>/to be discharged") leaves the item open', () => {
+    for (const phrase of [
+      'The live read. Can be discharged by a manual repro naming its exact precondition.',
+      'The live read. It could be discharged at close-out by opening the page.',
+      'The live read, still to be discharged by a real-world check.',
+      'The live read. May be discharged through normal post-merge observation.',
+      'The live read. Will be discharged by the deploy check.',
+      'The live read. Should be discharged by a manual repro.',
+      'The live read. It can only be discharged by cited evidence.',
+      'The live read. Discharges through normal post-merge observation.',
+    ]) {
+      assert.strictEqual(ledgerOf(phrase).discharged, false, phrase);
+    }
+  });
+
+  test('a negated discharge leaves the item open (real LIN-3247 review, item 4)', () => {
+    const { ledger } = readRunLedger(RUN_COMMENT_TRAILS['lin-3247'].comments);
+    const item4 = ledger.items[3];
+    assert.match(item4.raw, /Inside, not discharged/);
+    assert.strictEqual(item4.discharged, false);
+  });
+
+  test('a stated result still reads as discharged', () => {
+    for (const phrase of [
+      'The live read — discharged by #123.',
+      'The live read. **Discharged:** filed LIN-9.',
+      'The live read — discharged.',
+      'The live read, already discharged at review.',
+      'The live read. Can be discharged by a repro; discharged by the repro in comment 4.',
+    ]) {
+      assert.strictEqual(ledgerOf(phrase).discharged, true, phrase);
+    }
+  });
+});
+
 describe('run-ledger: the ledger heading is anchored to a line start (R3)', () => {
   test('a heading mentioned inside prose/backticks does not start the ledger', () => {
     const body = [
