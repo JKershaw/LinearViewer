@@ -13,7 +13,7 @@
  *
  * Run (ticketDir holds proxy issue JSON, one ticket per file; models are comma-separated):
  *   OPENROUTER_API_KEY=... node scripts/eval/brief-writer-compare.mjs run <ticketDir> <outDir> \
- *     openai/gpt-5.4-mini,anthropic/claude-opus-5.5 [--router <model>] [--budget-multiple 20] [--seed 3294]
+ *     <model>,<model>,... [--router <model>] [--budget-multiple 20] [--seed 3294]
  *
  * Grade blind/*.md into <outDir>/grades.json and blind/regrade.md into <outDir>/regrades.json:
  *   { "<label>": { "purpose": [4, "reason"], "faithful": [..], "brief": [..], "tone": [..],
@@ -25,7 +25,11 @@
  * finished pairs already in <outDir> are reused. One call per pair, retried once on a
  * transient failure. The run stops before a call that would take total spend past
  * --budget-multiple times the estimated cost of one call on the ladder's priciest model.
- * The key is read from the environment and never written.
+ * The key is read from the environment and never written. Each writer call runs with the
+ * app's own token budget (briefWriterBudget: a reasoning model gets a reasoning allowance on
+ * top of the prose budget), recorded per model in ladder.json. A writer reply that did not
+ * finish falls back as 'truncated' or 'unfinished-<reason>'; an upstream error mid-reply is
+ * retried once like the other transient failures.
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -39,7 +43,7 @@ const { getProvider } = await lib('providers/registry.js');
 const { generatePrompt, deriveDispatchKind, PROMPT_TEMPLATES } = await lib('prompt-templates.js');
 const {
   DEFAULT_MODEL, getRecommendation, composeRoutedRecommendation, setLlmCallRecorder,
-  splitStageBody, routerFocus, BRIEF_WRITER_FEATURE
+  splitStageBody, routerFocus, BRIEF_WRITER_FEATURE, briefWriterBudget
 } = await lib('openrouter.js');
 const { formatStageContract } = await lib('prompt-contract.js');
 const { formatStageIntent, buildBriefWriterPrompt } = await lib('prompts/brief-writer.js');
@@ -54,7 +58,7 @@ const CRITERIA = [
   ['specific', 'specific to the situation'],
   ['concise', 'concise']
 ];
-const TRANSIENT = /^(http-(408|429|5\d\d)|timeout|error|empty)$/;
+const TRANSIENT = /^(http-(408|429|5\d\d)|timeout|error|empty|unfinished-error)$/;
 
 const [mode, ...rest] = process.argv.slice(2);
 const flags = {};
@@ -202,7 +206,8 @@ async function run() {
   for (const id of [...new Set([router, ...models])]) {
     const m = byId.get(id);
     if (!m) throw new Error(`model not on OpenRouter's list: ${id}`);
-    ladder.push({ id, name: m.name, inPerM: Number(m.pricing.prompt) * 1e6, outPerM: Number(m.pricing.completion) * 1e6, writer: models.includes(id), router: id === router });
+    const { reasoning, maxTokens } = briefWriterBudget(id);
+    ladder.push({ id, name: m.name, inPerM: Number(m.pricing.prompt) * 1e6, outPerM: Number(m.pricing.completion) * 1e6, writer: models.includes(id), router: id === router, writerMaxTokens: maxTokens, writerReasoningTokens: reasoning?.max_tokens ?? null });
   }
   writeJson(join(outDir, 'ladder.json'), { router, models, ladder, fetchedAt: new Date().toISOString() });
   const price = (id) => ladder.find(l => l.id === id);
@@ -459,9 +464,11 @@ function report() {
   console.log(md.slice(0, 40).join('\n'));
 }
 
+const USAGE = 'usage: brief-writer-compare.mjs run <ticketDir> <outDir> <model,model,...> [--router m] [--budget-multiple 20] [--seed n]\n       brief-writer-compare.mjs report <outDir>';
 if (mode === 'run') await run();
 else if (mode === 'report') report();
+else if (mode === '--help' || mode === '-h' || mode === 'help') console.log(USAGE);
 else {
-  console.error('usage: brief-writer-compare.mjs run <ticketDir> <outDir> <model,model,...> [--router m] [--budget-multiple 20] [--seed n]\n       brief-writer-compare.mjs report <outDir>');
+  console.error(USAGE);
   process.exit(2);
 }
