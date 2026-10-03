@@ -148,6 +148,50 @@ describe('sessions-feed-cache: get', () => {
   });
 });
 
+describe('sessions-feed-cache: peek (read-only, no producer)', () => {
+  test('returns a fresh entry without invoking a producer', async () => {
+    const cache = createSessionsFeedCache();
+    let calls = 0;
+    await cache.get('k', async () => { calls++; return 'v'; });
+    assert.equal(calls, 1);
+    assert.equal(cache.peek('k'), 'v', 'the cached value is returned');
+    assert.equal(calls, 1, 'peek never runs the producer');
+  });
+
+  test('a cold/missing key returns undefined', () => {
+    const cache = createSessionsFeedCache();
+    assert.equal(cache.peek('nope'), undefined);
+  });
+
+  test('does not expose an in-flight cold load', async () => {
+    const cache = createSessionsFeedCache();
+    let release;
+    const gate = new Promise(r => { release = r; });
+    const pending = cache.get('k', async () => { await gate; return 'v'; });
+    assert.equal(cache.peek('k'), undefined, 'no value yet while the first load is in flight');
+    release();
+    await pending;
+    assert.equal(cache.peek('k'), 'v');
+  });
+
+  test('ignores an entry older than the TTL (no producer to refresh it)', async () => {
+    let clock = 1000;
+    const cache = createSessionsFeedCache({ ttlMs: 5000, now: () => clock });
+    await cache.get('k', async () => 'v');
+    assert.equal(cache.peek('k'), 'v', 'within the TTL the entry is served');
+    clock += 5001;
+    assert.equal(cache.peek('k'), undefined, 'past the TTL an un-refreshable entry is not trusted');
+  });
+
+  test('still returns a stale-but-within-TTL entry', async () => {
+    let clock = 0;
+    const cache = createSessionsFeedCache({ ttlMs: 5000, now: () => clock });
+    await cache.get('k', async () => 'v');
+    clock += 4000; // stale for `get`'s refresh trigger, still within the peek bound
+    assert.equal(cache.peek('k'), 'v');
+  });
+});
+
 describe('sessions-feed-cache: clear (LIN-799 test-reset seam)', () => {
   test('clearing a workspace forces a fresh production on the next get', async () => {
     const cache = createSessionsFeedCache();

@@ -471,19 +471,25 @@ export function deriveSessionWaiting(enrichedLoops) {
  *
  * Pure; exported for unit tests (mirrors `deriveSessionWaiting` above).
  *
- * LIN-3252 G2: injects the SAME `liveDispatchOnAnchor` predicate the dashboard
- * rulings feed (`:1830`) and `routes/proxy-rulings.js` use — a live run already
- * on the anchor means `resolveEffect` branch 3, so a `gone` row answers
- * `record`, never a second run racing the live one. The source here is the
- * session's OWN loops (zero new reads); a live run in ANOTHER session on the
- * same issue is not seen — the residual named in the PR.
+ * LIN-3252 G2 / LIN-3260: injects the SAME `liveDispatchOnAnchor` predicate the
+ * dashboard rulings feed (`:2118`) and `routes/proxy-rulings.js` use — a live run
+ * already on the anchor means `resolveEffect` branch 3, so a `gone` row answers
+ * `record`, never a second run racing the live one. The predicate scans the
+ * session's OWN loops PLUS the caller-supplied workspace set (`workspaceLoops`
+ * — the rulings feed's cached `merged` loops). The concat is deliberate: that
+ * cache carries a 5 s TTL and serves its last value while revalidating, so a run
+ * this session just started can be absent from the cached set; scanning the own
+ * loops too keeps the same-session case correct with no cache bypass.
  *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
- * @param {{now?: Date}} [opts]
+ * @param {{now?: Date, workspaceLoops?: Array<Object>}} [opts]
  * @returns {Array<Object>} `collectUnansweredDecisions` rows
  */
-export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
+export function deriveSessionDecisions(enrichedLoops, { now, workspaceLoops } = {}) {
   const loops = Array.isArray(enrichedLoops) ? enrichedLoops : [];
+  // Own loops first, then the workspace set; `.some()` only needs membership,
+  // so duplicate hits across the two sources are harmless.
+  const liveLoops = Array.isArray(workspaceLoops) ? loops.concat(workspaceLoops) : loops;
   return collectUnansweredDecisions(
     {
       loops,
@@ -497,7 +503,7 @@ export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
       // (LIN-2934): a null anchor must never match another null anchor.
       liveDispatchOnAnchor: (issueIdentifier) =>
         issueIdentifier != null &&
-        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+        liveLoops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
     }
   );
 }
@@ -1371,9 +1377,17 @@ export function createDashboardRoutes({
 
       // Pinned question card (LIN-3252 S2): the session's unanswered decisions,
       // read independently of `waiting` so the card shows on a non-waiting or
-      // finished session too. Session-membership scope; no shelves, no
-      // task-decisions — see `deriveSessionDecisions`.
-      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date() });
+      // finished session too. Session-membership scope for the ROWS; the
+      // `liveDispatchOnAnchor` scan (LIN-3260) additionally sees the workspace's
+      // live loops — the SAME cached `merged` set the rulings feed below uses —
+      // so a live run in ANOTHER session on the same issue resolves `record`,
+      // never a racing second `dispatch`. `peek`, not `get`: this is a page load
+      // and must NOT trigger a workspace scan (LIN-1021). The ambient rulings
+      // badge poll (`public/common.js`) keeps that entry warm every 5s; on a cold
+      // miss `deriveSessionDecisions` falls back to the session's own loops.
+      const decisionWorkspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
+      const workspaceLoops = sessionsFeedCache.peek(sessionsFeedCache.keyFor(decisionWorkspaces, 'rulings'));
+      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date(), workspaceLoops });
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
       // box): gated to cli/web sessions (never dash/local — the dispatch route

@@ -4405,6 +4405,80 @@ describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', (
     assert.equal(row.effect, 'dispatch', 'a live run on a DIFFERENT issue does not suppress dispatch');
   });
 
+  // ─── LIN-3260: the cross-session residual (LIN-3252 review pass 3) ───────────
+
+  test('LIN-3260: a gone row is blocked by a live run on the same issue in ANOTHER session (workspaceLoops)', () => {
+    // The session's OWN loops hold only the terminal (gone) decision loop — the
+    // live run racing it lives in a DIFFERENT session, so it reaches the card
+    // only through the caller-supplied workspace loop set.
+    const gone = decisionLoop({ loopId: 'l-gone-x', decisionId: 'd-gone-x', terminalStatus: 'done', agentState: 'complete', issueIdentifier: 'LIN-500' });
+    const otherSessionLive = {
+      loopId: 'l-other-session', lineageId: 'l-other-session', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-500', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone], { now: new Date(), workspaceLoops: [otherSessionLive] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone-x');
+    assert.ok(row, 'the gone decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'record', 'a live run in another session on the same issue suppresses the racing dispatch');
+  });
+
+  test('LIN-3260 control: a workspace live run on a DIFFERENT issue does not suppress dispatch', () => {
+    const gone = decisionLoop({ loopId: 'l-gone-y', decisionId: 'd-gone-y', terminalStatus: 'done', agentState: 'complete', issueIdentifier: 'LIN-501' });
+    const unrelatedLive = {
+      loopId: 'l-other-issue', lineageId: 'l-other-issue', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-999', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone], { now: new Date(), workspaceLoops: [unrelatedLive] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone-y');
+    assert.equal(row.effect, 'dispatch');
+  });
+
+  test('LIN-3260: own loops are still scanned alongside the workspace set (same-session case, concat)', () => {
+    // The workspace set holds only an unrelated loop; the session's OWN live loop
+    // on the anchor must still force `record` — the concat is not a replacement.
+    const gone = decisionLoop({ loopId: 'l-gone-z', decisionId: 'd-gone-z', terminalStatus: 'done', agentState: 'complete', issueIdentifier: 'LIN-502' });
+    const ownLive = {
+      loopId: 'l-own-live', lineageId: 'l-own-live', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-502', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const unrelated = {
+      loopId: 'l-unrelated', lineageId: 'l-unrelated', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-777', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([gone, ownLive], { now: new Date(), workspaceLoops: [unrelated] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone-z');
+    assert.equal(row.effect, 'record', 'a live loop in the session\'s own set is still seen even when it is absent from the cache');
+  });
+
+  test('LIN-2934 null-anchor guard (pinned): a null-identifier row is NOT blocked by an unrelated live null-identifier loop', () => {
+    // Without the `issueIdentifier != null` guard, `null === null` would match
+    // the unrelated general run and wrongly flip this row to `record`.
+    const goneNull = decisionLoop({ loopId: 'l-gone-null', decisionId: 'd-null', terminalStatus: 'done', agentState: 'complete', issueIdentifier: null });
+    const liveNull = {
+      loopId: 'l-live-null', lineageId: 'l-live-null', workspaceUrlKey: 'ws-a',
+      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([goneNull], { now: new Date(), workspaceLoops: [liveNull] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-null');
+    assert.ok(row, 'the null-anchored decision is on the card');
+    assert.equal(row.effect, 'dispatch', 'a null anchor must never match another null anchor (LIN-2934)');
+  });
+
+  test('LIN-3260: a cold cache (no workspaceLoops) falls back to the session\'s own loops', () => {
+    const gone = decisionLoop({ loopId: 'l-gone-cold', decisionId: 'd-gone-cold', terminalStatus: 'done', agentState: 'complete' });
+    // No own live loop and no workspace set → today's behaviour: dispatch.
+    const cold = deriveSessionDecisions([gone], { now: new Date() });
+    assert.equal(cold.find(r => r.decision.decision_id === 'd-gone-cold').effect, 'dispatch');
+    // Own live loop present but still no workspace set → own loops still scanned.
+    const ownLive = {
+      loopId: 'l-own-cold', lineageId: 'l-own-cold', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const warm = deriveSessionDecisions([gone, ownLive], { now: new Date() });
+    assert.equal(warm.find(r => r.decision.decision_id === 'd-gone-cold').effect, 'record');
+  });
+
   test('no task-decisions input means a scan-sourced task-bound ruling stays out', () => {
     const rows = deriveSessionDecisions([], { now: new Date() });
     assert.deepEqual(rows, [], 'no loops → no card rows, regardless of scan store');
@@ -4451,6 +4525,92 @@ describe('GET /observation/session/:sessionId — bare-BLOCKED card routing (LIN
     assert.match(html, /data-testid="session-question-card"[^>]*data-issue-id="uuid-461"/);
     assert.match(html, /data-testid="session-question-card"[^>]*data-issue-identifier="LIN-461"/);
     assert.ok(!html.includes('session-question-card-dismiss'), 'no dismiss on a bare blocker');
+  });
+});
+
+// ─── LIN-3260: the run page sees a live run in ANOTHER session ──────────────────
+//
+// The session's own loop is a `gone` decision on LIN-500; the live run racing it
+// is in a DIFFERENT session, so it reaches the card only through the workspace
+// loop set (the rulings feed's cached `merged` loops). Before the fix the card
+// rendered `data-effect="dispatch"` and a second run raced the live one.
+describe('GET /observation/session/:sessionId — cross-session live run (LIN-3260)', () => {
+  const GONE_SESSION_ID = 'sess-gone-x';
+  function goneAnchorOn(identifier, decisionId) {
+    const oldIso = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // past the 6h reap window
+    const payload = { decision_id: decisionId, question: 'Proceed with the migration?', on_answer: { effect: 'dispatch' } };
+    return {
+      id: GONE_SESSION_ID, kind: 'autopilot', issueIdentifier: identifier, issueTitle: 'Gone run',
+      promptName: 'autopilot', prompt: 'p', dispatchedAt: oldIso, resolvedAt: oldIso,
+      status: 'taken',
+      feedback: [
+        { kind: 'decision', message: JSON.stringify(payload), timestamp: oldIso },
+        { message: '[done] shipped it', timestamp: oldIso }
+      ]
+    };
+  }
+
+  function buildRouter(sessionsFeedCache) {
+    const perWorkspace = {
+      'ws-a': {
+        // A live run on the SAME issue, in a DIFFERENT session (`sess-other`).
+        live: [workerLiveItem('w-other', 'LIN-500', 'sess-other')],
+        history: [goneAnchorOn('LIN-500', 'd-gone-x')],
+        agentStatus: []
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore, agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      runParagraphStore: new InMemoryRunParagraphStore(),
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({ issue: { state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] } } }),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache
+    });
+  }
+
+  function renderCard(router) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({
+      session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] },
+      workspace: { urlKey: 'ws-a' },
+      params: { sessionId: GONE_SESSION_ID }
+    });
+    return handler(req, res).then(() => res);
+  }
+
+  test('renders data-effect="record" for a gone row when the workspace set holds a live loop on the same issue', async () => {
+    const sessionsFeedCache = createSessionsFeedCache();
+    const key = sessionsFeedCache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
+    await sessionsFeedCache.get(key, async () => ([{
+      loopId: 'w-other', lineageId: 'w-other', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-500', agentState: 'running'
+    }]));
+
+    const res = await renderCard(buildRouter(sessionsFeedCache));
+    assert.equal(res.statusCode, 200, 'the page rendered');
+    const cards = res.sentBody.match(/data-testid="session-question-card"[^>]*/g) || [];
+    const card = cards.find(c => c.includes('data-decision-id="d-gone-x"'));
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'a live run in another session on the same issue resolves record, not dispatch');
+    assert.ok(!/data-effect="dispatch"/.test(card), 'the racing dispatch is suppressed');
+  });
+
+  test('control: with a cold cache and no own live loop the gone row still renders dispatch (today\'s behaviour)', async () => {
+    const res = await renderCard(buildRouter(createSessionsFeedCache()));
+    assert.equal(res.statusCode, 200);
+    const cards = res.sentBody.match(/data-testid="session-question-card"[^>]*/g) || [];
+    const card = cards.find(c => c.includes('data-decision-id="d-gone-x"'));
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="dispatch"/, 'a cold cache falls back to the session\'s own loops');
   });
 });
 
