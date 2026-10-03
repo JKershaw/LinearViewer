@@ -37,6 +37,7 @@ import { buildShareSnapshot } from '../lib/share-snapshot.js';
 import { publicShareId } from './share.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { primeFailOpenPrStatus, clearFailOpenPrStatus } from '../lib/github-pr-status.js';
+import { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from './dashboard.js';
 
 /**
  * Create test routes with required dependencies.
@@ -1891,6 +1892,8 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // LIN-3247: prime the run-evidence fail-open PR-status cache so the session
   // page can be exercised hermetically (no live GitHub read). Body:
   // `{ repo, number, readable, state?, merged?, headSha?, checks?, reason? }`.
+  // LIN-3251 (RC2): the SAME value also primes the pr-state route's own
+  // whole-reader cache, so the header PR line is hermetic too.
   router.post('/test/seed-pr-status', (req, res) => {
     const { repo, number, readable, state = null, merged = false, headSha = null, checks = [], reason = 'not checked' } = req.body || {};
     if (!repo || number === undefined) return res.status(400).json({ error: 'repo and number are required' });
@@ -1898,12 +1901,20 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       ? { repo, readable: true, number: Number(number), state, merged: !!merged, head: { ref: null, sha: headSha }, ref: headSha, checks }
       : { repo, readable: false, state: 'unknown', reason };
     primeFailOpenPrStatus({ repo, number, value });
+    primePrStateCache({ repo, number, value });
     res.json({ ok: true });
   });
 
   router.get('/test/clear-pr-status', (req, res) => {
     clearFailOpenPrStatus();
+    clearPrStateCache();
     res.json({ ok: true });
+  });
+
+  // LIN-3251 (RC2): how many real upstream GitHub fetches the pr-state route has
+  // made since the last clear — an e2e asserts 0 when the cache is primed.
+  router.get('/test/pr-state-upstream-count', (req, res) => {
+    res.json({ count: prStateUpstreamFetchCount() });
   });
 
   return router;

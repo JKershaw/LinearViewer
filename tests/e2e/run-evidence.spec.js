@@ -200,3 +200,44 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toHaveCount(0);
   });
 });
+
+// ─── LIN-3251 (RC2): the live PR line, hermetic ──────────────────────────────
+//
+// LIN-3247's `/test/seed-pr-status` primes BOTH the evidence fail-open cache and
+// the pr-state route's whole-reader cache, so the header line is served from the
+// stub. The route makes zero live api.github.com calls; the server-side counter
+// proves it.
+test.describe('Header PR line on the session page (LIN-3251)', () => {
+  async function noLiveGitHubFetches(page) {
+    const resp = await page.request.get('/test/pr-state-upstream-count');
+    expect(resp.ok(), `count read failed: ${await resp.text()}`).toBeTruthy();
+    return (await resp.json()).count;
+  }
+
+  test('open PR: the header line shows the open copy, with no live GitHub fetch', async ({ page }) => {
+    await seedLocalWorkspaceWithEvidence(page);
+    await seedFinishedRun(page);
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: REPO, number: 12, readable: true, state: 'open', merged: false, headSha: PR_HEAD, checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverSessionId(page);
+    await gotoSession(page, sessionId);
+
+    await expect(page.locator('[data-testid="session-pr-line"]'))
+      .toHaveText('Nothing has been merged. PR #12 is open: checks passing.');
+    expect(await noLiveGitHubFetches(page)).toBe(0, 'the primed route cache made no live GitHub call');
+  });
+
+  test('merged PR: the header line shows the merged copy, with no live GitHub fetch', async ({ page }) => {
+    await seedLocalWorkspaceWithEvidence(page);
+    await seedFinishedRun(page);
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: REPO, number: 12, readable: true, state: 'closed', merged: true, headSha: PR_HEAD, checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverSessionId(page);
+    await gotoSession(page, sessionId);
+
+    await expect(page.locator('[data-testid="session-pr-line"]')).toHaveText('PR #12 was merged.');
+    expect(await noLiveGitHubFetches(page)).toBe(0, 'the primed route cache made no live GitHub call');
+  });
+});

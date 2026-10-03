@@ -109,6 +109,30 @@ const PR_STATE_WINDOW_MS = 60 * 60 * 1000;
 const PR_STATE_READ_COST = 4;
 const PR_STATE_BUDGET_EXHAUSTED = 'PR_STATE_BUDGET_EXHAUSTED';
 
+// Test seam (LIN-3251, RC2). The default whole-reader cache is process-wide so
+// the NODE_ENV=test `/test/seed-pr-status` route can prime it (reusing LIN-3247's
+// existing seed) and an e2e can assert that the primed-cache path made no live
+// GitHub call. Unit tests inject their own cache, so this shared map and the
+// counter are only used by the real server.
+const prStateSharedCache = new Map();
+let prStateUpstreamFetches = 0;
+
+/** Prime the whole-reader cache for `owner/repo#number` (test-only caller). */
+export function primePrStateCache({ repo, number, value, ttlMs = PR_STATE_CLOSED_TTL_MS, now = Date.now } = {}) {
+  prStateSharedCache.set(`${repo}#${number}`, { value, expiresAt: now() + ttlMs });
+}
+
+/** Clear the shared whole-reader cache and the live-fetch counter (test-only). */
+export function clearPrStateCache() {
+  prStateSharedCache.clear();
+  prStateUpstreamFetches = 0;
+}
+
+/** Real upstream GitHub fetches the pr-state route has made (test-only read). */
+export function prStateUpstreamFetchCount() {
+  return prStateUpstreamFetches;
+}
+
 /**
  * `[evidence]` telemetry URLs across a session's runs — the corroborating (never
  * sole) PR-URL source the run-evidence model takes (LIN-3247/LIN-3251).
@@ -709,7 +733,7 @@ export function createDashboardRoutes({
   // is the per-workspace repo allowlist (a tracker `fetchProjects` read, not a
   // GitHub read), so a PR-state cache hit still runs no `fetchProjects`.
   const prStateStore = {
-    cache: new Map(),
+    cache: prStateSharedCache,
     allowlistCache: new Map(),
     bucket: [], // sliding log of upstream-call timestamps (ms), oldest first
     now: Date.now,
@@ -1509,6 +1533,7 @@ export function createDashboardRoutes({
         throw err;
       }
       log.push(now);
+      prStateUpstreamFetches += 1;
       return fetchImpl(url, opts);
     };
   }
