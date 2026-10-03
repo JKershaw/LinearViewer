@@ -347,6 +347,9 @@ const METHOD_CLASSES = {
   readReferencedConnections: 'READ',
   readConnectionsByAccountPrefix: 'READ',
   updateCredentials: 'WRITE',
+  // LIN-3278: the CAS mirror repair (best-effort heal of a stale Connection
+  // mirror from the authoritative owner record).
+  mirrorCredentialIfToken: 'WRITE',
   removeReferent: 'WRITE',
   // LIN-3125 Phase 1 (C1): the held-mode referent-only write.
   addReferent: 'WRITE',
