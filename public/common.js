@@ -1879,6 +1879,17 @@ window.ProxyToggle = (function () {
     return document.body && document.body.dataset.proxyFeature === 'true';
   }
 
+  // LIN-2944 P3 R1: when the toggle-path mint is refused with 429, the append
+  // skips (the copy/download still completes without the block) and this
+  // one-shot flag tells the caller to show the notice. Consumed by the caller.
+  const RATE_LIMIT_SKIP_NOTICE = 'The agent-access link was skipped — the token limit was reached (10 per 15 minutes). Try again in a few minutes.';
+  let rateLimitSkip = false;
+  function takeRateLimitNotice() {
+    const v = rateLimitSkip;
+    rateLimitSkip = false;
+    return v;
+  }
+
   // The workspace key this page is scoped to, parsed from the path. `null` on
   // non-workspace surfaces (landing), where the write route does not apply.
   function currentUrlKey() {
@@ -1936,8 +1947,9 @@ window.ProxyToggle = (function () {
     const purpose = opts && opts.purpose;
     if (purpose === 'driver') return getDriverCopyToken(urlKey);
     if (!urlKey) return { token: null, providerDisplayName: null };
+    let data;
     try {
-      const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+      data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // LIN-376: single-use bootstrap embedded in the appended block; the agent
@@ -1945,13 +1957,17 @@ window.ProxyToggle = (function () {
         body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }),
         on401: false
       });
-      return {
-        token: (data && data.token) || null,
-        providerDisplayName: (data && data.providerDisplayName) || null
-      };
-    } catch {
-      return { token: null, providerDisplayName: null };
+    } catch (err) {
+      // LIN-2944 P3 R1: distinguish the token-creation rate limit (429) from every
+      // other mint failure. A 429 makes the toggle-path append SKIP (the copy
+      // still completes without the agent-access block, with a visible notice);
+      // any other failure keeps the "surface, don't drop" throw in maybeAppend.
+      return { token: null, providerDisplayName: null, rateLimited: !!(err && err.status === 429) };
     }
+    return {
+      token: (data && data.token) || null,
+      providerDisplayName: (data && data.providerDisplayName) || null
+    };
   }
 
   /**
@@ -2124,6 +2140,11 @@ window.ProxyToggle = (function () {
    * (`purpose: 'driver'`, which holds the dispatch grant) and, if that is
    * refused, throws the mapped `DRIVER_COPY_ERROR_COPY` text — there is no
    * grant-less fallback. The unforced (toggle) path is unchanged.
+   *
+   * LIN-2944 P3 R1: the unforced toggle path treats a 429 (the 10-per-15-min
+   * token limiter) as a SKIP, not a failure — the prompt is returned unchanged
+   * so the copy/download completes, and `takeRateLimitNotice()` reports the skip
+   * so the caller can name it. Every other mint failure still throws.
    * @param {string} text
    * @param {string} urlKey
    * @param {{ force?: boolean }} [opts]
@@ -2137,9 +2158,23 @@ window.ProxyToggle = (function () {
       if (!isFeatureEnabled()) return text;
     }
     if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
-    const { token, providerDisplayName, grants, error } = await getOrCreateToken(urlKey, force ? { purpose: 'driver' } : undefined);
+    const { token, providerDisplayName, grants, error, rateLimited } = await getOrCreateToken(urlKey, force ? { purpose: 'driver' } : undefined);
     if (force && error) throw new Error(error.message);
-    if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+    if (!token) {
+      // R1: a toggle-path 429 completes WITHOUT the block and records the skip.
+      if (!force && rateLimited) {
+        rateLimitSkip = true;
+        try {
+          if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+            document.dispatchEvent(new CustomEvent('harbour:proxy-rate-limited'));
+          }
+        } catch {
+          // no DOM / no CustomEvent — the caller still gets the flag
+        }
+        return text;
+      }
+      throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+    }
     return text + buildBlock(token, providerDisplayName, grants);
   }
 
@@ -2174,9 +2209,18 @@ window.ProxyToggle = (function () {
       e.stopPropagation();
       setActive(!isActive());
     });
+    // R1: a toggle-path 429 skip is announced on every surface (the opened-task
+    // component also renders an inline notice beside the toggle).
+    document.addEventListener('harbour:proxy-rate-limited', () => {
+      try {
+        if (typeof window.toast === 'function') window.toast(RATE_LIMIT_SKIP_NOTICE, { type: 'info' });
+      } catch {
+        // no toast available — the caller's inline notice / flag still stands
+      }
+    });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive };
+  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

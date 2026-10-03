@@ -53,11 +53,15 @@ async function selectSwipePrompt(page) {
   return section;
 }
 
-/** Force every proxy-token mint to fail, as a tripped rate limiter would. */
-async function failTokenMint(page) {
+/**
+ * Force every proxy-token mint to fail with `status` (default 429, the rate
+ * limiter). A 429 SKIPS the block (R1); any other status is a hard failure that
+ * must still surface as "failed".
+ */
+async function failTokenMint(page, status = 429) {
   await page.route('**/api/proxy/tokens', route => {
     if (route.request().method() === 'POST') {
-      return route.fulfill({ status: 429, contentType: 'application/json', body: '{"error":"rate limited"}' });
+      return route.fulfill({ status, contentType: 'application/json', body: '{"error":"rate limited"}' });
     }
     return route.continue();
   });
@@ -125,11 +129,12 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     expect(clip).not.toContain(PROXY_MARKER);
   });
 
-  test('copy surfaces failure (does not silently drop) when token mint fails', async ({ page }) => {
+  test('copy surfaces a hard mint failure (does not silently drop)', async ({ page }) => {
     await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
-    await failTokenMint(page);
+    // A non-429 failure (e.g. a 500) is still surfaced, not skipped.
+    await failTokenMint(page, 500);
 
     const container = await selectDashboardPrompt(page);
     await container.locator('.prompt-proxy-toggle').click();
@@ -146,6 +151,28 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
     // ...and must NOT have silently copied a bare (proxy-less) prompt.
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe('__SENTINEL__');
+  });
+
+  // LIN-2944 P3 R1: a 429 from the token-creation limiter is NOT dropped — the
+  // copy completes WITHOUT the agent-access block and names the limit.
+  test('a 429 mint skips the block, completes the copy, and names the limit (R1)', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+    await failTokenMint(page, 429);
+
+    const container = await selectDashboardPrompt(page);
+    await container.locator('.prompt-proxy-toggle').click();
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+    const copyBtn = container.locator('.swipe-prompt-copy');
+    await copyBtn.click();
+    await expect(copyBtn).toHaveText('copied!');
+
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip.length).toBeGreaterThan(0);
+    expect(clip).not.toContain(PROXY_MARKER);
+    await expect(page.locator('.toast')).toContainText(/agent-access link was skipped|token limit/i);
   });
 
   // LIN-1140 regression: bootstrap tokens are single-use (LIN-376), so two copies
@@ -229,11 +256,11 @@ test.describe('+proxy copy — swipe (prompt-section.js)', () => {
     expect(clip).toContain(PROXY_MARKER);
   });
 
-  test('copy surfaces failure (does not silently drop) when token mint fails', async ({ page }) => {
+  test('copy surfaces a hard mint failure (does not silently drop)', async ({ page }) => {
     await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/swipe`);
     await page.waitForLoadState('networkidle');
-    await failTokenMint(page);
+    await failTokenMint(page, 500);
 
     const section = await selectSwipePrompt(page);
     await section.locator('.prompt-proxy-toggle').click();
@@ -246,6 +273,27 @@ test.describe('+proxy copy — swipe (prompt-section.js)', () => {
     await expect(copyBtn).toHaveText('failed');
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toBe('__SENTINEL__');
+  });
+
+  // LIN-2944 P3 R1: the Swipe 429 path completes the copy without the block and
+  // shows the plain-words notice beside the toggle.
+  test('a 429 mint skips the block on Swipe and shows the notice (R1)', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
+    await page.goto(`/workspace/${URL_KEY}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await failTokenMint(page, 429);
+
+    const section = await selectSwipePrompt(page);
+    await section.locator('.prompt-proxy-toggle').click();
+
+    const copyBtn = section.locator('.swipe-prompt-copy');
+    await copyBtn.click();
+    await expect(copyBtn).toHaveText('copied!');
+
+    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clip.length).toBeGreaterThan(0);
+    expect(clip).not.toContain(PROXY_MARKER);
+    await expect(section.locator('[data-proxy-limit-slot]')).toContainText(/agent-access link was skipped|token limit/i);
   });
 });
 
@@ -307,5 +355,38 @@ test.describe('+proxy gate — flag-off surface never injects (LIN-525 #2)', () 
     expect(clip.length).toBeGreaterThan(0);
     expect(clip).not.toContain(PROXY_MARKER);
     expect(mintAttempted).toBe(false);
+  });
+});
+
+// LIN-2944 P3 (review a6be902a R2): turning +proxy OFF persists server-side.
+// The click POSTs the preference; a reload must render data-proxy-active="false"
+// on BOTH Swipe and Home. This kills E8 (route doesn't write the session) and
+// C2 (setActive doesn't POST) end to end.
+test.describe('+proxy persistence — turning it off survives a reload (R2)', () => {
+  test('clicking +proxy off persists across reload on Swipe and Home', async ({ page }) => {
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_ON}`);
+    await page.goto(`/workspace/${URL_KEY}/swipe`);
+    await page.waitForLoadState('networkidle');
+
+    // Fresh state with a template selected so the action cluster (and +proxy) renders.
+    const section = await selectSwipePrompt(page);
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'true');
+
+    const [resp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/settings/proxy-default') && r.request().method() === 'POST'),
+      section.locator('.prompt-proxy-toggle').click(),
+    ]);
+    expect(resp.status()).toBe(200);
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'false');
+
+    // The write landed in the session: a reload still reads false.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'false');
+
+    // Home too.
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('body')).toHaveAttribute('data-proxy-active', 'false');
   });
 });
