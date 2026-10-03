@@ -117,9 +117,12 @@ describe('the switch: the experimental briefWriter workspace feature', () => {
     assert.ok(AI_OPERATION_LABELS[BRIEF_WRITER_OP_KIND]);
   });
 
-  test('model: env, then the workspace recommend-write override, then the router\'s model; free tier clamps', async () => {
+  test('model: the workspace recommend-write setting, then the env default, then the router\'s model; free tier clamps', async () => {
     const on = (byKind) => store({ features: ON, byKind });
-    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({}), env: { HARBOUR_BRIEF_WRITER_MODEL: 'x/writer' } }), { model: 'x/writer' });
+    const ENV = { HARBOUR_BRIEF_WRITER_MODEL: 'x/writer' };
+    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' } }), env: ENV }), { model: 'x/own' },
+      'a model chosen in Settings wins over the instance default');
+    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ recommend: { model: 'x/rec' } }), env: ENV }), { model: 'x/writer' });
     assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' }, recommend: { model: 'x/rec' } }), env: {} }), { model: 'x/own' });
     assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ recommend: { model: 'x/rec' } }), env: {} }), { model: 'x/rec' });
     const free = await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' } }), isFreeTier: true, env: {} });
