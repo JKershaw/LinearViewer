@@ -165,7 +165,7 @@ export function makeTwoRepoResolver({ cache, extraSessions = [] } = {}) {
 }
 
 /** The default proxy-route dependency set; `provider` records call scopes. */
-export function buildProxyApp({ resolveWorkspaceAccess, provider }) {
+export function buildProxyApp({ resolveWorkspaceAccess, provider, extraDeps = {} }) {
   const captured = {};
   const app = express();
   app.use(express.json());
@@ -190,8 +190,10 @@ export function buildProxyApp({ resolveWorkspaceAccess, provider }) {
       addItem: async (urlKey, item) => { captured.item = item; return { _id: 'disp-1', ...item }; },
     },
     workspaceFromUrl: (req, res, next) => next(),
+    workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }) },
     provider,
+    ...extraDeps,
   }));
   return { app, captured };
 }

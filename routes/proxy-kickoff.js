@@ -15,7 +15,7 @@ import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
-import { isValidIssueId, BINDING_INTENT } from '../lib/workspace.js';
+import { isValidIssueId, BINDING_INTENT, dispatchBindingPairFields } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { buildRunGate } from '../lib/chat-request.js';
@@ -276,6 +276,10 @@ export function createKickoffRoutes({
       // can inherit the project repo (mirrors /prompt + recommend-and-dispatch).
       let issue = null;
       let resolvedRepo = repo || null;
+      // LIN-3242 (LIN-3126 §4): the validated, trimmed binding selector pair to
+      // stamp on a scoped run row. Stays empty for a goal-only kickoff (and for a
+      // lone `source` hint), so the store's sparse write adds no key.
+      let persistedBindingFields = {};
       if (issueIdentifier) {
         // LIN-3242 (LIN-3126 §4): a scoped kickoff forwards the row's binding
         // selector pair into the seam when the body supplies one; otherwise
@@ -307,6 +311,11 @@ export function createKickoffRoutes({
         }
         issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
         resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
+        // The seam above resolved the complete pair (an unknown one refused), so
+        // stamp the trimmed values it matched; a lone `source` hint stamps none.
+        persistedBindingFields = (issueSource != null && issueBindingScope != null)
+          ? dispatchBindingPairFields(issueSource, issueBindingScope)
+          : {};
       }
 
       // Child-autopilot prompt inheritance (LIN-3246 / LIN-2949 P1b): a fresh
@@ -470,11 +479,10 @@ export function createKickoffRoutes({
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks —
           // stored on the run row so the dispatch-factory seam can enforce it.
           maxSessionsPerTask: maxSessionsPerTask ?? null,
-          // LIN-3242 (LIN-3126 §4): a scoped kickoff's seam-resolved binding
-          // selector pair. Null for a goal-only run; the STORE persists it
-          // SPARSELY, so an unstamped run row adds no key.
-          issueSource: issueSource ?? null,
-          issueBindingScope: issueBindingScope ?? null
+          // LIN-3242 (LIN-3126 §4): a scoped run's validated, trimmed binding
+          // selector pair (`?? null`; the store writes it sparsely, S0).
+          issueSource: persistedBindingFields.issueSource ?? null,
+          issueBindingScope: persistedBindingFields.issueBindingScope ?? null
         }
       });
 

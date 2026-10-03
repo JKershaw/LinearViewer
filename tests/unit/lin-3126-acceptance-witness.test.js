@@ -32,6 +32,13 @@
  * Slice-3 `describe`s below — assertion (c) the dispatch referent, and the
  * effort-read-out half of assertion (a). Fails before (recorded 2026-10-02,
  * `routes/dashboard.js` + `lib/dispatch-store.js` stashed to pre-beat-3):
+ *   - assertion (c), proxy lane: a STAMPED issue dispatch was refused because
+ *     the body pair never reached the seam's `selector`:
+ *       {"code":"BINDING_REQUIRED","provider":"github","bindings":["octo/repoA","octo/repoB"]}
+ *       422 !== 201
+ *   - assertion (c), session lane: the unfixed referent guard resolved the
+ *     workspace's active binding and the row carried no
+ *     `issueSource`/`issueBindingScope` (`undefined !== 'github'`).
  *   - stamped effort row: the unfixed read resolved the workspace's active
  *     binding (which refuses on a two-binding workspace), so the provider was
  *     never called:

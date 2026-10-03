@@ -21,7 +21,7 @@ import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-gu
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
-import { isValidIssueId, UUID_REGEX, BINDING_INTENT } from '../lib/workspace.js';
+import { isValidIssueId, UUID_REGEX, BINDING_INTENT, dispatchBindingPairFields } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
@@ -410,6 +410,16 @@ export function createDispatchRoutes({
         providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: issueIdentifier ? BINDING_INTENT.ISSUE : BINDING_INTENT.WORKSPACE, ...(issueIdentifier && issueBindingSelector ? { selector: issueBindingSelector } : {}) });
       }
 
+      // LIN-3242 (LIN-3126 §4): persist the selector pair ONLY for a named-issue
+      // dispatch whose COMPLETE pair the seam resolved — the trimmed values
+      // `findBindingBySelector` matched, never the raw body. A repo-only /
+      // issueless / abort request, or a lone `source` hint, stamps nothing (the
+      // store's sparse write then adds no key). The ISSUE arm above is what
+      // validates the pair: an unknown one refuses before this point.
+      const persistedBindingFields = (!isAbort && issueIdentifier && issueSource != null && issueBindingScope != null)
+        ? dispatchBindingPairFields(issueSource, issueBindingScope)
+        : {};
+
       if (!isAbort && issueIdentifier) {
         const { token: referentToken, provider: referentProvider, reason: referentReason } = providerAccess;
         // LIN-3241 (D, parent LIN-3126 §3): an explicit binding refusal must
@@ -654,11 +664,11 @@ export function createDispatchRoutes({
           maxTasks: maxTasks ?? null,
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks.
           maxSessionsPerTask: maxSessionsPerTask ?? null,
-          // LIN-3242 (LIN-3126 §4): the binding selector pair the seam resolved.
-          // Written as null when absent; the STORE persists it SPARSELY, so an
-          // unstamped row adds no key.
-          issueSource: issueSource ?? null,
-          issueBindingScope: issueBindingScope ?? null
+          // LIN-3242 (LIN-3126 §4): the seam-resolved binding selector pair,
+          // trimmed and only when this named-issue request supplied a complete
+          // one. `?? null` here; the STORE writes it SPARSELY (no key when null).
+          issueSource: persistedBindingFields.issueSource ?? null,
+          issueBindingScope: persistedBindingFields.issueBindingScope ?? null
         }
       });
 
@@ -933,6 +943,14 @@ export function createDispatchRoutes({
       if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recommend-and-dispatch')) return;
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
+      // LIN-3242 (LIN-3126 §4): persist the pair ONLY when the named-issue request
+      // supplied a complete one AND the seam resolved it (an unknown pair already
+      // 422'd above). Trimmed to the values `findBindingBySelector` matched; a
+      // lone `source` hint stamps nothing.
+      const persistedBindingFields = (issueIdentifier && issueSource != null && issueBindingScope != null)
+        ? dispatchBindingPairFields(issueSource, issueBindingScope)
+        : {};
+
       // ── Verb-override path (LIN-573) ──────────────────────────────────────
       // When the caller pins `kind`, skip the LLM recommendation + descent
       // entirely: fetch the named issue's context, generate the body
@@ -1121,10 +1139,10 @@ export function createDispatchRoutes({
               // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
               queueIfBusy: queueIfBusy === true,
               subscription: subscriptionResolved,
-              // LIN-3242 (LIN-3126 §4): the seam-resolved binding selector pair;
-              // null when absent, the STORE persists it SPARSELY.
-              issueSource: issueSource ?? null,
-              issueBindingScope: issueBindingScope ?? null
+              // LIN-3242 (LIN-3126 §4): the validated, trimmed binding selector
+              // pair (`?? null`; the store writes it sparsely).
+              issueSource: persistedBindingFields.issueSource ?? null,
+              issueBindingScope: persistedBindingFields.issueBindingScope ?? null
             }
           });
 
@@ -1446,11 +1464,10 @@ export function createDispatchRoutes({
             // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
             queueIfBusy: queueIfBusy === true,
             subscription: subscriptionResolved,
-            // LIN-3242 (LIN-3126 §4): same seam-resolved binding selector pair as
-            // the override arm — both fields blocks must carry it. SPARSE at the
-            // store; null when absent.
-            issueSource: issueSource ?? null,
-            issueBindingScope: issueBindingScope ?? null
+            // LIN-3242 (LIN-3126 §4): the same validated, trimmed binding selector
+            // pair as the override arm (`?? null`; the store writes it sparsely).
+            issueSource: persistedBindingFields.issueSource ?? null,
+            issueBindingScope: persistedBindingFields.issueBindingScope ?? null
           }
         });
 

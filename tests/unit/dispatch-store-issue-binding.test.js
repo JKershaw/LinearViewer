@@ -135,3 +135,24 @@ describe('LIN-3242 — dispatch-store: the selector pair persists and survives _
     assert.equal(store.historyCollection._docs[0].issueBindingScope, 'octo/repoB');
   });
 });
+
+// F3 (review): the LIVE-queue projection (`_formatItem`) is what the effort
+// read-out reads; only the history projection was pinned (M11), so removing the
+// `_formatItem` projection survived. These kill M10.
+describe('LIN-3242 review F3 — _formatItem projects the pair sparsely', () => {
+  test('a stamped live row projects both fields', async () => {
+    const store = makeStore();
+    await store.addItem('acme', { prompt: 'p', issueIdentifier: 'LIN-1', ...SELECTOR });
+    const projected = store._formatItem(store.collection._docs[0]);
+    assert.equal(projected.issueSource, 'github');
+    assert.equal(projected.issueBindingScope, 'octo/repoB');
+  });
+
+  test('an unstamped live row adds no key', async () => {
+    const store = makeStore();
+    await store.addItem('acme', { prompt: 'p', issueIdentifier: 'LIN-1' });
+    const projected = store._formatItem(store.collection._docs[0]);
+    assert.equal('issueSource' in projected, false);
+    assert.equal('issueBindingScope' in projected, false);
+  });
+});

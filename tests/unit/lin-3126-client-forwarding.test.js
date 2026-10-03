@@ -396,3 +396,90 @@ describe('LIN-3240 L2 — the task-chat client prefill sends bindingScope (kills
     assert.equal(captured[0], '/workspace/acme/api/task-chat/GB-1?source=github');
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-3242 (LIN-3126 slice 3) review F3: the issue-row dispatch click reads the
+// row's `data-source` / `data-binding-scope` stamps off the `.details` wrapper
+// and forwards them as `issue.source` / `issue.bindingScope`. The whole shipped
+// app.js is evaluated in a vm sandbox with a minimal fake DOM, then the real
+// click handler is driven — so removing the row read is fatal (kills M9), not a
+// source-text grep.
+// ---------------------------------------------------------------------------
+const APP_SRC = read('public/app.js');
+
+function fakeEl(dataset = {}, overrides = {}) {
+  const node = {
+    dataset,
+    textContent: '',
+    disabled: false,
+    classList: { add() {}, remove() {}, contains() { return false; } },
+    querySelector: () => null,
+    closest: () => null,
+    ...overrides,
+  };
+  return node;
+}
+
+/** Load the real public/app.js and drive one dispatch-button click. */
+function loadAppDispatchClick() {
+  const captured = [];
+  const listeners = {};
+  const detailsEl = fakeEl({ source: 'github', bindingScope: 'octo/repoB' });
+  const promptText = fakeEl({ rawPrompt: 'run me' });
+  const promptNameEl = fakeEl({}, { textContent: 'implementation' });
+  const titleEl = fakeEl({}, { textContent: 'Repo B issue' });
+  const lineEl = fakeEl({ identifier: 'GB-1' }, {
+    querySelector: (sel) => (sel === '.title, .title-dim' ? titleEl : null),
+  });
+  const promptContainer = fakeEl(
+    { promptFor: '42', urlKey: 'acme', kind: 'implementation', proxyForce: 'false' },
+    {
+      querySelector: (sel) => (sel === '.prompt-text' ? promptText : sel === '.prompt-name' ? promptNameEl : null),
+      closest: (sel) => (sel === '.details' ? detailsEl : null),
+    }
+  );
+  const dispatchBtn = fakeEl({ target: 'cli' }, {
+    textContent: 'dispatch',
+    closest: (sel) => (sel === '.prompt-container' ? promptContainer : sel === '.prompt-dispatch' ? dispatchBtn : null),
+  });
+  const document = {
+    addEventListener: (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); },
+    querySelector: (sel) => (sel.startsWith('.line[data-id=') ? lineEl : null),
+  };
+  const sandbox = {
+    document,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    console: { log() {}, error() {}, warn() {} },
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+    navigator: { clipboard: { writeText: async () => {} } },
+    URLSearchParams,
+    fetch: async () => ({ ok: false, json: async () => ({}) }),
+    dispatchPrompt: async (opts) => { captured.push(opts); return {}; },
+    readDispatchExecControls: () => ({}),
+    toast: () => {},
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+  };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(APP_SRC, sandbox, { filename: 'app.js' });
+  sandbox.initPrompts();
+  return { captured, listeners, dispatchBtn };
+}
+
+describe('LIN-3242 review F3 — the issue-row dispatch reads the binding stamps (kills M9)', () => {
+  test('a stamped row forwards source + bindingScope into dispatchPrompt', async () => {
+    const { captured, listeners, dispatchBtn } = loadAppDispatchClick();
+    const event = { target: dispatchBtn, preventDefault() {}, stopPropagation() {} };
+    for (const handler of listeners.click || []) await handler(event);
+
+    assert.equal(captured.length, 1, 'exactly one dispatch');
+    const issue = captured[0].issue;
+    assert.equal(issue.id, '42');
+    assert.equal(issue.identifier, 'GB-1');
+    assert.equal(issue.title, 'Repo B issue');
+    assert.equal(issue.source, 'github', 'the row data-source is forwarded');
+    assert.equal(issue.bindingScope, 'octo/repoB', 'the row data-binding-scope is forwarded');
+  });
+});

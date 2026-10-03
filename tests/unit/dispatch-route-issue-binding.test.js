@@ -276,3 +276,146 @@ describe('LIN-3242 — proxy dispatch lane forwards the selector into the seam',
     assert.equal(captured.item, undefined);
   });
 });
+
+// ── F1 (review): the proxy lanes persist only a validated, trimmed pair ──────
+
+describe('LIN-3242 review F1 — the proxy /dispatch stamps only a resolved, trimmed pair', () => {
+  function realProxyStore() {
+    return new DispatchQueueStore({
+      collection: createMockCollection(),
+      historyCollection: createMockCollection(),
+    });
+  }
+
+  test('the persisted pair is the trimmed values the seam matched, not the raw body', async () => {
+    const { fn } = makeTwoRepoResolver();
+    const store = realProxyStore();
+    const { app } = buildProxyApp({
+      resolveWorkspaceAccess: fn,
+      provider: recordingDispatchProvider(),
+      extraDeps: { dispatchQueueStore: store },
+    });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/dispatch', {
+      prompt: 'run me',
+      ...ISSUE,
+      issueSource: ' github ',
+      issueBindingScope: ` ${REPO_B} `,
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const doc = store.collection._docs[0];
+    assert.equal(doc.issueSource, 'github', 'padded source is stored trimmed');
+    assert.equal(doc.issueBindingScope, REPO_B, 'padded scope is stored trimmed');
+  });
+
+  test('an issueless dispatch ignores a stray pair of any JSON type (nothing stamped)', async () => {
+    const { fn } = makeTwoRepoResolver();
+    const store = realProxyStore();
+    const { app } = buildProxyApp({
+      resolveWorkspaceAccess: fn,
+      provider: recordingDispatchProvider(),
+      extraDeps: { dispatchQueueStore: store },
+    });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/dispatch', {
+      prompt: 'run me',
+      issueSource: { $ne: 1 },
+      issueBindingScope: ['a'],
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const doc = store.collection._docs[0];
+    assert.equal('issueSource' in doc, false, 'a non-issue dispatch never stamps a selector');
+    assert.equal('issueBindingScope' in doc, false);
+  });
+});
+
+// ── F2 (review): recommend-and-dispatch + kickoff selector rows ──────────────
+
+describe('LIN-3242 review F2 — recommend-and-dispatch forwards the selector', () => {
+  test('a complete pair reaches the seam, resolves repoB, and stamps the row', async () => {
+    const { fn } = makeTwoRepoResolver();
+    const seen = [];
+    const resolveWorkspaceAccess = async (urlKey, ownerAccountId, opts) => {
+      const out = await fn(urlKey, ownerAccountId, opts);
+      seen.push({ opts, out });
+      return out;
+    };
+    const { app, captured } = buildProxyApp({ resolveWorkspaceAccess, provider: recordingDispatchProvider() });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'GB-1',
+      kind: 'implementation',
+      issueSource: 'github',
+      issueBindingScope: REPO_B,
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.equal(seen.length, 1, 'the seam resolved once');
+    assert.deepEqual(seen[0].opts.selector, { source: 'github', bindingScope: REPO_B });
+    assert.deepEqual(seen[0].out.scope, { token: 'tok-a', repo: REPO_B });
+    assert.equal(captured.item.issueSource, 'github');
+    assert.equal(captured.item.issueBindingScope, REPO_B);
+  });
+
+  test('an unknown pair is refused 422 UNKNOWN_BINDING, nothing enqueued', async () => {
+    const { fn } = makeTwoRepoResolver();
+    const { app, captured } = buildProxyApp({ resolveWorkspaceAccess: fn, provider: recordingDispatchProvider() });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'GB-1',
+      kind: 'implementation',
+      issueSource: 'github',
+      issueBindingScope: 'octo/ghost',
+    });
+
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'UNKNOWN_BINDING');
+    assert.equal(captured.item, undefined);
+  });
+});
+
+describe('LIN-3242 review F2 — kickoff forwards the selector', () => {
+  test('a complete pair reaches the seam, resolves repoB, and stamps the run row', async () => {
+    const { fn } = makeTwoRepoResolver();
+    const seen = [];
+    const resolveWorkspaceAccess = async (urlKey, ownerAccountId, opts) => {
+      const out = await fn(urlKey, ownerAccountId, opts);
+      seen.push({ opts, out });
+      return out;
+    };
+    const { app, captured } = buildProxyApp({ resolveWorkspaceAccess, provider: recordingDispatchProvider() });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/autopilot/kickoff', {
+      goal: 'walk the stack',
+      target: 'cli',
+      issueIdentifier: 'GB-1',
+      issueSource: 'github',
+      issueBindingScope: REPO_B,
+    });
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assert.deepEqual(seen[0].opts.selector, { source: 'github', bindingScope: REPO_B });
+    assert.deepEqual(seen[0].out.scope, { token: 'tok-a', repo: REPO_B });
+    assert.equal(captured.item.issueSource, 'github');
+    assert.equal(captured.item.issueBindingScope, REPO_B);
+  });
+
+  test('an unknown pair is refused 422 UNKNOWN_BINDING, nothing enqueued', async () => {
+    const { fn } = makeTwoRepoResolver();
+    const { app, captured } = buildProxyApp({ resolveWorkspaceAccess: fn, provider: recordingDispatchProvider() });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/autopilot/kickoff', {
+      goal: 'walk the stack',
+      target: 'cli',
+      issueIdentifier: 'GB-1',
+      issueSource: 'github',
+      issueBindingScope: 'octo/ghost',
+    });
+
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'UNKNOWN_BINDING');
+    assert.equal(captured.item, undefined);
+  });
+});
