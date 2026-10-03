@@ -1816,15 +1816,20 @@ describe('review template', () => {
     assert.ok(/Approve.*Request Changes.*Needs Discussion/s.test(result.prompt), 'lists the three verdicts');
   });
 
-  test('Close-Out Gate cannot-close branch files a `blocks` ticket and routes to it, not another review', () => {
+  test('Close-Out Gate cannot-close branch keeps a surfaced problem in this task and routes to the stage that fixes it (LIN-3291)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/cannot-close branch/i.test(result.prompt), 'names the cannot-close branch');
     assert.ok(/do NOT loop back into another `review`/i.test(result.prompt), 'forbids looping back to review');
-    assert.ok(/as a `blocks` relation on the current task/i.test(result.prompt), 'files/links the blocker as `blocks`');
-    assert.ok(/A `blocks` relation does not make the engine descend/i.test(result.prompt),
-      'next action must be named explicitly because `blocks` does not drive descent');
-    assert.ok(/closes only once the blocker is resolved and CI is green/i.test(result.prompt),
-      'original closes only after blocker resolves and CI green');
+    assert.ok(/that is still this task's work, its cause included/i.test(result.prompt), 'a bigger problem the fix exposed stays this work');
+    assert.ok(/File no new ticket for it/.test(result.prompt), 'no new ticket is filed for it');
+    assert.ok(!/Create a new Linear ticket for the surfaced work/.test(result.prompt), 'the old split-off instruction is gone');
+    assert.ok(/name the stage that does it on this task as the next action: `implementation`, `bug`/.test(result.prompt),
+      'the next action is the stage that fixes it here');
+    assert.ok(/A `blocks` relation does not make the engine descend|a `blocks` relation does not make the engine descend/i.test(result.prompt),
+      'linking an owning task still names the next action, because `blocks` does not drive descent');
+    assert.ok(/Only a fix the team would need to hear about before it happens .* makes it \*\*Needs Discussion\*\*/.test(result.prompt),
+      'only a team-level change goes to the human');
+    assert.ok(/stays open until it is fixed and CI is green/i.test(result.prompt), 'closes only after the fix and green CI');
   });
 
   test('review completion signals reflect verdict-based, pre-merge close-out (LIN-523)', () => {
@@ -1838,8 +1843,8 @@ describe('review template', () => {
       'signals include CI green on the PR'
     );
     assert.ok(
-      reviewSignal.signals.some(s => /closure blocker filed\/linked as `blocks`/i.test(s)),
-      'signals include the blocker-filed-and-routed close-out outcome'
+      reviewSignal.signals.some(s => /Request Changes, naming the stage that fixes it here \(no new ticket\)/i.test(s)),
+      'signals include the cannot-close outcome: the fix stays in this task (LIN-3291)'
     );
     // The retired post-merge signals must be gone
     assert.ok(
@@ -2336,7 +2341,8 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(p), 'conditional approval encoded');
     assert.ok(/Review is WRITE-ONLY/i.test(p), 'review is write-only — no merge/Done/follow-ups');
     assert.ok(/must NOT loop back into another review/i.test(p), 'forbids looping back to review');
-    assert.ok(/as `blocks` the current task/i.test(p), 'files/links the blocker as `blocks`');
+    assert.ok(/that is still this task's work/i.test(p) && /filing no new ticket/i.test(p), 'a surfaced problem stays this work, no new ticket (LIN-3291)');
+    assert.ok(/Needs Discussion only for a fix the team would need to hear about first/i.test(p), 'only a team-level change goes to the human');
     assert.ok(/a `blocks` relation alone does not make the engine descend/i.test(p),
       'next action named because `blocks` does not drive descent');
     // The retired fused-gate + undefined-merger framing must be gone from the review rule.
@@ -2380,7 +2386,8 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
     assert.ok(/\*\*Cannot-close branch:\*\*/i.test(p), 'Step 0 names the cannot-close branch');
     assert.ok(/do NOT keep routing to `?review`?/i.test(p), 'it must not keep routing to review on CI-red/blocker');
-    assert.ok(/route instead via Step 2 to the blocker/i.test(p), 'it routes to the blocker via Step 2');
+    assert.ok(/route instead to the stage that fixes it here/i.test(p), 'it routes to the stage that fixes it on this task');
+    assert.ok(/never to a new ticket/i.test(p), 'never to a new ticket (LIN-3291)');
   });
 
   test('Step 3 already-landed seam routes a CI-red / surfaced-blocker case to the blocker, not a repeated review', () => {
@@ -2388,9 +2395,10 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
       ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
       isTerminal: false, hasOpenChildren: false
     });
-    assert.ok(/neither to `?implementation`? nor to a repeated `?review`?/i.test(p),
+    assert.ok(/One exception, never a repeated `?review`?/i.test(p),
       'Step 3 carries the cannot-close exception');
-    assert.ok(/route the next action to that blocker/i.test(p), 'it routes the next action to the blocker');
+    assert.ok(/route to the stage that fixes it here/i.test(p) && /not to a new ticket/i.test(p),
+      'it routes to the stage that fixes it on this task, not a new ticket (LIN-3291)');
   });
 
   test('Step 0 and Step 3 stuck-review-signal bullets name archive+prune in the same order as the Close-out quality rule (LIN-1773)', () => {
@@ -4915,8 +4923,8 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
       'review readinessCheck no longer routes CI-absence to a closure blocker');
     assert.ok(review.signals.some(s => /genuinely absent and the two-branch substitute recorded/.test(s)),
       'review signals name the no-CI substitute');
-    assert.ok(review.signals.some(s => /CI genuinely absent with no substitute recorded, or a blocker surfaced/.test(s)),
-      'review signals route an unrecorded no-CI substitute to the closure blocker, same as CI-red');
+    assert.ok(review.signals.some(s => /CI genuinely absent with no substitute recorded, or a bigger problem surfaced/.test(s)),
+      'review signals route an unrecorded no-CI substitute the same way as CI-red');
   });
 
   test('completion signals: close-out signal accepts the recorded substitute alongside green CI', () => {
