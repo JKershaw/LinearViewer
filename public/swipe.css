@@ -1104,6 +1104,21 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   color: var(--blue);
 }
 
+/* LIN-2944 P3: Home's one-line onboarding hint replaces the top-task mark when
+   only starter-seed rows remain. F8 palette only (--green-dim). */
+.home-onboarding-hint {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--green-dim);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* Edit slot (hidden on Swipe until P1 supplies editUrl). */
 .swipe-prompt-edit {
   margin-left: auto;

@@ -53,6 +53,19 @@ let filteredIssues = [];
 let currentIndex = 0;
 let activePromptHandle = null;
 
+// LIN-2944 P3 (addendum 18): when a view holds only starter-seed cards (each
+// carries `isSeed` from the server ordering), the deck FRONT is an onboarding
+// slot, not a seed card. The seed cards stay behind it in the deck — the existing
+// arrow/keyboard/swipe navigation reaches them unchanged.
+const ONBOARDING_ITEM = { __onboarding: true };
+const ONBOARDING_COPY = 'Your workspace is ready. Add your own task to get started — the welcome tasks are just a starting point.';
+
+function withOnboardingFront(issues) {
+  return (issues.length > 0 && issues.every(issue => issue && issue.isSeed))
+    ? [ONBOARDING_ITEM, ...issues]
+    : issues;
+}
+
 // Animation state
 let animationTimers = [];
 
@@ -137,6 +150,9 @@ function applyFilter(filterKey) {
     filteredIssues = allIssues;
   }
 
+  // LIN-2944 P3: a seed-only view fronts with the onboarding slot (seeds behind).
+  filteredIssues = withOnboardingFront(filteredIssues);
+
   // For project filters, start on the first non-in-progress issue
   // so the user lands on actionable work (they can swipe back for in-progress)
   if (filterKey.startsWith('project:')) {
@@ -194,6 +210,12 @@ function renderCard(direction) {
 
   if (!issue) {
     card.innerHTML = '<div class="swipe-card-empty">No tasks in this view</div>';
+    return;
+  }
+
+  // LIN-2944 P3: the seed-only front is the onboarding slot, not a seed card.
+  if (issue.__onboarding) {
+    card.innerHTML = `<div class="swipe-card-empty" data-testid="swipe-onboarding">${_esc(ONBOARDING_COPY)}</div>`;
     return;
   }
 

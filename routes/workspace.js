@@ -46,6 +46,20 @@ function starterSeed(urlKey) {
 }
 
 /**
+ * The set of issue ids the starter seed creates for a workspace (LIN-2944 P3
+ * addendum 18). Read-only and additive: derived from `starterSeed(urlKey)` so a
+ * future third seed issue is covered automatically and the two cannot drift.
+ * Used only at the presentation layer (the shared ordering helper) to demote
+ * seed cards — it does not change `starterSeed()`'s data, `task-stack.js` or the
+ * sort. LIN-3069 can reuse it for roadmap/next-run later.
+ * @param {string} urlKey - Workspace partition scope
+ * @returns {Set<string>}
+ */
+export function starterSeedIssueIds(urlKey) {
+  return new Set(starterSeed(urlKey).issues.map((issue) => issue.id))
+}
+
+/**
  * Create workspace management routes.
  * @param {Object} [deps]
  * @param {import('../lib/local-store.js').LocalStore} [deps.localStore] - Local provider store, used to seed starter content for new local workspaces.
