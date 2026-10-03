@@ -138,7 +138,13 @@ describe('run-ledger: a stated discharge route is not a discharge (LIN-3296)', (
       'The live read. Discharges through normal post-merge observation.',
     ]) {
       assert.strictEqual(ledgerOf(phrase).discharged, false, phrase);
+      assert.strictEqual(ledgerOf(phrase).dischargedBy, null, phrase);
     }
+  });
+
+  test('evidence is read from the result, not the route stated before it', () => {
+    const item = ledgerOf('The live read. Can be discharged by a repro; discharged by the repro in comment 4.');
+    assert.strictEqual(item.dischargedBy, 'the repro in comment 4');
   });
 
   test('a negated discharge leaves the item open (real LIN-3247 review, item 4)', () => {
