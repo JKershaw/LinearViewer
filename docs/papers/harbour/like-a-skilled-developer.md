@@ -6,7 +6,7 @@ version: 2
 date: 2026-10-03
 authors: [Claude (the Flight Companion session, with John Kershaw; versions 1 and 2)]
 model: "Frontier tier, Claude Code, in the Flight Companion's cloud session; written in conversation with John Kershaw on 3 October 2026, not from a dispatch. No new measurement: the figures are read from the research comments and papers listed below. Not checked, independently or otherwise."
-revision: "Version 2 (same day) follows John's decisions after reading version 1. It records his definition of a large change, replaces section 7's single-author rewrite with the two-layer design (rules assembled by code, the brief written by a separate step), records the rule changes already made on the branch, and says the release does not wait on a live test. A later same-day edit adds that "colleague" means judgement, not persona (John's tone standard). Sections 1 to 3 are unchanged."
+revision: "Version 2 (same day) follows John's decisions after reading version 1. It records his definition of a large change, replaces section 7's single-author rewrite with the two-layer design (rules assembled by code, the brief written by a separate step), records the rule changes already made on the branch, and says the release does not wait on a live test. A later same-day edit adds that "colleague" means judgement, not persona (John's tone standard), and another corrects two statements in section 7 about the switch: with it off, the prompt is the rules bundle (now carrying the contract and the rule changes), not today's prompt, and the meta call stops writing the prompt only with it on. Sections 1 to 3 are unchanged."
 sources:
   - "LIN-3275 research comment (3 Oct 2026, 08:08Z): the two-path cause of the 401/200 switching"
   - "LIN-3277 research comment (3 Oct 2026, 08:26Z): why eleven earlier tickets in the area did not hold"
@@ -245,9 +245,9 @@ These are still exact rules, and their tests moved with them.
 
 **The mechanical layer.** Code assembles a stage's rules, the task's facts and the gates that
 machines read. The stage's handwritten template becomes the one rules bundle for both paths,
-and the meta call only chooses the next stage. Code appends what later stages parse (the plan
-heading, the plan-review verdict, the ledger's words) instead of relying on the prose to ask
-for them.
+and with the writing layer on, the meta call only chooses the next stage. Code appends what
+later stages parse (the plan heading, the plan-review verdict, the ledger's words) instead of
+relying on the prose to ask for them.
 
 **The writing layer.** A separate model call turns the bundle into a brief, aiming at the
 stage's ideal version. Code then appends the contract, so a badly written brief cannot break a
@@ -257,8 +257,8 @@ its model is configurable, and its cost is recorded on its own.
 **The release does not wait on a live test.** The writing layer can only be judged on real
 tickets, and real tickets only reach it once it is released. A release that waited for that
 test would wait for ever. The tests check the contract instead: every machine-read block is
-present, grounding is appended once, and with the switch off the prompt is today's, byte for
-byte. That is enough to merge. The switch makes the change reversible, so turning it on needs
+present, grounding is appended once, and with the switch off the prompt is the rules bundle,
+byte for byte. That is enough to merge. The switch makes the change reversible, so turning it on needs
 no test either. Once it is on, the briefs are read side by side with today's prompts on a few
 real tickets and across several writer models. The read shows which model writes best and
 where extra cost stops buying quality (LIN-3294). It is a sanity check, not a gate.
