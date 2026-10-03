@@ -274,6 +274,58 @@ async function seedSessionWithDecision(page) {
   return { workerId, decisionId };
 }
 
+// LIN-2948 R1: one decision-bearing run that ALSO carries a run-chat proposal,
+// so the dark-contrast check sees every control this ticket added in a single
+// render (card Answer + dismiss, chat link, proposal Apply/Decline). Uses
+// TEST-1 (a mockAi-resolvable fixture task, tests/fixtures/mock-data.js) so the
+// run-scoped chat turn takes the propose path with no live LLM — the same seam
+// session-proposals.spec.js uses. Returns the anchor id (the run's session id).
+async function seedDecisionRunWithProposal(page) {
+  const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'TEST-1', issueTitle: 'Run-controls seed', target: 'cli' }
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+
+  const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'TEST-1', issueTitle: 'Run-controls worker', target: 'cli', sessionId: anchorId }
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+
+  const tokenResp = await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`);
+  const { token } = await tokenResp.json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const take = await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
+  expect(take.status(), `take failed: ${await take.text()}`).toBe(200);
+  const blocked = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: auth, data: { message: '[blocked] need a ruling before continuing' }
+  });
+  expect(blocked.status(), `blocked feedback failed: ${await blocked.text()}`).toBe(200);
+  const decision = await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: auth,
+    data: {
+      kind: 'decision',
+      message: JSON.stringify({
+        decision_id: 'd-r1-dark-controls',
+        question: 'Proceed with the rollout?',
+        options: [{ id: 'a', label: 'Approve' }],
+        if_unanswered: { summary: 'Nothing further runs; the run has already ended.' }
+      })
+    }
+  });
+  expect(decision.status(), `decision feedback failed: ${await decision.text()}`).toBe(200);
+
+  // One run-scoped chat turn → one pending proposal under the run's step.
+  await page.goto(`/workspace/${URL_KEY}/task-chat?task=TEST-1&run=${encodeURIComponent(anchorId)}`);
+  await page.waitForLoadState('networkidle');
+  await page.locator('#task-chat-question').fill('Please follow up on this run.');
+  await page.locator('#task-chat-send').click();
+  await expect(page.locator('.task-chat-tool', { hasText: 'proposed a follow-up' })).toBeVisible({ timeout: 5000 });
+
+  return anchorId;
+}
+
 // Read the sessions feed and return the first session's id.
 async function discoverSessionId(page) {
   const resp = await page.request.get(`/workspace/${URL_KEY}/api/dashboard/sessions`);
@@ -283,6 +335,52 @@ async function discoverSessionId(page) {
   const seeded = all.find(s => String(s.sessionId || '').length > 0);
   expect(seeded, `no reconstructed session in the feed: ${JSON.stringify(body.counts)}`).toBeTruthy();
   return seeded.sessionId;
+}
+
+// WCAG 2.x relative-luminance contrast resolved against each element's
+// effective (first opaque ancestor) background — the same maths
+// tests/unit/theme.test.js uses over the tokens, here on the live computed
+// style. Shared by the LIN-3250 header strip and the LIN-2948 R1 run-page
+// controls so both measure the surface the same way.
+async function measureAaContrast(page, selectors) {
+  return page.evaluate((sels) => {
+    const parse = (c) => {
+      const m = /rgba?\(([^)]+)\)/.exec(c || '');
+      if (!m) return null;
+      const p = m[1].split(',').map(s => parseFloat(s.trim()));
+      return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    };
+    const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
+    const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
+    const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); const hi = Math.max(l1, l2), lo = Math.min(l1, l2); return (hi + 0.05) / (lo + 0.05); };
+    const bgOf = (el) => {
+      // Composite every semi-transparent background layer (dark `--inset` is
+      // `rgba(255,255,255,0.05)`) over the opaque page surface, outermost
+      // first, so the ratio reflects what the eye sees.
+      const layers = [];
+      let n = el;
+      while (n) { layers.push(parse(getComputedStyle(n).backgroundColor)); n = n.parentElement; }
+      let base = { r: 255, g: 255, b: 255, a: 1 };
+      for (let i = layers.length - 1; i >= 0; i--) {
+        const c = layers[i];
+        if (!c || c.a === 0) continue;
+        base = {
+          r: c.r * c.a + base.r * (1 - c.a),
+          g: c.g * c.a + base.g * (1 - c.a),
+          b: c.b * c.a + base.b * (1 - c.a),
+          a: 1,
+        };
+      }
+      return { r: Math.round(base.r), g: Math.round(base.g), b: Math.round(base.b), a: 1 };
+    };
+    return sels.map((sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return { sel, missing: true };
+      const fg = parse(getComputedStyle(el).color);
+      const bg = bgOf(el);
+      return { sel, ratio: ratio(fg, bg), color: getComputedStyle(el).color, bg: `rgb(${bg.r}, ${bg.g}, ${bg.b})` };
+    });
+  }, selectors);
 }
 
 test.describe('Dedicated per-session page (LIN-1003)', () => {
@@ -979,44 +1077,7 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     // effective (first opaque ancestor) background — the same maths
     // tests/unit/theme.test.js uses over the tokens, here on the live computed
     // style of the new strip + step summaries.
-    const results = await page.evaluate((selectors) => {
-      const parse = (c) => {
-        const m = /rgba?\(([^)]+)\)/.exec(c || '');
-        if (!m) return null;
-        const p = m[1].split(',').map(s => parseFloat(s.trim()));
-        return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
-      };
-      const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); };
-      const lum = (c) => 0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b);
-      const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); const hi = Math.max(l1, l2), lo = Math.min(l1, l2); return (hi + 0.05) / (lo + 0.05); };
-      const bgOf = (el) => {
-        // Composite every semi-transparent background layer (dark `--inset` is
-        // `rgba(255,255,255,0.05)`) over the opaque page surface, outermost
-        // first, so the ratio reflects what the eye sees.
-        const layers = [];
-        let n = el;
-        while (n) { layers.push(parse(getComputedStyle(n).backgroundColor)); n = n.parentElement; }
-        let base = { r: 255, g: 255, b: 255, a: 1 };
-        for (let i = layers.length - 1; i >= 0; i--) {
-          const c = layers[i];
-          if (!c || c.a === 0) continue;
-          base = {
-            r: c.r * c.a + base.r * (1 - c.a),
-            g: c.g * c.a + base.g * (1 - c.a),
-            b: c.b * c.a + base.b * (1 - c.a),
-            a: 1,
-          };
-        }
-        return { r: Math.round(base.r), g: Math.round(base.g), b: Math.round(base.b), a: 1 };
-      };
-      return selectors.map((sel) => {
-        const el = document.querySelector(sel);
-        if (!el) return { sel, missing: true };
-        const fg = parse(getComputedStyle(el).color);
-        const bg = bgOf(el);
-        return { sel, ratio: ratio(fg, bg), color: getComputedStyle(el).color, bg: `rgb(${bg.r}, ${bg.g}, ${bg.b})` };
-      });
-    }, ['[data-testid="session-progress"]', '[data-testid="session-active-time"]', '[data-testid="session-elapsed"]', '[data-testid="session-step-summary"]']);
+    const results = await measureAaContrast(page, ['[data-testid="session-progress"]', '[data-testid="session-active-time"]', '[data-testid="session-elapsed"]', '[data-testid="session-step-summary"]']);
 
     for (const r of results) {
       expect(r.missing, `no element for ${r.sel}`).toBeFalsy();
@@ -1024,6 +1085,50 @@ test.describe('Dedicated per-session page (LIN-1003)', () => {
     }
 
     await page.screenshot({ path: test.info().outputPath('session-run-dark.png'), fullPage: true });
+  });
+
+  test('the run-page controls clear AA contrast in both themes (LIN-2948 R1)', async ({ page }) => {
+    // R1 (review e3328d9b): in dark the card Answer, the chat link and the
+    // proposal buttons inherited bare `.action-btn` (no `color`) or the
+    // browser-default link colour, measuring 1.65:1 and 1.89:1. Light passes
+    // for all of them and must not regress, so both themes are measured.
+    await page.context().addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ taskChat: true }))}&urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    const sessionId = await seedDecisionRunWithProposal(page);
+
+    const selectors = [
+      '[data-testid="session-question-card-answer"]',
+      '[data-testid="session-question-card-dismiss"]',
+      '[data-testid="session-run-chat"]',
+      '[data-testid="session-proposal"][data-proposal-status="proposed"] [data-proposal-action="apply"]',
+      '[data-testid="session-proposal"][data-proposal-status="proposed"] [data-proposal-action="decline"]',
+    ];
+    const sessionUrl = `/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`;
+
+    await page.goto(sessionUrl);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('html')).toHaveClass(/theme-dark/);
+    // The proposal row must actually be on the page, or the Apply/Decline
+    // selectors would be reported "missing" and the run would be vacuous.
+    await expect(page.locator('[data-testid="session-proposals"]')).toBeVisible();
+    const dark = await measureAaContrast(page, selectors);
+    for (const r of dark) {
+      expect(r.missing, `dark: no element for ${r.sel}`).toBeFalsy();
+      expect(r.ratio, `dark ${r.sel}: ${r.color} on ${r.bg} = ${r.ratio}`).toBeGreaterThanOrEqual(4.5);
+    }
+    await page.screenshot({ path: test.info().outputPath('session-run-controls-dark.png'), fullPage: true });
+
+    // Light: the same controls rendered as default high-contrast text before
+    // R1; the themed colours must keep them at AA.
+    await page.context().addCookies([{ name: 'theme', value: 'light', url: 'http://localhost:3001' }]);
+    await page.goto(sessionUrl);
+    await page.waitForLoadState('networkidle');
+    const light = await measureAaContrast(page, selectors);
+    for (const r of light) {
+      expect(r.missing, `light: no element for ${r.sel}`).toBeFalsy();
+      expect(r.ratio, `light ${r.sel}: ${r.color} on ${r.bg} = ${r.ratio}`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   test('a real stepped single-lineage run reads 3 of 4 with Next: close-out while close-out runs (LIN-3250)', async ({ page }) => {

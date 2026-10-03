@@ -785,3 +785,26 @@
   color: var(--muted);
   margin: var(--space-2) 0 0;
 }
+
+/* ── LIN-2948 R1: dark-theme legibility for the run page's controls ───────────
+   S2's card verb and S4's proposal/chat controls were added with a bare
+   `.action-btn` (no `color`) or the browser-default link colour, so in dark
+   they measured ~1.2:1 against the page (review e3328d9b, R1). Each gets a
+   themed colour from the AA-safe `-dim` text companions (the raw hues are for
+   fills/dots only; see style.css), painted on the opaque `--card` surface so
+   the ratio holds against the amber-tinted card fill too. Light is not
+   regressed: the same `-dim` text clears AA there as well. */
+.sess-qcard-answer,
+.sess-proposal-apply {
+  color: var(--green-dim);
+  background: var(--card);
+}
+.sess-proposal-decline {
+  color: var(--slate-dim);
+  background: var(--card);
+}
+.sess-run-chat {
+  color: var(--brand-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
