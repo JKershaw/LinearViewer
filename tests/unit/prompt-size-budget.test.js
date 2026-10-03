@@ -55,7 +55,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 129079,
+  'lib/prompt-template-defs.js': 128659, // LIN-3293: review files nothing; close-out owns filing
   'lib/prompt-templates.js': 20404,
   'lib/prompt-formatters.js': 52999,
   'lib/prompt-contract.js': 3481,
@@ -77,16 +77,16 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 1892,
   'plan-review': 7704,
   implementation: 7574,
-  review: 19098,
+  review: 18702, // LIN-3293: review's filing check moved to close-out, which already had it
   'close-out': 18455,
   'retrospective-audit': 4143,
   retro: 4114,
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106390; // LIN-3292: the routing-only switches, from the unallocated total
+export const META_PROMPT_SOURCE_CEILING = 106020; // LIN-3292: the routing-only switches, from the unallocated total; LIN-3293: review's filing check (5b) gone
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 103901;
+export const META_PROMPT_RENDERED_CEILING = 103537;
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own

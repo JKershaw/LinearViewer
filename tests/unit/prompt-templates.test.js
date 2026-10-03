@@ -799,7 +799,7 @@ describe('code-review consolidated into review (LIN-523)', () => {
   test('review does not instruct merge or Done (close-out split at the merge line)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     // Said once, in the hand-off, with its reason (LIN-3293 dedup).
-    assert.ok(/You do NOT merge, mark the task Done, or file close-out follow-ups/.test(result.prompt));
+    assert.ok(/You do NOT merge, mark the task Done, or file follow-ups/.test(result.prompt));
   });
 });
 
@@ -1800,8 +1800,8 @@ describe('review template', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/Review is write-only/i.test(result.prompt), 'states review is write-only');
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
-    assert.ok(/You do NOT merge, mark the task Done, or file close-out follow-ups/i.test(result.prompt),
-      'review does not merge, mark Done, or file close-out follow-ups');
+    assert.ok(/You do NOT merge, mark the task Done, or file follow-ups/i.test(result.prompt),
+      'review does not merge, mark Done, or file follow-ups: close-out files them (LIN-3293)');
     assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(result.prompt),
       'a non-empty ledger forces a conditional approval');
     assert.ok(/hand off to `close-out`/i.test(result.prompt), 'hands off to the close-out step');
@@ -2850,17 +2850,18 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const existingTicketClause = /before filing an outside item.*search the anchor's relations.*GET \/api\/proxy\/issues\/\{id\}\/relations.*GET \/api\/proxy\/search.*if one exists,? link it/is;
     const noReRaiseClause = /before raising a `DECISION:` on a finding.*GET \/api\/proxy\/rulings\?issueIdentifier=<anchor>&includeResolved=true.*do not re-raise a finding.*includeResolved.*covers loop-backed rulings only, never a task-bound one/is;
 
-    test('review carries both clauses, immediately after (not before) the LIN-3006 eligibility clause and before Test Quality Check', () => {
+    // LIN-3293: one owner for filing. Review files nothing, so it carries the
+    // no-re-raise check but not the filing check; close-out files the outside
+    // items and runs the existing-ticket check before each.
+    test('review carries the no-re-raise clause after the LIN-3006 eligibility clause, and leaves filing to close-out', () => {
       const review = generatePrompt('review', issue, context).prompt;
       const eligibilityIdx = review.search(/"file" is offered only for an outside item/i);
-      const existingIdx = review.search(existingTicketClause);
       const noReRaiseIdx = review.search(noReRaiseClause);
       const nextSectionIdx = review.indexOf('### Test Quality Check');
       assert.ok(eligibilityIdx > -1, 'sanity: LIN-3006\'s eligibility clause is present');
-      assert.ok(existingIdx > -1, 'the existing-ticket-check clause is present');
-      assert.ok(noReRaiseIdx > -1, 'the no-re-raise clause is present');
-      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx,
-        'both clauses sit after the eligibility clause and before the next section, in order');
+      assert.ok(eligibilityIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx, 'the no-re-raise clause sits after the eligibility clause');
+      assert.equal(review.search(existingTicketClause), -1, 'review files nothing, so it has no filing check');
+      assert.match(review, /close-out files it, after checking it does not already exist/);
     });
 
     test('close-out step 8 checks for an existing ticket before filing', () => {
@@ -2899,16 +2900,17 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       return meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith(name));
     }
 
-    test('meta (5b/5c): the Review-prompts quality rule carries both clauses, immediately after (5a)\'s eligibility sentence and before (6)', () => {
+    test('meta (5b): the Review-prompts quality rule carries the no-re-raise clause and leaves filing to close-out', () => {
       const rule = metaRule('- **Review prompts**');
       assert.ok(rule, 'the Review-prompts quality rule exists');
       const eligibilityIdx = rule.search(/"file" is offered only for an outside item/i);
-      const existingIdx = rule.search(existingTicketClause);
       const noReRaiseIdx = rule.search(noReRaiseClause);
       const nextItemIdx = rule.indexOf('(6) **write a `### What CI Did Not Prove` ledger**');
-      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three markers are present');
-      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < nextItemIdx,
-        'both new sub-items sit after (5a)\'s eligibility sentence and before (6), in order');
+      assert.ok(eligibilityIdx > -1 && noReRaiseIdx > -1, 'both markers are present');
+      assert.ok(eligibilityIdx < noReRaiseIdx && noReRaiseIdx < nextItemIdx, '(5b) sits after (5a)\'s eligibility sentence and before (6)');
+      assert.equal(rule.search(existingTicketClause), -1, 'review files nothing, so it has no filing check');
+      assert.match(rule, /close-out files it, after checking it does not already exist/);
+      assert.match(rule, /must NOT merge, mark the task Done, or file follow-ups/);
     });
 
     test('meta (6c/6d): the Close-out quality rule carries both clauses, immediately after (6b)\'s eligibility sentence and before the priority/label instruction', () => {
