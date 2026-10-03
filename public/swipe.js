@@ -60,7 +60,14 @@ let activePromptHandle = null;
 const ONBOARDING_ITEM = { __onboarding: true };
 const ONBOARDING_COPY = 'Your workspace is ready. Add your own task to get started — the welcome tasks are just a starting point.';
 
+// N3: key onboarding on the UNFILTERED workspace (same as Home), not the
+// filtered view — a workspace with any real card never shows the "ready"
+// onboarding, even on a filter that holds only seeds. The existing filter-empty
+// behavior stands instead.
+const workspaceHasRealCard = allIssues.some(issue => issue && !issue.isSeed);
+
 function withOnboardingFront(issues) {
+  if (workspaceHasRealCard) return issues;
   return (issues.length > 0 && issues.every(issue => issue && issue.isSeed))
     ? [ONBOARDING_ITEM, ...issues]
     : issues;

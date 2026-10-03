@@ -796,4 +796,49 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
     expect(await marked.getAttribute('data-id')).toBe(created.id);
     await expect(page.locator('[data-testid="home-top-task-onboarding"]')).toHaveCount(0);
   });
+
+  // LIN-2944 P3 review N1: the plain-words proxy label is visible beside +proxy
+  // and its FAQ discloses the side effects.
+  test('the plain-words proxy label sits beside +proxy and the FAQ opens with the side effects (N1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await openPrompts(page);
+
+    const component = page.locator('.prompt-section').first();
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+
+    const label = component.locator('.opened-task-proxy-label');
+    await expect(label).toBeVisible();
+    await expect(label).toContainText(/read & update your tasks/i);
+    await expect(label).toContainText(/what.s this/i);
+
+    const faq = component.locator('.opened-task-proxy-faq');
+    await expect(faq).toBeHidden();
+    await label.click();
+    await expect(faq).toBeVisible();
+    await expect(faq).toContainText(/read and update your tasks/i);
+    await expect(faq).toContainText(/token/i);
+    await expect(faq).toContainText(/Autopilot/i);
+    await expect(faq).toContainText(/Settings/i);
+  });
+
+  // LIN-2944 P3 review N3: onboarding keys on the UNFILTERED workspace. A
+  // workspace with a real card never shows the "workspace is ready" onboarding,
+  // even on a filter that holds only the seed.
+  test('a real workspace does not show onboarding on a filter that holds only the seed (N3)', async ({ page }) => {
+    const urlKey = await freshLocalWorkspace(page);
+    const create = await page.request.post(`/workspace/${urlKey}/api/issues`, {
+      data: { title: 'Real todo task', projectId: `${urlKey}-proj-1`, stateId: 'Todo' },
+    });
+    expect(create.ok(), `create real todo: ${create.status()}`).toBeTruthy();
+
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    // In Progress holds only LOCAL-1 (a seed); the workspace still has a real card.
+    await page.locator('[data-testid="swipe-filter"]').selectOption('in-progress');
+    await expect(page.locator('[data-testid="swipe-onboarding"]')).toHaveCount(0);
+    await expect(page.locator('.swipe-card-title')).toHaveText('Welcome to your local workspace');
+  });
 });
