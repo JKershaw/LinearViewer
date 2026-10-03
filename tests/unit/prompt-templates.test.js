@@ -140,6 +140,16 @@ describe('defer recommend-meta action', () => {
     assert.strictEqual(deriveDispatchKind('defer'), 'defer');
     assert.strictEqual(deriveDispatchKind('DEFER'), 'defer');
   });
+
+  // A router that writes `→ **close out**` named close-out. Read as custom, it lost its
+  // contract on the meta path and failed the hop with the brief writer on (LIN-3292).
+  test('deriveDispatchKind reads a space, underscore or hyphen alike', () => {
+    for (const [name, kind] of [['close out', 'close-out'], ['Close_Out', 'close-out'], ['plan review', 'plan-review'],
+      ['look-into', 'look-into'], ['look into', 'look-into'], ['retrospective audit', 'retrospective-audit'], ['implement', 'implementation']]) {
+      assert.strictEqual(deriveDispatchKind(name), kind, name);
+    }
+    assert.strictEqual(deriveDispatchKind('closeout'), 'custom', 'only separators are normalised, not spelling');
+  });
 });
 
 // =============================================================================

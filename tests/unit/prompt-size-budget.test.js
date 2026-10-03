@@ -56,7 +56,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 128622, // LIN-3293: review files nothing; close-out owns filing; no category list for "large"
-  'lib/prompt-templates.js': 20404,
+  'lib/prompt-templates.js': 20495, // LIN-3292: deriveDispatchKind reads "close out" as close-out; +91, paid by review's LIN-3293 cuts
   'lib/prompt-formatters.js': 52883, // LIN-3292: the finished-task ask is stage-neutral, its comment shorter
   'lib/prompt-contract.js': 3481,
 };
