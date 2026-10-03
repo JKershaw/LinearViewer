@@ -1,7 +1,9 @@
 /**
  * LIN-3293: the proxy recommend route (computeRecommendation, shared by GET
  * /recommend and the fused recommend-and-dispatch verb) turns the brief writer on
- * from HARBOUR_BRIEF_WRITER, per workspace, and off again. Mounted on the real
+ * from the workspace's experimental briefWriter feature, and off again. The route
+ * runs on a proxy token with no user session, which is why the switch is a
+ * workspace feature. Mounted on the real
  * routes/proxy.js with a fake provider; OpenRouter is captured at the fetch
  * boundary (setFetchImpl), as in lin-2353-recommend-llm-provider-ui.test.js.
  */
@@ -28,7 +30,7 @@ const CONTEXT = { issue: ISSUE, parent: null, siblings: [], project: null, child
 const ROUTING = '## Reasoning\n**Assessment:**\n- Ready: ✓ Yes - built\n→ **review**\n**Next:** close-out';
 const BRIEF = '# Review WR-1: Leaf task for the writer route\n\nA plain brief.';
 
-function buildApp() {
+function buildApp(features = {}) {
   registerProvider({
     name: FAKE_PROVIDER,
     ui: { write: true, comments: true, estimates: false, subtasks: true, displayName: 'Linear' },
@@ -51,7 +53,7 @@ function buildApp() {
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: { addItem: async () => ({ _id: 'disp-1' }) },
     workspaceFromUrl: (req, res, next) => next(),
-    workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+    workspacePreferencesStore: { getWorkspacePreferences: async (urlKey) => (urlKey === 'acme' ? { features } : {}) },
     freeTierStore: { tryUse: async () => ({ allowed: true }) }
   }));
   return app;
@@ -81,19 +83,14 @@ function capture() {
   return calls;
 }
 
-const saved = process.env.HARBOUR_BRIEF_WRITER;
-afterEach(() => {
-  setFetchImpl(null);
-  if (saved === undefined) delete process.env.HARBOUR_BRIEF_WRITER; else process.env.HARBOUR_BRIEF_WRITER = saved;
-});
+afterEach(() => { setFetchImpl(null); });
 
 describe('the recommend route and the brief writer switch (LIN-3293)', () => {
   test('switch off: one call, the meta body ships with its contract', async () => {
-    delete process.env.HARBOUR_BRIEF_WRITER;
     const guard = guardNetwork();
     try {
       const calls = capture();
-      const { status, body } = await recommend(buildApp());
+      const { status, body } = await recommend(buildApp({ briefWriter: false }));
       assert.equal(status, 200, JSON.stringify(body));
       assert.equal(calls.length, 1);
       assert.ok(body.prompt.startsWith('META BODY' + formatStageContract('review', ISSUE.identifier)));
@@ -103,12 +100,11 @@ describe('the recommend route and the brief writer switch (LIN-3293)', () => {
     }
   });
 
-  test('switch on for this workspace: a routing call, then the writer; the brief ships with its contract', async () => {
-    process.env.HARBOUR_BRIEF_WRITER = 'acme';
+  test('switch on in this workspace\'s Settings: a routing call, then the writer; the brief ships with its contract', async () => {
     const guard = guardNetwork();
     try {
       const calls = capture();
-      const { status, body } = await recommend(buildApp());
+      const { status, body } = await recommend(buildApp({ briefWriter: true }));
       assert.equal(status, 200, JSON.stringify(body));
       assert.deepEqual(calls.map(c => c.isWriter), [false, true]);
       assert.ok(body.prompt.startsWith(BRIEF + formatStageContract('review', ISSUE.identifier)));
@@ -118,10 +114,12 @@ describe('the recommend route and the brief writer switch (LIN-3293)', () => {
     }
   });
 
-  test('switch on for another workspace only: this one stays on today\'s path', async () => {
-    process.env.HARBOUR_BRIEF_WRITER = 'other-workspace';
+  test('the old environment switch does nothing: the workspace feature is the only switch', async () => {
+    const saved = process.env.HARBOUR_BRIEF_WRITER;
+    process.env.HARBOUR_BRIEF_WRITER = 'on';
     const calls = capture();
-    const { body } = await recommend(buildApp());
+    const { body } = await recommend(buildApp({}));
+    if (saved === undefined) delete process.env.HARBOUR_BRIEF_WRITER; else process.env.HARBOUR_BRIEF_WRITER = saved;
     assert.equal(calls.length, 1);
     assert.ok(body.prompt.startsWith('META BODY'));
   });

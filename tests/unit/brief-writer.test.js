@@ -6,7 +6,7 @@
  * contract and grounding. These pin what must hold whatever the writer writes:
  *   - every machine-read format is present, and grounding is appended once;
  *   - defer skips the writer;
- *   - with the switch off, output is byte-identical to the handwritten/meta paths;
+ *   - with the switch (the briefWriter workspace feature) off, output is byte-identical;
  *   - a writer failure, truncation or timeout ships the unwritten bundle.
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
@@ -28,6 +28,7 @@ import { appendGroundingSections } from '../../lib/prompt-formatters.js';
 import { buildBriefWriterPrompt, STAGE_IDEALS } from '../../lib/prompts/brief-writer.js';
 import { isBriefWriterEnabled, resolveBriefWriter, BRIEF_WRITER_OP_KIND } from '../../lib/brief-writer.js';
 import { AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
+import { WORKSPACE_FEATURES, WORKSPACE_FEATURE_DEFAULTS, WORKSPACE_FEATURE_LABELS, WORKSPACE_FEATURE_DESCRIPTIONS, isValidWorkspaceFeatureKey, isValidFeatureKey } from '../../lib/feature-defaults.js';
 import { AI_OPERATION_LABELS } from '../../lib/render-settings.js';
 
 const ISSUE = {
@@ -79,18 +80,29 @@ afterEach(() => {
   for (const [k, v] of Object.entries(savedProxy)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
 });
 
-describe('the switch', () => {
-  test('off by default and for every off spelling; on for every on spelling', () => {
-    for (const v of [undefined, '', '0', 'false', 'OFF', 'no']) assert.equal(isBriefWriterEnabled('acme', { HARBOUR_BRIEF_WRITER: v }), false, String(v));
-    for (const v of ['1', 'true', 'ON', 'yes']) assert.equal(isBriefWriterEnabled('acme', { HARBOUR_BRIEF_WRITER: v }), true, v);
+describe('the switch: the experimental briefWriter workspace feature', () => {
+  const store = ({ features = {}, byKind = {}, modelId = null } = {}) => ({ getWorkspacePreferences: async () => ({ modelId, features, aiModelOverrides: { byKind } }) });
+  const ON = { [WORKSPACE_FEATURES.BRIEF_WRITER]: true };
+
+  test('a Settings toggle: experimental, off by default, labelled and described', () => {
+    assert.equal(WORKSPACE_FEATURES.BRIEF_WRITER, 'briefWriter');
+    assert.equal(WORKSPACE_FEATURE_DEFAULTS.briefWriter, false);
+    assert.match(WORKSPACE_FEATURE_LABELS.briefWriter, /experimental/i);
+    assert.ok(WORKSPACE_FEATURE_DESCRIPTIONS.briefWriter);
+    assert.ok(isValidWorkspaceFeatureKey('briefWriter'));
+    assert.equal(isValidFeatureKey('briefWriter'), false, 'workspace-scoped: per-user flags never reach the proxy path');
   });
 
-  test('a list of workspace urlKeys turns it on for those workspaces only', () => {
-    const env = { HARBOUR_BRIEF_WRITER: 'acme, beta' };
-    assert.equal(isBriefWriterEnabled('acme', env), true);
-    assert.equal(isBriefWriterEnabled('beta', env), true);
-    assert.equal(isBriefWriterEnabled('gamma', env), false);
-    assert.equal(isBriefWriterEnabled(null, env), false);
+  test('off unless the workspace turned it on; off without a workspace or store', async () => {
+    assert.equal(await isBriefWriterEnabled({ urlKey: 'acme', workspacePreferencesStore: store() }), false);
+    assert.equal(await isBriefWriterEnabled({ urlKey: 'acme', workspacePreferencesStore: store({ features: { briefWriter: false } }) }), false);
+    assert.equal(await isBriefWriterEnabled({ urlKey: 'acme', workspacePreferencesStore: store({ features: ON }) }), true);
+    assert.equal(await isBriefWriterEnabled({ urlKey: null, workspacePreferencesStore: store({ features: ON }) }), false);
+    assert.equal(await isBriefWriterEnabled({ urlKey: 'acme', workspacePreferencesStore: null }), false);
+  });
+
+  test('no environment variable turns it on any more', async () => {
+    assert.equal(await resolveBriefWriter({ urlKey: 'acme', workspacePreferencesStore: store(), env: { HARBOUR_BRIEF_WRITER: 'on' } }), null);
   });
 
   test('the writer\'s model is a per-operation setting like the others: a kind with a label', () => {
@@ -99,13 +111,11 @@ describe('the switch', () => {
   });
 
   test('model: env, then the workspace recommend-write override, then the router\'s model; free tier clamps', async () => {
-    const store = (byKind, modelId = null) => ({ getWorkspacePreferences: async () => ({ modelId, aiModelOverrides: { byKind } }) });
-    const on = { HARBOUR_BRIEF_WRITER: 'on' };
-    assert.equal(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: store({}), env: { HARBOUR_BRIEF_WRITER: 'off' } }), null);
-    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: store({}), env: { ...on, HARBOUR_BRIEF_WRITER_MODEL: 'x/writer' } }), { model: 'x/writer' });
-    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: store({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' }, recommend: { model: 'x/rec' } }), env: on }), { model: 'x/own' });
-    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: store({ recommend: { model: 'x/rec' } }), env: on }), { model: 'x/rec' });
-    const free = await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: store({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' } }), isFreeTier: true, env: on });
+    const on = (byKind) => store({ features: ON, byKind });
+    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({}), env: { HARBOUR_BRIEF_WRITER_MODEL: 'x/writer' } }), { model: 'x/writer' });
+    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' }, recommend: { model: 'x/rec' } }), env: {} }), { model: 'x/own' });
+    assert.deepEqual(await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ recommend: { model: 'x/rec' } }), env: {} }), { model: 'x/rec' });
+    const free = await resolveBriefWriter({ urlKey: 'a', workspacePreferencesStore: on({ [BRIEF_WRITER_OP_KIND]: { model: 'x/own' } }), isFreeTier: true, env: {} });
     assert.notEqual(free.model, 'x/own', 'free tier never bills a workspace-chosen model');
   });
 });

@@ -100,7 +100,7 @@ lib/
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code after every stage's body on both paths
-  brief-writer.js      The brief writer's switch (HARBOUR_BRIEF_WRITER) and model resolution (LIN-3293); the writing calls live in openrouter.js
+  brief-writer.js      The brief writer's switch (the experimental `briefWriter` workspace feature) and model resolution (LIN-3293); the writing calls live in openrouter.js
   prompt-template-defs.js  Prompt template definitions (17 templates)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
