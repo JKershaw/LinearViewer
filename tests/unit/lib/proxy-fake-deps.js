@@ -73,6 +73,8 @@ export const BASE_DEPS = () => ({
     listEvents: async () => ({ events: [], total: 0 }),
     listCredentialHealth: async () => ({ tokens: [] }),
     listSelfCredentialHealth: async () => ({ occupancy: {}, workspaceAccess: {} }),
+    // LIN-3282: GET /api/proxy/credential-trail (routes/proxy-reads.js).
+    listSelfCredentialTrail: async () => ({ windowMs: 900000, items: [] }),
   },
   resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
   getWorkspaceAccessToken: async () => 'test-token',
