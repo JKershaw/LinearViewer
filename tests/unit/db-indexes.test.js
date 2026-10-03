@@ -156,6 +156,38 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the funnel-events first-per-account index, not a TTL (LIN-2952)', () => {
+    // FunnelEventStore.firstPerAccount reads {step, accountId} sorted by `at`
+    // oldest first; the `step` prefix also serves the instance-wide aggregate
+    // read. The log is lifetime-retained, so it may not be a TTL.
+    const spec = INDEX_SPECS.find(s =>
+      s.collection === 'funnel-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ step: 1, accountId: 1, at: 1 })
+    );
+    assert.ok(spec, 'funnel-events must have a {step:1, accountId:1, at:1} index');
+    assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
+  });
+
+  test('declares the per-account dispatch indexes on both collections (LIN-2952 + LIN-3238)', () => {
+    // ONE index per collection serves both readers: the milestone funnel reads a
+    // person's dispatches by `dispatchedBy`, earliest `dispatchedAt` first
+    // (lib/milestone-funnel.js, LIN-2952), and countFreshRunsSince range-scans the
+    // UTC day by attribution, queue first then history (LIN-3238). Without it the
+    // read is an unindexed collection scan. Plain, non-TTL.
+    for (const collection of ['dispatch-queue', 'dispatch-history']) {
+      const spec = INDEX_SPECS.find(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
+      );
+      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index`);
+      assert.strictEqual(
+        spec.options?.expireAfterSeconds,
+        undefined,
+        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
+      );
+    }
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an
@@ -223,23 +255,6 @@ describe('db-indexes', () => {
         JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, producingItemId: 1, producingItemAttempt: -1 })
       );
       assert.ok(hasIt, `${collection} must have a {urlKey:1, producingItemId:1, producingItemAttempt:-1} index`);
-    }
-  });
-
-  test('declares the run-count indexes on both dispatch collections (LIN-3238)', () => {
-    // Backs countFreshRunsSince: a per-account attached range scan over the UTC
-    // day, in the queue and (after the archive hop) in history. Plain, non-TTL.
-    for (const collection of ['dispatch-queue', 'dispatch-history']) {
-      const spec = INDEX_SPECS.find(s =>
-        s.collection === collection &&
-        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
-      );
-      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index (LIN-3238)`);
-      assert.strictEqual(
-        spec.options?.expireAfterSeconds,
-        undefined,
-        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
-      );
     }
   });
 

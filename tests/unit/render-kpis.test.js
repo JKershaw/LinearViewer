@@ -92,6 +92,16 @@ function buildStats(overrides = {}) {
       dayBars: { days: ['2026-06-09', '2026-06-10'], costUsd: [45.2, 61.8] }
     },
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
+    milestoneFunnel: {
+      steps: {
+        login: { state: 'reached', count: 4, coverage: 'accounts created in the window (distinct canonical people)' },
+        connected: { state: 'reached', count: 3, coverage: 'membership edges created in the window (distinct canonical people)' },
+        firstGo: { state: 'reached', count: 2, coverage: 'dispatches in the window (distinct canonical people)' },
+        prOpened: { state: 'reached', count: 1, coverage: 'evidence feedback with a PR url in the window (distinct canonical people)' },
+        mergeClicked: { state: 'no-signal', count: null, coverage: 'awaiting instrumentation (LIN-2949)' }
+      },
+      mode: { total: 3, byRung: [{ rung: 'copy', entries: 2, notReady: 1 }], coverage: { surfaces: ['swipe'] } }
+    },
     dispatchKinds: [{ label: 'autopilot', count: 4 }, { label: 'research', count: 3 }],
     stepOutcomes: { completed: 5, failed: 1, blocked: 0, other: 2 },
     proxyStatus: { ok: 30, clientError: 2, serverError: 1 },
@@ -178,7 +188,7 @@ describe('renderKpisPage', () => {
 
     for (const id of [
       'chart-proxy-phases', 'chart-weekly-budget', 'chart-outcome-trend', 'chart-dispatch-weekly',
-      'chart-dispatch-kinds', 'chart-funnel', 'chart-step-outcomes',
+      'chart-dispatch-kinds', 'chart-funnel', 'chart-milestone-funnel', 'chart-step-outcomes',
       'chart-proxy-status', 'chart-top-endpoints', 'chart-hour-of-day',
       'chart-free-tier'
     ]) {
