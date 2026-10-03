@@ -55,7 +55,7 @@ function parseSSE(text) {
 
 test.describe('Streaming AI Recommendations - API', () => {
   test.beforeEach(async ({ page, seedLocal }) => {
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
   });
 
   test('returns SSE content type', async ({ page, localWorkerUrlKey }) => {
@@ -242,7 +242,7 @@ test.describe('Streaming AI Recommendations - Free Tier', () => {
     // Seed a local session in free-tier mode (no key, session flag) so charging
     // rides the session-flag path — CI sets no OPENROUTER_FREE_TIER_KEY (LIN-405).
     // Clear THIS workspace's counter (the route charges workspace.urlKey).
-    await seedLocal(workspaceApiLocalSeed, { freeTierEnabled: true });
+    await seedLocal(workspaceApiLocalSeed, { freeTierEnabled: true, features: { proxy: false } });
     await page.goto(`/test/clear-free-tier?urlKey=${localWorkerUrlKey}`);
   });
 
@@ -287,7 +287,7 @@ async function expandPromptsSection(page, containerSelector, issueId) {
 test.describe('Streaming AI Recommendations - UI', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
     // The ✦ primary requires OpenRouter to be configured.
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
   });
@@ -344,7 +344,7 @@ test.describe('Streaming AI Recommendations - UI', () => {
   test('LIN-191: no actionable copy/dispatch until the prompt is ready', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, {
       openRouterConnected: true,
-      features: { dispatch: true },
+      features: { dispatch: true, proxy: false },
     });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
