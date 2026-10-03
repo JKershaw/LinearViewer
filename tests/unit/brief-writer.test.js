@@ -19,6 +19,7 @@ import {
   composeRoutedRecommendation,
   splitStageBody,
   routerFocus,
+  briefFault,
   setFetchImpl,
   setLlmCallRecorder,
   setPromptTraceRecorder,
@@ -52,7 +53,14 @@ const expected = (kind, goal = BRIEF) => {
   const body = `${before}${goal}${after.trim() ? `\n\n${after.trim()}` : ''}${formatStageIntent(kind)}`;
   return finishStagePrompt(body, kind, ISSUE, CONTEXT, {}, null);
 };
-const GROUNDING_HEAD = '## Re-ground the Ticket (staleness check)';
+/** A stub brief that keeps the bundle's commands keyed to the ticket, as every brief must (briefFault). */
+const keptIn = (bundle, goal = BRIEF) => {
+  const commands = [...new Set(bundle.match(/`[^`\n]+`/g) || [])].filter(s => s.includes(ISSUE.identifier));
+  return commands.length ? `${goal}\n\nRun ${commands.join(' and ')}.` : goal;
+};
+const keptFor = (kind, goal) => keptIn(splitStageBody(PROMPT_TEMPLATES[kind].generate(ISSUE, CONTEXT, {})).goal, goal);
+const keeping = (goal) => (opts) => json(keptIn(JSON.parse(opts.body).messages[0].content.match(/<bundle>\n([\s\S]*)\n<\/bundle>/)[1], goal));
+const GROUNDING_HEAD ='## Re-ground the Ticket (staleness check)';
 const count = (text, needle) => text.split(needle).length - 1;
 
 const json = (content, { finishReason = 'stop' } = {}) => ({
@@ -219,7 +227,7 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
   test('the scope and authority lines are code\'s, verbatim, for every stage; never on the switch-off path', async () => {
     assert.deepEqual(Object.keys(STAGE_INTENT).sort(), Object.keys(PROMPT_TEMPLATES).sort());
     for (const [kind, template] of Object.entries(PROMPT_TEMPLATES)) {
-      transport({ route: routing(template.name), write: '## Goal\n\nInside means this ticket\'s own unfinished scope.' });
+      transport({ route: routing(template.name), write: keeping('## Goal\n\nInside means this ticket\'s own unfinished scope.') });
       const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
       for (const line of STAGE_INTENT[kind]) assert.ok(rec.prompt.includes(`- ${line}`), `${kind}: ${line.slice(0, 40)}`);
       assert.ok(!generatePrompt(kind, ISSUE, CONTEXT).prompt.includes('## Scope and Authority'), `${kind}: switch-off unchanged`);
@@ -237,7 +245,7 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
         /green CI never settles a ledger item/i, /only by the name review wrote/i, /you cannot supply the name/i, /verify the snapshot before pruning/i]
     };
     for (const [kind, needed] of Object.entries(floors)) {
-      transport({ route: routing(kind), write: '## Goal\n\nLand it.' });
+      transport({ route: routing(kind), write: keeping('## Goal\n\nLand it.') });
       const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
       const scope = rec.prompt.slice(rec.prompt.indexOf('## Scope and Authority'));
       for (const floor of needed) assert.match(scope, floor, `${kind}: ${floor}`);
@@ -277,9 +285,9 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
 
   test('every machine-read format is present and the grounding is appended once, for every stage', async () => {
     for (const [kind, template] of Object.entries(PROMPT_TEMPLATES)) {
-      transport({ route: routing(template.name), write: BRIEF });
+      transport({ route: routing(template.name), write: keeping(BRIEF) });
       const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
-      assert.equal(rec.prompt, expected(kind), kind);
+      assert.equal(rec.prompt, expected(kind, keptFor(kind, BRIEF)), kind);
       const contract = formatStageContract(kind, ISSUE.identifier);
       if (contract) assert.equal(count(rec.prompt, contract), 1, `${kind}: contract once`);
       assert.ok(rec.prompt.includes(contract + appendGroundingSections('', ISSUE, CONTEXT, kind)), `${kind}: contract then grounding`);
@@ -474,5 +482,57 @@ describe('pure seams', () => {
     assert.match(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B', focus: 'F' }), /## Where the router points[^\n]*\n\nF/);
     assert.equal(routerFocus('**Assessment:**\n- Ready: ✓ Yes\n→ **plan**\n**Next:** write it'), '→ **plan**\n**Next:** write it');
     assert.equal(routerFocus('no pointer here'), null);
+  });
+});
+
+// A live read of real briefs found two faults: a command keyed to the ticket rewritten in
+// prose (`git log --grep=LIN-3251` became "a `git log` search for the live task's
+// identifier"), and the router's Next line passed on as the task ("Evaluate the three
+// fallback options…" in a design brief). The writer is told plainly, and code checks.
+describe('what the writer must not change: commands keyed to the ticket, the router\'s specifics', () => {
+  const MANGLED = '## Goal\n\nStart by locating the landed change through a `git log` search for the live task\'s identifier, then audit what shipped.';
+  const DESIGN_FOCUS = '→ **design**\n**Next:** Evaluate the three fallback options against the stated constraints and upstream authority model, select the preferred approach.';
+
+  test('the writer is told ticket numbers leave the prose, never a command, and that the router\'s line is emphasis, not the task', () => {
+    const prompt = buildBriefWriterPrompt({ kind: 'design', bundle: 'B', focus: 'F' });
+    assert.match(prompt, /in prose, drop ticket numbers/i);
+    assert.match(prompt, /commands[^\n]*exact[^\n]*ticket numbers in them/i);
+    const header = prompt.match(/## Where the router points[^\n]*/)[0];
+    assert.match(header, /start from the problem/i);
+    assert.match(header, /none of its specifics as fact, task or option/i);
+  });
+
+  test('briefFault: a command carrying the ticket\'s identifier must come through exactly', () => {
+    const bundle = '## Goal\n\nLocate the landed change first: `git log --grep=LIN-3251` (and `git log --since=<createdAt> -- <files>`).';
+    assert.equal(briefFault(MANGLED, { shown: bundle, identifier: 'LIN-3251' }), 'altered-command');
+    assert.equal(briefFault('## Goal\n\nRun `git log --grep=LIN-3251` first.', { shown: bundle, identifier: 'LIN-3251' }), null);
+    assert.equal(briefFault('## Goal\n\nRun\n\n```\ngit log --grep=LIN-3251\n```', { shown: bundle, identifier: 'LIN-3251' }), null, 'any formatting, exact text');
+    assert.equal(briefFault('## Goal\n\nAudit what shipped.', { shown: '`git log --since=<createdAt>`', identifier: 'LIN-3251' }), null, 'only spans keyed to the ticket');
+  });
+
+  test('briefFault: five words in a row from the router\'s line, not in anything else the writer was shown, are its specifics passed on', () => {
+    const shown = '## Goal\n\nWeigh the viable approaches against the constraints the task states, and choose one.';
+    assert.equal(briefFault('## Goal\n\nEvaluate the three fallback options against the ticket\'s constraints.', { shown, focus: DESIGN_FOCUS }), 'copied-router');
+    assert.equal(briefFault('## Goal\n\nStart from what the design is for, then weigh the viable approaches against the constraints the task states.', { shown, focus: DESIGN_FOCUS }), null);
+    assert.equal(briefFault('## Goal\n\nEvaluate the three fallback options.', { shown, focus: null }), null, 'no focus, nothing to copy');
+    assert.equal(briefFault('## Goal\n\nWeigh the viable approaches against the constraints.', { shown, focus: '**Next:** weigh the viable approaches against the constraints' }), null, 'words the bundle also says are the stage\'s own');
+  });
+
+  test('a brief that alters a ticket-keyed command ships the unwritten bundle', async () => {
+    transport({ route: routing('retrospective-audit'), write: MANGLED });
+    const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+    assert.equal(rec.prompt, generatePrompt('retrospective-audit', ISSUE, CONTEXT).prompt);
+    assert.equal(rec.written, false);
+    assert.equal(rec.writerReason, 'altered-command');
+  });
+
+  test('a brief that passes on the router\'s Next line ships the unwritten bundle', async () => {
+    const route = `## Reasoning\n**Assessment:**\n- Ready: ✓ Yes\n${DESIGN_FOCUS}`;
+    transport({ route, write: '## Goal\n\nEvaluate the three fallback options against the ticket\'s stated constraints and upstream authority model.' });
+    const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+    assert.equal(rec.prompt, generatePrompt('design', ISSUE, CONTEXT).prompt);
+    assert.equal(rec.writerReason, 'copied-router');
+    transport({ route, write: BRIEF });
+    assert.equal((await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } })).written, true);
   });
 });
