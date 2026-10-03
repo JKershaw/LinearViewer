@@ -6,7 +6,7 @@ version: 2
 date: 2026-10-03
 authors: [Claude (the Flight Companion session, with John Kershaw; versions 1 and 2)]
 model: "Frontier tier, Claude Code, in the Flight Companion's cloud session; written in conversation with John Kershaw on 3 October 2026, not from a dispatch. No new measurement: the figures are read from the research comments and papers listed below. Not checked, independently or otherwise."
-revision: "Version 2 (same day) follows John's decisions after reading version 1. It records his definition of a large change, replaces section 7's single-author rewrite with the two-layer design (rules assembled by code, the brief written by a separate step), records the rule changes already made on the branch, and says the release does not wait on a live test. Sections 1 to 3 are unchanged."
+revision: "Version 2 (same day) follows John's decisions after reading version 1. It records his definition of a large change, replaces section 7's single-author rewrite with the two-layer design (rules assembled by code, the brief written by a separate step), records the rule changes already made on the branch, and says the release does not wait on a live test. A later same-day edit adds that "colleague" means judgement, not persona (John's tone standard). Sections 1 to 3 are unchanged."
 sources:
   - "LIN-3275 research comment (3 Oct 2026, 08:08Z): the two-path cause of the 401/200 switching"
   - "LIN-3277 research comment (3 Oct 2026, 08:26Z): why eleven earlier tickets in the area did not hold"
@@ -156,7 +156,9 @@ For Harbour this means three things:
 - **Briefs.** Each stage prompt reads as a brief to a skilled colleague: what the work is for,
   what good looks like, and where the real edges are, in plain language. The stages become the
   things a good developer does anyway (look closely, think it through, ask someone to check),
-  not gates that defend scope.
+  not gates that defend scope. "Colleague" means trusted with judgement and context, not given a
+  persona: a brief addresses the agent directly and plainly, explains why, states its real
+  limits, and leaves out the social habits of human teams.
 - **Coherence.** The briefs tell one story of a task's life. Most of today's rules exist to
   fence off the gaps between stages, so a coherent set should come out shorter. Coherence comes
   from one writing step that holds an ideal version of every stage, not from one author editing
