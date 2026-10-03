@@ -1674,7 +1674,7 @@ A compact orientation projection: each task drops the full `description` for a d
 GET /api/proxy/issues/{identifier}/prompt/{templateKey}
 ```
 
-Generates a deterministic, template-based prompt for an issue. `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
+Generates a deterministic, template-based prompt for an issue, whatever the workspace's brief writer setting: it is the template read. To get a pinned stage's prompt as a worker would receive it, use `recommend?kind=`. `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
 
 ```json
 {
@@ -2399,7 +2399,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `repoInherited` | bool | No | Default `false`. Marks `repo` as **inherited** (forwarded from a parent context) rather than user-explicit. When `true`, a cross-project descent's child repo — or the named node's own project `repo=` on a `kind` override — wins over the inherited `repo`; a repo-less child still falls back to it. Leave it off (or `false`) for a deliberately chosen repo, which keeps winning (see below) |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
-| `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
+| `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated for the **named issue** with that template (see below) |
 | `sessionId` | string (opaque) | No | The autopilot dispatch id driving this run. Stamp it on every fan-out so the whole multi-task run reconstructs as one session. An **opaque grouping key, not a UUID** (LIN-1118): non-empty, ≤128 chars, no control characters, `__meta__` reserved; existing UUIDs stay valid. Any target; stored and forwarded verbatim. See LIN-591 |
 | `periodicalId` | string | No | The periodical-template join key: the id of a periodicals-registry template (e.g. `documentation-review`) this dispatch was minted from. Stamped once at dispatch time, never maintained, and does **not** propagate to a `followUpTo` beat or a wake. Validated against the live registry — an unknown/typo id is rejected `400`. Stored and forwarded verbatim; inert to execution. Stamped onto whichever `createDispatchItem` call this route resolves to — the verb-override branch (`kind` set) and the recommendation-derived branch (`kind` omitted, the branch autopilot's normal trigger actually takes) both carry it. See LIN-1825/LIN-2385 |
 
@@ -2408,7 +2408,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 **`kind` — pin the verb when the engine is wrong.** The recommendation engine is ~90% right but occasionally picks the wrong step (e.g. refuses to hand you a `review` for a task that is plainly ready for one). Rather than hand-writing the prompt that broken verb would have produced — which violates the server-side-only invariant — pass `kind` to **pin the step**. The server still **writes the body**; you only choose the verb. You pick the verb, never the words.
 
 When `kind` is present the verb:
-- **bypasses the LLM** recommendation and descent entirely (no OpenRouter call, no free-tier charge);
+- **bypasses the LLM** recommendation and descent entirely: no routing call. With the workspace's experimental brief writer off there is no OpenRouter call and no free-tier charge; with it on, the writer rewrites the pinned stage's Goal (one call, charged once, 20-40s behind a keepalive) as it does for a routed recommendation;
 - generates the body for the **named issue with no descent** (the wobble is the verb, not the target);
 - accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
 - returns the same headers-only response plus `"override": true`.

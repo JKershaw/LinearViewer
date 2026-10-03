@@ -25,7 +25,8 @@ import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.j
 import { READ_HORIZON_MS, READ_HORIZON_DAYS, readHorizonStart } from '../lib/read-horizon.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
 import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
-import { armKeepalive } from '../lib/http-keepalive.js';
+import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
+import { resolveBriefWriter, generateStagePrompt } from '../lib/brief-writer.js';
 import { UUID_REGEX, isValidIssueId, BINDING_INTENT } from '../lib/workspace.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 
@@ -274,6 +275,10 @@ export function createComputeRoutes({
    * GET /api/proxy/prompt/:identifier/:templateKey           (forgiving alias, flat form)
    * Returns the generated prompt for a specific issue and template.
    * Shared :identifier/:templateKey params across both forms (LIN-528).
+   * Deterministic whatever the brief writer switch (LIN-3293): this is the
+   * template read, and no dispatch, autopilot or lane path takes the prompt an
+   * agent runs from it (they use recommend / recommend-and-dispatch, with `kind`
+   * to pin a stage).
    */
   router.get(['/api/proxy/issues/:identifier/prompt/:templateKey', '/api/proxy/prompt/:identifier/:templateKey'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
@@ -406,18 +411,25 @@ export function createComputeRoutes({
         return badRequest.json(res, `Invalid kind: ${kind}`);
       }
 
+      // The kind-override is a pinned stage: with the workspace's brief writer on
+      // (LIN-3293) the writer rewrites its Goal, its one model call; off, it makes none.
+      const pinnedWriter = kind !== undefined && !isTestMode
+        ? await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier })
+        : null;
+      const makesModelCall = kind === undefined || pinnedWriter !== null;
+
       // LIN-1458: witness which credential source served this request when
       // the creator's own key came back empty. Gated the same as the charge
-      // below (kind-override makes no LLM call, so nothing to witness there).
-      if (kind === undefined && !isTestMode) {
+      // below (a kind-override with the writer off makes no LLM call).
+      if (makesModelCall && !isTestMode) {
         logOpenRouterCredentialSource(req, '/api/proxy/recommend', { sessionApiKey, isFreeTier });
       }
 
       // Charge one free-tier unit ONCE per request (not per descent hop — that
       // would overbill a multi-hop container). resolveRecommendation does the
       // generation below; charge before it so an exhausted user gets a clean 429.
-      // Skipped on the kind-override path (LIN-839): it makes no LLM call.
-      if (kind === undefined && isFreeTier && !isTestMode) {
+      // Skipped on the kind-override path with the writer off (LIN-839): no LLM call.
+      if (makesModelCall && isFreeTier && !isTestMode) {
         const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recommend');
         if (rejection) {
           logEvent(req, '/api/proxy/recommend', 429);
@@ -434,12 +446,15 @@ export function createComputeRoutes({
       // delayed whitespace keepalive so the dyno can keep the connection open
       // while the LLM call completes.
       const keepalive = armKeepalive(res);
+      // A client hang-up aborts the model calls (routing and writer) on either path.
+      const gone = clientGoneSignal(res);
       try {
         let rec, deferredVia, deferTruncated, deferStopReason;
         if (kind !== undefined) {
           // Kind-override (LIN-839): skip the LLM recommendation + descent. Fetch
           // the named issue's context and generate the requested kind's prompt
-          // deterministically. generatePrompt() internally runs the grounding
+          // (deterministically with the brief writer off; with it on, the writer
+          // rewrites only the Goal, LIN-3293). generatePrompt() internally runs the grounding
           // post-passes (appendGroundingSections: staleness / terminal-state /
           // all-subtasks-complete / bug-investigated, plus capability + attachments),
           // so every grounding section the LLM path emits is preserved here.
@@ -453,21 +468,28 @@ export function createComputeRoutes({
             if (err.message?.includes('not found')) {
               keepalive.stop();
               logEvent(req, '/api/proxy/recommend', 404);
-              return notFound.json(res, 'Issue not found');
+              return keepalive.send(404, { error: 'Issue not found' });
             }
             throw err;
           }
           if (!ctx) {
             keepalive.stop();
             logEvent(req, '/api/proxy/recommend', 404);
-            return notFound.json(res, 'Issue not found');
+            return keepalive.send(404, { error: 'Issue not found' });
           }
           const { issue, parent, siblings, project, children, comments, attachments } = ctx;
-          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
+          // generatePrompt byte for byte with the writer off (lib/brief-writer.js).
+          const generated = await generateStagePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {
+            providerUi: provider?.ui || null,
+            briefWriter: pinnedWriter,
+            apiKey: resolveProxyLLM(sessionApiKey).apiKey,
+            signal: gone.signal,
+            callMeta: { urlKey: req.proxyUrlKey, feature: 'recommend', issueIdentifier: issue.identifier }
+          });
           if (!generated) {
             keepalive.stop();
             logEvent(req, '/api/proxy/recommend', 500);
-            return jsonError(res, 500, 'Failed to generate prompt');
+            return keepalive.send(500, { error: 'Failed to generate prompt' });
           }
           // Shape a recommendation-equivalent object so the override falls through
           // to the shared md/JSON response below (no forked response path).
@@ -497,7 +519,8 @@ export function createComputeRoutes({
               isTestMode,
               sessionApiKey,
               deadline: recommendDeadline,
-              noDescend
+              noDescend,
+              clientSignal: gone.signal
             })
           }));
         }
@@ -539,6 +562,8 @@ export function createComputeRoutes({
         const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend', status);
         keepalive.send(status, body);
+      } finally {
+        gone.release();
       }
     } catch (err) {
       const { status, body } = recommendErrorResponse(err, req);

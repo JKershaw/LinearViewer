@@ -7,7 +7,8 @@
  * GET /api/proxy/dispatch/:id/prompt.
  */
 import { Router } from 'express';
-import { armKeepalive } from '../lib/http-keepalive.js';
+import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
+import { resolveBriefWriter, generateStagePrompt } from '../lib/brief-writer.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -19,7 +20,7 @@ import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbac
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-guard.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
-import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX, BINDING_INTENT } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
@@ -742,6 +743,10 @@ export function createDispatchRoutes({
       return jsonError(res, 503, 'Dispatch is not available');
     }
 
+    // The verb-override arm's keepalive, once armed: the outer catch must answer
+    // through it, since a flushed 200 can no longer take a plain error status.
+    let overrideKeepalive = null;
+
     try {
       const { issueIdentifier, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
 
@@ -926,19 +931,47 @@ export function createDispatchRoutes({
       // Linear output stays byte-identical to the /prompt endpoint since its ui
       // is the DEFAULT_PROMPT_UI floor.
       if (kind !== undefined) {
+        // With the workspace's brief writer on (LIN-3293) the pinned stage's Goal is
+        // rewritten by the writer, its one model call: charged like the routed arm,
+        // keepalive-armed, and aborted if the caller hangs up. Off, no model call,
+        // and the prompt is generatePrompt's byte for byte.
+        const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
+        const { apiKey: overrideApiKey, isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
+        const overrideWriter = isTestMode
+          ? null
+          : await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier: overrideIsFreeTier });
+        if (overrideWriter) {
+          logOpenRouterCredentialSource(req, '/api/proxy/recommend-and-dispatch', { sessionApiKey: overrideSessionApiKey, isFreeTier: overrideIsFreeTier });
+          if (overrideIsFreeTier) {
+            const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recommend-and-dispatch');
+            if (rejection) {
+              logEvent(req, '/api/proxy/recommend-and-dispatch', 429);
+              return res.status(rejection.status).json(rejection.body);
+            }
+          }
+        }
+        const keepalive = armKeepalive(res);
+        overrideKeepalive = keepalive;
+        const gone = clientGoneSignal(res);
+
         let ctx;
         try {
           ctx = await resolvePromptIssueContext(provider, accessToken, issueIdentifier, isTestMode);
         } catch (err) {
           if (err.message?.includes('not found')) {
+            keepalive.stop();
+            gone.release();
             logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
-            return notFound.json(res, 'Issue not found');
+            return keepalive.send(404, { error: 'Issue not found' });
           }
+          gone.release();
           throw err;
         }
         if (!ctx) {
+          keepalive.stop();
+          gone.release();
           logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
-          return notFound.json(res, 'Issue not found');
+          return keepalive.send(404, { error: 'Issue not found' });
         }
 
         const { issue, parent, siblings, project, children, comments, attachments } = ctx;
@@ -957,10 +990,17 @@ export function createDispatchRoutes({
         // path, which already passes the full context. provider?.ui is threaded
         // through (LIN-2353) so a non-Linear provider renders capability-appropriate
         // text; Linear output stays byte-identical.
-        const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
+        const generated = await generateStagePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {
+          providerUi: provider?.ui || null,
+          briefWriter: overrideWriter,
+          apiKey: overrideApiKey,
+          signal: gone.signal,
+          callMeta: { urlKey: req.proxyUrlKey, feature: 'recommend', issueIdentifier: issue.identifier }
+        });
         if (!generated) {
+          keepalive.stop();
           logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
-          return jsonError(res, 500, 'Failed to generate prompt');
+          return keepalive.send(500, { error: 'Failed to generate prompt' });
         }
 
         // The body is server-generated/trusted, so it skips the dangerous-char /
@@ -981,10 +1021,20 @@ export function createDispatchRoutes({
             // matching comment on the plain POST /dispatch guard above.
             const repoResult = await validateDispatchRepo({ repo: overrideRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
             if (!repoResult.ok) {
+              keepalive.stop();
               logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 422, `UNKNOWN_REPO ${overrideRepoCandidate}`);
-              return jsonError(res, 422, `Unknown repo "${overrideRepoCandidate}"`, { code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
+              return keepalive.send(422, { error: `Unknown repo "${overrideRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
             }
             overrideResolvedRepo = repoResult.repo;
+          }
+
+          // A caller that hung up before the enqueue gets nothing enqueued. Once
+          // createDispatchItem starts it is never abandoned: no signal reaches it.
+          gone.release();
+          if (gone.gone) {
+            keepalive.stop();
+            logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 499, 'client closed before enqueue');
+            return keepalive.send(499, { error: 'Client closed the request before dispatch' });
           }
 
           // Create the dispatch item through the shared factory (LIN-1139): it
@@ -994,9 +1044,8 @@ export function createDispatchRoutes({
           // runs inside finalizePrompt AFTER the harness is resolved (LIN-1155), so
           // it can gate its MCP-token-vs-prose branch on it and hand back the
           // bootstrapToken to carry as a field. Opt out with appendProxyContext:false.
-          // Free-tier run gate (LIN-3238): token creator's key decides free tier.
-          const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-          const { isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
+          // Free-tier run gate (LIN-3238): token creator's key decides free tier
+          // (overrideIsFreeTier, resolved above from the same key).
           const runGate = buildRunGate({
             isFreeTier: overrideIsFreeTier,
             freeTierStore,
@@ -1109,12 +1158,13 @@ export function createDispatchRoutes({
           // Record the override so it can feed heuristic improvement — the
           // engine's verb was demonstrably wrong here (LIN-573). The distinct
           // endpoint tag keeps these auditable in the proxy event log.
+          keepalive.stop();
           logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 201);
           {
             // Consumer poll-recency warning (LIN-2885) — see formatDispatchWatch's
             // comment for why this is the same pure function used everywhere.
             const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
-            return res.status(201).json({
+            return keepalive.send(201, {
               success: true,
               id: item._id,
               status: 'queued',
@@ -1139,25 +1189,25 @@ export function createDispatchRoutes({
             });
           }
         } catch (err) {
-          // Duplicate-dispatch refusal (LIN-1656). This is the verb-OVERRIDE arm,
-          // which creates its dispatch BEFORE `armKeepalive` runs, so it replies on
-          // plain `res` — no keepalive to thread. (The LLM arm below is armed and
-          // must pass one.)
-          if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
-          // Task-budget refusal (LIN-1751) — same plain-`res` arm as above.
-          if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
-          // Free-tier run-limit refusal (LIN-3238) — plain-`res` arm (no keepalive armed).
-          if (refuseIfRunLimit(err, req, res, '/api/proxy/recommend-and-dispatch')) return;
+          keepalive.stop();
+          // Duplicate-dispatch refusal (LIN-1656). The verb-override arm is
+          // keepalive-armed too (the brief writer can take 20-40s, LIN-3293), so
+          // every refusal rides `keepalive.send`, as on the LLM arm below.
+          if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
+          // Task-budget refusal (LIN-1751) — same keepalive-armed arm as above.
+          if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
+          // Free-tier run-limit refusal (LIN-3238) — same keepalive-armed arm.
+          if (refuseIfRunLimit(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-            return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
+            return keepalive.send(503, { error: PROXY_ATTACH_FAILED_MESSAGE });
           }
           // A declared resume whose grant cannot be re-issued (LIN-3134): relay
           // the coded refusal ahead of graphqlErrorStatus, which would 500 it.
           if (isStructuralGrantRefusal(err)) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
-            return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
+            return keepalive.send(err.status, { error: err.message, code: err.code, retryable: false });
           }
           // LIN-2260: classify an upstream provider-auth failure the same way
           // the read path (and GET /recommend via recommendErrorResponse)
@@ -1168,7 +1218,7 @@ export function createDispatchRoutes({
           const status = graphqlErrorStatus(err, req);
           logEvent(req, '/api/proxy/recommend-and-dispatch', status);
           console.error('Proxy recommend-and-dispatch override error:', err.message);
-          return jsonError(res, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
+          return keepalive.send(status, { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
         }
       }
 
@@ -1198,6 +1248,8 @@ export function createDispatchRoutes({
 
       // /recommend is slow (Linear + OpenRouter) — arm keepalive before computing.
       const keepalive = armKeepalive(res);
+      // A client hang-up aborts the model calls; the enqueue checks it before starting.
+      const gone = clientGoneSignal(res);
 
       let rec, deferredVia, deferTruncated, deferStopReason;
       try {
@@ -1219,11 +1271,13 @@ export function createDispatchRoutes({
             isTestMode,
             sessionApiKey,
             deadline: recommendDeadline,
-            noDescend: noDescend === true
+            noDescend: noDescend === true,
+            clientSignal: gone.signal
           })
         }));
       } catch (err) {
         keepalive.stop();
+        gone.release();
         const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend-and-dispatch', status);
         return keepalive.send(status, body);
@@ -1288,6 +1342,15 @@ export function createDispatchRoutes({
             return keepalive.send(422, { error: `Unknown repo "${recommendRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
           }
           recommendResolvedRepo = repoResult.repo;
+        }
+
+        // A caller that hung up before the enqueue gets nothing enqueued. Once
+        // createDispatchItem starts it is never abandoned: no signal reaches it.
+        gone.release();
+        if (gone.gone) {
+          keepalive.stop();
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 499, 'client closed before enqueue');
+          return keepalive.send(499, { error: 'Client closed the request before dispatch' });
         }
 
         // Create the dispatch item through the shared factory (LIN-1139): it
@@ -1499,7 +1562,12 @@ export function createDispatchRoutes({
       const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/recommend-and-dispatch', status);
       console.error('Proxy recommend-and-dispatch error:', err.message);
-      jsonError(res, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
+      const body = { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) };
+      if (overrideKeepalive) {
+        overrideKeepalive.stop();
+        return overrideKeepalive.send(status, body);
+      }
+      jsonError(res, status, 'Failed to dispatch prompt', { detail: body.detail, ...graphqlErrorExtra(err, status) });
     }
   });
 

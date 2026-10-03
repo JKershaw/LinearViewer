@@ -100,7 +100,7 @@ lib/
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code after every stage's body on both paths
-  brief-writer.js      The brief writer's switch (the experimental `briefWriter` workspace feature) and model resolution (LIN-3293); the writing calls live in openrouter.js
+  brief-writer.js      The brief writer's switch (the experimental `briefWriter` workspace feature) and model resolution (LIN-3293), and the two helpers every prompt surface uses: resolveRecommendModels (routed) and generateStagePrompt (pinned); the writing calls live in openrouter.js
   prompt-template-defs.js  Prompt template definitions (17 templates)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
@@ -189,7 +189,7 @@ lib/
   audit.js             Workspace audit module (computes audit report from Linear)
   feature-defaults.js  Feature toggle keys, defaults, and helpers
   token-refresh.js     Linear OAuth token refresh
-  http-keepalive.js    Defuses Heroku H12 30s router timeout on long handlers
+  http-keepalive.js    Keeps slow replies alive behind the router (H12 first byte, timed from X-Request-Start; H15 idle): JSON whitespace, SSE comments, and the client-gone abort signal
   errors.js            Error response helpers
   parse-landing.js     Parses markdown content for landing page
   deploy-info.js       Footer deploy info (LIN-1385): neutral DEPLOY_* env vars first, RAILWAY_GIT_COMMIT_SHA fallback for commit; version/createdAt have no Railway analog and stay null unless DEPLOY_VERSION/DEPLOY_CREATED_AT are set
