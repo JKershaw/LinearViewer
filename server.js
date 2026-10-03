@@ -1720,7 +1720,8 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     showSource,
     truncated,
     topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
-    topTaskWhy: homeTopTask ? homeTopTask.why : []
+    topTaskWhy: homeTopTask ? homeTopTask.why : [],
+    proxyDefault: session.proxyDefault
   });
   return res.send(html);
 }
@@ -3106,7 +3107,8 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       showSource,
       truncated,
       topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
-      topTaskWhy: homeTopTask ? homeTopTask.why : []
+      topTaskWhy: homeTopTask ? homeTopTask.why : [],
+      proxyDefault: req.session.proxyDefault
     });
     res.send(html);
   } catch (error) {
@@ -3180,7 +3182,8 @@ app.get('/workspace/:urlKey/swipe/:identifier?', workspaceFromUrl, async (req, r
         isLocalhost,
         sessionCounts,
         teams,
-        selectedTeamId
+        selectedTeamId,
+        proxyDefault: req.session.proxyDefault
       }
     );
     res.send(html);
@@ -3705,7 +3708,8 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     featureFlags,
     projectRepos,
     isLocalhost,
-    dispatchDefaults
+    dispatchDefaults,
+    proxyDefault: req.session.proxyDefault
   });
   res.send(html);
 });
@@ -4086,6 +4090,50 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
   // AJAX requests get JSON; regular form submissions get redirect
   if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
     res.json({ ok: true, theme });
+  } else {
+    res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
+  }
+});
+
+/**
+ * Set the account's proxy-default preference (LIN-2944 P3, addendum 15).
+ *
+ * Mirrors the theme route above: validate, write the session (authoritative),
+ * best-effort persist to UserPreferencesStore (top-level `prefs.proxyDefault`)
+ * when an account is present, then JSON for XHR / redirect for a plain form
+ * submit. Accepts `{ proxyDefault }` — boolean only, 400 otherwise. The client's
+ * `+proxy` toggle POSTs here fire-and-forget; unset session values mean ON
+ * (addendum 16), so this route only ever records an explicit choice.
+ */
+app.post('/workspace/:urlKey/settings/proxy-default', workspaceFromUrl, async (req, res) => {
+  const workspace = req.workspace;
+  const { proxyDefault } = req.body || {};
+
+  if (typeof proxyDefault !== 'boolean') {
+    return res.status(400).json({ error: 'Invalid proxyDefault' });
+  }
+
+  // Session is the authoritative, immediate path.
+  req.session.proxyDefault = proxyDefault;
+  try {
+    await saveSession(req.session);
+  } catch (err) {
+    console.error('Failed to save proxy default:', err);
+    return res.status(500).json({ error: 'Failed to save proxy default' });
+  }
+
+  // Best-effort durable persist for cross-device sync (non-fatal: the session
+  // already carries the choice for this device/session).
+  if (req.session.accountId) {
+    try {
+      await userPreferencesStore.setProxyDefault(req.session.accountId, proxyDefault);
+    } catch (err) {
+      console.error('Failed to persist proxy default to preferences store:', err);
+    }
+  }
+
+  if (req.headers['x-requested-with'] === 'XMLHttpRequest') {
+    res.json({ ok: true, proxyDefault });
   } else {
     res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }

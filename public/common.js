@@ -1844,15 +1844,17 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  * loaded on every authenticated surface (tree, dispatch, swipe, …).
  *
  * State model:
- *  - The toggle's on/off lives in a single localStorage key.
- *  - The *rendered* active look is driven by a `data-proxy-active` attribute on
+ *  - The toggle's on/off is the account's durable `prefs.proxyDefault`, emitted
+ *    by the server as `data-proxy-active` on <body> (LIN-2944 P3). Unset means
+ *    on. There is no localStorage key (addendum 15).
+ *  - The *rendered* active look is driven by that `data-proxy-active` attribute on
  *    <body> + CSS, NOT a per-button class — so buttons injected after load
  *    (lazy issue-detail blocks, swipe re-renders) inherit it automatically and
  *    can't "miss the restore" (LIN-525 #1).
  *  - The proxy feature flag is per-user/per-workspace and known only to the
  *    server; the page shell emits it as `data-proxy-feature` on <body>. When it
  *    is absent/off the toggle is inert — no block appended, no token minted —
- *    even if the global toggle key is on from a flag-on workspace (LIN-525 #2).
+ *    even if the account's proxy default is on (LIN-525 #2).
  *  - Bootstrap tokens are single-use (LIN-376): each is spent by the agent's
  *    one exchange at `POST /api/proxy/token`. They are therefore minted FRESH on
  *    every append and never cached — caching one and serving it to a later
@@ -1864,14 +1866,12 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  * @global
  */
 window.ProxyToggle = (function () {
-  const TOGGLE_KEY = 'proxy-toggle-active';
-
+  // The active state is emitted SERVER-SIDE as `data-proxy-active` on <body>
+  // from the account's durable preference (LIN-2944 P3). Unset means on. There is
+  // no localStorage key and no client-side fallback (addendum 15/16): a session
+  // the server has not stamped yet reads as off until the next page render.
   function isActive() {
-    try {
-      return localStorage.getItem(TOGGLE_KEY) === 'true';
-    } catch {
-      return false;
-    }
+    return !!(document.body && document.body.dataset.proxyActive === 'true');
   }
 
   // The server-emitted proxy feature flag for the current workspace/user.
@@ -1879,19 +1879,32 @@ window.ProxyToggle = (function () {
     return document.body && document.body.dataset.proxyFeature === 'true';
   }
 
-  // Mirror the persisted toggle onto <body> so CSS styles every (current AND
-  // future-injected) +proxy button without per-button bookkeeping.
-  function syncBodyState() {
-    if (document.body) document.body.dataset.proxyActive = isActive() ? 'true' : 'false';
+  // The workspace key this page is scoped to, parsed from the path. `null` on
+  // non-workspace surfaces (landing), where the write route does not apply.
+  function currentUrlKey() {
+    const pathname = (window.location && window.location.pathname) || '';
+    const m = pathname.match(/^\/workspace\/([^/]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
   }
 
+  // Flip the rendered state optimistically (the dataset drives body[data-proxy-
+  // active] CSS and every +proxy button), then persist fire-and-forget to the
+  // preference route. A failed write self-corrects on the next page load.
   function setActive(active) {
+    const next = active === true;
+    if (document.body) document.body.dataset.proxyActive = next ? 'true' : 'false';
+    const urlKey = currentUrlKey();
+    if (!urlKey) return;
     try {
-      localStorage.setItem(TOGGLE_KEY, active ? 'true' : 'false');
+      window.api(`/workspace/${encodeURIComponent(urlKey)}/settings/proxy-default`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ proxyDefault: next }),
+        on401: false
+      }).catch(() => {});
     } catch {
-      // ignore persistence failures (private mode etc.)
+      // ignore: the optimistic flip is the user-visible truth until reload
     }
-    syncBodyState();
   }
 
   /**
@@ -2148,11 +2161,12 @@ window.ProxyToggle = (function () {
   }
 
   /**
-   * Restore the rendered state and wire a single delegated click handler for
-   * every +proxy button on the page (current and future-injected).
+   * Wire a single delegated click handler for every +proxy button on the page
+   * (current and future-injected). The rendered active look comes from the
+   * server-emitted `data-proxy-active` body attribute, so there is nothing to
+   * restore here (LIN-2944 P3).
    */
   function init() {
-    syncBodyState();
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('.prompt-proxy-toggle');
       if (!btn) return;

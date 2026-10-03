@@ -535,6 +535,7 @@ export function createFlightCompanionRoutes({
           workspaces: req.session.workspaces,
           featureFlags,
           aiConfigured,
+          proxyDefault: req.session.proxyDefault,
         }
       );
       res.send(html);

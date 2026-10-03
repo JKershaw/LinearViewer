@@ -34,9 +34,9 @@ test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
 });
 
-/** Fresh session, toggle guaranteed OFF (a new context has no localStorage state). */
+/** Fresh session, toggle explicitly OFF through the proxyDefault seam. */
 async function setSession(page) {
-  await page.goto(`/test/set-session?features=${FEATS}&urlKey=${URL_KEY}`);
+  await page.goto(`/test/set-session?features=${FEATS}&urlKey=${URL_KEY}&proxyDefault=false`);
   // fixture:LIN-3136: forced copies mint the owner-only driver copy (M5), and the dispatches declare for the owner (M2)
   await seedWorkspaceOwnership(page, URL_KEY);
   // /fixture:LIN-3136
