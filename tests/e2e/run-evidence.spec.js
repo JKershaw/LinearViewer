@@ -205,8 +205,7 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
 //
 // LIN-3247's `/test/seed-pr-status` primes BOTH the evidence fail-open cache and
 // the pr-state route's whole-reader cache, so the header line is served from the
-// stub. The route makes zero live api.github.com calls; the server-side counter
-// proves it.
+// stub. The route makes zero live GitHub calls; the server-side counter proves it.
 test.describe('Header PR line on the session page (LIN-3251)', () => {
   async function noLiveGitHubFetches(page) {
     const resp = await page.request.get('/test/pr-state-upstream-count');
