@@ -38,6 +38,7 @@ import {
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
 import { appendGroundingSections } from '../../lib/prompt-formatters.js';
+import { formatStageContract } from '../../lib/prompt-contract.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
@@ -1009,8 +1010,11 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
   test('S2 parity — the Plan-prompts quality rule carries the gate and the revision half', () => {
     const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan prompts**'));
     assert.ok(rule, 'the meta-prompt must carry a Plan-prompts quality rule');
-    assert.ok(/plan-review due: yes.*plan-review due: no/is.test(rule),
+    assert.ok(/record in the description whether plan-review is due/i.test(rule),
       'the rule must require the recorded gate decision');
+    // Its exact form is the stage contract's, appended by code on both paths (LIN-3292).
+    assert.ok(/plan-review due: yes.*plan-review due: no/is.test(formatStageContract('plan', 'LIN-1')),
+      'the contract carries the form the router and the round-trip instrument read');
     assert.ok(/placed AFTER the Scope Assessment \/ session-fit step/i.test(rule),
       'the rule must pin the gate BELOW session-fit, since criterion (a) reads that answer');
     assert.ok(/revise against a prior plan-review verdict/i.test(rule),
@@ -1036,8 +1040,9 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the rule must require archiving before pruning');
     assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
       'the rule must carry the never-prune carve-out, including scope');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\), any "plan-review due:" line, and any "Implementation Plan" heading/i.test(rule),
-      'the rule must carry the verbatim marker-preservation mandate');
+    // The verbatim marker-preservation mandate is the stage contract's (LIN-3292).
+    assert.ok(/keep word for word any `Implementation Plan` heading, the session-fit phrase \(`fits one session` \/ `needs multiple sessions`\) and any `plan-review due:` line/.test(formatStageContract('close-out', 'LIN-1')),
+      'the close-out contract carries the verbatim marker-preservation mandate');
     assert.ok(/this step runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
       'the rule must scope the step to the all-clear path only, mirroring the handwritten template');
   });

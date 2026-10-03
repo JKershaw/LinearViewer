@@ -21,7 +21,7 @@
  * `scripts/steady-base-growth.mjs` (the four-week growth read), so a drift in
  * one instrument is visible in the other:
  *   - Templates source  : lib/prompt-template-defs.js, lib/prompt-templates.js,
- *                         lib/prompt-formatters.js
+ *                         lib/prompt-formatters.js, lib/prompt-contract.js
  *   - Templates rendered: generatePrompt() for each PROMPT_TEMPLATES key under one
  *                         fixed fixture (composed output, catches leaks through a
  *                         source the frozen file does not itself contain)
@@ -50,12 +50,14 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 // cap, not an identity pin: shrinking a surface needs no edit here. Growing one
 // needs an equal-or-greater removal elsewhere; see the message on each assert.
 
-/** Templates, source bytes. Same three files `steady-base-growth.mjs` GROUPS as
- * "worker templates". */
+/** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
+ * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
+ * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 133056,
-  'lib/prompt-templates.js': 20984,
-  'lib/prompt-formatters.js': 54812,
+  'lib/prompt-template-defs.js': 131297,
+  'lib/prompt-templates.js': 20404,
+  'lib/prompt-formatters.js': 53209,
+  'lib/prompt-contract.js': 3481,
 };
 
 /** Templates, rendered bytes for each PROMPT_TEMPLATES key under FIXTURE_ISSUE +
@@ -63,27 +65,27 @@ export const TEMPLATES_SOURCE_CEILINGS = {
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 2990,
   bug: 4420,
-  plan: 15314,
+  plan: 15433, // LIN-3292: plan, implementation and review carry the stage contract, paid by triage, plan-review and close-out
   'look-into': 1645,
-  triage: 3169,
+  triage: 2499,
   breakdown: 4669,
   research: 11115,
   scoping: 2079,
   design: 2277, // LIN-3296: design and spike rewritten as briefs, paid by implementation and close-out's LIN-3291 trims
   spike: 2190,
   context: 1892,
-  'plan-review': 7807,
-  implementation: 7511,
-  review: 19890,
-  'close-out': 19693,
+  'plan-review': 7704,
+  implementation: 7574,
+  review: 20106,
+  'close-out': 19598,
   'retrospective-audit': 4161,
   retro: 4114,
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106905;
+export const META_PROMPT_SOURCE_CEILING = 106327;
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 104526;
+export const META_PROMPT_RENDERED_CEILING = 104046;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;

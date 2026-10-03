@@ -2214,6 +2214,7 @@ import { generateCustomPrompt } from '../../lib/prompt-templates.js';
 import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck, formatIfBlocked } from '../../lib/prompt-formatters.js';
 import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { formatStageContract } from '../../lib/prompt-contract.js';
 
 describe('resolvePromptUi (LIN-177 S4)', () => {
   test('no provider → Linear floor (every capability on, displayName Linear)', () => {
@@ -2922,8 +2923,10 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const closeout = generatePrompt('close-out', issue, context).prompt;
     // Review still emits the structured heading — helpful structure when present.
     assert.ok(review.includes('### What CI Did Not Prove'), 'review writes the ### What CI Did Not Prove ledger');
-    assert.ok(/add a summary comment containing the `### What CI Did Not Prove` ledger/i.test(review),
+    assert.ok(/record it in one summary comment: the ledger/i.test(review),
       'review records the ledger into its summary comment (the carrier)');
+    assert.ok(/Put the ledger under `### What CI Did Not Prove`/.test(review),
+      'the ledger heading is the stage contract\'s (LIN-3292)');
     // Close-out no longer requires that exact string — it reads the verdict and flagged gaps fuzzily.
     assert.ok(!closeout.includes('### What CI Did Not Prove'),
       'close-out does not key on the literal heading (decoupled)');
@@ -3064,12 +3067,12 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   test('(g5) the stub must preserve the session-fit phrase or Implementation Plan heading verbatim', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/retain, word for word, the committed session-fit phrase/i.test(prompt),
+    // Carried by the stage contract (LIN-3292), appended by code after the brief.
+    assert.ok(/keep word for word any `Implementation Plan` heading/i.test(prompt),
       'the marker-preservation mandate is explicit and verbatim');
     assert.ok(/fits one session.*needs multiple sessions/.test(prompt), 'both session-fit phrases are named');
-    assert.ok(/`Implementation Plan` heading/.test(prompt), 'the Implementation Plan heading alternative is named');
     assert.ok(/any `plan-review due:` line/.test(prompt), 'LIN-3296: the plan-review gate marker survives the prune');
-    assert.ok(/Deterministic readers key on these literals/i.test(prompt),
+    assert.ok(/code reads them there/i.test(prompt),
       'the prompt explains WHY the literals matter, so an implementer does not "clean up" the wording');
   });
 
@@ -3128,8 +3131,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/verify the archive landed/i.test(rule), 'meta rule requires verifying the archive before editing');
     assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
       'meta rule carries the same never-prune carve-out');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\), any "plan-review due:" line, and any "Implementation Plan" heading/i.test(rule),
-      'meta rule carries the same marker-preservation mandate');
+    // The marker-preservation mandate is the stage contract's on both paths (LIN-3292).
+    assert.ok(applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: 'close-out' }, { identifier: 'LIN-901', state: {} }, {}).prompt
+      .includes('keep word for word any `Implementation Plan` heading'), 'the meta path appends the same mandate');
     assert.ok(/runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
       'meta rule scopes the step to the all-clear path only');
   });
@@ -3498,13 +3502,15 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
     assert.ok(/\*\*\(b\)\*\* Strategy Framing names a routed-around contract gap/.test(p), 'criterion (b)');
     assert.ok(/\*\*\(c\)\*\* Any step in the plan relaxes a validation, a contract, or a guard/.test(p), 'criterion (c)');
     assert.ok(/\*\*\(d\)\*\* The plan touches credential, merge-rule, or dispatch-contract surfaces/.test(p), 'criterion (d)');
-    assert.ok(/"plan-review due: yes" or "plan-review due: no", naming which of \(a\)–\(d\) fired/.test(p),
-      'the decision must be recorded in the description, in the form the router reads');
+    assert.ok(/Record the decision in the issue description, naming which of \(a\)–\(d\) fired/.test(p),
+      'the decision must be recorded in the description');
+    assert.ok(/`plan-review due: yes` or `plan-review due: no`/.test(p),
+      'in the form the router reads, carried by the stage contract (LIN-3292)');
   });
 
   test('the gate is sited AFTER the session-fit answer — criterion (a) reads it', () => {
     const p = plan();
-    const sessionFit = p.indexOf('phrased as either "fits one session" or "needs multiple sessions."');
+    const sessionFit = p.indexOf('Document the answer in the issue description alongside the plan.');
     const gate = p.indexOf('### Plan-review Gate');
     assert.ok(sessionFit > -1 && gate > -1, 'both landmarks must be present');
     assert.ok(sessionFit < gate,
@@ -3547,8 +3553,8 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
     // Without this the header has two consumers (the close-out exclusions and the
     // plan's revision half) and no producer.
     const { prompt } = generatePrompt('plan-review', issue, context);
-    assert.ok(/add a comment headed \`### Plan Review Verdict\`/.test(prompt),
-      'plan-review must head its verdict comment with the disambiguator');
+    assert.ok(/one comment that starts with \`### Plan Review Verdict\`/.test(prompt),
+      'plan-review must head its verdict comment with the disambiguator (the stage contract, LIN-3292)');
     assert.ok(/an Approve here must never be mistaken for authorization to close the task out/.test(prompt),
       'the template must say why the header exists — the close-out confusion it prevents');
   });
@@ -4136,7 +4142,9 @@ describe('cross-path grounding parity (LIN-435)', () => {
       { reasoning: 'r', prompt: 'BODY', truncated: false, recommendedAction: 'implement', deferTo: null, completionTokens: 1 },
       issue, context
     );
-    assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path appends the identical grounding');
+    const contract = formatStageContract('implementation', issue.identifier);
+    assert.ok(hw.includes(contract + grounding), 'handwritten prompt carries the stage contract, then the grounding (LIN-3292)');
+    assert.strictEqual(meta.prompt, 'BODY' + contract + grounding, 'meta path appends the identical contract and grounding');
   });
 
   test('staleness --since date is injected deterministically from issue.createdAt (no placeholder)', () => {
@@ -4242,7 +4250,8 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
           { reasoning: `→ **${action}**`, prompt: 'BODY', truncated: false, recommendedAction: action, deferTo: null, completionTokens: 1 },
           issue, context
         );
-        assert.strictEqual(meta.prompt, 'BODY' + grounding, `${kind}: meta grounding keyed off recommendedAction "${action}"`);
+        const contract = formatStageContract(kind, issue.identifier);
+        assert.strictEqual(meta.prompt, 'BODY' + contract + grounding, `${kind}: meta grounding keyed off recommendedAction "${action}"`);
       }
     });
   }
@@ -5080,5 +5089,61 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const base = generatePrompt('breakdown', baseIssue, baseContext, {}).prompt;
     const withUi = generatePrompt('breakdown', baseIssue, baseContext, {}, { ...DEFAULT_PROMPT_UI }).prompt;
     assert.strictEqual(withUi, base, 'the new breakdown content must remain byte-identical for Linear');
+  });
+});
+
+// =============================================================================
+// The stage contract (LIN-3292) is appended by code on both prompt paths, once,
+// between the body and the grounding, and is said nowhere else in the prompt.
+// =============================================================================
+describe('stage contract on both prompt paths (LIN-3292)', () => {
+  const issue = {
+    id: 'issue-c', identifier: 'LIN-3292', title: 'Contract fixture', description: 'd',
+    url: 'https://linear.app/test/issue/LIN-3292', createdAt: '2026-03-01T00:00:00.000Z',
+    state: { name: 'In Progress', type: 'started' }, labels: []
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+  const HEADING = '## Formats Later Steps Read';
+  const count = (text, needle) => text.split(needle).length - 1;
+
+  for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+    test(`${kind}: the contract appears exactly once, after the body, on both paths`, () => {
+      const contract = formatStageContract(kind, issue.identifier);
+      const hw = generatePrompt(kind, issue, context).prompt;
+      const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});
+      assert.ok(hw.startsWith(body + contract), `${kind}: handwritten = body + contract + …`);
+      const meta = applyGroundingToRecommendation(
+        { reasoning: 'r', prompt: 'BODY', truncated: false, recommendedAction: PROMPT_TEMPLATES[kind].name, deferTo: null, completionTokens: 1 },
+        issue, context
+      ).prompt;
+      assert.ok(meta.startsWith('BODY' + contract), `${kind}: meta = body + contract + …`);
+      const want = contract ? 1 : 0;
+      assert.strictEqual(count(hw, HEADING), want);
+      assert.strictEqual(count(meta, HEADING), want);
+    });
+  }
+
+  test('each format the contract carries is said once: the body no longer asks for it', () => {
+    const formats = {
+      plan: ['## Implementation Plan', 'plan-review due: yes'],
+      'plan-review': ['### Plan Review Verdict'],
+      review: ['ledger empty', `## Review — ${issue.identifier}`],
+      'close-out': ['plan-review due:', `## Close-out — ${issue.identifier}`]
+    };
+    for (const [kind, needles] of Object.entries(formats)) {
+      const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});
+      const contract = formatStageContract(kind, issue.identifier);
+      for (const needle of needles) {
+        assert.ok(contract.includes(needle), `${kind}: the contract carries ${needle}`);
+        assert.ok(!body.includes(needle), `${kind}: the body no longer asks for ${needle}`);
+      }
+    }
+  });
+
+  test('a read-only tracker gets no contract on either path', () => {
+    const ui = { write: false, subtasks: false, displayName: 'Jira', fixedStates: false };
+    assert.ok(!generatePrompt('review', issue, context, {}, ui).prompt.includes(HEADING));
+    const meta = applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: 'review' }, issue, context, {}, ui).prompt;
+    assert.ok(!meta.includes(HEADING));
   });
 });
