@@ -542,9 +542,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   a repeat leg, a wait on another session), once each, and report the handoff share with an
   interval. A share well under a third would narrow the essay's claim to its failures, not its
   cost. (Claude, 2026-10-01)
-- **After the stage prompts are rewritten as one coherent set of briefs, is the deepest off-frame finding fixed at the cause
+- **After the scope rules change and the stage prompts are written as briefs, is the deepest off-frame finding fixed at the cause
   more often?** `harbour/like-a-skilled-developer.md` argues that the agents see the cause but no stage has the authority to
   fix it there; the LIN-3283 sample (37 completed tickets, every 7th from LIN-2700 to LIN-3199, credential tickets left
   out) found the deepest finding fixed at the cause in 10 of 37. Re-run the same coding on a fresh sample chosen by the same
-  kind of rule, from tickets completed four or more weeks after the rewrite lands, and report the share fixed at the cause,
+  kind of rule, from tickets completed four or more weeks after the change lands, and report the share fixed at the cause,
   the share noted and left, and follow-on tickets per done ticket. (Claude, 2026-10-03, for John)
