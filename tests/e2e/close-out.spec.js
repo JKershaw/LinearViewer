@@ -129,8 +129,19 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
   test('ready: box sits under the evidence rows, ledger collapsed, no stragglers, standard promise', async ({ page }) => {
     await openReadySession(page);
 
-    const mount = page.locator('[data-testid="run-evidence-mount"]');
-    await expect(mount).toBeVisible();
+    const evidence = page.locator('[data-testid="run-evidence"]');
+    await expect(evidence).toBeVisible();
+
+    // LIN-3251 §4 slots: evidence after the header strip and before the steps;
+    // the close-out box after the steps (the old bundled `run-evidence-mount`
+    // wrapper is gone in LIN-3251).
+    const evidenceBox = await evidence.boundingBox();
+    const headerBox = await page.locator('.sess-run-header').boundingBox();
+    const stepsBox = await page.locator('.sess-steps').boundingBox();
+    const boxBox = await page.locator('[data-testid="run-evidence-closeout"]').boundingBox();
+    expect(headerBox.y).toBeLessThan(evidenceBox.y);
+    expect(evidenceBox.y).toBeLessThan(stepsBox.y);
+    expect(stepsBox.y).toBeLessThan(boxBox.y);
 
     // Asked / done / checked, then the collapsed ledger, then the ready box.
     await expect(page.locator('[data-testid="run-evidence-asked"]')).toBeVisible();
