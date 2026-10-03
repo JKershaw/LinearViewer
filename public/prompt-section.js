@@ -681,13 +681,10 @@
           if (issue.source) params.set('source', issue.source);
           if (issue.bindingScope) params.set('bindingScope', issue.bindingScope);
           const query = params.toString() ? `?${params.toString()}` : '';
-          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
-          if (abortController !== ac || destroyed) return;
           // With the brief writer on (LIN-3293) this can outlast the keepalive's
           // first byte, after which an error arrives in a 200 as `statusCode`.
-          if (result && Object.prototype.hasOwnProperty.call(result, 'statusCode')) {
-            throw new Error(result.error || `Failed to load prompt (${result.statusCode})`);
-          }
+          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false, statusInBody: true });
+          if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, repo: result.repo || null, generatedAt: Date.now() };
           promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);

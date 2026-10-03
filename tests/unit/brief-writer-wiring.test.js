@@ -23,6 +23,8 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe, before, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
@@ -57,6 +59,7 @@ const CONTEXTS = {
   [CHILD.id]: ctxOf(CHILD), [CHILD.identifier]: ctxOf(CHILD)
 };
 const contextFor = (id) => {
+  if (id === 'WR-401') throw Object.assign(new Error('Unauthorized'), { response: { status: 401 } });
   const ctx = CONTEXTS[id];
   if (!ctx) throw new Error(`Issue not found: ${id}`);
   return ctx;
@@ -65,6 +68,7 @@ const contextFor = (id) => {
 const ROUTING = '## Reasoning\n**Assessment:**\n- Ready: ✓ Yes - built\n→ **review**\n**Next:** close-out';
 const DEFER = `## Reasoning\nWR-2 is a container.\n→ **defer**\n**DeferTo:** ${CHILD.identifier}`;
 const BRIEF = '## Goal\n\nA plain written brief.';
+const PROVIDER_UI = { write: true, comments: true, estimates: false, subtasks: true, displayName: 'Linear' };
 const isWriterCall = (content) => content.startsWith('You are writing the brief');
 
 // The repo inventory read recommend-and-dispatch makes just before its enqueue
@@ -72,12 +76,18 @@ const isWriterCall = (content) => content.startsWith('You are writing the brief'
 // between the writer finishing and the enqueue starting; it then fails, which the
 // guard treats as "no inventory, accept the repo".
 let inventoryHold = null;
+// The issue context read; a test can delay it so a keepalive armed with a past
+// X-Request-Start flushes before the route replies.
+let contextDelayMs = 0;
+// The creator's OpenRouter key read, the proxy route's first await after auth: a
+// test can hold it open to land a hang-up before the route arms its signal.
+let keyHold = null;
 registerProvider({
   name: PROVIDER,
   ui: { write: true, comments: true, estimates: false, subtasks: true, displayName: 'Linear' },
   supports: () => true,
-  async fetchRecommendationContext(_scope, id) { return contextFor(id); },
-  async fetchIssueContext(_scope, id) { return contextFor(id); },
+  async fetchRecommendationContext(_scope, id) { if (contextDelayMs) await new Promise(r => setTimeout(r, contextDelayMs)); return contextFor(id); },
+  async fetchIssueContext(_scope, id) { if (contextDelayMs) await new Promise(r => setTimeout(r, contextDelayMs)); return contextFor(id); },
   async fetchProjectsList() { if (inventoryHold) await inventoryHold(); throw new Error('no inventory'); }
 });
 
@@ -104,7 +114,8 @@ function capture({ hold = () => false, releaseMs = 3000, onCall = () => {} } = {
   const calls = [];
   setFetchImpl(async (url, opts = {}) => {
     const content = JSON.parse(opts.body).messages[0].content;
-    const call = { isWriter: isWriterCall(content), content, signal: opts.signal, abortedAt: null };
+    // abortedAtStart: the call never reached the wire (real fetch refuses an aborted signal).
+    const call = { isWriter: isWriterCall(content), content, signal: opts.signal, abortedAt: null, abortedAtStart: !!opts.signal?.aborted };
     calls.push(call);
     onCall(call);
     let text;
@@ -155,7 +166,7 @@ async function request(app, path, { method = 'GET', body, headers = {} } = {}) {
     const res = await fetch(`${srv.base}${path}`, opts);
     const text = await res.text();
     let parsed; try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { status: res.status, body: parsed, text };
+    return { status: res.status, body: parsed, text, contentType: res.headers.get('content-type') };
   } finally {
     await srv.close();
   }
@@ -180,7 +191,7 @@ function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier 
     proxyEventStore: { recordEvent: async (e) => { events.push(e); } },
     resolveWorkspaceAccess: async () => ({ token: 'live-access-token', reason: 'ok', provider: PROVIDER }),
     getWorkspaceAccessToken: async () => 'live-access-token',
-    getWorkspaceOpenRouterKey: async () => openRouterKey,
+    getWorkspaceOpenRouterKey: async () => { if (keyHold) await keyHold(); return openRouterKey; },
     agentStatusStore: {},
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
@@ -189,23 +200,30 @@ function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier 
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async (urlKey) => (urlKey === 'acme' ? { features } : {}) },
-    freeTierStore: { tryUse: async () => { freeTier.count++; return { allowed: freeTier.allowed, reason: 'limit', remaining: 0, limit: 1, resetsAt: null }; } }
+    // tryUse is the prompt safety-net charge; checkRun the free-tier run gate at the enqueue.
+    freeTierStore: {
+      tryUse: async () => { freeTier.count++; return { allowed: freeTier.allowed, reason: 'limit', remaining: 0, limit: 1, resetsAt: null }; },
+      checkRun: async () => ({ allowed: true, runsUsed: 0, limit: 10, remaining: 10, resetsAt: null })
+    }
   }));
   return app;
 }
 
 // ── Workspace (UI) app ──────────────────────────────────────────────────────
 
-function buildUiApp({ features = {}, sessionKey = 'sk-test', freeTier = { count: 0, allowed: true } } = {}) {
+function buildUiApp({ features = {}, sessionKey = 'sk-test', freeTier = { count: 0, allowed: true }, responses = [] } = {}) {
   const app = express();
   app.use(express.json());
+  // The UI routes keep no event log: a test reads the status a route set on its
+  // response, even one it set after the client had gone.
+  app.use((req, res, next) => { responses.push(res); next(); });
   app.use(createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER, accessToken: 'ws-token' };
       req.session = { openRouterApiKey: sessionKey, features: {} };
       next();
     },
-    freeTierStore: { tryUse: async () => { freeTier.count++; return { allowed: freeTier.allowed, reason: 'limit', remaining: 0, limit: 1, resetsAt: null }; } },
+    freeTierStore: { tryUse: async () => { freeTier.count++; if (freeTier.hold) await freeTier.hold(); return { allowed: freeTier.allowed, reason: 'limit', remaining: 0, limit: 1, resetsAt: null }; } },
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({ features }) },
     getOpenRouterSource: () => null,
     userPreferencesStore: {},
@@ -289,6 +307,28 @@ describe('UI Recommend honours the briefWriter switch (routed)', () => {
     } finally {
       await srv.close();
     }
+  });
+
+  test('stream: a client that left during the free-tier gate, before the stream began, gets no model call', async () => {
+    await withEnv({ OPENROUTER_API_KEY: null, OPENROUTER_FREE_TIER_KEY: 'sk-free' }, async () => {
+      const calls = capture();
+      let held;
+      const gateStarted = new Promise(r => { held = r; });
+      const freeTier = { count: 0, allowed: true, hold: async () => { held(); await new Promise(r => setTimeout(r, 300)); } };
+      const srv = await listen(buildUiApp({ features: { briefWriter: true }, sessionKey: null, freeTier }));
+      try {
+        const ac = new AbortController();
+        const pending = fetch(`${srv.base}/workspace/acme/api/recommend/${LEAF.id}/stream`, { signal: ac.signal }).then(r => r.text()).catch(() => null);
+        await gateStarted;
+        ac.abort();
+        await pending;
+        await new Promise(r => setTimeout(r, 600));
+        assert.equal(freeTier.count, 1, 'the gate ran');
+        assert.deepEqual(calls.filter(c => !c.abortedAtStart).map(c => c.isWriter), [], 'no model call reached the wire');
+      } finally {
+        await srv.close();
+      }
+    });
   });
 });
 
@@ -483,4 +523,229 @@ describe('a client hang-up on the proxy', () => {
       }
     });
   }
+});
+
+// ── A hang-up recorded as the client leaving, not an AI outage ──────────────
+
+const postDispatch = (srv, body, signal) => fetch(`${srv.base}/api/proxy/recommend-and-dispatch`, {
+  method: 'POST', headers: { Authorization: 'Bearer x', 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal
+}).catch(() => null);
+
+describe('a client hang-up is the client leaving (499), never an AI outage (503)', () => {
+  test('proxy GET recommend: a hang-up during the routing call records 499', async () => {
+    let started;
+    const routingStarted = new Promise(r => { started = r; });
+    capture({ hold: (c) => !c.isWriter, onCall: () => started() });
+    const events = [];
+    const srv = await listen(buildProxyApp({ features: {}, events }));
+    try {
+      const ac = new AbortController();
+      const pending = fetch(`${srv.base}/api/proxy/issues/${LEAF.id}/recommend`, { headers: { Authorization: 'Bearer x' }, signal: ac.signal }).catch(() => null);
+      await routingStarted;
+      ac.abort();
+      await pending;
+      assert.ok(await waitFor(() => events.length > 0), 'the route recorded an outcome');
+      assert.deepEqual(events.map(e => e.status), [499]);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('routed recommend-and-dispatch, writer off: a hang-up during the routing call records 499 and enqueues nothing', async () => {
+    let started;
+    const routingStarted = new Promise(r => { started = r; });
+    const calls = capture({ hold: (c) => !c.isWriter, onCall: () => started() });
+    let added = 0;
+    const events = [];
+    const srv = await listen(buildProxyApp({ features: {}, events, addItem: async (urlKey, item) => { added++; return { _id: 'disp-1', ...item }; } }));
+    try {
+      const ac = new AbortController();
+      const pending = postDispatch(srv, { issueIdentifier: LEAF.identifier, appendProxyContext: false }, ac.signal);
+      await routingStarted;
+      ac.abort();
+      await pending;
+      assert.ok(await waitFor(() => events.length > 0), 'the route recorded an outcome');
+      assert.deepEqual(events.map(e => e.status), [499]);
+      assert.ok(calls[0].abortedAt != null, 'the routing call saw the abort');
+      assert.equal(added, 0);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('UI buffered GET recommend: a hang-up during the routing call is answered 499, not 503', async () => {
+    let started;
+    const routingStarted = new Promise(r => { started = r; });
+    const calls = capture({ hold: (c) => !c.isWriter, onCall: () => started() });
+    const responses = [];
+    const srv = await listen(buildUiApp({ features: {}, responses }));
+    try {
+      const ac = new AbortController();
+      const pending = fetch(`${srv.base}/workspace/acme/api/recommend/${LEAF.id}`, { signal: ac.signal }).catch(() => null);
+      await routingStarted;
+      ac.abort();
+      await pending;
+      assert.ok(await waitFor(() => calls[0].abortedAt != null), 'the routing call saw the abort');
+      assert.ok(await waitFor(() => responses[0]?.statusCode !== 200), 'the route answered the hang-up');
+      assert.equal(responses[0].statusCode, 499);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  for (const [label, body] of [
+    ['pinned (kind)', { issueIdentifier: LEAF.identifier, kind: 'review', appendProxyContext: false }],
+    ['routed', { issueIdentifier: LEAF.identifier, appendProxyContext: false }]
+  ]) {
+    test(`recommend-and-dispatch, ${label}: a client that left before the route armed its signal gets no model call and nothing enqueued`, async () => {
+      const calls = capture();
+      let held;
+      const keyReadStarted = new Promise(r => { held = r; });
+      keyHold = async () => { held(); await new Promise(r => setTimeout(r, 300)); };
+      let added = 0;
+      const events = [];
+      const srv = await listen(buildProxyApp({ features: { briefWriter: true }, events, addItem: async (urlKey, item) => { added++; return { _id: 'disp-1', ...item }; } }));
+      try {
+        const ac = new AbortController();
+        const pending = postDispatch(srv, body, ac.signal);
+        await keyReadStarted;
+        ac.abort();
+        await pending;
+        assert.ok(await waitFor(() => events.length > 0), 'the route recorded an outcome');
+        assert.deepEqual(events.map(e => e.status), [499]);
+        assert.deepEqual(calls.filter(c => !c.abortedAtStart).map(c => c.isWriter), [], 'no model call reached the wire');
+        assert.equal(added, 0, 'nothing was enqueued');
+      } finally {
+        keyHold = null;
+        await srv.close();
+      }
+    });
+  }
+});
+
+// ── After the keepalive has flushed ─────────────────────────────────────────
+//
+// A past X-Request-Start puts the request beyond the keepalive's first-byte target,
+// so armKeepalive flushes at once; the issue read is delayed a little so the flush
+// lands before the route replies. From then on the HTTP status is a committed 200
+// and the real one rides in the body as `statusCode`.
+
+const PAST = () => ({ 'X-Request-Start': String(Date.now() - 25_000) });
+
+describe('after the keepalive has flushed', () => {
+  afterEach(() => { contextDelayMs = 0; });
+
+  test('UI stage button, writer on: a missing issue is a 200 carrying statusCode 404', async () => {
+    capture();
+    contextDelayMs = 50;
+    const { status, body, text } = await request(buildUiApp({ features: { briefWriter: true } }), '/workspace/acme/api/prompt/WR-404/review', { headers: PAST() });
+    assert.equal(status, 200);
+    assert.ok(text.startsWith(' '), 'the keepalive had flushed');
+    assert.deepEqual(body, { error: 'Issue not found: WR-404', statusCode: 404 });
+  });
+
+  test('UI stage button, writer on: ?format=md after the flush still sends the prompt bytes', async () => {
+    capture();
+    contextDelayMs = 50;
+    const { status, text, contentType } = await request(buildUiApp({ features: { briefWriter: true } }), `/workspace/acme/api/prompt/${LEAF.id}/review?format=md`, { headers: PAST() });
+    assert.equal(status, 200);
+    assert.match(contentType, /application\/json/, 'the flush committed the JSON headers');
+    assert.ok(text.startsWith(' # Review WR-1'), text.slice(0, 40));
+    assert.ok(text.includes(BRIEF + '\n\n## Scope and Authority'));
+  });
+
+  test('recommend-and-dispatch with kind: the 201 rides in a 200 as statusCode', async () => {
+    capture();
+    contextDelayMs = 50;
+    const { status, body } = await request(buildProxyApp({ features: { briefWriter: true } }), '/api/proxy/recommend-and-dispatch', {
+      method: 'POST', headers: PAST(), body: { issueIdentifier: LEAF.identifier, kind: 'review', appendProxyContext: false }
+    });
+    assert.equal(status, 200);
+    assert.equal(body.statusCode, 201);
+    assert.equal(body.success, true);
+    assert.equal(body.override, true);
+  });
+
+  test('recommend-and-dispatch with kind: a missing issue is a 200 carrying statusCode 404', async () => {
+    capture();
+    contextDelayMs = 50;
+    const { status, body } = await request(buildProxyApp({ features: { briefWriter: true } }), '/api/proxy/recommend-and-dispatch', {
+      method: 'POST', headers: PAST(), body: { issueIdentifier: 'WR-404', kind: 'review', appendProxyContext: false }
+    });
+    assert.equal(status, 200);
+    assert.deepEqual(body, { error: 'Issue not found', statusCode: 404 });
+  });
+
+  // The UI's readers, through the REAL window.api from public/common.js against the
+  // live route: the only fabricated piece is the fetch shim, which resolves the
+  // origin-relative URL and adds the past router stamp.
+  function loadApi(origin) {
+    const window = { location: { href: '' }, addEventListener() {} };
+    const sandbox = {
+      window, console, setTimeout, clearTimeout, URLSearchParams,
+      document: { addEventListener() {}, querySelector: () => null, querySelectorAll: () => [] },
+      localStorage: { getItem: () => null, setItem() {} },
+      navigator: {},
+      fetch: (url, opts = {}) => globalThis.fetch(new URL(url, origin), { ...opts, headers: { ...(opts.headers || {}), ...PAST() } })
+    };
+    vm.runInContext(readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8'), vm.createContext(sandbox));
+    return window;
+  }
+
+  test('UI reader (statusInBody): a flushed 404 rejects with the real status', async () => {
+    capture();
+    contextDelayMs = 50;
+    const srv = await listen(buildUiApp({ features: { briefWriter: true } }));
+    try {
+      const window = loadApi(srv.base);
+      await assert.rejects(
+        window.api('/workspace/acme/api/prompt/WR-404/review', { on401: false, statusInBody: true }),
+        (err) => err.status === 404 && err.message === 'Issue not found: WR-404'
+      );
+      // Without the opt-in the same reply would read as a prompt.
+      const plain = await window.api('/workspace/acme/api/prompt/WR-404/review', { on401: false });
+      assert.equal(plain.statusCode, 404);
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('UI reader (statusInBody): a flushed 401 still sends the user to /logout', async () => {
+    capture();
+    contextDelayMs = 50;
+    const srv = await listen(buildUiApp({ features: { briefWriter: true } }));
+    try {
+      const window = loadApi(srv.base);
+      await assert.rejects(window.api('/workspace/acme/api/prompt/WR-401/close-out', { statusInBody: true }), (err) => err.status === 401);
+      assert.equal(window.location.href, '/logout');
+    } finally {
+      await srv.close();
+    }
+  });
+
+  test('both stage-prompt readers opt in to statusInBody', () => {
+    const read = (f) => readFileSync(new URL(`../../public/${f}`, import.meta.url), 'utf8');
+    assert.match(read('prompt-section.js'), /window\.api\(`\$\{apiPrefix\}\/api\/prompt\/[^\n]*statusInBody: true/, 'prompt-section.js stage button');
+    assert.match(read('session.js'), /'\/api\/prompt\/' \+ encodeURIComponent\(ctx\.issueId\) \+ '\/close-out',\s*\{ statusInBody: true \}/, 'session.js close-out button (default on401: /logout)');
+  });
+});
+
+// ── Writer off: the pinned dispatch is exactly as before ────────────────────
+
+describe('recommend-and-dispatch with kind, writer off', () => {
+  test('201, no model call, no charge, and the stored prompt is generatePrompt byte for byte', async () => {
+    await withEnv({ OPENROUTER_API_KEY: null, OPENROUTER_FREE_TIER_KEY: 'sk-free' }, async () => {
+      const calls = capture();
+      const freeTier = { count: 0, allowed: true };
+      let stored = null;
+      const app = buildProxyApp({ features: {}, openRouterKey: null, freeTier, addItem: async (urlKey, item) => { stored = item; return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }; } });
+      const { status, body, text } = await request(app, '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: LEAF.identifier, kind: 'review', appendProxyContext: false } });
+      assert.equal(status, 201, text);
+      assert.equal(body.statusCode, undefined);
+      assert.equal(text.startsWith(' '), false, 'no keepalive bytes');
+      assert.equal(calls.length, 0);
+      assert.equal(freeTier.count, 0);
+      assert.equal(stored.prompt, generatePrompt('review', LEAF, ctxOf(LEAF), {}, PROVIDER_UI).prompt);
+    });
+  });
 });

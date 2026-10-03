@@ -743,10 +743,6 @@ export function createDispatchRoutes({
       return jsonError(res, 503, 'Dispatch is not available');
     }
 
-    // The verb-override arm's keepalive, once armed: the outer catch must answer
-    // through it, since a flushed 200 can no longer take a plain error status.
-    let overrideKeepalive = null;
-
     try {
       const { issueIdentifier, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
 
@@ -933,8 +929,9 @@ export function createDispatchRoutes({
       if (kind !== undefined) {
         // With the workspace's brief writer on (LIN-3293) the pinned stage's Goal is
         // rewritten by the writer, its one model call: charged like the routed arm,
-        // keepalive-armed, and aborted if the caller hangs up. Off, no model call,
-        // and the prompt is generatePrompt's byte for byte.
+        // and aborted if the caller hangs up. Off: no model call, and the prompt is
+        // generatePrompt's byte for byte. The keepalive and the hang-up check before
+        // the enqueue apply either way.
         const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
         const { apiKey: overrideApiKey, isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
         const overrideWriter = isTestMode
@@ -951,62 +948,56 @@ export function createDispatchRoutes({
           }
         }
         const keepalive = armKeepalive(res);
-        overrideKeepalive = keepalive;
         const gone = clientGoneSignal(res);
-
-        let ctx;
+        // Every exit below answers through the keepalive, the catch included: once it
+        // has flushed, a plain error status can no longer be sent.
         try {
-          ctx = await resolvePromptIssueContext(provider, accessToken, issueIdentifier, isTestMode);
-        } catch (err) {
-          if (err.message?.includes('not found')) {
-            keepalive.stop();
-            gone.release();
+          let ctx;
+          try {
+            ctx = await resolvePromptIssueContext(provider, accessToken, issueIdentifier, isTestMode);
+          } catch (err) {
+            if (err.message?.includes('not found')) {
+              logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
+              return keepalive.send(404, { error: 'Issue not found' });
+            }
+            throw err;
+          }
+          if (!ctx) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
             return keepalive.send(404, { error: 'Issue not found' });
           }
-          gone.release();
-          throw err;
-        }
-        if (!ctx) {
-          keepalive.stop();
-          gone.release();
-          logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
-          return keepalive.send(404, { error: 'Issue not found' });
-        }
 
-        const { issue, parent, siblings, project, children, comments, attachments } = ctx;
-        // LIN-2575: a caller-supplied `periodicalId` always wins (it is the
-        // explicit join key); when absent, derive it from the issue's own
-        // LIN-694 gate marker. This is the seam a lane/batch dispatch of a
-        // minted periodical review task uses — the agent running the task
-        // need not know, or remember to pass, the template id. A description
-        // with no marker (the ordinary case) derives null, byte-identical to
-        // the prior `periodicalId || null`.
-        const overridePeriodicalId = (periodicalId !== undefined
-          ? periodicalId
-          : resolvePeriodicalIdFromGateMarker(issue.description)) || null;
-        // Forward `attachments` (LIN-776): the verb-override dispatch path must
-        // surface the same Attachments section as the LLM recommend-and-dispatch
-        // path, which already passes the full context. provider?.ui is threaded
-        // through (LIN-2353) so a non-Linear provider renders capability-appropriate
-        // text; Linear output stays byte-identical.
-        const generated = await generateStagePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {
-          providerUi: provider?.ui || null,
-          briefWriter: overrideWriter,
-          apiKey: overrideApiKey,
-          signal: gone.signal,
-          callMeta: { urlKey: req.proxyUrlKey, feature: 'recommend', issueIdentifier: issue.identifier }
-        });
-        if (!generated) {
-          keepalive.stop();
-          logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
-          return keepalive.send(500, { error: 'Failed to generate prompt' });
-        }
+          const { issue, parent, siblings, project, children, comments, attachments } = ctx;
+          // LIN-2575: a caller-supplied `periodicalId` always wins (it is the
+          // explicit join key); when absent, derive it from the issue's own
+          // LIN-694 gate marker. This is the seam a lane/batch dispatch of a
+          // minted periodical review task uses — the agent running the task
+          // need not know, or remember to pass, the template id. A description
+          // with no marker (the ordinary case) derives null, byte-identical to
+          // the prior `periodicalId || null`.
+          const overridePeriodicalId = (periodicalId !== undefined
+            ? periodicalId
+            : resolvePeriodicalIdFromGateMarker(issue.description)) || null;
+          // Forward `attachments` (LIN-776): the verb-override dispatch path must
+          // surface the same Attachments section as the LLM recommend-and-dispatch
+          // path, which already passes the full context. provider?.ui is threaded
+          // through (LIN-2353) so a non-Linear provider renders capability-appropriate
+          // text; Linear output stays byte-identical.
+          const generated = await generateStagePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {
+            providerUi: provider?.ui || null,
+            briefWriter: overrideWriter,
+            apiKey: overrideApiKey,
+            signal: gone.signal,
+            callMeta: { urlKey: req.proxyUrlKey, feature: 'recommend', issueIdentifier: issue.identifier }
+          });
+          if (!generated) {
+            logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
+            return keepalive.send(500, { error: 'Failed to generate prompt' });
+          }
 
-        // The body is server-generated/trusted, so it skips the dangerous-char /
-        // length checks the caller-supplied POST /dispatch path runs, and is
-        // never returned to the caller — same contract as the LLM-driven path.
-        try {
+          // The body is server-generated/trusted, so it skips the dangerous-char /
+          // length checks the caller-supplied POST /dispatch path runs, and is
+          // never returned to the caller — same contract as the LLM-driven path.
           // Repo override validation at the Harbour seam (LIN-2886): resolve
           // the SAME repo value this branch is about to store — after LIN-537/
           // LIN-1210 precedence, not the raw caller value — against the
@@ -1021,7 +1012,6 @@ export function createDispatchRoutes({
             // matching comment on the plain POST /dispatch guard above.
             const repoResult = await validateDispatchRepo({ repo: overrideRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
             if (!repoResult.ok) {
-              keepalive.stop();
               logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 422, `UNKNOWN_REPO ${overrideRepoCandidate}`);
               return keepalive.send(422, { error: `Unknown repo "${overrideRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
             }
@@ -1030,9 +1020,7 @@ export function createDispatchRoutes({
 
           // A caller that hung up before the enqueue gets nothing enqueued. Once
           // createDispatchItem starts it is never abandoned: no signal reaches it.
-          gone.release();
           if (gone.gone) {
-            keepalive.stop();
             logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 499, 'client closed before enqueue');
             return keepalive.send(499, { error: 'Client closed the request before dispatch' });
           }
@@ -1158,7 +1146,6 @@ export function createDispatchRoutes({
           // Record the override so it can feed heuristic improvement — the
           // engine's verb was demonstrably wrong here (LIN-573). The distinct
           // endpoint tag keeps these auditable in the proxy event log.
-          keepalive.stop();
           logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 201);
           {
             // Consumer poll-recency warning (LIN-2885) — see formatDispatchWatch's
@@ -1189,7 +1176,6 @@ export function createDispatchRoutes({
             });
           }
         } catch (err) {
-          keepalive.stop();
           // Duplicate-dispatch refusal (LIN-1656). The verb-override arm is
           // keepalive-armed too (the brief writer can take 20-40s, LIN-3293), so
           // every refusal rides `keepalive.send`, as on the LLM arm below.
@@ -1219,6 +1205,8 @@ export function createDispatchRoutes({
           logEvent(req, '/api/proxy/recommend-and-dispatch', status);
           console.error('Proxy recommend-and-dispatch override error:', err.message);
           return keepalive.send(status, { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
+        } finally {
+          gone.release();
         }
       }
 
@@ -1276,8 +1264,13 @@ export function createDispatchRoutes({
           })
         }));
       } catch (err) {
-        keepalive.stop();
         gone.release();
+        // A hang-up aborts the model call, which surfaces as a timeout: the client
+        // left, and that is not an AI outage.
+        if (gone.gone) {
+          logEvent(req, '/api/proxy/recommend-and-dispatch', 499, 'client closed');
+          return keepalive.send(499, { error: 'Client closed the request' });
+        }
         const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend-and-dispatch', status);
         return keepalive.send(status, body);
@@ -1288,7 +1281,6 @@ export function createDispatchRoutes({
       // it may have halted on a `defer` with no prompt — surface that anomaly
       // rather than dispatching an empty prompt. `defer` must never reach dispatch.
       if (rec.recommendedAction === 'defer' || !rec.prompt) {
-        keepalive.stop();
         logEvent(req, '/api/proxy/recommend-and-dispatch', 422);
         return keepalive.send(422, {
           error: 'Recommendation did not resolve to an actionable task',
@@ -1337,7 +1329,6 @@ export function createDispatchRoutes({
           // verb-override branch above.
           const repoResult = await validateDispatchRepo({ repo: recommendRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
           if (!repoResult.ok) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/recommend-and-dispatch', 422, `UNKNOWN_REPO ${recommendRepoCandidate}`);
             return keepalive.send(422, { error: `Unknown repo "${recommendRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
           }
@@ -1348,7 +1339,6 @@ export function createDispatchRoutes({
         // createDispatchItem starts it is never abandoned: no signal reaches it.
         gone.release();
         if (gone.gone) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/recommend-and-dispatch', 499, 'client closed before enqueue');
           return keepalive.send(499, { error: 'Client closed the request before dispatch' });
         }
@@ -1490,7 +1480,6 @@ export function createDispatchRoutes({
           }
         });
 
-        keepalive.stop();
         logEvent(req, '/api/proxy/recommend-and-dispatch', 201);
         // Task header ONLY — no prompt body. deferredVia + descent are additive
         // (LIN-327): they let Autopilot read the descent ("LIN-318 → LIN-297
@@ -1522,7 +1511,6 @@ export function createDispatchRoutes({
           ...(descent ? { descent: `${descent} · dispatched` } : {})
         });
       } catch (err) {
-        keepalive.stop();
         // Duplicate-dispatch refusal (LIN-1656). Keepalive is ARMED on this arm, so
         // the refusal must ride `keepalive.send` — if the 25s flush already fired,
         // the 200 is committed and the real 409 travels as `statusCode` in the body
@@ -1562,12 +1550,7 @@ export function createDispatchRoutes({
       const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/recommend-and-dispatch', status);
       console.error('Proxy recommend-and-dispatch error:', err.message);
-      const body = { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) };
-      if (overrideKeepalive) {
-        overrideKeepalive.stop();
-        return overrideKeepalive.send(status, body);
-      }
-      jsonError(res, status, 'Failed to dispatch prompt', { detail: body.detail, ...graphqlErrorExtra(err, status) });
+      jsonError(res, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
     }
   });
 
@@ -1907,7 +1890,6 @@ export function createDispatchRoutes({
           current = next;
           if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
         }
-        keepalive.stop();
         logEvent(req, '/api/proxy/dispatch/:id', 200);
         return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }, wakeShadow));
       }

@@ -11,6 +11,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import express from 'express';
 import {
   armKeepalive, armSseKeepalive, clientGoneSignal, requestArrivedAt,
@@ -92,6 +94,41 @@ describe('armKeepalive (JSON framing)', () => {
     ka.stop();
   });
 
+  test('send stops the keep-alive: nothing is flushed or written after the reply', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+    const res = makeRes();
+    const ka = armKeepalive(res);
+    ka.send(201, { ok: true });
+    assert.deepEqual(res.jsonBody, { ok: true });
+    assert.equal(res.statusCode, 201);
+    t.mock.timers.tick(25_000 + HEARTBEAT_INTERVAL_MS * 2);
+    assert.equal(res.flushedAt, null, 'no flush after the reply');
+    assert.deepEqual(res.writes, []);
+  });
+
+  test('a reply made on res directly is never overwritten by the flush', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+    const res = makeRes();
+    armKeepalive(res);
+    res.status(404).json({ error: 'gone' });
+    res.headersSent = true;
+    t.mock.timers.tick(25_000);
+    assert.equal(res.flushedAt, null);
+    assert.equal(res.statusCode, 404, 'the flush did not reset the status');
+    assert.deepEqual(res.writes, []);
+  });
+
+  test('the heartbeat stops when the response closes', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+    const res = makeRes();
+    armKeepalive(res);
+    t.mock.timers.tick(25_000);
+    assert.deepEqual(res.writes, [' ']);
+    res.emit('close');
+    t.mock.timers.tick(HEARTBEAT_INTERVAL_MS * 3);
+    assert.deepEqual(res.writes, [' '], 'no heartbeat after close');
+  });
+
   test('a request already past the target flushes at once', (t) => {
     t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_800_000_000_000 });
     const res = makeRes({ 'x-request-start': String(Date.now() - 27_000) });
@@ -115,6 +152,42 @@ describe('armSseKeepalive (SSE framing)', () => {
     ka.stop();
     t.mock.timers.tick(HEARTBEAT_INTERVAL_MS * 3);
     assert.equal(res.writes.length, 2);
+  });
+
+  // Runtime witness: a real stream on 127.0.0.1 that stays silent for several
+  // intervals, read by the UI's REAL readSSEStream (sliced from public/common.js).
+  test('a real silent stream carries comment lines the UI reader skips', async () => {
+    const app = express();
+    app.get('/stream', (req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+      res.flushHeaders();
+      const ka = armSseKeepalive(res, { intervalMs: 30 });
+      setTimeout(() => {
+        ka.stop();
+        res.write(`event: done\ndata: ${JSON.stringify({ ok: true })}\n\n`);
+        res.end();
+      }, 140);
+    });
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    const url = `http://127.0.0.1:${server.address().port}/stream`;
+    try {
+      const raw = await (await fetch(url)).text();
+      assert.ok(raw.split(': keepalive\n\n').length - 1 >= 3, `the silence was filled: ${JSON.stringify(raw)}`);
+
+      const src = readFileSync(new URL('../../public/common.js', import.meta.url), 'utf8');
+      const start = src.indexOf('window.readSSEStream = async function readSSEStream(');
+      const end = src.indexOf('\n};', start) + 3;
+      const sandbox = { TextDecoder, console };
+      vm.runInContext(src.slice(start, end).replace('window.readSSEStream', 'var readSSEStream'), vm.createContext(sandbox));
+      const events = [];
+      await sandbox.readSSEStream(await fetch(url), (type, data) => events.push({ type, data }));
+      // JSON round trip: the vm realm's objects are not this realm's.
+      assert.deepEqual(JSON.parse(JSON.stringify(events)), [{ type: 'done', data: { ok: true } }], 'the reader saw only the data event');
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise(r => server.close(r));
+    }
   });
 
   test('stays quiet once the response has ended', (t) => {
@@ -145,6 +218,51 @@ describe('clientGoneSignal', () => {
     res.emit('close');
     assert.equal(gone.signal.aborted, false);
     gone.release();
+  });
+
+  test('armed after the client has already gone, it aborts at once', () => {
+    const res = makeRes();
+    res.destroyed = true;
+    const gone = clientGoneSignal(res);
+    assert.equal(gone.gone, true, 'a hang-up before arming is not missed');
+    gone.release();
+  });
+
+  test('armed after a finished response, it stays quiet', () => {
+    const res = makeRes();
+    res.end('{}');
+    res.destroyed = true;
+    const gone = clientGoneSignal(res);
+    assert.equal(gone.gone, false);
+    gone.release();
+  });
+
+  // Runtime witness: the client drops while the handler is still in its preamble
+  // (prefs read, charge...), before it arms the signal (review follow-up, should-fix 1).
+  test('a real client hang-up BEFORE arming is seen when the signal is armed', async () => {
+    let result;
+    const done = new Promise(resolve => { result = resolve; });
+    const app = express();
+    app.get('/late', async (req, res) => {
+      await new Promise(r => setTimeout(r, 300));
+      const gone = clientGoneSignal(res);
+      result(gone.gone);
+      gone.release();
+      if (!res.writableEnded) res.end('ok');
+    });
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    const { port } = server.address();
+    try {
+      const ac = new AbortController();
+      const pending = fetch(`http://127.0.0.1:${port}/late`, { signal: ac.signal }).catch(() => null);
+      setTimeout(() => ac.abort(), 50);
+      await pending;
+      assert.equal(await done, true);
+    } finally {
+      server.closeAllConnections?.();
+      await new Promise(r => server.close(r));
+    }
   });
 
   test('a fake res with no event surface never aborts', () => {

@@ -496,12 +496,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     // With the brief writer on (LIN-3293) a stage button is a pinned stage: the writer
     // rewrites the stage's Goal, a 20-40s model call, so the reply is keepalive-armed
-    // and a client hang-up aborts the call. Off, nothing below changes.
+    // and a client hang-up aborts the call. Off: no keepalive, no model call, and
+    // generatePrompt's bytes (it does read the workspace preferences).
     let keepalive = null
     let gone = null
     const reply = (status, body) => {
       if (!keepalive) return res.status(status).json(body)
-      keepalive.stop()
       return keepalive.send(status, body)
     }
 
@@ -970,7 +970,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       if (isTestMode) {
         const mockIssue = testMockData.issues.find(i => i.id === issueId)
         if (!mockIssue) {
-          keepalive.stop();
           return keepalive.send(404, { error: 'Issue not found' })
         }
 
@@ -979,7 +978,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         if (testIsFreeTier) {
           const check = await freeTierStore.tryUse(workspace.urlKey)
           if (!check.allowed) {
-            keepalive.stop();
             return keepalive.send(429, {
               error: check.reason,
               freeTier: {
@@ -1036,7 +1034,6 @@ ${goal}`
           repo: parseRepoFromDescription(mockRecommendProject?.content)
         }
 
-        keepalive.stop();
         return keepalive.send(200, result)
       }
 
@@ -1106,10 +1103,13 @@ ${goal}`
         deferStopReason
       }
 
-      keepalive.stop();
       keepalive.send(200, result)
     } catch (error) {
-      keepalive.stop();
+      // A hang-up aborts the model call, which surfaces as a timeout: the client
+      // left, and that is not an AI outage.
+      if (gone.gone) {
+        return keepalive.send(499, { error: 'Client closed the request' })
+      }
       console.error('Recommendation error:', error)
 
       if (error.response?.status === 401) {
@@ -1322,10 +1322,14 @@ ${goal}`
     // Track client disconnection
     const abortController = new AbortController();
     let closed = false;
-    req.on('close', () => {
+    const onClientGone = () => {
       closed = true;
       abortController.abort();
-    });
+    };
+    req.on('close', onClientGone);
+    // A client that left during the awaits above (the free-tier gate) closed before
+    // the listener was there: it is gone already, so no model call starts.
+    if (res.destroyed) onClientGone();
 
     try {
       // Phase 1: Fetch context from Linear
@@ -2176,7 +2180,6 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          keepalive.stop();
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
@@ -2210,7 +2213,6 @@ ${goal}`
       });
       const stored = await recapCacheStore.get(workspace.urlKey, canonicalId);
 
-      keepalive.stop();
       keepalive.send(200, {
         status: 'fresh',
         recap: stored?.recap ?? recap,
@@ -2424,7 +2426,6 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          keepalive.stop();
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
@@ -2457,7 +2458,6 @@ ${goal}`
       });
       const stored = await briefCacheStore.get(workspace.urlKey, canonicalId);
 
-      keepalive.stop();
       keepalive.send(200, {
         status: 'fresh',
         brief: stored?.brief ?? brief,
@@ -2782,7 +2782,6 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          keepalive.stop();
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
@@ -2791,7 +2790,6 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       if (!UUID_REGEX.test(canonicalId)) {
-        keepalive.stop();
         return keepalive.send(422, {
           error: "This task's canonical id could not be resolved; scan requires a canonical identity",
           code: 'CANONICAL_ID_REQUIRED'
@@ -2825,7 +2823,6 @@ ${goal}`
         // persist anything when it was skipped, since nothing was actually
         // evaluated (a stored zero-finding here would be a false "found
         // nothing", exactly what this feature exists to prevent).
-        keepalive.stop();
         return keepalive.send(503, {
           error: 'Scan rubric is temporarily unavailable; nothing was evaluated',
           code: 'PRINCIPLE_ZERO_UNAVAILABLE'
@@ -2835,7 +2832,6 @@ ${goal}`
         // A claimed decision that failed validation, or an unparseable
         // response: persists nothing and asks the operator to retry, rather
         // than risk silently downgrading a real ruling into a zero-finding.
-        keepalive.stop();
         return keepalive.send(502, {
           error: 'Scan produced an unusable response; please retry',
           code: 'SCAN_PARSE_FAILED'
@@ -2885,11 +2881,9 @@ ${goal}`
         decision: scanResult.outcome === 'decision' ? scanResult.decision : null
       });
       if (!record) {
-        keepalive.stop();
         return keepalive.send(500, { error: 'Failed to record scan result' });
       }
 
-      keepalive.stop();
       keepalive.send(200, {
         status: 'fresh',
         id: record.id,
@@ -3108,7 +3102,6 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          keepalive.stop();
           return keepalive.send(404, { error: 'Issue not found' });
         }
       } else {
@@ -3117,7 +3110,6 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       if (!UUID_REGEX.test(canonicalId)) {
-        keepalive.stop();
         return keepalive.send(422, {
           error: "This task's canonical id could not be resolved; scan requires a canonical identity",
           code: 'CANONICAL_ID_REQUIRED'
@@ -3135,7 +3127,6 @@ ${goal}`
           // Same fail-closed discipline as raising: never send a scan prompt
           // without the Principle 0 gate, and never touch the row when it
           // was skipped.
-          keepalive.stop();
           return keepalive.send(503, {
             error: 'Scan rubric is temporarily unavailable; nothing was evaluated',
             code: 'PRINCIPLE_ZERO_UNAVAILABLE'

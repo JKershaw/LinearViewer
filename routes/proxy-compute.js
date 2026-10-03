@@ -466,14 +466,12 @@ export function createComputeRoutes({
             ctx = await resolvePromptIssueContext(provider, accessToken, identifier, isTestMode);
           } catch (err) {
             if (err.message?.includes('not found')) {
-              keepalive.stop();
               logEvent(req, '/api/proxy/recommend', 404);
               return keepalive.send(404, { error: 'Issue not found' });
             }
             throw err;
           }
           if (!ctx) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/recommend', 404);
             return keepalive.send(404, { error: 'Issue not found' });
           }
@@ -487,7 +485,6 @@ export function createComputeRoutes({
             callMeta: { urlKey: req.proxyUrlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           });
           if (!generated) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/recommend', 500);
             return keepalive.send(500, { error: 'Failed to generate prompt' });
           }
@@ -558,7 +555,12 @@ export function createComputeRoutes({
           ...(rec.override ? { override: true } : {})
         });
       } catch (err) {
-        keepalive.stop();
+        // A hang-up aborts the model call, which surfaces as a timeout: the client
+        // left, and that is not an AI outage.
+        if (gone.gone) {
+          logEvent(req, '/api/proxy/recommend', 499, 'client closed');
+          return keepalive.send(499, { error: 'Client closed the request' });
+        }
         const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend', status);
         keepalive.send(status, body);
@@ -1083,7 +1085,6 @@ export function createComputeRoutes({
         if (isTestMode) {
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/recap', 404);
             return keepalive.send(404, { error: 'Issue not found' });
           }
@@ -1097,7 +1098,6 @@ export function createComputeRoutes({
         const cached = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/recap', 200);
           return keepalive.send(200, {
             status: 'fresh',
@@ -1109,7 +1109,6 @@ export function createComputeRoutes({
         }
 
         if (noRefresh) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/recap', 200);
           return keepalive.send(200, {
             status: cached ? 'stale' : 'missing',
@@ -1124,7 +1123,6 @@ export function createComputeRoutes({
         // never reaches it — and the charge below never bills a cache hit.
         const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
         if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/recap', 503);
           return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
         }
@@ -1138,7 +1136,6 @@ export function createComputeRoutes({
         if (isFreeTier && !isTestMode) {
           const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recap');
           if (rejection) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/recap', 429);
             return keepalive.send(rejection.status, rejection.body);
           }
@@ -1166,7 +1163,6 @@ export function createComputeRoutes({
         });
         const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
-        keepalive.stop();
         logEvent(req, '/api/proxy/recap', 200);
         keepalive.send(200, {
           status: 'fresh',
@@ -1257,7 +1253,6 @@ export function createComputeRoutes({
         if (isTestMode) {
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/recap', 404);
             return keepalive.send(404, { error: 'Issue not found' });
           }
@@ -1291,7 +1286,6 @@ export function createComputeRoutes({
         });
         const stored = await recapCacheStore.get(req.proxyUrlKey, canonicalId);
 
-        keepalive.stop();
         logEvent(req, '/api/proxy/recap', 200);
         keepalive.send(200, {
           status: 'fresh',
@@ -1374,7 +1368,6 @@ export function createComputeRoutes({
         if (isTestMode) {
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/brief', 404);
             return keepalive.send(404, { error: 'Issue not found' });
           }
@@ -1388,7 +1381,6 @@ export function createComputeRoutes({
         const cached = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
         if (cached && cached.inputHash === inputHash) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/brief', 200);
           return keepalive.send(200, {
             status: 'fresh',
@@ -1400,7 +1392,6 @@ export function createComputeRoutes({
         }
 
         if (noRefresh) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/brief', 200);
           return keepalive.send(200, {
             status: cached ? 'stale' : 'missing',
@@ -1414,7 +1405,6 @@ export function createComputeRoutes({
         // the cache-hit / noRefresh returns, so a fresh-cache read never charges.
         const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
         if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/brief', 503);
           return keepalive.send(503, { error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
         }
@@ -1428,7 +1418,6 @@ export function createComputeRoutes({
         if (isFreeTier && !isTestMode) {
           const rejection = await chargeFreeTierOrReject(req, '/api/proxy/brief');
           if (rejection) {
-          keepalive.stop();
           logEvent(req, '/api/proxy/brief', 429);
           return keepalive.send(rejection.status, rejection.body);
         }
@@ -1456,7 +1445,6 @@ export function createComputeRoutes({
         });
         const stored = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
-        keepalive.stop();
         logEvent(req, '/api/proxy/brief', 200);
         keepalive.send(200, {
           status: 'fresh',
@@ -1546,7 +1534,6 @@ export function createComputeRoutes({
         if (isTestMode) {
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
-            keepalive.stop();
             logEvent(req, '/api/proxy/brief', 404);
             return keepalive.send(404, { error: 'Issue not found' });
           }
@@ -1580,7 +1567,6 @@ export function createComputeRoutes({
         });
         const stored = await briefCacheStore.get(req.proxyUrlKey, canonicalId);
 
-        keepalive.stop();
         logEvent(req, '/api/proxy/brief', 200);
         keepalive.send(200, {
           status: 'fresh',

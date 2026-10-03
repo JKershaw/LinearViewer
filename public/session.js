@@ -801,13 +801,11 @@
     var original = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'closing out…';
-    window.api('/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/prompt/' + encodeURIComponent(ctx.issueId) + '/close-out')
+    // A keepalive-flushed error (the brief writer can take 20-40s, LIN-3293) arrives
+    // in a 200 as `statusCode`: read as the real status, so it is never dispatched
+    // as a prompt and a 401 still goes to /logout.
+    window.api('/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/prompt/' + encodeURIComponent(ctx.issueId) + '/close-out', { statusInBody: true })
       .then(function (result) {
-        // A keepalive-flushed error (the brief writer can take 20-40s, LIN-3293)
-        // arrives in a 200 as `statusCode`: never dispatch it as a prompt.
-        if (result && Object.prototype.hasOwnProperty.call(result, 'statusCode')) {
-          throw new Error(result.error || 'Failed to load the close-out prompt');
-        }
         return window.dispatchPrompt({
           urlKey: ctx.urlKey,
           prompt: result.prompt,
