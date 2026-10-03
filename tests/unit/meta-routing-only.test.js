@@ -46,6 +46,16 @@ describe('routing-only meta-prompt (LIN-3292)', () => {
     assert.throws(() => parseRecommendationResponse('## Reasoning\nno arrow', 'stop', 3, { routingOnly: true }), /recommended action/);
   });
 
+  test('routing mode needs only the action line: a reply with the header rendered as bold still parses (seen live)', () => {
+    const reply = '**Reasoning**\n**Assessment:**\n- Ready: ✗ No - open decision\n→ **design**\n**Next:** weigh the shapes';
+    const parsed = parseRecommendationResponse(reply, 'stop', 3, { routingOnly: true });
+    assert.equal(parsed.recommendedAction, 'design');
+    assert.ok(parsed.reasoning.startsWith('**Assessment:**'));
+    const defer = parseRecommendationResponse('Reasoning:\n→ **defer**\n**DeferTo:** LIN-9', 'stop', 3, { routingOnly: true });
+    assert.equal(defer.deferTo, 'LIN-9');
+    assert.throws(() => parseRecommendationResponse(reply, 'stop', 3), /missing ## Reasoning or ## Prompt/, 'the full mode is unchanged');
+  });
+
   test('routing mode ignores a body the model emits anyway, and keeps the defer contract', () => {
     const parsed = parseRecommendationResponse('## Reasoning\n→ **plan**\n## Prompt\nBODY', 'stop', 3, { routingOnly: true });
     assert.equal(parsed.prompt, null);
