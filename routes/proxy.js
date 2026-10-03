@@ -65,8 +65,8 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
-import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
-import { resolveBriefWriter } from '../lib/brief-writer.js';
+import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
+import { resolveRecommendModels } from '../lib/brief-writer.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
 import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
@@ -365,7 +365,8 @@ const GRAPHQL_TIMEOUT_MS = 25_000;
 // with provider routing and output size; the previous 50s cap surfaced as
 // intermittent 504s whose root cause was this leg, not Linear (the error text
 // misattributed it). The armed keepalive (http-keepalive.js) writes a heartbeat
-// space every 15s after its 25s flush, so the socket stays alive for an
+// space every 15s after its flush (20s after the router took the request, at
+// most 25s after arming), so the socket stays alive for an
 // arbitrarily long wait — the keepalive, not this number, is what keeps Heroku's
 // H12 at bay. This cap is therefore just a generous backstop against a genuinely
 // hung generation.
@@ -373,7 +374,7 @@ const LLM_TIMEOUT_MS = 180_000;
 
 // Backstop for the Linear context fetch on recommendation-style endpoints
 // (recommend/recap/brief/status). These fetches run behind an armed keepalive
-// (http-keepalive.js flushes a 200 + heartbeat at 25s and then holds the
+// (http-keepalive.js flushes a 200 + heartbeat by 25s and then holds the
 // connection open), so a 25s cap on the fetch would fire at the same instant
 // the keepalive starts covering for slowness — surfacing a 504 on healthy large
 // epics instead of letting the request complete. A larger budget keeps the cap
@@ -1543,7 +1544,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false, clientSignal = null }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -1631,10 +1632,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // Resolved BEFORE the model so the free-tier clamp (LIN-513) can force the
     // default model — a free-tier descent must never bill a workspace-preferred model.
     const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-    const selectedModel = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
     // The brief writer (LIN-3293): when on, this hop's call only routes and a second
     // call writes the prompt, inside the same hop timeout and descent deadline.
-    const briefWriter = await resolveBriefWriter({ urlKey, workspacePreferencesStore, isFreeTier });
+    // Resolved with the router's model by the one helper every recommend surface uses.
+    const { model: selectedModel, briefWriter } = await resolveRecommendModels({ urlKey, workspacePreferencesStore, isFreeTier });
     // Five seconds' margin so a fallback to the unwritten bundle lands before either fires.
     const hopDeadline = Math.min(deadline ?? Infinity, Date.now() + LLM_TIMEOUT_MS) - 5000;
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
@@ -1642,7 +1643,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
     // (gap #3) bounds each hop by the REMAINING shared descent budget so a stalled hop
     // can't overrun it — released on settle so the timer can't leak across hops.
-    const hop = armHopSignal({ deadline });
+    // clientSignal: the caller hung up (clientGoneSignal), so stop paying for the hop.
+    const hop = armHopSignal({ clientSignal, deadline });
     let recommendation;
     try {
       recommendation = await fetchWithTimeout(

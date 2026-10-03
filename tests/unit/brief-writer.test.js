@@ -22,7 +22,13 @@ import {
   setFetchImpl,
   setLlmCallRecorder,
   setPromptTraceRecorder,
-  BRIEF_WRITER_FEATURE
+  BRIEF_WRITER_FEATURE,
+  BRIEF_WRITER_PROSE_TOKENS,
+  briefWriterBudget,
+  resolveReasoningBudget,
+  defaultReasoningTokens,
+  isReasoningModel,
+  DEFAULT_MODEL
 } from '../../lib/openrouter.js';
 import { generatePrompt, finishStagePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
@@ -356,6 +362,69 @@ describe('writer failure ships the unwritten bundle', () => {
     const out = await writeBrief('BUNDLE', { kind: 'review', apiKey: null, model: 'x/w' });
     assert.deepEqual(out, { brief: null, reason: 'no-key' });
   });
+});
+
+// LIN-3294: a reasoning model spends hidden reasoning inside max_tokens, so a flat cap
+// let it think its way out of room and fall back on long stages.
+describe('the writer\'s token budget and unfinished replies', () => {
+  const bundle = (kind) => generatePrompt(kind, ISSUE, CONTEXT).prompt;
+  const writerBody = async (model) => {
+    const calls = transport({ route: routing('review'), write: BRIEF });
+    await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model } });
+    return calls.find(c => c.isWriter).body;
+  };
+
+  // Every writer gets the reasoning headroom in max_tokens, which costs nothing unless
+  // used: the models that fell back in the comparison reason by default and are not on
+  // the shared prefix list. The `reasoning` field goes only to the listed models. Outside
+  // the list it is not ignored: on a hybrid model it switches thinking on.
+  const HEADROOM = BRIEF_WRITER_PROSE_TOKENS + defaultReasoningTokens(BRIEF_WRITER_PROSE_TOKENS);
+
+  test('a listed reasoning model gets the LIN-1000 split: a reasoning bound and the whole prose budget on top', async () => {
+    assert.ok(isReasoningModel(DEFAULT_MODEL));
+    const body = await writerBody(DEFAULT_MODEL);
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: BRIEF_WRITER_PROSE_TOKENS });
+    assert.deepEqual(body.reasoning, reasoning);
+    assert.equal(body.max_tokens, maxTokens);
+    assert.equal(body.max_tokens, HEADROOM);
+    assert.equal(body.max_tokens, BRIEF_WRITER_PROSE_TOKENS + body.reasoning.max_tokens, 'the prose budget survives the reasoning run');
+    assert.deepEqual(briefWriterBudget(DEFAULT_MODEL), { reasoning, maxTokens });
+  });
+
+  for (const model of ['google/gemini-3.8-flash', 'deepseek/deepseek-v4-flash', 'openai/gpt-6.1-sol', 'anthropic/claude-opus-5.5', 'x/w']) {
+    test(`a model off the prefix list (${model}) still gets the headroom, and no reasoning field`, async () => {
+      assert.equal(isReasoningModel(model), false, 'the shared list is unchanged');
+      const body = await writerBody(model);
+      assert.equal(body.max_tokens, HEADROOM);
+      assert.ok(body.max_tokens > BRIEF_WRITER_PROSE_TOKENS, 'room to think and still write the whole brief');
+      assert.equal('reasoning' in body, false);
+      assert.deepEqual(briefWriterBudget(model), { reasoning: undefined, maxTokens: HEADROOM });
+    });
+  }
+
+  const unfinished = {
+    'reasoning spent the whole budget: no content, cut at the limit': [{ content: '', finishReason: 'length' }, 'truncated'],
+    'a null content cut at the limit': [{ content: null, finishReason: 'length' }, 'truncated'],
+    'an upstream error mid-reply': [{ content: '## Goal\n\nHalf a', finishReason: 'error' }, 'unfinished-error'],
+    'no finish reason at all': [{ content: '## Goal\n\nHalf a', finishReason: null }, 'unfinished-none']
+  };
+  for (const [name, [reply, reason]] of Object.entries(unfinished)) {
+    test(`${name}: recognised, the bundle ships, and the trace says why`, async () => {
+      const traces = [];
+      const records = [];
+      setPromptTraceRecorder(t => traces.push(t));
+      setLlmCallRecorder(r => records.push(r));
+      transport({ route: routing('review'), write: () => json(reply.content, { finishReason: reply.finishReason }) });
+      const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+      assert.equal(rec.prompt, bundle('review'));
+      assert.equal(rec.written, false);
+      assert.equal(rec.writerReason, reason);
+      assert.deepEqual(traces[0].briefWriter, { model: 'x/w', written: false, reason });
+      const writerCall = records.find(r => r.feature === BRIEF_WRITER_FEATURE);
+      assert.ok(writerCall, 'the spent call is still in the cost log');
+      assert.equal(writerCall.finishReason, reply.finishReason);
+    });
+  }
 });
 
 describe('streaming', () => {

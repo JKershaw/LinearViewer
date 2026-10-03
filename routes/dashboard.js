@@ -2067,7 +2067,6 @@ export function createDashboardRoutes({
       const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || ARCHIVE_PAGE_SIZE), recentLimit);
       const recent = archive.slice(offset, offset + limit);
 
-      keepalive.stop();
       keepalive.send(200, {
         workspaces,
         view: isSessionsView ? 'sessions' : 'autopilot',
@@ -2081,7 +2080,6 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Observation sessions error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not load sessions' });
     }
   });
@@ -2099,7 +2097,6 @@ export function createDashboardRoutes({
       const active = merged.filter(l => !isTerminalLoop(l));
       const recent = merged.filter(isTerminalLoop).slice(0, recentLimit);
 
-      keepalive.stop();
       keepalive.send(200, {
         workspaces,
         active,
@@ -2109,7 +2106,6 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard loops error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not load runs' });
     }
   });
@@ -2198,7 +2194,6 @@ export function createDashboardRoutes({
         suggestions
       );
 
-      keepalive.stop();
       keepalive.send(200, {
         workspaces,
         count: rulings.length,
@@ -2207,7 +2202,6 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard rulings error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not load rulings' });
     }
   });
@@ -2632,11 +2626,9 @@ export function createDashboardRoutes({
     const keepalive = armKeepalive(res);
     try {
       const kpis = await computeWorkspaceEscalationKpis(workspaces, { windowMs: windowDays * 24 * 60 * 60 * 1000, now, targetPerDay });
-      keepalive.stop();
       keepalive.send(200, { windowDays, generatedAt: now.toISOString(), ...kpis });
     } catch (error) {
       console.error('Escalation KPIs error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not compute escalation KPIs' });
     }
   });
@@ -2766,7 +2758,6 @@ export function createDashboardRoutes({
     const keepalive = armKeepalive(res);
     try {
       const readout = await computeWorkspaceEffortReadout(workspace, { now });
-      keepalive.stop();
       keepalive.send(200, { generatedAt: now.toISOString(), ...readout });
     } catch (error) {
       keepalive.stop();
@@ -3103,7 +3094,6 @@ export function createDashboardRoutes({
         session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
       }
       if (!session) {
-        keepalive.stop();
         return keepalive.send(404, { error: 'Session not found' });
       }
 
@@ -3112,7 +3102,6 @@ export function createDashboardRoutes({
         window: { start: session.dispatchedAt, end: session.completedAt }
       });
 
-      keepalive.stop();
       return keepalive.send(200, {
         sessionId,
         seedIssue: session.seedIssue,

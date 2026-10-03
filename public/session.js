@@ -801,7 +801,10 @@
     var original = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'closing out…';
-    window.api('/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/prompt/' + encodeURIComponent(ctx.issueId) + '/close-out')
+    // A keepalive-flushed error (the brief writer can take 20-40s, LIN-3293) arrives
+    // in a 200 as `statusCode`: read as the real status, so it is never dispatched
+    // as a prompt and a 401 still goes to /logout.
+    window.api('/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/prompt/' + encodeURIComponent(ctx.issueId) + '/close-out', { statusInBody: true })
       .then(function (result) {
         return window.dispatchPrompt({
           urlKey: ctx.urlKey,

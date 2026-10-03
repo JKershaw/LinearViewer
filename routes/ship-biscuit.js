@@ -193,7 +193,6 @@ export function createShipBiscuitRoutes({
         if (isFreeTier) {
           const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
           if (check) {
-            keepalive.stop();
             return keepalive.send(429, {
               error: check.reason,
               freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
@@ -249,7 +248,6 @@ export function createShipBiscuitRoutes({
           })
         : { model: modelId, window: model.window, since: model.since, workspaceName: model.workspaceName, isQuiet: model.isQuiet, frontPage: body.frontPage, index: body.index, weather: model.weather };
 
-      keepalive.stop();
       keepalive.send(200, { edition: saved });
     } catch (error) {
       keepalive.stop();

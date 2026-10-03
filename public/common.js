@@ -533,23 +533,17 @@ function initDeployTime() {
  *                                            targets are supported (e.g. audit.js → `/`).
  * @param {boolean} [opts.toastOnError=false] When true, surface the error via
  *                                            `window.toast(msg, {type:'error'})` before throwing.
+ * @param {boolean} [opts.statusInBody=false] For a keepalive-armed route (lib/http-keepalive.js):
+ *                                            once it has flushed, a 200 carries the real
+ *                                            status as `statusCode`, read here like a real one.
  * @returns {Promise<*>} Parsed JSON body on success (null if the body is empty/non-JSON).
  * @throws {Error} On a non-2xx response. The error carries `.status` and `.body`
  *                 (the parsed error payload, or null if it wasn't JSON).
  */
 window.api = async function api(url, opts = {}) {
-  const { on401 = '/logout', toastOnError = false, ...fetchOpts } = opts;
+  const { on401 = '/logout', toastOnError = false, statusInBody = false, ...fetchOpts } = opts;
 
   const response = await fetch(url, fetchOpts);
-
-  // 401 → redirect by default (session expired). `on401:false` falls through to
-  // the normal throw path so the caller can branch on `err.status === 401`.
-  if (response.status === 401 && on401 !== false) {
-    window.location.href = on401;
-    const err = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
-  }
 
   // Parse the body once, best-effort — used for both the success value and the
   // error shape. An empty/non-JSON body leaves it null.
@@ -560,13 +554,26 @@ window.api = async function api(url, opts = {}) {
     // Non-JSON or empty body — leave body null.
   }
 
-  if (!response.ok) {
-    const message = (body && (body.error || body.message)) || `HTTP ${response.status}`;
+  const status = statusInBody && response.ok && body && typeof body.statusCode === 'number'
+    ? body.statusCode
+    : response.status;
+
+  // 401 → redirect by default (session expired). `on401:false` falls through to
+  // the normal throw path so the caller can branch on `err.status === 401`.
+  if (status === 401 && on401 !== false) {
+    window.location.href = on401;
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
+  }
+
+  if (status < 200 || status > 299) {
+    const message = (body && (body.error || body.message)) || `HTTP ${status}`;
     if (toastOnError && typeof window.toast === 'function') {
       window.toast(message, { type: 'error' });
     }
     const err = new Error(message);
-    err.status = response.status;
+    err.status = status;
     err.body = body;
     throw err;
   }
