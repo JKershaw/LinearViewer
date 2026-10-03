@@ -690,3 +690,83 @@ test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
     expect(spend).toEqual([]);
   });
 });
+
+// =============================================================================
+// LIN-2944 P3 — R2-5 top-task seed demotion on the first screen.
+//
+// A fresh local workspace is seeded (by POST /workspace/new) with ONLY the two
+// starter issues (LOCAL-1 in progress, LOCAL-2 its todo child) — onboarding
+// scaffolding, not real work. Neither may surface as Swipe's front card or
+// Home's marked top task. When only the seed remains the deck is empty; adding
+// one real task makes it the single top task on BOTH surfaces. The ✦ primary is
+// click-gated, so nothing spends AI before that click.
+//
+// Disjoint `test.describe` block (P2's block above is untouched).
+// =============================================================================
+test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
+  /**
+   * Create a genuine fresh local workspace. POST /workspace/new seeds
+   * `starterSeed(urlKey)` (LOCAL-1 + LOCAL-2) and redirects to Home; the
+   * redirect's final URL carries the random urlKey.
+   */
+  async function freshLocalWorkspace(page) {
+    const resp = await page.request.post('/workspace/new', { form: { name: 'P3 Fresh' } });
+    const m = new URL(resp.url()).pathname.match(/^\/workspace\/([^/]+)\//);
+    expect(m, `new workspace redirect carries a urlKey: ${resp.url()}`).not.toBeNull();
+    return decodeURIComponent(m[1]);
+  }
+
+  async function topCard(page) {
+    return page.evaluate(() => {
+      const i = window.__SWIPE_DATA__ && window.__SWIPE_DATA__.issues[0];
+      return i ? { id: i.id, identifier: i.identifier } : null;
+    });
+  }
+
+  test('a fresh workspace with only the starter seed shows no seed as the top task', async ({ page }) => {
+    const urlKey = await freshLocalWorkspace(page);
+
+    // Swipe: the deck is empty — no LOCAL-1/LOCAL-2 dressed as real work.
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.swipe-card-empty')).toBeVisible();
+    await expect(page.locator('.swipe-card-identifier')).toHaveCount(0);
+    expect(await topCard(page)).toBeNull();
+
+    // Home: no row is marked as the top task (the seed is demoted, not promoted).
+    await page.goto(`/workspace/${urlKey}/`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-top-task="1"]')).toHaveCount(0);
+  });
+
+  test('adding one real task makes it the top task on both Swipe and Home, with no spend before Go', async ({ page }) => {
+    const spend = recommendSpy(page);
+    const urlKey = await freshLocalWorkspace(page);
+
+    const REAL_TITLE = 'Real P3 task';
+    const create = await page.request.post(`/workspace/${urlKey}/api/issues`, {
+      data: { title: REAL_TITLE, projectId: `${urlKey}-proj-1`, stateId: 'In Progress' },
+    });
+    expect(create.ok(), `create real task: ${create.status()} ${await create.text()}`).toBeTruthy();
+    const { issue: created } = await create.json();
+    expect(created && created.id, 'created issue has an id').toBeTruthy();
+
+    // Swipe: the real task is the front card, never a seed issue.
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.swipe-card-title')).toHaveText(REAL_TITLE);
+    const swipeTop = await topCard(page);
+    expect(swipeTop.id).toBe(created.id);
+
+    // Opening the top task's prompt section spends nothing (✦ is click-gated).
+    await openPrompts(page);
+    expect(spend).toEqual([]);
+
+    // Home: exactly one mark, on the SAME real task.
+    await page.goto(`/workspace/${urlKey}/`);
+    await page.waitForLoadState('networkidle');
+    const marked = page.locator('[data-top-task="1"]');
+    await expect(marked).toHaveCount(1);
+    expect(await marked.getAttribute('data-id')).toBe(created.id);
+  });
+});
