@@ -301,7 +301,7 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     assert.equal(WAKE_DELIVERY_GRACE_MS, 3 * MIN);
   });
 
-  test('RC7: a chain feeding into a cycle mints one cycle record, not an extra orphan', () => {
+  test('RC7/RC9: a chain feeding into a cycle mints one cycle-record keyed on the CYCLE CORE, not the feeder-inclusive walk', () => {
     const a = 'aaaaaaaa-0000-0000-0000-000000000030';
     const b = 'bbbbbbbb-0000-0000-0000-000000000031';
     const c = 'cccccccc-0000-0000-0000-000000000032';
@@ -326,9 +326,12 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage });
     assert.equal(chains.length, 1, `one incident record, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
     assert.equal(chains[0].shape, 'cycle');
-    assert.deepEqual(chains[0].members, [a, b, c].sort());
-    // The upstream waiter A is on the record, and no orphan-shaped duplicate exists.
-    assert.ok(chains[0].members.includes(a));
+    // RC9: identity is the {B,C} core — the upstream feeder A is deliberately
+    // NOT part of the record identity (it would otherwise re-key the incident
+    // whenever it joins or leaves), while still being visible in the edges.
+    assert.deepEqual(chains[0].members, [b, c].sort());
+    assert.ok(!chains[0].members.includes(a), 'the feeder is not part of the cycle-core identity');
+    assert.ok(chains[0].detail.edges.some((e) => e.from === a && e.to === b), 'the feeder edge stays in the detail');
     assert.equal(chains.filter((x) => x.shape === 'orphan').length, 0);
   });
 
@@ -438,6 +441,34 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     const stale = make('2026-10-02T09:40:00.000Z'); // 20 min old
     const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(stale), rowsByLineage: stale });
     assert.equal(chains.length, 1);
+    assert.equal(chains[0].shape, 'orphan');
+  });
+
+  test('RC10: the WAITER\'s own post-wait activity older than ACTIVE_FRESH_MS does not cover a stopped target', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000080';
+    const b = 'bbbbbbbb-0000-0000-0000-000000000081';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [
+          feedback(`[pending] waiting on worker dispatch ${b}`, '2026-10-02T09:50:00.000Z'),
+          // The waiter's OWN post-wait activity, 28 min old at `now`: past the
+          // 15-min ACTIVE_FRESH_MS bound, so it must NOT read as active. Drop
+          // that bound and the waiter covers its own stopped chain (0 alarms).
+          feedback('[working] a stale post-wait heartbeat', '2026-10-02T09:52:00.000Z')
+        ]
+      })]],
+      [b, [row({
+        id: b,
+        sessionId: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[working] target last moved long ago', '2026-10-02T09:10:00.000Z')]
+      })]]
+    ]);
+    const now = Date.parse('2026-10-02T10:20:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage });
+    assert.equal(chains.length, 1, `stale waiter activity must not cover the stopped target, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
     assert.equal(chains[0].shape, 'orphan');
   });
 });

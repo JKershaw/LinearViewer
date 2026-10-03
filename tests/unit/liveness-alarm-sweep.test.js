@@ -434,4 +434,100 @@ describe('liveness-alarm-sweep: tick simulator', () => {
     // runs without throwing and leaves the store empty.
     assert.equal((await alarmStore.list(URL_KEY, { state: 'all' })).length, 0);
   });
+
+  test('RC9: a feeder lineage joining an open cycle does not re-key the incident (one record, unchanged startedAt)', async () => {
+    const feeder = 'f0f0f0f0-0000-0000-0000-000000000001';
+    const parent = '11111111-0000-0000-0000-000000000002';
+    const child = '22222222-0000-0000-0000-000000000003';
+    // Feeder FIRST in the row order, so an unfixed sweep walks it before the
+    // cycle members once it becomes a waiter — the mutation witness.
+    const rows = [
+      {
+        id: feeder, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        // Not visible at 10:20 (future timestamp); a waiter only from 10:30.
+        feedback: [{ message: `[pending] waiting on worker dispatch ${parent}`, timestamp: '2026-10-02T10:25:00.000Z' }]
+      },
+      {
+        id: parent, kind: 'autopilot', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${child}`, timestamp: '2026-10-02T10:05:00.000Z' }]
+      },
+      {
+        id: child, kind: 'close-out', status: 'taken', sessionId: parent, followUpTo: null, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: '[pending] I am waiting on the orchestrator to dispatch a beat', timestamp: '2026-10-02T10:06:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:20:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await d2All();
+    assert.equal(d2.length, 1, `cycle opens before the feeder joins, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    const openedId = d2[0]._id;
+    assert.deepEqual(d2[0].members, [parent, child].sort());
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:06:00.000Z');
+
+    // The feeder now joins the open cycle: the core is unchanged, so the ONE
+    // existing record must be confirmed, not duplicated or reopened.
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await d2All();
+    assert.equal(d2.length, 1, `feeder join must not mint a second record, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    assert.equal(d2[0]._id, openedId, 'incident identity is the cycle core, not the feeder-inclusive walk');
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:06:00.000Z', 'startedAt must not reopen on a feeder join');
+    assert.equal(d2[0].clearedAt, null);
+  });
+
+  test('RC9: a feeder answered while the cycle persists keeps one record and the original startedAt', async () => {
+    const feeder = 'f0f0f0f0-0000-0000-0000-000000000010';
+    const feederWake = 'f0f0f0f0-0000-0000-0000-000000000011';
+    const parent = '11111111-0000-0000-0000-000000000012';
+    const child = '22222222-0000-0000-0000-000000000013';
+    const rows = [
+      {
+        id: feeder, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${parent}`, timestamp: '2026-10-02T10:04:00.000Z' }]
+      },
+      {
+        id: feederWake, kind: 'wake', status: 'done', sessionId: null, followUpTo: feeder, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:25:00.000Z', feedback: []
+      },
+      {
+        id: parent, kind: 'autopilot', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${child}`, timestamp: '2026-10-02T10:05:00.000Z' }]
+      },
+      {
+        id: child, kind: 'close-out', status: 'taken', sessionId: parent, followUpTo: null, issueIdentifier: 'LIN-9',
+        dispatchedAt: '2026-10-02T10:00:00.000Z',
+        feedback: [{ message: '[pending] I am waiting on the orchestrator to dispatch a beat', timestamp: '2026-10-02T10:06:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:20:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await d2All();
+    assert.equal(d2.length, 1, `cycle opens with the feeder waiting, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    const openedId = d2[0]._id;
+    assert.deepEqual(d2[0].members, [parent, child].sort());
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:06:00.000Z');
+
+    // The feeder is answered at 10:25 while the P↔C cycle persists. The record
+    // must stay the same ONE record with its original `startedAt`.
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await d2All();
+    assert.equal(d2.length, 1, `feeder resolution must not mint a second record, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    assert.equal(d2[0]._id, openedId);
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:06:00.000Z');
+    assert.equal(d2[0].clearedAt, null);
+  });
 });
