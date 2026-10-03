@@ -4010,6 +4010,71 @@ describe('capability-aware prompts: non-Linear providers (LIN-177 S4/S5)', () =>
   });
 });
 
+// LIN-3296 (B): the subtask strip ended a multi-line "**Subtasks:**" block at the next
+// blank line, but templates build their lines with `.filter(Boolean)` (the '' spacers are
+// gone), so no blank line followed the block and the strip ate everything after it —
+// the whole `## Goal` section for `context`. Latent only because the GitHub providers
+// return no hierarchy today.
+describe('subtask strip removes only the subtask list (LIN-3296)', () => {
+  const issue = {
+    identifier: 'GH-7', title: 'Sample', description: 'd',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z', labels: []
+  };
+  const ctx = (children) => ({ project: { name: 'P' }, parent: null, siblings: [], children, comments: [] });
+  const children = [
+    { identifier: 'GH-8', title: 'Child one', state: { name: 'Todo', type: 'unstarted' } },
+    { identifier: 'GH-9', title: 'Child two', state: { name: 'In Progress', type: 'started' } }
+  ];
+  const ui = { write: true, comments: true, estimates: true, subtasks: false, displayName: 'GitHub' };
+
+  // context/plan/implementation/look-into render "**Subtasks:**"; breakdown renders
+  // "**Existing Subtasks:**".
+  for (const template of ['context', 'plan', 'implementation', 'look-into', 'breakdown']) {
+    test(`${template}: subtask lines are removed and the following sections survive`, () => {
+      const withChildren = generatePrompt(template, { ...issue, labels: [template] }, ctx(children), {}, ui).prompt;
+      const withoutChildren = generatePrompt(template, { ...issue, labels: [template] }, ctx([]), {}, ui).prompt;
+      assert.ok(!/^\*\*(Existing Subtasks|Subtasks):\*\*/m.test(withChildren), 'subtask header removed');
+      assert.ok(!/GH-8|GH-9/.test(withChildren), 'subtask list lines removed');
+      assert.ok(withChildren.includes('## Goal'), '## Goal survives the strip');
+      // Structural: nothing of the no-children prompt is lost — its lines appear, in
+      // order, in the stripped prompt. (Not strict equality: a template may add
+      // child-conditional prose of its own, and the inline summary leaves its trailing
+      // blank line, neither of which is the strip's concern.)
+      const kept = withChildren.split('\n');
+      let at = 0;
+      for (const line of withoutChildren.split('\n')) {
+        const found = kept.indexOf(line, at);
+        assert.ok(found !== -1, `line lost by the strip: ${JSON.stringify(line.slice(0, 80))}`);
+        at = found + 1;
+      }
+    });
+  }
+
+  test('context: a provider without subtasks sees exactly the no-children prompt', () => {
+    const withChildren = generatePrompt('context', { ...issue, labels: ['context'] }, ctx(children), {}, ui).prompt;
+    const withoutChildren = generatePrompt('context', { ...issue, labels: ['context'] }, ctx([]), {}, ui).prompt;
+    assert.strictEqual(withChildren, withoutChildren);
+  });
+
+  test('a provider that keeps subtasks still renders the list unchanged', () => {
+    const keep = { ...ui, subtasks: true };
+    const p = generatePrompt('context', { ...issue, labels: ['context'] }, ctx(children), {}, keep).prompt;
+    assert.ok(p.includes('**Subtasks:**\n- GH-8: "Child one" (Todo)\n- GH-9: "Child two" (In Progress)\n'));
+  });
+
+  test('the strip stops at the first non-list line, blank line or not', () => {
+    const caps = { write: true, subtasks: false, displayName: 'Linear', includeTracker: true, fixedStates: null };
+    const prompt = [
+      '**Subtasks:**', '- GH-8: "Child one" (Todo)', '- GH-9: "Child two" (In Progress)',
+      '**Labels:** x', '## Goal', '- keep this bullet'
+    ].join('\n');
+    assert.strictEqual(applyPromptCapabilities(prompt, caps), '**Labels:** x\n## Goal\n- keep this bullet');
+    // Inline forms are still dropped line-by-line, as before.
+    const inline = '**Subtasks:** 0/2 done → Next: GH-8\n**Frontier facts:** 2 open\nafter';
+    assert.strictEqual(applyPromptCapabilities(inline, caps), 'after');
+  });
+});
+
 describe('generateCustomPrompt capability awareness (LIN-177 S4)', () => {
   const issue = { identifier: 'GH-9', title: 'T', description: 'd', state: { name: 'Todo' }, labels: [] };
   const ctx = { project: { name: 'P' }, children: [], comments: [] };
