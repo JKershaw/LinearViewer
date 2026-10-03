@@ -540,6 +540,49 @@ Response:
   clamped to at least 60 seconds — a shorter window can land entirely inside one
   phase of a periodic fault and read falsely clean.
 
+#### Get Own Credential Trail (LIN-3282)
+
+Read-only view of **this token's own provider-lane credential trail**, newest
+first: the credential **source** and **fingerprint** each of your provider-lane
+calls actually resolved. Use it to attribute an intermittent `401`/`200` toggle
+to a source (`connection`, `session-scan`, `cache`, `refresh-on-resolve`)
+instead of inferring it from status codes. Needs no new grant (same as
+`/credential-health`) and never exposes token bytes — `credentialFingerprint` is
+a one-way 12-hex digest.
+
+```
+GET /api/proxy/credential-trail
+GET /api/proxy/credential-trail?limit=50&windowMs=900000
+```
+
+Response:
+```json
+{
+  "windowMs": 900000,
+  "items": [
+    {
+      "timestamp": "2026-10-03T09:35:00.000Z",
+      "method": "GET",
+      "endpoint": "/api/proxy/issues/:id",
+      "status": 200,
+      "credentialSource": "connection",
+      "credentialFingerprint": "388d2df2db5b"
+    }
+  ]
+}
+```
+
+- Only rows with `stage: "provider-lane"` appear — this endpoint's own reads are
+  `proxy-token`-staged, so they never pollute the window.
+- `endpoint` is the **route pattern** the handler logs (for example
+  `/api/proxy/issues/:id`), never the concrete issue id; `method`
+  disambiguates a `GET` read from a `PATCH` on the same pattern.
+- `credentialSource` is the closed enum `cache` | `session-scan` |
+  `refresh-on-resolve` | `connection`. Rows written before this field existed
+  read `null` — there is no backfill.
+- `limit` defaults to `50` (cap `100`); `windowMs` defaults to `900000`
+  (15 min, cap 86400000). Both are clamped server-side.
+
 #### List Teams
 
 ```

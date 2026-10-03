@@ -196,6 +196,13 @@ describe('buildInstructions — proxy-token 401 fields + Class-B retry guidance 
     assert.match(text, /retry over 10-15 minutes/);
     assert.match(text, /`stage: "proxy-token"`[\s\S]*?retrying it wastes the window/);
   });
+
+  test('LIN-3282: documents the token-scoped credential-trail read', () => {
+    const text = buildInstructions({ baseUrl: BASE_URL, scope: 'readWrite' });
+    assert.match(text, new RegExp(`GET ${BASE_URL}/api/proxy/credential-trail`));
+    assert.match(text, /"credentialSource": "connection"/);
+    assert.match(text, /never\s+token bytes/);
+  });
 });
 
 // LIN-2773 Area 4: the published contract now carries "effect" beside

@@ -697,6 +697,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       if (req) {
         req.resolvedCredentialFingerprint = null;
         req.resolvedCredentialExpiresAt = null;
+        // LIN-3282: stamped beside the fingerprint for the identical reason —
+        // a reused `req`-shaped object must never read a stale credential
+        // source from a prior request. This branch calls no
+        // `resolveWorkspaceAccess`, so there is no `source` to record.
+        req.resolvedCredentialSource = null;
         // LIN-2351: stamped here too, for the identical reason LIN-1980
         // duplicated the fingerprint stamp on this branch — a reused
         // `req`-shaped object in a test harness must never read a stale
@@ -738,6 +743,14 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // code review). Per-request storage makes the transient-vs-terminal
       // classification race-free by construction.
       req.resolvedCredentialExpiresAt = Number.isFinite(expiresAt) ? expiresAt : null;
+      // LIN-3282: the credential's SOURCE (cache | session-scan |
+      // refresh-on-resolve | connection), stamped per request beside the
+      // fingerprint — deliberately NOT read back from `credentialResolutions`
+      // (a shared per-(urlKey, owner) correlation that can lag under
+      // interleaving; the fingerprint comment above applies identically).
+      // Persisted onto the proxy-event row so the live 401/200 toggle can be
+      // attributed to a source from a proxy token via /credential-trail.
+      req.resolvedCredentialSource = source ?? null;
     }
     const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
     if (req) {
@@ -1129,7 +1142,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       status,
       note,
       stage,
-      credentialFingerprint: req.resolvedCredentialFingerprint ?? null
+      credentialFingerprint: req.resolvedCredentialFingerprint ?? null,
+      // LIN-3282: how the resolved credential was obtained, persisted at this
+      // single write seam for the same reason as the fingerprint above.
+      // `undefined` (nothing resolved) and `null` both land as null on the row.
+      credentialSource: req.resolvedCredentialSource ?? null
     }).catch(err => console.error('Failed to log proxy event:', err));
   }
 
