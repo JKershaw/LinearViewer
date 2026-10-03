@@ -1827,8 +1827,11 @@ describe('review template', () => {
       'the next action is the stage that fixes it here');
     assert.ok(/A `blocks` relation does not make the engine descend|a `blocks` relation does not make the engine descend/i.test(result.prompt),
       'linking an owning task still names the next action, because `blocks` does not drive descent');
-    assert.ok(/Only a fix the team would need to hear about before it happens .* makes it \*\*Needs Discussion\*\*/.test(result.prompt),
+    assert.ok(/Only a fix the team would need to hear about before it happens makes it \*\*Needs Discussion\*\*/.test(result.prompt),
       'only a team-level change goes to the human');
+    // LIN-3293: John's definition is the clause itself. A bracketed list of
+    // categories read as the definition and was turned into the test by a writer.
+    assert.ok(!/before it happens \(/.test(result.prompt), 'no category list stands in for the definition');
     assert.ok(/stays open until it is fixed and CI is green/i.test(result.prompt), 'closes only after the fix and green CI');
   });
 

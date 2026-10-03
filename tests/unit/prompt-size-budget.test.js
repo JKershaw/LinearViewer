@@ -55,7 +55,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 128659, // LIN-3293: review files nothing; close-out owns filing
+  'lib/prompt-template-defs.js': 128622, // LIN-3293: review files nothing; close-out owns filing; no category list for "large"
   'lib/prompt-templates.js': 20404,
   'lib/prompt-formatters.js': 52999,
   'lib/prompt-contract.js': 3481,
@@ -77,7 +77,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 1892,
   'plan-review': 7704,
   implementation: 7574,
-  review: 18702, // LIN-3293: review's filing check moved to close-out, which already had it
+  review: 18666, // LIN-3293: review's filing check moved to close-out, which already had it; no category list for "large"
   'close-out': 18455,
   'retrospective-audit': 4143,
   retro: 4114,

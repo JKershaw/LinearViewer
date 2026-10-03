@@ -12,4 +12,8 @@ On 3 October 2026, for LIN-3289, each prompt template was read alongside its met
 
 These are working notes for the prompt-pipeline split, read at commit `065e776f`. They are not a specification, and their line numbers will drift.
 
+One reading in them was not adopted:
+
+- **What "large" means.** Several notes list product behaviour, a published contract, stored data and another repo's interface as what the team would need to hear about. That list was LIN-3288's candidate definition. John's definition is the clause alone: a change goes to him only if he would need to tell the team about it before it happens. Size, effort and category lists don't define it, so read each list as an example at most.
+
 The intent behind the work is in `docs/papers/harbour/like-a-skilled-developer.md`.
