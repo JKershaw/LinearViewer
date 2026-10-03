@@ -23,10 +23,12 @@
  *
  * The router defaults to the app's default model. Re-running `run` resumes: routes and
  * finished pairs already in <outDir> are reused. One call per pair, retried once on a
- * transient failure. The run stops before a call that would take total spend past
- * --budget-multiple times the estimated cost of one call on the ladder's priciest model.
- * Each call's look-ahead assumes the writer spends its whole reasoning headroom on top of a
- * typical brief, since the app gives every writer that headroom.
+ * transient failure. The run stops before a call, routing or writing, that would take total
+ * spend (every attempt counted) past --budget-multiple times the estimated cost of one call
+ * on the ladder's priciest model, on the largest writer prompt any stage could give.
+ * A writer call's look-ahead assumes the writer spends its whole reasoning headroom on top
+ * of a typical brief, since the app gives every writer that headroom; a routing call's is
+ * the dearest routing call so far.
  * The key is read from the environment and never written. Each writer call runs with the
  * app's own token budget (briefWriterBudget: a reasoning allowance on top of the prose
  * budget for every model), recorded per model in ladder.json. A writer reply that did not
@@ -219,6 +221,8 @@ async function run() {
     .filter(j => j && j.identifier).map(j => adapt(j));
 
   // The guard: multiple × one call on the priciest writer, sized on the largest writer prompt.
+  // It covers the routing pass too, so it is sized before routing, on every stage a ticket
+  // could be routed to.
   const estimate = (id, inBytes, outTokens = 1500) => (inBytes / 3.5) * price(id).inPerM / 1e6 + outTokens * price(id).outPerM / 1e6;
   const priciest = ladder.filter(l => l.writer).sort((a, b) => estimate(b.id, 20000) - estimate(a.id, 20000))[0];
   // A writer may spend its whole reasoning headroom before the brief, so a call's look-ahead
@@ -234,13 +238,33 @@ async function run() {
   const spent = () => Object.values(routes).reduce((s, r) => s + (r.usage?.cost || 0), 0)
     + runs.reduce((s, r) => s + r.attempts.reduce((t, a) => t + (a.cost || 0), 0), 0);
 
+  let maxBytes = 0;
+  for (const t of tickets) {
+    for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+      const { goal } = stageParts(kind, t.issue, t.context);
+      maxBytes = Math.max(maxBytes, Buffer.byteLength(buildBriefWriterPrompt({ kind, bundle: goal, focus: null, sections: [] })));
+    }
+  }
+  const unit = estimate(priciest.id, maxBytes);
+  const budget = multiple * unit;
+  console.log(`guard: ${multiple} × ~$${unit.toFixed(4)} (one ${priciest.id} call) = $${budget.toFixed(3)}; spent so far $${spent().toFixed(4)}`);
+  let stopped = null;
+
   // 1. Route each ticket once on the router. The writer is handed a spent deadline, so it
-  // returns 'no-time' without a call and only the routing call goes out.
+  // returns 'no-time' without a call and only the routing call goes out. Every attempt is
+  // paid for, and each is guarded, looking ahead by the dearest routing call so far.
+  let routeAhead = Object.values(routes).reduce((m, r) => Math.max(m, r.usage?.cost || 0), 0);
   for (const t of tickets) {
     const id = t.issue.identifier;
     if (routes[id]) continue;
-    let rec = null; let error = null;
+    let rec = null; let error = null; let u = {};
+    const attemptCosts = [];
     for (let attempt = 0; attempt < 2 && !rec; attempt++) {
+      const pending = attemptCosts.reduce((s, c) => s + c, 0);
+      if (spent() + pending + routeAhead > budget) {
+        stopped = `before routing ${id}: spent $${(spent() + pending).toFixed(4)}, next ~$${routeAhead.toFixed(4)}, budget $${budget.toFixed(3)}`;
+        break;
+      }
       calls.length = 0;
       try {
         rec = await getRecommendation(t.issue, t.context, {
@@ -248,31 +272,23 @@ async function run() {
           callMeta: { feature: 'recommend', issueIdentifier: id }
         });
       } catch (e) { error = e.message.slice(0, 300); }
+      u = calls.find(c => c.feature === 'recommend') || {};
+      attemptCosts.push(u.cost || 0);
+      routeAhead = Math.max(routeAhead, u.cost || 0);
     }
-    const u = calls.find(c => c.feature === 'recommend') || {};
+    if (!attemptCosts.length) break;
+    const cost = attemptCosts.reduce((s, c) => s + c, 0);
     routes[id] = rec
-      ? { action: rec.recommendedAction, kind: rec.recommendedAction === 'defer' ? 'defer' : deriveDispatchKind(rec.recommendedAction), deferTo: rec.deferTo || null, reasoning: rec.reasoning, focus: routerFocus(rec.reasoning), usage: { model: u.model, promptTokens: u.promptTokens, completionTokens: u.completionTokens, cost: u.cost, durationMs: u.durationMs } }
-      : { error, usage: { cost: u.cost || 0 } };
+      ? { action: rec.recommendedAction, kind: rec.recommendedAction === 'defer' ? 'defer' : deriveDispatchKind(rec.recommendedAction), deferTo: rec.deferTo || null, reasoning: rec.reasoning, focus: routerFocus(rec.reasoning), usage: { model: u.model, promptTokens: u.promptTokens, completionTokens: u.completionTokens, cost, durationMs: u.durationMs } }
+      : { error, usage: { cost } };
     writeJson(routesPath, routes);
     console.log(`route ${id}: ${routes[id].action ?? 'ERROR ' + error} → ${routes[id].kind ?? '-'}`);
+    if (stopped) break;
   }
 
-  // The unit cost for the guard, now that the stages (and so the bundles) are known.
-  let maxBytes = 0;
-  for (const t of tickets) {
-    const r = routes[t.issue.identifier];
-    if (!r?.kind || r.kind === 'defer' || !PROMPT_TEMPLATES[r.kind]) continue;
-    const { goal } = stageParts(r.kind, t.issue, t.context);
-    maxBytes = Math.max(maxBytes, Buffer.byteLength(buildBriefWriterPrompt({ kind: r.kind, bundle: goal, focus: r.focus, sections: [] })));
-  }
-  const unit = estimate(priciest.id, maxBytes);
-  const budget = multiple * unit;
-  console.log(`guard: ${multiple} × ~$${unit.toFixed(4)} (one ${priciest.id} call) = $${budget.toFixed(3)}; spent so far $${spent().toFixed(4)}`);
-
-  // 2. Each ticket × writer model, through the real writer path.
-  let stopped = null;
+  // 2. Each ticket × writer model, through the real writer path (none once the guard stopped).
   outer:
-  for (const t of tickets) {
+  for (const t of stopped ? [] : tickets) {
     const id = t.issue.identifier;
     const r = routes[id];
     if (!r?.kind || r.kind === 'defer' || !PROMPT_TEMPLATES[r.kind]) continue;
