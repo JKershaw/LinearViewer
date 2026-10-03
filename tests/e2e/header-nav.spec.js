@@ -35,7 +35,9 @@ test.describe('Header view switcher (LIN-978)', () => {
   });
 
   test('flagged power-user views are hidden when their flags are off', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    await seedLocal(swimLocalSeed, { features: {} });
+    // proxy explicitly off: it now defaults on, so an empty features map would
+    // still show the proxy link (LIN-2944 P3).
+    await seedLocal(swimLocalSeed, { features: { proxy: false } });
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
 
