@@ -84,9 +84,9 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106020; // LIN-3292: the routing-only switches, from the unallocated total; LIN-3293: review's filing check (5b) gone
+export const META_PROMPT_SOURCE_CEILING = 106015; // LIN-3292: the routing-only switches, from the unallocated total; LIN-3293: review's filing check (5b) gone
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 103537;
+export const META_PROMPT_RENDERED_CEILING = 103532;
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own

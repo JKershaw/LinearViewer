@@ -2355,6 +2355,12 @@ describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', (
     const closeoutMatches = p.match(/\*\*Close-out prompts\*\* must/g) || [];
     assert.strictEqual(closeoutMatches.length, 1, 'exactly one Close-out-prompts rule exists');
     assert.ok(/gate on the review verdict rather than any specific format/i.test(p), 'close-out gates on the verdict, not the exact heading (LIN-810)');
+    // Both paths (LIN-3291, John's ruling): an explicitly empty ledger passes; a review with
+    // no ledger at all goes back to review. The meta rule had kept LIN-810's absent-is-empty.
+    assert.ok(/hold the close and name `review` next for a task with no review verdict on record, or a review with no ledger at all, which is not empty/i.test(p),
+      'meta close-out rule: a missing ledger goes back to review');
+    assert.ok(!/absence of flagged gaps as effectively empty|empty or absent under an Approve|an Approve with no ledger items/i.test(p),
+      'meta close-out rule: an absent ledger is never read as empty');
     assert.ok(/it never discharges a flagged gap/i.test(p), 'green CI never discharges a flagged gap');
     assert.ok(/names the exact precondition they exercised/i.test(p), 'human acceptance must name the exact precondition');
     // LIN-1365 parity with the handwritten close-out gate: the recorded Approve + discharged
