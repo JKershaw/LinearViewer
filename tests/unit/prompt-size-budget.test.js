@@ -27,6 +27,7 @@
  *                         source the frozen file does not itself contain)
  *   - Meta-prompt       : lib/prompts/meta-prompt-template.js, source + rendered
  *                         with the same leaf fixture the baseline snapshot uses
+ *   - Brief writer      : lib/prompts/brief-writer.js, source (LIN-3293)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
  *
  * The existing `meta-prompt.baseline.txt` byte-identity guard in
@@ -86,6 +87,15 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 export const META_PROMPT_SOURCE_CEILING = 106450; // LIN-3292: the routing-only switches, from the unallocated total
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
 export const META_PROMPT_RENDERED_CEILING = 103927;
+
+/**
+ * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
+ * brief and every stage's ideal shape. New prompt text, paid by removing restated rules from
+ * review and close-out (both paths), lowering every slack ceiling to its size, and the
+ * unallocated remainder of the total. It renders only around a bundle the template
+ * ceilings already measure, so it carries a source ceiling alone.
+ */
+export const BRIEF_WRITER_SOURCE_CEILING = 6650;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
@@ -186,6 +196,14 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
   });
 
+  test('brief writer source bytes', () => {
+    const actual = sourceBytes('lib/prompts/brief-writer.js');
+    assert.ok(actual <= BRIEF_WRITER_SOURCE_CEILING,
+      `lib/prompts/brief-writer.js is ${actual} bytes, ${actual - BRIEF_WRITER_SOURCE_CEILING} over its ` +
+      `${BRIEF_WRITER_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - BRIEF_WRITER_SOURCE_CEILING} bytes ` +
+      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+  });
+
   test('served runner prompt source bytes', () => {
     const actual = sourceBytes('docs/runner-prompt.md');
     assert.ok(actual <= RUNNER_PROMPT_SOURCE_CEILING,
@@ -219,6 +237,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       ...Object.values(TEMPLATES_RENDERED_CEILINGS),
       META_PROMPT_SOURCE_CEILING,
       META_PROMPT_RENDERED_CEILING,
+      BRIEF_WRITER_SOURCE_CEILING,
       RUNNER_PROMPT_SOURCE_CEILING,
       RUNNER_PROMPT_RENDERED_CEILING,
     ].reduce((sum, n) => sum + n, 0);

@@ -66,6 +66,7 @@ import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
+import { resolveBriefWriter } from '../lib/brief-writer.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
 import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
@@ -1631,6 +1632,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // default model — a free-tier descent must never bill a workspace-preferred model.
     const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
     const selectedModel = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
+    // The brief writer (LIN-3293): when on, this hop's call only routes and a second
+    // call writes the prompt, inside the same hop timeout and descent deadline.
+    const briefWriter = await resolveBriefWriter({ urlKey, workspacePreferencesStore, isFreeTier });
+    // Five seconds' margin so a fallback to the unwritten bundle lands before either fires.
+    const hopDeadline = Math.min(deadline ?? Infinity, Date.now() + LLM_TIMEOUT_MS) - 5000;
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
@@ -1655,6 +1661,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
             featureFlags: {},
             providerUi: provider?.ui || null,
             signal: AbortSignal.any([signal, hop.signal]),
+            briefWriter,
+            deadline: hopDeadline,
             callMeta: { urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           }
         ),
