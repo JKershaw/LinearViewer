@@ -83,7 +83,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106319;
+export const META_PROMPT_SOURCE_CEILING = 106575; // LIN-3292: the routing-only switches, from the unallocated total
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
 export const META_PROMPT_RENDERED_CEILING = 104052;
 
