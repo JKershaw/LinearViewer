@@ -694,14 +694,22 @@ test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
 // =============================================================================
 // LIN-2944 P3 — R2-5 top-task seed demotion on the first screen.
 //
-// A fresh local workspace is seeded (by POST /workspace/new) with ONLY the two
-// starter issues (LOCAL-1 in progress, LOCAL-2 its todo child) — onboarding
-// scaffolding, not real work. Neither may surface as Swipe's front card or
-// Home's marked top task. When only the seed remains the deck is empty; adding
-// one real task makes it the single top task on BOTH surfaces. The ✦ primary is
-// click-gated, so nothing spends AI before that click.
+// Addendum 18 (verdict `15237eb1`): a fresh local workspace is seeded (by POST
+// /workspace/new) with ONLY the two starter issues (LOCAL-1 in progress, LOCAL-2
+// its todo child) — onboarding scaffolding, not real work. On Swipe the seed
+// cards are REORDERED after all real cards and REMAIN REACHABLE (not deleted);
+// only when no real card remains does the front render the onboarding/empty
+// state. On Home the seed rows stay in the list but are never marked as the top
+// task; when only seed rows remain a one-line onboarding hint replaces the mark.
+// Adding one real task makes it the single top task on BOTH surfaces. The ✦
+// primary is click-gated, so nothing spends AI before that click.
 //
 // Disjoint `test.describe` block (P2's block above is untouched).
+//
+// WITNESS CONTRACT for beat 3: `[data-testid="home-top-task-onboarding"]` is the
+// Home one-line onboarding hint that replaces the top-task mark on a seed-only
+// workspace. `orderIssuesForSwipe` retains seed cards and flags each card
+// `isSeed`; the deck front is a seed iff every card is `isSeed`.
 // =============================================================================
 test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
   /**
@@ -716,30 +724,38 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
     return decodeURIComponent(m[1]);
   }
 
-  async function topCard(page) {
-    return page.evaluate(() => {
-      const i = window.__SWIPE_DATA__ && window.__SWIPE_DATA__.issues[0];
-      return i ? { id: i.id, identifier: i.identifier } : null;
-    });
+  /** The deck's card list (server-embedded), including demoted seed cards. */
+  async function swipeIssues(page) {
+    return page.evaluate(() => (window.__SWIPE_DATA__ && window.__SWIPE_DATA__.issues) || []);
   }
 
-  test('a fresh workspace with only the starter seed shows no seed as the top task', async ({ page }) => {
+  const seedIds = (urlKey) => [`${urlKey}-issue-1`, `${urlKey}-issue-2`];
+
+  test('a seed-only workspace shows onboarding, never a seed as the top task', async ({ page }) => {
     const urlKey = await freshLocalWorkspace(page);
 
-    // Swipe: the deck is empty — no LOCAL-1/LOCAL-2 dressed as real work.
+    // Swipe: the front is the onboarding/empty state — not a seed card.
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.swipe-card-empty')).toBeVisible();
-    await expect(page.locator('.swipe-card-identifier')).toHaveCount(0);
-    expect(await topCard(page)).toBeNull();
+    await expect(page.locator('.swipe-card-title')).toHaveCount(0);
 
-    // Home: no row is marked as the top task (the seed is demoted, not promoted).
+    // The seed cards are RETAINED (reachable), not deleted from the deck data.
+    const issues = await swipeIssues(page);
+    for (const id of seedIds(urlKey)) {
+      expect(issues.some(i => i.id === id), `seed ${id} stays reachable in the deck`).toBeTruthy();
+    }
+
+    // Home: no row is marked, and a one-line onboarding hint replaces the mark.
     await page.goto(`/workspace/${urlKey}/`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-top-task="1"]')).toHaveCount(0);
+    const hint = page.locator('[data-testid="home-top-task-onboarding"]');
+    await expect(hint).toBeVisible();
+    expect(((await hint.textContent()) || '').trim().length).toBeGreaterThan(0);
   });
 
-  test('adding one real task makes it the top task on both Swipe and Home, with no spend before Go', async ({ page }) => {
+  test('adding one real task makes it the top task on both Swipe and Home, seeds demoted, with no spend before Go', async ({ page }) => {
     const spend = recommendSpy(page);
     const urlKey = await freshLocalWorkspace(page);
 
@@ -751,22 +767,29 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
     const { issue: created } = await create.json();
     expect(created && created.id, 'created issue has an id').toBeTruthy();
 
-    // Swipe: the real task is the front card, never a seed issue.
+    // Swipe: the real task is the front card; the seeds follow, still reachable.
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.swipe-card-title')).toHaveText(REAL_TITLE);
-    const swipeTop = await topCard(page);
-    expect(swipeTop.id).toBe(created.id);
+    const issues = await swipeIssues(page);
+    expect(issues[0].id).toBe(created.id);
+    const realIdx = issues.findIndex(i => i.id === created.id);
+    for (const id of seedIds(urlKey)) {
+      const seedIdx = issues.findIndex(i => i.id === id);
+      expect(seedIdx, `seed ${id} is present`).toBeGreaterThanOrEqual(0);
+      expect(seedIdx, `seed ${id} comes after the real card`).toBeGreaterThan(realIdx);
+    }
 
     // Opening the top task's prompt section spends nothing (✦ is click-gated).
     await openPrompts(page);
     expect(spend).toEqual([]);
 
-    // Home: exactly one mark, on the SAME real task.
+    // Home: exactly one mark, on the SAME real task; no onboarding hint.
     await page.goto(`/workspace/${urlKey}/`);
     await page.waitForLoadState('networkidle');
     const marked = page.locator('[data-top-task="1"]');
     await expect(marked).toHaveCount(1);
     expect(await marked.getAttribute('data-id')).toBe(created.id);
+    await expect(page.locator('[data-testid="home-top-task-onboarding"]')).toHaveCount(0);
   });
 });
