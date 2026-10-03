@@ -473,16 +473,24 @@ export function deriveSessionWaiting(enrichedLoops) {
  * LIN-3252 G2: injects the SAME `liveDispatchOnAnchor` predicate the dashboard
  * rulings feed (`:1830`) and `routes/proxy-rulings.js` use — a live run already
  * on the anchor means `resolveEffect` branch 3, so a `gone` row answers
- * `record`, never a second run racing the live one. The source here is the
- * session's OWN loops (zero new reads); a live run in ANOTHER session on the
- * same issue is not seen — the residual named in the PR.
+ * `record`, never a second run racing the live one.
+ *
+ * LIN-3260: the predicate scans the `liveLoops` opt when supplied — the
+ * workspace-wide loop set the route reads from the warm `sessionsFeedCache`
+ * `rulings` entry — so a live run on the same issue in ANOTHER session is seen.
+ * Absent `liveLoops`, it scans the session's OWN loops (the prior behaviour,
+ * and the route's cold-cache fallback).
  *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
- * @param {{now?: Date}} [opts]
+ * @param {{now?: Date, liveLoops?: Array<Object>}} [opts] - `liveLoops`: the
+ *   loop set the liveness predicate scans (defaults to `enrichedLoops`)
  * @returns {Array<Object>} `collectUnansweredDecisions` rows
  */
-export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
+export function deriveSessionDecisions(enrichedLoops, { now, liveLoops } = {}) {
   const loops = Array.isArray(enrichedLoops) ? enrichedLoops : [];
+  // The rows still come from the session's own loops (session membership); only
+  // the liveness predicate widens to the workspace set when one is supplied.
+  const livenessScope = Array.isArray(liveLoops) ? liveLoops : loops;
   return collectUnansweredDecisions(
     {
       loops,
@@ -496,7 +504,7 @@ export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
       // (LIN-2934): a null anchor must never match another null anchor.
       liveDispatchOnAnchor: (issueIdentifier) =>
         issueIdentifier != null &&
-        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+        livenessScope.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
     }
   );
 }
@@ -1368,11 +1376,30 @@ export function createDashboardRoutes({
       const waiting = !sessionTerminal && rawWaiting;
       const waitingMessage = waiting ? rawWaitingMessage : null;
 
-      // Pinned question card (LIN-3252 S2): the session's unanswered decisions,
-      // read independently of `waiting` so the card shows on a non-waiting or
-      // finished session too. Session-membership scope; no shelves, no
-      // task-decisions — see `deriveSessionDecisions`.
-      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date() });
+      // Pinned question card (LIN-3252 S2 / LIN-3260): the session's unanswered
+      // decisions, read independently of `waiting` so the card shows on a
+      // non-waiting or finished session too. Rows stay session-membership scoped
+      // (no shelves, no task-decisions), but the liveness predicate must see a
+      // live run on the anchor in ANOTHER session — so feed `deriveSessionDecisions`
+      // the workspace-wide loop set from the warm `rulings` entry (the SAME cache
+      // the Rulings feed / nav-badge poll fills). This is a NON-producing `peek`:
+      // the run page must never trigger the whole-workspace reconstruction a
+      // producing `get` would (LIN-1021/H12). A cold cache falls back to the
+      // session's own loops (the prior behaviour).
+      //
+      // The `rulings` entry is merged across `req.session.workspaces`, and issue
+      // identifiers are only per-TEAM unique, so the SAME identifier can exist in
+      // two connected workspaces — scope the set to the workspace being viewed
+      // (`workspaceUrlKey`) so a same-named issue elsewhere cannot force `record`
+      // on this card.
+      const sessionWorkspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
+      const cachedLoopSet = typeof sessionsFeedCache.peek === 'function'
+        ? sessionsFeedCache.peek(sessionsFeedCache.keyFor(sessionWorkspaces, 'rulings'))
+        : undefined;
+      const liveLoops = Array.isArray(cachedLoopSet)
+        ? cachedLoopSet.filter(l => l && l.workspaceUrlKey === workspace.urlKey)
+        : enrichedLoops;
+      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date(), liveLoops });
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
       // box): gated to cli/web sessions (never dash/local — the dispatch route

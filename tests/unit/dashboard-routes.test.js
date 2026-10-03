@@ -4409,6 +4409,51 @@ describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', (
     const rows = deriveSessionDecisions([], { now: new Date() });
     assert.deepEqual(rows, [], 'no loops → no card rows, regardless of scan store');
   });
+
+  // ─── LIN-3260: cross-session live run on the anchor ──────────────────────────
+  //
+  // The G2 predicate above scans only the session's OWN loops, so a live run in
+  // ANOTHER session on the same issue is invisible and the gone row resolves
+  // `dispatch` — starting a second run that races the live one. The `liveLoops`
+  // opt lets the route hand `deriveSessionDecisions` the workspace-wide loop set
+  // (the warm `sessionsFeedCache` `rulings` entry) for the PREDICATE only; rows
+  // still come from `enrichedLoops` (session membership).
+  test('LIN-3260: a gone row with a live loop on its anchor from ANOTHER session (via liveLoops) resolves "record"', () => {
+    const gone = decisionLoop({ loopId: 'l-gone-a', decisionId: 'd-gone-a', terminalStatus: 'done', agentState: 'complete' });
+    const otherSessionLive = {
+      loopId: 'l-live-b', lineageId: 'l-live-b', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    // The session's OWN loops (enrichedLoops) carry NO live run on LIN-1.
+    const rows = deriveSessionDecisions([gone], { now: new Date(), liveLoops: [gone, otherSessionLive] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone-a');
+    assert.ok(row, 'the gone decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'record', 'the workspace-wide liveLoops set supplies the other-session live run (resolveEffect branch 3)');
+  });
+
+  // Mutation M5 (LIN-3252 pass 3) survived because nothing exercised the
+  // `issueIdentifier != null` guard: a null anchor must never match another null
+  // anchor. The null-anchored live loop is present in BOTH the session's own
+  // loops and the workspace-wide `liveLoops`, so the guard is exercised on the
+  // session-scope predicate (where M5 lived) AND the workspace-wide one.
+  test('LIN-3260/null-pin: a null-anchored gone row beside a null-anchored live loop stays "dispatch", never "record"', () => {
+    const goneNull = {
+      loopId: 'l-gone-null', lineageId: 'l-gone-null', workspaceUrlKey: 'ws-a',
+      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO,
+      terminalStatus: 'done', agentState: 'complete',
+      decision: { decision_id: 'd-null-gone', question: 'Proceed?' }
+    };
+    const liveNull = {
+      loopId: 'l-live-null', lineageId: 'l-live-null', workspaceUrlKey: 'ws-a',
+      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([goneNull, liveNull], { now: new Date(), liveLoops: [goneNull, liveNull] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-null-gone');
+    assert.ok(row, 'the null-anchored decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'dispatch', 'a null anchor must never match another null anchor (LIN-2934 guard)');
+  });
 });
 
 // ─── LIN-3252 S2.7: the bare-BLOCKED card's producer routing ───────────────────
@@ -4565,6 +4610,146 @@ describe('GET /observation/session/:sessionId — issue-scoped read, no whole-wo
     await handler(req, res);
     assert.equal(res.statusCode, 404, 'unknown session 404s');
     assert.ok(stores.unscoped.length > 0, 'the full-read fallback ran (issue-scoping found nothing)');
+  });
+});
+
+// ─── LIN-3260: the run page sees live runs in OTHER sessions on the same issue ─
+//
+// The residual named by the LIN-3252 pass-3 review (G2, mutation M5). The card's
+// `liveDispatchOnAnchor` predicate must consult the workspace-wide loop set the
+// rulings feed uses — the warm `sessionsFeedCache` `rulings` entry — NOT the
+// session's own loops alone. The read is a NON-producing `peek`: the run page
+// must never trigger a whole-workspace reconstruction (LIN-1021/H12); a cold
+// cache falls back to the session's own loops.
+describe('GET /observation/session/:sessionId — cross-session live anchor (LIN-3260)', () => {
+  const OLD_ISO = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past the 6h reap window
+
+  // A worker whose decision is terminal + reaped (past the reap window) — the
+  // `gone` row whose answer would start a fresh run.
+  function goneDecisionWorker({ id, identifier, sessionId, decisionId, ts = OLD_ISO }) {
+    return {
+      id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
+      promptName: 'implementation', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken',
+      feedback: [
+        { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed?' }), timestamp: ts },
+        { message: '[done] shipped it', timestamp: ts }
+      ]
+    };
+  }
+
+  function makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache }) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache
+    });
+  }
+
+  // The workspaces carry EXTRA fields beyond { urlKey, name }. `keyFor`
+  // (lib/sessions-feed-cache.js:55-58) derives the key from `urlKey`s ONLY
+  // (sorted), so the Rulings route's raw objects and the run page's mapped
+  // `{ urlKey, name }` must collapse to one key — this proves it end to end.
+  const SESSION = {
+    ...ENABLED,
+    workspaces: [{ urlKey: 'ws-a', name: 'Alpha', provider: 'linear', nwo: 'acme/widget', pinned: 42 }]
+  };
+
+  async function renderSession(router, sessionId, session = SESSION) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({ session, workspace: { urlKey: 'ws-a' }, params: { sessionId } });
+    await handler(req, res);
+    return res;
+  }
+
+  // Warm the SHARED cache through the REAL Rulings route — its own
+  // `keyFor(req.session.workspaces, 'rulings')` producer — never a hand-rolled
+  // stub, so the test exercises the actual key derivation both sides use.
+  async function warmRulings(router, session = SESSION) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session, workspace: { urlKey: 'ws-a' } });
+    await handler(req, res);
+    return res;
+  }
+
+  const cardFor = (html, decisionId) =>
+    (html.match(/data-testid="session-question-card"[^>]*/g) || []).find(c => c.includes(`data-decision-id="${decisionId}"`));
+
+  test('acceptance: a gone row with a live run on the same issue in ANOTHER session renders data-effect="record"', async () => {
+    // Session A: terminal anchor + a reaped-decision worker on LIN-1. Its OWN
+    // loops carry NO live run on LIN-1 (both terminal), so before LIN-3260 the
+    // card would resolve `dispatch` and race session B's live run below.
+    // Session B: a DIFFERENT session with a live run on the same issue.
+    const { dispatchQueueStore, agentStatusStore } = makeStores({
+      'ws-a': {
+        live: [workerLiveItem('b-live', 'LIN-1', 'sess-B')],
+        history: [
+          autopilotHistoryItem('sess-B', 'LIN-1', NOW_ISO),
+          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
+          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
+        ],
+        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
+      }
+    });
+    // ONE real cache, shared by the Rulings route (which fills it) and the run
+    // page (which peeks it).
+    const cache = createSessionsFeedCache();
+    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
+
+    // 1) Warm through the REAL Rulings path (its own keyFor over the raw,
+    //    extra-field workspace objects).
+    const warmed = await warmRulings(router);
+    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
+    // Key parity: the run page's mapped `{ urlKey, name }` must resolve to the
+    // entry the Rulings route actually filled.
+    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
+    assert.notEqual(cache.peek(runPageKey), undefined, 'the real Rulings path warmed the key the run page peeks');
+
+    // 2) Render session A — the card must now see session B's live run.
+    const res = await renderSession(router, 'sess-A');
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-A');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'a live run on the anchor in ANOTHER session forces record (no racing dispatch)');
+    assert.ok(!/data-effect="dispatch"/.test(card), 'must NOT render dispatch');
+  });
+
+  test('cold cache: no `rulings` entry → falls back to the session\'s own loops (same-session record) with NO unscoped whole-workspace read (LIN-1021 preserved)', async () => {
+    const stores = scopedStore({
+      live: [
+        { id: 'w-live-same', sessionId: 'sess-C', issueIdentifier: 'LIN-1', issueTitle: 'Title LIN-1', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO }
+      ],
+      history: [
+        autopilotHistoryItem('sess-C', 'LIN-1', OLD_ISO),
+        goneDecisionWorker({ id: 'w-C', identifier: 'LIN-1', sessionId: 'sess-C', decisionId: 'd-gone-C' })
+      ],
+      agentStatus: [agentStatusDone('sess-C', 'LIN-1', OLD_ISO)]
+    });
+    const router = makeSessionPageRouter({
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      // A REAL cache that is never warmed — genuinely cold, so `peek` returns
+      // undefined and the route must fall back without a producing `get`.
+      sessionsFeedCache: createSessionsFeedCache()
+    });
+
+    const res = await renderSession(router, 'sess-C');
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-C');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'the session-local live run still forces record on the cold-cache fallback');
+    assert.deepEqual(stores.unscoped, [], 'peek never produces: the run page does no unscoped whole-workspace read (LIN-1021)');
   });
 });
 
