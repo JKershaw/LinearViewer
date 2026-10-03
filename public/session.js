@@ -630,6 +630,90 @@
     }
   }
 
+  // ── Live PR state (LIN-3251, S1b beat 3) ───────────────────────────────────
+  // The header's PR line (LIN-3251 beat 2) starts neutral and is filled from the
+  // cached `.../pr-state` route. One initial fetch runs on load for EVERY run —
+  // live or finished — so a finished run does not sit on the neutral copy; then
+  // a 60 s poll runs only while the tab is visible and the run is live. It stops
+  // for good once the PR is merged/closed or `data-run-live` is false. A failed
+  // request leaves the current line untouched and retries on the next tick.
+  var PR_STATE_POLL_MS = 60000;
+
+  // The whole schedule/stop decision, pure and directly testable.
+  //   'stop'     — run finished, or the PR is merged/closed: never fetch again
+  //   'schedule' — keep the 60 s cadence
+  //   'pause'    — tab hidden: hold, and fetch immediately on becoming visible
+  function pollAction(runLive, prState, visible) {
+    if (!runLive) return 'stop';
+    if (prState === 'merged' || prState === 'closed') return 'stop';
+    return visible ? 'schedule' : 'pause';
+  }
+
+  function prStateVisible() {
+    return typeof document.visibilityState === 'undefined' || document.visibilityState === 'visible';
+  }
+
+  function initPrState() {
+    var el = document.querySelector('[data-testid="session-pr-state"]');
+    if (!el) return;
+    var line = el.querySelector('[data-testid="session-pr-line"]');
+    var url = el.dataset.prStateUrl || '';
+    var runLive = el.dataset.runLive === 'true';
+    if (!url) return;
+
+    var timer = null;
+    var stopped = false;
+    var currentState = null;
+
+    function clearTimer() {
+      if (timer !== null) { clearTimeout(timer); timer = null; }
+    }
+
+    function schedule() {
+      clearTimer();
+      timer = setTimeout(tick, PR_STATE_POLL_MS);
+    }
+
+    function apply(payload) {
+      if (!payload) return;
+      if (payload.state) currentState = payload.state;
+      // Prefer the route's `message` — the same copy the server renders — so the
+      // line has one source of truth.
+      if (line && typeof payload.message === 'string' && payload.message) {
+        line.textContent = payload.message;
+      }
+    }
+
+    function tick() {
+      timer = null;
+      if (stopped) return;
+      fetch(url, { headers: { Accept: 'application/json' } })
+        .then(function (resp) { return resp && resp.ok ? resp.json() : null; })
+        .then(function (payload) { if (payload) apply(payload); })
+        .catch(function () { /* leave the line as-is and retry on the next tick */ })
+        .then(function () {
+          if (stopped) return;
+          var action = pollAction(runLive, currentState, prStateVisible());
+          if (action === 'stop') { stopped = true; clearTimer(); return; }
+          if (action === 'schedule') schedule();
+          // 'pause' (hidden): hold with no timer; visibilitychange resumes.
+        });
+    }
+
+    function onVisibility() {
+      if (stopped) return;
+      if (prStateVisible()) {
+        clearTimer();
+        tick(); // fetch once immediately, then resume the cadence
+      } else {
+        clearTimer(); // pause
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility);
+    tick(); // one initial fetch for every run, live or finished
+  }
+
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     // Per-run transcripts must render before toggle init so content is visible.
@@ -639,6 +723,7 @@
     initInlineReplies();
     initProposals();
     initContextWidgets();
+    initPrState();
     tickClocks();
     setInterval(tickClocks, 1000);
   });
@@ -647,6 +732,6 @@
   // is unit-tested directly, so the effect branch it hands to
   // window.ReplyDelivery is pinned without a full browser DOM.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { initQuestionCards };
+    module.exports = { initQuestionCards: initQuestionCards, initPrState: initPrState, pollAction: pollAction };
   }
 })();
