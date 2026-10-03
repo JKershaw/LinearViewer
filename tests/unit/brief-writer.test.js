@@ -18,6 +18,7 @@ import {
   writeBrief,
   composeRoutedRecommendation,
   splitStageBody,
+  routerFocus,
   setFetchImpl,
   setLlmCallRecorder,
   setPromptTraceRecorder,
@@ -158,20 +159,38 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
     assert.match(meta, /→ \*\*<action>\*\*/);
   });
 
-  test('the writer rewrites the Goal alone, sees what code adds, and gets the router\'s reasoning, on its own model', async () => {
+  test('the writer rewrites the Goal alone, on its own model, told what code adds and where the router points', async () => {
     const calls = transport({ route: routing('review'), write: BRIEF });
     await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/writer' } });
     const writer = calls.find(c => c.isWriter);
-    const { before, goal } = splitStageBody(PROMPT_TEMPLATES.review.generate(ISSUE, CONTEXT, {}));
+    const { goal } = splitStageBody(PROMPT_TEMPLATES.review.generate(ISSUE, CONTEXT, {}));
     assert.equal(writer.body.model, 'x/writer');
     const bundle = writer.content.match(/<bundle>\n([\s\S]*)\n<\/bundle>/)[1];
     assert.equal(bundle, goal, 'the bundle is the template\'s Goal section');
-    const added = writer.content.match(/<added>\n([\s\S]*)\n<\/added>/)[1];
-    assert.ok(added.includes(before) && added.includes(formatStageIntent('review')) && added.includes('## Formats Later Steps Read'),
-      'shown what code adds, so it does not restate it');
     assert.ok(writer.content.includes(STAGE_IDEALS.review));
-    assert.match(writer.content, /→ \*\*review\*\*/);
     assert.doesNotMatch(writer.content, /<task>/, 'the agent reads the live ticket itself; the writer is not handed it');
+    // What code adds is named by heading, with the scope lines it must not narrow; the
+    // contract's literals and the facts block's text are not shown, since a writer shown
+    // them copies them (LIN-3293 review S5).
+    const added = writer.content.match(/## What code adds\n\n([\s\S]*?)\n\n## The rules bundle/)[1];
+    for (const h of ['## Workflow', '## Context', '## Scope and Authority', '## Formats Later Steps Read', GROUNDING_HEAD]) assert.ok(added.includes(h), h);
+    for (const line of STAGE_INTENT.review) assert.ok(added.includes(`- ${line}`), line.slice(0, 40));
+    assert.ok(!added.includes('Title the summary comment') && !added.includes('Read before acting'), 'no contract or facts text');
+    // The router's action and Next lines, not its assessment, which the writer would state as fact.
+    assert.match(writer.content, /→ \*\*review\*\*/);
+    assert.match(writer.content, /\*\*Next:\*\* close-out/);
+    assert.doesNotMatch(writer.content, /Ready: ✓ Yes - built/);
+  });
+
+  test('a writer that copies or varies a section code owns changes nothing: each is said once, in code\'s words', async () => {
+    const copies = '## Formats Later Steps Read\n\n- Title it `## Review: LIN-3293`\n\n## Scope and Authority\n\n- Stay inside the ticket.\n\n' +
+      '## Re-ground the Ticket\n\nTrust the ticket.\n\n## If Blocked\n\nKeep going.\n\n## workflow\n\n1. Just do it';
+    transport({ route: routing('implement'), write: `${BRIEF}\n\n## Notes\n\nKept.\n\n${copies}` });
+    const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+    assert.equal(rec.prompt, expected('implementation', `${BRIEF}\n\n## Notes\n\nKept.`), 'a section code does not own is kept');
+    for (const h of ['## Formats Later Steps Read', '## Scope and Authority', '## If Blocked', '## Workflow']) assert.equal(count(rec.prompt, h), 1, h);
+    assert.equal(count(rec.prompt, '## Re-ground the Ticket'), 1);
+    for (const copied of ['Stay inside the ticket', 'Review: LIN-3293', 'Trust the ticket', 'Keep going', 'Just do it']) assert.ok(!rec.prompt.includes(copied), copied);
   });
 
   test('code owns the title, workflow and facts blocks: a writer that drops or rewrites them changes nothing there', async () => {
@@ -381,8 +400,10 @@ describe('pure seams', () => {
     assert.deepEqual(Object.keys(STAGE_IDEALS).sort(), Object.keys(PROMPT_TEMPLATES).sort());
   });
 
-  test('the writer prompt carries the reasoning only when there is one', () => {
-    assert.doesNotMatch(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B' }), /Why this stage was chosen/);
-    assert.match(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B', reasoning: 'R' }), /Why this stage was chosen\n\nR/);
+  test('the writer prompt carries where the router points only when there is a pointer', () => {
+    assert.doesNotMatch(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B' }), /Where the router points/);
+    assert.match(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B', focus: 'F' }), /## Where the router points[^\n]*\n\nF/);
+    assert.equal(routerFocus('**Assessment:**\n- Ready: ✓ Yes\n→ **plan**\n**Next:** write it'), '→ **plan**\n**Next:** write it');
+    assert.equal(routerFocus('no pointer here'), null);
   });
 });
