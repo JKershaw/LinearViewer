@@ -28,7 +28,7 @@ const ISSUE = {
 };
 const CONTEXT = { issue: ISSUE, parent: null, siblings: [], project: null, children: [], comments: [], focusedChild: null, attachments: [] };
 const ROUTING = '## Reasoning\n**Assessment:**\n- Ready: ✓ Yes - built\n→ **review**\n**Next:** close-out';
-const BRIEF = '# Review WR-1: Leaf task for the writer route\n\nA plain brief.';
+const BRIEF = '## Goal\n\nA plain brief.';
 
 function buildApp(features = {}) {
   registerProvider({
@@ -107,7 +107,9 @@ describe('the recommend route and the brief writer switch (LIN-3293)', () => {
       const { status, body } = await recommend(buildApp({ briefWriter: true }));
       assert.equal(status, 200, JSON.stringify(body));
       assert.deepEqual(calls.map(c => c.isWriter), [false, true]);
-      assert.ok(body.prompt.startsWith(BRIEF + formatStageContract('review', ISSUE.identifier)));
+      assert.ok(body.prompt.includes(BRIEF + '\n\n## Scope and Authority'));
+      assert.ok(body.prompt.startsWith('# Review WR-1'));
+      assert.equal(body.prompt.split(formatStageContract('review', ISSUE.identifier)).length, 2);
     } finally {
       guard.restore();
       assert.equal(guard.attempts.length, 0);

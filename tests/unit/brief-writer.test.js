@@ -17,15 +17,16 @@ import {
   writeStagePrompt,
   writeBrief,
   composeRoutedRecommendation,
+  splitStageBody,
   setFetchImpl,
   setLlmCallRecorder,
   setPromptTraceRecorder,
   BRIEF_WRITER_FEATURE
 } from '../../lib/openrouter.js';
-import { generatePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { generatePrompt, finishStagePrompt, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { appendGroundingSections } from '../../lib/prompt-formatters.js';
-import { buildBriefWriterPrompt, STAGE_IDEALS } from '../../lib/prompts/brief-writer.js';
+import { buildBriefWriterPrompt, STAGE_IDEALS, STAGE_INTENT, formatStageIntent } from '../../lib/prompts/brief-writer.js';
 import { isBriefWriterEnabled, resolveBriefWriter, BRIEF_WRITER_OP_KIND } from '../../lib/brief-writer.js';
 import { AI_OPERATION_KINDS } from '../../lib/workspace-preferences.js';
 import { WORKSPACE_FEATURES, WORKSPACE_FEATURE_DEFAULTS, WORKSPACE_FEATURE_LABELS, WORKSPACE_FEATURE_DESCRIPTIONS, isValidWorkspaceFeatureKey, isValidFeatureKey } from '../../lib/feature-defaults.js';
@@ -37,7 +38,13 @@ const ISSUE = {
   state: { name: 'In Progress', type: 'started' }, labels: []
 };
 const CONTEXT = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
-const BRIEF = '# Review LIN-3293: Writer fixture\n\nA plain brief, written for a colleague.';
+const BRIEF = '## Goal\n\nA plain brief, written for a colleague.';
+/** What the writer path ships for a stage: code's blocks around the written Goal, the intent lines, the finish. */
+const expected = (kind, goal = BRIEF) => {
+  const { before, after } = splitStageBody(PROMPT_TEMPLATES[kind].generate(ISSUE, CONTEXT, {}));
+  const body = `${before}${goal}${after.trim() ? `\n\n${after.trim()}` : ''}${formatStageIntent(kind)}`;
+  return finishStagePrompt(body, kind, ISSUE, CONTEXT, {}, null);
+};
 const GROUNDING_HEAD = '## Re-ground the Ticket (staleness check)';
 const count = (text, needle) => text.split(needle).length - 1;
 
@@ -148,23 +155,65 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
     assert.match(meta, /→ \*\*<action>\*\*/);
   });
 
-  test('the writer gets the stage bundle, its ideal shape and the router\'s reasoning, on its own model', async () => {
+  test('the writer rewrites the Goal alone, sees what code adds, and gets the router\'s reasoning, on its own model', async () => {
     const calls = transport({ route: routing('review'), write: BRIEF });
     await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/writer' } });
     const writer = calls.find(c => c.isWriter);
+    const { before, goal } = splitStageBody(PROMPT_TEMPLATES.review.generate(ISSUE, CONTEXT, {}));
     assert.equal(writer.body.model, 'x/writer');
-    assert.ok(writer.content.includes(PROMPT_TEMPLATES.review.generate(ISSUE, CONTEXT, {})), 'the bundle is the template body');
+    const bundle = writer.content.match(/<bundle>\n([\s\S]*)\n<\/bundle>/)[1];
+    assert.equal(bundle, goal, 'the bundle is the template\'s Goal section');
+    const added = writer.content.match(/<added>\n([\s\S]*)\n<\/added>/)[1];
+    assert.ok(added.includes(before) && added.includes(formatStageIntent('review')) && added.includes('## Formats Later Steps Read'),
+      'shown what code adds, so it does not restate it');
     assert.ok(writer.content.includes(STAGE_IDEALS.review));
     assert.match(writer.content, /→ \*\*review\*\*/);
-    assert.ok(!writer.content.includes('## Formats Later Steps Read'), 'the writer never sees the contract');
+    assert.doesNotMatch(writer.content, /<task>/, 'the agent reads the live ticket itself; the writer is not handed it');
+  });
+
+  test('code owns the title, workflow and facts blocks: a writer that drops or rewrites them changes nothing there', async () => {
+    const careless = '# Something else\n\n## Workflow\n\n1. Just do it\n\n## Goal\n\nA plain brief, written for a colleague.';
+    transport({ route: routing('review'), write: careless });
+    const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+    assert.equal(rec.prompt, expected('review'));
+    assert.equal(count(rec.prompt, '## Workflow'), 1);
+    assert.match(rec.prompt, /\*\*Update Linear\*\*: Add findings as a comment on LIN-3293/);
+  });
+
+  test('on a read-only tracker the code-owned workflow still loses its write steps', async () => {
+    const ui = { write: false, subtasks: false, displayName: 'Jira', fixedStates: false };
+    transport({ route: routing('implement'), write: BRIEF });
+    const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' }, providerUi: ui });
+    assert.match(rec.prompt, /## Workflow/);
+    assert.doesNotMatch(rec.prompt, /\*\*Start\*\*|status to "In Progress"/);
+  });
+
+  test('the scope and authority lines are code\'s, verbatim, for every stage; never on the switch-off path', async () => {
+    assert.deepEqual(Object.keys(STAGE_INTENT).sort(), Object.keys(PROMPT_TEMPLATES).sort());
+    for (const [kind, template] of Object.entries(PROMPT_TEMPLATES)) {
+      transport({ route: routing(template.name), write: '## Goal\n\nInside means this ticket\'s own unfinished scope.' });
+      const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+      for (const line of STAGE_INTENT[kind]) assert.ok(rec.prompt.includes(`- ${line}`), `${kind}: ${line.slice(0, 40)}`);
+      assert.ok(!generatePrompt(kind, ISSUE, CONTEXT).prompt.includes('## Scope and Authority'), `${kind}: switch-off unchanged`);
+    }
+    assert.match(STAGE_INTENT.review.join(' '), /its cause included, wherever it lives/);
+  });
+
+  test('a reply with no Goal text left ships the unwritten bundle', async () => {
+    transport({ route: routing('review'), write: '# Title only\n\n## Goal\n' });
+    const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+    assert.equal(rec.prompt, generatePrompt('review', ISSUE, CONTEXT).prompt);
+    assert.equal(rec.writerReason, 'empty');
   });
 
   test('every machine-read format is present and the grounding is appended once, for every stage', async () => {
     for (const [kind, template] of Object.entries(PROMPT_TEMPLATES)) {
       transport({ route: routing(template.name), write: BRIEF });
       const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
-      const tail = formatStageContract(kind, ISSUE.identifier) + appendGroundingSections('', ISSUE, CONTEXT, kind);
-      assert.equal(rec.prompt, BRIEF + tail, kind);
+      assert.equal(rec.prompt, expected(kind), kind);
+      const contract = formatStageContract(kind, ISSUE.identifier);
+      if (contract) assert.equal(count(rec.prompt, contract), 1, `${kind}: contract once`);
+      assert.ok(rec.prompt.includes(contract + appendGroundingSections('', ISSUE, CONTEXT, kind)), `${kind}: contract then grounding`);
       assert.equal(count(rec.prompt, GROUNDING_HEAD), kind === 'triage' ? 0 : 1, kind);
       assert.equal(rec.written, true);
     }
@@ -256,7 +305,7 @@ describe('streaming', () => {
     assert.equal(prompt.length, 1);
     assert.equal(prompt[0].data.content, rec.prompt);
     assert.ok(deltas.findIndex(e => e.data.section === 'prompt') > deltas.findIndex(e => e.data.section === 'reasoning'));
-    assert.ok(rec.prompt.startsWith(BRIEF + formatStageContract('review', ISSUE.identifier)));
+    assert.equal(rec.prompt, expected('review'));
   });
 
   test('a body the router emits anyway is never streamed: the client only appends', async () => {

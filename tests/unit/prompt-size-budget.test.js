@@ -95,7 +95,7 @@ export const META_PROMPT_RENDERED_CEILING = 103901;
  * unallocated remainder of the total. It renders only around a bundle the template
  * ceilings already measure, so it carries a source ceiling alone.
  */
-export const BRIEF_WRITER_SOURCE_CEILING = 6650;
+export const BRIEF_WRITER_SOURCE_CEILING = 6641;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
