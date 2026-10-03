@@ -21,7 +21,7 @@ import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-gu
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
-import { isValidIssueId, UUID_REGEX, BINDING_INTENT } from '../lib/workspace.js';
+import { isValidIssueId, UUID_REGEX, BINDING_INTENT, dispatchBindingPairFields } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
@@ -237,7 +237,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks, maxSessionsPerTask } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, issueBindingScope, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks, maxSessionsPerTask } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -398,8 +398,27 @@ export function createDispatchRoutes({
       // blocked by either guard.
       let providerAccess = null;
       if (!isAbort && (issueIdentifier || repo)) {
-        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: issueIdentifier ? BINDING_INTENT.ISSUE : BINDING_INTENT.WORKSPACE });
+        // LIN-3242 (LIN-3126 §4): an issue-addressed dispatch carries the row's
+        // binding selector pair into the seam on the ISSUE arm, so the referent
+        // is resolved against its own binding (slice-1/2 resolver + selector).
+        // Only when the body SUPPLIES a pair: otherwise `selector` stays absent
+        // and the seam's existing query-selector fallback is preserved
+        // byte-for-byte. Selection-only — the credential comes from the Connection.
+        const issueBindingSelector = (issueSource != null || issueBindingScope != null)
+          ? { source: issueSource, bindingScope: issueBindingScope }
+          : undefined;
+        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: issueIdentifier ? BINDING_INTENT.ISSUE : BINDING_INTENT.WORKSPACE, ...(issueIdentifier && issueBindingSelector ? { selector: issueBindingSelector } : {}) });
       }
+
+      // LIN-3242 (LIN-3126 §4): persist the selector pair ONLY for a named-issue
+      // dispatch whose COMPLETE pair the seam resolved — the trimmed values
+      // `findBindingBySelector` matched, never the raw body. A repo-only /
+      // issueless / abort request, or a lone `source` hint, stamps nothing (the
+      // store's sparse write then adds no key). The ISSUE arm above is what
+      // validates the pair: an unknown one refuses before this point.
+      const persistedBindingFields = (!isAbort && issueIdentifier && issueSource != null && issueBindingScope != null)
+        ? dispatchBindingPairFields(issueSource, issueBindingScope)
+        : {};
 
       if (!isAbort && issueIdentifier) {
         const { token: referentToken, provider: referentProvider, reason: referentReason } = providerAccess;
@@ -644,7 +663,12 @@ export function createDispatchRoutes({
           // absent/null stores as unbounded, byte-identical to today.
           maxTasks: maxTasks ?? null,
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks.
-          maxSessionsPerTask: maxSessionsPerTask ?? null
+          maxSessionsPerTask: maxSessionsPerTask ?? null,
+          // LIN-3242 (LIN-3126 §4): the seam-resolved binding selector pair,
+          // trimmed and only when this named-issue request supplied a complete
+          // one. `?? null` here; the STORE writes it SPARSELY (no key when null).
+          issueSource: persistedBindingFields.issueSource ?? null,
+          issueBindingScope: persistedBindingFields.issueBindingScope ?? null
         }
       });
 
@@ -743,7 +767,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { issueIdentifier, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
+      const { issueIdentifier, issueSource, issueBindingScope, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -902,7 +926,11 @@ export function createDispatchRoutes({
         : !explicitOptOut;
 
       // Recommendation preconditions — identical to GET /recommend.
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
+      // LIN-3242 (LIN-3126 §4): the fused verb forwards the row's binding selector
+      // pair into the seam when the body supplies one; otherwise `selector` stays
+      // absent and the seam's query-selector fallback is preserved. Selection-only.
+      const issueBindingSelector = (issueSource != null || issueBindingScope != null) ? { source: issueSource, bindingScope: issueBindingScope } : undefined;
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -914,6 +942,14 @@ export function createDispatchRoutes({
       if (denyIfUnsupported(provider, 'fetchIssueContext', req, res, '/api/proxy/recommend-and-dispatch')) return;
       if (denyIfUnsupported(provider, 'fetchRecommendationContext', req, res, '/api/proxy/recommend-and-dispatch')) return;
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
+
+      // LIN-3242 (LIN-3126 §4): persist the pair ONLY when the named-issue request
+      // supplied a complete one AND the seam resolved it (an unknown pair already
+      // 422'd above). Trimmed to the values `findBindingBySelector` matched; a
+      // lone `source` hint stamps nothing.
+      const persistedBindingFields = (issueIdentifier && issueSource != null && issueBindingScope != null)
+        ? dispatchBindingPairFields(issueSource, issueBindingScope)
+        : {};
 
       // ── Verb-override path (LIN-573) ──────────────────────────────────────
       // When the caller pins `kind`, skip the LLM recommendation + descent
@@ -1102,7 +1138,11 @@ export function createDispatchRoutes({
               // `terminal-only` unless the caller declares `everything`; queueIfBusy
               // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
               queueIfBusy: queueIfBusy === true,
-              subscription: subscriptionResolved
+              subscription: subscriptionResolved,
+              // LIN-3242 (LIN-3126 §4): the validated, trimmed binding selector
+              // pair (`?? null`; the store writes it sparsely).
+              issueSource: persistedBindingFields.issueSource ?? null,
+              issueBindingScope: persistedBindingFields.issueBindingScope ?? null
             }
           });
 
@@ -1423,7 +1463,11 @@ export function createDispatchRoutes({
             // `terminal-only` unless the caller declares `everything`; queueIfBusy
             // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
             queueIfBusy: queueIfBusy === true,
-            subscription: subscriptionResolved
+            subscription: subscriptionResolved,
+            // LIN-3242 (LIN-3126 §4): the same validated, trimmed binding selector
+            // pair as the override arm (`?? null`; the store writes it sparsely).
+            issueSource: persistedBindingFields.issueSource ?? null,
+            issueBindingScope: persistedBindingFields.issueBindingScope ?? null
           }
         });
 

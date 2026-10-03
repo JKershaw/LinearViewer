@@ -1170,6 +1170,14 @@ function initPrompts() {
     const issueTitle = lineEl?.querySelector('.title, .title-dim')?.textContent || null
     const issueIdentifier = lineEl?.dataset.identifier || null
 
+    // LIN-3242 (LIN-3126 §4): read the row's own binding selector stamps so the
+    // dispatch is resolved against — and stamped with — the binding it came from.
+    // The lazy `.details` wrapper carries `data-source`/`data-binding-scope`
+    // unconditionally (render.js), present in the DOM even before expansion.
+    const detailsEl = promptContainer.closest('.details')
+    const issueSource = detailsEl?.dataset.source || undefined
+    const issueBindingScope = detailsEl?.dataset.bindingScope || undefined
+
     // Get repo from prompt/recommend container (set by prompt API response)
     const repo = promptContainer.dataset.repo || null
     // Explicit kind for meta-loops (e.g. Autopilot) — set on the container by
@@ -1208,7 +1216,7 @@ function initPrompts() {
         promptName,
         ...(issueless
           ? { issueless: true }
-          : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle } }),
+          : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle, source: issueSource, bindingScope: issueBindingScope } }),
         target,
         repo: repo || undefined,
         kind,
