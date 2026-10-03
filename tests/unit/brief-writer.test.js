@@ -202,6 +202,47 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
     assert.match(STAGE_INTENT.review.join(' '), /its cause included, wherever it lives/);
   });
 
+  // The safety floors review and close-out rest on are code's, so a writer that drops
+  // them from the Goal cannot drop them from the prompt (LIN-3293 review S1).
+  test('review and close-out keep their safety floors whatever the writer writes', async () => {
+    const floors = {
+      review: [/green CI never settles a ledger item/i, /non-empty ledger takes the conditional Approve/i,
+        /named monitor and one line on why nothing short of production/i, /named rollback/i, /quoting it exactly/i, /do not fix, merge, set Done or file follow-ups/i],
+      'close-out': [/no ledger at all, leave the task open and name review/i, /do not merge or set Done while any ledger item is undischarged/i,
+        /green CI never settles a ledger item/i, /only by the name review wrote/i, /you cannot supply the name/i, /verify the snapshot before pruning/i]
+    };
+    for (const [kind, needed] of Object.entries(floors)) {
+      transport({ route: routing(kind), write: '## Goal\n\nLand it.' });
+      const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
+      const scope = rec.prompt.slice(rec.prompt.indexOf('## Scope and Authority'));
+      for (const floor of needed) assert.match(scope, floor, `${kind}: ${floor}`);
+    }
+  });
+
+  // Judging and investigating stages change no code, so they are not handed a licence to
+  // fix; the stages that choose or build are (LIN-3293 review S2).
+  test('only the stages that choose or build are told fixing at the cause is theirs', () => {
+    const licence = /fixing at the cause and refactoring included, are yours/;
+    for (const kind of ['plan-review', 'bug', 'review', 'close-out', 'retrospective-audit']) {
+      assert.ok(!STAGE_INTENT[kind].some(l => licence.test(l)), kind);
+      assert.match(STAGE_INTENT[kind][0], /one clear question with your recommendation/, kind);
+    }
+    for (const kind of ['research', 'scoping', 'design', 'spike', 'plan', 'breakdown', 'implementation', 'blocked']) {
+      assert.match(STAGE_INTENT[kind][0], licence, kind);
+    }
+  });
+
+  // Research, design and plan also serve features, evaluations and migrations, so their
+  // shapes and the cause line do not assume a defect (LIN-3293 review S6).
+  test('the stage shapes and the cause line do not assume every task is a defect', () => {
+    for (const kind of ['research', 'design', 'plan']) {
+      assert.doesNotMatch(STAGE_IDEALS[kind], /recommend a fix|^[^,(]*\bthe problem and its cause\b|right fix/i, kind);
+    }
+    for (const lines of Object.values(STAGE_INTENT)) {
+      for (const l of lines) assert.doesNotMatch(l, /^This task's problem includes its cause|removes this task's cause/, l.slice(0, 40));
+    }
+  });
+
   test('a reply with no Goal text left ships the unwritten bundle', async () => {
     transport({ route: routing('review'), write: '# Title only\n\n## Goal\n' });
     const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
@@ -329,7 +370,7 @@ describe('pure seams', () => {
 
   test('the tone standard: the writer and every stage shape address the agent directly, without persona or scars', () => {
     const text = [buildBriefWriterPrompt({ kind: 'plan', bundle: 'B' }), ...Object.values(STAGE_IDEALS), ...Object.values(STAGE_INTENT).flat()].join('\n');
-    for (const bad of [/\bwe\b/i, /\bsomeone\b/i, /pair of (eyes|hands)/i, /\bhonestly\b/i, /skilled lead/i, /\bLIN-\d+/]) {
+    for (const bad of [/\bwe\b/i, /\bsomeone\b/i, /pair of (eyes|hands)/i, /\bhonestly\b/i, /skilled lead/i, /\bLIN-\d+/, /\bact as\b/i]) {
       const hits = text.split('\n').filter(l => bad.test(l) && !/No "we"/.test(l));
       assert.deepEqual(hits, [], String(bad));
     }

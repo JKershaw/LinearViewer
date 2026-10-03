@@ -55,7 +55,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 128622, // LIN-3293: review files nothing; close-out owns filing; no category list for "large"
+  'lib/prompt-template-defs.js': 128366, // LIN-3293: review files nothing (close-out owns filing), no category list for "large", no checklist or hand-off restating other sections
   'lib/prompt-templates.js': 20495, // LIN-3292: deriveDispatchKind reads "close out" as close-out; +91, paid by review's LIN-3293 cuts
   'lib/prompt-formatters.js': 52883, // LIN-3292: the finished-task ask is stage-neutral, its comment shorter
   'lib/prompt-contract.js': 3481,
@@ -77,7 +77,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 1892,
   'plan-review': 7704,
   implementation: 7574,
-  review: 18666, // LIN-3293: review's filing check moved to close-out, which already had it; no category list for "large"
+  review: 18432, // LIN-3293: as its source, above
   'close-out': 18455,
   'retrospective-audit': 4143,
   retro: 4114,
@@ -93,9 +93,12 @@ export const META_PROMPT_RENDERED_CEILING = 103532;
  * brief and every stage's ideal shape. New prompt text, paid by removing restated rules from
  * review and close-out (both paths), lowering every slack ceiling to its size, and the
  * unallocated remainder of the total. It renders only around a bundle the template
- * ceilings already measure, so it carries a source ceiling alone.
+ * ceilings already measure, so it carries a source ceiling alone. +2018 for the review
+ * fixes (the safety floors review and close-out rest on, owned by code; two cause lines;
+ * a writer brief that names code's sections instead of showing their text), paid by the
+ * template, meta and formatter cuts in the same change (2109 bytes moved, 2148 freed).
  */
-export const BRIEF_WRITER_SOURCE_CEILING = 6639;
+export const BRIEF_WRITER_SOURCE_CEILING = 8657;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
