@@ -123,7 +123,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
         route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_BODY })
       );
 
-      await page.goto('/test/set-session?openRouterConnected=true');
+      await page.goto(`/test/set-session?openRouterConnected=true&features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
       await seedGitHubWorkspace(page);
 
       await page.goto(`/workspace/${GITHUB_WORKSPACE_URL_KEY}/swipe`);
@@ -168,7 +168,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
   test.describe('local-connected', () => {
     test('top task with its one-line why, Go, tailored prompt with visible reasoning', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const seen = recommendSpy(page);
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
 
@@ -395,7 +395,9 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     // mid-stream (the proxy set-up rung) is cleared once the stream settles.
     test('a ladder rung pressed mid-stream keeps the streamed reasoning; settle clears the notice (N4/T1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const STREAMED_REASONING = 'Reasoning about the task in several words.';
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      // Proxy explicitly off: this case asserts the proxy set-up rung/notice
+      // (LIN-2944 P3 made proxy default on, which makes run-task ready).
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true, proxy: false } });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -453,7 +455,9 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 // =============================================================================
 test.describe('LIN-2942 — the ladder records its mode', () => {
   async function openTopTask(page, seedLocal, urlKey, options) {
-    await seedLocal(workspaceApiLocalSeed, options);
+    // LIN-2944 P3: proxy now defaults on; the ladder-mode cases assert the
+    // "set up" ladder shape, so keep proxy explicitly off unless a case says on.
+    await seedLocal(workspaceApiLocalSeed, { ...(options || {}), features: { proxy: false, ...((options && options.features) || {}) } });
     await page.goto(`/test/clear-task-mode-events?urlKey=${urlKey}`);
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
@@ -601,7 +605,7 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
 test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
   test('top task shows why + Go, streams a TEST-13 prompt with reasoning, and copies in 3 clicks with no spend before Go', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
 
     const spend = recommendSpy(page);
     let clicks = 0;
@@ -688,5 +692,153 @@ test.describe('LIN-2944 P2 — no AI spend when Brief/Recap open', () => {
 
     // The expands themselves spent nothing.
     expect(spend).toEqual([]);
+  });
+});
+
+// =============================================================================
+// LIN-2944 P3 — R2-5 top-task seed demotion on the first screen.
+//
+// Addendum 18 (verdict `15237eb1`): a fresh local workspace is seeded (by POST
+// /workspace/new) with ONLY the two starter issues (LOCAL-1 in progress, LOCAL-2
+// its todo child) — onboarding scaffolding, not real work. On Swipe the seed
+// cards are REORDERED after all real cards and REMAIN REACHABLE (not deleted);
+// only when no real card remains does the front render the onboarding/empty
+// state. On Home the seed rows stay in the list but are never marked as the top
+// task; when only seed rows remain a one-line onboarding hint replaces the mark.
+// Adding one real task makes it the single top task on BOTH surfaces. The ✦
+// primary is click-gated, so nothing spends AI before that click.
+//
+// Disjoint `test.describe` block (P2's block above is untouched).
+//
+// WITNESS CONTRACT for beat 3: `[data-testid="home-top-task-onboarding"]` is the
+// Home one-line onboarding hint that replaces the top-task mark on a seed-only
+// workspace. `orderIssuesForSwipe` retains seed cards and flags each card
+// `isSeed`; the deck front is a seed iff every card is `isSeed`.
+// =============================================================================
+test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
+  /**
+   * Create a genuine fresh local workspace. POST /workspace/new seeds
+   * `starterSeed(urlKey)` (LOCAL-1 + LOCAL-2) and redirects to Home; the
+   * redirect's final URL carries the random urlKey.
+   */
+  async function freshLocalWorkspace(page) {
+    const resp = await page.request.post('/workspace/new', { form: { name: 'P3 Fresh' } });
+    const m = new URL(resp.url()).pathname.match(/^\/workspace\/([^/]+)\//);
+    expect(m, `new workspace redirect carries a urlKey: ${resp.url()}`).not.toBeNull();
+    return decodeURIComponent(m[1]);
+  }
+
+  /** The deck's card list (server-embedded), including demoted seed cards. */
+  async function swipeIssues(page) {
+    return page.evaluate(() => (window.__SWIPE_DATA__ && window.__SWIPE_DATA__.issues) || []);
+  }
+
+  const seedIds = (urlKey) => [`${urlKey}-issue-1`, `${urlKey}-issue-2`];
+
+  test('a seed-only workspace shows onboarding, never a seed as the top task', async ({ page }) => {
+    const urlKey = await freshLocalWorkspace(page);
+
+    // Swipe: the front is the onboarding/empty state — not a seed card.
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.swipe-card-empty')).toBeVisible();
+    await expect(page.locator('.swipe-card-title')).toHaveCount(0);
+
+    // The seed cards are RETAINED (reachable), not deleted from the deck data.
+    const issues = await swipeIssues(page);
+    for (const id of seedIds(urlKey)) {
+      expect(issues.some(i => i.id === id), `seed ${id} stays reachable in the deck`).toBeTruthy();
+    }
+
+    // Home: no row is marked, and a one-line onboarding hint replaces the mark.
+    await page.goto(`/workspace/${urlKey}/`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-top-task="1"]')).toHaveCount(0);
+    const hint = page.locator('[data-testid="home-top-task-onboarding"]');
+    await expect(hint).toBeVisible();
+    expect(((await hint.textContent()) || '').trim().length).toBeGreaterThan(0);
+  });
+
+  test('adding one real task makes it the top task on both Swipe and Home, seeds demoted, with no spend before Go', async ({ page }) => {
+    const spend = recommendSpy(page);
+    const urlKey = await freshLocalWorkspace(page);
+
+    const REAL_TITLE = 'Real P3 task';
+    const create = await page.request.post(`/workspace/${urlKey}/api/issues`, {
+      data: { title: REAL_TITLE, projectId: `${urlKey}-proj-1`, stateId: 'In Progress' },
+    });
+    expect(create.ok(), `create real task: ${create.status()} ${await create.text()}`).toBeTruthy();
+    const { issue: created } = await create.json();
+    expect(created && created.id, 'created issue has an id').toBeTruthy();
+
+    // Swipe: the real task is the front card; the seeds follow, still reachable.
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.swipe-card-title')).toHaveText(REAL_TITLE);
+    const issues = await swipeIssues(page);
+    expect(issues[0].id).toBe(created.id);
+    const realIdx = issues.findIndex(i => i.id === created.id);
+    for (const id of seedIds(urlKey)) {
+      const seedIdx = issues.findIndex(i => i.id === id);
+      expect(seedIdx, `seed ${id} is present`).toBeGreaterThanOrEqual(0);
+      expect(seedIdx, `seed ${id} comes after the real card`).toBeGreaterThan(realIdx);
+    }
+
+    // Opening the top task's prompt section spends nothing (✦ is click-gated).
+    await openPrompts(page);
+    expect(spend).toEqual([]);
+
+    // Home: exactly one mark, on the SAME real task; no onboarding hint.
+    await page.goto(`/workspace/${urlKey}/`);
+    await page.waitForLoadState('networkidle');
+    const marked = page.locator('[data-top-task="1"]');
+    await expect(marked).toHaveCount(1);
+    expect(await marked.getAttribute('data-id')).toBe(created.id);
+    await expect(page.locator('[data-testid="home-top-task-onboarding"]')).toHaveCount(0);
+  });
+
+  // LIN-2944 P3 review N1: the plain-words proxy label is visible beside +proxy
+  // and its FAQ discloses the side effects.
+  test('the plain-words proxy label sits beside +proxy and the FAQ opens with the side effects (N1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true } });
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await openPrompts(page);
+
+    const component = page.locator('.prompt-section').first();
+    await component.locator('[data-testid="other-prompts"] .swipe-prompt-btn').first().click();
+    await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
+
+    const label = component.locator('.opened-task-proxy-label');
+    await expect(label).toBeVisible();
+    await expect(label).toContainText(/read & update your tasks/i);
+    await expect(label).toContainText(/what.s this/i);
+
+    const faq = component.locator('.opened-task-proxy-faq');
+    await expect(faq).toBeHidden();
+    await label.click();
+    await expect(faq).toBeVisible();
+    await expect(faq).toContainText(/read and update your tasks/i);
+    await expect(faq).toContainText(/token/i);
+    await expect(faq).toContainText(/Autopilot/i);
+    await expect(faq).toContainText(/Settings/i);
+  });
+
+  // LIN-2944 P3 review N3: onboarding keys on the UNFILTERED workspace. A
+  // workspace with a real card never shows the "workspace is ready" onboarding,
+  // even on a filter that holds only the seed.
+  test('a real workspace does not show onboarding on a filter that holds only the seed (N3)', async ({ page }) => {
+    const urlKey = await freshLocalWorkspace(page);
+    const create = await page.request.post(`/workspace/${urlKey}/api/issues`, {
+      data: { title: 'Real todo task', projectId: `${urlKey}-proj-1`, stateId: 'Todo' },
+    });
+    expect(create.ok(), `create real todo: ${create.status()}`).toBeTruthy();
+
+    await page.goto(`/workspace/${urlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    // In Progress holds only LOCAL-1 (a seed); the workspace still has a real card.
+    await page.locator('[data-testid="swipe-filter"]').selectOption('in-progress');
+    await expect(page.locator('[data-testid="swipe-onboarding"]')).toHaveCount(0);
+    await expect(page.locator('.swipe-card-title')).toHaveText('Welcome to your local workspace');
   });
 });

@@ -1043,6 +1043,82 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   color: var(--amber-dim);
 }
 
+/* LIN-2944 P3: plain-words proxy label + "what's this?" FAQ disclosure, next to
+   the +proxy toggle. F8 palette only (--blue / --green-dim / --amber-dim). */
+.opened-task-proxy {
+  display: inline-block;
+  margin-left: var(--space-1);
+  font-family: var(--font-content);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.opened-task-proxy-label {
+  cursor: pointer;
+  color: var(--blue);
+  list-style: none;
+}
+
+.opened-task-proxy-label::-webkit-details-marker {
+  display: none;
+}
+
+.opened-task-proxy-label::after {
+  content: " \203A";
+}
+
+.opened-task-proxy[open] .opened-task-proxy-label::after {
+  content: "";
+}
+
+.opened-task-proxy-faq {
+  position: absolute;
+  z-index: 5;
+  max-width: 34ch;
+  margin-top: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--green-dim);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.opened-task-proxy-faq p {
+  margin: 0 0 var(--space-1);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.opened-task-proxy-faq p:last-child {
+  margin-bottom: 0;
+}
+
+.opened-task-proxy-faq strong {
+  color: var(--green-dim);
+}
+
+.opened-task-proxy-faq a {
+  color: var(--blue);
+}
+
+/* LIN-2944 P3: Home's one-line onboarding hint replaces the top-task mark when
+   only starter-seed rows remain. F8 palette only (--green-dim). */
+.home-onboarding-hint {
+  margin: var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--green-dim);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* Edit slot (hidden on Swipe until P1 supplies editUrl). */
 .swipe-prompt-edit {
   margin-left: auto;

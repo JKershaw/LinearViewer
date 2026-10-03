@@ -44,7 +44,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
 
   test('the picker renders "— none —" plus one option per saved preset', async ({ page, request }) => {
     await request.post(`/test/seed-dispatch-preset?urlKey=${WS}`, { data: { name: 'Alpha preset', config: { harness: 'claude-code' } } });
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
@@ -64,7 +64,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
   // and a failed fetch collapse to the SAME `presets = []` branch — both
   // cases are exercised here.
   test('an empty preset list links to Settings to create one', async ({ page }) => {
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
@@ -78,7 +78,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
   });
 
   test('a failed presets fetch degrades to the same empty-picker "create a preset" link', async ({ page }) => {
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.route(`**/workspace/${WS}/api/dispatch/presets`, route => route.abort());
     await page.goto(DISPATCH_URL);
@@ -99,7 +99,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
     });
     const preset = await createRes.json();
 
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
@@ -134,7 +134,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
     const preset = await createRes.json();
     const presetId = preset.id ?? preset._id;
 
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(`${DISPATCH_URL}?preset=${presetId}`);
     await page.waitForLoadState('networkidle');
@@ -145,7 +145,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
   });
 
   test('leaving the picker on "— none —" sends no presetId at all', async ({ page }) => {
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
@@ -166,7 +166,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
     });
     const preset = await createRes.json();
 
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
@@ -190,7 +190,7 @@ test.describe('Dispatch page preset picker (LIN-1391 S9)', () => {
     });
     const preset = await createRes.json();
 
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey: WS });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey: WS });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${WS}`);
     await page.goto(DISPATCH_URL);
     await page.waitForLoadState('networkidle');
@@ -218,7 +218,7 @@ test.describe('375px acceptance journey (LIN-2719 S5)', () => {
   test('choose a free model, save a preset, dispatch with it — presetId on the wire and the resolved model match', async ({ page, localWorkerUrlKey }) => {
     const urlKey = localWorkerUrlKey;
     await page.setViewportSize({ width: 375, height: 812 });
-    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true }, urlKey });
+    await seedLocalWorkspace(page, REPO_SEED, { features: { dispatch: true, proxy: false }, urlKey });
     await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
     await page.request.get(`/test/clear-dispatch-presets?urlKey=${urlKey}`);
 

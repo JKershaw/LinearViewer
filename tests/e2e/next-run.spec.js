@@ -32,7 +32,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
 
     test('loads when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       // Title routes through the shared renderPageHeader primitive (LIN-975).
@@ -56,7 +56,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the next-run suggester")')).toHaveCount(0);
 
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(SETTINGS_URL);
       await page.waitForLoadState('networkidle');
       await expect(page.locator('.settings-action:has-text("open the next-run suggester")')).toBeVisible();
@@ -65,7 +65,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
 
   test.describe('Page Structure', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -100,7 +100,9 @@ test.describe('Suggested Next Run Page (experimental)', () => {
 
   test.describe('Generation', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      // proxy explicitly off: the goal-prefilled dispatch LINK is only rendered
+      // in the proxy-off fallback (proxy now defaults on, LIN-2944 P3).
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -337,7 +339,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
   // resolver's trailing catch-all is exercised for real.
   test.describe('Direction chooser', () => {
     test.beforeEach(async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
     });
@@ -796,7 +798,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
 
   test.describe('Dispatch fallback (proxy off)', () => {
     test('keeps the navigate-to-dispatch link and renders no inline disclosure', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       await page.locator('#next-run-generate').click();
@@ -816,7 +818,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     // reference. The first concrete mock option references TEST-1 ("Parent task
     // in progress").
     test('the dispatched goal embeds the referenced task id and title', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
       await page.locator('#next-run-generate').click();
@@ -842,7 +844,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     });
 
     test('returns options including the open-ended one when the flag is on', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       const res = await page.request.post(SUGGEST_API, { data: {} });
       expect(res.status()).toBe(200);
       const body = await res.json();
@@ -875,7 +877,7 @@ test.describe('Suggested Next Run Page (experimental)', () => {
     // the only response the e2e suite ever sees, so a mock missing `directions`
     // would let every grouped test pass against the flat fallback.
     test('returns a resolved directions grouping in parity with the live generator', async ({ page }) => {
-      await page.goto(`/test/set-session?${featuresParam({ nextRun: true })}&urlKey=${URL_KEY}`);
+      await page.goto(`/test/set-session?${featuresParam({ nextRun: true, proxy: false })}&urlKey=${URL_KEY}`);
       const res = await page.request.post(SUGGEST_API, { data: {} });
       const body = await res.json();
 
