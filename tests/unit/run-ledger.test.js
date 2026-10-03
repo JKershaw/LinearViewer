@@ -142,6 +142,20 @@ describe('run-ledger: a stated discharge route is not a discharge (LIN-3296)', (
     }
   });
 
+  test('contractions, "un-" and "get discharged" leave the item open too', () => {
+    for (const phrase of [
+      'The live read. It isn\'t discharged yet.',
+      'The live read. It isn’t discharged yet.',
+      'The live read. It hasn\'t been discharged.',
+      'The live read. Still un-discharged.',
+      'The live read. It should get discharged by close-out.',
+      'The live read. It was never discharged.',
+    ]) {
+      assert.strictEqual(ledgerOf(phrase).discharged, false, phrase);
+      assert.strictEqual(ledgerOf(phrase).dischargedBy, null, phrase);
+    }
+  });
+
   test('evidence is read from the result, not the route stated before it', () => {
     const item = ledgerOf('The live read. Can be discharged by a repro; discharged by the repro in comment 4.');
     assert.strictEqual(item.dischargedBy, 'the repro in comment 4');
