@@ -154,8 +154,9 @@ test.describe('Feature Toggle Settings', () => {
     expect(data.prompt).not.toContain('Git Workflow');
   });
 
-  test('prompts include git workflow when featureBranches is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Set session with featureBranches ON
+  // LIN-3296: the toggle's git block only ever reached plan, which must not
+  // branch or open a PR; implementation carries its own branch and PR steps.
+  test('plan never gets a git workflow, even with featureBranches on', async ({ page, seedLocal, localWorkerUrlKey }) => {
     await seedLocal(workspaceApiLocalSeed, { features: { featureBranches: true } });
 
     const response = await page.request.get(
@@ -163,7 +164,8 @@ test.describe('Feature Toggle Settings', () => {
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
-    expect(data.prompt).toContain('Git Workflow');
+    expect(data.prompt).not.toContain('Git Workflow');
+    expect(data.prompt).not.toMatch(/create a pull request/i);
   });
 
   // =========================================================================

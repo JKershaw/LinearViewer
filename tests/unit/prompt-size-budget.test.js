@@ -69,13 +69,13 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   breakdown: 4669,
   research: 11115,
   scoping: 2079,
-  design: 2035,
-  spike: 1821,
+  design: 2277, // LIN-3296: design and spike rewritten as briefs, paid by implementation and close-out's LIN-3291 trims
+  spike: 2190,
   context: 1892,
   'plan-review': 7807,
-  implementation: 7880,
+  implementation: 7511,
   review: 19890,
-  'close-out': 19935,
+  'close-out': 19693,
   'retrospective-audit': 4161,
   retro: 4114,
 };

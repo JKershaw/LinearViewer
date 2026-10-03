@@ -4875,7 +4875,7 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
         'R5: the aiHint workflow must retain its plain acceptance-criteria fallback when no Approve verdict exists');
       // R6: the goal must not copy a false `fits one session` onto a surface the
       // approved plan itself could not scope to one session.
-      assert.ok(/or, for a surface the plan itself could not scope to one session, omit the false claim/.test(goal),
+      assert.ok(/omitting a false session-fit claim for a surface the plan could not scope to one session/.test(goal),
         'R6: the aiHint goal must require omitting a false session-fit claim when the plan could not scope the surface to one session');
     });
   }
@@ -4914,8 +4914,8 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     // R4: the focused, per-surface acceptance-criteria guidance must survive as the
     // fallback's description wording (it was deleted, leaving the precondition pointing
     // at wording that no longer existed).
-    assert.ok(/Description with acceptance criteria for just this surface — the parent task carries the full scope and sibling context flows in at runtime, so keep the description focused on this surface alone/.test(section),
-      'R4: the no-Approve fallback must restore the focused per-surface acceptance-criteria guidance');
+    assert.ok(/Description with acceptance criteria for this surface — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
+      'R4: the no-Approve fallback must keep the per-surface acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
     assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
       'the fallback must withhold every approved-path bullet, (a) the plan slice included');
   });

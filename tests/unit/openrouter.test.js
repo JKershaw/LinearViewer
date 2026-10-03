@@ -3311,7 +3311,7 @@ describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049
     assert.ok(/Plan-review due: no — covered by <parent>'s approving plan-review \(comment <id>, rev <N>\)/.test(rule),
       'the rule must require the plan-review-due:no line citing the approving verdict');
     assert.ok(/grounding SHA\(s\) the plan cited/.test(rule), 'the rule must require the grounding SHA(s)');
-    assert.ok(/the parent's approved plan is the starting point — follow it, and where the code shows it wrong, change course and say so on the parent/.test(rule),
+    assert.ok(/the parent's approved plan is the starting point, and where to read it in full \(the child sees its parent only as a title\) — follow it, and where the code shows it wrong, change course and say so on the parent/.test(rule),
       'the rule must carry the do-not-redesign line');
   });
 
