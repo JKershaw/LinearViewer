@@ -870,8 +870,8 @@ describe('generatePrompt all-subtasks-complete note (LIN-364)', () => {
     };
     const result = generatePrompt('review', issue, context);
     assert.ok(/All Subtasks Complete/i.test(result.prompt), 'the all-complete note must be present');
-    assert.ok(/review\/verification pass|close it out|add up to this task/i.test(result.prompt),
-      'it must steer toward review/close, not defer');
+    assert.ok(/holds up against this task's goal/i.test(result.prompt),
+      'it must steer toward checking the parent against its goal, not defer');
   });
 
   test('canceled and duplicate children also count as complete (all terminal states)', () => {
@@ -4203,7 +4203,7 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
   const HEADINGS = {
     S: '## Re-ground the Ticket (staleness check)',
     T: '## Task Already Complete',
-    C: '## All Subtasks Complete — Close Out the Parent',
+    C: '## All Subtasks Complete',
     B: "## Prior Investigation On Record — Don't Loop"
   };
   const base = {
@@ -5146,4 +5146,63 @@ describe('stage contract on both prompt paths (LIN-3292)', () => {
     const meta = applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: 'review' }, issue, context, {}, ui).prompt;
     assert.ok(!meta.includes(HEADING));
   });
+});
+
+// =============================================================================
+// A finished task's notes fit the stage routing sent it to (LIN-3292). Review
+// authorizes the close and does not perform it; in-scope findings are never filed
+// as follow-ups; and a work stage sent a Done task (to fix red CI, say) is told to
+// fix that, not that the work is complete and should be closed out.
+// =============================================================================
+describe('finished-task notes ask what their stage does (LIN-3292)', () => {
+  const base = {
+    id: 'issue-f', identifier: 'LIN-3292', title: 'Finished fixture', description: 'work',
+    url: 'https://linear.app/test/issue/LIN-3292', createdAt: '2026-03-01T00:00:00.000Z', labels: []
+  };
+  const done = { issue: { ...base, state: { name: 'Done', type: 'completed' } }, context: { children: [], comments: [] } };
+  const kids = {
+    issue: { ...base, state: { name: 'In Progress', type: 'started' } },
+    context: { children: [{ identifier: 'LIN-1', title: 'c', state: { name: 'Done', type: 'completed' } }], comments: [] }
+  };
+  const WORK_STAGES = ['implementation', 'blocked', 'bug', 'plan', 'breakdown', 'research', 'scoping', 'design', 'spike', 'plan-review'];
+
+  for (const { issue, context } of [done, kids]) {
+    const label = issue.state.type === 'completed' ? 'Done task' : 'open parent, subtasks Done';
+    test(`${label}: no stage is told to file what is missing as a follow-up`, () => {
+      for (const kind of [...WORK_STAGES, 'review', 'close-out']) {
+        const notes = appendGroundingSections('', issue, context, kind);
+        assert.ok(notes.length > 0, `${kind}: a note is present`);
+        assert.ok(!/as a follow-up/i.test(notes), `${kind}: no follow-up filing`);
+      }
+    });
+
+    test(`${label}: review checks and gives a verdict; it does not close`, () => {
+      const notes = appendGroundingSections('', issue, context, 'review');
+      assert.match(notes, /put it in your verdict rather than filing it/);
+      assert.match(notes, /authorizes the close; it does not perform it/);
+      assert.ok(!/close (it )?out/i.test(notes), 'review is not told to close out');
+    });
+
+    test(`${label}: close-out lands it and sends what is missing back to implementation`, () => {
+      const notes = appendGroundingSections('', issue, context, 'close-out');
+      assert.match(notes, /close it out/);
+      assert.match(notes, /back to `implementation` rather than filing it/);
+    });
+
+    test(`${label}: a work stage routing sent here fixes what it was sent for`, () => {
+      for (const kind of WORK_STAGES) {
+        const notes = appendGroundingSections('', issue, context, kind);
+        assert.match(notes, /fix that at its cause/, kind);
+        assert.ok(!/close (it )?out|verdict/i.test(notes), `${kind}: no close-out or verdict ask`);
+      }
+    });
+
+    test(`${label}: the meta path appends the same stage-fitted note`, () => {
+      for (const kind of ['implementation', 'review', 'close-out']) {
+        const action = PROMPT_TEMPLATES[kind].name;
+        const meta = applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: action }, issue, context).prompt;
+        assert.ok(meta.endsWith(appendGroundingSections('', issue, context, kind)), kind);
+      }
+    });
+  }
 });

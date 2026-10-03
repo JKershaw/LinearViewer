@@ -56,7 +56,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 131297,
   'lib/prompt-templates.js': 20404,
-  'lib/prompt-formatters.js': 53209,
+  'lib/prompt-formatters.js': 52999,
   'lib/prompt-contract.js': 3481,
 };
 
@@ -83,9 +83,9 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106327;
+export const META_PROMPT_SOURCE_CEILING = 106319;
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 104046;
+export const META_PROMPT_RENDERED_CEILING = 104052;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
