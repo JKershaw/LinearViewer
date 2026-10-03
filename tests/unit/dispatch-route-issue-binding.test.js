@@ -164,6 +164,48 @@ describe('LIN-3242 — session dispatch lane carries the binding selector', () =
     assert.equal('issueSource' in doc, false, 'an unstamped row adds no key');
     assert.equal('issueBindingScope' in doc, false);
   });
+
+  // Regression (CI e2e): every issue row carries a `source`, but only a stamped
+  // row carries a binding scope, so the client sends a lone `issueSource`. That
+  // is a legitimate source-only hint, resolved by `resolveIssueBinding`'s §1
+  // source-only rule — never a 422.
+  test('a lone issueSource (source-only hint) is admitted and stored as no pair', async () => {
+    installGitHubProvider();
+    const binding = { provider: 'github', scope: REPO_A, connectionId: 'conn-1' };
+    const { setBindingCredential } = await import('../../lib/connection-binding.js');
+    setBindingCredential(binding, { installationId: '99', token: 'tok-a' });
+    const workspace = { urlKey: 'acme', provider: 'github', bindings: [binding], activeBinding: { provider: 'github', scope: REPO_A } };
+    const store = freshStore();
+    const app = buildSessionApp(workspace, store);
+
+    const res = await withServer(app, req => req('POST', '/workspace/acme/api/dispatch', {
+      prompt: 'run me',
+      ...ISSUE,
+      issueSource: 'github',
+    }));
+
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const doc = store.collection._docs[0];
+    assert.equal('issueSource' in doc, false, 'a source-only hint is not persisted as a pair');
+    assert.equal('issueBindingScope' in doc, false);
+  });
+
+  test('a lone issueBindingScope is refused 422 UNKNOWN_BINDING (never a valid selector)', async () => {
+    installGitHubProvider();
+    const workspace = makeTwoRepoWorkspace();
+    const store = freshStore();
+    const app = buildSessionApp(workspace, store);
+
+    const res = await withServer(app, req => req('POST', '/workspace/acme/api/dispatch', {
+      prompt: 'run me',
+      ...ISSUE,
+      issueBindingScope: REPO_B,
+    }));
+
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, 'UNKNOWN_BINDING');
+    assert.equal(store.collection._docs.length, 0);
+  });
 });
 
 // ── Proxy lane ───────────────────────────────────────────────────────────────

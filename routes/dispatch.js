@@ -477,20 +477,31 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
 
       // LIN-3242 (LIN-3126 §4): an issue-addressed dispatch may name its binding
-      // selector (`issueSource`/`issueBindingScope`). Validate the pair through
-      // slice-1's `findBindingBySelector` against THIS workspace's own bindings:
-      // an unknown or malformed pair refuses with the shared 422 shape BEFORE any
-      // row is written. Selection-only — the call scope always comes from
-      // `getBindingCallScope` of the hydrated binding, never from `bindingScope`
-      // (B1/LIN-2473). The validated pair is persisted on the row (see `fields`).
+      // selector (`issueSource`/`issueBindingScope`). A COMPLETE pair is validated
+      // through slice-1's `findBindingBySelector` against THIS workspace's own
+      // bindings: an unknown pair refuses with the shared 422 shape BEFORE any row
+      // is written. A lone `issueSource` is a legitimate source-only hint (every
+      // issue row carries a source; only a stamped row carries a binding scope),
+      // resolved by `resolveIssueBinding`'s §1 source-only rule and NOT persisted
+      // as a pair. A lone `issueBindingScope` is never valid. Selection-only — the
+      // call scope always comes from `getBindingCallScope` of the hydrated binding,
+      // never from `bindingScope` (B1/LIN-2473). The validated pair persists (see
+      // `fields`).
       let issueBindingSelector = null;
-      if (issueSource != null || issueBindingScope != null) {
+      let issueBindingPair = null;
+      if (issueSource != null && issueBindingScope != null) {
         const found = findBindingBySelector(workspace, { source: issueSource, bindingScope: issueBindingScope });
         if (found.error) {
           const refusal = bindingRefusalResponse(found);
           return res.status(refusal.status).json(refusal.body);
         }
         issueBindingSelector = { source: found.binding.provider, bindingScope: found.binding.scope };
+        issueBindingPair = issueBindingSelector;
+      } else if (issueBindingScope != null) {
+        const refusal = bindingRefusalResponse(findBindingBySelector(workspace, { source: undefined, bindingScope: issueBindingScope }));
+        return res.status(refusal.status).json(refusal.body);
+      } else if (issueSource != null) {
+        issueBindingSelector = { source: issueSource };
       }
 
       // Dangling-referent guard (LIN-1948, surface 2d). The session-cookie twin
@@ -747,8 +758,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           // here as null when absent (the existing route `fields` style), but the
           // STORE writes it SPARSELY — an unstamped persisted row adds no key.
           // Selection-only provenance (never a credential).
-          issueSource: issueBindingSelector?.source ?? null,
-          issueBindingScope: issueBindingSelector?.bindingScope ?? null
+          issueSource: issueBindingPair?.source ?? null,
+          issueBindingScope: issueBindingPair?.bindingScope ?? null
         }
       });
 
