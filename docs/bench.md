@@ -5,6 +5,16 @@
 > ledger) into one run that can be repeated for any harness and model. The companion playbook
 > for bringing a new harness in is simple-dispatcher's `docs/adding-a-harness.md`; this bench
 > is that playbook's first gate.
+>
+> **Decided the same day (John):**
+> - Start on one cheap target to prove the plumbing, then expand slowly; Harbour's whole spend is
+>   about $300 a month.
+> - Only headline results are public. The evidence is recorded in a separate repository, so it
+>   does not bloat this one.
+> - Opus, run through Claude Code, is the judge for now.
+> - It runs on the normal dispatcher host.
+>
+> Sections 7 to 11 reflect these decisions.
 
 ## The short version
 
@@ -21,16 +31,17 @@
   Then one blind read compares the result with what actually shipped.
 - **Cost and time** come from each harness's own report, checked against a dedicated API key's
   meter.
-- **Cheap.** Benching a configuration costs, API-equivalent:
-  - about $20 for a cheap model;
-  - about $80 for Sonnet;
-  - up to about $250 for Opus.
-
-  An edition (the incumbent twice plus three challengers) is roughly $250.
+- **Cheap, and it starts small.**
+  - The plumbing proof runs one cheap target on five tasks, for about $3 of OpenRouter spend.
+  - The first full run puts the same target on all twenty tasks, twice, for about $20.
+  - Challengers then join one at a time, cheapest first.
+  - The judge runs on the Claude subscription, so it spends quota, not cash.
 - **Honest about its size.** Twenty tasks find big differences, such as "cannot do our work" or
   "does it for a tenth of the price". Small differences are ties, and a tie goes to the cheaper
   configuration.
-- **Published.** Every edition is a dated table in `docs/bench/` and on a public `/bench` page.
+- **Headline public, evidence private.** Each run's headline row goes into this repository. The
+  evidence goes into a separate private repository, proposed as `harbour-benchmarks`: packets,
+  records, diffs, judge reads and transcripts.
 
 ## Why our own
 
@@ -64,10 +75,11 @@
 
 ## 1. A task
 
-A task is a directory, built once per edition and never edited afterwards:
+A task is a directory, built once per task set and never edited afterwards. It lives in the private
+evidence repository (section 8):
 
 ```
-data/bench/<edition>/<LIN-n>/
+task-sets/<task-set>/<LIN-n>/
   task.json     track, repo, base sha, original merge sha, frozenAt, size band, area, sources
   prompt.md     the frozen ticket text the agent receives
   hidden/       what the agent never sees: shipped tests, fix tests, the known finding
@@ -92,10 +104,9 @@ data/bench/<edition>/<LIN-n>/
   duration of each session.
   - Count every implementation session up to the merge, including send-back rounds, because the
     candidate gets one shot at what the original got several.
-  - This gives every edition a free baseline row.
+  - This gives every run a free baseline row.
 
-`data/` is git-ignored, like the survey data. The edition's committed doc carries the task list and
-the SHAs, not the ticket text.
+Nothing from a packet lands in this repository; only the headline does.
 
 ## 2. Three tracks, twenty tasks
 
@@ -318,7 +329,8 @@ These thresholds are provisional. The raw numbers are kept so the thresholds can
 
 ## 6. Reading the results
 
-Each edition's table has one row per configuration, plus a "what shipped" row priced from `/cost`.
+The headline table has one row per configuration and run, plus a "what shipped" row priced from
+`/cost`.
 
 | Configuration | Implementation resolved | Faults avoided | Review: caught / clean blocked | Research useful | False done | Infra | $ per resolved task | Median minutes |
 |---|---|---|---|---|---|---|---|---|
@@ -327,7 +339,8 @@ Each edition's table has one row per configuration, plus a "what shipped" row pr
 
 **Three rules for reading it**
 
-1. **The incumbent runs twice.** The tasks its two runs disagree on are the bench's own noise.
+1. **The first configuration runs twice** (step 2 in section 9). The tasks its two runs disagree on
+   are the bench's own noise.
 2. **Compare on the same tasks.** For two configurations, count the tasks one resolved and the
    other did not.
    - On twenty tasks, only a lopsided split means much. 6–0 or 8–1 is a difference: an exact sign
@@ -340,17 +353,31 @@ A bench result becomes a capability-ledger entry, not a routing change. A defaul
 a preset trial in production behind the unchanged Opus review gate, as the bake-off ran it. The
 change reverts in one line.
 
-## 7. What an edition costs
+## 7. What it costs
 
-These are per-task estimates from medians we have already measured. Fleet legs also carry
-Harbour's chores (proxy reads, the PR, CI waits), so a lean bench run should cost less. Treat the
-figures as ceilings.
+**Starting small.** The bench's cash is OpenRouter spend on a dedicated key with a credit limit, so
+a runaway configuration cannot overspend. The judge (Opus, through Claude Code) and any Claude
+configuration run on the subscription. They spend quota from the fleet's weekly window, not cash.
 
-| Configuration | Implementation (10) | Review (6) | Research (4) | Blind reads (20) | Total |
-|---|---|---|---|---|---|
-| DeepSeek Flash on opencode | ≈ $5 | ≈ $1 | ≈ $2 | ≈ $10 | ≈ $18 |
-| Sonnet 5 on claude-code | ≈ $45 | ≈ $11 | ≈ $10 | ≈ $10 | ≈ $76 |
-| Opus 5 on claude-code | ≈ $100–190 | ≈ $28 | ≈ $26 | ≈ $10 | ≈ $165–255 |
+| Step | What runs | OpenRouter cash | Subscription quota |
+|---|---|---|---|
+| 1. Plumbing proof | the cheap target on 5 tasks (3 implementation, 1 review, 1 research) | ≈ $3 | 5 judge reads |
+| 2. First full run | the cheap target on all 20 tasks, twice | ≈ $15–20 | 40 judge reads |
+| 3. Each later challenger | one configuration on the tracks it is a candidate for | ≈ $5–50 for an OpenRouter model; $0 for a Claude model | 20 judge reads, plus the run itself for a Claude model |
+
+**Proposed cap:** about $30 a month of bench cash, a tenth of Harbour's current spend, enforced by
+the key's limit. Claude configurations run only when the weekly window has headroom.
+
+**Per-configuration reference.** These are estimates from medians we have already measured, for when
+a step 3 configuration is chosen. Fleet legs also carry Harbour's chores (proxy reads, the PR, CI
+waits), so a lean bench run should cost less; treat the figures as ceilings.
+
+| Configuration | Implementation (10) | Review (6) | Research (4) | Total, one run |
+|---|---|---|---|---|
+| DeepSeek Flash on opencode | ≈ $5 | ≈ $1 | ≈ $2 | ≈ $8 |
+| GLM-5.3 on opencode | ≈ $38 | ≈ $6 | ≈ $6 | ≈ $50 |
+| Sonnet 5 (claude-code: quota; opencode: cash) | ≈ $45 | ≈ $11 | ≈ $10 | ≈ $66 |
+| Opus 5 on claude-code (quota) | ≈ $100–190 | ≈ $28 | ≈ $26 | ≈ $155–245 |
 
 **Where the figures come from**
 - **Medians** come from `docs/reviews/model-effort-routing-proposal-2026-09-11.md`:
@@ -358,115 +385,128 @@ figures as ceilings.
   - Opus implementation: $18.72, from a small sample chosen for hardness;
   - Opus review: $4.67;
   - Opus research: $6.37.
-- **Flash** is $0.45 a ticket, from the bake-off.
+- **Flash and GLM** are $0.45 and $3.75 a ticket, from the bake-off.
 - **Sonnet's review and research** are scaled down from Opus by the 2.5× token price ratio.
-- **A blind read** is assumed to cost about $0.50.
+- **A judge read** is about $0.50 of quota.
 
-**Edition 1, as proposed below, costs roughly $250.** The Claude rows are subscription quota rather
-than cash. It also takes about five hours of host time per configuration, running one task at a
-time, because CPU contention already cost the bake-off a launch.
+**Time.** About five hours of host time for a full run of one configuration, one task at a time,
+because CPU contention already cost the bake-off a launch.
 
-## 8. Publishing
+## 8. Where it lives, and what is public
 
-- **Each edition** is a dated pair in `docs/bench/`. A new edition supersedes an old one; it never
-  edits it.
-  - `<edition>.md` holds the method version, the prompts, the task list with base SHAs, the table,
-    the per-task grid, the caveats, and the predictions made beforehand.
-  - `<edition>.json` holds the run records, without transcripts.
-- **A public `/bench` page** renders the editions from the committed JSON.
-  - It is indexable like `/templates`, because discovery is the point.
-  - The page states the method and its limits: twenty tasks, one run each, one judge.
-- **Privacy.**
-  - LinearViewer is public, so its tasks can be shown in full and linked to their commits.
-  - simple-dispatcher is private. Publish its tasks as ticket ids and aggregates only, never diffs
-    or text.
-  - Never publish transcripts.
-  - Run `lib/secret-scan.js` over every published file, and add `/bench` to
-    `npm run scan:public-pages`. A bake-off implementer once quoted a planted secret in its PR body
+- **Public, in this repository: the headline only.**
+  - One row per run in a results table here, with section 6's columns.
+  - Each row carries the date, the task-set id, the configuration (harness version, model id as
+    routed, effort) and the totals, split by repository.
+  - A `/bench` page can render the table later, if that is ever wanted.
+- **Private, in a separate repository (proposed: `harbour-benchmarks`): everything else.**
+  - The method (this document moves there once the repository exists), the runner and the
+    adapters.
+  - Per task set, under `task-sets/<task-set>/`: the selection and the task packets (frozen prompt
+    text and hidden-test lists).
+  - Per run, under `runs/<task-set>/<configuration>/`:
+    - the run records and diffs;
+    - the judge prompts and replies;
+    - the gzipped transcripts.
+  - It is private because simple-dispatcher is private, and because transcripts can carry anything
+    a session printed.
+- **Privacy rules.**
+  - simple-dispatcher tasks appear in public only as counts.
+  - Run `lib/secret-scan.js` over the headline before it lands here, and over the evidence before
+    it is committed there. A bake-off implementer once quoted a planted secret in its PR body
     (LIN-2573, `docs/papers/harbour/capability-ledger.md`).
 - **Contamination.**
-  - A model trained after a LinearViewer task merged may have read the answer. Each row carries the
-    model's stated training cutoff where one is published, and the edition flags tasks merged
-    before it.
-  - simple-dispatcher's tasks are private and never at risk, so results are published split by
-    repository as well.
-- **Every row names** its harness version, the model id as routed, the upstream provider OpenRouter
-  picked (where recorded), the effort and the date. Rows go stale as harnesses and models change,
-  which is why editions are dated.
-- **Each row also becomes a capability-ledger entry**, worded the ledger's way: what the
-  configuration was seen to do, on how many tasks, and what it was never tried on.
+  - A model trained after a LinearViewer task merged may have read the answer. Each row records the
+    model's stated training cutoff where one is published, and flags tasks merged before it.
+  - simple-dispatcher's tasks are private and never at risk, which is another reason to split
+    results by repository.
+- **Every row becomes a capability-ledger entry**, worded the ledger's way: what the configuration
+  was seen to do, on how many tasks, and what it was never tried on.
 
-## 9. Building it, cheapest first
+## 9. Building it, one step at a time
 
-- **v0: one edition by hand.** About a day of agent time plus the run budget.
-  - It needs a selection script, a box builder, the two adapters, the scoring scripts, and edition
-    1's markdown.
-  - Most of it is the replay's scripts with new inputs: `survey-replay-select`, `-prepare`,
-    `-emit`, `-fences`, `-tests`, `-cost` and `-analyse`.
-- **v1: one command.**
-  - The command is `npm run bench -- --edition 2026-10 --config opencode:deepseek/deepseek-v4.1-flash --tracks impl,review`.
-  - It is idempotent per task and configuration, resumable, and budget-guarded, and it writes the
-    edition's JSON and markdown.
-  - An optional mode adds one review round (implement, fixed reviewer, fix), the lean pipeline the
-    replay ran. That is closer to how production gives a ticket a second chance.
-- **v2: a feature.**
-  - Settings shows each harness and model choice's bench row beside it, and `/bench` is live.
-  - A harness's bench adapter is the first step of adding that harness.
-  - A new harness or model version triggers a re-bench.
-  - Later, for any workspace: pick twenty Done tasks, freeze them, and let your own runner bench
-    the configurations you are weighing. Your tasks, your benchmark.
-- **Optional, for reach: export LinearViewer's tasks in Harbor's task format.**
-  - Harbor is Laude Institute's open-source evaluation framework; despite the name, it is not ours.
-    A task there is an `instruction.md`, a `task.toml`, an `environment/` Dockerfile, and a
-    `tests/` script that writes a reward.
-  - Others could then run our bench, and Harbor's pre-integrated agents (claude-code, codex,
-    opencode, gemini-cli, goose, aider, openhands and more) would cover harnesses we have no
-    adapter for.
-  - Two costs: it needs Docker, and it runs those agents its own way, not with our settings. So it
-    is a reach option, not the core.
+1. **Plumbing proof.** One cheap target, five tasks, about $3. It needs:
+   - a selection script;
+   - frozen packets;
+   - the box builder, with its no-future assertion;
+   - a bench mode for `opencode-runner.js`;
+   - the scorers;
+   - the run record;
+   - the headline row.
 
-## 10. Edition 1, proposed
+   Most of it is the replay's scripts with new inputs: `survey-replay-select`, `-prepare`, `-emit`,
+   `-fences`, `-tests`, `-cost` and `-analyse`. It is done when every stage has produced its
+   artifact for all five tasks, and the key's own usage figure agrees with the summed record costs.
+2. **First full run.** The same target on all twenty tasks, twice. It gives the first headline row,
+   and the bench's own noise.
+3. **Challengers, one at a time,** cheapest first (section 10).
+4. **Later, only if it earns it:**
+   - **One command.** `npm run bench -- --tasks 2026-10 --config opencode:<model> --tracks impl,review`:
+     idempotent per task and configuration, resumable, and budget-guarded.
+     - An optional mode adds one review round (implement, fixed reviewer, fix), the lean pipeline
+       the replay ran.
+   - **A feature.** Settings shows each harness and model choice's bench row beside it, and a new
+     harness or model version triggers a re-bench. For any workspace: pick twenty Done tasks,
+     freeze them, and let your own runner bench the configurations you are weighing.
+   - **An export to Harbor's task format.**
+     - Harbor is Laude Institute's open-source evaluation framework; despite the name, it is not
+       ours.
+     - A task there is an `instruction.md`, a `task.toml`, an `environment/` Dockerfile, and a
+       `tests/` script that writes a reward.
+     - Harbor's pre-integrated agents (claude-code, codex, opencode, gemini-cli, goose, aider,
+       openhands and more) would then cover harnesses we have no adapter for. It needs Docker, and
+       it runs those agents its own way.
 
-| # | Configuration | Tracks | Question it answers |
+## 10. The first runs, and the order after
+
+**Steps 1 and 2: production's cheap tier, on all three tracks.** Read the exact model from Settings
+rather than assuming it. Since 25 September, implementation and research run on the cheap tier via
+opencode, and the bake-off recommended DeepSeek Flash.
+
+**These runs answer three questions:**
+- **How does the cheap tier compare with what shipped?** "What shipped" is the free baseline row.
+- **Does a cheap reviewer find what Opus finds?** That is open in `docs/papers/proposals.md`, and
+  the review track's known blockers were all found by Opus reviews.
+- **Should the cheap implementer be the default or only a preset?** That is LIN-2834's question,
+  still Todo. The cheap tier became the implementation default on 25 September with only the
+  bake-off's 13 small tickets behind it (`docs/papers/harbour/how-process-changes-land.md`).
+
+**Then, one challenger at a time:**
+
+| Order | Configuration | Question it answers | Cash |
 |---|---|---|---|
-| 1, 2 | **The incumbent**: production routing on the day, read from Settings rather than assumed. Since 25 September, implementation and research run on the cheap tier via opencode (the bake-off recommended DeepSeek Flash), and review runs on Opus 5 via claude-code at medium effort. | all, twice | the baseline, and the bench's own noise |
-| 3 | Sonnet 5, claude-code, high | all | the mid tier, against the routing proposal's 84% first-pass approval |
-| 4 | Sonnet 5, opencode via OpenRouter (`anthropic/claude-sonnet-5`) | all | same model, different harness: the harness effect on our tasks, with no new adapter |
-| 5 | A cheap reviewer on a model other than the implementer's (GLM-5.3 or Gemini Flash, on opencode) | review | `docs/papers/proposals.md`: does a cheap reviewer find what Opus finds? |
+| a | The same cheap model in a second harness: Dash (LIN-2687) once it has a bench adapter, or another open harness that takes OpenRouter | **the harness effect**, with the model held fixed, at cheap-model prices | ≈ $8 a run |
+| b | A second cheap model on opencode (DeepSeek V4 Flash 0731, Gemini Flash or GLM-5.3) | the model effect inside the cheap tier | ≈ $1–50 |
+| c | Sonnet 5 on claude-code | the mid tier, against the routing proposal's 84% first-pass approval | quota only |
+| d | Sonnet 5 on opencode (`anthropic/claude-sonnet-5`), paired with c | the harness effect at the mid tier | ≈ $66 |
 
-**Rows 1 and 2 also give LIN-2834 its missing read.** LIN-2834 asks whether the cheap implementer
-should be the default or only a preset. It is still Todo, although the cheap tier became the
-implementation default on 25 September with only the bake-off's 13 small tickets behind it
-(`docs/papers/harbour/how-process-changes-land.md`).
-
-**The next row is a third harness**, once its bench adapter exists. Dash (LIN-2687) is the natural
-first:
+Dash suits row a well:
 - It is ours.
-- Its premise is exactly what the implementation track tests. Its own measurement landed about
-  40–50% of whole tickets, against about 80–85% of pre-decomposed steps with explicit file paths
-  (`docs/collective-session-2026-06-12.md`).
+- Its own measurement landed about 40–50% of whole tickets, against about 80–85% of pre-decomposed
+  steps with explicit file paths (`docs/collective-session-2026-06-12.md`). The implementation
+  track tests exactly that.
 
-**Before the first run,** commit `docs/bench/2026-10.md` on its own, holding:
-- the selection output;
-- the prompts;
-- a prediction for each row.
-
-Results are added afterwards, and anything decided after the first run is marked as a deviation.
-This is the archive's pre-registration convention
+**Before each run,** commit the task-set's selection and prompts, and a one-line prediction, on
+their own. Results are added afterwards, and anything decided later is marked as a deviation. This
+is the archive's pre-registration convention, kept light
 (`docs/papers/harbour/replay-small-work-preregistration.md`).
 
-## 11. Decisions for John
+## 11. Decisions
 
-1. **Budget.** Proposed: up to $300 API-equivalent per edition, enforced by per-configuration key
-   limits.
-2. **simple-dispatcher tasks in public.** Proposed: ticket ids and aggregates only.
-3. **The judge.** Proposed: Opus 5 at a fixed effort, never changed within an edition. It shares a
-   family with the Claude rows and may favour them. A second judge from another family could
-   re-read only the tasks where configurations disagree.
-4. **Cadence.** Proposed: an edition whenever a candidate harness or model is worth a look, and a
-   fresh task set every quarter, because older LinearViewer tasks drift toward contamination.
-5. **Where it runs.** Proposed: the dispatcher host, which has the credentials, both repositories,
-   the transcripts and the harness installs.
+**Decided, 3 October**
+1. **Start on one cheap target** and expand slowly.
+2. **Publish only the headline**; the evidence lives in a separate private repository.
+3. **The judge is Opus, run through Claude Code**, at a fixed effort that never changes within a
+   task set.
+   - It shares a family with any Claude configuration and may favour it.
+   - Add a second judge from another family, for disputed tasks only, if that ever matters.
+4. **It runs on the normal dispatcher host.**
+
+**Still open**
+1. **The repository.** Its name (`harbour-benchmarks`?) and private visibility.
+2. **The monthly cash cap.** Proposed: about $30, set as the bench key's limit.
+3. **Cadence.** Proposed: a run when a candidate is worth a look, and a fresh task set each quarter,
+   because older LinearViewer tasks drift toward contamination.
 
 ## Sources
 
