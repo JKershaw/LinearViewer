@@ -57,7 +57,7 @@ import { readRunEvidence, buildRunEvidence, summarizeChecks } from '../lib/run-e
 import { fetchPrStatus, resolveRepoAllowlist } from '../lib/github-pr-status.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
-import { resolveRunVariant } from '../lib/run-closeout-state.js';
+import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -1801,10 +1801,9 @@ export function createDashboardRoutes({
     try {
       const rows = [];
       const live = await Promise.resolve(store.listItems(urlKey, { issueIdentifier })).catch(() => []);
-      if (Array.isArray(live)) rows.push(...live);
+      rows.push(...listRows(live));
       const hist = await Promise.resolve(store.listHistory(urlKey, { issueIdentifier })).catch(() => null);
-      const items = Array.isArray(hist) ? hist : (hist && Array.isArray(hist.items) ? hist.items : []);
-      rows.push(...items);
+      rows.push(...listRows(hist));
       const stopAt = rows.some(row => row && row.stopAt === 'pr') ? 'pr' : null;
       const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
       // The row's own persisted `variant` is the authoritative source (never

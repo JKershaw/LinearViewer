@@ -12,6 +12,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const CHECK_PATH = '/workspace/:urlKey/api/run-evidence/:issueIdentifier/check';
@@ -348,6 +349,54 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     await check(built);
     assert.equal(built.calls.markDone, 1);
     assert.equal((await rows(built.collection)).length, 1);
+  });
+
+  test('F3: a taken (history-only) stop-at-PR run is found without a seam and sets Done', async () => {
+    const db = harness.freshDb();
+    const queueStore = new DispatchQueueStore({
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history'),
+    });
+    const added = await queueStore.addItem('ws', { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1', stopAt: 'pr' });
+    // Take it, so the run row lives ONLY in history (`{items,total}`), the exact
+    // shape `history.some(...)` used to throw on.
+    await queueStore.takeItem(added._id, 'ws');
+
+    const store = new CloseOutEventsStore({ collection: db.collection('close-out-events') });
+    const calls = { markDone: 0 };
+    const router = createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: queueStore,
+      closeOutEventsStore: store,
+      closeOut: {
+        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')] }), callScope: 'scope' }),
+        readPrStatus: async ({ number }) => mergedStatus(number),
+        runnerReady: () => true,
+        markDone: async () => { calls.markDone += 1; },
+        // no `isStopAtRun` seam: exercise the real defaultIsStopAtRun.
+      },
+    });
+    const res = await callRoute(router, CHECK_PATH, 'post', baseReq({ workspace: { urlKey: 'ws', id: 'ws', accessToken: 't' } }));
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.recorded.length, 1);
+    assert.equal(res.jsonBody.done, true);
+    assert.equal(calls.markDone, 1);
+  });
+
+  test('F4: a press at a DIFFERENT head than the merge still marks the merge close-out', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      // the merge is seen at a NEW head (a push happened after the press)
+      statuses: { 41: mergedStatus(41, 'bbbbbbb') },
+    });
+    const pressRes = await press(built, baseReq({ body: { prUrl: PR_A, headSha: 'aaaaaaa', dispatchId: 'd-1' } }));
+    assert.equal(pressRes.statusCode, 201, JSON.stringify(pressRes.jsonBody));
+
+    const res = await check(built);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.recorded.length, 1);
+    assert.equal(res.jsonBody.recorded[0].by, 'close-out');
+    assert.equal(res.jsonBody.state.mergedByYou, false);
   });
 });
 

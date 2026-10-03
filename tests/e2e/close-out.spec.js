@@ -88,6 +88,8 @@ async function seedFinishedRun(page, { variant = 'standard', stopAt = 'pr' } = {
 
   const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${URL_KEY}`)).json();
   const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  // Take the anchor too, so the run row is history-only (production shape; F3).
+  await page.request.post(`/api/dispatch/take/${anchorId}`, { headers: auth });
   await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth });
   await page.request.post(`/api/dispatch/feedback/${workerId}`, {
     headers: auth, data: { message: `[evidence] opened PR ${PR}`, url: PR, urlLabel: 'PR #12' },

@@ -55,7 +55,7 @@ import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
 import { resolveRepoAllowlist, readPrStatusFailOpen } from '../lib/github-pr-status.js';
 import { readRunLedger } from '../lib/run-ledger.js';
-import { deriveCloseOutState, closeOutSetsDone } from '../lib/run-closeout-state.js';
+import { deriveCloseOutState, closeOutSetsDone, listRows } from '../lib/run-closeout-state.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
@@ -4448,12 +4448,14 @@ ${goal}`
 
   // Is the task's run a stop-at-PR run? The run row is the autopilot kickoff
   // whose `issueIdentifier` matches; `stopAt: 'pr'` is the boundary P1a landed.
-  // Fail-open to null (a run without the fact behaves as today).
+  // A finished run's row lives in history only, and `listHistory` returns
+  // `{ items, total }` — `listRows` normalizes both shapes (F3). Fail-open to
+  // null (a run without the fact behaves as today).
   async function defaultIsStopAtRun({ urlKey, issueIdentifier }) {
-    const has = async (fn) => { try { return await fn() || []; } catch { return []; } };
-    const queue = await has(() => dispatchQueueStore?.listItems?.(urlKey, { issueIdentifier }));
+    const has = async (fn) => { try { return await fn(); } catch { return null; } };
+    const queue = listRows(await has(() => dispatchQueueStore?.listItems?.(urlKey, { issueIdentifier })));
     if (queue.some(row => row && row.stopAt === 'pr')) return 'pr';
-    const history = await has(() => dispatchQueueStore?.listHistory?.(urlKey, { issueIdentifier }));
+    const history = listRows(await has(() => dispatchQueueStore?.listHistory?.(urlKey, { issueIdentifier })));
     if (history.some(row => row && row.stopAt === 'pr')) return 'pr';
     return null;
   }
@@ -4576,11 +4578,12 @@ ${goal}`
           const status = prStatuses[i];
           if (!(status && status.readable === true && status.merged === true)) continue;
           const headSha = statusHeadSha(status);
-          // F1: a press already recorded for this head means the close-out
-          // worker merged it — not "by you". Record it as a close-out merge.
+          // F1/F4: a press recorded for this PR at ANY head means the close-out
+          // worker merged it — not "by you". (Dropping the head constraint: a
+          // push between the press and the merge must not hide the press.)
           let by = 'person';
           if (closeOutEventsStore) {
-            const press = await closeOutEventsStore.getByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url, headSha, by: 'press' });
+            const press = await closeOutEventsStore.findAnyByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url, by: 'press' });
             if (press) by = 'close-out';
           }
           const event = closeOutEventsStore

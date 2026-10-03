@@ -688,7 +688,7 @@ const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection }
 
 // Close-out events (LIN-3248, P3 of LIN-2949): an append-only record of a
 // person's merge or their close-out press. Lifetime-retained, idempotent on
-// urlKey + prUrl + headSha (lib/close-out-events-store.js).
+// urlKey + prUrl + headSha + by (lib/close-out-events-store.js).
 const closeOutEventsStore = new CloseOutEventsStore({ collection: db.collection('close-out-events') })
 
 // Public share links (LIN-3243, Session A of LIN-3073). One store over the
