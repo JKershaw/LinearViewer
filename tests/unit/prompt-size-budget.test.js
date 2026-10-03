@@ -96,7 +96,7 @@ export const META_PROMPT_RENDERED_CEILING = 103532;
  * ceilings already measure, so it carries a source ceiling alone. +2018 for the review
  * fixes (the safety floors review and close-out rest on, owned by code; two cause lines;
  * a writer brief that names code's sections instead of showing their text), paid by the
- * template, meta and formatter cuts in the same change (2109 bytes moved, 2148 freed).
+ * template, meta and formatter cuts in the same change (2109 bytes moved, 2239 freed).
  */
 export const BRIEF_WRITER_SOURCE_CEILING = 8657;
 
