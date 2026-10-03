@@ -116,6 +116,35 @@ describe('the recommend route and the brief writer switch (LIN-3293)', () => {
     }
   });
 
+  // The writer runs inside the hop's deadline (five seconds inside LLM_TIMEOUT_MS and the
+  // descent budget), so a slow routing call ships the unwritten bundle instead of the
+  // hop timing out. Date.now jumps 170 s during the routing call; the writer must then
+  // see too little time left. Without the route's deadline its budget would be the full
+  // REQUEST_TIMEOUT_MS and it would run.
+  test('a routing call that used up the hop\'s time ships the unwritten bundle, without calling the writer', async () => {
+    const realNow = Date.now;
+    let skew = 0;
+    Date.now = () => realNow() + skew;
+    try {
+      const calls = [];
+      setFetchImpl(async (url, opts = {}) => {
+        const content = JSON.parse(opts.body).messages[0].content;
+        const isWriter = content.startsWith('You are writing the brief');
+        calls.push({ isWriter });
+        if (!isWriter) skew = 170_000;
+        return { ok: true, json: async () => ({ choices: [{ message: { content: isWriter ? BRIEF : ROUTING }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
+      });
+      const { status, body } = await recommend(buildApp({ briefWriter: true }));
+      assert.equal(status, 200, JSON.stringify(body));
+      assert.deepEqual(calls.map(c => c.isWriter), [false], 'the writer is not started with no time left');
+      assert.ok(body.prompt.startsWith('# Review WR-1'));
+      assert.ok(!body.prompt.includes('## Scope and Authority'), 'the unwritten bundle shipped');
+      assert.equal(body.prompt.split(formatStageContract('review', ISSUE.identifier)).length, 2);
+    } finally {
+      Date.now = realNow;
+    }
+  });
+
   test('the old environment switch does nothing: the workspace feature is the only switch', async () => {
     const saved = process.env.HARBOUR_BRIEF_WRITER;
     process.env.HARBOUR_BRIEF_WRITER = 'on';
