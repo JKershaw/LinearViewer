@@ -1701,7 +1701,11 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
   const { trees, inProgressTrees, recentActivityTrees, organizationName, teams, selectedTeamId, showSource, truncated, availableAssignees, appliedAssigneeName } = await fetchAndPrepareProjects(workspace, teamId, null, workspace.urlKey, { slim: true, assigneeName: assigneeState.resolvedAssigneeName });
   // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
   // `orderIssuesForSwipe` is pure and adds no provider call.
-  const homeTopTask = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees })[0] || null;
+  // LIN-2944 P3 (addendum 18): the top task is the first NON-seed card; when only
+  // seed rows remain the mark is replaced by a one-line onboarding hint.
+  const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
+  const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
+  const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
   const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
     teams,
     selectedTeamId,
@@ -1721,6 +1725,7 @@ async function renderDashboardAfterRefresh(workspace, session, teamId, assigneeS
     truncated,
     topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
     topTaskWhy: homeTopTask ? homeTopTask.why : [],
+    topTaskOnboarding: seedOnlyHome,
     proxyDefault: session.proxyDefault
   });
   return res.send(html);
@@ -3085,7 +3090,9 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
     // LIN-2944 P1 F3: the deck's front card, over the SAME already-fetched trees —
     // `orderIssuesForSwipe` is pure and adds no provider call. With `?assignee=`,
     // the trees Home shows are already filtered, so the top task is too.
-    const homeTopTask = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees })[0] || null;
+    const orderedHome = orderIssuesForSwipe({ projectTrees: trees, inProgressTrees, recentActivityTrees, urlKey: workspace.urlKey });
+    const homeTopTask = orderedHome.find((issue) => !issue.isSeed) || null;
+    const seedOnlyHome = orderedHome.length > 0 && orderedHome.every((issue) => issue.isSeed);
     const html = renderPage(trees, inProgressTrees, recentActivityTrees, organizationName, {
       teams,
       selectedTeamId,
@@ -3108,6 +3115,7 @@ app.get('/workspace/:urlKey/', workspaceFromUrl, async (req, res) => {
       truncated,
       topTaskId: homeTopTask ? nodeKey(homeTopTask) : null,
       topTaskWhy: homeTopTask ? homeTopTask.why : [],
+      topTaskOnboarding: seedOnlyHome,
       proxyDefault: req.session.proxyDefault
     });
     res.send(html);
