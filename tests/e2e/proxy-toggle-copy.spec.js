@@ -16,6 +16,10 @@ let URL_KEY;
 const BLOCKED_ISSUE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PROXY_FEAT = encodeURIComponent(JSON.stringify({ proxy: true }));
 const PROXY_MARKER = 'Workspace API access';
+// LIN-2944 P3: the toggle state is the session's `proxyDefault` (unset means on),
+// not localStorage. Set it explicitly through the test seam.
+const PROXY_OFF = '&proxyDefault=false';
+const PROXY_ON = '&proxyDefault=true';
 
 test.beforeEach(({ workerUrlKey }) => {
   URL_KEY = workerUrlKey;
@@ -65,7 +69,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
   });
 
   test('copy appends the proxy block when +proxy is enabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
@@ -86,7 +90,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
   // LIN-3136: the toggle path is the grant-less prompt-proxy mint, byte for
   // byte — only a FORCED copy asks for the owner's driver copy.
   test('the toggle copy still mints with exactly the prompt-proxy body (LIN-3136)', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     const bodies = [];
     page.on('request', (req) => {
       if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/api/proxy/tokens')) bodies.push(req.postDataJSON());
@@ -107,7 +111,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
   });
 
   test('copy does NOT append when +proxy is disabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
@@ -122,7 +126,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
   });
 
   test('copy surfaces failure (does not silently drop) when token mint fails', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
     await failTokenMint(page);
@@ -164,7 +168,7 @@ test.describe('+proxy copy/dispatch — dashboard (app.js)', () => {
       return route.continue();
     });
 
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
@@ -210,7 +214,7 @@ test.describe('+proxy copy — swipe (prompt-section.js)', () => {
   });
 
   test('copy appends the proxy block when +proxy is enabled', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/swipe`);
     await page.waitForLoadState('networkidle');
 
@@ -226,7 +230,7 @@ test.describe('+proxy copy — swipe (prompt-section.js)', () => {
   });
 
   test('copy surfaces failure (does not silently drop) when token mint fails', async ({ page }) => {
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_OFF}`);
     await page.goto(`/workspace/${URL_KEY}/swipe`);
     await page.waitForLoadState('networkidle');
     await failTokenMint(page);
@@ -252,8 +256,8 @@ test.describe('+proxy copy — swipe (prompt-section.js)', () => {
 test.describe('+proxy state — lazily-injected button reflects persisted toggle (LIN-525 #1)', () => {
   test('persisted ON applies to a button injected after page load', async ({ page }) => {
     // Simulate the toggle persisted ON from a previous session.
-    await page.addInitScript(() => localStorage.setItem('proxy-toggle-active', 'true'));
-    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}`);
+    // The toggle is persisted ON via the session's proxyDefault preference.
+    await page.goto(`/test/set-session?features=${PROXY_FEAT}&urlKey=${URL_KEY}${PROXY_ON}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 
@@ -280,15 +284,15 @@ test.describe('+proxy gate — flag-off surface never injects (LIN-525 #2)', () 
   });
 
   test('copy does not append or mint when the feature is off, even with the toggle on', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('proxy-toggle-active', 'true'));
-
     let mintAttempted = false;
     await page.route('**/api/proxy/tokens', route => {
       if (route.request().method() === 'POST') mintAttempted = true;
       return route.continue();
     });
 
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({}))}&urlKey=${URL_KEY}`);
+    // LIN-2944 P3: proxy now defaults on, so an explicit proxy:false is required
+    // to exercise the flag-off surface.
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ proxy: false }))}&urlKey=${URL_KEY}${PROXY_ON}`);
     await page.goto(`/workspace/${URL_KEY}/`);
     await page.waitForLoadState('networkidle');
 

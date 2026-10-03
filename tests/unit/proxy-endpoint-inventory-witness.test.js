@@ -113,7 +113,9 @@ const ROWS = [
   {
     group: 'A', method: 'POST', url: '/workspace/acme/api/proxy/tokens', expect: 403,
     note: 'feature flag off (routes/proxy-tokens-admin.js:51)',
-    run: () => call(sessionWorkspaceApp({}), 'POST', '/workspace/acme/api/proxy/tokens', { body: {} }),
+    // LIN-2944 P3: proxy now defaults on, so an explicit proxy:false is needed
+    // to reach this gate's off branch.
+    run: () => call(sessionWorkspaceApp({ features: { proxy: false } }), 'POST', '/workspace/acme/api/proxy/tokens', { body: {} }),
   },
   {
     group: 'A', method: 'GET', url: '/workspace/acme/api/proxy/tokens', expect: 200,

@@ -177,7 +177,7 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   //                               a `-wN` suffix the siblings stay second-workspace
   //                               / workspace-N, keeping the default byte-identical.
   router.get('/test/set-session', async (req, res) => {
-    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode, noLinearUser } = req.query
+    const { tokenExpired, noRefreshToken, multiWorkspace, maxWorkspaces, openRouterConnected, freeTierEnabled, features, swimSample, shipSample, patMode, noLinearUser, proxyDefault } = req.query
     // Per-worker key for the first workspace; same `?urlKey=` interface the
     // teardown endpoints already use, with the identical 'test-workspace' default.
     const singleUrlKey = req.query.urlKey || 'test-workspace'
@@ -314,6 +314,14 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       } catch {
         // Ignore invalid JSON
       }
+    }
+
+    // LIN-2944 P3: the +proxy toggle's durable default lives in the session
+    // (`proxyDefault`); this seam sets it explicitly so specs can run with the
+    // toggle ON or OFF without touching localStorage. Absent leaves it unset
+    // (server renders active, per unset-means-on).
+    if (proxyDefault !== undefined) {
+      req.session.proxyDefault = proxyDefault === 'true' || proxyDefault === true
     }
 
     // Set swim sample data flag for swim page testing/screenshots
@@ -1505,6 +1513,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
         req.session.freeTierEnabled = true;
       } else {
         delete req.session.freeTierEnabled;
+      }
+
+      // LIN-2944 P3: optional +proxy default for this local session (unset →
+      // server renders active). Mirrors /test/set-session's `?proxyDefault=`.
+      const proxyDefault = req.query.proxyDefault ?? (req.body && req.body.proxyDefault);
+      if (proxyDefault !== undefined) {
+        req.session.proxyDefault = proxyDefault === 'true' || proxyDefault === true;
+      } else {
+        delete req.session.proxyDefault;
       }
 
       req.session.save(() => res.json({ ok: true, urlKey }));

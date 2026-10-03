@@ -123,7 +123,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
         route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_BODY })
       );
 
-      await page.goto('/test/set-session?openRouterConnected=true');
+      await page.goto(`/test/set-session?openRouterConnected=true&features=${encodeURIComponent(JSON.stringify({ proxy: false }))}`);
       await seedGitHubWorkspace(page);
 
       await page.goto(`/workspace/${GITHUB_WORKSPACE_URL_KEY}/swipe`);
@@ -168,7 +168,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
   test.describe('local-connected', () => {
     test('top task with its one-line why, Go, tailored prompt with visible reasoning', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const seen = recommendSpy(page);
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
 
@@ -395,7 +395,9 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
     // mid-stream (the proxy set-up rung) is cleared once the stream settles.
     test('a ladder rung pressed mid-stream keeps the streamed reasoning; settle clears the notice (N4/T1)', async ({ page, seedLocal, localWorkerUrlKey }) => {
       const STREAMED_REASONING = 'Reasoning about the task in several words.';
-      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true } });
+      // Proxy explicitly off: this case asserts the proxy set-up rung/notice
+      // (LIN-2944 P3 made proxy default on, which makes run-task ready).
+      await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { dispatch: true, proxy: false } });
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
@@ -453,7 +455,9 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 // =============================================================================
 test.describe('LIN-2942 — the ladder records its mode', () => {
   async function openTopTask(page, seedLocal, urlKey, options) {
-    await seedLocal(workspaceApiLocalSeed, options);
+    // LIN-2944 P3: proxy now defaults on; the ladder-mode cases assert the
+    // "set up" ladder shape, so keep proxy explicitly off unless a case says on.
+    await seedLocal(workspaceApiLocalSeed, { ...(options || {}), features: { proxy: false, ...((options && options.features) || {}) } });
     await page.goto(`/test/clear-task-mode-events?urlKey=${urlKey}`);
     await page.goto(`/workspace/${urlKey}/swipe`);
     await page.waitForLoadState('networkidle');
@@ -601,7 +605,7 @@ test.describe('LIN-2944 P1 — Home top-task mark', () => {
 test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
   test('top task shows why + Go, streams a TEST-13 prompt with reasoning, and copies in 3 clicks with no spend before Go', async ({ page, context, seedLocal, localWorkerUrlKey }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true });
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: false } });
 
     const spend = recommendSpy(page);
     let clicks = 0;

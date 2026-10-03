@@ -35,8 +35,9 @@ function load(apiImpl, { toggleOn = false } = {}) {
   const calls = [];
   const sandbox = {
     window: { location: { origin: 'https://harbour.test' } },
-    document: { addEventListener() {}, body: { dataset: { proxyFeature: 'true' } } },
-    localStorage: { getItem: (k) => (k === 'proxy-toggle-active' && toggleOn ? 'true' : null), setItem() {} },
+    // LIN-2944 P3: the active state is the server-emitted body attribute, not a
+    // localStorage key.
+    document: { addEventListener() {}, body: { dataset: { proxyFeature: 'true', proxyActive: toggleOn ? 'true' : 'false' } } },
     console,
     fetch() { throw new Error('fetch should not be called'); }
   };

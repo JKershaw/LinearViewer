@@ -396,7 +396,20 @@
       // Active look is driven by the body[data-proxy-active] CSS rule (LIN-525
       // #1), so no per-button class is rendered here. data-action is kept off
       // the button: ProxyToggle's delegated listener (common.js) owns the click.
-      html += `<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
+      // LIN-2944 P3: a plain-words label sits beside it, with a "what's this?"
+      // disclosure that explains what turning the proxy on does and how to turn
+      // it off. Native <details> matches the settings-page disclosure pattern.
+      html += '<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>';
+      html += '<details class="opened-task-proxy">'
+        + '<summary class="opened-task-proxy-label">your agent can read &amp; update your tasks \u00b7 what\u2019s this? \u203A</summary>'
+        + '<div class="opened-task-proxy-faq">'
+        + '<p>With this on, every prompt you copy, download or dispatch carries a workspace API access block so your agent can read and update your tasks through Harbour\u2019s own API. Each copy mints a fresh single-use read/write token, valid for 48 hours, and it appears in this prompt only.</p>'
+        + '<p>It also enables the proxy page and nav link, Autopilot prompts and next-run dispatch, and it removes the \u201cproxy off\u201d notices on the surfaces that need it.</p>'
+        + '<p>Turn it off any time by pressing <strong>+proxy</strong> again, or by switching off <strong>Linear API proxy</strong> in <a href="/workspace/'
+        + esc(opts.urlKey || '')
+        + '/settings">Settings</a>.</p>'
+        + '</div>'
+        + '</details>';
     }
     if (dispatchEnabled) {
       // Shared dispatch disclosure (LIN-1137): composes the toggle, exec controls,
