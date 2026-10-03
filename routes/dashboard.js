@@ -57,6 +57,7 @@ import { readRunEvidence, buildRunEvidence, summarizeChecks } from '../lib/run-e
 import { fetchPrStatus, resolveRepoAllowlist } from '../lib/github-pr-status.js';
 import { createProxyFetch } from '../lib/proxy-fetch.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
+import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -1401,12 +1402,20 @@ export function createDashboardRoutes({
         ? await runProposalsStore.list(workspace.urlKey, sessionId)
         : [];
 
-      // LIN-3247: the evidence fragment mounted at the top of the session page,
-      // guarded to the ONE seam LIN-2948 will lift out. Skipped when the reader
-      // is not wired (tests, and any deployment without the module), and
-      // fail-open: a read error renders no evidence rather than a broken page.
+      // LIN-3247/3248: the evidence fragment + close-out box mounted at the top
+      // of the session page, guarded to the ONE seam LIN-2948 will lift out.
+      // Skipped when the reader is not wired (tests, and any deployment without
+      // the module), and fail-open: a read error renders no evidence rather than
+      // a broken page. The run's `stopAt`/variant come off its own dispatch row
+      // (P1a/P1b): a standard run's box carries the seam-guard promise, a
+      // stepped run's does not (N2).
+      const runFacts = await readRunFacts(dispatchQueueStore, workspace.urlKey, session.seedIssue);
       const runEvidence = (readRunEvidenceFn && session.seedIssue)
-        ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle)
+        ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle, {
+          stopAt: runFacts.stopAt,
+          variant: runFacts.variant,
+          runnerReady: getFeatureFlags(req.session).dispatch === true,
+        })
         : null;
 
       // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
@@ -1752,7 +1761,7 @@ export function createDashboardRoutes({
    * @param {string|null} anchorIssueTitle
    * @returns {Promise<Object|null>}
    */
-  async function readSessionRunEvidence(reader, workspace, session, anchorIssueTitle) {
+  async function readSessionRunEvidence(reader, workspace, session, anchorIssueTitle, facts = {}) {
     try {
       const evidenceUrls = collectRunEvidenceUrls(session);
       const { provider, callScope } = resolveIssueBinding(workspace, null);
@@ -1762,11 +1771,50 @@ export function createDashboardRoutes({
         callScope,
         viewerIsOwner: true,
         evidenceUrls,
-        asked: anchorIssueTitle || session.seedIssue
+        asked: anchorIssueTitle || session.seedIssue,
+        urlKey: workspace.urlKey,
+        stopAt: facts.stopAt || null,
+        variant: facts.variant || 'unknown',
+        runnerReady: !!facts.runnerReady,
       });
     } catch (err) {
       console.error('Session page run-evidence read failed:', err.message);
       return null;
+    }
+  }
+
+  /**
+   * The run's boundary facts for the close-out box, off its own dispatch row(s)
+   * (LIN-3248). `stopAt: 'pr'` is P1a's run fact; the run variant is the row's
+   * own persisted `variant` field (`resolveRunVariant`, never `promptName`), so
+   * N2's copy can be chosen at render time. Fail-open to the safe defaults:
+   * no stop, `unknown` variant (the promise stays closed), never a broken page.
+   *
+   * @param {Object} store - dispatchQueueStore
+   * @param {string} urlKey
+   * @param {string|null} issueIdentifier
+   * @returns {Promise<{stopAt: ('pr'|null), variant: ('standard'|'stepper'|'unknown')}>}
+   */
+  async function readRunFacts(store, urlKey, issueIdentifier) {
+    const defaults = { stopAt: null, variant: 'unknown' };
+    if (!store || !urlKey || !issueIdentifier) return defaults;
+    try {
+      const rows = [];
+      const live = await Promise.resolve(store.listItems(urlKey, { issueIdentifier })).catch(() => []);
+      rows.push(...listRows(live));
+      const hist = await Promise.resolve(store.listHistory(urlKey, { issueIdentifier })).catch(() => null);
+      rows.push(...listRows(hist));
+      const stopAt = rows.some(row => row && row.stopAt === 'pr') ? 'pr' : null;
+      const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
+      // The row's own persisted `variant` is the authoritative source (never
+      // `promptName` — a real stepper kickoff is named `Autopilot (LIN-NNNN)`).
+      // Fail closed: a missing/unknown/non-autopilot row is `unknown`, so N2's
+      // promise is shown only for a positively-standard run.
+      const variant = resolveRunVariant(kickoff);
+      return { stopAt, variant };
+    } catch (err) {
+      console.error('Session page run-facts read failed:', err.message);
+      return defaults;
     }
   }
 

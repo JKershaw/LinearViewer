@@ -714,6 +714,147 @@
     tick(); // one initial fetch for every run, live or finished
   }
 
+  // ── Close-out box (LIN-3248, P3 of LIN-2949) ──────────────────────────────
+  // Self-merge detection on read + the press, off the box the run-evidence
+  // fragment renders. The press reuses the ordinary dispatch path — it fetches
+  // the close-out prompt and calls window.dispatchPrompt (no new dispatch
+  // route) — then records the press through beat 2's route. Detection calls
+  // the check route on load and on tab focus, only while the state is ready.
+  function closeOutContext() {
+    var box = document.querySelector('[data-testid="run-evidence-closeout"]');
+    if (!box) return null;
+    var reply = document.querySelector('[data-testid="session-inline-reply"][data-issue-id]');
+    var urlKey = (reply && reply.getAttribute('data-url-key')) || box.getAttribute('data-url-key') || '';
+    var issueId = reply ? (reply.getAttribute('data-issue-id') || '') : '';
+    var issueIdentifier = (reply && reply.getAttribute('data-issue-identifier'))
+      || box.getAttribute('data-issue-identifier') || '';
+    return { box: box, urlKey: urlKey, issueId: issueId, issueIdentifier: issueIdentifier };
+  }
+
+  // Replace the box's dynamic content with a single line, built via textContent
+  // so a server-provided message can never inject markup.
+  function paintCloseOut(box, testId, line) {
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var p = document.createElement('p');
+    p.setAttribute('data-testid', testId);
+    p.textContent = line;
+    box.appendChild(p);
+  }
+
+  function applyCloseOutState(box, state) {
+    if (!box || !state || !state.status) return;
+    var prevYou = box.getAttribute('data-merged-by-you') === 'true';
+    var nextYou = !!state.mergedByYou;
+    // Repaint when the state or the "by you" claim changes (F1: a close-out
+    // merge found on check replaces the server-rendered "merged by you").
+    if (box.getAttribute('data-state') === state.status && prevYou === nextYou) return;
+    box.setAttribute('data-state', state.status);
+    box.setAttribute('data-merged-by-you', nextYou ? 'true' : 'false');
+    if (state.status === 'ready') return;
+    if (state.status === 'merged' || state.status === 'partial') {
+      if (nextYou) {
+        paintCloseOut(box, 'run-evidence-closeout-merged', '✓ merged by you' + (state.message ? ' · ' + state.message : ''));
+      } else {
+        paintCloseOut(box, 'run-evidence-closeout-neutral', state.message || 'the pull request is already merged');
+      }
+    } else if (state.status === 'not-ready' || state.status === 'no-pr' || state.status === 'multiple-prs' || state.status === 'closed') {
+      paintCloseOut(box, 'run-evidence-closeout-setup', '○ set up ›');
+    } else {
+      paintCloseOut(box, 'run-evidence-closeout-withheld', state.message || 'the pull request could not be read — not checked');
+    }
+  }
+
+  function runCloseOutCheck() {
+    var ctx = closeOutContext();
+    if (!ctx || !ctx.urlKey || !ctx.issueIdentifier) return;
+    var state = ctx.box.getAttribute('data-state');
+    // Stop-at-PR runs only (LIN-3248 review F1): an ordinary run's merged page
+    // must not POST check at all (it writes nothing and costs live GitHub reads).
+    if (ctx.box.getAttribute('data-stop-at') !== 'pr') return;
+    // `ready` catches a merge that happened since load; `merged`/`partial`
+    // catch a reload/revisit that already saw the merge server-side — without
+    // this the person's self-merge would never be recorded and Done never set
+    // (LIN-3248 review B1). The check is idempotent, so a repeat is safe.
+    if (state !== 'ready' && state !== 'merged' && state !== 'partial') return;
+    window.api(
+      '/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/run-evidence/' + encodeURIComponent(ctx.issueIdentifier) + '/check',
+      { method: 'POST', body: JSON.stringify({}) }
+    ).then(function (result) {
+      applyCloseOutState(ctx.box, result && result.state);
+    }).catch(function () { /* fail open: the box keeps its last state */ });
+  }
+
+  // Debounce tab-return so one return fires one check, not one per focused
+  // element (LIN-3248 review N-a).
+  var closeOutCheckTimer = null;
+  function scheduleCloseOutCheck() {
+    if (closeOutCheckTimer) return;
+    closeOutCheckTimer = setTimeout(function () {
+      closeOutCheckTimer = null;
+      runCloseOutCheck();
+    }, 300);
+  }
+
+  function pressCloseOut(btn) {
+    var ctx = closeOutContext();
+    if (!ctx || !ctx.urlKey || !ctx.issueId || !ctx.issueIdentifier) return;
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'closing out…';
+    window.api('/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/prompt/' + encodeURIComponent(ctx.issueId) + '/close-out')
+      .then(function (result) {
+        return window.dispatchPrompt({
+          urlKey: ctx.urlKey,
+          prompt: result.prompt,
+          promptName: result.promptName || 'close-out',
+          kind: 'close-out',
+          issue: { id: ctx.issueId, identifier: ctx.issueIdentifier, title: result.issueTitle || '' },
+          entryRung: 'run-step'
+        });
+      })
+      .then(function (dispatch) {
+        var dispatchId = (dispatch && dispatch.item && dispatch.item.id)
+          || (dispatch && dispatch.id) || null;
+        return window.api(
+          '/workspace/' + encodeURIComponent(ctx.urlKey) + '/api/run-evidence/' + encodeURIComponent(ctx.issueIdentifier) + '/close-out-press',
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              prUrl: ctx.box.getAttribute('data-pr-url') || null,
+              headSha: ctx.box.getAttribute('data-head-sha') || null,
+              dispatchId: dispatchId
+            })
+          }
+        );
+      })
+      .then(function () {
+        btn.textContent = 'close-out sent ✓';
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        btn.textContent = original;
+        console.error('Close-out press failed:', err && err.message);
+      });
+  }
+
+  function initCloseOut() {
+    if (!document.querySelector('[data-testid="run-evidence-closeout"]')) return;
+    document.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('[data-action="closeout-press"]') : null;
+      if (!btn) return;
+      e.preventDefault();
+      pressCloseOut(btn);
+    });
+    runCloseOutCheck();
+    // Tab return only: `window` focus plus visible `visibilitychange`, debounced
+    // (LIN-3248 review N-a) — never the capture-phase document focus that fired
+    // on every element.
+    window.addEventListener('focus', scheduleCloseOutCheck);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) scheduleCloseOutCheck();
+    });
+  }
+
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     // Per-run transcripts must render before toggle init so content is visible.
@@ -724,6 +865,7 @@
     initProposals();
     initContextWidgets();
     initPrState();
+    initCloseOut();
     tickClocks();
     setInterval(tickClocks, 1000);
   });

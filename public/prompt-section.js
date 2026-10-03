@@ -1006,6 +1006,12 @@
           // LIN-3246: the ladder's own autopilot run declares the PR boundary on
           // the row too (the server validates it); a run-step dispatch does not.
           stopAt: isAutopilotResult() ? 'pr' : undefined,
+          // LIN-3248 (N2): the ladder's autopilot press also declares its own
+          // variant, so the run page's seam-guard promise is shown only for a
+          // standard run (never inferred from promptName).
+          variant: isAutopilotResult()
+            ? ((state.result && state.result.label === '__autopilot_stepper__') ? 'stepper' : 'standard')
+            : undefined,
           // LIN-2944 P1 (handover d610edd0): which opened-task surface this came
           // from, so Home (`home`) and Swipe (`swipe`) dispatches are
           // distinguishable in the task-mode log. The server validates it against

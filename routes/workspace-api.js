@@ -52,7 +52,10 @@ import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
 import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
-import { readRunEvidence } from '../lib/run-evidence.js';
+import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
+import { resolveRepoAllowlist, readPrStatusFailOpen } from '../lib/github-pr-status.js';
+import { readRunLedger } from '../lib/run-ledger.js';
+import { deriveCloseOutState, closeOutSetsDone, listRows } from '../lib/run-closeout-state.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
@@ -352,9 +355,11 @@ function sendBindingRefusal(res, refusal) {
  * @param {Object} [options.ownerCredentialStore] - Durable owner-credential store (LIN-2933); null → the comment route's one-shot auth-recovery is disabled, not a hard dependency
  * @param {Function} [options.adoptConnectionCredential] - LIN-3124 PR3 (D7): connection-keyed adopt read (injected; protected module imports no connection seam)
  * @param {Object} [options.runEvidence] - LIN-3247 test seam for the run-evidence route: optional `{ resolveProvider, viewerIsOwner, readPrStatus, githubFetch }` overrides
+ * @param {Object} [options.closeOutEventsStore] - LIN-3248 close-out event log (lib/close-out-events-store.js)
+ * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -4413,6 +4418,284 @@ ${goal}`
     } catch (error) {
       console.error('Run evidence error:', error);
       jsonError(res, 500, 'Failed to build run evidence', { message: error.message });
+    }
+  });
+
+  // ===========================================================================
+  // Close-out (LIN-3248, P3 of LIN-2949)
+  // ===========================================================================
+
+  // The PR head the reader saw, or null.
+  function statusHeadSha(status) {
+    if (!status || status.readable !== true) return null;
+    return (status.head && status.head.sha) || status.ref || null;
+  }
+
+  // The open-ledger-item counts at merge: review-ledger items not yet
+  // discharged, by scope. Content-free — counts only (the audit trail says what
+  // "Done" meant).
+  function countOpenLedgerItems(review) {
+    const items = (review && review.ledger && review.ledger.items) || [];
+    const counts = { inside: 0, outside: 0, unknown: 0, total: 0 };
+    for (const item of items) {
+      if (!item || item.discharged) continue;
+      const scope = item.scope === 'inside' ? 'inside' : item.scope === 'outside' ? 'outside' : 'unknown';
+      counts[scope] += 1;
+      counts.total += 1;
+    }
+    return counts;
+  }
+
+  // Is the task's run a stop-at-PR run? The run row is the autopilot kickoff
+  // whose `issueIdentifier` matches; `stopAt: 'pr'` is the boundary P1a landed.
+  // A finished run's row lives in history only, and `listHistory` returns
+  // `{ items, total }` — `listRows` normalizes both shapes (F3). Fail-open to
+  // null (a run without the fact behaves as today).
+  async function defaultIsStopAtRun({ urlKey, issueIdentifier }) {
+    const has = async (fn) => { try { return await fn(); } catch { return null; } };
+    const queue = listRows(await has(() => dispatchQueueStore?.listItems?.(urlKey, { issueIdentifier })));
+    if (queue.some(row => row && row.stopAt === 'pr')) return 'pr';
+    const history = listRows(await has(() => dispatchQueueStore?.listHistory?.(urlKey, { issueIdentifier })));
+    if (history.some(row => row && row.stopAt === 'pr')) return 'pr';
+    return null;
+  }
+
+  // Set the tracker issue Done. Resolves the issue's team, its completed
+  // workflow state, then transitions it. Throws on failure so the caller can
+  // record the error and retry on the next check.
+  async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
+    const { issue } = await provider.fetchIssueContext(callScope, issueIdentifier);
+    const issueRef = (issue && issue.id) || issueIdentifier;
+    let teamId = (issue && issue.team && issue.team.id) || null;
+    if (!teamId && typeof provider.issueWriteGuard === 'function') {
+      const guard = await provider.issueWriteGuard(callScope, issueRef);
+      teamId = (guard && guard.team && guard.team.id) || null;
+    }
+    if (!teamId) throw new Error('could not resolve the issue team for Done');
+    const states = await provider.states(callScope, teamId);
+    const completed = (states || []).find(s => s && s.type === 'completed');
+    const stateId = (completed && completed.id) || resolveStateRef(states, 'Done');
+    return provider.updateIssue(callScope, issueRef, { stateId });
+  }
+
+  // The signed-in person's own session: an authenticated session (workspaceFromUrl
+  // already required one) and NOT a worker/proxy token. Computed from the
+  // request, never from the body, so the route can never be handed
+  // `byPersonCheck: true`.
+  function isPersonSession(req) {
+    return !!req.session?.accountId && !req.proxyTokenId && !req.proxyUrlKey;
+  }
+
+  /**
+   * Close-out check (LIN-3248, P3 of LIN-2949). The page calls this on load and
+   * on tab focus, only while the close-out state is `ready`. It re-reads the PR
+   * live, derives the close-out state with `deriveCloseOutState` (never P2's
+   * looser `closeOut.status`), records a `{ by: 'person' }` event when a PR is
+   * merged, and sets Done only within R1's bounds — all on the signed-in
+   * person's own provider session, never a worker or proxy token.
+   *
+   * @route POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check
+   */
+  router.post('/workspace/:urlKey/api/run-evidence/:issueIdentifier/check', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { issueIdentifier } = req.params;
+
+    if (!issueIdentifier || issueIdentifier.length > 100) {
+      return badRequest.json(res, 'Invalid issue identifier');
+    }
+    if (!req.session?.accountId) {
+      return unauthorized.json(res, 'Not authenticated');
+    }
+    if (!isPersonSession(req)) {
+      return jsonError(res, 403, "The close-out check must use the signed-in person's own session", { code: 'PERSON_SESSION_REQUIRED' });
+    }
+
+    const accountId = req.session.accountId;
+    const seam = closeOut || {};
+    const resolveProvider = seam.resolveProvider || resolveIssueBinding;
+    const requestedSource = typeof req.body?.source === 'string' ? req.body.source : (typeof req.query.source === 'string' ? req.query.source : null);
+    const requestedScope = req.body?.bindingScope ?? req.query.bindingScope;
+
+    try {
+      const binding = resolveProvider(workspace, issueBindingSelector(requestedSource, requestedScope));
+      if (binding.error) return sendBindingRefusal(res, binding);
+      const { provider, callScope } = binding;
+
+      const comments = await provider.fetchIssueComments(callScope, issueIdentifier);
+      let allowlist = new Set();
+      try {
+        allowlist = await resolveRepoAllowlist(provider, callScope);
+      } catch {
+        allowlist = new Set();
+      }
+      const prUrls = extractPrUrls(comments, allowlist);
+      const readPrStatus = seam.readPrStatus || readPrStatusFailOpen;
+      const prStatuses = await Promise.all(prUrls.map(async pr => {
+        try {
+          return await readPrStatus({
+            provider,
+            scope: callScope,
+            repo: pr.repo,
+            number: pr.number,
+            doFetch: seam.githubFetch || null,
+            allowlist,
+          });
+        } catch (err) {
+          // Fail open: an unreadable PR state is "unknown", never a 500.
+          return { repo: pr.repo, readable: false, state: 'unknown', reason: err?.message || 'not checked' };
+        }
+      }));
+
+      const ledger = readRunLedger(comments);
+      const runStopAt = seam.isStopAtRun
+        ? await seam.isStopAtRun({ workspace, issueIdentifier })
+        : await defaultIsStopAtRun({ urlKey: workspace.urlKey, issueIdentifier });
+      const runnerReady = seam.runnerReady
+        ? !!seam.runnerReady(req)
+        : getFeatureFlags(req.session).dispatch === true;
+
+      const state = deriveCloseOutState({
+        prs: prUrls,
+        prStatuses,
+        review: ledger,
+        runnerReady,
+        owner: true,
+        stopAt: runStopAt,
+        byPersonCheck: true,
+      });
+
+      const recorded = [];
+      let done = false;
+      let doneError = null;
+
+      // Close-out is a stop-at-PR surface only: a normal run records and sets
+      // nothing here.
+      if (runStopAt === 'pr') {
+        const openItems = countOpenLedgerItems(ledger);
+        let mergedEvent = null;
+        let mergedPrIndex = -1;
+        for (let i = 0; i < prUrls.length; i += 1) {
+          const status = prStatuses[i];
+          if (!(status && status.readable === true && status.merged === true)) continue;
+          const headSha = statusHeadSha(status);
+          // F1/F4: a press recorded for this PR at ANY head means the close-out
+          // worker merged it — not "by you". (Dropping the head constraint: a
+          // push between the press and the merge must not hide the press.)
+          let by = 'person';
+          if (closeOutEventsStore) {
+            const press = await closeOutEventsStore.findAnyByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url, by: 'press' });
+            if (press) by = 'close-out';
+          }
+          const event = closeOutEventsStore
+            ? await closeOutEventsStore.record({
+              accountId,
+              urlKey: workspace.urlKey,
+              issueId: null,
+              issueIdentifier,
+              by,
+              prUrl: prUrls[i].url,
+              headSha,
+              merged: true,
+              openItems,
+            })
+            : null;
+          if (event) {
+            recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
+            if (!mergedEvent) { mergedEvent = event; mergedPrIndex = i; }
+          }
+        }
+
+        // R1: set Done only when all four bounds hold. F2: write it once per
+        // merge — skip when this merge already carries a successful `doneAt`,
+        // and retry only after a failed attempt.
+        const targetIndex = mergedPrIndex >= 0 ? mergedPrIndex : 0;
+        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prIndex: targetIndex, review: ledger, byPersonCheck: true })) {
+          if (mergedEvent && mergedEvent.doneAt) {
+            done = true; // already written for this merge; never repeat the provider write
+          } else {
+            try {
+              const markDone = seam.markDone || defaultMarkDone;
+              await markDone({ provider, callScope, issueIdentifier });
+              done = true;
+              if (mergedEvent && closeOutEventsStore) {
+                mergedEvent = await closeOutEventsStore.stampDone({
+                  urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: new Date(), doneError: null,
+                }) || mergedEvent;
+              }
+            } catch (err) {
+              doneError = err?.message || 'could not set the task Done';
+              if (mergedEvent && closeOutEventsStore) {
+                await closeOutEventsStore.stampDone({
+                  urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: null, doneError,
+                });
+              }
+            }
+          }
+        }
+
+        // F1: show a press-then-merge as a close-out merge, not "by you".
+        if (mergedEvent && mergedEvent.by === 'close-out') {
+          state.mergedByYou = false;
+          state.mergedBy = 'close-out';
+          state.message = 'the pull request was merged by close-out';
+        }
+      }
+
+      return res.json({ state, recorded, done, doneError });
+    } catch (error) {
+      console.error('Close-out check error:', error);
+      jsonError(res, 500, 'Failed to check close-out state', { message: error.message });
+    }
+  });
+
+  /**
+   * Close-out press record (LIN-3248, P3 of LIN-2949). The press itself goes
+   * through the existing dispatch path (GET /api/prompt/:issueId/close-out +
+   * window.dispatchPrompt); this route only records what that path dispatched.
+   * No new dispatch route.
+   *
+   * @route POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press
+   */
+  router.post('/workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press', workspaceFromUrl, json(), async (req, res) => {
+    const workspace = req.workspace;
+    const { issueIdentifier } = req.params;
+
+    if (!issueIdentifier || issueIdentifier.length > 100) {
+      return badRequest.json(res, 'Invalid issue identifier');
+    }
+    if (!req.session?.accountId) {
+      return unauthorized.json(res, 'Not authenticated');
+    }
+    if (!isPersonSession(req)) {
+      return jsonError(res, 403, "The close-out press must use the signed-in person's own session", { code: 'PERSON_SESSION_REQUIRED' });
+    }
+
+    const { prUrl, headSha, dispatchId } = req.body || {};
+    try {
+      const event = closeOutEventsStore
+        ? await closeOutEventsStore.record({
+          accountId: req.session.accountId,
+          urlKey: workspace.urlKey,
+          issueId: null,
+          issueIdentifier,
+          by: 'press',
+          dispatchId,
+          prUrl,
+          headSha: headSha ?? null,
+          merged: false,
+          openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
+        })
+        : null;
+      if (!event) {
+        return badRequest.json(res, 'Invalid close-out press');
+      }
+      return res.status(201).json({
+        success: true,
+        event: { id: event._id, by: event.by, dispatchId: event.dispatchId, prUrl: event.prUrl, headSha: event.headSha },
+      });
+    } catch (error) {
+      console.error('Close-out press record error:', error);
+      jsonError(res, 500, 'Failed to record close-out press', { message: error.message });
     }
   });
 

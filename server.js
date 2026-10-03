@@ -88,6 +88,7 @@ import { RunProposalsStore } from './lib/run-proposals-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { TaskModeStore } from './lib/task-mode-store.js'
 import { FunnelEventStore } from './lib/funnel-event-store.js'
+import { CloseOutEventsStore } from './lib/close-out-events-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
@@ -684,6 +685,11 @@ const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collec
 // count dispatch rows, not these.
 const taskModeEventsCollection = db.collection('task-mode-events')
 const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
+
+// Close-out events (LIN-3248, P3 of LIN-2949): an append-only record of a
+// person's merge or their close-out press. Lifetime-retained, idempotent on
+// urlKey + prUrl + headSha + by (lib/close-out-events-store.js).
+const closeOutEventsStore = new CloseOutEventsStore({ collection: db.collection('close-out-events') })
 
 // Public share links (LIN-3243, Session A of LIN-3073). One store over the
 // `shares` collection; the route is mounted below and receives the store plus
@@ -2890,7 +2896,7 @@ app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, 
 app.use(createRunnerKitRoutes())
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args) }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.

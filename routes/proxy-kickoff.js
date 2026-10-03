@@ -464,7 +464,12 @@ export function createKickoffRoutes({
           maxTasks: maxTasks ?? null,
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks —
           // stored on the run row so the dispatch-factory seam can enforce it.
-          maxSessionsPerTask: maxSessionsPerTask ?? null
+          maxSessionsPerTask: maxSessionsPerTask ?? null,
+          // Run variant (LIN-3248 N2): the authoritative standard/stepper fact
+          // the run page reads for the seam-guard promise. `resolvedVariant` is
+          // the same value the kickoff body is built from; stamped here so the
+          // page and the guard agree (the row, not the response, is the source).
+          variant: resolvedVariant
         }
       });
 

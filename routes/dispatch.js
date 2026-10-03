@@ -244,7 +244,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -427,6 +427,25 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
         if (!issueIdentifier) {
           return badRequest.json(res, 'stopAt requires issueIdentifier');
+        }
+      }
+
+      // Run variant (LIN-3248 N2): the authoritative standard/stepper fact the
+      // run page reads to decide whether the "Harbour never merges on its own"
+      // promise is backed. A DEDICATED, validated body field (never sniffed
+      // from promptName), only on a fresh autopilot dispatch for a task; absent
+      // stays null, which the page reads as unknown and fails the promise
+      // closed. Same freshness discipline as stopAt above.
+      const hasVariant = variant !== undefined && variant !== null;
+      if (hasVariant) {
+        if (variant !== 'standard' && variant !== 'stepper') {
+          return badRequest.json(res, "variant must be 'standard' or 'stepper'");
+        }
+        if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
+          return badRequest.json(res, 'variant is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
+        }
+        if (kind !== 'autopilot') {
+          return badRequest.json(res, "variant requires kind 'autopilot'");
         }
       }
 
@@ -720,7 +739,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           // Run-boundary fact (LIN-3245 / LIN-2949 P1a): stamped only when the
           // validated `'pr'` value was supplied; null (the default) is
           // byte-identical to today.
-          stopAt: stopAt ?? null
+          stopAt: stopAt ?? null,
+          // Run variant (LIN-3248 N2): stamped when the validated
+          // standard/stepper value was supplied; null otherwise.
+          variant: variant ?? null
         }
       });
 
