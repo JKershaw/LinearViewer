@@ -26,6 +26,7 @@ import {
   BRIEF_WRITER_PROSE_TOKENS,
   briefWriterBudget,
   resolveReasoningBudget,
+  defaultReasoningTokens,
   isReasoningModel,
   DEFAULT_MODEL
 } from '../../lib/openrouter.js';
@@ -373,21 +374,33 @@ describe('the writer\'s token budget and unfinished replies', () => {
     return calls.find(c => c.isWriter).body;
   };
 
-  test('a reasoning model gets a reasoning bound and room to write the whole brief on top', async () => {
+  // Every writer gets the reasoning headroom in max_tokens, which costs nothing unless
+  // used: the models that fell back in the comparison reason by default and are not on
+  // the shared prefix list. The `reasoning` field goes only to the listed models. Outside
+  // the list it is not ignored: on a hybrid model it switches thinking on.
+  const HEADROOM = BRIEF_WRITER_PROSE_TOKENS + defaultReasoningTokens(BRIEF_WRITER_PROSE_TOKENS);
+
+  test('a listed reasoning model gets the LIN-1000 split: a reasoning bound and the whole prose budget on top', async () => {
     assert.ok(isReasoningModel(DEFAULT_MODEL));
     const body = await writerBody(DEFAULT_MODEL);
     const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: BRIEF_WRITER_PROSE_TOKENS });
     assert.deepEqual(body.reasoning, reasoning);
     assert.equal(body.max_tokens, maxTokens);
+    assert.equal(body.max_tokens, HEADROOM);
     assert.equal(body.max_tokens, BRIEF_WRITER_PROSE_TOKENS + body.reasoning.max_tokens, 'the prose budget survives the reasoning run');
     assert.deepEqual(briefWriterBudget(DEFAULT_MODEL), { reasoning, maxTokens });
   });
 
-  test('a non-reasoning model keeps a bare max_tokens and gets no reasoning field', async () => {
-    const body = await writerBody('x/w');
-    assert.equal(body.max_tokens, BRIEF_WRITER_PROSE_TOKENS);
-    assert.equal('reasoning' in body, false);
-  });
+  for (const model of ['google/gemini-3.8-flash', 'deepseek/deepseek-v4-flash', 'openai/gpt-6.1-sol', 'anthropic/claude-opus-5.5', 'x/w']) {
+    test(`a model off the prefix list (${model}) still gets the headroom, and no reasoning field`, async () => {
+      assert.equal(isReasoningModel(model), false, 'the shared list is unchanged');
+      const body = await writerBody(model);
+      assert.equal(body.max_tokens, HEADROOM);
+      assert.ok(body.max_tokens > BRIEF_WRITER_PROSE_TOKENS, 'room to think and still write the whole brief');
+      assert.equal('reasoning' in body, false);
+      assert.deepEqual(briefWriterBudget(model), { reasoning: undefined, maxTokens: HEADROOM });
+    });
+  }
 
   const unfinished = {
     'reasoning spent the whole budget: no content, cut at the limit': [{ content: '', finishReason: 'length' }, 'truncated'],
