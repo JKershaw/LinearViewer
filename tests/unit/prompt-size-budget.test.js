@@ -54,7 +54,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 131297,
+  'lib/prompt-template-defs.js': 129081,
   'lib/prompt-templates.js': 20404,
   'lib/prompt-formatters.js': 52999,
   'lib/prompt-contract.js': 3481,
@@ -64,28 +64,28 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * FIXTURE_CONTEXT below. The key set is asserted to match the live registry. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 2990,
-  bug: 4420,
+  bug: 4362,
   plan: 15433, // LIN-3292: plan, implementation and review carry the stage contract, paid by triage, plan-review and close-out
   'look-into': 1645,
   triage: 2499,
-  breakdown: 4669,
-  research: 11115,
-  scoping: 2079,
+  breakdown: 4637,
+  research: 11070,
+  scoping: 2047,
   design: 2277, // LIN-3296: design and spike rewritten as briefs, paid by implementation and close-out's LIN-3291 trims
   spike: 2190,
   context: 1892,
   'plan-review': 7704,
   implementation: 7574,
-  review: 20106,
-  'close-out': 19598,
-  'retrospective-audit': 4161,
+  review: 19101,
+  'close-out': 18455,
+  'retrospective-audit': 4143,
   retro: 4114,
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106575; // LIN-3292: the routing-only switches, from the unallocated total
+export const META_PROMPT_SOURCE_CEILING = 106450; // LIN-3292: the routing-only switches, from the unallocated total
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 104052;
+export const META_PROMPT_RENDERED_CEILING = 103927;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;

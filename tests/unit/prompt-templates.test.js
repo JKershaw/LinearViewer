@@ -798,8 +798,8 @@ describe('code-review consolidated into review (LIN-523)', () => {
 
   test('review does not instruct merge or Done (close-out split at the merge line)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('does NOT merge') || result.prompt.includes('not merge'));
-    assert.ok(result.prompt.includes('Do NOT mark this task Done') || result.prompt.includes('Do NOT mark the task Done'));
+    // Said once, in the hand-off, with its reason (LIN-3293 dedup).
+    assert.ok(/You do NOT merge, mark the task Done, or file close-out follow-ups/.test(result.prompt));
   });
 });
 
@@ -1014,8 +1014,9 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
 
   test('review checklist carries the class-check item', () => {
     const result = generatePrompt('review', reviewIssue, ctx);
-    assert.ok(result.prompt.includes('- [ ] Class check answered: isolated, or class named with unhandled instances listed'),
-      'checklist must include the class-check line');
+    // The class check is its own section; the checklist no longer restates it (LIN-3293 dedup).
+    assert.ok(/### Isolated, or One of a Class\?/.test(result.prompt), 'the class check stays required');
+    assert.ok(!result.prompt.includes('- [ ] Class check answered'), 'and is said once');
   });
 });
 
@@ -1047,8 +1048,9 @@ describe('mutation-check directive — pin the review institutionalization (LIN-
 
   test('review checklist carries the mutation-check item', () => {
     const result = generatePrompt('review', reviewIssue, ctx);
-    assert.ok(result.prompt.includes('- [ ] At least the load-bearing new/changed tests were mutation-checked (code path deleted, test confirmed red, then restored) rather than merely inspected'),
-      'checklist must include the mutation-check line');
+    // The mutation check lives in Test Quality Check; the checklist no longer restates it (LIN-3293 dedup).
+    assert.ok(/\*\*Mutation-check the load-bearing tests/.test(result.prompt), 'the mutation check stays required');
+    assert.ok(!result.prompt.includes('- [ ] At least the load-bearing'), 'and is said once');
   });
 
   test('mutation-check directive stays inside Test Quality Check, ahead of the Review Checklist', () => {
@@ -1747,10 +1749,8 @@ describe('review template', () => {
   test('Test Quality Check names e2e/integration and a checklist item locks the wording', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(result.prompt.includes('e2e'), 'should reference e2e in test-level guidance');
-    assert.ok(
-      result.prompt.includes('Tests exist at the appropriate level (e2e/integration for cross-module or user-facing behavior, not only unit tests)'),
-      'should include the new Review Checklist item phrase verbatim'
-    );
+    assert.ok(/UI\/route\/cross-module → e2e; pure function → unit/.test(result.prompt),
+      'the test-level rule is stated once, in Test Quality Check');
   });
 
   test('Test Quality Check is positioned between Gap Analysis and Review Checklist', () => {
@@ -1800,7 +1800,7 @@ describe('review template', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/Review is write-only/i.test(result.prompt), 'states review is write-only');
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
-    assert.ok(/does NOT merge, does NOT mark the task Done, and does NOT file the close-out follow-ups/i.test(result.prompt),
+    assert.ok(/You do NOT merge, mark the task Done, or file close-out follow-ups/i.test(result.prompt),
       'review does not merge, mark Done, or file close-out follow-ups');
     assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(result.prompt),
       'a non-empty ledger forces a conditional approval');
@@ -1825,8 +1825,6 @@ describe('review template', () => {
       'next action must be named explicitly because `blocks` does not drive descent');
     assert.ok(/closes only once the blocker is resolved and CI is green/i.test(result.prompt),
       'original closes only after blocker resolves and CI green');
-    assert.ok(/distinct from a plan-phase prerequisite-refactor subtask/i.test(result.prompt),
-      'closure blocker kept distinct from plan refactor-subtask');
   });
 
   test('review completion signals reflect verdict-based, pre-merge close-out (LIN-523)', () => {
@@ -3084,14 +3082,13 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the prune step explicitly excludes the cannot-close / stays-open branches');
   });
 
-  test('(g7) comments stay untouched by policy — the prune is a description-only edit, and the existing comment-edit route is named for corrections', () => {
+  test('(g7) comments stay untouched by policy — the prune is a description-only edit', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     assert.ok(/Comments are untouched by policy/i.test(prompt),
       'comments are explicitly out of scope for the prune, stated as a policy choice rather than a capability gap');
     assert.ok(/the prune is a description edit only/i.test(prompt), 'the policy distinction is preserved');
-    assert.ok(/adds no new capability/i.test(prompt), 'the prune uses only existing write surfaces');
-    assert.ok(/PATCH \/api\/proxy\/issues\/:issueId\/comments\/:commentId/i.test(prompt),
-      'the existing comment-edit route is named, acknowledging it exists for corrections');
+    assert.ok(/using the existing write surface/i.test(prompt), 'the prune uses only existing write surfaces');
+    // The comment-edit route aside was a note for rule authors, not the agent (LIN-3293 dedup).
   });
 
   test('(g8) close-out still emits no literal "Linear" with the archive+prune section included (LIN-177 parity)', () => {
@@ -3247,8 +3244,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/best-effort, never blocking/i.test(prompt), 'triage is explicitly best-effort, never blocking');
     assert.ok(/record a one-line note on the ticket saying so instead of retrying or failing the close/i.test(prompt),
       'degrades to a stated note rather than retrying or failing the close');
-    assert.ok(/does not change which follow-ups get filed or expand close-out's authority/i.test(prompt),
-      'metadata-only — does not widen close-out\'s mandate');
   });
 
   test('(i5) the workflow list and the All-Clear list both point filers at Follow-up Triage', () => {
@@ -3310,8 +3305,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'meta rule requires an explicit note instead of inventing a label');
     assert.ok(/best-effort — when a provider silently drops priority on write, or offers no usable label catalog, record a one-line note/i.test(rule),
       'meta rule degrades best-effort to a stated note');
-    assert.ok(/this adds metadata only and does not change which follow-ups get filed/i.test(rule),
-      'meta rule stays metadata-only, does not widen close-out\'s mandate');
     assert.ok(rule.split('\n').length === 1 || !rule.includes('\n'),
       'the Close-out prompts rule stays a single line, since tests extract it by its line prefix');
   });
@@ -3671,7 +3664,7 @@ describe('ledger proportionality for low-risk changes (LIN-898)', () => {
     const closeout = generatePrompt('close-out', issue, context).prompt;
     assert.ok(/Proportional to risk class — low-risk post-merge-observation discharge/i.test(closeout),
       'close-out has the low-risk discharge path');
-    assert.ok(/that routing to normal post-merge observation .* IS its discharge under \(a\)/is.test(closeout),
+    assert.ok(/that routing to normal post-merge observation.* IS its discharge under \(a\)/is.test(closeout),
       'the routing itself is the discharge under option (a)');
     assert.ok(/without a pre-merge human sign-off ceremony/i.test(closeout),
       'no pre-merge human sign-off ceremony for a low-risk item');
