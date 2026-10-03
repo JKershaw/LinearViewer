@@ -92,8 +92,10 @@ const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 // PR-state cache + upstream budget (LIN-3251, S1b of LIN-2948, condition C1).
 // The whole reader result is cached per `owner/repo#number`: 15 min while the PR
 // is open, 24 h once merged or closed. Run pages share a process-wide budget of
-// 36 upstream GitHub calls per rolling hour; when it is spent the route serves
-// the stale value or "state not reported" and never lets another reader see a 403.
+// 36 upstream GitHub calls in any sliding 60-minute span — a log of call
+// timestamps, not a fixed window — so the cap holds across window boundaries.
+// When it is spent the route serves the stale value or "state not reported" and
+// never lets another reader see a 403.
 const PR_STATE_OPEN_TTL_MS = 15 * 60 * 1000;
 const PR_STATE_CLOSED_TTL_MS = 24 * 60 * 60 * 1000;
 // The per-workspace repo allowlist (a tracker `fetchProjects` read) is held for
@@ -101,6 +103,10 @@ const PR_STATE_CLOSED_TTL_MS = 24 * 60 * 60 * 1000;
 const PR_STATE_ALLOWLIST_TTL_MS = 15 * 60 * 1000;
 const PR_STATE_UPSTREAM_LIMIT = 36;
 const PR_STATE_WINDOW_MS = 60 * 60 * 1000;
+// One `fetchPrStatus` read makes up to this many upstream calls (repo probe,
+// pull, check-runs, commit status). The precheck reserves the whole read so a
+// read that starts is never cut off mid-flight (which would waste its calls).
+const PR_STATE_READ_COST = 4;
 const PR_STATE_BUDGET_EXHAUSTED = 'PR_STATE_BUDGET_EXHAUSTED';
 
 /**
@@ -705,7 +711,7 @@ export function createDashboardRoutes({
   const prStateStore = {
     cache: new Map(),
     allowlistCache: new Map(),
-    bucket: { windowStart: 0, count: 0 },
+    bucket: [], // sliding log of upstream-call timestamps (ms), oldest first
     now: Date.now,
     resolveProvider: (workspace, selector) => resolveIssueBinding(workspace, selector),
     loadRun: defaultLoadRun,
@@ -1469,37 +1475,49 @@ export function createDashboardRoutes({
     return { state: 'unknown', number: ref ? ref.number : null, checks: null, url: ref ? ref.url : null };
   }
 
-  /** Roll the budget window over if the hour has elapsed; returns the bucket. */
-  function prStateBucket(nowMs) {
-    const bucket = prStateStore.bucket;
-    if (nowMs - bucket.windowStart >= PR_STATE_WINDOW_MS) {
-      bucket.windowStart = nowMs;
-      bucket.count = 0;
-    }
-    return bucket;
+  /**
+   * The sliding upstream-call log, pruned to the last 60 minutes. Entries are
+   * timestamps (ms), oldest first, capped at the limit. A log — not a fixed
+   * `{windowStart, count}` window — is what makes the 36 cap hold in ANY
+   * 60-minute span, not just aligned windows.
+   */
+  function prStateBudget(nowMs) {
+    const log = prStateStore.bucket;
+    const cutoff = nowMs - PR_STATE_WINDOW_MS;
+    while (log.length && log[0] <= cutoff) log.shift();
+    return log;
+  }
+
+  /** Upstream calls already made in the trailing 60-minute span. */
+  function prStateBudgetUsed(nowMs) {
+    return prStateBudget(nowMs).length;
   }
 
   /**
    * A fetch wrapper that spends one budget unit per real upstream call and
-   * refuses (rather than overruns) once the hour's 36 are used. The refusal is a
+   * refuses (rather than overruns) once the span's 36 are used. This is the
+   * backstop behind the precheck's whole-read reservation; the refusal is a
    * distinct thrown code the route turns into stale/unknown, never a 403.
    */
   function prStateCountingFetch(fetchImpl) {
     return async (url, opts) => {
-      const bucket = prStateBucket(prStateStore.now());
-      if (bucket.count >= PR_STATE_UPSTREAM_LIMIT) {
+      const now = prStateStore.now();
+      const log = prStateBudget(now);
+      if (log.length >= PR_STATE_UPSTREAM_LIMIT) {
         const err = new Error('run-page PR-state upstream budget exhausted');
         err.code = PR_STATE_BUDGET_EXHAUSTED;
         throw err;
       }
-      bucket.count += 1;
+      log.push(now);
       return fetchImpl(url, opts);
     };
   }
 
   /**
    * The cached read for one resolved PR. On a fresh cache hit nothing upstream
-   * runs. When the budget is spent it serves the last value (or unknown). A
+   * runs. Before starting a read it reserves room for the whole 4-call read in
+   * the trailing 60-minute span; if there is no room it serves the last value
+   * (or unknown) without starting a read that could be cut off mid-flight. A
    * failed read is fail-open: the stale value when there is one, else unknown.
    */
   async function readPrState(ref, nowMs) {
@@ -1508,7 +1526,7 @@ export function createDashboardRoutes({
     if (cached && cached.expiresAt > nowMs) {
       return prStatePayload(cached.value, ref);
     }
-    if (prStateBucket(nowMs).count >= PR_STATE_UPSTREAM_LIMIT) {
+    if (prStateBudgetUsed(nowMs) + PR_STATE_READ_COST > PR_STATE_UPSTREAM_LIMIT) {
       return cached ? prStatePayload(cached.value, ref) : prStateUnknown(ref);
     }
     const fetchImpl = prStateStore.githubFetch || (await createProxyFetch()) || globalThis.fetch;

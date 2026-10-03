@@ -5955,11 +5955,12 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     bucket,
     cache,
     allowlistCache,
-    loadRun
+    loadRun,
+    commentsThrow = false
   } = {}) {
     const counts = { github: 0, fetchProjects: 0, comments: 0 };
     const provider = {
-      async fetchIssueComments() { counts.comments += 1; return comments; },
+      async fetchIssueComments() { counts.comments += 1; if (commentsThrow) throw new Error('tracker read failed'); return comments; },
       async fetchProjects() {
         counts.fetchProjects += 1;
         return { projects: [{ id: 'p1', name: 'P', content: `repo=${repo}` }], issues: [] };
@@ -5970,7 +5971,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
         now,
         cache: cache || new Map(),
         allowlistCache: allowlistCache || new Map(),
-        bucket: bucket || { windowStart: now(), count: 0 },
+        bucket: bucket || [],
         resolveProvider: () => ({ provider, callScope: 'scope' }),
         loadRun: loadRun || (async () => ({ issueIdentifier: 'LIN-1', evidenceUrls: [] })),
         githubFetch: githubStub({ ...github, counts })
@@ -6007,7 +6008,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
 
   test('a merged PR is not re-read within 24 h (injected clock, no sleeps)', async () => {
     let clock = 1_000_000;
-    const bucket = { windowStart: clock, count: 0 };
+    const bucket = [];
     const { router, counts } = makePrStateRouter({
       comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
       github: { state: 'closed', merged: true },
@@ -6027,7 +6028,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
 
   test('with the budget spent, a GET serves the stale value with zero upstream fetches and status 200', async () => {
     let clock = 2_000_000;
-    const bucket = { windowStart: clock, count: 0 };
+    const bucket = [];
     const { router, counts } = makePrStateRouter({
       comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
       github: { state: 'open' },
@@ -6039,7 +6040,8 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     assert.equal(first.jsonBody.state, 'open');
     assert.equal(counts.github, 4);
 
-    bucket.count = 36; // the hour's budget is spent
+    // Spend the trailing 60-minute span's whole 36-call budget.
+    bucket.splice(0, bucket.length, ...Array(36).fill(clock));
     clock += 16 * 60 * 1000; // past the 15 min open TTL, so a refresh would run
     const second = await callPrState(router);
     assert.equal(second.statusCode, 200);
@@ -6050,7 +6052,7 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
   test('budget spent with no stale value returns state not reported, status 200, zero upstream fetches', async () => {
     const nowMs = 3_000_000;
     const allowlistCache = new Map([['ws-a', { value: new Set(['acme/widget']), expiresAt: nowMs + 15 * 60 * 1000 }]]);
-    const bucket = { windowStart: nowMs, count: 36 };
+    const bucket = Array(36).fill(nowMs);
     const { router, counts } = makePrStateRouter({
       now: () => nowMs,
       bucket,
@@ -6066,6 +6068,63 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     assert.equal(res.jsonBody.number, 12);
     assert.equal(counts.github, 0, 'zero upstream GitHub fetches');
     assert.equal(counts.fetchProjects, 0, 'the cached allowlist means no fetchProjects');
+  });
+
+  test('the sliding window holds across a boundary: 36 calls during the hour refuse a t=61min read, but age out by t=120min', async () => {
+    const base = 10_000_000;
+    let clock = base + 61 * 60 * 1000;
+    // 36 calls, one per minute from t=0 to t=35min. At t=61min the recent ones
+    // are still inside the trailing 60 min, so a sliding window still refuses;
+    // a fixed window that started at t=0 would have reset and wrongly allowed.
+    const bucket = Array.from({ length: 36 }, (_, i) => base + i * 60 * 1000);
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' },
+      now: () => clock,
+      bucket
+    });
+
+    const refused = await callPrState(router);
+    assert.equal(refused.statusCode, 200);
+    assert.equal(refused.jsonBody.state, 'unknown', 'no room for the 4-call read → state not reported');
+    assert.equal(counts.github, 0, 'zero upstream fetches at t=61min');
+
+    clock = base + 120 * 60 * 1000; // all 36 calls are now older than 60 min
+    const allowed = await callPrState(router);
+    assert.equal(allowed.statusCode, 200);
+    assert.equal(allowed.jsonBody.state, 'open', 'the aged-out budget permits a fresh read');
+    assert.equal(counts.github, 4, 'the read ran upstream once the window emptied');
+  });
+
+  test('reserving the whole read: 34 calls used leaves no room, so a new read makes zero upstream calls', async () => {
+    const nowMs = 20_000_000;
+    const bucket = Array(34).fill(nowMs);
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' },
+      now: () => nowMs,
+      bucket
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.state, 'unknown');
+    assert.equal(counts.github, 0, '34 + 4 > 36 → the read never starts');
+  });
+
+  test('a tracker read that throws returns 200 unknown, never a 403 (N2)', async () => {
+    const nowMs = 30_000_000;
+    const { router, counts } = makePrStateRouter({
+      commentsThrow: true,
+      github: { state: 'open' },
+      now: () => nowMs
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.statusCode, 200, 'a failed tracker read is not a 403');
+    assert.equal(res.jsonBody.state, 'unknown');
+    assert.equal(res.jsonBody.number, null);
+    assert.equal(counts.github, 0, 'no PR resolved → no GitHub read');
   });
 
   test('a PR URL newly posted on the run is picked up on the next poll (one fetchPrStatus)', async () => {
