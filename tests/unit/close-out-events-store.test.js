@@ -186,6 +186,18 @@ describe('CloseOutEventsStore reads', () => {
     assert.strictEqual(await store.getByPr({ urlKey: 'other', prUrl: PR_URL, headSha: 'abc1234', by: 'person' }), null);
   });
 
+  test('N-f: findAnyByPr stays scoped to the workspace, so a press in one workspace never labels another workspace\'s merge', async () => {
+    // Same repo, same PR URL, different workspace — the two-workspace-same-repo case.
+    await store.record(pressEvent({ urlKey: 'ws-a', headSha: 'aaaaaaa' }));
+    assert.strictEqual(await store.findAnyByPr({ urlKey: 'ws-b', prUrl: PR_URL, by: 'press' }), null);
+    // Positive control: the press is found in its own workspace, at any head.
+    const found = await store.findAnyByPr({ urlKey: 'ws-a', prUrl: PR_URL, by: 'press' });
+    assert.strictEqual(found.urlKey, 'ws-a');
+    assert.strictEqual(found.headSha, 'aaaaaaa');
+    // The `by` filter is part of the key: no person event exists on this head.
+    assert.strictEqual(await store.findAnyByPr({ urlKey: 'ws-a', prUrl: PR_URL, by: 'person' }), null);
+  });
+
   test('listForIssue returns the task\'s events oldest-first', async () => {
     await store.record(pressEvent({ headSha: 'one' }));
     await new Promise(resolve => setTimeout(resolve, 3));
