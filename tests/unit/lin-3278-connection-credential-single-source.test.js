@@ -183,21 +183,22 @@ describe('LIN-3278 — stale Connection mirror vs authoritative owner record', (
     });
   }
 
-  // KNOWN RESIDUAL (documents a gap for a follow-up ticket, not a pass).
+  // B1a — the LIN-3278 residual this ticket closes (LIN-3282 commit 2).
   //
   // When the owner has BOTH a connection-backed session row and a legacy
   // session row for the same urlKey, `selectOwnerSessionRow` can pick the
   // legacy row (it outranks the stripped connection row on the expiry-tier
   // tie-break). `selectIssueBinding` then returns that row's LEGACY binding for
-  // the same (provider, scope), the arm sees a non-connection target and bails
-  // to the legacy scan, which serves the dead scalar; the next request adopts
-  // the healthy record (200) and `accept()` clears the mark, so the strict
-  // `401 200 401 200` alternation persists. Closing this needs the arm to
-  // prefer the owner's Connection over a same-(provider, scope) legacy binding
-  // in the SELECTED owner row — a larger LIN-3241 selection change than this
-  // ticket's credential-source fix, and out of the plan's scope. Observed
-  // `401 200 401 200 401 200 401 200` on the fixed tree (and on HEAD).
-  test('KNOWN RESIDUAL: legacy owner row beats a same-scope healthy Connection', { skip: 'LIN-3278 residual — follow-up: prefer the Connection over a same-(provider,scope) legacy binding in the selected owner row' }, async () => {
+  // the same (provider, scope). Before commit 2 the arm saw a non-connection
+  // target and bailed to the legacy scan, which served the dead scalar; the
+  // next request adopted the healthy record (200) and `accept()` cleared the
+  // mark, so the strict `401 200 401 200` alternation persisted.
+  //
+  // The connection-first fallback at the `:660` guard now derives the desired
+  // `(provider, scope)` from the selected legacy binding, scope-filters the
+  // owner's referent Connections, overlays the authoritative record and serves
+  // it — so every one of the 8 repeated requests is a 200 from the record.
+  test('KNOWN RESIDUAL: legacy owner row beats a same-scope healthy Connection', async () => {
     const w = await world({ mirrorExpiryPast: true, legacyRow: true, legacyOwnerWins: true });
     const statuses = await run(w, { intent: BINDING_INTENT.ISSUE, selector: SEL }, false);
     assertNoSwitch(statuses);
