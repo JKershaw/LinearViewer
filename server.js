@@ -72,6 +72,8 @@ import { createObserverPassRun } from './lib/observer-pass.js'
 import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
+import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
+import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
 import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { RunParagraphStore } from './lib/run-paragraph-store.js'
 import { createRunParagraphPrecompute } from './lib/run-paragraph-hook.js'
@@ -714,6 +716,12 @@ const observerStateStore = new ObserverStateStore({ collection: observerStateCol
 const observerShadowLogCollection = db.collection('observer-shadow-log')
 const observerShadowLogStore = new ObserverShadowLogStore({ collection: observerShadowLogCollection })
 
+// Liveness alarm sink (LIN-3258, M21 option A): one durable row per
+// dispatcher-silent / stopped-or-circular-wait incident. Written ONLY by the
+// `liveness-alarm-sweep` job below and read back through GET /api/proxy/alarms
+// — never an acting path.
+const livenessAlarmStore = new LivenessAlarmStore({ collection: db.collection('liveness-alarms') })
+
 // Deterministic observer sweep (LIN-2131, P1-3): this scheduler's first real
 // consumer (see the `scheduler` construction comment above). `register()` alone
 // arms nothing — `scheduler.start()` below (in the `app.listen` callback) is
@@ -874,6 +882,33 @@ scheduler.register({
 // silent-never-runs state is diagnosable rather than inferred.
 }).catch((err) => {
   console.error(`[pricing-conformance-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// Liveness alarm sweep (LIN-3258, M21 option A): every 10 minutes per
+// workspace with live dispatches. Rule S (dispatcher silent, using the live
+// `getConsumerLastSeenAt` poll recency — NOT the enqueue-stamped
+// `item.consumerLastSeenAt`) and Rule D2 (stopped or circular waits over
+// dispatch rows). ALARM ONLY: it aborts nothing, re-dispatches nothing and
+// messages no agent; the singleton write is its own `liveness-alarms` store.
+const LIVENESS_ALARM_SWEEP_INTERVAL_MS = 10 * 60 * 1000
+const LIVENESS_ALARM_SWEEP_LEASE_MS = 5 * 60 * 1000
+scheduler.register({
+  name: 'liveness-alarm-sweep',
+  intervalMs: LIVENESS_ALARM_SWEEP_INTERVAL_MS,
+  leaseMs: LIVENESS_ALARM_SWEEP_LEASE_MS,
+  run: createLivenessAlarmSweepRun({
+    dispatchStore: dispatchQueueStore,
+    dispatchTokenStore,
+    proxyTokenStore,
+    agentStatusStore,
+    alarmStore: livenessAlarmStore,
+    intervalMs: LIVENESS_ALARM_SWEEP_INTERVAL_MS
+  })
+// Same discipline as the sweeps above: not awaited (a failed seed write must
+// not abort server boot), with a purpose-written catch so a silent-never-runs
+// state is diagnosable rather than inferred.
+}).catch((err) => {
+  console.error(`[liveness-alarm-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
 // =============================================================================
@@ -2883,7 +2918,7 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
   return resolveNorthStarDocVersion(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore }))
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, livenessAlarmStore }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
