@@ -5201,10 +5201,13 @@ describe('finished-task notes ask what their stage does (LIN-3292)', () => {
       assert.match(notes, /back to `implementation` rather than filing it/);
     });
 
-    test(`${label}: a work stage routing sent here fixes what it was sent for`, () => {
+    // Stage-neutral (LIN-3292 review O2): plan-review is write-only and research, scoping
+    // and design build nothing, so the note asks for this stage's part, not a fix.
+    test(`${label}: a work stage routing sent here does its own part for what is missing`, () => {
       for (const kind of WORK_STAGES) {
         const notes = appendGroundingSections('', issue, context, kind);
-        assert.match(notes, /fix that at its cause/, kind);
+        assert.match(notes, /do this stage's part for what is still missing, at its cause/, kind);
+        assert.ok(!/\bfix\b/i.test(notes), `${kind}: not told to fix something its stage may not touch`);
         assert.ok(!/close (it )?out|verdict/i.test(notes), `${kind}: no close-out or verdict ask`);
       }
     });
