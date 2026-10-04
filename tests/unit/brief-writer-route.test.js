@@ -16,6 +16,8 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { setFetchImpl } from '../../lib/openrouter.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
+import { formatStageIntent } from '../../lib/prompts/brief-writer.js';
+import { STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
@@ -93,7 +95,7 @@ describe('the recommend route and the brief writer switch (LIN-3293)', () => {
       const { status, body } = await recommend(buildApp({ briefWriter: false }));
       assert.equal(status, 200, JSON.stringify(body));
       assert.equal(calls.length, 1);
-      assert.ok(body.prompt.startsWith('META BODY' + formatStageContract('review', ISSUE.identifier)));
+      assert.ok(body.prompt.startsWith('META BODY' + formatStageIntent('review') + formatStageContract('review', ISSUE.identifier)));
     } finally {
       guard.restore();
       assert.equal(guard.attempts.length, 0);
@@ -138,7 +140,7 @@ describe('the recommend route and the brief writer switch (LIN-3293)', () => {
       assert.equal(status, 200, JSON.stringify(body));
       assert.deepEqual(calls.map(c => c.isWriter), [false], 'the writer is not started with no time left');
       assert.ok(body.prompt.startsWith('# Review WR-1'));
-      assert.ok(!body.prompt.includes('## Scope and Authority'), 'the unwritten bundle shipped');
+      assert.ok(body.prompt.includes(`## Goal\n${STAGE_LEADS.review}\n\n## Scope and Authority`), 'the unwritten bundle shipped');
       assert.equal(body.prompt.split(formatStageContract('review', ISSUE.identifier)).length, 2);
     } finally {
       Date.now = realNow;

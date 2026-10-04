@@ -119,7 +119,7 @@ const shingles = (t, n = 8) => {
 
 const ROLE = /\bact as\b|\bin the role of\b|\byou are (?:an?|the) (?:(?:senior|expert|experienced|skilled|seasoned|capable)\s+)?(?:[a-z-]+\s+)?(?:agent|engineer|developer|reviewer|architect|expert|assistant|investigator|planner|auditor|colleague)\b/i;
 const WE = /\b(?:we|we're|we've|we'll|let's|our|ours|us)\b/i;
-const LEAK = /\brouter\b|\brules bundle\b|<bundle>|\bthe writer\b|\bstage's shape\b/i;
+const LEAK = /\brouter\b|\brules bundle\b|<bundle>|<lead>|\bthe writer\b|\bstage's (?:shape|lead)\b/i;
 
 /** The bundle Goal the writer reads, and the rest of the stage, for one ticket. */
 function stageParts(kind, issue, context) {

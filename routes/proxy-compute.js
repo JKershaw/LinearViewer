@@ -412,9 +412,10 @@ export function createComputeRoutes({
       }
 
       // The kind-override is a pinned stage: with the workspace's brief writer on
-      // (LIN-3293) the writer rewrites its Goal, its one model call; off, it makes none.
+      // (LIN-3293) the writer rewrites its Goal, its one model call; off, or for a
+      // process-only stage (LIN-3299), it makes none.
       const pinnedWriter = kind !== undefined && !isTestMode
-        ? await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier })
+        ? await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier, kind })
         : null;
       const makesModelCall = kind === undefined || pinnedWriter !== null;
 

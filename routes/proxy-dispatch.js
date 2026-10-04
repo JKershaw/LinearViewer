@@ -929,14 +929,14 @@ export function createDispatchRoutes({
       if (kind !== undefined) {
         // With the workspace's brief writer on (LIN-3293) the pinned stage's Goal is
         // rewritten by the writer, its one model call: charged like the routed arm,
-        // and aborted if the caller hangs up. Off: no model call, and the prompt is
+        // and aborted if the caller hangs up. Off, or a process-only stage (LIN-3299): no model call, and the prompt is
         // generatePrompt's byte for byte. The keepalive and the hang-up check before
         // the enqueue apply either way.
         const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
         const { apiKey: overrideApiKey, isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
         const overrideWriter = isTestMode
           ? null
-          : await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier: overrideIsFreeTier });
+          : await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier: overrideIsFreeTier, kind });
         if (overrideWriter) {
           logOpenRouterCredentialSource(req, '/api/proxy/recommend-and-dispatch', { sessionApiKey: overrideSessionApiKey, isFreeTier: overrideIsFreeTier });
           if (overrideIsFreeTier) {

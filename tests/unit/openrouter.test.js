@@ -35,8 +35,10 @@ import {
   EPIC_CHILD_THRESHOLD,
   COUSIN_CAP,
   SIBLING_CAP,
-  EPIC_TITLE_PATTERN
+  EPIC_TITLE_PATTERN,
+  holdFromGoal
 } from '../../lib/openrouter.js';
+import { formatStageIntent } from '../../lib/prompts/brief-writer.js';
 import { appendGroundingSections } from '../../lib/prompt-formatters.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
@@ -2410,7 +2412,8 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.strictEqual(reasoningDeltas.map(e => e.data.content).join(''), '→ **research**\nLook into it.');
     // The LLM body streams first, then the deterministic grounding post-pass (LIN-435)
     // streams as an additional prompt delta so the leaf view matches the shipped prompt.
-    const grounding = appendGroundingSections('', ISSUE, CONTEXT);
+    // LIN-3299: the stage's Scope and Authority comes first (this body has no Goal, so at its end).
+    const grounding = formatStageIntent('research') + appendGroundingSections('', ISSUE, CONTEXT);
     assert.strictEqual(promptDeltas.map(e => e.data.content).join(''), 'Go research the thing.' + grounding);
 
     // emits a terminal done
@@ -2426,6 +2429,35 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.strictEqual(result.prompt, 'Go research the thing.' + grounding);
     assert.strictEqual(result.truncated, false);
     assert.strictEqual(result.completionTokens, 17);
+  });
+
+  // LIN-3299: code adds Scope and Authority after the generated Goal's lead, in the middle
+  // of a body that streams, and the client only appends. So the body streams live up to
+  // its Goal and the rest goes out with the finish: the deltas still add up to the prompt.
+  test('a body with a Goal streams up to it; the rest, with Scope and Authority after the lead, follows', async () => {
+    const body = '# Plan LIN-1\n\n## Workflow\n\n1. Go\n\n## Goal\n\nWhat it is for.\n\n## Process\n\nThe steps.';
+    const raw = `## Reasoning\n→ **plan**\nReady.\n## Prompt\n${body}`;
+    // Split inside the Goal heading, so a partial heading must wait for the next chunk.
+    const at = raw.indexOf('## Goal') + 4;
+    global.fetch = mock.fn(async () => mockStreamResponse([raw.slice(0, 40), raw.slice(40, at), raw.slice(at, at + 9), raw.slice(at + 9)]));
+    const events = [];
+    const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+    const deltas = events.filter(e => e.type === 'delta' && e.data.section === 'prompt').map(e => e.data.content);
+    assert.strictEqual(deltas.join(''), result.prompt, 'the deltas add up to the prompt that ships');
+    assert.ok(!deltas.slice(0, -1).join('').includes('## Go'), 'nothing from the Goal on streams before the finish');
+    assert.ok(deltas.slice(0, -1).join('').includes('## Workflow'), 'the part before the Goal streams live');
+    const scopeAt = result.prompt.indexOf('## Scope and Authority');
+    assert.ok(result.prompt.indexOf('What it is for.') < scopeAt && scopeAt < result.prompt.indexOf('## Process'));
+    assert.deepStrictEqual(result, applyGroundingToRecommendation(parseRecommendationResponse(raw, 'stop', 42), ISSUE, CONTEXT));
+  });
+
+  test('holdFromGoal: live to the Goal heading, whatever the chunking; a mid-line "## Goal" is text', () => {
+    const run = (chunks) => { const h = holdFromGoal(); return chunks.map(c => h.take(c)).join(''); };
+    assert.strictEqual(run(['a\n## Go', 'al\nlead']), 'a\n');
+    assert.strictEqual(run(['## Goal\nlead']), '');
+    assert.strictEqual(run(['x ## Goal y\n', 'more']), 'x ## Goal y\nmore');
+    assert.strictEqual(run(['a\n##', ' Notes\nb']), 'a\n## Notes\nb');
+    assert.strictEqual(run(['a\nb']), 'a\nb', 'a partial line that cannot become the heading streams');
   });
 
   test('defer-shaped stream returns recommendedAction:defer, deferTo set, prompt:null', async () => {
@@ -2471,7 +2503,7 @@ describe('getRecommendationStream (LIN-346)', () => {
     const events = [];
     const result = await getRecommendationStream(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
     const streamed = events.filter(e => e.type === 'delta' && e.data.section === 'prompt').map(e => e.data.content).join('');
-    const grounding = appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit');
+    const grounding = formatStageIntent('retrospective-audit') + appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit');
     assert.strictEqual(streamed, 'Audit the landed change.' + grounding);
     assert.strictEqual(result.prompt, streamed);
     assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(streamed), 'look-back keeps its brief');
@@ -2484,7 +2516,7 @@ describe('getRecommendationStream (LIN-346)', () => {
       json: async () => ({ choices: [{ message: { content: AUDIT_RAW }, finish_reason: 'stop' }], usage: { completion_tokens: 5 } })
     }));
     const result = await getRecommendation(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' });
-    assert.strictEqual(result.prompt, 'Audit the landed change.' + appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit'));
+    assert.strictEqual(result.prompt, 'Audit the landed change.' + formatStageIntent('retrospective-audit') + appendGroundingSections('', DONE_BUG, WITH_COMMENT, 'retrospective-audit'));
     assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(result.prompt));
   });
 });

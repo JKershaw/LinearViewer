@@ -732,6 +732,46 @@ describe('after the keepalive has flushed', () => {
 
 // ── Writer off: the pinned dispatch is exactly as before ────────────────────
 
+// LIN-3299: a process-only stage is never written, so a pinned one with the switch on is
+// the switch-off path on every surface: no model call, no free-tier charge, and the
+// prompt is generatePrompt's byte for byte. Resolved once, in resolveBriefWriter.
+describe('a pinned process-only stage with the switch on: no writer anywhere', () => {
+  const free = (fn) => withEnv({ OPENROUTER_API_KEY: null, OPENROUTER_FREE_TIER_KEY: 'sk-free' }, fn);
+  const handwritten = (kind) => generatePrompt(kind, LEAF, ctxOf(LEAF), {}, PROVIDER_UI).prompt;
+
+  test('UI stage button', () => free(async () => {
+    const calls = capture();
+    const freeTier = { count: 0, allowed: true };
+    const { status, body, text } = await request(buildUiApp({ features: { briefWriter: true }, sessionKey: null, freeTier }), `/workspace/acme/api/prompt/${LEAF.id}/close-out`);
+    assert.equal(status, 200, text);
+    assert.equal(calls.length, 0);
+    assert.equal(freeTier.count, 0);
+    assert.equal(body.prompt, handwritten('close-out'));
+  }));
+
+  test('proxy GET recommend ?kind=', () => free(async () => {
+    const calls = capture();
+    const freeTier = { count: 0, allowed: true };
+    const { status, body, text } = await request(buildProxyApp({ features: { briefWriter: true }, openRouterKey: null, freeTier }), `/api/proxy/issues/${LEAF.id}/recommend?kind=triage`);
+    assert.equal(status, 200, text);
+    assert.equal(calls.length, 0);
+    assert.equal(freeTier.count, 0);
+    assert.equal(body.prompt, handwritten('triage'));
+  }));
+
+  test('recommend-and-dispatch with kind', () => free(async () => {
+    const calls = capture();
+    const freeTier = { count: 0, allowed: true };
+    let stored = null;
+    const app = buildProxyApp({ features: { briefWriter: true }, openRouterKey: null, freeTier, addItem: async (urlKey, item) => { stored = item; return { _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }; } });
+    const { status, text } = await request(app, '/api/proxy/recommend-and-dispatch', { method: 'POST', body: { issueIdentifier: LEAF.identifier, kind: 'breakdown', appendProxyContext: false } });
+    assert.equal(status, 201, text);
+    assert.equal(calls.length, 0);
+    assert.equal(freeTier.count, 0);
+    assert.equal(stored.prompt, handwritten('breakdown'));
+  }));
+});
+
 describe('recommend-and-dispatch with kind, writer off', () => {
   test('201, no model call, no charge, and the stored prompt is generatePrompt byte for byte', async () => {
     await withEnv({ OPENROUTER_API_KEY: null, OPENROUTER_FREE_TIER_KEY: 'sk-free' }, async () => {

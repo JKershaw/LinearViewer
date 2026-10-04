@@ -55,38 +55,44 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 128366, // LIN-3293: review files nothing (close-out owns filing), no category list for "large", no checklist or hand-off restating other sections
-  'lib/prompt-templates.js': 20495, // LIN-3292: deriveDispatchKind reads "close out" as close-out; +91, paid by review's LIN-3293 cuts
-  'lib/prompt-formatters.js': 52883, // LIN-3292: the finished-task ask is stage-neutral, its comment shorter
+  'lib/prompt-template-defs.js': 127237, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority
+  'lib/prompt-templates.js': 20707, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority
+  'lib/prompt-formatters.js': 52917, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3481,
 };
 
 /** Templates, rendered bytes for each PROMPT_TEMPLATES key under FIXTURE_ISSUE +
- * FIXTURE_CONTEXT below. The key set is asserted to match the live registry. */
+ * FIXTURE_CONTEXT below. The key set is asserted to match the live registry.
+ * LIN-3299: every stage gains a `## Process` heading and the reworded hypothesis sentence,
+ * and its role line became its lead; the rises (+468 over twelve stages) are paid by the
+ * writer's ideals and unwritten stages' scope lines leaving lib/prompts/brief-writer.js.
+ * Then every stage gains its Scope and Authority on every path (+4606 over seventeen
+ * stages, net of leads that no longer repeat it), paid from the 4813 bytes left
+ * unallocated under FROZEN_TOTAL_BYTES, 4485 of them freed by LIN-3299 itself. */
 export const TEMPLATES_RENDERED_CEILINGS = {
-  blocked: 2990,
-  bug: 4362,
-  plan: 15433, // LIN-3292: plan, implementation and review carry the stage contract, paid by triage, plan-review and close-out
-  'look-into': 1645,
-  triage: 2499,
-  breakdown: 4637,
-  research: 11070,
-  scoping: 2047,
-  design: 2277, // LIN-3296: design and spike rewritten as briefs, paid by implementation and close-out's LIN-3291 trims
-  spike: 2190,
-  context: 1892,
-  'plan-review': 7704,
-  implementation: 7574,
-  review: 18432, // LIN-3293: as its source, above
-  'close-out': 18455,
-  'retrospective-audit': 4143,
-  retro: 4114,
+  blocked: 3244,
+  bug: 4744,
+  plan: 15960,
+  'look-into': 1762,
+  triage: 2429,
+  breakdown: 5096,
+  research: 11514,
+  scoping: 2362,
+  design: 2562,
+  spike: 2581,
+  context: 1972,
+  'plan-review': 7955,
+  implementation: 7841,
+  review: 18846,
+  'close-out': 18752,
+  'retrospective-audit': 4427,
+  retro: 4265,
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 106015; // LIN-3292: the routing-only switches, from the unallocated total; LIN-3293: review's filing check (5b) gone
+export const META_PROMPT_SOURCE_CEILING = 105791; // LIN-3299: the skeleton's Goal asks for a lead and a Process, no role; plan-review's verify-not-redesign is code's
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 103532;
+export const META_PROMPT_RENDERED_CEILING = 103308;
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
@@ -97,8 +103,12 @@ export const META_PROMPT_RENDERED_CEILING = 103532;
  * fixes (the safety floors review and close-out rest on, owned by code; two cause lines;
  * a writer brief that names code's sections instead of showing their text), paid by the
  * template, meta and formatter cuts in the same change (2109 bytes moved, 2239 freed).
+ * LIN-3299: -4276. The stage ideals merged into the templates' leads, and the stages the
+ * writer no longer writes lost their scope lines (close-out's floors stay in its template).
+ * Then +398: every stage's scope lines again, now added on every path (withStageIntent),
+ * less review's floors, which its process already states.
  */
-export const BRIEF_WRITER_SOURCE_CEILING = 8657;
+export const BRIEF_WRITER_SOURCE_CEILING = 4779;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
