@@ -61,7 +61,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 124995, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority
+  'lib/prompt-template-defs.js': 125596, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority. LIN-3300: +601, six stage rules moved in from the deleted meta-prompt
   'lib/prompt-templates.js': 20390, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3424,
@@ -74,22 +74,25 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * writer's ideals and unwritten stages' scope lines leaving lib/prompts/brief-writer.js.
  * Then every stage gains its Scope and Authority on every path (+4606 over seventeen
  * stages, net of leads that no longer repeat it), paid from the 4813 bytes left
- * unallocated under FROZEN_TOTAL_BYTES, 4485 of them freed by LIN-3299 itself. */
+ * unallocated under FROZEN_TOTAL_BYTES, 4485 of them freed by LIN-3299 itself.
+ * LIN-3300: implementation, plan, review, scoping and context each gained a rule that
+ * existed only in the deleted meta-prompt (+359 rendered), paid from its ceilings;
+ * close-out's bug-label line renders only for a bug-labelled task, so not here. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 3244,
   bug: 4744,
-  plan: 15921,
+  plan: 16021,
   'look-into': 1762,
   triage: 2429,
   breakdown: 5096,
   research: 11514,
-  scoping: 2362,
+  scoping: 2427,
   design: 2562,
   spike: 2581,
-  context: 1972,
+  context: 2021,
   'plan-review': 7955,
-  implementation: 7841,
-  review: 18846,
+  implementation: 7937,
+  review: 18895,
   'close-out': 18752,
   'retrospective-audit': 4427,
   retro: 4265,
@@ -131,9 +134,10 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * LIN-3304 raised it by 6990 (568534 -> 575524) when lib/stage-router.js joined the
  * frozen surfaces. LIN-3300 lowered it to the sum of the ceilings above, each at its
  * actual size, once the meta-prompt template and the brief writer's prompt were deleted
- * (575524 before), so there is no slack.
+ * (575524 before), so there is no slack. That includes +960 for the six stage rules
+ * the meta-prompt alone carried, moved into their templates in the same change.
  */
-export const FROZEN_TOTAL_BYTES = 436805;
+export const FROZEN_TOTAL_BYTES = 437765;
 
 const BASE_URL = 'https://harbour.example';
 

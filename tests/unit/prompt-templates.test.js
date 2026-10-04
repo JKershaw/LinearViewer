@@ -4778,3 +4778,53 @@ describe('the Goal lead and the Process (LIN-3299)', () => {
   });
 
 });
+
+// =============================================================================
+// LIN-3300: the stage rules that lived only in the deleted meta-prompt's writing
+// blocks, moved into the template of the stage they govern. Prompt-writing rules
+// (prompt sizing, skeleton, comment-vs-description guidance) were dropped, not moved.
+// =============================================================================
+describe('stage rules moved from the deleted meta-prompt (LIN-3300)', () => {
+  const issue = {
+    id: 'issue-m', identifier: 'LIN-3300', title: 'Moved-rules fixture', description: 'd',
+    url: 'https://linear.app/test/issue/LIN-3300', createdAt: '2026-03-01T00:00:00.000Z',
+    state: { name: 'In Progress', type: 'started' }, labels: []
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+  const prompt = (kind) => generatePrompt(kind, issue, context).prompt;
+
+  test('implementation tests for unintended side effects, not only intended ones', () => {
+    assert.match(prompt('implementation'), /cover intended effects, unintended side effects, and any interactions the plan flagged/);
+  });
+
+  test('implementation finds a shared system\'s dependents before changing it', () => {
+    assert.match(prompt('implementation'), /Before changing a shared system, find its dependents in the codebase\./);
+  });
+
+  test('plan states how requirements that share a path, state or interface are expected to interact', () => {
+    assert.match(prompt('plan'), /Where requirements share a code path, state, or interface, state how they are expected to interact\./);
+  });
+
+  test('review verifies a visual or behavioural change by running it', () => {
+    assert.match(prompt('review'), /verify the result directly where possible \(run the app, take screenshots, check viewports\)/);
+  });
+
+  test('scoping says when the ticket is aimed at a symptom', () => {
+    const p = prompt('scoping');
+    assert.match(p, /If the ticket is aimed at a symptom of something deeper, say so\./);
+    assert.ok(p.indexOf('aimed at a symptom') > p.indexOf('## Process'), 'in the process, not the lead');
+  });
+
+  test('context says how done work is known and which decisions were overturned', () => {
+    const p = prompt('context');
+    assert.match(p, /\*\*Completed\*\*: What's already done, and how that is known/);
+    assert.match(p, /\*\*Key Decisions\*\*: Important choices made, and any since overturned/);
+  });
+
+  test('close-out of a bug-labelled task keeps the bug label when it sets Done; other tasks are not told', () => {
+    const rule = 'Leave the `bug` label in place: Done marks it resolved';
+    const bug = generatePrompt('close-out', { ...issue, labels: ['Bug'] }, context).prompt;
+    assert.ok(bug.includes(`set the task to Done. ${rule}`), 'beside the Done transition');
+    assert.ok(!prompt('close-out').includes(rule));
+  });
+});
