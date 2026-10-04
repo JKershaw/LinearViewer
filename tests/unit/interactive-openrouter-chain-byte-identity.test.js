@@ -145,7 +145,7 @@ const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 const expectedGateCalls = {
   'routes/next-run.js': 1,
   'routes/ship-biscuit.js': 1,
-  'routes/workspace-api.js': 7, // + the stage button's brief writer (LIN-3293)
+  'routes/workspace-api.js': 6,
   'routes/dashboard.js': 2,
   'routes/workspace-api-roadmap.js': 1,
   'routes/flight-companion.js': 2,
@@ -186,10 +186,10 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.equal(roadmapCallCount, 2, 'routes/workspace-api-roadmap.js should call resolveChatCredential exactly TWICE — roadmap-chat (LIN-2970) and roadmap-generate/resolveRoadmapLLM (LIN-2978, credential only; chargeRoadmapLayer stays its own per-layer charge, outside this module)');
   });
 
-  test('routes/workspace-api.js: resolveChatCredential is called exactly 9 times, and the old duplicated ternary shape is gone entirely (LIN-2978, LIN-3238, LIN-3293)', () => {
+  test('routes/workspace-api.js: resolveChatCredential is called exactly 8 times, and the old duplicated ternary shape is gone entirely (LIN-2978, LIN-3238)', () => {
     const src = read('routes/workspace-api.js');
     const callCount = (src.match(/resolveChatCredential\s*\(/g) || []).length;
-    assert.equal(callCount, 9, `expected exactly 9 resolveChatCredential calls in routes/workspace-api.js (the seven full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire, and the stage button's brief writer (LIN-3293) — plus the credential-only feedback-title site, plus the LIN-3238 feedback dispatch-point re-derivation for the free-tier run gate), found ${callCount}`);
+    assert.equal(callCount, 8, `expected exactly 8 resolveChatCredential calls in routes/workspace-api.js (the six full-adopt sites — recommend/recommend-stream/recap/brief/scan/scan-retire — plus the credential-only feedback-title site, plus the LIN-3238 feedback dispatch-point re-derivation for the free-tier run gate), found ${callCount}`);
     assert.doesNotMatch(src, /apiKeyToUse = sessionApiKey \|\| \(isFreeTier \? freeTierKey : undefined\)/, 'the old per-site duplicated ternary must be gone — resolveChatCredential now supplies apiKeyToUse directly at each site');
   });
 

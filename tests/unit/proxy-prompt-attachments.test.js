@@ -3,8 +3,8 @@
  * forward `context.attachments` into generatePrompt so the worker-facing
  * `## Attachments` section is surfaced.
  *
- * The library seam (generatePrompt → formatAttachmentsSection) and its both-paths
- * parity are unit-tested elsewhere (prompt-templates / prompt-formatters). The gap
+ * The library seam (generatePrompt → formatAttachmentsSection) and its parity with
+ * the routing prompt are unit-tested elsewhere (prompt-templates / prompt-formatters). The gap
  * this file closes is the ROUTE WIRING: two handlers rebuilt a smaller context
  * object that dropped `attachments`, so the section silently vanished even though
  * fetchIssueContext (LIN-772) carries it. These tests drive

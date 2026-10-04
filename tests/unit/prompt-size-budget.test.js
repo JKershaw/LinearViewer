@@ -2,7 +2,7 @@
  * Byte budget guard for the prompt surfaces (LIN-3203).
  *
  * Prompt text is carried context: every session that reads a template, the
- * meta-prompt or the served runner prompt pays for it in full, across the whole
+ * routing prompt or the served runner prompt pays for it in full, across the whole
  * leg. Additions to the process have outnumbered removals about six to one, and
  * rule text is a small slice of the cost — the ratchet is what makes the rules
  * expensive. This guard freezes each prompt surface at the byte size it had when
@@ -25,17 +25,20 @@
  *   - Templates rendered: generatePrompt() for each PROMPT_TEMPLATES key under one
  *                         fixed fixture (composed output, catches leaks through a
  *                         source the frozen file does not itself contain)
- *   - Meta-prompt       : lib/prompts/meta-prompt-template.js, source + rendered
- *                         with the same leaf fixture the baseline snapshot uses
- *   - Stage router      : lib/stage-router.js, source (LIN-3304) — the routing
- *                         sections and parse the meta call's next-stage choice uses,
- *                         given their own ceiling when they got their own home
- *   - Brief writer      : lib/prompts/brief-writer.js, source (LIN-3293)
+ *   - Stage router      : lib/stage-router.js, source (LIN-3304) + the routing prompt
+ *                         rendered with the leaf fixture the eval baseline uses — the
+ *                         one prompt a recommendation call sends (LIN-3300)
+ *   - Stage intent      : lib/prompts/stage-intent.js, source — every stage's Scope
+ *                         and Authority lines (was lib/prompts/brief-writer.js)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
  *
- * The existing `meta-prompt.baseline.txt` byte-identity guard in
- * rulings-resolution-contract-drift.test.js stays as is: that pins the rendered
- * text, this pins its size. A shrink must still regenerate that baseline.
+ * LIN-3300 deleted the meta-prompt template (its source and rendered ceilings went
+ * with it) and the brief writer's prompt; the writer's ceiling moved with the scope
+ * lines it kept to lib/prompts/stage-intent.js. Every ceiling was then lowered to its
+ * actual size and the total to their sum. The router's byte snapshots
+ * (stage-router-prompt-snapshots.test.js) and the `meta-prompt.baseline.txt` guard in
+ * rulings-resolution-contract-drift.test.js pin the rendered routing text; this pins
+ * its size.
  *
  * Run with: node --test tests/unit/prompt-size-budget.test.js
  */
@@ -45,7 +48,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { PROMPT_TEMPLATES, generatePrompt, formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 
@@ -58,10 +61,10 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 127237, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority
-  'lib/prompt-templates.js': 20707, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority
-  'lib/prompt-formatters.js': 52917, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
-  'lib/prompt-contract.js': 3481,
+  'lib/prompt-template-defs.js': 125596, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority. LIN-3300: +601, six stage rules moved in from the deleted meta-prompt
+  'lib/prompt-templates.js': 20390, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority
+  'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
+  'lib/prompt-contract.js': 3424,
 };
 
 /** Templates, rendered bytes for each PROMPT_TEMPLATES key under FIXTURE_ISSUE +
@@ -71,57 +74,51 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * writer's ideals and unwritten stages' scope lines leaving lib/prompts/brief-writer.js.
  * Then every stage gains its Scope and Authority on every path (+4606 over seventeen
  * stages, net of leads that no longer repeat it), paid from the 4813 bytes left
- * unallocated under FROZEN_TOTAL_BYTES, 4485 of them freed by LIN-3299 itself. */
+ * unallocated under FROZEN_TOTAL_BYTES, 4485 of them freed by LIN-3299 itself.
+ * LIN-3300: implementation, plan, review, scoping and context each gained a rule that
+ * existed only in the deleted meta-prompt (+359 rendered), paid from its ceilings;
+ * close-out's bug-label line renders only for a bug-labelled task, so not here. */
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 3244,
   bug: 4744,
-  plan: 15960,
+  plan: 16021,
   'look-into': 1762,
   triage: 2429,
   breakdown: 5096,
   research: 11514,
-  scoping: 2362,
+  scoping: 2427,
   design: 2562,
   spike: 2581,
-  context: 1972,
+  context: 2021,
   'plan-review': 7955,
-  implementation: 7841,
-  review: 18846,
+  implementation: 7937,
+  review: 18895,
   'close-out': 18752,
   'retrospective-audit': 4427,
   retro: 4265,
 };
 
-/** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 67740; // LIN-3304: -38051, the routing fragments moved into lib/stage-router.js; every byte is now owned once, there is no stale slack
-/** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 103308;
+/**
+ * The stage router's source bytes (lib/stage-router.js, LIN-3304): the routing
+ * fragments and the reply parse. LIN-3300 lowered it to size after its comments stopped
+ * describing a second path.
+ */
+export const STAGE_ROUTER_SOURCE_CEILING = 44667;
+/**
+ * The routing prompt, rendered bytes under ROUTER_PROMPT_ARGS (the eval baseline's leaf
+ * fixture). LIN-3300: replaces the meta-prompt's rendered ceiling (103308) as the measure
+ * of what a recommendation call sends; it is what that ceiling's routing half rendered
+ * to, now the whole call. It also catches growth in the aiHints and completion signals
+ * the prompt interpolates.
+ */
+export const ROUTER_PROMPT_RENDERED_CEILING = 40687;
 
 /**
- * The stage router's source bytes (lib/stage-router.js, LIN-3304). This surface
- * gets its own ceiling now that the routing fragments (moved out of the meta
- * template) and the reply parse (moved out of the unfrozen openrouter.js) live here.
- * The bytes are not new prompt text: they are the routing half the meta source already
- * carried, plus the parse that was never frozen. Its own ceiling is what keeps the
- * routing half from growing silently inside the meta-prompt's old slack.
+ * Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js).
+ * LIN-3300: the file was lib/prompts/brief-writer.js (ceiling 4779); the writer's prompt
+ * left with the writer, and the ceiling moved with the lines that stayed.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 45728;
-
-/**
- * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
- * brief and every stage's ideal shape. New prompt text, paid by removing restated rules from
- * review and close-out (both paths), lowering every slack ceiling to its size, and the
- * unallocated remainder of the total. It renders only around a bundle the template
- * ceilings already measure, so it carries a source ceiling alone. +2018 for the review
- * fixes (the safety floors review and close-out rest on, owned by code; two cause lines;
- * a writer brief that names code's sections instead of showing their text), paid by the
- * template, meta and formatter cuts in the same change (2109 bytes moved, 2239 freed).
- * LIN-3299: -4276. The stage ideals merged into the templates' leads, and the stages the
- * writer no longer writes lost their scope lines (close-out's floors stay in its template).
- * Then +398: every stage's scope lines again, now added on every path (withStageIntent),
- * less review's floors, which its process already states.
- */
-export const BRIEF_WRITER_SOURCE_CEILING = 4779;
+export const STAGE_INTENT_SOURCE_CEILING = 2830;
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
@@ -135,12 +132,12 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * reviewed rather than assumed.
  *
  * LIN-3304 raised it by 6990 (568534 -> 575524) when lib/stage-router.js joined the
- * frozen surfaces. The meta-prompt's ceiling fell by 38051 as its routing fragments
- * moved out; the net increase is the reply-parse code that moved in from
- * lib/openrouter.js, which was never a frozen surface, plus the seam's docs. The sum
- * still equals the total, so there is no new slack.
+ * frozen surfaces. LIN-3300 lowered it to the sum of the ceilings above, each at its
+ * actual size, once the meta-prompt template and the brief writer's prompt were deleted
+ * (575524 before), so there is no slack. That includes +960 for the six stage rules
+ * the meta-prompt alone carried, moved into their templates in the same change.
  */
-export const FROZEN_TOTAL_BYTES = 575524;
+export const FROZEN_TOTAL_BYTES = 437765;
 
 const BASE_URL = 'https://harbour.example';
 
@@ -173,8 +170,8 @@ const FIXTURE_CONTEXT = {
 
 // The leaf fixture the baseline snapshot (scripts/eval/regen-baseline.mjs) uses,
 // with {{ISSUE_CONTEXT}}/{{IDENTIFIER}} left as placeholders. Rendered this is
-// byte-identical to scripts/eval/meta-prompt.baseline.txt at the freeze.
-const META_PROMPT_ARGS = {
+// byte-identical to scripts/eval/meta-prompt.baseline.txt.
+const ROUTER_PROMPT_ARGS = {
   issueContext: '{{ISSUE_CONTEXT}}',
   identifier: '{{IDENTIFIER}}',
   hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
@@ -212,21 +209,6 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `land the lesson as code or a test; raising a number alone is not the fix.`);
   });
 
-  test('meta-prompt source bytes', () => {
-    const actual = sourceBytes('lib/prompts/meta-prompt-template.js');
-    assert.ok(actual <= META_PROMPT_SOURCE_CEILING,
-      `lib/prompts/meta-prompt-template.js is ${actual} bytes, ${actual - META_PROMPT_SOURCE_CEILING} over its ` +
-      `${META_PROMPT_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - META_PROMPT_SOURCE_CEILING} bytes ` +
-      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
-  });
-
-  test('meta-prompt rendered bytes', () => {
-    const actual = Buffer.byteLength(buildMetaPromptTemplate(META_PROMPT_ARGS));
-    assert.ok(actual <= META_PROMPT_RENDERED_CEILING,
-      `The meta-prompt renders to ${actual} bytes, ${actual - META_PROMPT_RENDERED_CEILING} over its ` +
-      `${META_PROMPT_RENDERED_CEILING}-byte ceiling. Remove at least ${actual - META_PROMPT_RENDERED_CEILING} ` +
-      `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
-  });
 
   test('stage router source bytes', () => {
     const actual = sourceBytes('lib/stage-router.js');
@@ -236,11 +218,19 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
   });
 
-  test('brief writer source bytes', () => {
-    const actual = sourceBytes('lib/prompts/brief-writer.js');
-    assert.ok(actual <= BRIEF_WRITER_SOURCE_CEILING,
-      `lib/prompts/brief-writer.js is ${actual} bytes, ${actual - BRIEF_WRITER_SOURCE_CEILING} over its ` +
-      `${BRIEF_WRITER_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - BRIEF_WRITER_SOURCE_CEILING} bytes ` +
+  test('routing prompt rendered bytes', () => {
+    const actual = Buffer.byteLength(buildRouterPrompt(ROUTER_PROMPT_ARGS));
+    assert.ok(actual <= ROUTER_PROMPT_RENDERED_CEILING,
+      `The routing prompt renders to ${actual} bytes, ${actual - ROUTER_PROMPT_RENDERED_CEILING} over its ` +
+      `${ROUTER_PROMPT_RENDERED_CEILING}-byte ceiling. Remove at least ${actual - ROUTER_PROMPT_RENDERED_CEILING} ` +
+      `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+  });
+
+  test('stage intent source bytes', () => {
+    const actual = sourceBytes('lib/prompts/stage-intent.js');
+    assert.ok(actual <= STAGE_INTENT_SOURCE_CEILING,
+      `lib/prompts/stage-intent.js is ${actual} bytes, ${actual - STAGE_INTENT_SOURCE_CEILING} over its ` +
+      `${STAGE_INTENT_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - STAGE_INTENT_SOURCE_CEILING} bytes ` +
       `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
   });
 
@@ -275,10 +265,9 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
     const ceilingSum = [
       ...Object.values(TEMPLATES_SOURCE_CEILINGS),
       ...Object.values(TEMPLATES_RENDERED_CEILINGS),
-      META_PROMPT_SOURCE_CEILING,
-      META_PROMPT_RENDERED_CEILING,
       STAGE_ROUTER_SOURCE_CEILING,
-      BRIEF_WRITER_SOURCE_CEILING,
+      ROUTER_PROMPT_RENDERED_CEILING,
+      STAGE_INTENT_SOURCE_CEILING,
       RUNNER_PROMPT_SOURCE_CEILING,
       RUNNER_PROMPT_RENDERED_CEILING,
     ].reduce((sum, n) => sum + n, 0);

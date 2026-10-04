@@ -14,7 +14,7 @@ prompt; this doc is how we got from finding → shipped-and-measured change.
 ## The loop
 
 ```
-retro finding ──▶ does this live in our own tooling? ──▶ change BOTH prompt paths
+retro finding ──▶ does this live in our own tooling? ──▶ change the stage template
       ▲                                                          │
       │                                                          ▼
    re-measure ◀── behavioral A/B eval ◀── structural tests ◀── guard against overfitting
@@ -29,16 +29,19 @@ wasn't just a LIN-295 mistake, it was a gap in the plan template. The highest-va
 retro outcomes are the ones you can push upstream into the prompts so the whole
 fleet benefits, not just the next person who reads the ticket.
 
-### 2. Change both prompt paths
+### 2. Change the stage template (one path)
 
-Per `docs/architecture/prompt-system.md`, prompt behavior lives in two places and both must change together:
+Per `docs/architecture/prompt-system.md`, every recommendation takes one path since
+LIN-3300: a routing call picks the stage and code assembles its prompt, so a stage's
+behavior lives in one place:
 
-- **Handwritten**: `lib/prompt-template-defs.js` (+ shared blocks in
-  `lib/prompt-formatters.js`), assembled by `generatePrompt()`.
-- **AI-generated**: `lib/prompts/meta-prompt-template.js` (the meta-prompt's
-  quality rules), consumed via `lib/openrouter.js`.
+- **Stage rules**: `lib/prompt-template-defs.js` (+ shared blocks in
+  `lib/prompt-formatters.js`, the contract in `lib/prompt-contract.js`, the scope
+  lines in `lib/prompts/stage-intent.js`), assembled by `generatePrompt()`.
+- **Routing** (which stage comes next, not what it says): `lib/stage-router.js`,
+  sent via `lib/openrouter.js`. Change it only for a routing finding.
 
-A change in only one path silently diverges the two.
+There is no model-written prompt to mirror a rule into.
 
 ### 3. Guard the wording against overfitting
 
@@ -57,10 +60,11 @@ useless for a backend ticket. Generalize:
 
 ### 4. Add structural tests (cheap, deterministic)
 
-Assert the directive is present, and ordered correctly, in **both** paths. These
-catch regressions and accidental divergence but prove nothing about behavior — see
-`tests/unit/prompt-templates.test.js` (handwritten) and the
-`buildMetaPromptTemplate` assertions in `tests/unit/openrouter.test.js` (meta).
+Assert the directive is present, and ordered correctly, in the stage prompt. These
+catch regressions but prove nothing about behavior — see
+`tests/unit/prompt-templates.test.js` (stage templates) and, for a routing change,
+the `buildRouterPrompt` assertions in `tests/unit/openrouter.test.js` and the byte
+snapshots in `tests/fixtures/stage-router-prompts/`.
 
 ### 5. Measure behavioral impact (an offline A/B eval)
 

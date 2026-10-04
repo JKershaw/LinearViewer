@@ -1,10 +1,10 @@
 /**
  * LIN-3304: the next-stage choice has its own seam (lib/stage-router.js).
  *
- * This is the routing eval arm the ticket asks for, pinned at the seam: it proves
- * the router prompt the writer-on live path sends is byte-identical to the routing
- * half the full template composes, and that the routing reply is parsed into the
- * stage decision by one owner. LIN-3309 fixed the two defects this seam pinned as
+ * This is the routing eval arm the ticket asks for, pinned at the seam: the router
+ * prompt (since LIN-3300 the only prompt a recommendation call sends; its bytes are
+ * pinned by stage-router-prompt-snapshots.test.js) is its fragments in order, and the
+ * routing reply is parsed into the stage decision by one owner. LIN-3309 fixed the two defects this seam pinned as
  * PRESENT (`**Reasoning**` streaming, an out-of-list `retro`), so those pins moved.
  *
  * Run with: node --test tests/unit/stage-router.test.js
@@ -19,8 +19,6 @@ import {
   parseRecommendedAction,
   parseDeferTo
 } from '../../lib/stage-router.js';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
-import { parseRecommendationResponse } from '../../lib/openrouter.js';
 
 const ARGS = {
   issueContext: 'CTX', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0,
@@ -38,27 +36,17 @@ const NODE_ARGS = {
 };
 
 describe('stage-router: one owner for the next-stage choice (LIN-3304)', () => {
-  test('the router prompt is byte-identical to the routing half the full template composes', () => {
-    // A non-Linear provider must be in the set: the capability pass renames the
-    // tracker on both paths, and skipping it in buildRouterPrompt (review finding 1)
-    // only shows up off the default provider.
-    const github = { ...ARGS, featureFlags: { linearMcp: false }, providerUi: { displayName: 'GitHub Issues' } };
-    for (const args of [ARGS, NODE_ARGS, { ...NODE_ARGS, isTerminal: true }, github]) {
-      assert.equal(
-        buildRouterPrompt(args),
-        buildMetaPromptTemplate({ ...args, routingOnly: true }),
-        `routing-only output must match the seam for ${args.identifier}`
-      );
+  test('the router prompt is every fragment, in order, nothing else (Linear: the capability pass is a no-op)', () => {
+    for (const args of [ARGS, NODE_ARGS, { ...NODE_ARGS, isTerminal: true }]) {
+      assert.equal(buildRouterPrompt(args), Object.values(routerFragments(args)).join(''), args.identifier);
     }
   });
 
-  test('the full template still composes every router fragment (nothing dropped in the move)', () => {
-    const full = buildMetaPromptTemplate(ARGS);
-    const f = routerFragments(ARGS);
-    for (const [name, text] of Object.entries(f)) {
-      if (name === 'trailing') continue;
-      assert.ok(full.includes(text), `the full prompt still carries the ${name} fragment exactly`);
-    }
+  test('a non-Linear provider gets the capability pass (review finding 1)', () => {
+    const github = { ...ARGS, featureFlags: { linearMcp: false }, providerUi: { displayName: 'GitHub Issues' } };
+    const prompt = buildRouterPrompt(github);
+    assert.ok(!/\bLinear\b/.test(prompt));
+    assert.ok(prompt.includes('on a GitHub Issues task.'));
   });
 
   test('routeStage reads the chosen stage, its kind and its contract lines', () => {
@@ -94,20 +82,10 @@ describe('stage-router: one owner for the next-stage choice (LIN-3304)', () => {
     assert.equal(parseRecommendedAction('## Reasoning\n→ **retro**'), 'retro');
   });
 
-  test('the full-mode parse is unchanged: it still requires a ## Prompt body', () => {
-    const reply = '## Reasoning\n→ **plan**\n**Next:** review';
-    assert.throws(() => parseRecommendationResponse(reply, 'stop', 3), /missing ## Reasoning or ## Prompt/);
-    const parsed = parseRecommendationResponse(reply + '\n## Prompt\nBODY', 'stop', 3);
-    assert.equal(parsed.prompt, 'BODY');
-    assert.equal(parsed.recommendedAction, 'plan');
-  });
-
-  test('parseRecommendationResponse routing mode delegates to the seam (same decision, legacy shape)', () => {
-    const reply = '## Reasoning\n→ **plan**\n**Next:** review';
-    const viaSeam = routeStage(reply, 'stop', 3);
-    const legacy = parseRecommendationResponse(reply, 'stop', 3, { routingOnly: true });
-    assert.equal(legacy.recommendedAction, viaSeam.action);
-    assert.equal(legacy.prompt, null);
+  test('a `## Prompt` section a model adds anyway is not part of the reasoning', () => {
+    const d = routeStage('## Reasoning\n→ **plan**\n**Next:** review\n## Prompt\nBODY', 'stop', 3);
+    assert.equal(d.action, 'plan');
+    assert.ok(!d.reasoning.includes('BODY'));
   });
 
   test('parseRouteDecision and routeStage are the same owner', () => {

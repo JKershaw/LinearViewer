@@ -44,19 +44,19 @@ Each template receives rich context from Linear (parent task, siblings, children
 
 Formatting helpers in `lib/prompt-formatters.js` produce consistent sections across templates: git workflow instructions, self-review checklists, CI/CD checks, subtask summaries.
 
-#### Path B: AI-Generated Recommendations
+#### Path B: AI Recommendations (routing)
 
-An LLM (via OpenRouter) receives a **meta-prompt** (`lib/prompts/meta-prompt-template.js`) that encodes a decision tree:
+Since LIN-3300 this is the one path for every recommendation: an LLM (via OpenRouter) picks the stage, and Path A's template for that stage assembles the prompt. The LLM receives a **routing prompt** (`lib/stage-router.js`) that encodes a decision tree:
 
 1. Does the task need preparation/research?
 2. Are there blockers or bugs?
 3. Is planning needed, or is it ready for implementation?
 
-The meta-prompt includes all 14 template definitions (with `aiHint` metadata: situation, goal, workflow) so the LLM can select the most appropriate one and generate a tailored prompt.
+The routing prompt includes every recommendable template's `aiHint` metadata (situation, goal, workflow) so the LLM can select the most appropriate one; it writes no prompt.
 
-**Two-tier context mode** (for parent tasks with subtasks): the meta-prompt receives both a parent overview (all subtasks at a glance) and focused context for the recommended next subtask.
+**Two-tier context mode** (for parent tasks with subtasks): the routing prompt receives both a parent overview (all subtasks at a glance) and focused context for the recommended next subtask.
 
-**Delivery**: Non-streaming (`/api/recommend/:issueId`) or SSE streaming (`/api/recommend/:issueId/stream`) with a `StreamingSectionParser` that handles `## Reasoning` / `## Prompt` section boundaries across chunk splits.
+**Delivery**: Non-streaming (`/api/recommend/:issueId`) or SSE streaming (`/api/recommend/:issueId/stream`) with a `StreamingSectionParser` that streams the `## Reasoning` section live across chunk splits; the assembled prompt follows as one delta.
 
 #### How Both Paths Surface in the UI
 
@@ -129,7 +129,7 @@ into session per-request and synced to MongoDB for cross-device persistence (LIN
 │    linear.js ─────── GraphQL client (issues, context)           │
 │    openrouter.js ──── LLM client (streaming + non-streaming)    │
 │    prompt-templates.js ── 14 handwritten templates              │
-│    meta-prompt-template.js ── AI decision tree                  │
+│    stage-router.js ── AI decision tree (routing prompt)         │
 │    dispatch-store.js ── Queue + history (MongoDB/MangoDB)       │
 │    dispatch-tokens.js ── Consumer token management              │
 │    feature-defaults.js ── Toggle definitions + helpers          │
@@ -160,7 +160,7 @@ The planned feature — **follow-on prompts triggered by Claude Code** — would
 | Template definitions | `lib/prompt-template-defs.js` | 17 prompt templates with `aiHint` and `completionSignals` |
 | Template engine | `lib/prompt-templates.js` | `generatePrompt()` entry point, availability rules |
 | Formatting helpers | `lib/prompt-formatters.js` | Shared section formatters |
-| Meta-prompt | `lib/prompts/meta-prompt-template.js` | AI decision tree for recommendation |
+| Routing prompt | `lib/stage-router.js` | AI decision tree for recommendation (picks the stage) |
 | OpenRouter client | `lib/openrouter.js` | LLM API calls (streaming + non-streaming) |
 
 ### Where Prompts Are Consumed

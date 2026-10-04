@@ -11,10 +11,9 @@
  *   2. incumbent (gpt-5.4-mini) + distilled state         (model-vs-representation control)
  *   3. incumbent (gpt-5.4-mini) + raw state, via the LIVE  getRecommendation()  (the
  *      production incumbent; its cost/latency/prompt come from the graded call's own
- *      recorder hooks — no duplicate rebuild call). LIN-3304: this arm still measures the
- *      FULL prompt (no briefWriter), so it runs the full-mode parse, not buildRouterPrompt
- *      or routeStage; the routing sections it renders come from lib/stage-router.js's
- *      shared fragments and its action parse is the shared parseRecommendedAction.
+ *      recorder hooks — no duplicate rebuild call). Since LIN-3300 that is the one path:
+ *      the routing prompt (buildRouterPrompt) and its parse (routeStage); code assembles
+ *      the stage prompt with no further model call.
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
@@ -35,8 +34,6 @@
  *   ARMS       1 | 2 | 3 | 12 | 123               (default 123)
  *   MODEL      incumbent model                    (default openai/gpt-5.4-mini)
  *   JEV_MODEL  Jev model                          (default typesafe/jev-1.13)
- *   ROUTING_ONLY 1 = arm 3 runs the SHIPPING routing-only path (buildRouterPrompt +
- *                  routeStage) instead of the full prompt (LIN-3309)
  *   DRY        1 = deterministic stub answers, no network (pipeline verification). Writes to a
  *                  temp dir unless OUT_DIR is set, so it can never overwrite the canonical
  *                  scripts/eval/jev-routing-out artifacts.
@@ -66,11 +63,6 @@ const K = Number(process.env.K || 3);
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const ARMS = process.env.ARMS || '123';
 const DRY = !!process.env.DRY;
-// ROUTING_ONLY: arm 3 exercises the SHIPPING routing-only path (buildRouterPrompt
-// + routeStage) instead of the full prompt. `deadline: 0` makes writeBrief return
-// `no-time` before any writer call (openrouter.js), so the one-LLM-record
-// correlation assertion still holds. LIN-3309.
-const ROUTING_ONLY = !!process.env.ROUTING_ONLY;
 
 /**
  * Resolve the output directory. An explicit OUT_DIR always wins; otherwise a DRY run uses a
@@ -373,7 +365,6 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
   const t0 = performance.now();
   const rec = await getRecommendation(issue, context, {
     apiKey: KEY, model: MODEL, featureFlags: {}, callMeta,
-    ...(ROUTING_ONLY ? { briefWriter: { model: MODEL }, deadline: 0 } : {}),
   });
   const wallMs = Math.round(performance.now() - t0);
   const llm = recorders.llm.filter((r) => r.evalCallId === evalCallId);
@@ -701,7 +692,7 @@ function writeReport(r, corpus, path) {
   L.push('## Heads-up on what each arm measures');
   L.push('- **Arm 1** = Jev choosing over the distilled state (the candidate).');
   L.push('- **Arm 2** = the incumbent (gpt-5.4-mini) choosing over the SAME distilled state — this is the **like-for-like step-one cost/latency comparator**.');
-  L.push('- **Arm 3** = the incumbent over the raw state via the live `getRecommendation()`. Its latency and cost are the **full choose-and-write call** (it generates the whole `## Prompt`), so Jev\'s arm-1 cost is **not** a straight like-for-like replacement for arm 3\'s figure — arm 2 is.');
+  L.push('- **Arm 3** = the incumbent over the raw state via the live `getRecommendation()`. Its latency and cost are the **routing call** (code assembles the stage prompt), so Jev\'s arm-1 cost compares with it directly; arm 2 isolates the representation.');
   L.push('');
   L.push('## Hit rates (per run) and Wilson intervals');
   L.push('| arm | hits/runs | rate | Wilson 95% | loop-repeat | off-gold avoid |');

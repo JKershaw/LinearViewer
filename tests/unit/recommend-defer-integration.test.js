@@ -1,25 +1,50 @@
 /**
- * Integration test: mock LLM responses → real parse → real recursion (LIN-327/329).
+ * Integration test: mock LLM responses → real recommendation path → real recursion
+ * (LIN-327/329; one path since LIN-3300).
  *
  * The route-level E2E tests drive the *test-mode* mock in computeRecommendation, which
  * returns a hardcoded recommendation and never touches the LLM-text parser. This test
- * closes the seam in between: it feeds canned OpenRouter completion strings — exactly the
- * `## Reasoning` / `## Prompt` shape the live meta-prompt elicits — through the REAL
- * parseRecommendationResponse (the same function getRecommendation uses) and the REAL
+ * closes the seam in between: it feeds canned OpenRouter completion strings — the
+ * `## Reasoning` shape the routing prompt elicits — through the REAL getRecommendation
+ * (routing parse, then code assembles the stage's prompt) and the REAL
  * resolveRecommendation, proving the full chain descends as intended:
  *
- *   LLM emits `defer { DeferTo: X }` (no body)  →  parser yields { recommendedAction:'defer', deferTo:X }
- *     →  resolver re-enters on X  →  LLM emits real action + prompt  →  terminal returned + breadcrumb.
+ *   LLM emits `defer { DeferTo: X }` (no body)  →  { recommendedAction:'defer', deferTo:X }
+ *     →  resolver re-enters on X  →  LLM emits a real action  →  code assembles its prompt
+ *     →  terminal returned + breadcrumb.
  *
- * Only the HTTP transport and meta-prompt assembly are left out (pure plumbing); the
- * routing-and-descent logic is exercised against real LLM-shaped text.
+ * Only the HTTP transport is stubbed (setFetchImpl); a `## Prompt` body a model writes
+ * anyway is ignored, which the action replies below exercise.
  *
  * Run with: node --test tests/unit/recommend-defer-integration.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
-import { parseRecommendationResponse } from '../../lib/openrouter.js';
+import { getRecommendation, setFetchImpl } from '../../lib/openrouter.js';
+import { generatePrompt } from '../../lib/prompt-templates.js';
 import { resolveRecommendation, describeDescent } from '../../lib/recommend-recurse.js';
+
+const issueOf = (identifier) => ({
+  identifier, title: `Task ${identifier}`, description: 'd', url: `https://linear.app/x/issue/${identifier}`,
+  state: { name: 'In Progress', type: 'started' }, labels: [], createdAt: '2026-01-01T00:00:00.000Z'
+});
+const CONTEXT = { parent: null, siblings: [], project: null, children: [], comments: [], focusedChild: null };
+
+// The canned completion the stubbed transport returns for the next call.
+let nextReply = null;
+before(() => {
+  setFetchImpl(async () => ({
+    ok: true,
+    json: async () => ({ choices: [{ message: { content: nextReply }, finish_reason: 'stop' }], usage: { completion_tokens: 100 } })
+  }));
+});
+after(() => { setFetchImpl(null); });
+
+/** One recommendation hop through the live path: routing reply in, routed recommendation out. */
+async function recommend(text, identifier) {
+  nextReply = text;
+  return getRecommendation(issueOf(identifier), CONTEXT, { apiKey: 'stub-key' });
+}
 
 // A defer reply: action `defer`, a structured DeferTo line, and an EMPTY prompt body.
 const deferReply = (target) => `## Reasoning
@@ -34,7 +59,7 @@ const deferReply = (target) => `## Reasoning
 ## Prompt
 `;
 
-// A real-action reply: an action and a full prompt body.
+// A real-action reply: an action, and a prompt body the path ignores (code assembles it).
 const actionReply = (action, body) => `## Reasoning
 **Assessment:**
 - Preparation: ✗ Needed
@@ -48,12 +73,12 @@ ${body}
 `;
 
 // Build a computeOne backed by a table of canned LLM completions, run through the REAL
-// parser — i.e. a faithful stand-in for getRecommendation with the network removed.
+// getRecommendation with only the network removed.
 function llmBackedComputeOne(completions) {
   return async (identifier) => {
     const text = completions[identifier];
     if (!text) throw new Error(`Issue not found: ${identifier}`);
-    const rec = parseRecommendationResponse(text, 'stop', 100);
+    const rec = await recommend(text, identifier);
     return { identifier, ...rec };
   };
 }
@@ -65,7 +90,7 @@ function llmBackedComputeOneWithTree(completions, trees) {
   return async (identifier) => {
     const text = completions[identifier];
     if (!text) throw new Error(`Issue not found: ${identifier}`);
-    const rec = parseRecommendationResponse(text, 'stop', 100);
+    const rec = await recommend(text, identifier);
     const node = trees[identifier] || {};
     return { identifier, ...rec, state: node.state, children: node.children };
   };
@@ -83,16 +108,16 @@ describe('mock-LLM → parse → recurse (defer end-to-end)', () => {
     // Terminal node, not the parent — the bug this fixes.
     assert.strictEqual(out.recommendation.identifier, 'LIN-297');
     assert.strictEqual(out.recommendation.recommendedAction, 'research');
-    assert.ok(out.recommendation.prompt.includes('Investigate the dependency contract.'),
-      'the terminal node carries the real prompt body');
+    assert.strictEqual(out.recommendation.prompt, generatePrompt('research', issueOf('LIN-297'), CONTEXT).prompt,
+      'the terminal node carries the stage prompt code assembled');
     assert.deepStrictEqual(out.deferredVia, ['LIN-318', 'LIN-297']);
     assert.strictEqual(out.deferTruncated, false);
     assert.strictEqual(describeDescent(out.deferredVia, out.recommendation),
       'LIN-318 is a container → descended to LIN-297 (research)');
   });
 
-  test('the deferring hop itself carries NO prompt body (cost contract, via the real parser)', async () => {
-    const parentRec = parseRecommendationResponse(deferReply('LIN-297'), 'stop', 20);
+  test('the deferring hop itself carries NO prompt body (cost contract, via the real path)', async () => {
+    const parentRec = await recommend(deferReply('LIN-297'), 'LIN-318');
     assert.strictEqual(parentRec.recommendedAction, 'defer');
     assert.strictEqual(parentRec.deferTo, 'LIN-297');
     assert.strictEqual(parentRec.prompt, null);
@@ -162,7 +187,8 @@ describe('container-descent bug reproduction (LIN-353)', () => {
       const out = await resolveRecommendation({ computeOne, startIdentifier: 'HAR-589' });
       assert.strictEqual(out.recommendation.identifier, 'HAR-590', `pass ${pass}: reaches the READY crux, not the Done child`);
       assert.strictEqual(out.recommendation.recommendedAction, 'implement', `pass ${pass}: dispatches real work`);
-      assert.ok(!out.recommendation.prompt.includes('No-op'), `pass ${pass}: the Done-child no-op never dispatches`);
+      assert.strictEqual(out.recommendation.prompt, generatePrompt('implementation', issueOf('HAR-590'), CONTEXT).prompt,
+        `pass ${pass}: the ready crux's prompt, never the Done child's look-into`);
       assert.deepStrictEqual(out.deferredVia, ['HAR-589', 'HAR-590'], `pass ${pass}: breadcrumb shows the redirect`);
       assert.strictEqual(out.deferTruncated, false, `pass ${pass}: clean resolution, not a truncation`);
     }

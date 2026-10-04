@@ -15,7 +15,7 @@ import { GraphQLClient } from 'graphql-request';
 import {
   assemblePlanReviewFacts, formatPlanReviewFactsBlock, REVISION_LABEL_RE
 } from '../../lib/recommendation-facts.js';
-import { formatIssueContext, getRecommendation, parseRecommendationResponse, setFetchImpl, resolveCodeRoutedAction } from '../../lib/openrouter.js';
+import { formatIssueContext, getRecommendation, setFetchImpl, setPromptTraceRecorder, resolveCodeRoutedAction } from '../../lib/openrouter.js';
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { readRunLedger } from '../../lib/run-ledger.js';
@@ -351,16 +351,14 @@ describe('the implementation fix-round brief (LIN-3309 S4)', () => {
 });
 
 describe('D2: excluded kinds are refused (LIN-3309 S5)', () => {
-  test('retro is rejected in routing and full mode; the extractor still returns it', () => {
+  test('retro is rejected by the routing parse; the extractor still returns it', () => {
     assert.throws(() => routeStage('## Reasoning\n→ **retro**', 'stop', 3), /cannot be recommended/);
     assert.throws(() => parseRouteDecision('## Reasoning\n→ **retro**'), /cannot be recommended/);
-    assert.throws(() => parseRecommendationResponse('## Reasoning\n→ **retro**\n## Prompt\nx', 'stop', 3), /cannot be recommended/);
     assert.equal(parseRecommendedAction('## Reasoning\n→ **retro**'), 'retro');
   });
 
-  test('a normal stage still parses in both modes', () => {
+  test('a normal stage still parses', () => {
     assert.equal(routeStage('## Reasoning\n→ **plan**', 'stop', 1).action, 'plan');
-    assert.equal(parseRecommendationResponse('## Reasoning\n→ **plan**\n## Prompt\nx', 'stop', 1).recommendedAction, 'plan');
   });
 });
 
@@ -372,7 +370,7 @@ describe('the code route is not sent to the model (LIN-3309 F1 + addendum)', () 
     setFetchImpl(async () => { throw new Error('the model must not be called for a code-settled route'); });
     try {
       const issue = { identifier: 'T-1', title: 't', description: '## Implementation Plan\n\nRevision 2 — addresses plan-review findings.', state: { name: 'In Progress', type: 'started' }, labels: [] };
-      const rec = await getRecommendation(issue, bundle(issue, [planReviewRc]), { apiKey: 'stub', model: 'x', briefWriter: { model: 'x' }, deadline: 0 });
+      const rec = await getRecommendation(issue, bundle(issue, [planReviewRc]), { apiKey: 'stub', model: 'x' });
       assert.equal(rec.codeRoute, 'plan-review');
       assert.equal(rec.recommendedAction, 'plan-review');
     } finally {
@@ -441,21 +439,23 @@ describe('code settles a route only where the router\'s earlier steps cannot app
     assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, focusedChild: { issue: child('T-10', 'started') } }), null);
   });
 
-  test('the full path names the steer only where code may settle the route', async () => {
-    const prompts = [];
-    setFetchImpl(async (url, opts = {}) => {
-      prompts.push(JSON.parse(opts.body).messages[0].content);
-      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**\n## Prompt\nbody' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
-    });
+  test('the routing prompt names the steer only where code may settle the route', async () => {
+    // The code-settled case makes no model call; its routing prompt is still built and
+    // recorded in the trace, so both cases are read from there.
+    const traces = [];
+    setPromptTraceRecorder((t) => traces.push(t.metaPrompt));
+    setFetchImpl(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) }));
     try {
       const bundle = (over) => ({ parent: null, siblings: [], project: null, children: [], focusedChild: null, ...oneRc, ...over });
-      await getRecommendation(leaf(), bundle({}), { apiKey: 'stub', model: 'x' });
+      const settled = await getRecommendation(leaf(), bundle({}), { apiKey: 'stub', model: 'x' });
       await getRecommendation(leaf(), bundle({ children: [child('T-10', 'unstarted')] }), { apiKey: 'stub', model: 'x' });
-      assert.match(prompts[0], /Route this pass: `plan`/);
-      assert.doesNotMatch(prompts[1], /Route this pass/);
-      assert.match(prompts[1], /Plan-review verdicts on the trail: 1/);
+      assert.equal(settled.codeRoute, 'plan');
+      assert.match(traces[0], /Route this pass: `plan`/);
+      assert.doesNotMatch(traces[1], /Route this pass/);
+      assert.match(traces[1], /Plan-review verdicts on the trail: 1/);
     } finally {
       setFetchImpl(null);
+      setPromptTraceRecorder(null);
     }
   });
 
@@ -467,7 +467,7 @@ describe('code settles a route only where the router\'s earlier steps cannot app
     });
     try {
       const issue = leaf({ state: { name: 'Canceled', type: 'canceled' } });
-      const rec = await getRecommendation(issue, { parent: null, siblings: [], project: null, children: [], focusedChild: null, ...threeRc }, { apiKey: 'stub', model: 'x', briefWriter: { model: 'x' }, deadline: 0 });
+      const rec = await getRecommendation(issue, { parent: null, siblings: [], project: null, children: [], focusedChild: null, ...threeRc }, { apiKey: 'stub', model: 'x' });
       assert.equal(calls.length, 1, 'the router model is called');
       assert.equal(rec.codeRoute, undefined);
       assert.equal(rec.recommendedAction, 'review');

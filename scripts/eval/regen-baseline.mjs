@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
- * Regenerate meta-prompt.baseline.txt (Arm A) from the LIVE template.
+ * Regenerate meta-prompt.baseline.txt (Arm A) from the LIVE routing prompt
+ * (lib/stage-router.js buildRouterPrompt, the one prompt a recommendation call sends
+ * since LIN-3300).
  *
- * Run this whenever lib/prompts/meta-prompt-template.js changes, so the eval's
- * baseline stays a faithful snapshot. After shipping a proven candidate, run this
- * then `cp meta-prompt.baseline.txt meta-prompt.candidate.txt` to reset A==B.
+ * Run this whenever the router prompt changes, so the eval's baseline stays a faithful
+ * snapshot. After shipping a proven candidate, run this then
+ * `cp meta-prompt.baseline.txt meta-prompt.candidate.txt` to reset A==B.
  *
  * The snapshot is for a LEAF task (no subtasks/comments), featureFlags:{} —
  * exactly what the proxy passes — with {{ISSUE_CONTEXT}} / {{IDENTIFIER}} left as
@@ -13,11 +15,11 @@
 import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 
-const text = buildMetaPromptTemplate({
+const text = buildRouterPrompt({
   issueContext: '{{ISSUE_CONTEXT}}',
   identifier: '{{IDENTIFIER}}',
   hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
