@@ -389,3 +389,92 @@ describe('the code route is not sent to the model (LIN-3309 F1 + addendum)', () 
     assert.equal(resolveCodeRoutedAction(issue, { comments: [] }), null);
   });
 });
+
+describe('code settles a route only where the router\'s earlier steps cannot apply (LIN-3309 review F1)', () => {
+  // One Request Changes, no reply: on an open, active leaf the facts settle `plan`. Every
+  // other case below must return null, so the model still runs Step 0 / Step 2 / Step 4.
+  const open = { name: 'In Progress', type: 'started' };
+  const leaf = (over = {}) => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [], ...over });
+  const child = (id, type) => ({ id, identifier: id, title: id, state: { name: type, type } });
+  const oneRc = { comments: [RC('2026-01-01T00:00:00Z')] };
+  const threeRc = { comments: [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')] };
+
+  test('control: an open, active leaf with no blockers is settled in code', () => {
+    assert.equal(resolveCodeRoutedAction(leaf(), oneRc), 'plan');
+    assert.equal(resolveCodeRoutedAction(leaf(), threeRc), 'blocked');
+  });
+
+  test('a Canceled issue is left to the model (Step 0)', () => {
+    assert.equal(resolveCodeRoutedAction(leaf({ state: { name: 'Canceled', type: 'canceled' } }), oneRc), null);
+  });
+
+  test('a Done issue is left to the model (Step 0)', () => {
+    assert.equal(resolveCodeRoutedAction(leaf({ state: { name: 'Done', type: 'completed' } }), oneRc), null);
+  });
+
+  test('a Canceled issue with 3 Request Changes is not sent to `blocked` in code', () => {
+    assert.equal(resolveCodeRoutedAction(leaf({ state: { name: 'Canceled', type: 'canceled' } }), threeRc), null);
+  });
+
+  test('an open blocker is left to the model (Step 2)', () => {
+    const issue = leaf({ blockedBy: [{ identifier: 'T-1', title: 'b', state: { name: 'In Progress', type: 'started' } }] });
+    assert.equal(resolveCodeRoutedAction(issue, oneRc), null);
+  });
+
+  test('a resolved blocker does not stop code settling (Done and Canceled count as resolved)', () => {
+    const issue = leaf({ blockedBy: [
+      { identifier: 'T-1', title: 'b', state: { name: 'Done', type: 'completed' } },
+      { identifier: 'T-2', title: 'c', state: { name: 'Canceled', type: 'canceled' } }
+    ] });
+    assert.equal(resolveCodeRoutedAction(issue, oneRc), 'plan');
+  });
+
+  test('open children are left to the model (Step 4 / defer)', () => {
+    assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, children: [child('T-10', 'unstarted')] }), null);
+  });
+
+  test('all-terminal children are left to the model (Step 0: the node\'s close-out)', () => {
+    assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, children: [child('T-10', 'completed'), child('T-11', 'canceled')] }), null);
+  });
+
+  test('a focused child is left to the model (defer)', () => {
+    assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, focusedChild: { issue: child('T-10', 'started') } }), null);
+  });
+
+  test('the full path names the steer only where code may settle the route', async () => {
+    const prompts = [];
+    setFetchImpl(async (url, opts = {}) => {
+      prompts.push(JSON.parse(opts.body).messages[0].content);
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**\n## Prompt\nbody' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
+    });
+    try {
+      const bundle = (over) => ({ parent: null, siblings: [], project: null, children: [], focusedChild: null, ...oneRc, ...over });
+      await getRecommendation(leaf(), bundle({}), { apiKey: 'stub', model: 'x' });
+      await getRecommendation(leaf(), bundle({ children: [child('T-10', 'unstarted')] }), { apiKey: 'stub', model: 'x' });
+      assert.match(prompts[0], /Route this pass: `plan`/);
+      assert.doesNotMatch(prompts[1], /Route this pass/);
+      assert.match(prompts[1], /Plan-review verdicts on the trail: 1/);
+    } finally {
+      setFetchImpl(null);
+    }
+  });
+
+  test('getRecommendation sends a guarded case to the model, which still sees the facts block', async () => {
+    const calls = [];
+    setFetchImpl(async (url, opts = {}) => {
+      calls.push(JSON.parse(opts.body).messages[0].content);
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **review**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
+    });
+    try {
+      const issue = leaf({ state: { name: 'Canceled', type: 'canceled' } });
+      const rec = await getRecommendation(issue, { parent: null, siblings: [], project: null, children: [], focusedChild: null, ...threeRc }, { apiKey: 'stub', model: 'x', briefWriter: { model: 'x' }, deadline: 0 });
+      assert.equal(calls.length, 1, 'the router model is called');
+      assert.equal(rec.codeRoute, undefined);
+      assert.equal(rec.recommendedAction, 'review');
+      assert.match(calls[0], /Plan-review verdicts on the trail: 3/);
+      assert.doesNotMatch(calls[0], /Route this pass/, 'no code steer pins a stage the model must decide');
+    } finally {
+      setFetchImpl(null);
+    }
+  });
+});
