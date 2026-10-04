@@ -1,0 +1,2697 @@
+{
+  "task": "LIN-3107",
+  "ranAt": "2026-10-04T17:47:44.628Z",
+  "dryRun": false,
+  "models": {
+    "jev": "typesafe/jev-1.13",
+    "incumbent": "openai/gpt-5.6-sol"
+  },
+  "k": 6,
+  "arms": {
+    "arm3": {
+      "hits": 89,
+      "n": 132,
+      "rate": 0.6742424242424242,
+      "wilson": {
+        "lo": 0.5903484794634237,
+        "hi": 0.7482812186555617
+      },
+      "avoids": 0,
+      "loopRepeat": null
+    }
+  },
+  "fixtureCount": 22,
+  "sourceCounts": {
+    "B": 22
+  },
+  "goldOverrides": [],
+  "deferRule": "defer eligible only on a node with a real non-terminal child; leaf defer is a miss in every arm; node defer scored on action only; arms 1/2 filter at prompt time, arm 3 at grading time",
+  "corpusQuery": {
+    "query": "GET https://harbour.cat/api/proxy/search?q=verb%20override",
+    "runAt": "2026-09-26T21:16:42Z",
+    "groundedAt": "b5c528c4",
+    "hitCount": 50,
+    "cap": 50,
+    "included": 1,
+    "excluded": 49
+  },
+  "paired": {},
+  "calibration": null,
+  "resources": {
+    "arm3": {
+      "calls": 132,
+      "latencyMs": {
+        "min": 2018,
+        "median": 5298,
+        "max": 13731,
+        "mean": 5668.55303030303
+      },
+      "totalCostUsd": 1.7976230000000009,
+      "meanCostUsd": 0.013618356060606067,
+      "inputTokens": 2304072,
+      "outputTokens": 45302
+    }
+  },
+  "deferByArm": {
+    "arm3": {
+      "leaf": {
+        "defer": 0,
+        "n": 132
+      },
+      "node": {
+        "defer": 0,
+        "n": 0
+      }
+    }
+  },
+  "arm3DeferToAgreement": {
+    "agree": 0,
+    "n": 0
+  },
+  "fix830PosDistribution": null,
+  "normalizationRewrites": 0,
+  "goNoGo": {
+    "decided": false,
+    "note": "both arm 1 and arm 3 required"
+  },
+  "cases": [
+    {
+      "id": "NSC-LIN-2950-R2",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real trail through plan-review round 2 (two Request Changes, no revision label) — expect plan (a revision), never blocked or build",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8106,
+            "cost": 0.094841,
+            "inputTokens": 35949,
+            "outputTokens": 497,
+            "promptChars": 140156,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7627,
+            "cost": 0.0110952,
+            "inputTokens": 35949,
+            "outputTokens": 390,
+            "promptChars": 140156,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4049,
+            "cost": 0.0097752,
+            "inputTokens": 35949,
+            "outputTokens": 258,
+            "promptChars": 140156,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5393,
+            "cost": 0.0100552,
+            "inputTokens": 35949,
+            "outputTokens": 286,
+            "promptChars": 140156,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5692,
+            "cost": 0.0105152,
+            "inputTokens": 35949,
+            "outputTokens": 332,
+            "promptChars": 140156,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7258,
+            "cost": 0.0120052,
+            "inputTokens": 35949,
+            "outputTokens": 481,
+            "promptChars": 140156,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2954",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real trail: blocked by open tickets — expect blocked",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 9289,
+            "cost": 0.031061,
+            "inputTokens": 10449,
+            "outputTokens": 494,
+            "promptChars": 47693,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8936,
+            "cost": 0.0070252,
+            "inputTokens": 10449,
+            "outputTokens": 493,
+            "promptChars": 47693,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7019,
+            "cost": 0.0066252,
+            "inputTokens": 10449,
+            "outputTokens": 453,
+            "promptChars": 47693,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6827,
+            "cost": 0.0057652,
+            "inputTokens": 10449,
+            "outputTokens": 367,
+            "promptChars": 47693,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5863,
+            "cost": 0.0058052,
+            "inputTokens": 10449,
+            "outputTokens": 371,
+            "promptChars": 47693,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 10288,
+            "cost": 0.0087752,
+            "inputTokens": 10449,
+            "outputTokens": 668,
+            "promptChars": 47693,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-GO",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then a person's go-ahead — expect plan",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 9704,
+            "cost": 0.095856,
+            "inputTokens": 36011,
+            "outputTokens": 583,
+            "promptChars": 140378,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6174,
+            "cost": 0.0117776,
+            "inputTokens": 36011,
+            "outputTokens": 457,
+            "promptChars": 140378,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8609,
+            "cost": 0.0131576,
+            "inputTokens": 36011,
+            "outputTokens": 595,
+            "promptChars": 140378,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 10232,
+            "cost": 0.0121676,
+            "inputTokens": 36011,
+            "outputTokens": 496,
+            "promptChars": 140378,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 13731,
+            "cost": 0.0171576,
+            "inputTokens": 36011,
+            "outputTokens": 995,
+            "promptChars": 140378,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 9693,
+            "cost": 0.0126476,
+            "inputTokens": 36011,
+            "outputTokens": 544,
+            "promptChars": 140378,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-HOLD",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then a person's hold — expect blocked (a hold wins at any count)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6426,
+            "cost": 0.0927635,
+            "inputTokens": 36014,
+            "outputTokens": 273,
+            "promptChars": 140388,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7877,
+            "cost": 0.0110782,
+            "inputTokens": 36014,
+            "outputTokens": 387,
+            "promptChars": 140388,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6102,
+            "cost": 0.0114682,
+            "inputTokens": 36014,
+            "outputTokens": 426,
+            "promptChars": 140388,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5752,
+            "cost": 0.0108482,
+            "inputTokens": 36014,
+            "outputTokens": 364,
+            "promptChars": 140388,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5545,
+            "cost": 0.0109382,
+            "inputTokens": 36014,
+            "outputTokens": 373,
+            "promptChars": 140388,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8662,
+            "cost": 0.0108082,
+            "inputTokens": 36014,
+            "outputTokens": 360,
+            "promptChars": 140388,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-NOTE",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then an agent's plan-posted note — expect blocked (a note is not a reply)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6969,
+            "cost": 0.0944135,
+            "inputTokens": 36014,
+            "outputTokens": 438,
+            "promptChars": 140395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7882,
+            "cost": 0.0129182,
+            "inputTokens": 36014,
+            "outputTokens": 571,
+            "promptChars": 140395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5144,
+            "cost": 0.0102382,
+            "inputTokens": 36014,
+            "outputTokens": 303,
+            "promptChars": 140395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4810,
+            "cost": 0.0098282,
+            "inputTokens": 36014,
+            "outputTokens": 262,
+            "promptChars": 140395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5396,
+            "cost": 0.0102182,
+            "inputTokens": 36014,
+            "outputTokens": 301,
+            "promptChars": 140395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7115,
+            "cost": 0.0118182,
+            "inputTokens": 36014,
+            "outputTokens": 461,
+            "promptChars": 140395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-LATEST-REPLY",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then a hold, then a go-ahead — expect plan (the newest reply wins, F3a)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 9694,
+            "cost": 0.096426,
+            "inputTokens": 36003,
+            "outputTokens": 642,
+            "promptChars": 140333,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8262,
+            "cost": 0.012106,
+            "inputTokens": 36003,
+            "outputTokens": 490,
+            "promptChars": 140333,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 10265,
+            "cost": 0.013796,
+            "inputTokens": 36003,
+            "outputTokens": 659,
+            "promptChars": 140333,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7659,
+            "cost": 0.012556,
+            "inputTokens": 36003,
+            "outputTokens": 535,
+            "promptChars": 140333,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7863,
+            "cost": 0.011766,
+            "inputTokens": 36003,
+            "outputTokens": 456,
+            "promptChars": 140333,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6382,
+            "cost": 0.011566,
+            "inputTokens": 36003,
+            "outputTokens": 436,
+            "promptChars": 140333,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-REVISED",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: one Request Changes, then Revision 2 — expect plan-review, never plan",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4200,
+            "cost": 0.043711,
+            "inputTokens": 16305,
+            "outputTokens": 295,
+            "promptChars": 69857,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5849,
+            "cost": 0.0064164,
+            "inputTokens": 16305,
+            "outputTokens": 315,
+            "promptChars": 69857,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4253,
+            "cost": 0.0068164,
+            "inputTokens": 16305,
+            "outputTokens": 355,
+            "promptChars": 69857,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3652,
+            "cost": 0.0056764,
+            "inputTokens": 16305,
+            "outputTokens": 241,
+            "promptChars": 69857,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4156,
+            "cost": 0.0057564,
+            "inputTokens": 16305,
+            "outputTokens": 249,
+            "promptChars": 69857,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4547,
+            "cost": 0.0065864,
+            "inputTokens": 16305,
+            "outputTokens": 332,
+            "promptChars": 69857,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-NOW",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: two Request Changes, no revision label — expect plan (control)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4180,
+            "cost": 0.043126,
+            "inputTokens": 16303,
+            "outputTokens": 237,
+            "promptChars": 69851,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3550,
+            "cost": 0.005386,
+            "inputTokens": 16303,
+            "outputTokens": 212,
+            "promptChars": 69851,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4329,
+            "cost": 0.005936,
+            "inputTokens": 16303,
+            "outputTokens": 267,
+            "promptChars": 69851,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4331,
+            "cost": 0.005976,
+            "inputTokens": 16303,
+            "outputTokens": 271,
+            "promptChars": 69851,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4004,
+            "cost": 0.005626,
+            "inputTokens": 16303,
+            "outputTokens": 236,
+            "promptChars": 69851,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4775,
+            "cost": 0.006016,
+            "inputTokens": 16303,
+            "outputTokens": 275,
+            "promptChars": 69851,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-R2-REV",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: count 2 plus a landed Revision 3 (this ticket's own state) — expect plan-review",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6102,
+            "cost": 0.0524085,
+            "inputTokens": 19356,
+            "outputTokens": 402,
+            "promptChars": 81296,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5384,
+            "cost": 0.0072466,
+            "inputTokens": 19356,
+            "outputTokens": 337,
+            "promptChars": 81296,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5339,
+            "cost": 0.0074966,
+            "inputTokens": 19356,
+            "outputTokens": 362,
+            "promptChars": 81296,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6686,
+            "cost": 0.0082966,
+            "inputTokens": 19356,
+            "outputTokens": 442,
+            "promptChars": 81296,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5648,
+            "cost": 0.0076666,
+            "inputTokens": 19356,
+            "outputTokens": 379,
+            "promptChars": 81296,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5889,
+            "cost": 0.0073066,
+            "inputTokens": 19356,
+            "outputTokens": 343,
+            "promptChars": 81296,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-RC1-REV",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "PR-1603 trail: count 1, revised to Revision 2 — expect plan-review, never plan",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3552,
+            "cost": 0.025516,
+            "inputTokens": 9159,
+            "outputTokens": 262,
+            "promptChars": 42581,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4390,
+            "cost": 0.0046872,
+            "inputTokens": 9159,
+            "outputTokens": 285,
+            "promptChars": 42581,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5166,
+            "cost": 0.0048072,
+            "inputTokens": 9159,
+            "outputTokens": 297,
+            "promptChars": 42581,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3834,
+            "cost": 0.0045772,
+            "inputTokens": 9159,
+            "outputTokens": 274,
+            "promptChars": 42581,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7243,
+            "cost": 0.0057272,
+            "inputTokens": 9159,
+            "outputTokens": 389,
+            "promptChars": 42581,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4992,
+            "cost": 0.0051372,
+            "inputTokens": 9159,
+            "outputTokens": 330,
+            "promptChars": 42581,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-RC1-HOLD",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "PR-1603 trail: count 1, then a person's hold — expect blocked at any count",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4927,
+            "cost": 0.0265485,
+            "inputTokens": 9180,
+            "outputTokens": 360,
+            "promptChars": 42637,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4593,
+            "cost": 0.0049014,
+            "inputTokens": 9180,
+            "outputTokens": 306,
+            "promptChars": 42637,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5223,
+            "cost": 0.0046614,
+            "inputTokens": 9180,
+            "outputTokens": 282,
+            "promptChars": 42637,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6957,
+            "cost": 0.0053814,
+            "inputTokens": 9180,
+            "outputTokens": 354,
+            "promptChars": 42637,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5084,
+            "cost": 0.0053814,
+            "inputTokens": 9180,
+            "outputTokens": 354,
+            "promptChars": 42637,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7634,
+            "cost": 0.0063514,
+            "inputTokens": 9180,
+            "outputTokens": 451,
+            "promptChars": 42637,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-RC1-FC-RULING",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "PR-1603 trail: count 1, then an FC ruling posted as a comment — expect plan (F3d)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4479,
+            "cost": 0.025556,
+            "inputTokens": 9183,
+            "outputTokens": 260,
+            "promptChars": 42642,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8195,
+            "cost": 0.006042,
+            "inputTokens": 9183,
+            "outputTokens": 420,
+            "promptChars": 42642,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6371,
+            "cost": 0.005432,
+            "inputTokens": 9183,
+            "outputTokens": 359,
+            "promptChars": 42642,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4895,
+            "cost": 0.005022,
+            "inputTokens": 9183,
+            "outputTokens": 318,
+            "promptChars": 42642,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5859,
+            "cost": 0.005622,
+            "inputTokens": 9183,
+            "outputTokens": 378,
+            "promptChars": 42642,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5517,
+            "cost": 0.005292,
+            "inputTokens": 9183,
+            "outputTokens": 345,
+            "promptChars": 42642,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-GO-REV",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, go-ahead, then a revision lands — expect plan-review",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7178,
+            "cost": 0.057376,
+            "inputTokens": 20883,
+            "outputTokens": 517,
+            "promptChars": 84694,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8812,
+            "cost": 0.010012,
+            "inputTokens": 20883,
+            "outputTokens": 583,
+            "promptChars": 84694,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "breakdown",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 13146,
+            "cost": 0.013802,
+            "inputTokens": 20883,
+            "outputTokens": 962,
+            "promptChars": 84694,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8277,
+            "cost": 0.010362,
+            "inputTokens": 20883,
+            "outputTokens": 618,
+            "promptChars": 84694,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 9852,
+            "cost": 0.011162,
+            "inputTokens": 20883,
+            "outputTokens": 698,
+            "promptChars": 84694,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 10199,
+            "cost": 0.011072,
+            "inputTokens": 20883,
+            "outputTokens": 689,
+            "promptChars": 84694,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-APPROVE-LANDED",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan-review Approve, then the implementation landed (PR opened) — expect review; the earlier Approve no longer points at implementation",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2584,
+            "cost": 0.0249035,
+            "inputTokens": 9314,
+            "outputTokens": 162,
+            "promptChars": 43133,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4139,
+            "cost": 0.0035282,
+            "inputTokens": 9314,
+            "outputTokens": 166,
+            "promptChars": 43133,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2716,
+            "cost": 0.0034982,
+            "inputTokens": 9314,
+            "outputTokens": 163,
+            "promptChars": 43133,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3131,
+            "cost": 0.0035082,
+            "inputTokens": 9314,
+            "outputTokens": 164,
+            "promptChars": 43133,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4685,
+            "cost": 0.0035282,
+            "inputTokens": 9314,
+            "outputTokens": 166,
+            "promptChars": 43133,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2893,
+            "cost": 0.0034782,
+            "inputTokens": 9314,
+            "outputTokens": 161,
+            "promptChars": 43133,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-LANDED",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: two Request Changes, Revision 3, the FC go-ahead, then PR #1748 opened — expect review (implementation landed)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5267,
+            "cost": 0.0535835,
+            "inputTokens": 20074,
+            "outputTokens": 340,
+            "promptChars": 84217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4607,
+            "cost": 0.0066202,
+            "inputTokens": 20074,
+            "outputTokens": 260,
+            "promptChars": 84217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5298,
+            "cost": 0.0067802,
+            "inputTokens": 20074,
+            "outputTokens": 276,
+            "promptChars": 84217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6228,
+            "cost": 0.0065102,
+            "inputTokens": 20074,
+            "outputTokens": 249,
+            "promptChars": 84217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5199,
+            "cost": 0.0074502,
+            "inputTokens": 20074,
+            "outputTokens": 343,
+            "promptChars": 84217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5941,
+            "cost": 0.0071902,
+            "inputTokens": 20074,
+            "outputTokens": 317,
+            "promptChars": 84217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-gated-recorded",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan on record whose own text records 'plan-review due: yes' for criterion (d), credential surface, still unimplemented (expect -> plan-review; the designed primary path — the plan writes the decision, the router reads it)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3459,
+            "cost": 0.024511,
+            "inputTokens": 8997,
+            "outputTokens": 202,
+            "promptChars": 41933,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4169,
+            "cost": 0.0036648,
+            "inputTokens": 8997,
+            "outputTokens": 186,
+            "promptChars": 41933,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3984,
+            "cost": 0.0036648,
+            "inputTokens": 8997,
+            "outputTokens": 186,
+            "promptChars": 41933,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3301,
+            "cost": 0.0037448,
+            "inputTokens": 8997,
+            "outputTokens": 194,
+            "promptChars": 41933,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4200,
+            "cost": 0.0037848,
+            "inputTokens": 8997,
+            "outputTokens": 198,
+            "promptChars": 41933,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4347,
+            "cost": 0.0035248,
+            "inputTokens": 8997,
+            "outputTokens": 172,
+            "promptChars": 41933,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-gated-rederive",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan on record that MEETS criterion (c) — it drops a validation assertion — but predates the gate, so it records no decision and the router must judge the criteria itself (expect -> plan-review; the fallback path, measured because scripts/eval-plan-review.mjs shows it is the weak one)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3431,
+            "cost": 0.024831,
+            "inputTokens": 8957,
+            "outputTokens": 244,
+            "promptChars": 41772,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2614,
+            "cost": 0.0034868,
+            "inputTokens": 8957,
+            "outputTokens": 169,
+            "promptChars": 41772,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4751,
+            "cost": 0.0037068,
+            "inputTokens": 8957,
+            "outputTokens": 191,
+            "promptChars": 41772,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2808,
+            "cost": 0.0035168,
+            "inputTokens": 8957,
+            "outputTokens": 172,
+            "promptChars": 41772,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5856,
+            "cost": 0.0040168,
+            "inputTokens": 8957,
+            "outputTokens": 222,
+            "promptChars": 41772,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3404,
+            "cost": 0.0035768,
+            "inputTokens": 8957,
+            "outputTokens": 178,
+            "promptChars": 41772,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-clean-small",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "clean single-surface plan, gate met by NONE of (a)-(d), decision recorded as 'plan-review due: no' (expect -> implementation, NOT plan-review; this is the over-fire guard and the phase's acceptance criterion — zero added dispatches on a clean plan)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2316,
+            "cost": 0.0238035,
+            "inputTokens": 8970,
+            "outputTokens": 138,
+            "promptChars": 41823,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2599,
+            "cost": 0.0032094,
+            "inputTokens": 8970,
+            "outputTokens": 141,
+            "promptChars": 41823,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2173,
+            "cost": 0.0030994,
+            "inputTokens": 8970,
+            "outputTokens": 130,
+            "promptChars": 41823,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3051,
+            "cost": 0.0035994,
+            "inputTokens": 8970,
+            "outputTokens": 180,
+            "promptChars": 41823,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2018,
+            "cost": 0.0031594,
+            "inputTokens": 8970,
+            "outputTokens": 136,
+            "promptChars": 41823,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2910,
+            "cost": 0.0031694,
+            "inputTokens": 8970,
+            "outputTokens": 137,
+            "promptChars": 41823,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-verdict-approve",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "gated plan whose trail already carries a plan-review Approve, work still unimplemented (expect -> implementation: an Approve routes on session-fit exactly as before, and must NOT trigger a second plan-review — nor be read as close-out evidence)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3539,
+            "cost": 0.025096,
+            "inputTokens": 9219,
+            "outputTokens": 205,
+            "promptChars": 42821,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4690,
+            "cost": 0.0036792,
+            "inputTokens": 9219,
+            "outputTokens": 183,
+            "promptChars": 42821,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4347,
+            "cost": 0.0036592,
+            "inputTokens": 9219,
+            "outputTokens": 181,
+            "promptChars": 42821,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3669,
+            "cost": 0.0037592,
+            "inputTokens": 9219,
+            "outputTokens": 191,
+            "promptChars": 42821,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2970,
+            "cost": 0.0035592,
+            "inputTokens": 9219,
+            "outputTokens": 171,
+            "promptChars": 42821,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "implement",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3231,
+            "cost": 0.0037892,
+            "inputTokens": 9219,
+            "outputTokens": 194,
+            "promptChars": 42821,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-request-changes-1",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "gated plan whose trail carries ONE plan-review Request Changes (expect -> plan: the revision pass, the single exception to 'completed prep ⇒ never re-emit the prep verb')",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3771,
+            "cost": 0.0250435,
+            "inputTokens": 9146,
+            "outputTokens": 218,
+            "promptChars": 42540,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6852,
+            "cost": 0.0056946,
+            "inputTokens": 9146,
+            "outputTokens": 386,
+            "promptChars": 42540,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5733,
+            "cost": 0.0050246,
+            "inputTokens": 9146,
+            "outputTokens": 319,
+            "promptChars": 42540,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5699,
+            "cost": 0.0050546,
+            "inputTokens": 9146,
+            "outputTokens": 322,
+            "promptChars": 42540,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4713,
+            "cost": 0.0048546,
+            "inputTokens": 9146,
+            "outputTokens": 302,
+            "promptChars": 42540,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3889,
+            "cost": 0.0044646,
+            "inputTokens": 9146,
+            "outputTokens": 263,
+            "promptChars": 42540,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-request-changes-2",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding with no reply (expect -> plan: LIN-3309 moved the escalation point to the third unanswered Request Changes; the second is still the revision pass)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4746,
+            "cost": 0.0264385,
+            "inputTokens": 9292,
+            "outputTokens": 321,
+            "promptChars": 43146,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4571,
+            "cost": 0.0047438,
+            "inputTokens": 9292,
+            "outputTokens": 288,
+            "promptChars": 43146,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5104,
+            "cost": 0.0047638,
+            "inputTokens": 9292,
+            "outputTokens": 290,
+            "promptChars": 43146,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4117,
+            "cost": 0.0048538,
+            "inputTokens": 9292,
+            "outputTokens": 299,
+            "promptChars": 43146,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5829,
+            "cost": 0.0056038,
+            "inputTokens": 9292,
+            "outputTokens": 374,
+            "promptChars": 43146,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4864,
+            "cost": 0.0046638,
+            "inputTokens": 9292,
+            "outputTokens": 280,
+            "promptChars": 43146,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-request-changes-3",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "same plan after two revision cycles, trail carries a THIRD Request Changes so the code-computed count reaches 3 with no reply (expect -> blocked: LIN-3309 moves the escalation point from the second to the third unanswered Request Changes)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6365,
+            "cost": 0.0267835,
+            "inputTokens": 9234,
+            "outputTokens": 370,
+            "promptChars": 42812,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5500,
+            "cost": 0.0059222,
+            "inputTokens": 9234,
+            "outputTokens": 407,
+            "promptChars": 42812,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4462,
+            "cost": 0.0047022,
+            "inputTokens": 9234,
+            "outputTokens": 285,
+            "promptChars": 42812,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7259,
+            "cost": 0.0067822,
+            "inputTokens": 9234,
+            "outputTokens": 493,
+            "promptChars": 42812,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6909,
+            "cost": 0.0065322,
+            "inputTokens": 9234,
+            "outputTokens": 468,
+            "promptChars": 42812,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5797,
+            "cost": 0.0059622,
+            "inputTokens": 9234,
+            "outputTokens": 411,
+            "promptChars": 42812,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    }
+  ]
+}
