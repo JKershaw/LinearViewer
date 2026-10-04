@@ -9,17 +9,18 @@
  *
  * Run with: node --test tests/unit/next-stage-choice.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { GraphQLClient } from 'graphql-request';
 import {
   assemblePlanReviewFacts, formatPlanReviewFactsBlock, REVISION_LABEL_RE
 } from '../../lib/recommendation-facts.js';
-import { formatIssueContext } from '../../lib/openrouter.js';
+import { formatIssueContext, getRecommendation, parseRecommendationResponse, setFetchImpl } from '../../lib/openrouter.js';
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
-import { parseRecommendationResponse } from '../../lib/openrouter.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { readRunLedger } from '../../lib/run-ledger.js';
 import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
+import { fetchIssueContext } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
 
@@ -43,6 +44,39 @@ describe('relations reach the router (LIN-3309 S1)', () => {
     const out = formatIssueContext(issue, {});
     assert.match(out, /\*\*Blocked by \(open\):\*\* LIN-2 — Live blocker \(In Progress\)/);
     assert.match(out, /\*\*Blockers already resolved:\*\* LIN-3 — Done blocker \(Done\); LIN-4 — Canceled blocker \(Canceled\)/);
+    // The resolved split is the thing the research spike showed matters: a resolved
+    // blocker must NOT leak into the open list (mutation: `open = blockedBy`).
+    assert.doesNotMatch(out, /\*\*Blocked by \(open\):\*\*[^\n]*LIN-3/);
+    assert.doesNotMatch(out, /\*\*Blocked by \(open\):\*\*[^\n]*LIN-4/);
+    assert.doesNotMatch(out, /\*\*Blockers already resolved:\*\*[^\n]*LIN-2/);
+  });
+
+  test('Linear normalises an inverse blocks relation to blockedBy (direction + resolved)', async () => {
+    const data = {
+      issue: {
+        id: 'i1', identifier: 'LIN-1', title: 'Blocked task', description: 'd', trashed: false,
+        state: { name: 'In Progress', type: 'started' }, labels: { nodes: [] },
+        parent: null, children: { nodes: [] }, comments: { nodes: [] },
+        inverseRelations: {
+          nodes: [
+            { type: 'blocks', issue: { identifier: 'LIN-2', title: 'Open blocker', state: { name: 'In Progress', type: 'started' } } },
+            { type: 'blocks', issue: { identifier: 'LIN-3', title: 'Done blocker', state: { name: 'Done', type: 'completed' } } },
+            { type: 'blocks', issue: { identifier: 'LIN-4', title: 'Canceled blocker', state: { name: 'Canceled', type: 'canceled' } } },
+            // A 'related' relation is not a blocker and must be dropped.
+            { type: 'related', issue: { identifier: 'LIN-9', title: 'Not a blocker', state: { name: 'Todo', type: 'unstarted' } } },
+          ]
+        }
+      }
+    };
+    const m = mock.method(GraphQLClient.prototype, 'request', async () => data);
+    try {
+      const ctx = await fetchIssueContext('tok', 'i1');
+      assert.deepEqual(ctx.issue.blockedBy.map(b => b.identifier), ['LIN-2', 'LIN-3', 'LIN-4']);
+      assert.equal(ctx.issue.blockedBy.find(b => b.identifier === 'LIN-3').state.type, 'completed');
+      assert.equal(ctx.issue.blockedBy.find(b => b.identifier === 'LIN-4').state.type, 'canceled');
+    } finally {
+      m.mock.restore();
+    }
   });
 
   test('nothing is rendered when there are no blockers', () => {
@@ -113,18 +147,77 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
   });
 
   test('shuffled input order yields the same facts (the reader sorts by createdAt)', () => {
-    const trail = [RC('2026-01-01T00:00:00Z'), { createdAt: '2026-01-02T00:00:00Z', body: 'go on' }, RC('2026-01-03T00:00:00Z')];
+    // Asymmetric on purpose (review F5): a reply lands after the latest verdict in
+    // time but before it in array order, so a reader that trusts input order differs.
+    const trail = [RC('2026-01-03T00:00:00Z'), { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }, RC('2026-01-01T00:00:00Z')];
     const a = assemblePlanReviewFacts(trail);
     const b = assemblePlanReviewFacts([...trail].reverse());
     assert.deepEqual(a, b);
+    assert.deepEqual(a.replies.map(r => r.text), ['go on'], 'the reply after the latest verdict is kept');
   });
 
-  test('revised reads the Revision N label against the verdict count', () => {
+  test('revised reads the HIGHEST Revision N label against the verdict count (F4)', () => {
     const desc = (n) => `## Implementation Plan\n\nthings\n\nRevision ${n} — addresses plan-review findings F1.`;
     assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z')], desc(2)).revised, true);
     assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')], desc(2)).revised, false);
     assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z')], 'no label here').revised, false);
     assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), APP('2026-01-02T00:00:00Z')], desc(3)).revised, false, 'not computed after an Approve');
+    // A description that carries Revision 2 AND Revision 3 with 2 verdicts: the first
+    // match (2) would say not-revised and redo finished work; the highest (3) is right.
+    const twoLabels = `${desc(2)}\n\nRevision 3 — addresses plan-review findings F2.`;
+    const facts = assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')], twoLabels);
+    assert.equal(facts.revisionN, 3);
+    assert.equal(facts.revised, true);
+  });
+
+  test('the newest reply wins: a hold superseded by a go-ahead is not a hold (F3a)', () => {
+    const holdThenGo = [
+      RC('2026-01-01T00:00:00Z'),
+      { createdAt: '2026-01-02T00:00:00Z', body: 'Hold until LIN-3098 ships.' },
+      { createdAt: '2026-01-03T00:00:00Z', body: 'OK, go on.' },
+    ];
+    const facts = assemblePlanReviewFacts(holdThenGo);
+    assert.deepEqual(facts.replies.map(r => r.text), ['OK, go on.', 'Hold until LIN-3098 ships.'], 'newest first');
+    assert.equal(facts.route, 'plan', 'the newest reply (go) wins over the older hold');
+    // The block tells the model to read the NEWEST reply, not any hold in the list.
+    const block = formatPlanReviewFactsBlock(facts);
+    assert.match(block, /The NEWEST reply wins: a hold a later reply superseded is not a hold/);
+    assert.match(block, /unless the NEWEST reply after the latest verdict tells the work to continue/);
+  });
+
+  test('the code route settles the no-reply cases (F1 + FC addendum)', () => {
+    const verdict = (v, at) => ({ createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: ${v}.**` });
+    const oneRc = [verdict('Request Changes', '2026-01-01T00:00:00Z')];
+    const twoRc = [...oneRc, verdict('Request Changes', '2026-01-02T00:00:00Z')];
+    const threeRc = [...twoRc, verdict('Request Changes', '2026-01-03T00:00:00Z')];
+    // count 1 or 2, no reply, not revised -> plan
+    assert.equal(assemblePlanReviewFacts(oneRc).route, 'plan');
+    assert.equal(assemblePlanReviewFacts(twoRc).route, 'plan');
+    // count 3, no reply -> blocked
+    assert.equal(assemblePlanReviewFacts(threeRc).route, 'blocked');
+    // revised -> plan-review (count 1 and count 2 + a revision, this ticket's own state)
+    assert.equal(assemblePlanReviewFacts(oneRc, 'Revision 2 — addresses plan-review').route, 'plan-review');
+    assert.equal(assemblePlanReviewFacts(twoRc, 'Revision 3 — addresses plan-review').route, 'plan-review');
+    // a reply is read in code when its newest word is recognisably go/hold
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }]).route, 'plan');
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'Hold until LIN-3098 ships.' }]).route, 'blocked');
+    // an ambiguous reply is left to the model
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'thanks, looking at this now' }]).route, null);
+    // an agent's plan-posted note is not a reply, so the code route still settles it
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: '**Plan posted** — plan revision written.' }]).route, 'blocked');
+    // an explicit implementation go-ahead routes to the fix round
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on, take it to implementation' }]).route, 'implementation');
+    // Approve -> session-fit rules own it
+    assert.equal(assemblePlanReviewFacts([verdict('Approve', '2026-01-01T00:00:00Z')]).route, null);
+  });
+
+  test('a landed implementation dominates a stale Revision label (FC addendum 2)', () => {
+    const review = { createdAt: '2026-02-01T00:00:00Z', body: '## Review — LIN-3309\n\n### Verdict\nRequest Changes — F1' };
+    const facts = assemblePlanReviewFacts([
+      RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), review,
+    ], '## Implementation Plan\n\nRevision 3 — addresses plan-review findings F1.');
+    assert.equal(facts.revised, true, 'the stale label still reads revised');
+    assert.equal(facts.route, 'implementation', 'but the landed review sends it to the fix round, not plan-review');
   });
 
   test('the planner template carries a line the reader regex reads (coupling test)', () => {
@@ -148,7 +241,7 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
       replies: [{ text: 'go on' }], commentsRead: 8
     });
     assert.match(revised, /Revision landed since the latest verdict: yes \(revision 4\)/);
-    assert.match(revised, /A revision has landed since the latest verdict → \`plan-review\`, at any count and after a go-ahead too/);
+    assert.match(revised, /A revision has landed since the latest verdict → \`plan-review\`, at any count/);
   });
 });
 
@@ -201,5 +294,35 @@ describe('D2: excluded kinds are refused (LIN-3309 S5)', () => {
   test('a normal stage still parses in both modes', () => {
     assert.equal(routeStage('## Reasoning\n→ **plan**', 'stop', 1).action, 'plan');
     assert.equal(parseRecommendationResponse('## Reasoning\n→ **plan**\n## Prompt\nx', 'stop', 1).recommendedAction, 'plan');
+  });
+});
+
+describe('the code route is not sent to the model (LIN-3309 F1 + addendum)', () => {
+  const bundle = (issue, comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
+  const planReviewRc = { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Request Changes.**' };
+
+  test('getRecommendation skips the routing call when the facts settle the route', async () => {
+    setFetchImpl(async () => { throw new Error('the model must not be called for a code-settled route'); });
+    try {
+      const issue = { identifier: 'T-1', title: 't', description: '## Implementation Plan\n\nRevision 2 — addresses plan-review findings.', state: { name: 'In Progress', type: 'started' }, labels: [] };
+      const rec = await getRecommendation(issue, bundle(issue, [planReviewRc]), { apiKey: 'stub', model: 'x', briefWriter: { model: 'x' }, deadline: 0 });
+      assert.equal(rec.codeRoute, 'plan-review');
+      assert.equal(rec.recommendedAction, 'plan-review');
+    } finally {
+      setFetchImpl(null);
+    }
+  });
+
+  test('a Request Changes review routes to the fix-round brief without the model', async () => {
+    setFetchImpl(async () => { throw new Error('the model must not be called for a code-settled route'); });
+    try {
+      const issue = { identifier: 'T-2', title: 't', description: 'do it', state: { name: 'In Progress', type: 'started' }, labels: [] };
+      const review = { createdAt: '2026-01-01T00:00:00Z', body: '## Review — T-2\n\n### Verdict\nRequest Changes — F1' };
+      const rec = await getRecommendation(issue, bundle(issue, [review]), { apiKey: 'stub', model: 'x', briefWriter: { model: 'x' }, deadline: 0 });
+      assert.equal(rec.codeRoute, 'implementation');
+      assert.match(rec.prompt, /### Revising After a Review/);
+    } finally {
+      setFetchImpl(null);
+    }
   });
 });

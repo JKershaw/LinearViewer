@@ -992,11 +992,13 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'the count is computed in code and shown, not re-derived in prose');
     assert.ok(/Count 1 or 2 → \`plan\` \(the revision pass\)/.test(text),
       'the first/second Request Changes route back to plan for the revision pass');
-    assert.ok(/Count 3 or more → \`blocked\`, unless a reply after the latest verdict tells the work to continue/.test(text),
+    assert.ok(/Count 3 or more → \`blocked\`, unless the NEWEST reply after the latest verdict tells the work to continue/.test(text),
       'the third escalates to the human edge via blocked');
-    assert.ok(/A reply after the latest verdict tells the work to hold .* → \`blocked\`, at any count/.test(text),
+    assert.ok(/tells the work to hold .* → \`blocked\`, at any count/.test(text),
       'a hold wins at any count');
-    assert.ok(/A revision has landed since the latest verdict → \`plan-review\`, at any count and after a go-ahead too/.test(text),
+    assert.ok(/The NEWEST reply wins: a hold a later reply superseded is not a hold/.test(text),
+      'the newest reply wins over an older hold');
+    assert.ok(/A revision has landed since the latest verdict → \`plan-review\`, at any count/.test(text),
       'a revised plan must route to plan-review, not back to plan');
     assert.ok(/Never route past an unanswered verdict to \`breakdown\` or \`implementation\`/.test(text),
       'the build/re-review safety floor must survive');

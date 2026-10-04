@@ -18,11 +18,11 @@
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
- *   B. scripts/eval/fixtures/recommend/*.json             (51 targets over 10 files)
+ *   B. scripts/eval/fixtures/recommend/*.json             (54 targets over 10 files)
  *   C. scripts/eval-research-routing.mjs inline CASES[]   (24 inline)
  *   D. scripts/eval/fixtures-widened/*.json               (5 targets: LIN-830 x2, LIN-1084,
  *                                                          breakdown-fork-neg, all-terminal-node)
- *   Total 7 + 51 + 24 + 5 = 87 fixtures.
+ *   Total 7 + 54 + 24 + 5 = 90 fixtures.
  *
  * Grading is deterministic (no LLM judge). Gold overrides are harness-side only; the frozen
  * fixture files are read, never written.
@@ -378,14 +378,18 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
   const wallMs = Math.round(performance.now() - t0);
   const llm = recorders.llm.filter((r) => r.evalCallId === evalCallId);
   const trace = recorders.trace.filter((r) => r.evalCallId === evalCallId);
-  if (llm.length !== 1 || trace.length !== 1) {
-    throw new Error(`recorder correlation failed for ${evalCallId}: llm=${llm.length} trace=${trace.length}`);
+  // LIN-3309: a code-settled route (no reply after the latest verdict) skips the
+  // routing LLM call entirely — 0 llm records, 1 trace — so the correlation check
+  // accepts that shape too instead of failing the run.
+  const expectedLlm = rec.codeRoute ? 0 : 1;
+  if (llm.length !== expectedLlm || trace.length !== 1) {
+    throw new Error(`recorder correlation failed for ${evalCallId}: llm=${llm.length} (expected ${expectedLlm}) trace=${trace.length}`);
   }
   return {
-    action: rec.recommendedAction, deferTo: rec.deferTo || null,
-    latencyMs: llm[0].durationMs ?? wallMs, cost: llm[0].cost ?? null,
-    inputTokens: llm[0].promptTokens ?? null, outputTokens: llm[0].completionTokens ?? null,
-    promptChars: (trace[0].metaPrompt || '').length, servedModel: llm[0].model || null,
+    action: rec.recommendedAction, deferTo: rec.deferTo || null, codeRoute: rec.codeRoute || null,
+    latencyMs: rec.codeRoute ? 0 : (llm[0].durationMs ?? wallMs), cost: rec.codeRoute ? 0 : (llm[0].cost ?? null),
+    inputTokens: rec.codeRoute ? 0 : (llm[0].promptTokens ?? null), outputTokens: rec.codeRoute ? 0 : (llm[0].completionTokens ?? null),
+    promptChars: (trace[0].metaPrompt || '').length, servedModel: rec.codeRoute ? 'code-route' : (llm[0].model || null),
   };
 }
 
@@ -477,8 +481,8 @@ async function main() {
   const armKeys = ['1', '2', '3'].filter((a) => ARMS.includes(a)).map((a) => `arm${a}`);
 
   // Expected total count check (only when unfiltered).
-  if (!ONLY.length && cases.length !== 87) {
-    console.warn(`WARNING: expected 87 fixtures, loaded ${cases.length}`);
+  if (!ONLY.length && cases.length !== 90) {
+    console.warn(`WARNING: expected 90 fixtures, loaded ${cases.length}`);
   }
 
   const recorders = registerRecorders();
