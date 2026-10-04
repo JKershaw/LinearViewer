@@ -40,7 +40,7 @@ Platform Projects
 ### AI
 
 - **AI Prompts** - Generate a focused prompt for any task from its title, description, parent, and siblings
-- **AI Recommendations** - LLM-suggested next actions via OpenRouter (handwritten and AI-generated prompt paths)
+- **AI Recommendations** - LLM-suggested next actions via OpenRouter: one routing call picks the stage, and the stage's template assembles its prompt
 - **Bring Your Own Key** - Connect your OpenRouter account via OAuth, or fall back to a server key
 - **Free Tier** - Rate-limited free prompts when a server free-tier key is configured
 

@@ -1674,7 +1674,7 @@ A compact orientation projection: each task drops the full `description` for a d
 GET /api/proxy/issues/{identifier}/prompt/{templateKey}
 ```
 
-Generates a deterministic, template-based prompt for an issue, whatever the workspace's brief writer setting: it is the template read. To get a pinned stage's prompt as a worker would receive it, use `recommend?kind=`. `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
+Generates a deterministic, template-based prompt for an issue: the same bytes `recommend?kind=` returns for that stage, and the same prompt a routed recommendation assembles when it picks it (one path, LIN-3300). `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
 
 ```json
 {
@@ -2408,7 +2408,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 **`kind` — pin the verb when the engine is wrong.** The recommendation engine is ~90% right but occasionally picks the wrong step (e.g. refuses to hand you a `review` for a task that is plainly ready for one). Rather than hand-writing the prompt that broken verb would have produced — which violates the server-side-only invariant — pass `kind` to **pin the step**. The server still **writes the body**; you only choose the verb. You pick the verb, never the words.
 
 When `kind` is present the verb:
-- **bypasses the LLM** recommendation and descent entirely: no routing call. With the workspace's experimental brief writer off there is no OpenRouter call and no free-tier charge; with it on, the writer rewrites the pinned stage's Goal (one call, charged once, 20-40s behind a keepalive) as it does for a routed recommendation;
+- **bypasses the LLM** recommendation and descent entirely (no OpenRouter call, no free-tier charge); the body is the same one a routed recommendation assembles for that stage;
 - generates the body for the **named issue with no descent** (the wobble is the verb, not the target);
 - accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
 - returns the same headers-only response plus `"override": true`.

@@ -41,7 +41,7 @@ lib/
   tree.js              Transforms flat issues → nested tree structure (frontier ranking in selectFocusSubtask)
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
   context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
-  openrouter.js        OpenRouter API client for AI recommendations
+  openrouter.js        OpenRouter API client; recommendations take one path (LIN-3300): one routing call (or a code-settled route), then composeRoutedRecommendation assembles the routed stage's prompt with generatePrompt
   openrouter-catalog.js  Live OpenRouter model catalog (LIN-1111): in-process TTL-cached wrapper over GET /api/v1/models, mocked in tests via the same `shouldMockAi` predicate that gates the AI recommendation mock; supplements (never replaces) the static DISPATCH_MODEL_SUGGESTIONS datalists in public/common.js + lib/render-settings.js, consumed server-side by Settings and client-side via GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js) — one shared source of truth for both surfaces
   providers/           Provider abstraction (decouples views from Linear specifics)
     index.js           Provider barrel (LIN-2010) — the single entry point for provider registration: owns the five self-registering `<provider>/index.js` imports (moved out of server.js:68-72) and re-exports the `registry.js` readers plus `localProvider` (server.js still needs `localProvider.configure({ store: localStore })`). NOT claimed as the only path to the registry — ~15 pre-existing modules import `registry.js` directly and stay that way; the barrel owns registration and the display/identity reads LIN-2010 migrated. Its import order (`linear, github, github-projects, jira, local`) is load-bearing: `lib/render-settings.js`'s add-row loop iterates `getAllProviders().filter(p => p.addProvider)`, so registration order IS the rendered row order. Caveat recorded in the file: order is really set by the whole ENTRY import graph — an import above server.js:66 that transitively reaches a provider would register it first, and the unit test (barrel-first by construction) would not catch it
@@ -99,16 +99,14 @@ lib/
   swim-graph.js        Swim dependency-graph model (flow / side-rail view)
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
-  prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code after every stage's body on both paths
-  stage-router.js      The next-stage choice's own seam (LIN-3304): the routing sections (routerFragments), the routing-only prompt a writer-on call sends (buildRouterPrompt), and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo). lib/prompts/meta-prompt-template.js composes the SAME fragments into the full template, so the full path stays byte-identical and routing-only is no longer a subtractive mask; getRecommendation/getRecommendationStream call the seam. Behaviour is unchanged here — the known parser defects are follow-up work
-  brief-writer.js      The brief writer's switch (the experimental `briefWriter` workspace feature) and model resolution (LIN-3293), and the two helpers every prompt surface uses: resolveRecommendModels (routed) and generateStagePrompt (pinned); the writing calls live in openrouter.js
-  prompt-template-defs.js  Prompt template definitions (17 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source for the handwritten Goal and the brief writer (LIN-3299)
+  prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code (finishStagePrompt) after every stage's body
+  stage-router.js      The next-stage choice's own seam (LIN-3304): the routing prompt every recommendation call sends (routerFragments → buildRouterPrompt, pinned by tests/fixtures/stage-router-prompts/) and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo); getRecommendation/getRecommendationStream call the seam
+  prompt-template-defs.js  Prompt template definitions (17 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source per stage (LIN-3299)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
   collective-characters-store.js  Collective character (persona) storage (LIN-1048): mirrors custom-prompts-store (Mongo/Mango, UUID, per-anchor-urlKey partition); each record carries its own repo binding (workspaceUrlKey, re-validated at dispatch, NO stored proxy token) + the five persona fields; two kinds — `custom` (capped 20, throw on overflow) and `recent` (auto-recorded per /start dispatch, rolling 10, evict-oldest, never throw); identity = binding+persona, so saving a recent promotes it to custom in place and a dispatched saved character is not double-listed
   prompts/
-    meta-prompt-template.js  Meta-prompt for AI recommendation generation (routingOnly: the routing half alone, LIN-3292)
-    brief-writer.js          The brief writer's prompt (it rewrites a stage's Goal lead only, LIN-3299), PROCESS_ONLY (the stages it never writes), and every stage's Scope and Authority lines (STAGE_INTENT), which withStageIntent places after the Goal's lead on every path (LIN-3293)
+    stage-intent.js          Every stage's Scope and Authority lines (STAGE_INTENT), which withStageIntent places after the Goal's lead (LIN-3291/LIN-3299)
     autopilot-kickoff.js     Autopilot kickoff briefing template
     autopilot-manual.js      Autopilot operating manual ("handbook")
     collective-participant.js  Collective discussion participant prompt (experimental, LIN-450)

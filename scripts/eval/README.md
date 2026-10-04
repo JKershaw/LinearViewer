@@ -1,8 +1,8 @@
 # Research-routing eval (standalone research infra)
 
-A/B harness for the recommendation meta-prompt's **routing decision** (the
+A/B harness for the recommendation routing prompt's **routing decision** (the
 `→ **action**` it emits). Decoupled from `lib/` on purpose: it treats the
-meta-prompt as plain text so you can iterate a candidate in isolation, prove a
+routing prompt as plain text so you can iterate a candidate in isolation, prove a
 lift, and only then make a single manual edit to the live prompt.
 
 ## Files
@@ -10,7 +10,7 @@ lift, and only then make a single manual edit to the live prompt.
 | File | Role |
 |------|------|
 | `../eval-research-routing.mjs` | the harness (reads the two prompt files, runs cases, grades) |
-| `meta-prompt.baseline.txt` | **Arm A** — faithful snapshot of the LIVE meta-prompt |
+| `meta-prompt.baseline.txt` | **Arm A** — faithful snapshot of the LIVE routing prompt (`lib/stage-router.js`) |
 | `meta-prompt.candidate.txt` | **Arm B** — the variant under test (edit this) |
 
 Both use placeholders `{{ISSUE_CONTEXT}}` / `{{IDENTIFIER}}`, filled per case. The
@@ -35,13 +35,13 @@ what the proxy sends — so cases must likewise be leaf tasks to stay faithful.
    ```
    Read: **research recall ↑**, **over-fire ↓**, **off-vocab ↓**, accuracy ↑.
 3. **Ship when proven** — copy the winning wording into the live prompt
-   `lib/prompts/meta-prompt-template.js` (Step 1). Routing lives only in the
-   meta-prompt, so there is no handwritten mirror to update.
+   `lib/stage-router.js` (Step 1). Routing lives only in the router prompt, so
+   there is no template mirror to update.
 4. **Verify the port for free** — regenerate the snapshot and diff:
    ```bash
    node scripts/eval/regen-baseline.mjs && diff scripts/eval/meta-prompt.baseline.txt scripts/eval/meta-prompt.candidate.txt
    ```
-   If the only diff is whitespace, the live template == the proven candidate
+   If the only diff is whitespace, the live prompt == the proven candidate
    (proof-by-construction — no API spend). Then reset candidate to baseline.
 
 ## Env knobs
@@ -53,5 +53,10 @@ cost**; iterate on a small `ONLY` subset before the full suite.
 
 ## Regenerating the baseline snapshot
 
-When `lib/prompts/meta-prompt-template.js` changes, regenerate Arm A so it stays
+When `lib/stage-router.js` changes, regenerate Arm A so it stays
 faithful: `node scripts/eval/regen-baseline.mjs`.
+
+The LIN-263 model spikes, the phase-4 distillation probe, the assessment-scaffold
+spike and the brief-writer comparison measured the prompt a model used to write.
+LIN-3300 deleted that path, and their scripts with it; their results files stay as
+the record.

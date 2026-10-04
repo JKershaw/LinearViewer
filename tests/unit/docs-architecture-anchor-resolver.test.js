@@ -125,7 +125,8 @@ const COMMENT_PREFIX = /^\s*(\*\/?|\/\/|>)\s?/;
 const sourceFiles = walk(repoRoot, '', []);
 const existingDocs = new Set(readdirSync(architectureDir).filter((f) => f.endsWith('.md')));
 
-// The section heading each doc was moved with (LIN-2896 beat 1), fixed here
+// The section heading each doc was moved with (LIN-2896 beat 1; prompt-system.md's
+// renamed by LIN-3300 when the prompt system became one path), fixed here
 // as a literal — deliberately NOT read from git history (a depth-1 CI
 // checkout makes HEAD a grafted root commit, under which every file looks
 // "added at HEAD" and a history-derived heading collapses to the doc's own
@@ -138,7 +139,7 @@ const existingDocs = new Set(readdirSync(architectureDir).filter((f) => f.endsWi
 // why those are different under LIN-2896's "no pinned list" constraint.
 const EXPECTED_HEADINGS = new Map([
   ['source-map.md', '## Architecture'],
-  ['prompt-system.md', '### Prompt System (two independent paths)'],
+  ['prompt-system.md', '### Prompt System (one path)'],
   ['auth.md', '## Authentication'],
   ['configuration.md', '## Environment Variables'],
   ['dispatch-and-proxy.md', '## Dispatch API'],
@@ -242,17 +243,18 @@ describe('docs/architecture/ anchor resolver (LIN-2896)', () => {
           `"${normalizedQuote}", but that text is not in the doc. The referring site expected to find it there ` +
           `verbatim — either the doc's content moved/changed and the quote is now stale, or the citation is wrong.`);
       } else if (/both[- ]paths/i.test(row.keywordContext)) {
-        // The dominant, highest-risk citation class in this file: a claim
-        // that BOTH the handwritten and AI-generated prompt paths are
-        // documented together. Checking only "the file exists" would pass
-        // even if the doc had been edited down to name just one path — the
-        // exact defect class (LIN-2302) this whole ticket exists to guard
-        // against (see CLAUDE.md's own "Invariants" section, G5).
+        // A citation written while the prompt system had two paths (dated
+        // research docs keep them). Since LIN-3300 there is one path with two
+        // halves, and the doc must still name both: the routing call
+        // (lib/openrouter.js) and the stage-prompt assembly
+        // (lib/prompt-templates.js). Checking only "the file exists" would
+        // pass even if the doc had been edited down to one of them — the
+        // defect class (LIN-2302) this whole ticket exists to guard against.
         assert.ok(docText.includes('lib/prompt-templates.js') && docText.includes('lib/openrouter.js'),
           `${row.file}:${row.line} cites docs/architecture/${row.targetDoc} for a "both-paths" rule, but that ` +
-          `doc no longer names both the handwritten path (lib/prompt-templates.js) and the AI-generated path ` +
-          `(lib/openrouter.js). A both-paths rule that only names one path is a false claim of exactly the ` +
-          `class LIN-2302 landed.`);
+          `doc no longer names both the stage-prompt assembly (lib/prompt-templates.js) and the routing call ` +
+          `(lib/openrouter.js). A citation of the prompt system that names only one half is a false claim of ` +
+          `exactly the class LIN-2302 landed.`);
       } else {
         // No literal quote and no both-paths keyword nearby — the weakest
         // remaining citation class, and the one review found landing 31 of

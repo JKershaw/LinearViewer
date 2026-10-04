@@ -89,7 +89,7 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 ## Where the detail lives
 
 - `docs/architecture/source-map.md` — map of the source tree: where each module, page asset, and feature lives, plus file-local invariants (scheduler job roster, prompt-template count, etc.)
-- `docs/architecture/prompt-system.md` — the two-path prompt system and the both-paths update rule; see `docs/prompt-change-validation.md` for the repeatable validation process
+- `docs/architecture/prompt-system.md` — the one-path prompt system (a routing call, then code assembles the stage prompt); see `docs/prompt-change-validation.md` for the repeatable validation process
 - `docs/architecture/views.md` — the view tiers (first-class / experimental / flagged power-user) and how they're surfaced
 - `docs/architecture/auth.md` — Linear OAuth 2.0 and the rest of authentication
 - `docs/architecture/configuration.md` — environment variables
@@ -99,7 +99,7 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 
 ## Invariants
 
-- Prompt-behavior changes (feature flags, workflow instructions, context formatting) must update BOTH paths — handwritten (`lib/prompt-templates.js` → `generatePrompt()`) and AI-generated (`lib/openrouter.js` → `lib/prompts/meta-prompt-template.js`); full detail in `docs/architecture/prompt-system.md`.
+- One path for every recommendation: a routing call (`lib/openrouter.js` → `lib/stage-router.js`) picks the stage and `generatePrompt()` (`lib/prompt-templates.js`) assembles its prompt; no model writes a prompt. Prompt-behavior changes (feature flags, workflow instructions, context formatting) land in the stage templates, routing changes in the router; full detail in `docs/architecture/prompt-system.md`.
 - This file must stay ≤110 lines / ≤12,000 bytes (bytes binding); the `docs/architecture/` citations above must resolve to real content, not just to an existing file.
 - `ci-success` must be green on a PR before merging (it aggregates the unit and e2e jobs).
 - A PAT-mode session still supports OAuth if OAuth vars are configured; see `docs/architecture/auth.md`.
