@@ -204,7 +204,8 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }]).route, null);
     assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'Hold until LIN-3098 ships.' }]).route, null);
     assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'thanks, looking at this now' }]).route, null);
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: '**Plan posted** — plan revision written.' }]).route, null);
+    // An agent's own note is part of the trail, not a reply (FC 10c608df): code still settles.
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: '**Plan posted** — plan revision written.' }]).route, 'blocked');
     assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on, take it to implementation' }]).route, null);
     // Approve -> session-fit rules own it
     assert.equal(assemblePlanReviewFacts([verdict('Approve', '2026-01-01T00:00:00Z')]).route, null);
@@ -216,7 +217,74 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
       RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), review,
     ], '## Implementation Plan\n\nRevision 3 — addresses plan-review findings F1.');
     assert.equal(facts.revised, true, 'the stale label still reads revised');
-    assert.equal(facts.route, null, 'the review is a reply: the router reads it, no code rule sends it to implementation');
+    assert.equal(facts.landed, 'a code review is on the trail');
+    assert.equal(facts.route, null, 'the landed review hands the route to the router; no code rule sends it to implementation');
+  });
+
+  describe('a reply means a person\'s reply (FC 10c608df)', () => {
+    const twoRc = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')];
+    const rev3 = '## Implementation Plan\n\nRevision 3 — addresses plan-review 53e4757c.';
+    const note = (body) => ({ createdAt: '2026-01-03T00:00:00Z', body });
+
+    test('a revised plan with its planner note routes to plan-review in code (this ticket\'s own trail)', () => {
+      // LIN-3309 at 15:05: two Request Changes, then the planner's own note for Revision 3.
+      const facts = assemblePlanReviewFacts([...twoRc, note('**Plan revised in the description (`## Implementation Plan`, Revision 3), answering plan-review 53e4757c.** Plan-review is due again.')], rev3);
+      assert.deepEqual(facts.replies, [], 'the planner note is not a reply');
+      assert.equal(facts.route, 'plan-review');
+      const block = formatPlanReviewFactsBlock(facts);
+      assert.match(block, /→ Route this pass: `plan-review`/);
+      assert.match(block, /agent notes are not replies\): none/);
+    });
+
+    test('each agent note form is part of the trail, not a reply', () => {
+      for (const body of [
+        '**Plan posted in the description (`## Implementation Plan`).** One PR.',
+        '**Plan revision 1 written** (`## Implementation Plan` in the description).',
+        'Revision 4 — addresses plan-review findings.',
+        '**Autopilot step record — plan revision 1 done (verified); plan-review round 2 started.**',
+        '## Autopilot plan step done',
+      ]) {
+        assert.deepEqual(assemblePlanReviewFacts([...twoRc, note(body)]).replies, [], body);
+      }
+    });
+
+    test('a person\'s reply, an FC ruling included, still defers to the model', () => {
+      for (const body of ['Decision (FC): go on — take the revision.', '**Note for the plan revision (FC).** F3 is right.', 'Hold until LIN-3098 ships.']) {
+        const facts = assemblePlanReviewFacts([...twoRc, note(body)], rev3);
+        assert.equal(facts.replies.length, 1, body);
+        assert.equal(facts.route, null, body);
+      }
+    });
+  });
+
+  describe('an implementation that landed ends the plan-review routing (FC 10c608df)', () => {
+    const summary = (at = '2026-01-03T00:00:00Z') => ({ createdAt: at, body: '**Implementation complete — PR opened: https://github.com/JKershaw/LinearViewer/pull/1748** (commit e1287c0c).' });
+
+    test('an earlier Approve no longer points at implementation once a PR has landed', () => {
+      const facts = assemblePlanReviewFacts([APP('2026-01-01T00:00:00Z'), summary()]);
+      assert.equal(facts.landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
+      assert.equal(facts.route, null);
+      const block = formatPlanReviewFactsBlock(facts);
+      assert.match(block, /Implementation landed since the latest verdict: yes \(https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1748\)/);
+      assert.match(block, /an Approve does not point at `implementation` again/);
+      assert.doesNotMatch(block, /Latest verdict is Approve → route on the session-fit answer/, 'rule 1 is not offered on a landed trail');
+      assert.doesNotMatch(block, /→ Route this pass:/);
+    });
+
+    test('a landed PR also releases a revised Request Changes trail from the code route', () => {
+      const facts = assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), summary()], '## Implementation Plan\n\nRevision 3 — addresses plan-review.');
+      assert.equal(facts.revised, true);
+      assert.deepEqual(facts.replies, [], 'the implementation summary is a stage note, not a reply');
+      assert.equal(facts.route, null, 'never plan-review again after the build');
+    });
+
+    test('a PR only before the latest verdict, or cited in a planner note, is not landed', () => {
+      assert.equal(assemblePlanReviewFacts([summary('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')]).landed, null);
+      const plannerCites = { createdAt: '2026-01-03T00:00:00Z', body: '**Plan revised in the description (Revision 2)**, grounded on https://github.com/JKershaw/LinearViewer/pull/1747.' };
+      const facts = assemblePlanReviewFacts([RC('2026-01-02T00:00:00Z'), plannerCites], 'Revision 2 — addresses plan-review');
+      assert.equal(facts.landed, null);
+      assert.equal(facts.route, 'plan-review');
+    });
   });
 
   test('the planner template carries a line the reader regex reads (coupling test)', () => {
@@ -233,7 +301,7 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
       replies: [{ text: 'Hold until LIN-9 ships' }], commentsRead: 2
     });
     assert.match(hold, /Request Changes \/ Needs Discussion since the latest Approve: 1/);
-    assert.match(hold, /Reply after the latest verdict: "Hold until LIN-9 ships"/);
+    assert.match(hold, /A person's reply after the latest verdict \(agent notes are not replies\): "Hold until LIN-9 ships"/);
     assert.match(hold, /hold \(stop, wait, do not proceed\) → \`blocked\`, at any count/);
     const revised = formatPlanReviewFactsBlock({
       verdicts: 3, count: 3, latestVerdict: 'request changes', revised: true, revisionN: 4,
