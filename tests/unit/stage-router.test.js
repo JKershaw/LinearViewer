@@ -20,7 +20,7 @@ import {
   parseDeferTo
 } from '../../lib/stage-router.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
-import { parseRecommendationResponse } from '../../lib/openrouter.js';
+import { parseRecommendationResponse, buildSelectorArgs } from '../../lib/openrouter.js';
 
 const ARGS = {
   issueContext: 'CTX', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0,
@@ -38,17 +38,18 @@ const NODE_ARGS = {
 };
 
 describe('stage-router: one owner for the next-stage choice (LIN-3304)', () => {
-  test('the router prompt is byte-identical to the routing half the full template composes', () => {
-    // A non-Linear provider must be in the set: the capability pass renames the
-    // tracker on both paths, and skipping it in buildRouterPrompt (review finding 1)
-    // only shows up off the default provider.
-    const github = { ...ARGS, featureFlags: { linearMcp: false }, providerUi: { displayName: 'GitHub Issues' } };
-    for (const args of [ARGS, NODE_ARGS, { ...NODE_ARGS, isTerminal: true }, github]) {
-      assert.equal(
-        buildRouterPrompt(args),
-        buildMetaPromptTemplate({ ...args, routingOnly: true }),
-        `routing-only output must match the seam for ${args.identifier}`
-      );
+  // LIN-3300: the router is the stage selector now, its own prompt rather than the
+  // full template's routing half with the writing blanked out. The full (writer-off)
+  // template keeps that half until every recommendation takes one path.
+  test('the selector is its own prompt; the full template keeps its own routing half', () => {
+    const selector = buildRouterPrompt(buildSelectorArgs(
+      { identifier: 'LIN-1', title: 't', description: 'd', state: { name: 'Todo', type: 'unstarted' }, labels: [] },
+      { parent: null, siblings: [], project: null, children: [], comments: [] }
+    ));
+    assert.match(selector, /## How to choose/);
+    assert.doesNotMatch(selector, /Sequential Workflow Decision/);
+    for (const args of [ARGS, NODE_ARGS]) {
+      assert.match(buildMetaPromptTemplate(args), /## CRITICAL: Sequential Workflow Decision/);
     }
   });
 

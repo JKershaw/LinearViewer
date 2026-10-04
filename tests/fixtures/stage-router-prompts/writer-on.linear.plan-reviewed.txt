@@ -2,24 +2,50 @@ You choose the next stage of work for one ticket. You do not do the work or writ
 
 ## The ticket
 
-**Issue:** ABC-30 - A terminal node with an open subtask
-**State:** Done (completed)
-**Subtasks Overview:**
-✓ Done: ABC-31
-○ Remaining:
-  → ABC-32 open one (in progress)
-**→ SUGGESTED NEXT (defer candidate): ABC-32 - open one (In Progress)**
-**Description:** Parent.
+**Issue:** ABC-40 - A planned leaf
+**State:** In Progress (started)
+**Description:** Goal.
+
+## Implementation Plan
+
+Revision 2 — addresses plan-review F1.
+
+Session fit: fits one session.
+
+plan-review due: yes
+
+**Comments:** Latest 1 of 1 comments, oldest first (older bodies are not shown; the trail facts read all of them).
+
+**Agent** (2026-10-01):
+### Plan Review Verdict
+
+**Verdict:** Request Changes.
 
 ## Facts computed in code
 
-**TRAIL FACTS (computed in code from all 0 comments — do not re-derive):**
+**TRAIL FACTS (computed in code from all 1 comments — do not re-derive):**
 - Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)
 - PRs linked on the trail: none
-- Subtasks: 2 (1 done, 1 in progress, 1 remaining)
-- Open subtasks: ABC-32 [actionable]
-- Frontier next child (skip-blocked, unblocks-most/critical-path ranked): ABC-32
-- Session fit stated in the plan: none
+- Implementation plan in the description: yes (revision 2)
+- Session fit stated: fits one session
+- Plan-review due stated: yes
+
+**PLAN-REVIEW FACTS (deterministic — do not re-derive):**
+- Plan-review verdicts on the trail: 1 (comments read: 1)
+- Latest verdict: request changes
+- Request Changes / Needs Discussion since the latest Approve: 1
+- Revision landed since the latest verdict: yes (revision 2)
+- A person's reply after the latest verdict (agent notes are not replies): none
+
+**→ Route this pass: `plan-review`** — computed in code from the facts below. It supersedes any older escalation wording quoted in the trail (an autopilot step record may repeat a rule that no longer holds).
+
+Route on these facts, first match wins:
+1. Latest verdict is Approve → route on the session-fit answer (`implementation` if "fits one session", `breakdown` if "needs multiple sessions"); never re-emit `plan-review` on a plan that already has one, and never read an Approve as close-out evidence.
+2. A reply after the latest verdict tells the work to hold (stop, wait, do not proceed) → `blocked`, at any count. The NEWEST reply wins: a hold a later reply superseded is not a hold.
+3. A revision has landed since the latest verdict → `plan-review`, at any count (unless rule 2's NEWEST reply came after the revision).
+4. Count 1 or 2 → `plan` (the revision pass).
+5. Count 3 or more → `blocked`, unless the NEWEST reply after the latest verdict tells the work to continue: follow it — `implementation` if it names implementation or says the plan is approved to build, otherwise `plan` (the revision pass).
+Never route past an unanswered verdict to `breakdown` or `implementation`.
 
 ## Stages
 

@@ -58,8 +58,8 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 127237, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority
-  'lib/prompt-templates.js': 20707, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority
+  'lib/prompt-template-defs.js': 121897, // LIN-3300: -5340, each stage's route (when / when not / requires) replaces its aiHint
+  'lib/prompt-templates.js': 20624, // LIN-3300: -83, formatStageOptions and defer's entry replace the aiHint formatter
   'lib/prompt-formatters.js': 52917, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3481,
 };
@@ -75,7 +75,7 @@ export const TEMPLATES_SOURCE_CEILINGS = {
 export const TEMPLATES_RENDERED_CEILINGS = {
   blocked: 3244,
   bug: 4744,
-  plan: 15960,
+  plan: 15921,
   'look-into': 1762,
   triage: 2429,
   breakdown: 5096,
@@ -93,9 +93,9 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 67740; // LIN-3304: -38051, the routing fragments moved into lib/stage-router.js; every byte is now owned once, there is no stale slack
+export const META_PROMPT_SOURCE_CEILING = 67691; // LIN-3304: -38051, the routing fragments moved into lib/stage-router.js. LIN-3300: lowered to its size
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 103308;
+export const META_PROMPT_RENDERED_CEILING = 101724; // LIN-3300: -1584, the stage options replace the aiHints
 
 /**
  * The stage router's source bytes (lib/stage-router.js, LIN-3304). This surface
@@ -105,7 +105,11 @@ export const META_PROMPT_RENDERED_CEILING = 103308;
  * carried, plus the parse that was never frozen. Its own ceiling is what keeps the
  * routing half from growing silently inside the meta-prompt's old slack.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 45728;
+export const STAGE_ROUTER_SOURCE_CEILING = 48105;
+// LIN-3300: +2377. The file now holds the stage selector (its rules, prompt and Why now
+// parse) beside the full meta path's routing half, which stays until the one-path change
+// deletes it. Paid by aiHint leaving the defs and the meta prompt; the selector itself
+// sends 11.5 KB of fixed text where the routing-only prompt sent 27.7 KB.
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
@@ -139,8 +143,11 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * moved out; the net increase is the reply-parse code that moved in from
  * lib/openrouter.js, which was never a frozen surface, plus the seam's docs. The sum
  * still equals the total, so there is no new slack.
+ *
+ * LIN-3300 lowered it by 4718 (575524 -> 570806): every ceiling now sits at its surface's
+ * size, and the stage selector's rules and options cost less than the aiHints they replace.
  */
-export const FROZEN_TOTAL_BYTES = 575524;
+export const FROZEN_TOTAL_BYTES = 570806;
 
 const BASE_URL = 'https://harbour.example';
 

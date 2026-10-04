@@ -163,8 +163,9 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
     await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/writer' } });
     const meta = calls.find(c => !c.isWriter).content;
     assert.doesNotMatch(meta, /## Prompt Structure|Quality rules for generated prompts|\n## Prompt\n/);
-    assert.match(meta, /## CRITICAL: Sequential Workflow Decision/);
-    assert.match(meta, /→ \*\*<action>\*\*/);
+    // LIN-3300: the routing call is the stage selector.
+    assert.match(meta, /## How to choose/);
+    assert.match(meta, /→ \*\*<stage>\*\*/);
   });
 
   test('the writer rewrites the Goal\'s lead alone, on its own model, told what code adds and where the router points', async () => {
