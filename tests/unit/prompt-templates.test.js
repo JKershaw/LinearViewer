@@ -520,9 +520,11 @@ describe('bug template', () => {
     // Note: the template's section array is .filter(Boolean)-ed, which strips empty
     // strings — so adjacent items end up separated by a single '\n', not '\n\n'.
     // This snapshot reflects the post-filter shape.
+    // LIN-3299: the role line became the Goal's lead, and the steps moved under ## Process.
     const expectedGoalBlock = [
       '## Goal',
-      '**Role**: Act as a software debugger investigating unexpected behavior. You have authority to reproduce issues, trace root causes, and propose fixes, but should not deploy changes without review.',
+      'Something behaves wrong. Find its cause for certain, and whether it is one of a class, and propose the fix that removes it; the next stage builds it, and nothing ships without review.',
+      '## Process',
       'Start by reading any prior investigation notes in comments. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
       'Investigation process:',
       '1. Reproduce the issue (document exact steps)',
@@ -626,9 +628,10 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Next: TEST-C1'));
   });
 
-  test('uses planning role, not implementation role', () => {
+  // LIN-3299: the role line is the Goal's lead now; it keeps the role's limit.
+  test('leads with planning, and makes no code changes', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('technical planner'));
+    assert.ok(result.prompt.includes('the code changes are the next step\'s, so make none here'));
     assert.ok(!result.prompt.includes('implementation engineer'));
   });
 
@@ -1116,6 +1119,16 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
       'a query must not be the only accepted form of bounding at research stage');
   });
 
+  // LIN-3299: research's Goal told it to recommend "not final decisions on direction",
+  // which contradicts its Scope and Authority (engineering choices are the agent's).
+  test('research recommends an approach without being told the direction is not its to decide', () => {
+    const { prompt } = generatePrompt('research', researchIssue, ctx);
+    assert.doesNotMatch(prompt, /final decisions on direction/i);
+    assert.match(prompt, /recommend an approach the next stage can build on/);
+    const withComments = generatePrompt('research', researchIssue, { ...ctx, comments: [{ body: 'notes', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }] }).prompt;
+    assert.ok(withComments.split('## Process')[1].includes('build on existing findings'), 'prior research is a process step, printed by code');
+  });
+
   test('treats an unbound class as a first-class answer, naming the two recurring shapes', () => {
     const result = generatePrompt('research', researchIssue, ctx);
     assert.ok(/A class you could not bound is a first-class answer/i.test(result.prompt),
@@ -1593,12 +1606,15 @@ describe('triage template', () => {
     assert.strictEqual(priorityLine, '**Priority:** Not set');
   });
 
-  test('(f3) the Role authority line names priorityLevel as the sole priority write field', () => {
+  // LIN-3299: the role line became the Goal's lead, which grants the authority without
+  // naming a field; the write field is named once, in the metadata bullet (f4).
+  test('(f3) the Goal lead grants the metadata authority without naming any priority field', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
-    const roleLine = result.prompt.split('\n').find(l => l.startsWith('**Role**:'));
-    assert.ok(roleLine, 'the Role authority line is present');
-    assert.deepStrictEqual(namedPriorityFields(roleLine), ['priorityLevel'],
-      'the Role line names exactly priorityLevel as a priority-family field — never a bare native `priority` alongside it');
+    const lines = result.prompt.split('\n');
+    const lead = lines[lines.indexOf('## Goal') + 1];
+    assert.match(lead, /priority/, 'the lead is the authority line');
+    assert.deepStrictEqual(namedPriorityFields(lead), [],
+      'the lead names no priority-family field, so never a bare native `priority`');
   });
 
   test('(f4) the Other Metadata Priority bullet names priorityLevel as the sole write field', () => {
@@ -4181,6 +4197,16 @@ describe('cross-path grounding parity (LIN-435)', () => {
     );
   });
 
+  // LIN-3299: a research run adopted a ticket's prescribed limit ("leave this file
+  // unchanged") as its own. The one hypothesis sentence covers the ticket's proposed fix
+  // as well as its account of the code, on both paths, since grounding is shared.
+  test('the hypothesis sentence covers the ticket\'s proposed fix, on both paths', () => {
+    const sentence = appendGroundingSections('', issue, context).split('\n').find(l => l.startsWith('Treat this ticket'));
+    assert.match(sentence, /\*\*hypothesis\*\*/);
+    assert.match(sentence, /any solution or limit it proposes/);
+    assert.ok(applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: 'research' }, issue, context).prompt.includes(sentence));
+  });
+
   test('defer replies (prompt:null) get NO grounding — the no-body cost contract (LIN-327/328)', () => {
     const deferReply = { reasoning: 'r', prompt: null, truncated: false, recommendedAction: 'defer', deferTo: 'LIN-2', completionTokens: 1 };
     const out = applyGroundingToRecommendation(deferReply, issue, context);
@@ -5230,4 +5256,35 @@ describe('finished-task notes ask what their stage does (LIN-3292)', () => {
       }
     });
   }
+});
+
+// =============================================================================
+// LIN-3299: a stage's Goal is its intent, the lead; the process code prints as written
+// follows under ## Process. The switch-off meta path's skeleton mirrors the shape, so a
+// generated prompt leads with purpose instead of a role and keeps its steps apart.
+// =============================================================================
+describe('the Goal lead and the Process, on both paths (LIN-3299)', () => {
+  const metaArgs = {
+    issueContext: 'CTX', identifier: 'LIN-3299',
+    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
+    hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, research',
+    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
+  };
+
+  test('handwritten: every template leads its Goal with the intent and puts its steps under ## Process', () => {
+    const issue = { identifier: 'LIN-3299', title: 'T', description: 'd', state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-03-01T00:00:00.000Z', labels: [] };
+    for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+      const { prompt } = generatePrompt(kind, issue, { children: [], comments: [] });
+      assert.ok(prompt.indexOf('## Goal') < prompt.indexOf('## Process'), kind);
+      assert.equal(prompt.split('\n## Process\n').length, 2, `${kind}: one process section`);
+      assert.doesNotMatch(prompt, /\*\*Role\*\*|\bAct as\b/, kind);
+    }
+  });
+
+  test('meta: the skeleton asks for a lead, then a Process, and no role', () => {
+    const meta = buildMetaPromptTemplate(metaArgs);
+    const goal = meta.slice(meta.indexOf('\n## Goal\n'), meta.indexOf('### Quality rules'));
+    assert.doesNotMatch(goal, /\*\*Role\*\*/);
+    assert.match(goal, /## Goal\n\[[^\]]*what the work is for[^\]]*\]\n\n## Process\n\[/);
+  });
 });
