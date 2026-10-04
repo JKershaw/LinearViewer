@@ -25,12 +25,12 @@ for splitting.
 | `fixtures-widened/` | class-D fixtures + their `_source/` captures |
 | `jev-routing-out/` | generated `results.json` + `report.md` (+ `stability.md` — the run-to-run go/no-go evidence; the K=5 run is canonical) |
 
-## Fixture population — 66
+## Fixture population — 87
 
 | class | source | count |
 |---|---|---|
 | A | `scripts/eval/fixtures/*.json` (7 real frozen) | 7 |
-| B | `scripts/eval/fixtures/recommend/*.json` (30 targets over 8 files) | 30 |
+| B | `scripts/eval/fixtures/recommend/*.json` (51 targets over 10 files) | 51 |
 | C | `scripts/eval-research-routing.mjs` inline `CASES[]` (read-only extraction) | 24 |
 | D | `scripts/eval/fixtures-widened/*.json` (`LIN-830@implement`, `LIN-830@review`, `LIN-1084`, `breakdown-fork-neg`, `all-terminal-node`) | 5 |
 

@@ -971,32 +971,45 @@ describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () =
       'both pre-existing session-fit routes must remain intact');
   });
 
+  const REVIEW_FACTS = {
+    verdicts: 2, count: 1, latestVerdict: 'request changes', revised: false,
+    revisionN: 2, replies: [], commentsRead: 5
+  };
+
   test('gate met + no verdict on the trail ⇒ plan-review, and only then', () => {
     const text = build();
     assert.ok(/Recommend \`plan-review\` when ALL of these hold: a plan exists; the gate is met; and NO plan-review verdict is on the trail yet/i.test(text),
       'all three conditions must be required together');
-    assert.ok(/Do NOT re-emit \`plan-review\` on a plan that already has one/i.test(text),
+    const withVerdict = build({ planReviewFacts: { ...REVIEW_FACTS, latestVerdict: 'approve', count: 0 } });
+    assert.ok(/never re-emit \`plan-review\` on a plan that already has one/i.test(withVerdict),
       'a plan that already carries a verdict must not be re-reviewed');
+    assert.ok(!/PLAN-REVIEW FACTS \(deterministic/.test(text), 'no facts block when no verdict is on the trail');
   });
 
-  test('the revision loop is bounded at one cycle, escalating to the human edge on the second', () => {
-    const text = build();
-    assert.ok(/\*\*Request Changes \/ Needs Discussion \(the first one\)\*\* → \`plan\`/i.test(text),
-      'the first Request Changes must route back to plan for the revision pass');
-    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend \`blocked\`/i.test(text),
-      'the second must escalate to the human edge via blocked');
-    assert.ok(/Do NOT emit a third \`plan-review\`, and do NOT emit another \`plan\`/i.test(text),
-      'neither a third plan-review nor a further plan may be emitted after the second verdict');
-    assert.ok(/One revision cycle \(plan → plan-review → revised plan → plan-review\) is \*converging\*; a second is \*looping\*/i.test(text),
-      'the bound must name converging vs looping, matching the kickoff and handbook wording');
+  test('the revision loop is bounded in code, escalating after the third verdict', () => {
+    const text = build({ planReviewFacts: REVIEW_FACTS });
+    assert.ok(/Request Changes \/ Needs Discussion since the latest Approve: 1/i.test(text),
+      'the count is computed in code and shown, not re-derived in prose');
+    assert.ok(/Count 1 or 2 → \`plan\` \(the revision pass\)/.test(text),
+      'the first/second Request Changes route back to plan for the revision pass');
+    assert.ok(/Count 3 or more → \`blocked\`, unless a reply after the latest verdict tells the work to continue/.test(text),
+      'the third escalates to the human edge via blocked');
+    assert.ok(/A reply after the latest verdict tells the work to hold .* → \`blocked\`, at any count/.test(text),
+      'a hold wins at any count');
+    assert.ok(/A revision has landed since the latest verdict → \`plan-review\`, at any count and after a go-ahead too/.test(text),
+      'a revised plan must route to plan-review, not back to plan');
+    assert.ok(/Never route past an unanswered verdict to \`breakdown\` or \`implementation\`/.test(text),
+      'the build/re-review safety floor must survive');
   });
 
   test('Approve routes on session-fit as before, and is explicitly not close-out evidence', () => {
-    const text = build();
-    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
+    const text = build({ planReviewFacts: { ...REVIEW_FACTS, count: 0, latestVerdict: 'approve' } });
+    assert.ok(/Latest verdict is Approve → route on the session-fit answer/.test(text),
       'an approved plan must rejoin the unchanged session-fit routing');
-    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
+    assert.ok(/never read an Approve as close-out evidence/i.test(text),
       'the carve-out must also be stated at the producing end of the verdict');
+    assert.ok(/An Approve authorizes implementation only — it is never close-out evidence/.test(build()),
+      'the static lead also carries the carve-out');
   });
 
   test('the Completed-prep rule carries the one exception the revision branch needs', () => {
@@ -3394,16 +3407,14 @@ describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049
     const text = build();
     assert.ok(/fits one session.*`implementation`.*needs multiple sessions.*`breakdown`/is.test(text),
       'both pre-existing session-fit routes must survive');
-    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
-      'the Approve routing pin (openrouter.test.js:993) must survive');
-    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
+    assert.ok(/route on the PLAN-REVIEW FACTS below \(computed in code — do not re-count or re-derive it\)/i.test(text),
+      'the verdict routing lead must point at the code-computed facts');
+    assert.ok(/An Approve authorizes implementation only — it is never close-out evidence/i.test(text),
       'the Approve-not-close-out pin must survive');
     assert.ok(/Completed prep ⇒ never re-emit the prep verb/i.test(text),
       'the completed-prep rule itself must survive');
     assert.ok(/ONE exception, and only one: a `plan-review` that recorded \*\*Request Changes\*\* or \*\*Needs Discussion\*\*/i.test(text),
       'the single request-changes exception pin (openrouter.test.js:1005) must survive');
-    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend `blocked`/i.test(text),
-      'the one-cycle bound pin must survive');
     assert.ok(/no committed scope ⇒ never `implement`/i.test(text),
       'the no-committed-scope rule must survive');
     assert.ok(/one-directional/i.test(text) && /resolve DOWN/i.test(text),

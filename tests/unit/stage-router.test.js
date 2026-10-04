@@ -4,9 +4,8 @@
  * This is the routing eval arm the ticket asks for, pinned at the seam: it proves
  * the router prompt the writer-on live path sends is byte-identical to the routing
  * half the full template composes, and that the routing reply is parsed into the
- * stage decision by one owner. Behaviour is deliberately unchanged here — the two
- * known defects (a `**Reasoning**` header, an out-of-list stage) are pinned as
- * PRESENT, so the follow-up ticket that fixes them has a witness to move.
+ * stage decision by one owner. LIN-3309 fixed the two defects this seam pinned as
+ * PRESENT (`**Reasoning**` streaming, an out-of-list `retro`), so those pins moved.
  *
  * Run with: node --test tests/unit/stage-router.test.js
  */
@@ -83,14 +82,16 @@ describe('stage-router: one owner for the next-stage choice (LIN-3304)', () => {
     assert.throws(() => routeStage('## Reasoning\n→ **defer**', 'stop', 3), /DeferTo target/);
   });
 
-  test('PRESENT-BEHAVIOUR PIN: the live `**Reasoning**` header still parses in routing mode (fix owed later)', () => {
+  test('the live `**Reasoning**` header still parses in routing mode (D1 fixed the stream, not the parse)', () => {
     const d = routeStage('**Reasoning**\n→ **design**\n**Next:** weigh the shapes', 'stop', 3);
     assert.equal(d.action, 'design');
     assert.ok(d.reasoning.startsWith('→ **design**') || d.reasoning.includes('Weigh') || d.reasoning.includes('→'), 'the reasoning survives the bold header');
   });
 
-  test('PRESENT-BEHAVIOUR PIN: an out-of-list stage is still accepted in routing mode (fix owed later)', () => {
-    assert.equal(routeStage('## Reasoning\n→ **retro**', 'stop', 3).action, 'retro');
+  test('an out-of-list stage is rejected in routing mode (D2)', () => {
+    assert.throws(() => routeStage('## Reasoning\n→ **retro**', 'stop', 3), /cannot be recommended/);
+    // `parseRecommendedAction` stays a pure extractor that returns the token.
+    assert.equal(parseRecommendedAction('## Reasoning\n→ **retro**'), 'retro');
   });
 
   test('the full-mode parse is unchanged: it still requires a ## Prompt body', () => {

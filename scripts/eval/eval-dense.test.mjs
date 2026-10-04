@@ -74,8 +74,12 @@ test('STUB runs with OPENROUTER_API_KEY unset (reaches the stub transport)', (t)
   assert.equal(r.res.status, 0, r.res.stderr);
   assert.ok(r.summary, 'summary.json was written');
   assert.equal(r.summary.production.errors, 0, 'no run may error without a key under STUB');
-  assert.equal(r.summary.production.hit, 175);
-  assert.equal(r.summary.production.n, 200);
+  // 51 targets × 5 models. LIN-3309 added 11 recommend targets (10 next-stage-choice
+  // + plan-review-gate request-changes-3); all hit under the stub, so the counts move
+  // from 175/200 to 230/255. The 25 remaining misses are the pre-existing LIN-385 /
+  // LIN-389 / LIN-428 descent cases, unchanged.
+  assert.equal(r.summary.production.hit, 230);
+  assert.equal(r.summary.production.n, 255);
 });
 
 test('cost of a failed attempt that is then retried is counted', (t) => {
