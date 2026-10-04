@@ -533,15 +533,12 @@ function initDeployTime() {
  *                                            targets are supported (e.g. audit.js → `/`).
  * @param {boolean} [opts.toastOnError=false] When true, surface the error via
  *                                            `window.toast(msg, {type:'error'})` before throwing.
- * @param {boolean} [opts.statusInBody=false] For a keepalive-armed route (lib/http-keepalive.js):
- *                                            once it has flushed, a 200 carries the real
- *                                            status as `statusCode`, read here like a real one.
  * @returns {Promise<*>} Parsed JSON body on success (null if the body is empty/non-JSON).
  * @throws {Error} On a non-2xx response. The error carries `.status` and `.body`
  *                 (the parsed error payload, or null if it wasn't JSON).
  */
 window.api = async function api(url, opts = {}) {
-  const { on401 = '/logout', toastOnError = false, statusInBody = false, ...fetchOpts } = opts;
+  const { on401 = '/logout', toastOnError = false, ...fetchOpts } = opts;
 
   const response = await fetch(url, fetchOpts);
 
@@ -554,9 +551,7 @@ window.api = async function api(url, opts = {}) {
     // Non-JSON or empty body — leave body null.
   }
 
-  const status = statusInBody && response.ok && body && typeof body.statusCode === 'number'
-    ? body.statusCode
-    : response.status;
+  const status = response.status;
 
   // 401 → redirect by default (session expired). `on401:false` falls through to
   // the normal throw path so the caller can branch on `err.status === 401`.

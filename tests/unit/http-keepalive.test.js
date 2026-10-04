@@ -5,7 +5,7 @@
  * its first-byte deadline from the router's X-Request-Start stamp (not from when the
  * handler got round to arming it), and sends a body byte with the flush rather than
  * bare headers. The SSE framing sends a comment line on the same cadence while a
- * stream is otherwise silent (the brief writer's 20-40s). clientGoneSignal turns a
+ * stream is otherwise silent (a slow routing call). clientGoneSignal turns a
  * client hang-up into an abort for the model calls.
  */
 import { test, describe } from 'node:test';

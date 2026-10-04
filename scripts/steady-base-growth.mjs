@@ -10,9 +10,11 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer
 // prompt-templates.js held the template bodies until the 2026-02 split into -defs/-formatters.
 export const GROUPS = {
   'worker templates': ['lib/prompt-templates.js', 'lib/prompt-template-defs.js', 'lib/prompt-formatters.js', 'lib/prompt-contract.js'],
+  // The meta-prompt template and the brief writer were deleted by LIN-3300; kept for history.
   'meta-prompt': ['lib/prompts/meta-prompt-template.js'],
   'stage router': ['lib/stage-router.js'],
   'brief writer': ['lib/prompts/brief-writer.js'],
+  'stage intent': ['lib/prompts/stage-intent.js'],
   'autopilot kickoff': ['lib/prompts/autopilot-kickoff.js', 'lib/prompts/autopilot-manual.js'],
   'operating manual': ['docs/autopilot-operating-manual.md'],
   'lane + passage prompts': ['docs/worker-lane-prompt.md', 'docs/passage-runner-prompt.md', 'docs/passage-planner-prompt.md', 'docs/runner-prompt.md'],

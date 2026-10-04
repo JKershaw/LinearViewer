@@ -65,8 +65,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
-import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
-import { resolveRecommendModels } from '../lib/brief-writer.js';
+import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
 import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
@@ -1632,12 +1631,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // Resolved BEFORE the model so the free-tier clamp (LIN-513) can force the
     // default model — a free-tier descent must never bill a workspace-preferred model.
     const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-    // The brief writer (LIN-3293): when on, this hop's call only routes and a second
-    // call writes the prompt, inside the same hop timeout and descent deadline.
-    // Resolved with the router's model by the one helper every recommend surface uses.
-    const { model: selectedModel, briefWriter } = await resolveRecommendModels({ urlKey, workspacePreferencesStore, isFreeTier });
-    // Five seconds' margin so a fallback to the unwritten bundle lands before either fires.
-    const hopDeadline = Math.min(deadline ?? Infinity, Date.now() + LLM_TIMEOUT_MS) - 5000;
+    const selectedModel = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
@@ -1650,12 +1644,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       recommendation = await fetchWithTimeout(
         (signal) => getRecommendation(
           issue,
-          // Forward `attachments` (LIN-777) so getRecommendation's meta-prompt
-          // (formatIssueContext → formatAttachmentsSection) surfaces the worker-facing
+          // Forward `attachments` (LIN-777) so getRecommendation's routing prompt
+          // (formatIssueContext → formatAttachmentsSection) and the stage prompt carry the
           // ## Attachments section. fetchRecommendationContext carries it at top level
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
-          // deterministic LIN-776 fix. `focusedChild` stays (the meta path reads it).
+          // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
           { parent, siblings, project, children, comments, focusedChild, attachments },
           {
             apiKey: resolvedApiKey,
@@ -1663,8 +1657,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
             featureFlags: {},
             providerUi: provider?.ui || null,
             signal: AbortSignal.any([signal, hop.signal]),
-            briefWriter,
-            deadline: hopDeadline,
             callMeta: { urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           }
         ),

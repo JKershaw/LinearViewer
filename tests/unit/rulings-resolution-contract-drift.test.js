@@ -14,10 +14,11 @@
  * Nothing fails loudly if one site drifts from the others — this file is that
  * alarm.
  *
- * It also pins the no-re-raise guidance's literal list broadening at the 5
- * live sites (across 3 files) and accounts for the derived snapshot
+ * It also pins the no-re-raise guidance's literal list broadening at the 3
+ * live sites (across 2 files; the meta-prompt template's 2 went with it in
+ * LIN-3300) and accounts for the derived snapshot
  * `scripts/eval/meta-prompt.baseline.txt`, which is regenerated from the live
- * meta-prompt template by `scripts/eval/regen-baseline.mjs`.
+ * router prompt by `scripts/eval/regen-baseline.mjs`.
  *
  * Follows tests/unit/decision-lifecycle-stamp-drift.test.js's convention:
  * every source read into its own variable and asserted per-source (never
@@ -30,7 +31,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 
@@ -41,7 +42,6 @@ const unansweredDecisionsSource = read('lib/unanswered-decisions.js');
 const proxyInstructionsSource = read('lib/proxy-instructions.js');
 const proxyRulingsSource = read('routes/proxy-rulings.js');
 const promptTemplateDefsSource = read('lib/prompt-template-defs.js');
-const metaPromptTemplateSource = read('lib/prompts/meta-prompt-template.js');
 const autopilotManualSource = read('docs/autopilot-operating-manual.md');
 const baselineSource = read('scripts/eval/meta-prompt.baseline.txt');
 
@@ -115,11 +115,10 @@ describe('withdrawn resolution contract — doc-consistency drift guard (LIN-289
 describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
   const liveSites = [
     { label: 'lib/prompt-template-defs.js', source: promptTemplateDefsSource, expected: 2 },
-    { label: 'lib/prompts/meta-prompt-template.js', source: metaPromptTemplateSource, expected: 2 },
     { label: 'docs/autopilot-operating-manual.md', source: autopilotManualSource, expected: 1 },
   ];
 
-  test('the live prompt sources carry 0 "answered, or dismissed" and 5 "dismissed, or withdrawn"', () => {
+  test('the live prompt sources carry 0 "answered, or dismissed" and 3 "dismissed, or withdrawn"', () => {
     let oldTotal = 0;
     let newTotal = 0;
     for (const { label, source, expected } of liveSites) {
@@ -132,29 +131,24 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
       newTotal += newCount;
     }
     assert.strictEqual(oldTotal, 0, 'no live prompt source still carries the old list');
-    assert.strictEqual(newTotal, 5, 'the 5 live no-re-raise guidance sites are broadened');
+    assert.strictEqual(newTotal, 3, 'the 3 live no-re-raise guidance sites are broadened');
   });
 
-  test('the 4 lib/ sites keep their includeResolved scope note (never a task-bound one)', () => {
-    // The two prompt-template-defs.js sites and the meta-prompt-template.js
-    // sites each restate the scope note; broadening the literal list must not
-    // have dropped it.
+  test('the 2 lib/ sites keep their includeResolved scope note (never a task-bound one)', () => {
+    // The two prompt-template-defs.js sites each restate the scope note;
+    // broadening the literal list must not have dropped it.
     assert.strictEqual(countOccurrences(promptTemplateDefsSource, 'never a task-bound one'), 2);
-    assert.strictEqual(countOccurrences(metaPromptTemplateSource, 'never a task-bound one'), 2);
   });
 
   test('the derived snapshot scripts/eval/meta-prompt.baseline.txt is accounted for and in sync', () => {
     // It is NOT a live prompt source — it is regenerated from the live
-    // meta-prompt template by scripts/eval/regen-baseline.mjs. Assert it was
-    // regenerated in this change (0 old / 2 new) AND that it is byte-identical
-    // to a fresh render, so a future template edit cannot silently leave it
-    // stale.
+    // router prompt by scripts/eval/regen-baseline.mjs. Assert it carries no
+    // stale list AND that it is byte-identical to a fresh render, so a future
+    // prompt edit cannot silently leave it stale.
     assert.strictEqual(countOccurrences(baselineSource, 'answered, or dismissed'), 0,
-      'the baseline snapshot was regenerated after the guidance edit');
-    assert.strictEqual(countOccurrences(baselineSource, 'dismissed, or withdrawn'), 2,
-      'the baseline snapshot mirrors the live template\'s 2 broadened sites');
+      'the baseline snapshot carries no stale list');
 
-    const fresh = buildMetaPromptTemplate({
+    const fresh = buildRouterPrompt({
       issueContext: '{{ISSUE_CONTEXT}}',
       identifier: '{{IDENTIFIER}}',
       hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,

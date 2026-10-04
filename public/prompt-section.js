@@ -681,9 +681,7 @@
           if (issue.source) params.set('source', issue.source);
           if (issue.bindingScope) params.set('bindingScope', issue.bindingScope);
           const query = params.toString() ? `?${params.toString()}` : '';
-          // With the brief writer on (LIN-3293) this can outlast the keepalive's
-          // first byte, after which an error arrives in a 200 as `statusCode`.
-          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false, statusInBody: true });
+          const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, repo: result.repo || null, generatedAt: Date.now() };
@@ -740,10 +738,8 @@
           // mutates body.innerHTML — the mutation itself grows the body, so
           // sampling after would measure the already-grown gap.
           const wasPinned = window.isPinnedToBottom(body);
-          if (currentField === 'reasoning' || currentField === 'writing') {
-            // `writing` (LIN-3293): the stage is chosen and the brief writer is
-            // running, 20-40s with nothing to stream; the reasoning stays up.
-            if (nameEl) nameEl.textContent = currentField === 'writing' ? 'AI writing the brief\u2026' : 'AI thinking\u2026';
+          if (currentField === 'reasoning') {
+            if (nameEl) nameEl.textContent = 'AI thinking\u2026';
             body.innerHTML = renderReasoning(reasoningRaw);
           } else {
             if (nameEl) nameEl.textContent = 'AI Recommendation';
@@ -774,11 +770,10 @@
           throw new Error(payload.error);
         }
         if (payload.phase) {
-          if (payload.phase === 'prompt' && (currentField === 'reasoning' || currentField === 'writing')) {
+          if (payload.phase === 'prompt' && currentField === 'reasoning') {
             prevChildCount = 0;
           }
           currentField = payload.phase;
-          if (payload.phase === 'writing') scheduleRender();
           return;
         }
         if (payload.section === 'reasoning' && payload.content) {

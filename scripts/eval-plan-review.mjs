@@ -3,9 +3,8 @@
  * A/B eval for the plan-review GATE and its routing branch (LIN-1603, item 2.8).
  *
  * Modelled on scripts/eval-review-closeout.mjs, but pointed at the RECOMMENDER:
- * the thing under test is the Step-3 routing branch composed into
- * lib/prompts/meta-prompt-template.js and owned by lib/stage-router.js (LIN-3304),
- * not a handwritten prompt. The sibling harness measures a prompt's OUTPUT quality
+ * the thing under test is the Step-3 routing branch of the routing prompt, owned by
+ * lib/stage-router.js (LIN-3304), not a stage template. The sibling harness measures a prompt's OUTPUT quality
  * with an LLM judge; this one measures a ROUTING DECISION, which is a single
  * parseable token (`→ **action**`), so it is scored deterministically by
  * `parseRecommendedAction` — imported from the seam — with no judge in the loop.
@@ -18,9 +17,10 @@
  * added dispatches, exactly as it did before the gate existed?
  *
  * Arms (the prompt is the only variable):
- *   - Arm B = the shipped meta-prompt (gate + routing branch + S2 parity).
- *   - Arm A = the same prompt with the gate branch and the Plan-prompts gate/revision
- *     parity excised — the pre-LIN-1603 shape. The action vocabulary is left alone
+ *   - Arm B = the shipped routing prompt (gate + routing branch).
+ *   - Arm A = the same prompt with the gate branch and the completed-prep exception
+ *     excised — the pre-LIN-1603 routing shape. (Since LIN-3300 the plan prompt is the
+ *     plan template, which neither arm varies.) The action vocabulary is left alone
  *     in both arms: `plan-review` was registered in Phase 1 (LIN-1602), so arm A is
  *     "the kind exists but nothing routes to it", which is the true baseline.
  *
@@ -47,7 +47,7 @@
  * Usage:   OPENROUTER_API_KEY=... node scripts/eval-plan-review.mjs
  * Env knobs: GEN_MODEL, K (runs per arm per case), ONLY (case-id filter).
  */
-import { buildMetaPromptTemplate } from '../lib/prompts/meta-prompt-template.js';
+import { buildRouterPrompt } from '../lib/stage-router.js';
 import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../lib/completion-signals.js';
 import { deriveDispatchKind } from '../lib/prompt-templates.js';
@@ -320,25 +320,21 @@ function buildArms(context) {
     completionSignals: formatAllSignalsForMetaPrompt(),
     isTerminal: false, hasOpenChildren: false
   };
-  const B = buildMetaPromptTemplate(common);
+  const B = buildRouterPrompt(common);
 
   // Arm A = pre-LIN-1603: remove the Step-3 gate branch (through the verdict
-  // routing, up to the session-fit routing) and the Plan-prompts S2 parity.
+  // routing, up to the session-fit routing) and the completed-prep exception.
   let A = B.replace(/\*\*Before routing on session-fit, check whether a `plan-review` is due[\s\S]*?(?=\*\*Otherwise route on the session-fit answer)/, '');
   if (A === B) throw new Error('gate branch not found to strip');
-  let step = A;
-  A = A.replace(/ \*\*Plan prompts must also carry the plan-review gate decision[\s\S]*?the one-revision-cycle bound can never be satisfied\./, '');
-  if (A === step) throw new Error('Plan-prompts S2 parity not found to strip');
-  step = A;
-  A = A.replace(/ ONE exception, and only one: a `plan-review` that recorded[\s\S]*?bounds it to a single cycle\./, '');
+  const step = A;
+  A = A.replace(/ ONE exception, and only one: a `plan-review` that recorded[\s\S]*?see the plan-review gate just below\./, '');
   if (A === step) throw new Error('Completed-prep exception not found to strip');
   return { A, B };
 }
 
 // The prompt is sent EXACTLY as production sends it — no output override, so the
-// measurement is of the real thing. `stop` cuts the generation at the `## Prompt`
-// section: the decision (`→ **action**`) is emitted just above it, in the Reasoning
-// block, so the routing answer is complete while the long prompt body is never paid for.
+// measurement is of the real thing. The routing reply is the Reasoning block alone;
+// `stop` at `## Prompt` stays as a guard against a model that writes a body anyway.
 async function call(prompt) {
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST', headers: { Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' },
@@ -353,7 +349,7 @@ async function call(prompt) {
 
 /**
  * K runs of one arm → the parsed actions, normalised to dispatch KINDS.
- * The meta-prompt emits display names (`implement`), which the dispatch layer maps
+ * The routing prompt emits display names (`implement`), which the dispatch layer maps
  * to kinds (`implementation`) — comparing kinds is what the routing actually means.
  */
 async function actionsFor(prompt) {

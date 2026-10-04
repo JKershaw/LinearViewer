@@ -2,22 +2,20 @@
  * Case matrix for the checked-in router-prompt byte snapshots (LIN-3304, review
  * addendum 1).
  *
- * These are REAL snapshots of the two prompts the meta call sends, pinned as
- * expected text under this directory and compared byte-for-byte by
- * tests/unit/stage-router-prompt-snapshots.test.js:
- *
- *   - `router`  (writer ON)  = buildRouterPrompt() — the routing-only prompt the
- *                              live writer-on call sends.
- *   - `full`    (writer OFF) = buildMetaPromptTemplate() — the full prompt,
- *                              whose routing sections are the same fragments.
+ * These are REAL snapshots of the routing prompt every recommendation call sends
+ * (buildRouterPrompt; LIN-3300 made it the only one), pinned as expected text under
+ * this directory and compared byte-for-byte by
+ * tests/unit/stage-router-prompt-snapshots.test.js.
  *
  * The matrix varies a provider other than Linear (GitHub Issues, Local, both with
  * the tracker flag off) and the Step 0 decision-tree branches, so a one-character
- * change to any prompt text, or a capability pass applied on one path only, fails.
+ * change to the prompt text, or a skipped capability pass, fails.
  *
- * The snapshot files were generated from base 75b5c924 (before the seam moved),
- * so they witness byte-identity with the pre-change output rather than comparing
- * new code with new code. Regenerate intentionally with:
+ * The snapshot files were generated from base 75b5c924 (before the seam moved) as
+ * the writer-on routing-only prompt, and carried over unchanged (renamed from
+ * `writer-on.*`) when LIN-3300 deleted the full-prompt path, so they witness
+ * byte-identity with the output that shipped before both changes rather than
+ * comparing new code with new code. Regenerate intentionally with:
  *   node scripts/eval/regen-stage-router-snapshots.mjs
  */
 
@@ -60,19 +58,13 @@ const GITHUB = { featureFlags: { linearMcp: false }, providerUi: { displayName: 
 const LOCAL = { featureFlags: { linearMcp: false }, providerUi: { displayName: 'Local' } };
 
 export const CASES = [
-  // Writer ON — the routing-only prompt (buildRouterPrompt).
-  { id: 'writer-on.linear.leaf', mode: 'router', args: BASE_ARGS },
-  { id: 'writer-on.linear.complete-no-open', mode: 'router', args: COMPLETE_NO_OPEN_ARGS },
-  { id: 'writer-on.linear.terminal-open-child', mode: 'router', args: TERMINAL_OPEN_CHILD_ARGS },
-  { id: 'writer-on.github-issues.leaf', mode: 'router', args: { ...BASE_ARGS, ...GITHUB } },
-  { id: 'writer-on.local.leaf', mode: 'router', args: { ...BASE_ARGS, ...LOCAL } },
-
-  // Writer OFF — the full prompt (buildMetaPromptTemplate).
-  { id: 'writer-off.linear.leaf', mode: 'full', args: BASE_ARGS },
-  { id: 'writer-off.linear.terminal-open-child', mode: 'full', args: TERMINAL_OPEN_CHILD_ARGS },
-  { id: 'writer-off.github-issues.leaf', mode: 'full', args: { ...BASE_ARGS, ...GITHUB } }
+  { id: 'router.linear.leaf', args: BASE_ARGS },
+  { id: 'router.linear.complete-no-open', args: COMPLETE_NO_OPEN_ARGS },
+  { id: 'router.linear.terminal-open-child', args: TERMINAL_OPEN_CHILD_ARGS },
+  { id: 'router.github-issues.leaf', args: { ...BASE_ARGS, ...GITHUB } },
+  { id: 'router.local.leaf', args: { ...BASE_ARGS, ...LOCAL } }
 ];
 
-export function renderCase(entry, { buildRouterPrompt, buildMetaPromptTemplate }) {
-  return entry.mode === 'router' ? buildRouterPrompt(entry.args) : buildMetaPromptTemplate(entry.args);
+export function renderCase(entry, { buildRouterPrompt }) {
+  return buildRouterPrompt(entry.args);
 }

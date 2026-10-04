@@ -8,7 +8,6 @@
  */
 import { Router } from 'express';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
-import { resolveBriefWriter, generateStagePrompt } from '../lib/brief-writer.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -20,7 +19,7 @@ import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbac
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-guard.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
-import { hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
+import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX, BINDING_INTENT } from '../lib/workspace.js';
 import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
@@ -927,26 +926,11 @@ export function createDispatchRoutes({
       // Linear output stays byte-identical to the /prompt endpoint since its ui
       // is the DEFAULT_PROMPT_UI floor.
       if (kind !== undefined) {
-        // With the workspace's brief writer on (LIN-3293) the pinned stage's Goal is
-        // rewritten by the writer, its one model call: charged like the routed arm,
-        // and aborted if the caller hangs up. Off, or a process-only stage (LIN-3299): no model call, and the prompt is
-        // generatePrompt's byte for byte. The keepalive and the hang-up check before
-        // the enqueue apply either way.
+        // No model call on this arm; the token creator's key still decides free tier
+        // for the run gate at the enqueue (LIN-3238). The keepalive and the hang-up
+        // check before the enqueue cover the provider calls below.
         const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-        const { apiKey: overrideApiKey, isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
-        const overrideWriter = isTestMode
-          ? null
-          : await resolveBriefWriter({ urlKey: req.proxyUrlKey, workspacePreferencesStore, isFreeTier: overrideIsFreeTier, kind });
-        if (overrideWriter) {
-          logOpenRouterCredentialSource(req, '/api/proxy/recommend-and-dispatch', { sessionApiKey: overrideSessionApiKey, isFreeTier: overrideIsFreeTier });
-          if (overrideIsFreeTier) {
-            const rejection = await chargeFreeTierOrReject(req, '/api/proxy/recommend-and-dispatch');
-            if (rejection) {
-              logEvent(req, '/api/proxy/recommend-and-dispatch', 429);
-              return res.status(rejection.status).json(rejection.body);
-            }
-          }
-        }
+        const { isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
         const keepalive = armKeepalive(res);
         const gone = clientGoneSignal(res);
         // Every exit below answers through the keepalive, the catch included: once it
@@ -983,13 +967,7 @@ export function createDispatchRoutes({
           // path, which already passes the full context. provider?.ui is threaded
           // through (LIN-2353) so a non-Linear provider renders capability-appropriate
           // text; Linear output stays byte-identical.
-          const generated = await generateStagePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {
-            providerUi: provider?.ui || null,
-            briefWriter: overrideWriter,
-            apiKey: overrideApiKey,
-            signal: gone.signal,
-            callMeta: { urlKey: req.proxyUrlKey, feature: 'recommend', issueIdentifier: issue.identifier }
-          });
+          const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
           if (!generated) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
             return keepalive.send(500, { error: 'Failed to generate prompt' });
@@ -1177,8 +1155,8 @@ export function createDispatchRoutes({
           }
         } catch (err) {
           // Duplicate-dispatch refusal (LIN-1656). The verb-override arm is
-          // keepalive-armed too (the brief writer can take 20-40s, LIN-3293), so
-          // every refusal rides `keepalive.send`, as on the LLM arm below.
+          // keepalive-armed too, so every refusal rides `keepalive.send`, as on the
+          // LLM arm below.
           if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
           // Task-budget refusal (LIN-1751) — same keepalive-armed arm as above.
           if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;

@@ -87,7 +87,6 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
-import { resolveBriefWriter, resolveRecommendModels, generateStagePrompt } from '../lib/brief-writer.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
 
@@ -129,18 +128,14 @@ export function shouldMockAi(workspace) {
  * @param {string} opts.prompt - Raw prompt string for the markdown download
  * @param {string} opts.identifier - Issue identifier for the filename (may be empty)
  * @param {string} opts.downloadName - Prompt name slug for the filename
- * @param {Object|null} [keepalive] - armKeepalive handle when the route armed one
  */
-function sendPromptResult(req, res, { json, prompt, identifier, downloadName }, keepalive = null) {
-  keepalive?.stop();
+function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) {
   if (req.query.format === 'md') {
-    // A flushed keepalive has committed JSON headers: just send the prompt bytes.
-    if (keepalive?.flushed) return res.end(prompt);
     res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${buildPromptFilename(identifier, downloadName)}"`);
     return res.send(prompt);
   }
-  return keepalive ? keepalive.send(200, json) : res.json(json);
+  return res.json(json);
 }
 
 /**
@@ -494,17 +489,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // legacy workspaces. For Linear this is a no-op — output stays byte-identical.
     const providerUi = getProviderForWorkspace(workspace)?.ui || null
 
-    // With the brief writer on (LIN-3293) a stage button is a pinned stage: the writer
-    // rewrites the stage's Goal, a 20-40s model call, so the reply is keepalive-armed
-    // and a client hang-up aborts the call. Off: no keepalive, no model call, and
-    // generatePrompt's bytes (it does read the workspace preferences).
-    let keepalive = null
-    let gone = null
-    const reply = (status, body) => {
-      if (!keepalive) return res.status(status).json(body)
-      return keepalive.send(status, body)
-    }
-
     try {
       // Use mock data in test mode
       if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
@@ -597,23 +581,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
       if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
       const { provider: issueProvider, callScope: issueCallScope } = issueBinding
-
-      // The writer bills the same credential Recommend does, and a free-tier caller
-      // pays the same prompt safety-net unit, but only when the writer will run (never
-      // for a process-only stage, LIN-3299).
-      const { apiKey: writerKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey })
-      const briefWriter = isCustomPrompt || shouldMockAi(workspace)
-        ? null
-        : await resolveBriefWriter({ urlKey: workspace.urlKey, workspacePreferencesStore, isFreeTier, kind: labelName })
-      if (briefWriter) {
-        const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore })
-        if (check) {
-          return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } })
-        }
-        keepalive = armKeepalive(res)
-        gone = clientGoneSignal(res)
-      }
-
       const { issue, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
 
       // Generate the prompt
@@ -630,20 +597,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
       } else {
         // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
-        // worker-facing Attachments section, matching the proxy /prompt route. With the
-        // writer off this is generatePrompt, byte for byte.
-        result = await generateStagePrompt(labelName, issue, { parent, siblings, project, children, comments, attachments }, {
-          featureFlags: getFeatureFlags(req.session),
-          providerUi,
-          briefWriter,
-          apiKey: writerKey,
-          signal: gone?.signal || null,
-          callMeta: { urlKey: workspace.urlKey, feature: 'prompt', issueIdentifier: issue.identifier }
-        });
+        // worker-facing Attachments section, matching the proxy /prompt route.
+        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments, attachments }, getFeatureFlags(req.session), providerUi);
       }
 
       if (!result) {
-        return reply(500, { error: 'Failed to generate prompt' })
+        return jsonError(res, 500, 'Failed to generate prompt')
       }
 
       sendPromptResult(req, res, {
@@ -656,23 +615,21 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           prompt: result.prompt,
           repo: parseRepoFromDescription(project?.description)
         }
-      }, keepalive)
+      })
     } catch (error) {
       console.error('Prompt generation error:', error)
 
       // Handle 401 from Linear API
       if (error.response?.status === 401) {
-        return reply(401, { error: 'Token expired or invalid' })
+        return unauthorized.json(res, 'Token expired or invalid')
       }
 
       // Handle issue not found
       if (error.message?.includes('not found')) {
-        return reply(404, { error: error.message })
+        return notFound.json(res, error.message)
       }
 
-      reply(500, { error: 'Failed to generate prompt', message: error.message })
-    } finally {
-      gone?.release()
+      jsonError(res, 500, 'Failed to generate prompt', { message: error.message })
     }
   })
 
@@ -1043,9 +1000,7 @@ ${goal}`
       // pinned is transparently resolved to its actionable descendant, with the
       // descent breadcrumb returned. Free-tier usage is charged once per request
       // (above, before this point), not per hop.
-      // The router's model and the brief writer (LIN-3293), resolved the same way on
-      // every recommend surface (lib/brief-writer.js).
-      const { model: selectedModel, briefWriter } = await resolveRecommendModels({ urlKey: workspace.urlKey, workspacePreferencesStore, isFreeTier })
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier })
       const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS
       const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
         startIdentifier: issueId,
@@ -1062,11 +1017,11 @@ ${goal}`
           try {
             r = await getRecommendation(
               ctx.issue,
-              // Forward `attachments` (LIN-777) so the meta-prompt surfaces the
-              // worker-facing ## Attachments section on this LLM recommendation hop.
+              // Forward `attachments` (LIN-777) so the routing prompt and the stage
+              // prompt carry the ## Attachments section on this recommendation hop.
               { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
               { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null,
-                signal: hop.signal, briefWriter, deadline: deadline - 5000,
+                signal: hop.signal,
                 callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } }
             )
           } finally {
@@ -1317,7 +1272,7 @@ ${goal}`
     });
     res.flushHeaders();
     // A comment line every 15s keeps the router's 55s window open through any
-    // silent stretch: a slow routing call, the brief writer's 20-40s.
+    // silent stretch, such as a slow routing call.
     const sseKeepalive = armSseKeepalive(res);
 
     // Track client disconnection
@@ -1346,10 +1301,7 @@ ${goal}`
 
       if (closed) return;
 
-      // The router's model and the brief writer (LIN-3293), resolved the same way on
-      // every recommend surface (lib/brief-writer.js). The writer must finish five
-      // seconds inside the descent budget.
-      const { model: selectedModel, briefWriter } = await resolveRecommendModels({ urlKey: workspace.urlKey, workspacePreferencesStore, isFreeTier });
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
       const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
 
       // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
@@ -1369,7 +1321,7 @@ ${goal}`
         // warm on every hop and Heroku H15 can't fire on an all-complete parent that
         // recommends real work at hop 0. The streaming fn's structured return drives the
         // descent (defer parsing stays byte-identical — it routes through the same
-        // parseRecommendationResponse as the buffered path).
+        // routeStage as the buffered path).
         const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
           startIdentifier: issueId,
           deadline,
@@ -1407,11 +1359,10 @@ ${goal}`
               }
               const r = await getRecommendationStream(
                 ctx.issue,
-                // Forward `attachments` (LIN-777) so the streamed meta-prompt surfaces
-                // the worker-facing ## Attachments section on each descent hop.
+                // Forward `attachments` (LIN-777) so the routing and stage prompts
+                // carry the ## Attachments section on each descent hop.
                 { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
                 { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null, signal: hop.signal,
-                  briefWriter, deadline: deadline - 5000,
                   callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } },
                 (type, data) => {
                   if (closed) return;
@@ -1478,8 +1429,8 @@ ${goal}`
       } else {
         await getRecommendationStream(
           issue,
-          // Forward `attachments` (LIN-777) so the streamed terminal-hop meta-prompt
-          // surfaces the worker-facing ## Attachments section, matching the proxy
+          // Forward `attachments` (LIN-777) so the terminal hop's routing and stage
+          // prompts carry the ## Attachments section, matching the proxy
           // recommendation path. fetchRecommendationContext carries it (LIN-772/773).
           { parent, siblings, project, children, comments, focusedChild, attachments },
           {
@@ -1488,8 +1439,6 @@ ${goal}`
             featureFlags: getFeatureFlags(req.session),
             providerUi: issueProvider.ui || null,
             signal: abortController.signal,
-            briefWriter,
-            deadline: deadline - 5000,
             callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
           },
           (type, data) => {

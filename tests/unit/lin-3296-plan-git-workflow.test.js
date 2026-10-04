@@ -1,13 +1,13 @@
 /**
  * LIN-3296: the old featureBranches toggle appended a "branch, commit, open a
  * PR" block to the only READY template, plan, whose Role forbids implementing.
- * Implementation carries its own branch and PR steps on both paths, so the
- * block is gone from both, and the toggle itself was then removed.
+ * Implementation carries its own branch and PR steps, so the block is gone,
+ * and the toggle itself was then removed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { generatePrompt } from '../../lib/prompt-templates.js';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { buildRouterPrompt } from '../../lib/stage-router.js';
 import { FEATURE_DEFAULTS, getFeatureFlags, isValidFeatureKey } from '../../lib/feature-defaults.js';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 
@@ -34,8 +34,8 @@ test('implementation still branches and opens a PR', () => {
   assert.ok(/pull request/i.test(p));
 });
 
-test('meta-prompt has no git workflow block', () => {
-  const p = buildMetaPromptTemplate({
+test('the routing prompt has no git workflow block', () => {
+  const p = buildRouterPrompt({
     issueContext: 'CTX', identifier: 'TEST-1',
     hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
     hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, implementation',
