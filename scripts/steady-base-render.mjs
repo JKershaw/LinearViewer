@@ -24,11 +24,12 @@ for (const key of Object.keys(templates.PROMPT_TEMPLATES || {})) {
 // The AI path: the meta-prompt a cheap model reads to WRITE the worker prompt, on every recommend-and-dispatch.
 const mp = await tryImport('lib/prompts/meta-prompt-template.js');
 const cs = await tryImport('lib/completion-signals.js');
+const mat = await tryImport('lib/prompts/meta-action-types.js');
 let meta = null;
 try {
   meta = mp.buildMetaPromptTemplate?.({
     issueContext: '', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
-    remainingCount: 0, hasComments: false, commentCount: 0, aiHints: (templates.formatStageOptions || templates.formatAIHintsForMetaPrompt)?.() ?? '',
+    remainingCount: 0, hasComments: false, commentCount: 0, aiHints: templates.formatAIHintsForMetaPrompt?.() ?? mat.META_ACTION_TYPES ?? '',
     actionVocabulary: templates.getAIRecommendationActionNames?.().join(', '), completionSignals: cs.formatAllSignalsForMetaPrompt?.() ?? '',
   });
 } catch {}

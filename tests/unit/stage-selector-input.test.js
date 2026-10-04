@@ -16,7 +16,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  assembleTrailFacts, formatTrailFactsBlock, condensePlan, RULING_MARK
+  assembleTrailFacts, formatTrailFactsBlock, condensePlan, RULING_MARK, isRuling
 } from '../../lib/recommendation-facts.js';
 import { formatSelectorView, formatIssueContext } from '../../lib/openrouter.js';
 
@@ -53,6 +53,28 @@ describe('trail facts (LIN-3300)', () => {
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
     assert.equal(facts.latestRuling.at, at(3));
     assert.match(facts.latestRuling.body, /^Go to implementation\./);
+  });
+
+  // Fix round: a ruling is a person's comment that ENDS with the mark the in-app route
+  // appends. Quoting the mark, or an agent's own note, is not a ruling (LIN-3309's
+  // agent-note predicate decides person vs agent in code).
+  test('a ruling ends with the mark and is a person\'s comment; a quote or an agent note is not', () => {
+    assert.equal(isRuling(`Go to implementation.\n\n${RULING_MARK}`), true);
+    assert.equal(isRuling(`Go.\n\n${RULING_MARK}\n`), true, 'trailing whitespace is fine');
+    assert.equal(isRuling(`### Plan Review Verdict\n\nThe suffix "${RULING_MARK}" is not a ruling mark.\n\n**Verdict:** Request Changes.`), false);
+    assert.equal(isRuling(`**Autopilot step record — parked.**\n\n${RULING_MARK}`), false, 'an agent note is not a person');
+    assert.equal(isRuling(`Plan revised in the description.\n\n${RULING_MARK}`), false);
+    const facts = assembleTrailFacts([
+      { createdAt: at(1), body: `Hold.\n\n${RULING_MARK}` },
+      { createdAt: at(2), body: `### Plan Review Verdict\n\nQuotes "${RULING_MARK}" mid-text.\n\n**Verdict:** Approve.` }
+    ], '');
+    assert.equal(facts.latestRuling.at, at(1), 'the quoting verdict is skipped');
+  });
+
+  test('TRAIL FACTS says whether a ruling is on the trail', () => {
+    const withRuling = formatTrailFactsBlock(assembleTrailFacts([{ createdAt: at(3), body: `Go.\n\n${RULING_MARK}` }], ''), 1);
+    assert.match(withRuling, /- Latest ruling recorded via Harbour: 2026-10-03 \(shown with the comments\)/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest ruling recorded via Harbour: none/);
   });
 
   test('a leaf gets its plan facts; the negated session fit reads as multiple sessions', () => {
@@ -163,6 +185,12 @@ describe('the selector view (LIN-3300)', () => {
     const full = formatIssueContext(issue, context);
     assert.match(full, /Older note one\./);
     assert.match(full, /fetch the parent epic's full child list/);
+  });
+
+  test('a comment that only quotes the mark is never shown as the latest ruling', () => {
+    const quoting = { user: 'John', createdAt: at(6), body: `### Plan Review Verdict\n\nThe suffix "${RULING_MARK}" is quoted here.\n\n**Verdict:** Request Changes.` };
+    const view = formatSelectorView(issue, { ...context, comments: [...comments, ...[7, 8, 9].map(d => ({ user: 'A', createdAt: `2026-10-0${d}T10:00:00.000Z`, body: `n${d}` })), quoting].sort((a, b) => a.createdAt.localeCompare(b.createdAt)) });
+    assert.match(view, /Latest ruling recorded via Harbour[^\n]*\n+Ruling: plan first\./, 'the real ruling, not the quoting verdict');
   });
 
   test('a ruling among the latest 3 is not shown twice', () => {

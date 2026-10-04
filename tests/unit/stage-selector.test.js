@@ -14,7 +14,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRouterPrompt, routeStage, parseWhyNow } from '../../lib/stage-router.js';
-import { formatStageOptions, getSelectableStages } from '../../lib/prompt-templates.js';
+import { formatStageOptions, getSelectableStages, STAGE_LEADS } from '../../lib/prompt-templates.js';
 import { getRecommendation, setFetchImpl, routerFocus, buildSelectorArgs } from '../../lib/openrouter.js';
 import { RULING_MARK } from '../../lib/recommendation-facts.js';
 
@@ -49,6 +49,42 @@ describe('the selector prompt (LIN-3300)', () => {
     ]);
     for (const line of rules.split('\n').filter(l => /^\d+\. /.test(l))) {
       assert.match(line, / Why: /, `every rule states its reason: ${line.slice(0, 40)}`);
+    }
+  });
+
+  // Fix round (PR #1750 check).
+  test('rule 2 sends finished, reviewed work to retrospective-audit before the general review sentence', () => {
+    const p = prompt();
+    const rule2 = p.slice(p.indexOf('2. **Landed work.**'), p.indexOf('3. **Blocked.**'));
+    assert.ok(rule2.indexOf('`retrospective-audit`') > -1);
+    assert.ok(rule2.indexOf('`retrospective-audit`') < rule2.indexOf('`review`'), 'the specific case comes first');
+  });
+
+  test('rule 1 is the ruling mark, decided in code, and no reason names a person', () => {
+    const p = prompt();
+    const rules = p.slice(p.indexOf('## How to choose'), p.indexOf('## Reply'));
+    assert.doesNotMatch(rules, /person's comment among the latest/);
+    assert.match(rules, /1\. \*\*A ruling\.\*\* The latest ruling recorded via Harbour/);
+    assert.doesNotMatch(rules, /John|Flight Companion/);
+  });
+
+  test('no dangling step references, and "fix it here" names a stage', () => {
+    const landed = [
+      { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict:** Approve.' },
+      { createdAt: '2026-01-02T00:00:00Z', body: 'Implementation landed: https://github.com/o/r/pull/9' }
+    ];
+    const p = prompt(leaf(), ctx({ comments: landed }));
+    assert.match(p, /Implementation landed since the latest verdict: yes/);
+    assert.doesNotMatch(p, /Step \d/, 'the selector has rules, not Steps');
+    assert.doesNotMatch(p, /fix it here first|is fixed here/);
+    const closeOut = getSelectableStages().find(s => s.key === 'close-out');
+    assert.match(closeOut.whenNot, /`implementation`/);
+  });
+
+  test('stage purposes say what the stage is for, without the worker\'s instructions', () => {
+    for (const s of getSelectableStages()) {
+      assert.doesNotMatch(s.purpose, /yours|your part|make no changes|flag for the human/i, `${s.key}: ${s.purpose}`);
+      if (STAGE_LEADS[s.key]) assert.ok(STAGE_LEADS[s.key].startsWith(s.purpose), `${s.key} purpose is its lead's first sentence`);
     }
   });
 

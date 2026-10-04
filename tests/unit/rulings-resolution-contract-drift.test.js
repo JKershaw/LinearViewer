@@ -31,7 +31,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
-import { formatStageOptions, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { META_ACTION_TYPES } from '../../lib/prompts/meta-action-types.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -159,7 +160,7 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
       identifier: '{{IDENTIFIER}}',
       hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
       hasComments: false, commentCount: 0,
-      aiHints: formatStageOptions(),
+      aiHints: META_ACTION_TYPES,
       actionVocabulary: getAIRecommendationActionNames().join(', '),
       completionSignals: formatAllSignalsForMetaPrompt(),
       focusedSubtaskId: null,

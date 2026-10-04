@@ -44,7 +44,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PROMPT_TEMPLATES, generatePrompt, formatStageOptions, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { PROMPT_TEMPLATES, generatePrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { META_ACTION_TYPES } from '../../lib/prompts/meta-action-types.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
@@ -58,8 +59,8 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 121897, // LIN-3300: -5340, each stage's route (when / when not / requires) replaces its aiHint
-  'lib/prompt-templates.js': 20624, // LIN-3300: -83, formatStageOptions and defer's entry replace the aiHint formatter
+  'lib/prompt-template-defs.js': 121985, // LIN-3300: -5252, each stage's route (when / when not / requires) replaces its aiHint
+  'lib/prompt-templates.js': 20744, // LIN-3300: +37, formatStageOptions and defer's entry replace the aiHint formatter
   'lib/prompt-formatters.js': 52917, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3481,
 };
@@ -95,7 +96,12 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 /** Meta-prompt, source bytes. */
 export const META_PROMPT_SOURCE_CEILING = 67691; // LIN-3304: -38051, the routing fragments moved into lib/stage-router.js. LIN-3300: lowered to its size
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
-export const META_PROMPT_RENDERED_CEILING = 101724; // LIN-3300: -1584, the stage options replace the aiHints
+export const META_PROMPT_RENDERED_CEILING = 102406; // LIN-3300: lowered to its size; the writer-off prompt is byte-identical to main
+// Its Action Types Reference is lib/prompts/meta-action-types.js, a frozen copy of what
+// main rendered from the aiHints (LIN-3300). That file is not a source surface of its own:
+// it is one string that renders only inside this prompt, so every byte of it is counted
+// here, and tests/unit/writer-off-live-prompt.test.js pins it to main. It is deleted
+// with the meta template when every recommendation takes one path.
 
 /**
  * The stage router's source bytes (lib/stage-router.js, LIN-3304). This surface
@@ -105,11 +111,11 @@ export const META_PROMPT_RENDERED_CEILING = 101724; // LIN-3300: -1584, the stag
  * carried, plus the parse that was never frozen. Its own ceiling is what keeps the
  * routing half from growing silently inside the meta-prompt's old slack.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 48105;
-// LIN-3300: +2377. The file now holds the stage selector (its rules, prompt and Why now
+export const STAGE_ROUTER_SOURCE_CEILING = 48221;
+// LIN-3300: +2493. The file now holds the stage selector (its rules, prompt and Why now
 // parse) beside the full meta path's routing half, which stays until the one-path change
 // deletes it. Paid by aiHint leaving the defs and the meta prompt; the selector itself
-// sends 11.5 KB of fixed text where the routing-only prompt sent 27.7 KB.
+// sends 10.3 KB of fixed text where the routing-only prompt sent 27.7 KB.
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
@@ -144,10 +150,10 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * lib/openrouter.js, which was never a frozen surface, plus the seam's docs. The sum
  * still equals the total, so there is no new slack.
  *
- * LIN-3300 lowered it by 4718 (575524 -> 570806): every ceiling now sits at its surface's
+ * LIN-3300 lowered it by 3712 (575524 -> 571812): every ceiling now sits at its surface's
  * size, and the stage selector's rules and options cost less than the aiHints they replace.
  */
-export const FROZEN_TOTAL_BYTES = 570806;
+export const FROZEN_TOTAL_BYTES = 571812;
 
 const BASE_URL = 'https://harbour.example';
 
@@ -186,7 +192,7 @@ const META_PROMPT_ARGS = {
   identifier: '{{IDENTIFIER}}',
   hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
   hasComments: false, commentCount: 0,
-  aiHints: formatStageOptions(),
+  aiHints: META_ACTION_TYPES,
   actionVocabulary: getAIRecommendationActionNames().join(', '),
   completionSignals: formatAllSignalsForMetaPrompt(),
   focusedSubtaskId: null,
