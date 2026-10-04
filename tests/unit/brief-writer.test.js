@@ -7,7 +7,8 @@
  *   - every machine-read format is present, and grounding is appended once;
  *   - defer skips the writer;
  *   - with the switch (the briefWriter workspace feature) off, output is byte-identical;
- *   - a writer failure, truncation or timeout ships the unwritten bundle.
+ *   - a writer failure, truncation or timeout ships the unwritten bundle;
+ *   - Scope and Authority is code's on every path, once, after the Goal's lead (LIN-3299).
  */
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,7 +28,7 @@ import {
   BRIEF_WRITER_PROSE_TOKENS,
   briefWriterBudget,
   resolveReasoningBudget,
-  defaultReasoningTokens,
+  REASONING_MAX_TOKENS,
   isReasoningModel,
   DEFAULT_MODEL
 } from '../../lib/openrouter.js';
@@ -47,13 +48,12 @@ const ISSUE = {
 };
 const CONTEXT = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 const BRIEF = '## Goal\n\nA plain brief, written for a colleague.';
-/** What the writer path ships for a stage: code's blocks around the written lead, the scope lines after it, then code's process, then the finish. */
+/** What the writer path ships for a stage: code's blocks around the written lead, then code's process, then the finish (which puts the scope lines after the lead). */
 const expected = (kind, goal = BRIEF) => {
   const { before, after } = splitStageBody(PROMPT_TEMPLATES[kind].generate(ISSUE, CONTEXT, {}));
-  const body = `${before}${goal}${formatStageIntent(kind)}${after.trim() ? `\n\n${after.trim()}` : ''}`;
+  const body = `${before}${goal}${after.trim() ? `\n\n${after.trim()}` : ''}`;
   return finishStagePrompt(body, kind, ISSUE, CONTEXT, {}, null);
 };
-const WRITTEN = Object.keys(PROMPT_TEMPLATES).filter(k => !PROCESS_ONLY.includes(k));
 const GROUNDING_HEAD ='## Re-ground the Ticket (staleness check)';
 const count = (text, needle) => text.split(needle).length - 1;
 
@@ -153,7 +153,7 @@ describe('switch off: byte-identical', () => {
     const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k' });
     assert.equal(calls.length, 1);
     assert.match(calls[0].content, /## Prompt Structure/);
-    assert.ok(rec.prompt.startsWith('BODY' + formatStageContract('review', ISSUE.identifier)));
+    assert.ok(rec.prompt.startsWith('BODY' + formatStageIntent('review') + formatStageContract('review', ISSUE.identifier)));
   });
 });
 
@@ -235,27 +235,49 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
     assert.doesNotMatch(rec.prompt, /\*\*Start\*\*|status to "In Progress"/);
   });
 
-  test('the scope and authority lines are code\'s, verbatim, for every written stage; never on the switch-off path', async () => {
-    assert.deepEqual(Object.keys(STAGE_INTENT).sort(), WRITTEN.sort());
-    for (const kind of WRITTEN) {
-      transport({ route: routing(PROMPT_TEMPLATES[kind].name), write: '## Goal\n\nInside means this ticket\'s own unfinished scope.' });
-      const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
-      for (const line of STAGE_INTENT[kind]) assert.ok(rec.prompt.includes(`- ${line}`), `${kind}: ${line.slice(0, 40)}`);
-      assert.ok(!generatePrompt(kind, ISSUE, CONTEXT).prompt.includes('## Scope and Authority'), `${kind}: switch-off unchanged`);
+  // LIN-3299: Scope and Authority is code's on every path, as the contract is: written or
+  // not, a fallback, a process-only stage, and the meta path with the switch off. Before,
+  // only a written lead carried it, so the switch-off path had no permission lines at all.
+  test('Scope and Authority: every stage, every path, once, between the Goal\'s lead and the process', async () => {
+    assert.deepEqual(Object.keys(STAGE_INTENT).sort(), Object.keys(PROMPT_TEMPLATES).sort());
+    const placed = (prompt, kind, path) => {
+      assert.equal(count(prompt, '## Scope and Authority'), 1, `${kind}, ${path}: once`);
+      for (const line of STAGE_INTENT[kind]) assert.ok(prompt.includes(`- ${line}`), `${kind}, ${path}: ${line.slice(0, 40)}`);
+      const at = prompt.indexOf('## Scope and Authority');
+      assert.ok(prompt.indexOf('## Goal') < at && at < prompt.indexOf('## Process'), `${kind}, ${path}: after the lead, before the process`);
+    };
+    const meta = '# T\n\n## Workflow\n\n1. Go\n\n## Goal\n\nWhat it is for.\n\n## Process\n\nThe steps.';
+    for (const [kind, { name }] of Object.entries(PROMPT_TEMPLATES)) {
+      placed(generatePrompt(kind, ISSUE, CONTEXT).prompt, kind, 'writer off');
+      transport({ route: routing(name), write: BRIEF });
+      placed((await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } })).prompt, kind, 'writer on');
+      transport({ route: routing(name), write: () => json('', { finishReason: 'length' }) });
+      placed((await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } })).prompt, kind, 'writer fallback');
+      transport({ route: `${routing(name)}\n\n## Prompt\n${meta}` });
+      placed((await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k' })).prompt, kind, 'meta, switch off');
     }
-    assert.match(STAGE_INTENT.review.join(' '), /its cause included, wherever it lives/);
   });
 
-  // The safety floors review rests on are code's, so a writer that drops them from the
-  // Goal cannot drop them from the prompt (LIN-3293 review S1). Close-out has no writer
-  // (LIN-3299), so its whole template, floors included, ships as written.
+  test('meta: a generated prompt with no Goal still gets Scope and Authority once, before the contract', async () => {
+    transport({ route: `${routing('plan')}\n\n## Prompt\nJust do it.` });
+    const { prompt } = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k' });
+    assert.ok(prompt.startsWith(`Just do it.${formatStageIntent('plan')}${formatStageContract('plan', ISSUE.identifier)}`));
+    assert.equal(count(prompt, '## Scope and Authority'), 1);
+  });
+
+  // The safety floors review rests on are code's on every path: the process states them,
+  // printed as written, and the one it does not (green CI never settles a ledger item) is a
+  // scope line, so a writer that drops them from its lead cannot drop them from the prompt
+  // (LIN-3293 review S1). Close-out has no writer (LIN-3299); its floors are its process.
   test('review keeps its safety floors whatever the writer writes; close-out is never written', async () => {
-    const floors = [/green CI never settles a ledger item/i, /non-empty ledger takes the conditional Approve/i,
-      /named monitor and one line on why nothing short of production/i, /named rollback/i, /quoting it exactly/i, /do not fix, merge, set Done or file follow-ups/i];
+    const floors = [/green CI never settles a ledger item/i, /never a bare Approve/i,
+      /name the specific monitor/i, /write one line naming why no check short of production could prove the claim/i,
+      /you name the rollback/i, /state the exact change/i, /You do NOT merge, mark the task Done, or file follow-ups/];
     transport({ route: routing('review'), write: '## Goal\n\nLand it.' });
     const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
-    const scope = rec.prompt.slice(rec.prompt.indexOf('## Scope and Authority'));
-    for (const floor of floors) assert.match(scope, floor, String(floor));
+    assert.equal(rec.written, true);
+    const rest = rec.prompt.slice(rec.prompt.indexOf('## Scope and Authority'));
+    for (const floor of floors) assert.match(rest, floor, String(floor));
     const calls = transport({ route: routing('close-out'), write: '## Goal\n\nLand it.' });
     const closeOut = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
     assert.equal(closeOut.prompt, generatePrompt('close-out', ISSUE, CONTEXT).prompt);
@@ -266,11 +288,12 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
   // fix; the stages that choose or build are (LIN-3293 review S2).
   test('only the stages that choose or build are told fixing at the cause is theirs', () => {
     const licence = /fixing at the cause and refactoring included, are yours/;
-    for (const kind of ['plan-review', 'bug', 'review', 'retrospective-audit']) {
+    for (const kind of ['plan-review', 'bug', 'review', 'close-out', 'retrospective-audit']) {
       assert.ok(!STAGE_INTENT[kind].some(l => licence.test(l)), kind);
       assert.match(STAGE_INTENT[kind][0], /one clear question with your recommendation/, kind);
     }
-    for (const kind of ['research', 'scoping', 'design', 'spike', 'plan', 'implementation', 'blocked']) {
+    for (const kind of ['triage', 'context', 'look-into', 'retro']) assert.ok(!STAGE_INTENT[kind].some(l => licence.test(l)), kind);
+    for (const kind of ['research', 'scoping', 'design', 'spike', 'plan', 'breakdown', 'implementation', 'blocked']) {
       assert.match(STAGE_INTENT[kind][0], licence, kind);
     }
   });
@@ -410,17 +433,27 @@ describe('the writer\'s token budget and unfinished replies', () => {
     return calls.find(c => c.isWriter).body;
   };
 
-  // Every writer gets the reasoning headroom in max_tokens, which costs nothing unless
-  // used: the models that fell back in the comparison reason by default and are not on
-  // the shared prefix list. The `reasoning` field goes only to the listed models. Outside
-  // the list it is not ignored: on a hybrid model it switches thinking on.
-  const HEADROOM = BRIEF_WRITER_PROSE_TOKENS + defaultReasoningTokens(BRIEF_WRITER_PROSE_TOKENS);
+  // Every writer gets a full reasoning allowance (REASONING_MAX_TOKENS, the most the shared
+  // split ever grants) in max_tokens on top of the lead's budget, which costs nothing unless
+  // used: the models that fell back in the comparison reason by default and are not on the
+  // shared prefix list. A lead's small prose budget must not shrink the headroom with it
+  // (LIN-3299 review: it fell to 2000). The `reasoning` field goes only to the listed
+  // models. Outside the list it is not ignored: on a hybrid model it switches thinking on.
+  const HEADROOM = BRIEF_WRITER_PROSE_TOKENS + REASONING_MAX_TOKENS;
 
-  test('a listed reasoning model gets the LIN-1000 split: a reasoning bound and the whole prose budget on top', async () => {
+  test('the headroom is a full reasoning allowance, not one scaled to the lead', () => {
+    assert.ok(REASONING_MAX_TOKENS >= 8000, String(REASONING_MAX_TOKENS));
+    for (const model of [DEFAULT_MODEL, 'x/w']) {
+      assert.ok(briefWriterBudget(model).maxTokens - BRIEF_WRITER_PROSE_TOKENS >= REASONING_MAX_TOKENS, model);
+    }
+  });
+
+  test('a listed reasoning model gets the LIN-1000 split: a full reasoning bound and the whole prose budget on top', async () => {
     assert.ok(isReasoningModel(DEFAULT_MODEL));
     const body = await writerBody(DEFAULT_MODEL);
-    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: BRIEF_WRITER_PROSE_TOKENS });
+    const { reasoning, maxTokens } = resolveReasoningBudget({ model: DEFAULT_MODEL, proseTokens: BRIEF_WRITER_PROSE_TOKENS, reasoningTokens: REASONING_MAX_TOKENS });
     assert.deepEqual(body.reasoning, reasoning);
+    assert.equal(body.reasoning.max_tokens, REASONING_MAX_TOKENS);
     assert.equal(body.max_tokens, maxTokens);
     assert.equal(body.max_tokens, HEADROOM);
     assert.equal(body.max_tokens, BRIEF_WRITER_PROSE_TOKENS + body.reasoning.max_tokens, 'the prose budget survives the reasoning run');
@@ -518,6 +551,25 @@ describe('pure seams', () => {
     assert.doesNotMatch(STAGE_LEADS.blocked, /cannot unilaterally/);
   });
 
+  // A limit that must survive lives where code prints it as written, not in the lead the
+  // writer rewrites (LIN-3299 review): plan's no-code-changes and the audit's no-state-change.
+  test('the limits a writer must not lose are in the process, not the lead', () => {
+    const process = (kind) => PROMPT_TEMPLATES[kind].generate(ISSUE, CONTEXT, {}).split('## Process')[1];
+    assert.match(process('plan'), /Make no code changes here/);
+    assert.doesNotMatch(STAGE_LEADS.plan, /code changes/);
+    assert.match(process('retrospective-audit'), /Do not change status, labels, or any other task state/);
+    assert.doesNotMatch(STAGE_LEADS['retrospective-audit'], /change state|authority/);
+    assert.match(PROMPT_TEMPLATES.plan.generate(ISSUE, CONTEXT, {}), /\(see Process below\)/);
+  });
+
+  // The writer keeps the lead's limits but writes none of code's sections; it is not told
+  // not to "repeat" Scope and Authority, which a lead may echo (LIN-3299 review).
+  test('the writer is told not to write or narrow code\'s sections, not that it may never echo them', () => {
+    const prompt = buildBriefWriterPrompt({ kind: 'plan', bundle: 'B' });
+    assert.match(prompt, /do not write or narrow them/);
+    assert.doesNotMatch(prompt, /\brepeat\b/);
+  });
+
   test('the writer prompt carries where the router points only when there is a pointer', () => {
     assert.doesNotMatch(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B' }), /Where the router points/);
     assert.match(buildBriefWriterPrompt({ kind: 'plan', bundle: 'B', focus: 'F' }), /## Where the router points[^\n]*\n\nF/);
@@ -541,18 +593,17 @@ describe('what the writer must not pass on: the router\'s specifics', () => {
   });
 
   // LIN-3299: rules that did harm on rules text, and the command check, go with the rules.
-  test('the lead-only writer is not told to reshape rules, and code no longer checks commands', () => {
+  test('the lead-only writer is not told to reshape rules, and commands stay in the process', () => {
     const prompt = buildBriefWriterPrompt({ kind: 'retrospective-audit', bundle: '## Goal\n\nB', focus: null, sections: ['## Process'] });
     assert.doesNotMatch(prompt, /number only what has an order|conditionals that cannot apply/i);
     assert.match(prompt, /one or two short paragraphs/i);
-    assert.equal(briefFault('## Goal\n\nAudit what shipped.', { shown: '`git log --grep=LIN-3251`' }), null);
     assert.ok(!PROMPT_TEMPLATES['retrospective-audit'].generate(ISSUE, CONTEXT, {}).split('## Process')[0].includes('git log'),
       'the ticket-keyed command is in the process, not the lead');
   });
 
-  test('the writer\'s visible budget is sized for a lead, with the reasoning headroom kept', () => {
+  test('the writer\'s visible budget is sized for a lead, with a full reasoning allowance on top', () => {
     assert.ok(BRIEF_WRITER_PROSE_TOKENS <= 1500, String(BRIEF_WRITER_PROSE_TOKENS));
-    assert.equal(briefWriterBudget('x/w').maxTokens, BRIEF_WRITER_PROSE_TOKENS + defaultReasoningTokens(BRIEF_WRITER_PROSE_TOKENS));
+    assert.equal(briefWriterBudget('x/w').maxTokens, BRIEF_WRITER_PROSE_TOKENS + REASONING_MAX_TOKENS);
   });
 
   test('briefFault: five words in a row from the router\'s line, not in anything else the writer was shown, are its specifics passed on', () => {

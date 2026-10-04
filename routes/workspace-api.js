@@ -599,11 +599,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       const { provider: issueProvider, callScope: issueCallScope } = issueBinding
 
       // The writer bills the same credential Recommend does, and a free-tier caller
-      // pays the same prompt safety-net unit, but only when the writer will run.
+      // pays the same prompt safety-net unit, but only when the writer will run (never
+      // for a process-only stage, LIN-3299).
       const { apiKey: writerKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey })
       const briefWriter = isCustomPrompt || shouldMockAi(workspace)
         ? null
-        : await resolveBriefWriter({ urlKey: workspace.urlKey, workspacePreferencesStore, isFreeTier })
+        : await resolveBriefWriter({ urlKey: workspace.urlKey, workspacePreferencesStore, isFreeTier, kind: labelName })
       if (briefWriter) {
         const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore })
         if (check) {

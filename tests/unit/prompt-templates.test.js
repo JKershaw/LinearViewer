@@ -523,7 +523,8 @@ describe('bug template', () => {
     // LIN-3299: the role line became the Goal's lead, and the steps moved under ## Process.
     const expectedGoalBlock = [
       '## Goal',
-      'Something behaves wrong. Find its cause for certain, and whether it is one of a class, and propose the fix that removes it; the next stage builds it, and nothing ships without review.',
+      // LIN-3299: code adds Scope and Authority after the lead, on every path.
+      'Something behaves wrong. Find its cause for certain, with evidence, before anything is fixed; nothing ships without review.' + formatStageIntent('bug') + '\n',
       '## Process',
       'Start by reading any prior investigation notes in comments. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
       'Investigation process:',
@@ -631,7 +632,7 @@ describe('plan template', () => {
   // LIN-3299: the role line is the Goal's lead now; it keeps the role's limit.
   test('leads with planning, and makes no code changes', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('the code changes are the next step\'s, so make none here'));
+    assert.ok(result.prompt.split('## Process')[1].includes('Make no code changes here: the next stage builds the plan.'));
     assert.ok(!result.prompt.includes('implementation engineer'));
   });
 
@@ -2247,6 +2248,7 @@ import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubt
 import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { formatStageContract } from '../../lib/prompt-contract.js';
+import { formatStageIntent, withStageIntent } from '../../lib/prompts/brief-writer.js';
 
 describe('resolvePromptUi (LIN-177 S4)', () => {
   test('no provider → Linear floor (every capability on, displayName Linear)', () => {
@@ -3454,6 +3456,10 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
 
   test('(c) both paths carry the verdict vocabulary and the verify-don\'t-redesign, write-only stance', () => {
     const { prompt } = generatePrompt('plan-review', issue, context);
+    // LIN-3299: verify-don't-redesign is a Scope and Authority line, which code adds on both
+    // paths (the meta rule no longer asks the model to write it).
+    const metaPrompt = applyGroundingToRecommendation({ prompt: 'BODY', recommendedAction: 'plan-review' }, issue, context).prompt;
+    for (const text of [prompt, metaPrompt]) assert.ok(/Verify, do not redesign: another reasonable approach is not a finding/.test(text));
     const meta = buildMetaPromptTemplate({
       issueContext: 'CTX', identifier: 'LIN-903', hasSubtasks: false, subtaskCount: 0,
       completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
@@ -3463,8 +3469,7 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
     for (const [pathName, text] of [['handwritten', prompt], ['meta', rule]]) {
       assert.ok(/Approve/.test(text) && /Request Changes/.test(text) && /Needs Discussion/.test(text),
         `${pathName}: carries the Approve / Request Changes / Needs Discussion vocabulary`);
-      assert.ok(/second planner/i.test(text), `${pathName}: forbids becoming a second planner`);
-      assert.ok(/do not add requirements/i.test(text), `${pathName}: verifies against the plan's own claims`);
+      assert.ok(/against its own claims, adding no requirements of (your|its) own/i.test(text), `${pathName}: verifies against the plan's own claims`);
       assert.ok(/claims verified; proceed to implementation/i.test(text),
         `${pathName}: cheap-when-clean line`);
     }
@@ -4182,7 +4187,8 @@ describe('cross-path grounding parity (LIN-435)', () => {
     );
     const contract = formatStageContract('implementation', issue.identifier);
     assert.ok(hw.includes(contract + grounding), 'handwritten prompt carries the stage contract, then the grounding (LIN-3292)');
-    assert.strictEqual(meta.prompt, 'BODY' + contract + grounding, 'meta path appends the identical contract and grounding');
+    // LIN-3299: Scope and Authority comes first, after the body (which has no Goal here).
+    assert.strictEqual(meta.prompt, 'BODY' + formatStageIntent('implementation') + contract + grounding, 'meta path appends the identical contract and grounding');
   });
 
   test('staleness --since date is injected deterministically from issue.createdAt (no placeholder)', () => {
@@ -4299,7 +4305,7 @@ describe('grounding notes chosen per stage (LIN-3296)', () => {
           issue, context
         );
         const contract = formatStageContract(kind, issue.identifier);
-        assert.strictEqual(meta.prompt, 'BODY' + contract + grounding, `${kind}: meta grounding keyed off recommendedAction "${action}"`);
+        assert.strictEqual(meta.prompt, 'BODY' + formatStageIntent(kind) + contract + grounding, `${kind}: meta grounding keyed off recommendedAction "${action}"`);
       }
     });
   }
@@ -5159,12 +5165,12 @@ describe('stage contract on both prompt paths (LIN-3292)', () => {
       const contract = formatStageContract(kind, issue.identifier);
       const hw = generatePrompt(kind, issue, context).prompt;
       const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});
-      assert.ok(hw.startsWith(body + contract), `${kind}: handwritten = body + contract + …`);
+      assert.ok(hw.startsWith(withStageIntent(body, kind) + contract), `${kind}: handwritten = body (with its scope lines, LIN-3299) + contract + …`);
       const meta = applyGroundingToRecommendation(
         { reasoning: 'r', prompt: 'BODY', truncated: false, recommendedAction: PROMPT_TEMPLATES[kind].name, deferTo: null, completionTokens: 1 },
         issue, context
       ).prompt;
-      assert.ok(meta.startsWith('BODY' + contract), `${kind}: meta = body + contract + …`);
+      assert.ok(meta.startsWith('BODY' + formatStageIntent(kind) + contract), `${kind}: meta = body + scope lines + contract + …`);
       const want = contract ? 1 : 0;
       assert.strictEqual(count(hw, HEADING), want);
       assert.strictEqual(count(meta, HEADING), want);
