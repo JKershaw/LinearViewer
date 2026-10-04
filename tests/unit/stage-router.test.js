@@ -2,7 +2,7 @@
  * LIN-3304: the next-stage choice has its own seam (lib/stage-router.js).
  *
  * This is the routing eval arm the ticket asks for, pinned at the seam: it proves
- * the router prompt the writer-off live path sends is byte-identical to the routing
+ * the router prompt the writer-on live path sends is byte-identical to the routing
  * half the full template composes, and that the routing reply is parsed into the
  * stage decision by one owner. Behaviour is deliberately unchanged here — the two
  * known defects (a `**Reasoning**` header, an out-of-list stage) are pinned as
@@ -40,7 +40,11 @@ const NODE_ARGS = {
 
 describe('stage-router: one owner for the next-stage choice (LIN-3304)', () => {
   test('the router prompt is byte-identical to the routing half the full template composes', () => {
-    for (const args of [ARGS, NODE_ARGS, { ...NODE_ARGS, isTerminal: true }]) {
+    // A non-Linear provider must be in the set: the capability pass renames the
+    // tracker on both paths, and skipping it in buildRouterPrompt (review finding 1)
+    // only shows up off the default provider.
+    const github = { ...ARGS, featureFlags: { linearMcp: false }, providerUi: { displayName: 'GitHub Issues' } };
+    for (const args of [ARGS, NODE_ARGS, { ...NODE_ARGS, isTerminal: true }, github]) {
       assert.equal(
         buildRouterPrompt(args),
         buildMetaPromptTemplate({ ...args, routingOnly: true }),

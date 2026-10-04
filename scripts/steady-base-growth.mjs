@@ -11,6 +11,7 @@ const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer
 export const GROUPS = {
   'worker templates': ['lib/prompt-templates.js', 'lib/prompt-template-defs.js', 'lib/prompt-formatters.js', 'lib/prompt-contract.js'],
   'meta-prompt': ['lib/prompts/meta-prompt-template.js'],
+  'stage router': ['lib/stage-router.js'],
   'brief writer': ['lib/prompts/brief-writer.js'],
   'autopilot kickoff': ['lib/prompts/autopilot-kickoff.js', 'lib/prompts/autopilot-manual.js'],
   'operating manual': ['docs/autopilot-operating-manual.md'],
