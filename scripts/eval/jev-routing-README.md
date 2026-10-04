@@ -118,7 +118,16 @@ separate from the canonical 66-fixture result**; it **does not change the NO-GO 
 ## Run
 
 ```sh
-OPENROUTER_API_KEY=... node scripts/eval/jev-routing-eval.mjs
+# A model-calling run names its model (no default, LIN-3300) and prints its planned call
+# count and input size first; a full-corpus run stops there unless --confirm is passed.
+node --env-file=.env scripts/eval/jev-routing-eval.mjs --model <router model> [--confirm]
+
+# the stage selector's arm alone (the shipping routing-only path), as the LIN-3300 gate runs it:
+ARMS=3 ROUTING_ONLY=1 K=6 node --env-file=.env scripts/eval/jev-routing-eval.mjs --model openai/gpt-5.6-sol --confirm
+
+# the same arm against a stubbed transport that answers each fixture's gold: proves the
+# selector's view, facts, prompt, parse and code routes wire up, no network, no spend:
+STUB=1 ARMS=3 ROUTING_ONLY=1 K=1 node scripts/eval/jev-routing-eval.mjs
 
 # no-network pipeline check (stub answers; exercises loading, overrides, grading, report).
 # OUT_DIR points somewhere non-canonical; with OUT_DIR unset a DRY run uses a temp dir,
@@ -135,8 +144,11 @@ node --test scripts/eval/jev-routing-state.test.mjs
 node scripts/eval/build-widened-routing-fixtures.mjs
 ```
 
-Env knobs: `K` (default 3), `ONLY` (comma-separated id substrings), `ARMS` (`123`), `MODEL`
-(incumbent), `JEV_MODEL`, `DRY`, `SELFTEST`, `OUT_DIR`.
+Flags: `--model <id>` (the incumbent / router model; `MODEL=<id>` is the same explicit
+choice), `--confirm` (a full-corpus model-calling run). Env knobs: `K` (default 3), `ONLY`
+(comma-separated id substrings), `ARMS` (`123`), `ROUTING_ONLY`, `JEV_MODEL`, `DRY`, `STUB`,
+`SELFTEST`, `OUT_DIR`. The corpus is 110 fixtures since LIN-3300 added the 4 Oct trial points
+(`fixtures/recommend/oct4-trials.json`).
 
 ## Limitations
 

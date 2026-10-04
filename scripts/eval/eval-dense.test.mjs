@@ -79,9 +79,10 @@ test('STUB runs with OPENROUTER_API_KEY unset (reaches the stub transport)', (t)
   // the real LIN-3309 / PR-1603 trails and added the newest-reply, count-2+revision and
   // FC-ruling carry-ins, and the last round added the two implementation-landed cases.
   // All hit under the stub, so the counts move to 255/280. The 25 remaining misses are
-  // the pre-existing LIN-385 / LIN-389 / LIN-428 descent cases.
-  assert.equal(r.summary.production.hit, 255);
-  assert.equal(r.summary.production.n, 280);
+  // the pre-existing LIN-385 / LIN-389 / LIN-428 descent cases. LIN-3300 added the 18
+  // 4 Oct trial points (oct4-trials.json), all hits under the stub: 345/370.
+  assert.equal(r.summary.production.hit, 345);
+  assert.equal(r.summary.production.n, 370);
 });
 
 test('cost of a failed attempt that is then retried is counted', (t) => {

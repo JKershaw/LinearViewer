@@ -18,25 +18,38 @@
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
- *   B. scripts/eval/fixtures/recommend/*.json             (54 targets over 10 files)
+ *   B. scripts/eval/fixtures/recommend/*.json             (74 targets over 12 files; LIN-3309's
+ *                                                          next-stage-choice and LIN-3300's
+ *                                                          oct4-trials are the 4 Oct trial points)
  *   C. scripts/eval-research-routing.mjs inline CASES[]   (24 inline)
  *   D. scripts/eval/fixtures-widened/*.json               (5 targets: LIN-830 x2, LIN-1084,
  *                                                          breakdown-fork-neg, all-terminal-node)
- *   Total 7 + 54 + 24 + 5 = 90 fixtures.
+ *   Total 7 + 74 + 24 + 5 = 110 fixtures (EXPECTED_FIXTURES).
  *
  * Grading is deterministic (no LLM judge). Gold overrides are harness-side only; the frozen
  * fixture files are read, never written.
  *
  * Usage:
- *   OPENROUTER_API_KEY=... node scripts/eval/jev-routing-eval.mjs
+ *   node --env-file=.env scripts/eval/jev-routing-eval.mjs --model <id> [--confirm]
+ * Flags (LIN-3300):
+ *   --model <id>  the incumbent / router model. Required for any run that calls a model:
+ *                 there is no default, because a run that silently fell back to the
+ *                 library default measured the wrong model. Use the model the workspace's
+ *                 Router setting names (MODEL=<id> is accepted as the same explicit choice).
+ *   --confirm     required for a full-corpus run (no ONLY filter) that calls a model. Every
+ *                 model-calling run first prints its planned call count and approximate
+ *                 input size; without --confirm a full-corpus run stops there.
  * Env knobs:
  *   K          runs per fixture per arm          (default 3)
  *   ONLY       comma-separated id substrings      (cheap focused runs)
  *   ARMS       1 | 2 | 3 | 12 | 123               (default 123)
- *   MODEL      incumbent model                    (default openai/gpt-5.4-mini)
  *   JEV_MODEL  Jev model                          (default typesafe/jev-1.13)
- *   ROUTING_ONLY 1 = arm 3 runs the SHIPPING routing-only path (buildRouterPrompt +
- *                  routeStage) instead of the full prompt (LIN-3309)
+ *   ROUTING_ONLY 1 = arm 3 runs the SHIPPING routing-only path (the stage selector,
+ *                  buildRouterPrompt + routeStage) instead of the full prompt (LIN-3309)
+ *   STUB       1 = arm 3 runs the real getRecommendation (with ROUTING_ONLY, the stage
+ *                  selector: its view, facts, prompt, parse and code routes) against a
+ *                  stubbed transport that answers each fixture's gold, so the wiring is
+ *                  proven with no network and no spend. Arms 1/2 answer as in DRY.
  *   DRY        1 = deterministic stub answers, no network (pipeline verification). Writes to a
  *                  temp dir unless OUT_DIR is set, so it can never overwrite the canonical
  *                  scripts/eval/jev-routing-out artifacts.
@@ -51,7 +64,7 @@ import { readFileSync, readdirSync, writeFileSync, mkdirSync, existsSync } from 
 import { tmpdir } from 'os';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { dirname, join } from 'path';
-import { getRecommendation, setLlmCallRecorder, setPromptTraceRecorder, setFetchImpl, DEFAULT_MODEL } from '../../lib/openrouter.js';
+import { getRecommendation, setLlmCallRecorder, setPromptTraceRecorder, setFetchImpl } from '../../lib/openrouter.js';
 import { selectFocusSubtask } from '../../lib/recommendation-facts.js';
 import { buildDistilledState } from './jev-routing-state.mjs';
 import { buildRoutingQuestion, buildIncumbentPrompt, norm, LIVE_VOCABULARY } from './jev-routing-criteria.mjs';
@@ -59,13 +72,33 @@ import { buildRoutingQuestion, buildIncumbentPrompt, norm, LIVE_VOCABULARY } fro
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
 
+/**
+ * The command-line flags (LIN-3300): `--model <id>` / `--model=<id>` and `--confirm`.
+ * @param {string[]} argv - process.argv.slice(2)
+ * @returns {{model: string|null, confirm: boolean}}
+ */
+export function parseCliArgs(argv = []) {
+  const out = { model: null, confirm: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--confirm') out.confirm = true;
+    else if (a === '--model') out.model = argv[++i] || null;
+    else if (a.startsWith('--model=')) out.model = a.slice('--model='.length) || null;
+  }
+  return out;
+}
+
+const CLI = parseCliArgs(process.argv.slice(2));
 const KEY = process.env.OPENROUTER_API_KEY || '';
-const MODEL = process.env.MODEL || DEFAULT_MODEL;
+const MODEL = CLI.model || process.env.MODEL || null;
 const JEV_MODEL = process.env.JEV_MODEL || 'typesafe/jev-1.13';
 const K = Number(process.env.K || 3);
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const ARMS = process.env.ARMS || '123';
 const DRY = !!process.env.DRY;
+const STUB = !!process.env.STUB;
+/** The corpus size the loader should find unfiltered (see the header's class counts). */
+export const EXPECTED_FIXTURES = 110;
 // ROUTING_ONLY: arm 3 exercises the SHIPPING routing-only path (buildRouterPrompt
 // + routeStage) instead of the full prompt. `deadline: 0` makes writeBrief return
 // `no-time` before any writer call (openrouter.js), so the one-LLM-record
@@ -82,7 +115,7 @@ export function resolveOutDir(dry, outDir, here = HERE) {
   if (outDir) return outDir;
   return dry ? join(tmpdir(), `jev-routing-dry-${process.pid}`) : join(here, 'jev-routing-out');
 }
-const OUT_DIR = resolveOutDir(DRY, process.env.OUT_DIR);
+const OUT_DIR = resolveOutDir(DRY || STUB, process.env.OUT_DIR);
 const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DECISIONS_URL = 'https://openrouter.ai/api/alpha/decisions';
 
@@ -322,7 +355,7 @@ function extractAction(content) {
 
 // ── arms ──────────────────────────────────────────────────────────────────────────────────────
 async function armJev(state, offerDefer) {
-  if (DRY) return { action: norm(state.__goldDry), confidence: 0.9, probabilities: {}, latencyMs: 1, cost: 0, inputTokens: 0, outputTokens: 0, servedModel: 'dry' };
+  if (DRY || STUB) return { action: norm(state.__goldDry), confidence: 0.9, probabilities: {}, latencyMs: 1, cost: 0, inputTokens: 0, outputTokens: 0, servedModel: 'dry' };
   const { json, latencyMs } = await postJson(DECISIONS_URL, {
     model: JEV_MODEL, state, questions: buildRoutingQuestion({ offerDefer }),
   });
@@ -335,7 +368,7 @@ async function armJev(state, offerDefer) {
 }
 
 async function armIncumbentDistilled(state, offerDefer) {
-  if (DRY) return { action: norm(state.__goldDry), latencyMs: 1, cost: 0, inputTokens: 0, outputTokens: 0, raw: 'dry' };
+  if (DRY || STUB) return { action: norm(state.__goldDry), latencyMs: 1, cost: 0, inputTokens: 0, outputTokens: 0, raw: 'dry' };
   const prompt = buildIncumbentPrompt(state, { offerDefer });
   const { json, latencyMs } = await postJson(CHAT_URL, {
     model: MODEL, temperature: 0, max_tokens: 24,
@@ -355,7 +388,7 @@ async function armIncumbentDistilled(state, offerDefer) {
  * by a unique per-call `callMeta.evalCallId` (no duplicate rebuild call).
  */
 async function armIncumbentRaw(bundle, evalCallId, recorders) {
-  if (DRY) {
+  if (DRY && !STUB) {
     // Stub arm-3 output: push one placeholder record per recorder kind so the run shape matches
     // a live run. This branch RETURNS BEFORE the correlation assertion below, so it does NOT
     // exercise that assertion; SELFTEST is the no-spend check that does.
@@ -372,7 +405,7 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
   const callMeta = { evalCallId, issueIdentifier: issue.identifier };
   const t0 = performance.now();
   const rec = await getRecommendation(issue, context, {
-    apiKey: KEY, model: MODEL, featureFlags: {}, callMeta,
+    apiKey: STUB ? 'stub' : KEY, model: MODEL || 'stub', featureFlags: {}, callMeta,
     ...(ROUTING_ONLY ? { briefWriter: { model: MODEL }, deadline: 0 } : {}),
   });
   const wallMs = Math.round(performance.now() - t0);
@@ -414,6 +447,60 @@ export function assertNoServerImport() {
   return true;
 }
 
+// ── run plan and the full-corpus gate (LIN-3300) ───────────────────────────────────────────────
+/**
+ * The calls a run would make and roughly how much input it would send, measured before any
+ * model call. Arm 3's prompt is rendered by the real getRecommendation against a capturing
+ * stub (no network): a code-settled route sends nothing. Arms 1/2 send the distilled state.
+ * @param {Array} cases
+ * @param {{k: number, armKeys: string[], routingOnly: boolean}} options
+ * @returns {Promise<{calls: number, inputChars: number, perArm: Object}>}
+ */
+export async function planRun(cases, { k, armKeys, routingOnly }) {
+  const perArm = {};
+  for (const key of armKeys) perArm[key] = { calls: 0, inputChars: 0 };
+  let captured = null;
+  setFetchImpl(async (url, opts = {}) => {
+    captured = JSON.parse(opts.body).messages[0].content;
+    return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **review**\n\n## Prompt\nplan' }, finish_reason: 'stop' }], usage: {} }) };
+  });
+  try {
+    for (const c of cases) {
+      if (perArm.arm1 || perArm.arm2) {
+        const stateChars = JSON.stringify(buildDistilledState(c.bundle)).length;
+        for (const key of ['arm1', 'arm2']) if (perArm[key]) { perArm[key].calls += k; perArm[key].inputChars += k * stateChars; }
+      }
+      if (perArm.arm3) {
+        const b = c.bundle;
+        captured = null;
+        try {
+          await getRecommendation(b.issue, { parent: b.parent, siblings: b.siblings || [], siblingsTotal: b.siblingsTotal || 0, project: b.project, children: b.children || [], comments: b.comments || [], focusedChild: b.focusedChild || null },
+            { apiKey: 'plan', model: 'plan', featureFlags: {}, ...(routingOnly ? { briefWriter: { model: 'plan' }, deadline: 0 } : {}) });
+        } catch { /* a plan-only reply may not parse for every shape; the prompt was captured */ }
+        if (captured != null) { perArm.arm3.calls += k; perArm.arm3.inputChars += k * captured.length; }
+      }
+    }
+  } finally {
+    setFetchImpl(null);
+  }
+  const calls = Object.values(perArm).reduce((n, a) => n + a.calls, 0);
+  const inputChars = Object.values(perArm).reduce((n, a) => n + a.inputChars, 0);
+  return { calls, inputChars, perArm };
+}
+
+/**
+ * Why a run must not start, or null. A run that calls a model needs an explicit model,
+ * and a full-corpus one needs --confirm.
+ * @param {{callsModels: boolean, model: string|null, fullCorpus: boolean, confirm: boolean}} run
+ * @returns {string|null}
+ */
+export function refusalReason({ callsModels, model, fullCorpus, confirm }) {
+  if (!callsModels) return null;
+  if (!model) return 'no model chosen: pass --model <id> (the model the workspace\'s Router setting names); there is no default';
+  if (fullCorpus && !confirm) return 'a full-corpus run calls the model for every fixture: re-run with --confirm once the plan above is what you mean to spend, or narrow it with ONLY=';
+  return null;
+}
+
 // ── calibration sweep ─────────────────────────────────────────────────────────────────────────
 function calibrationSweep(caseResults, incumbentArmKey = 'arm3') {
   const runs = [];
@@ -446,6 +533,20 @@ function calibrationSweep(caseResults, incumbentArmKey = 'arm3') {
   return { runs: runs.length, thresholds };
 }
 
+// ── STUB transport: the real path, a canned reply (LIN-3300) ──────────────────────────────────
+let stubAnswer = null;
+function installGoldStub() {
+  setFetchImpl(async () => {
+    const a = stubAnswer || { action: 'review' };
+    const content = `## Reasoning\n→ **${a.action}**\n${a.action === 'defer' && a.deferTo ? `**DeferTo:** ${a.deferTo}\n` : ''}**Why now:** stubbed reply.\n\n## Prompt\nstub`;
+    return {
+      ok: true, status: 200,
+      json: async () => ({ model: 'stub', choices: [{ message: { content }, finish_reason: 'stop' }], usage: { prompt_tokens: 0, completion_tokens: 0, cost: 0 } }),
+      text: async () => '{}',
+    };
+  });
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────────────────────
 async function runSelftest() {
   assertNoServerImport();
@@ -473,7 +574,8 @@ async function runSelftest() {
 
 async function main() {
   assertNoServerImport();
-  if (!KEY && !DRY) throw new Error('Set OPENROUTER_API_KEY (or DRY=1 for a no-network pipeline run)');
+  const callsModels = !DRY && !STUB;
+  if (!KEY && callsModels) throw new Error('Set OPENROUTER_API_KEY (or DRY=1 / STUB=1 for a no-network run)');
 
   let cases = loadCases();
   if (ONLY.length) cases = cases.filter((c) => ONLY.some((t) => c.id.includes(t)));
@@ -481,9 +583,22 @@ async function main() {
   const armKeys = ['1', '2', '3'].filter((a) => ARMS.includes(a)).map((a) => `arm${a}`);
 
   // Expected total count check (only when unfiltered).
-  if (!ONLY.length && cases.length !== 90) {
-    console.warn(`WARNING: expected 90 fixtures, loaded ${cases.length}`);
+  if (!ONLY.length && cases.length !== EXPECTED_FIXTURES) {
+    console.warn(`WARNING: expected ${EXPECTED_FIXTURES} fixtures, loaded ${cases.length}`);
   }
+
+  // The plan, printed before any model call, and the gate (LIN-3300).
+  const plan = await planRun(cases, { k: K, armKeys, routingOnly: ROUTING_ONLY });
+  console.log(`plan: ${cases.length} fixtures, K=${K}, arms ${armKeys.join(',')}, model ${MODEL || '(none)'}${armKeys.includes('arm1') ? `, Jev ${JEV_MODEL}` : ''}${ROUTING_ONLY ? ', routing-only (stage selector)' : ', full prompt'}${STUB ? ', STUB transport' : DRY ? ', DRY' : ''}`);
+  for (const [key, a] of Object.entries(plan.perArm)) console.log(`  ${key}: ${a.calls} calls, ~${Math.round(a.inputChars / 1000)}k input chars (~${Math.round(a.inputChars / 4000)}k tokens)`);
+  console.log(`  total: ${callsModels ? plan.calls : 0} model calls, ~${Math.round(plan.inputChars / 1000)}k input chars`);
+  const refusal = refusalReason({ callsModels, model: MODEL, fullCorpus: !ONLY.length, confirm: CLI.confirm });
+  if (refusal) {
+    console.error(`REFUSED: ${refusal}`);
+    process.exitCode = 2;
+    return;
+  }
+  if (STUB) installGoldStub();
 
   const recorders = registerRecorders();
   const ranAt = new Date().toISOString();
@@ -494,7 +609,8 @@ async function main() {
     for (const c of cases) {
       const state = buildDistilledState(c.bundle);
       const offerDefer = state.deferEligible;
-      if (DRY) { state.__goldDry = c.gold.expect[0] || 'review'; c.bundle.__goldDry = state.__goldDry; }
+      if (DRY || STUB) { state.__goldDry = c.gold.expect[0] || 'review'; c.bundle.__goldDry = state.__goldDry; }
+      if (STUB) stubAnswer = { action: c.gold.expect[0] || 'review', deferTo: state.deferTarget };
       const runs = [];
       for (let k = 0; k < K; k++) {
         const run = { k };
@@ -539,6 +655,7 @@ async function main() {
     }
   } finally {
     unregisterRecorders();
+    if (STUB) setFetchImpl(null);
   }
 
   // ── aggregate per arm ──
@@ -659,7 +776,7 @@ async function main() {
     ? JSON.parse(readFileSync(join(HERE, 'jev-routing-corpus.json'), 'utf8')) : null;
 
   const results = {
-    task: 'LIN-3107', ranAt, dryRun: DRY,
+    task: 'LIN-3107', ranAt, dryRun: DRY, stub: STUB, routingOnly: ROUTING_ONLY, plan,
     models: { jev: JEV_MODEL, incumbent: MODEL },
     k: K, arms: armKeys, fixtureCount: caseResults.length,
     sourceCounts: caseResults.reduce((m, c) => { m[c.source] = (m[c.source] || 0) + 1; return m; }, {}),
