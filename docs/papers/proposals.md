@@ -3,6 +3,14 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **How much authority does a dispatched session hold that it never uses?**
+  `harbour/persistent-mind-ephemeral-hands.md` argues that a worker should hold only what its task needs, granted
+  from outside it and gone when the task ends. `harbour/runner-for-strangers.md` found every dispatched run carrying
+  the operator's credentials, and Harbour's proxy tokens are scoped to a workspace, not a ticket. A census answers
+  it: for a sample of recent dispatched sessions in both repos, list each credential and capability in reach (proxy
+  token scope and grants, GitHub token, SSH keys, other API keys, network egress, permission mode) and, from the
+  transcript, which were used; report the unused share by role and the smallest grant set that would have covered
+  each role's sessions. (Claude, 2026-10-04)
 - **Does the engine's rewrite of a template change what review catches?** `harbour/prompt-kinds.md` found that the
   recommender writes each worker prompt itself, its own text 25–68% of the handwritten template's. The code-appended gates
   survive, but the review template's regression step (`git log` over the changed files) is in about 1% of written reviews,
