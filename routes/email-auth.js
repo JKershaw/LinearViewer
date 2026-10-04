@@ -254,13 +254,15 @@ export function createEmailAuthRoutes({
     // else the value carried from the register page (cleared below).
     const destination = safeNext(next) || safeNext(req.session.emailLinkNext);
     // D1 (LIN-1892 S3 review): link mode ATTACHES an identity to the live
-    // account P; it is not a sign-in for P. `establishAccount` is the one seam
-    // every real sign-in converges on and stamps `identityAuthenticatedAt` on
-    // every success, so save P's prior freshness and restore it exactly after a
-    // successful link — leaving it absent when it was absent. Otherwise adding
-    // an address would mark a stale P freshly authenticated, relaxing the
-    // LIN-2233 A1 merge-confirm proof. `lib/account-session.js` is deliberately
-    // untouched: every provider path depends on that stamp.
+    // account P; it is not a sign-in for P. `establishAccount` now stamps
+    // `identityAuthenticatedAt` only when the arriving identity proves P
+    // (B1/B2/B4) and never on a link-onto-live (B3) — the LIN-3140 seam fix —
+    // so a B3 link no longer refreshes P on its own. This save/restore stays as
+    // defence in depth: link mode is "not a sign-in" by its own ruling (N2), so
+    // it deliberately never moves P's freshness even in the B1 case (an address
+    // already on P), where the seam would now re-stamp. It leaves the stamp
+    // absent when it was absent, so adding an address can never relax the
+    // LIN-2233 A1 merge-confirm proof.
     const priorAuthenticatedAt = req.session.identityAuthenticatedAt;
     const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'email', emailNorm, {}, null);
     if (established.ok) {

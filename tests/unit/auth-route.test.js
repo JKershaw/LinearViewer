@@ -17,6 +17,8 @@ import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { getWorkspaceByUrlKey } from '../../lib/workspace.js';
+import { establishAccount } from '../../lib/account-session.js';
+import { respondToAccountConflict } from '../../lib/account-conflict.js';
 
 function fakeProvider(overrides = {}) {
   return {
@@ -323,6 +325,75 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     // limit-check passed) — persistOwnerCredential sits after this check too,
     // so no durable credential exists for (myAccount, 'beta') either.
     assert.strictEqual(await ownerCredentialStore.get(myAccount._id, 'beta'), null);
+  });
+
+  // === LIN-3140 (A1 freshness hole): the Linear callback is B3-reachable ===
+  // Both the add-source arm and the mode:'new' arm carry `accountId` and the
+  // freshness stamp across the request. When the arriving identity is NEW
+  // (unowned), `establishAccount` links it onto the live account P (B3) — it
+  // proves only the arriving identity, never P. The stamp must therefore be
+  // preserved exactly, so a later conflict still demands re-auth rather than
+  // offering a merge. Fail-first: on baseline the seam stamps on B3.
+  const conflictViewer = 'viewer-G';
+
+  async function expectMergeRefusedAfterStaleB3({ accountStore, accountWorkspaceStore, session, accountId }) {
+    // A later conflict: another account G owns `conflictViewer`.
+    const g = await accountStore.createAccount();
+    await accountStore.linkIdentity(g._id, 'linear', conflictViewer, {});
+    const conflict = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', conflictViewer, {}, 'ws-later');
+    assert.deepStrictEqual(conflict, { ok: false, conflict: { accountId: g._id } });
+    const res = makeRes();
+    await respondToAccountConflict({
+      req: { session }, res, established: conflict, workspace: null,
+      mode: 'new', returnUrlKey: 'ws-later', identityLabel: 'Linear', reauthUrl: '/auth/linear', provider: 'linear',
+    });
+    assert.strictEqual(res.statusCode, 409);
+    assert.match(res.body, /data-testid="merge-reauth-required-page"/);
+    assert.doesNotMatch(res.body, /data-testid="merge-confirm-page"/);
+    assert.strictEqual(session.pendingMerge, undefined, 'no merge offer from a session made stale by a B3 link');
+    assert.strictEqual(session.accountId, accountId, 'P stays the live account');
+  }
+
+  test('LIN-3140: mode:add-source B3 (new identity) preserves a stale stamp and keeps the later conflict on re-auth', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {}); // P owns only its first org
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = addSourceSession(myAccount._id, { identityAuthenticatedAt: 0 }); // stale P
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, makeRes());
+
+    // B3: viewer-2 was new, so it linked onto P — but that proves the arriving
+    // identity, not P. The stale stamp must survive exactly.
+    assert.strictEqual(session.identityAuthenticatedAt, 0, 'add-source B3 must not refresh P');
+
+    await expectMergeRefusedAfterStaleB3({ accountStore, accountWorkspaceStore, session, accountId: myAccount._id });
+  });
+
+  test('LIN-3140: mode:new B3 (brand-new identity carried onto a live P) preserves the stale stamp and keeps the later conflict on re-auth', async () => {
+    const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
+    const myAccount = await accountStore.createAccount();
+    await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+
+    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    // A normal front-door login whose arriving identity (viewer-2) is new while
+    // P is live: the carry restores accountId + a stale stamp across regenerate,
+    // so establishAccount takes B3, not a fresh mint.
+    const session = makeSession({
+      oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' },
+      accountId: myAccount._id, identityAuthenticatedAt: 0,
+      workspaces: [{ id: 'org-1', name: 'Acme', urlKey: 'acme' }], activeWorkspaceId: 'org-1',
+    });
+
+    await handler({ query: { code: 'good-code', state: 'real' }, session }, makeRes());
+
+    assert.strictEqual(session.accountId, myAccount._id, 'the carried accountId survives regenerate');
+    assert.strictEqual(session.identityAuthenticatedAt, 0, 'mode:new B3 must not refresh P');
+
+    await expectMergeRefusedAfterStaleB3({ accountStore, accountWorkspaceStore, session, accountId: myAccount._id });
   });
 
   test('add-source: a strict 409 leaves NO org-2 workspace in session.workspaces — the refused org cannot authorize /workspace/:urlKey/* (LIN-1351 review regression)', async () => {

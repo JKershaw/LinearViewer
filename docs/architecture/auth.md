@@ -142,6 +142,15 @@ across `regenerate()`, then calls `establishAccount(…, 'email', emailNorm, {},
 `null` workspace writes no account↔workspace edge. Preferences and the theme cookie are
 rehydrated like the provider callbacks.
 
+**Freshness (A1).** `establishAccount` writes `identityAuthenticatedAt` only when the
+arriving identity proves the session's own account: re-proof of an identity P already owns
+(B1), a front-door sign-in with no live account (B2), or mint/adoption of a brand-new
+account (B4). It never writes it when a new, unowned identity is linked onto an
+already-live `session.accountId` (B3) — `POST /workspace/new`, a provider add-source, or a
+`mode:'new'` callback carrying a live `accountId` across `regenerate()`. B3 proves only the
+arriving identity, not P, so a stale session cannot refresh itself and still gets
+re-auth-required (not a merge offer) on a later conflict (LIN-3140).
+
 **Zero-workspace accounts (N1)** — a session with `accountId` and no workspaces is signed
 in, not signed out: `/`, `/swipe`, `/swim` and `/ship` redirect it to `/account`, and PAT
 auto-login (`lib/pat-session.js`) skips it. Connecting GitHub from `/account` reuses the
