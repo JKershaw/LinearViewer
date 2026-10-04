@@ -34,9 +34,15 @@
     },
     {
       "id": "PR-1603-request-changes-2",
-      "role": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding (expect -> blocked: the one-cycle bound escalates to the human edge; a third plan-review or another plan is the failure this case exists to catch)",
-      "expect": ["blocked"],
+      "role": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding with no reply (expect -> plan: LIN-3309 moved the escalation point to the third unanswered Request Changes; the second is still the revision pass)",
+      "expect": ["plan"],
       "descentExpect": "PR-1603-request-changes-2"
+    },
+    {
+      "id": "PR-1603-request-changes-3",
+      "role": "same plan after two revision cycles, trail carries a THIRD Request Changes so the code-computed count reaches 3 with no reply (expect -> blocked: LIN-3309 moves the escalation point from the second to the third unanswered Request Changes)",
+      "expect": ["blocked"],
+      "descentExpect": "PR-1603-request-changes-3"
     }
   ],
   "bundles": {
@@ -177,6 +183,51 @@
         {
           "body": "### Plan Review Verdict\n\nThe sibling surface is now folded in — that finding is discharged. The routed-around gap still names no identifier, and the revision declines to file one, so the trade-off remains unauditable: this is the SAME finding as the first pass, answered by disagreement rather than by a change either of us can check later. That disagreement is not one more planning pass will settle.\n\n**Verdict: Request Changes.**",
           "createdAt": "2026-07-24T03:00:00.000Z",
+          "user": "reviewer"
+        }
+      ],
+      "focusedChild": null
+    },
+    "PR-1603-request-changes-3": {
+      "issue": {
+        "id": "pr-1603-request-changes-3-uuid",
+        "identifier": "PR-1603-request-changes-3",
+        "title": "Add a per-workspace rate limit to the recap endpoint",
+        "description": "## Implementation Plan\n\n- Add an in-process token bucket in `routes/proxy.js` around the recap read.\n- Key it on workspace id; 30/min.\n- **Revised after plan review:** folded in the `lib/kpi-stats.js` sibling surface.\n\n**Strategy Framing:** the clean fix is the shared limiter middleware; a local bucket is cheaper now.\n\n**Session fit:** fits one focused session.\n\n**plan-review due:** yes — (b) the plan routes around a tracked contract gap.\n\n**Revision notes:** addresses the missed-sibling finding. Declines the identifier finding.",
+        "url": "https://linear.app/linearviewer/issue/PR-1603-request-changes-3",
+        "state": { "name": "In Progress", "type": "started" },
+        "createdAt": "2026-07-25T00:00:00.000Z",
+        "labels": []
+      },
+      "parent": null,
+      "siblings": [],
+      "siblingsTotal": 0,
+      "project": { "name": "Autopilot, Recommendation & Prompt Engine", "description": null },
+      "children": [],
+      "comments": [
+        {
+          "body": "### Plan Review Verdict\n\n1. Completeness — `lib/kpi-stats.js` reads the same recap seam and is missing from the surface list.\n\n**Verdict: Request Changes.**",
+          "createdAt": "2026-07-24T01:00:00.000Z",
+          "user": "reviewer"
+        },
+        {
+          "body": "Revised the plan: folded in the `lib/kpi-stats.js` surface.",
+          "createdAt": "2026-07-24T02:00:00.000Z",
+          "user": "planner"
+        },
+        {
+          "body": "### Plan Review Verdict\n\nSame finding as the first pass, answered by disagreement rather than a change either of us can check later.\n\n**Verdict: Request Changes.**",
+          "createdAt": "2026-07-24T03:00:00.000Z",
+          "user": "reviewer"
+        },
+        {
+          "body": "Revision 2 — addresses plan-review: folded in the sibling; declines the identifier.",
+          "createdAt": "2026-07-24T04:00:00.000Z",
+          "user": "planner"
+        },
+        {
+          "body": "### Plan Review Verdict\n\nThird pass, same unresolved finding. This is not one more planning round will settle.\n\n**Verdict: Request Changes.**",
+          "createdAt": "2026-07-24T05:00:00.000Z",
           "user": "reviewer"
         }
       ],

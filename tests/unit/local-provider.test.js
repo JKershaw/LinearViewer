@@ -141,6 +141,26 @@ describe('LocalProvider reads', () => {
     await assert.rejects(() => provider.fetchIssueContext(SCOPE, 'nope'), /Issue not found/);
   });
 
+  test('fetchIssueContext normalises both Local blocker encodings to issue.blockedBy (LIN-3309)', async () => {
+    await store.clear(SCOPE);
+    await store.seed(SCOPE, {
+      issues: [
+        // Outgoing `blocks`: this issue blocks i3.
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Blocks it', state: { name: 'In Progress', type: 'started' }, relations: [{ type: 'blocks', relatedIssueId: 'i3' }] },
+        // Terminal, so the render splits it as resolved.
+        { id: 'i2', identifier: 'LOCAL-2', title: 'Via blocked-by', state: { name: 'Done', type: 'completed' } },
+        // Outgoing `blocked-by`: this issue is blocked by i2.
+        { id: 'i3', identifier: 'LOCAL-3', title: 'Blocked', state: { name: 'Todo', type: 'unstarted' }, relations: [{ type: 'blocked-by', relatedIssueId: 'i2' }] },
+      ],
+    });
+    const ctx = await provider.fetchIssueContext(SCOPE, 'i3');
+    assert.deepEqual(ctx.issue.blockedBy.map(b => b.identifier).sort(), ['LOCAL-1', 'LOCAL-2']);
+    assert.equal(ctx.issue.blockedBy.find(b => b.identifier === 'LOCAL-2').state.type, 'completed');
+    // A non-blocking relation is ignored.
+    const none = await provider.fetchIssueContext(SCOPE, 'i1');
+    assert.deepEqual(none.issue.blockedBy, []);
+  });
+
   // LIN-442: the lazy dashboard detail surface calls provider.fetchIssueFields
   // and feeds the result straight to renderDetailsContent, so it must return the
   // raw `{ nodes }`-labelled canonical issue (NOT fetchIssueContext's flat-array

@@ -249,6 +249,9 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
     const meta = '# T\n\n## Workflow\n\n1. Go\n\n## Goal\n\nWhat it is for.\n\n## Process\n\nThe steps.';
     for (const [kind, { name }] of Object.entries(PROMPT_TEMPLATES)) {
       placed(generatePrompt(kind, ISSUE, CONTEXT).prompt, kind, 'writer off');
+      // `retro` is excluded from the AI recommendation path (LIN-3309), so the
+      // routing reply can never name it; the template still renders writer-off.
+      if (kind === 'retro') continue;
       transport({ route: routing(name), write: BRIEF });
       placed((await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } })).prompt, kind, 'writer on');
       transport({ route: routing(name), write: () => json('', { finishReason: 'length' }) });
@@ -318,6 +321,10 @@ describe('switch on: the meta call routes, code assembles, the writer writes', (
 
   test('every machine-read format is present and the grounding is appended once, for every stage', async () => {
     for (const [kind, template] of Object.entries(PROMPT_TEMPLATES)) {
+      // `retro` is excluded from the AI recommendation path (LIN-3309), so it is not
+      // reachable through the routing reply this test drives; its formats are still
+      // pinned through generatePrompt elsewhere.
+      if (kind === 'retro') continue;
       transport({ route: routing(template.name), write: BRIEF });
       const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } });
       const written = !PROCESS_ONLY.includes(kind);
@@ -517,6 +524,23 @@ describe('streaming', () => {
     assert.equal(streamed, rec.prompt);
     assert.ok(!streamed.includes('MUST NOT SHOW'));
   });
+
+  // LIN-3309 D1: the section parser only starts on `## Reasoning\n`, so a
+  // `**Reasoning**` or headerless routing reply streams nothing on its own. The
+  // stream now emits the parsed reasoning as one catch-up delta, exactly once.
+  for (const [label, route] of [
+    ['**Reasoning**', '**Reasoning**\n**Assessment:**\n→ **review**\n**Next:** close-out'],
+    ['headerless', '→ **review**\n**Next:** close-out'],
+  ]) {
+    test(`a ${label} routing reply still streams its reasoning (D1)`, async () => {
+      transport({ route, write: BRIEF });
+      const events = [];
+      const rec = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'k', briefWriter: { model: 'x/w' } }, (type, data) => events.push({ type, data }));
+      const reasoning = events.filter(e => e.type === 'delta' && e.data.section === 'reasoning').map(e => e.data.content).join('');
+      assert.ok(reasoning.length > 0, 'reasoning is not blank');
+      assert.equal(reasoning, rec.reasoning, 'the parsed reasoning is streamed exactly once — no catch-up duplicate');
+    });
+  }
 });
 
 describe('pure seams', () => {

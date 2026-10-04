@@ -18,11 +18,11 @@
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
- *   B. scripts/eval/fixtures/recommend/*.json             (30 targets over 8 files)
+ *   B. scripts/eval/fixtures/recommend/*.json             (54 targets over 10 files)
  *   C. scripts/eval-research-routing.mjs inline CASES[]   (24 inline)
  *   D. scripts/eval/fixtures-widened/*.json               (5 targets: LIN-830 x2, LIN-1084,
  *                                                          breakdown-fork-neg, all-terminal-node)
- *   Total 7 + 30 + 24 + 5 = 66 fixtures.
+ *   Total 7 + 54 + 24 + 5 = 90 fixtures.
  *
  * Grading is deterministic (no LLM judge). Gold overrides are harness-side only; the frozen
  * fixture files are read, never written.
@@ -35,6 +35,8 @@
  *   ARMS       1 | 2 | 3 | 12 | 123               (default 123)
  *   MODEL      incumbent model                    (default openai/gpt-5.4-mini)
  *   JEV_MODEL  Jev model                          (default typesafe/jev-1.13)
+ *   ROUTING_ONLY 1 = arm 3 runs the SHIPPING routing-only path (buildRouterPrompt +
+ *                  routeStage) instead of the full prompt (LIN-3309)
  *   DRY        1 = deterministic stub answers, no network (pipeline verification). Writes to a
  *                  temp dir unless OUT_DIR is set, so it can never overwrite the canonical
  *                  scripts/eval/jev-routing-out artifacts.
@@ -64,6 +66,11 @@ const K = Number(process.env.K || 3);
 const ONLY = (process.env.ONLY || '').split(',').map((s) => s.trim()).filter(Boolean);
 const ARMS = process.env.ARMS || '123';
 const DRY = !!process.env.DRY;
+// ROUTING_ONLY: arm 3 exercises the SHIPPING routing-only path (buildRouterPrompt
+// + routeStage) instead of the full prompt. `deadline: 0` makes writeBrief return
+// `no-time` before any writer call (openrouter.js), so the one-LLM-record
+// correlation assertion still holds. LIN-3309.
+const ROUTING_ONLY = !!process.env.ROUTING_ONLY;
 
 /**
  * Resolve the output directory. An explicit OUT_DIR always wins; otherwise a DRY run uses a
@@ -364,18 +371,25 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
   };
   const callMeta = { evalCallId, issueIdentifier: issue.identifier };
   const t0 = performance.now();
-  const rec = await getRecommendation(issue, context, { apiKey: KEY, model: MODEL, featureFlags: {}, callMeta });
+  const rec = await getRecommendation(issue, context, {
+    apiKey: KEY, model: MODEL, featureFlags: {}, callMeta,
+    ...(ROUTING_ONLY ? { briefWriter: { model: MODEL }, deadline: 0 } : {}),
+  });
   const wallMs = Math.round(performance.now() - t0);
   const llm = recorders.llm.filter((r) => r.evalCallId === evalCallId);
   const trace = recorders.trace.filter((r) => r.evalCallId === evalCallId);
-  if (llm.length !== 1 || trace.length !== 1) {
-    throw new Error(`recorder correlation failed for ${evalCallId}: llm=${llm.length} trace=${trace.length}`);
+  // LIN-3309: a code-settled route (no reply after the latest verdict) skips the
+  // routing LLM call entirely — 0 llm records, 1 trace — so the correlation check
+  // accepts that shape too instead of failing the run.
+  const expectedLlm = rec.codeRoute ? 0 : 1;
+  if (llm.length !== expectedLlm || trace.length !== 1) {
+    throw new Error(`recorder correlation failed for ${evalCallId}: llm=${llm.length} (expected ${expectedLlm}) trace=${trace.length}`);
   }
   return {
-    action: rec.recommendedAction, deferTo: rec.deferTo || null,
-    latencyMs: llm[0].durationMs ?? wallMs, cost: llm[0].cost ?? null,
-    inputTokens: llm[0].promptTokens ?? null, outputTokens: llm[0].completionTokens ?? null,
-    promptChars: (trace[0].metaPrompt || '').length, servedModel: llm[0].model || null,
+    action: rec.recommendedAction, deferTo: rec.deferTo || null, codeRoute: rec.codeRoute || null,
+    latencyMs: rec.codeRoute ? 0 : (llm[0].durationMs ?? wallMs), cost: rec.codeRoute ? 0 : (llm[0].cost ?? null),
+    inputTokens: rec.codeRoute ? 0 : (llm[0].promptTokens ?? null), outputTokens: rec.codeRoute ? 0 : (llm[0].completionTokens ?? null),
+    promptChars: (trace[0].metaPrompt || '').length, servedModel: rec.codeRoute ? 'code-route' : (llm[0].model || null),
   };
 }
 
@@ -467,8 +481,8 @@ async function main() {
   const armKeys = ['1', '2', '3'].filter((a) => ARMS.includes(a)).map((a) => `arm${a}`);
 
   // Expected total count check (only when unfiltered).
-  if (!ONLY.length && cases.length !== 66) {
-    console.warn(`WARNING: expected 66 fixtures, loaded ${cases.length}`);
+  if (!ONLY.length && cases.length !== 90) {
+    console.warn(`WARNING: expected 90 fixtures, loaded ${cases.length}`);
   }
 
   const recorders = registerRecorders();
