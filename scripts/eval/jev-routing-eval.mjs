@@ -11,7 +11,9 @@
  *   2. incumbent (gpt-5.4-mini) + distilled state         (model-vs-representation control)
  *   3. incumbent (gpt-5.4-mini) + raw state, via the LIVE  getRecommendation()  (the
  *      production incumbent; its cost/latency/prompt come from the graded call's own
- *      recorder hooks — no duplicate rebuild call)
+ *      recorder hooks — no duplicate rebuild call). LIN-3304: the routing sections of
+ *      that prompt and the writer-off parse now come from lib/stage-router.js (the
+ *      next-stage choice's seam), so this arm reads the decision through its one owner.
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
