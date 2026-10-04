@@ -44,7 +44,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { PROMPT_TEMPLATES, generatePrompt, formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { PROMPT_TEMPLATES, generatePrompt, formatStageOptions, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
@@ -179,7 +179,7 @@ const META_PROMPT_ARGS = {
   identifier: '{{IDENTIFIER}}',
   hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
   hasComments: false, commentCount: 0,
-  aiHints: formatAIHintsForMetaPrompt(),
+  aiHints: formatStageOptions(),
   actionVocabulary: getAIRecommendationActionNames().join(', '),
   completionSignals: formatAllSignalsForMetaPrompt(),
   focusedSubtaskId: null,

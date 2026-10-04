@@ -49,7 +49,7 @@
  *                                                bloated prompt, or inflation hides)
  */
 import { formatIssueContext } from '../lib/openrouter.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
+import { formatStageOptions, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../lib/completion-signals.js';
 import { buildMetaPromptTemplate } from '../lib/prompts/meta-prompt-template.js';
 
@@ -84,7 +84,7 @@ function buildMeta(issue, context = {}) {
     remainingCount: children.length,
     hasComments: comments.length > 0,
     commentCount: comments.length,
-    aiHints: formatAIHintsForMetaPrompt(),
+    aiHints: formatStageOptions(),
     actionVocabulary: getAIRecommendationActionNames().join(', '),
     completionSignals: formatAllSignalsForMetaPrompt(),
     focusedSubtaskId: null,

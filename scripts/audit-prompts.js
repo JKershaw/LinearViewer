@@ -100,14 +100,11 @@ function outputTemplate(key, template) {
   console.log(`Category: ${categoryName}`);
   console.log(`Description: ${template.description}`);
 
-  if (template.aiHint) {
-    console.log('\nAI Hint:');
-    console.log(`  Situation: ${template.aiHint.situation}`);
-    console.log(`  Goal: ${template.aiHint.goal}`);
-    console.log(`  Workflow: ${template.aiHint.workflow}`);
-    if (template.aiHint.readinessCheck) {
-      console.log(`  Readiness Check: ${template.aiHint.readinessCheck}`);
-    }
+  if (template.route) {
+    console.log('\nRoute (stage selector):');
+    console.log(`  When: ${template.route.when}`);
+    console.log(`  Not when: ${template.route.whenNot}`);
+    if (template.route.requires) console.log(`  Requires: ${template.route.requires}`);
   }
 
   if (template.completionSignals) {
@@ -157,7 +154,7 @@ function outputJSON(templateKey = null) {
       name: template.name,
       category: CATEGORY_DISPLAY_NAMES[template.category] || template.category,
       description: template.description,
-      aiHint: template.aiHint || null,
+      route: template.route || null,
       completionSignals: template.completionSignals || null,
       samplePrompt: generateSamplePrompt(key, template)
     };

@@ -48,7 +48,7 @@
  * Env knobs: GEN_MODEL, K (runs per arm per case), ONLY (case-id filter).
  */
 import { buildMetaPromptTemplate } from '../lib/prompts/meta-prompt-template.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
+import { formatStageOptions, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../lib/completion-signals.js';
 import { deriveDispatchKind } from '../lib/prompt-templates.js';
 // LIN-3304: the action parser now lives with the next-stage choice; import it from
@@ -315,7 +315,7 @@ function buildArms(context) {
     issueContext: context, identifier: context.match(/# (\S+):/)?.[1] || 'LIN-1',
     hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
     remainingCount: 0, hasComments: true, commentCount: 1,
-    aiHints: formatAIHintsForMetaPrompt(),
+    aiHints: formatStageOptions(),
     actionVocabulary: getAIRecommendationActionNames().join(', '),
     completionSignals: formatAllSignalsForMetaPrompt(),
     isTerminal: false, hasOpenChildren: false

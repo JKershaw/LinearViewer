@@ -8,7 +8,7 @@
  *
  * Three questions, one model:
  *   1. routing   — a `choice` over the recommender's own action vocabulary
- *                  (getAIRecommendationActionNames, criteria = each template's aiHint.situation),
+ *                  (getAIRecommendationActionNames, criteria = each template's route.when (was aiHint.situation)),
  *                  graded against the seven real frozen routing fixtures
  *                  (scripts/eval/fixtures/*.json, their `expect` / `avoid` sidecars).
  *   2. operator  — a `noul` "does this task carry a decision only the operator can make", asked
@@ -55,7 +55,7 @@ const fixtures = readdirSync(FIXTURE_DIR)
 // node has an open child to descend into (lib/prompts/meta-prompt-template.js). Scoped to this
 // re-test only — not a general leaf detector, and not a production change.
 const situationByName = {};
-for (const t of Object.values(PROMPT_TEMPLATES)) if (t.aiHint) situationByName[t.name] = t.aiHint.situation;
+for (const t of Object.values(PROMPT_TEMPLATES)) if (t.route) situationByName[t.name] = t.route.when;
 const ACTIONS = getAIRecommendationActionNames().filter((name) => name !== 'defer');
 const routingCriteria = Object.fromEntries(ACTIONS.map((name) => [name, situationByName[name]]));
 // Fixture sidecars say "implementation" where the vocabulary says "implement".

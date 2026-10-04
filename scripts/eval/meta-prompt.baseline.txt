@@ -146,77 +146,64 @@ Reference the task rather than restating it. Do NOT copy {{IDENTIFIER}}'s descri
 
 ## Action Types Reference
 
-**blocked** (dependencies, missing info, or stalled):
-Goal: "Identify the blocker type and root cause, evaluate options to unblock."
-Workflow: Fetch details → Analyze blocker → Add comment in Linear
-
-**bug** (needs investigation, debugging):
-Goal: "Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach."
-Workflow: Fetch details → Investigate → Add findings as comment in Linear
-
-**plan** (clear requirements, needs documented approach):
-Goal: "Create a clear implementation plan, enumerate surfaces with any dependency arrows between them, commit to a session-fit answer (fits one session / needs multiple sessions), and state whether a plan-review pass is due before implementation."
-Workflow: Set status to "In Progress" → Analyze requirements → Revise against any prior plan-review verdict → Document plan in description → Enumerate surfaces and draw any dependency arrows → Answer the session-fit question → State whether plan-review is due → Ready for implementation, plan-review, or breakdown
-
-**look into** (understanding what's involved):
-Goal: "Summarize what this task involves and how it fits into the broader project context."
-Workflow: Fetch details → Analyze → Summarize findings for user
-
-**triage** (missing metadata, unclear priority, wrong or missing project):
-Goal: "Review and apply updates to labels, state, and project (confirm the task is in the correct project; move or assign it when unassigned or mis-filed), and priority — set via the provider-neutral `priorityLevel` field (ascending, 4 = highest)."
-Workflow: Fetch details → Analyze (including project fit) → Apply changes directly in Linear
-
-**breakdown** (plan has answered "needs multiple sessions"):
-Goal: "Create one subtask per surface the plan enumerated. Only if this ticket's own comment trail — never its own rendered 'Parent Task' section — records an Approve on the plan, copy each surface's approved slice into its subtask as the breakdown rule says (omitting a false session-fit claim for a surface the plan could not scope to one session). If no such Approve verdict is on this ticket's own comment trail, write a plain acceptance-criteria subtask instead — no session-fit line, no plan-review-due line. Copy any dependency arrows into blocked-by relations."
-Workflow: Fetch details → Check this ticket's own comment trail for a recorded `### Plan Review Verdict` of Approve → One subtask per surface: its approved slice when that Approve is on record, otherwise write a plain acceptance-criteria subtask → Copy arrows into blocked-by relations → Add summary comment
-
-**research** (unknowns, unfamiliar dependency/API, or an unvalidated assumption to de-risk before planning):
-Goal: "Identify key questions, read the relevant docs and prior art, check history, validate feasibility, and provide an actionable recommended approach for the plan that follows."
-Workflow: Fetch details → Read docs/prior art, check history, validate feasibility → Add exploration notes as comment, update description with key findings and recommended approach in Linear
-
-**scoping** (ambiguous requirements):
-Goal: "Define clear boundaries (in scope vs out), assumptions, success criteria, and open questions."
-Workflow: Fetch details → Define scope → Update issue description with finalized scope in Linear
-When NOT: the requirements are already clear and only the solution SHAPE is contested (that is `design`), or the intent is clear enough to plan/implement directly — do not scope a task whose boundaries are already known.
-Choose over: choose `scoping` over `research`/`plan` when the ambiguity is in WHAT to build (boundaries, success criteria, in/out of scope) rather than HOW to build it or how the code behaves today.
-
-**design** (architectural decisions needed):
-Goal: "Weigh the viable shapes against the problem and its cause, recommend one, and say what would change your mind."
-Workflow: Fetch details → Design → Add full analysis as comment, update description with chosen design in Linear
-When NOT: the shape is already decided (a committed approach in the ticket/comments, one obvious shape, or a familiar single-surface change) — that is `plan`; or the knowledge to weigh the shapes against is still ungathered — that is `research` first; or the work has already landed — that is `review`.
-Choose over: choose `design` over `plan` when ≥2 genuinely viable, materially-different solution shapes exist AND the fork is still undecided (do not let the plan pick the architecture silently); choose `plan` once the shape is settled and only sequencing the surfaces remains.
-
-**spike** (needs proof-of-concept or feasibility check):
-Goal: "Answer the one deciding question by trying it, within a timebox, and give a go/no-go with evidence."
-Workflow: Fetch details → Spike → Add findings as comment in Linear
-When NOT: the approach is already known to be feasible, or the unknown is broad understanding / track-record rather than one sharp technical question (that is `research`), or the solution shape is contested between viable approaches (that is `design`).
-Choose over: choose `spike` over `research` when a single, decisive feasibility question can be answered by a small time-boxed proof-of-concept; choose `research` when the knowledge gap is broader than one go/no-go probe.
-
-**context** (joining mid-way, returning after gap):
-Goal: "Synthesize current state, what's done, what remains, key decisions, and next steps."
-Workflow: Fetch details and comments → Analyze → Add summary as comment in Linear
-
-**plan-review** (plan documented, not yet implemented):
-Goal: "Independently re-run the plan's grounding claims and issue a verdict (Approve / Request Changes / Needs Discussion) before implementation starts. Plan-review verifies the plan; it does not edit or implement it."
-Workflow: Fetch details → Re-run the seven grounding claims → Issue verdict → Add findings + verdict as a comment
-
-**implement** (ready to code, plan exists):
-Goal: "Implement the planned changes with test coverage, then land them on a feature-branch PR with CI green (or, in a repo with no CI, the established-absence substitute recorded)."
-Workflow: Fetch details → Branch → Implement → Test → Commit & push → Open PR → Confirm CI green (or its substitute) → Add summary comment with PR link in Linear
-
-**review** (implementation complete, awaiting review):
-Goal: "Verify the implementation is complete and correct, then issue a verdict (Approve / Request Changes / Needs Discussion) that authorizes the merge. Review does not merge or mark Done."
-Workflow: Fetch details → Verify requirements/tests/CI green (or its substitute) on the PR → Issue verdict → Add review findings + verdict as comment in Linear
-
-**close-out** (review approved, PR green (or CI-absence + substitute recorded), ready to land):
-Goal: "Consume the review's Not-Proven-by-CI ledger and gate the irreversible finish: block merge/Done until every ledger item is discharged or explicitly accepted, then merge, set Done, post the summary, archive & prune, and file remaining follow-ups."
-Workflow: Fetch details + latest review comment → Read the ledger → Gate (discharge or accept each item) → Merge → Set Done → Post summary → Archive & prune → File follow-ups
-
-**retrospective-audit** (work already merged and closed out; an independent post-merge check on its claims and test integrity is wanted):
-Goal: "Audit the claims the deliverable rests on and the integrity of the tests that assert them against the landed code, and report findings — never re-verify overall correctness (CI covers that), never re-litigate the decision, never change state."
-Workflow: Fetch details → Locate the merged change → Audit claims against the landed code → Audit test integrity → Report findings as a comment
-When NOT: the work has not yet merged (that's `review`, which is pre-merge framed and authorizes the merge), or the goal is lessons-learned / downstream-effects analysis rather than claim/test-integrity auditing (that's `retro`).
-Choose over: choose `retrospective-audit` over `review` once the change is already merged and closed out — `review` opens expecting unlanded work; choose it over `retro` when the question is specifically whether the claims and the tests hold up, not what should be learned for next time.
+- `blocked`: Work has stalled. Find the real obstacle and clear it when it is yours to clear.
+  When: The work cannot proceed: an open blocker relation, a person's hold that nothing later lifted, or a decision only a person can make.
+  Not when: Every blocker is resolved, even if the description still says "blocked until"; a label alone never blocks.
+- `bug`: Something behaves wrong. Find its cause for certain, with evidence, before anything is fixed; nothing ships without review.
+  When: Unexpected behaviour whose cause is not yet confirmed, or whose cause a later comment refuted or relocated, or whose deciding experiment never ran.
+  Not when: An investigation already names a root cause and fix direction that still stand at the end of the trail: build the fix. The `bug` label alone does not mean investigation is owed.
+- `plan`: Work out how to make the change so it can be built in one session or split at real seams. Lead with what the change is for, and its cause when it fixes something.
+  When: The knowledge is gathered and the shape decided, but there is no plan with a session-fit answer, or the latest plan-review asked for a revision.
+  Not when: A complete plan (surfaces, approach, session fit) is already in the description, a breakdown child's copied slice of an approved parent plan included: route on its session fit.
+  Requires: Gathered knowledge and a decided shape.
+- `look-into`: Give a quick overview of this task and its context, so the reader can decide what to do next. Inform and summarize; make no changes or decisions.
+  When: Someone wants a quick overview of the task before deciding anything.
+  Not when: The trail already shows the next working stage.
+- `triage`: File the ticket so it routes correctly: its labels, priority, state and project (the project picks the repository). These updates are yours to make.
+  When: The ticket's labels, priority, state or project are wrong or missing.
+  Not when: What to build is unclear (`scoping`).
+- `breakdown`: Split the plan into pieces that each land alone and together finish the job. The subtasks and their dependencies are yours to define; keep the original task's intent and scope.
+  When: The plan needs multiple sessions, or the description lays out phases that each land on their own, and no subtasks cover them yet.
+  Not when: Steps that land together as one PR (`implementation`); subtasks already cover the scope (`defer`).
+  Requires: A plan or explicit phases, and an Approve from any plan-review that was due.
+- `research`: What this task needs is not known well enough to plan. Identify the key questions, find how this part really works, what was tried before and why, and recommend an approach the next stage can build on.
+  When: Doing the work well depends on knowledge not yet gathered: how the code behaves today, an unpinned external dependency, history or prior art, or every place a change must reach when the ticket names them only by description. Also when the ticket prescribes research as its method. In a close call, prefer research.
+  Not when: The task is small and obvious, or the findings and a chosen approach are already in the description or comments.
+- `scoping`: The ticket is unclear about its goal: settle what it should deliver and what done means. What is in and out of scope is yours to decide; read the code first, and flag for the human only product or intent questions.
+  When: What to build is unclear: the goal, the boundaries or what done means, including a vague or empty description.
+  Not when: The requirements are clear and only the solution shape is open (`design`).
+- `design`: Several shapes could work; choose the one that best serves what the task is for.
+  When: Two or more materially different solution shapes are viable and nothing has committed to one.
+  Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered (`research`).
+- `spike`: It is open whether this approach can work here. Find out by trying, against the real code: the code is evidence, not the deliverable.
+  When: One sharp feasibility question decides the approach, and a small proof against the real code can answer it.
+  Not when: The gap is broader understanding (`research`), or the approach is known to work.
+- `context`: Whoever picks this up next needs its state: where it really stands and what should happen next. Inform and summarize; make no changes or decisions.
+  When: Someone is picking the task up mid-way or after a long gap and needs to know where it stands.
+  Not when: The trail already shows the next working stage.
+- `plan-review`: Check the plan with fresh context before it is built: do its claims hold when you re-run them? Judge it against its own claims, adding no requirements of your own.
+  When: A plan has no plan-review verdict yet and the gate is met: the plan says "plan-review due: yes", or it needs multiple sessions, routes around a named contract gap, relaxes a validation, contract or guard, or touches credential, merge-rule or dispatch-contract surfaces. Also when a revision landed after the latest verdict.
+  Not when: The plan says "plan-review due: no" and nothing in it contradicts that (a breakdown child covered by its parent's approving plan-review included), or the work has landed.
+  Requires: A plan in the description.
+- `implementation`: Build it, prove it works, and open a PR that review can approve: the problem solved, not steps ticked off.
+  When: A plan that fits one session, approved by any plan-review that was due; a small task whose one surface and change are already named; or the fix round after a code review requested changes.
+  Not when: No committed scope: a long or legible description is not a plan (`plan` or `research`). Landed work (`review`). A bug cause that is refuted or unconfirmed (`bug`).
+  Requires: Gathered knowledge, a decided shape and committed scope.
+- `review`: You check the work before it lands: is it complete, does it meet the requirements, and is the evidence that it works real? Verify against the requirements; adding new ones is not review's job.
+  When: Work has landed (a PR or completion summary on the trail, or every subtask done) and no code review has run on it since.
+  Not when: A code review already approved the unchanged work (`close-out`) or requested changes not yet addressed (`implementation`).
+  Requires: Landed work.
+- `close-out`: Land approved work. After this the change is hard to undo, so settled must mean settled. Review has settled code quality; your part is the ledger, the merge, the Done transition, the summary and the follow-up filing.
+  When: The latest code review approved, plainly or conditionally, and the work is not yet merged and Done.
+  Not when: CI is red, or verifying the work surfaced a blocker: fix it here first.
+  Requires: An Approve from a code review; a plan-review Approve is not one.
+- `retrospective-audit`: The work has merged. Does it do what it claims, and would its tests catch a regression? Audit that independently and report what you find; there is no need to re-litigate whether the change should have been made, or to re-verify overall correctness, which CI covers.
+  When: The work is merged and Done, with a code review on record.
+  Not when: The work has not merged (`review`).
+- `defer`: Descend into a subtask: the next real work lives in a child, not in this task.
+  When: The task has an open, actionable subtask and its subtasks cover its remaining scope.
+  Not when: A leaf; every subtask done (close the parent); or the task needs its own work first (`breakdown` for scope no subtask covers, `triage` if mis-filed).
+  Requires: The child to descend into, on the DeferTo line.
 
 Consult the Action Types Reference above to match task situations to appropriate prompts.
 

@@ -384,17 +384,10 @@ describe('Integration', () => {
     }
   });
 
-  test('aiHint does not have redundant readinessCheck', async () => {
+  test('no template carries the retired aiHint (LIN-3300: route replaced it)', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-    const allTypes = Object.keys(PROMPT_TEMPLATES);
-
-    for (const type of allTypes) {
-      const template = PROMPT_TEMPLATES[type];
-      assert.strictEqual(
-        template.aiHint?.readinessCheck,
-        undefined,
-        `${type} aiHint should not have readinessCheck (use completionSignals instead)`
-      );
+    for (const [type, template] of Object.entries(PROMPT_TEMPLATES)) {
+      assert.strictEqual(template.aiHint, undefined, `${type} should describe itself with route, not aiHint`);
     }
   });
 });

@@ -28,7 +28,7 @@ let meta = null;
 try {
   meta = mp.buildMetaPromptTemplate?.({
     issueContext: '', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
-    remainingCount: 0, hasComments: false, commentCount: 0, aiHints: templates.formatAIHintsForMetaPrompt?.() ?? '',
+    remainingCount: 0, hasComments: false, commentCount: 0, aiHints: (templates.formatStageOptions || templates.formatAIHintsForMetaPrompt)?.() ?? '',
     actionVocabulary: templates.getAIRecommendationActionNames?.().join(', '), completionSignals: cs.formatAllSignalsForMetaPrompt?.() ?? '',
   });
 } catch {}

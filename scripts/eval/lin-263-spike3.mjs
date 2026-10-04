@@ -21,7 +21,7 @@ import { mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { formatIssueContext } from '../../lib/openrouter.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { formatStageOptions, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 import { isTerminalState } from '../../lib/tree.js';
@@ -57,7 +57,7 @@ function buildMeta(issue, context) {
     remainingCount: children.length - completedCount,
     hasComments: (ctx.comments?.length || 0) > 0,
     commentCount: ctx.comments?.length || 0,
-    aiHints: formatAIHintsForMetaPrompt(),
+    aiHints: formatStageOptions(),
     actionVocabulary: getAIRecommendationActionNames().join(', '),
     completionSignals: formatAllSignalsForMetaPrompt(),
     focusedSubtaskId: ctx.focusedChild?.issue?.identifier || null,

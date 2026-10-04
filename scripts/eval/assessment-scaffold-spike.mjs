@@ -47,7 +47,7 @@ import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { formatStageOptions, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 import { formatIssueContext } from '../../lib/openrouter.js';
 import { isTerminalState } from '../../lib/tree.js';
@@ -61,7 +61,7 @@ const ONLY = process.env.ONLY;
 const MAX_TOKENS = Number(process.env.MAX_TOKENS) || 600;
 const OUT_DIR = process.env.OUT_DIR || join(HERE, 'assessment-scaffold-out');
 
-const AI_HINTS = formatAIHintsForMetaPrompt();
+const AI_HINTS = formatStageOptions();
 const VOCAB = getAIRecommendationActionNames().join(', ');
 const SIGNALS = formatAllSignalsForMetaPrompt();
 

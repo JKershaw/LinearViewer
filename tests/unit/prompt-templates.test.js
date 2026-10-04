@@ -12,7 +12,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt, getAIRecommendationActionNames, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatStageOptions, getAIRecommendationActionNames, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -229,7 +229,7 @@ describe('current-state docs keep the prompt-template count in sync with PROMPT_
 
   const CURRENT_STATE_DOCS = [
     { file: 'docs/architecture/source-map.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
-    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `aiHint`/ },
+    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `route`/ },
   ];
 
   for (const { file, pattern } of CURRENT_STATE_DOCS) {
@@ -1460,9 +1460,9 @@ describe('retro template', () => {
   });
 
   test('is excluded from the AI recommendation meta-prompt (user-initiated only)', () => {
-    const hints = formatAIHintsForMetaPrompt();
+    const hints = formatStageOptions();
     assert.ok(!hints.includes('reorient'),
-      'retro aiHint should not appear in the meta-prompt');
+      'retro should not appear in the stage options');
     assert.ok(!/\*\*retro\*\*/.test(hints), 'retro should not be listed as an action type');
     // Sanity check: other prompts still flow into the meta-prompt
     assert.ok(hints.includes('research') || hints.includes('plan'),
@@ -1648,13 +1648,16 @@ describe('triage template', () => {
       'the Triage-prompts quality rule names exactly priorityLevel as a priority-family field — an unnamed write field or a bare native `priority` both fail this');
   });
 
-  test('(meta f6) the triage aiHint.goal fed into the meta-prompt names priorityLevel as the sole priority write field', () => {
-    const hints = formatAIHintsForMetaPrompt();
-    // Extract the triage entry specifically: the block starting at "**triage** (" up to the next blank line.
-    const triageBlock = hints.slice(hints.indexOf('**triage** ('), hints.indexOf('\n\n', hints.indexOf('**triage** (')));
-    assert.ok(triageBlock.includes('**triage** ('), 'the meta-prompt aiHints include a triage entry');
-    assert.deepStrictEqual(namedPriorityFields(triageBlock), ['priorityLevel'],
-      'the triage aiHint block names exactly priorityLevel as a priority-family field — an unnamed write field or a bare native `priority` both fail this');
+  // LIN-3300: the triage aiHint (a second copy of this write instruction) is gone. The
+  // stage options say when triage is next and give no write instruction at all, so
+  // they can name no priority field; the AI path's carrier is the quality rule (f5).
+  test('(meta f6) the triage stage option carries no priority write field', () => {
+    const options = formatStageOptions();
+    const start = options.indexOf('- `triage`:');
+    const triageBlock = options.slice(start, options.indexOf('\n- `', start + 1));
+    assert.ok(start >= 0, 'the stage options include a triage entry');
+    assert.deepStrictEqual(namedPriorityFields(triageBlock), [],
+      'the triage option names no priority-family write field');
   });
 
   test('(f7) canonical priority 0 is annotated as unknown/none, not only the top of the scale', () => {
@@ -2504,7 +2507,7 @@ describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', ()
   });
 });
 
-describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878)', () => {
+describe('meta-prompt design shape-fork routing + stage discriminators (LIN-878)', () => {
   const baseArgs = {
     issueContext: 'CTX', identifier: 'LIN-878',
     hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
@@ -2533,22 +2536,21 @@ describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878
       'the already-landed guard retains priority over the design hatch');
   });
 
-  test('formatAIHintsForMetaPrompt renders whenNot/chooseOver discriminators for design/scoping/spike', () => {
-    const hints = formatAIHintsForMetaPrompt();
-    assert.ok(/\*\*design\*\*/.test(hints), 'design is listed');
-    assert.ok(/When NOT: the shape is already decided/i.test(hints), 'design When NOT rendered');
-    assert.ok(/Choose over: choose `design` over `plan`/i.test(hints), 'design Choose over rendered');
-    assert.ok(/Choose over: choose `scoping` over/i.test(hints), 'scoping Choose over rendered');
-    assert.ok(/Choose over: choose `spike` over `research`/i.test(hints), 'spike Choose over rendered');
+  // LIN-3300: the discriminators are each stage's own "Not when", rendered for every stage.
+  test('formatStageOptions renders the design/scoping/spike discriminators', () => {
+    const options = formatStageOptions();
+    const entry = (key) => { const i = options.indexOf(`- \`${key}\`:`); return options.slice(i, options.indexOf('\n- `', i + 1)); };
+    assert.match(entry('design'), /Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered \(`research`\)/);
+    assert.match(entry('scoping'), /Not when: The requirements are clear and only the solution shape is open \(`design`\)/);
+    assert.match(entry('spike'), /Not when: The gap is broader understanding \(`research`\)/);
+    assert.match(entry('retrospective-audit'), /Not when: The work has not merged \(`review`\)/);
   });
 
-  test('discriminators are additive — only the tagged kinds emit them (back-compatible)', () => {
-    const hints = formatAIHintsForMetaPrompt();
-    // LIN-2261 added retrospective-audit as a fourth tagged kind (disambiguating it from review/retro).
-    assert.strictEqual((hints.match(/When NOT:/g) || []).length, 4, 'exactly design/scoping/spike/retrospective-audit emit When NOT');
-    assert.strictEqual((hints.match(/Choose over:/g) || []).length, 4, 'exactly design/scoping/spike/retrospective-audit emit Choose over');
-    // core kinds still render their situation/goal/workflow untouched
-    assert.ok(/\*\*research\*\*/.test(hints) && /\*\*review\*\*/.test(hints), 'core kinds still present');
+  test('every selectable stage says when it is next and when it is not', () => {
+    const options = formatStageOptions();
+    const n = getAIRecommendationActionNames().length;
+    assert.strictEqual((options.match(/^  When: /gm) || []).length, n, 'one When per stage');
+    assert.strictEqual((options.match(/^  Not when: /gm) || []).length, n, 'one Not when per stage');
   });
 });
 
@@ -2568,11 +2570,11 @@ describe('retrospective-audit template', () => {
   };
   const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
 
-  test('is registered with category UNIVERSAL, an aiHint, and completionSignals', () => {
+  test('is registered with category UNIVERSAL, a route, and completionSignals', () => {
     const template = PROMPT_TEMPLATES['retrospective-audit'];
     assert.ok(template, 'retrospective-audit template must exist');
     assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
-    assert.ok(template.aiHint, 'must have an aiHint so it is AI-recommendable');
+    assert.ok(template.route, 'must have a route so the selector offers it');
     assert.ok(template.completionSignals, 'must have completionSignals');
   });
 
@@ -2626,7 +2628,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const t = PROMPT_TEMPLATES['close-out'];
     assert.strictEqual(t.name, 'close-out');
     assert.strictEqual(t.category, PROMPT_CATEGORIES.UNIVERSAL);
-    assert.ok(t.aiHint, 'has an aiHint so it is AI-recommendable');
+    assert.ok(t.route, 'has a route so the selector offers it');
     assert.ok(COMPLETION_SIGNALS['close-out'], 'has a registered completion signal');
     assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['close-out'], 'template wires its completion signal');
   });
@@ -3219,7 +3221,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   });
 
   // ===========================================================================
-  // Catalog/aiHint text pinned to the template body's step ordering (LIN-1773)
+  // Catalog text pinned to the template body's step ordering (LIN-1773)
   // ===========================================================================
 
   test('(h1) sanity: the On All-Clear body itself states merge→done→summary→archive→prune→follow-up in order', () => {
@@ -3234,7 +3236,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     }
   });
 
-  test('(h2) description, aiHint.goal, and aiHint.workflow name every irreversible-set step in the body\'s order', () => {
+  // LIN-3300: aiHint.goal and aiHint.workflow (two more copies) are gone; the description stays.
+  test('(h2) the description names every irreversible-set step in the body\'s order', () => {
     const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
     const assertOrdered = (text, label) => {
       const lower = text.toLowerCase();
@@ -3247,8 +3250,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     };
     const t = PROMPT_TEMPLATES['close-out'];
     assertOrdered(t.description, 'close-out.description');
-    assertOrdered(t.aiHint.goal, 'close-out.aiHint.goal');
-    assertOrdered(t.aiHint.workflow, 'close-out.aiHint.workflow');
   });
 
   // ===========================================================================
@@ -3415,7 +3416,7 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
     // `→ **name**` and _DISPATCH_KIND_BY_ALIAS maps it back (the close-out precedent).
     assert.strictEqual(t.name, 'plan-review');
     assert.strictEqual(t.category, PROMPT_CATEGORIES.UNIVERSAL);
-    assert.ok(t.aiHint, 'has an aiHint so it is AI-recommendable');
+    assert.ok(t.route, 'has a route so the selector offers it');
     assert.ok(COMPLETION_SIGNALS['plan-review'], 'has a registered completion signal');
     assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['plan-review'], 'template wires its completion signal');
   });
@@ -4960,10 +4961,13 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
   test('implementation/review/close-out CI mentions are conditional, not a bare unconditional gate', () => {
     const review = generatePrompt('review', issue, context).prompt;
     const closeout = generatePrompt('close-out', issue, context).prompt;
-    assert.ok(
-      /CI green \(or, in a repo with no CI, the established-absence substitute recorded\)/.test(PROMPT_TEMPLATES['implementation'].aiHint.goal),
-      'implementation aiHint goal is conditional'
-    );
+    // LIN-3300: the AI path's copy is the Implementation-prompts quality rule (the aiHint went).
+    const meta = buildMetaPromptTemplate({
+      issueContext: 'CTX', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
+      remainingCount: 0, hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'implementation', completionSignals: 'S'
+    });
+    assert.ok(/if CI is genuinely absent, say so explicitly and run the substitute/.test(meta),
+      'the meta Implementation-prompts rule makes CI conditional');
     assert.ok(/or, if CI is genuinely absent, that the substitute above has been independently re-run and recorded/.test(review),
       'review\'s pre-Approve CI confirmation is conditional');
     assert.ok(/or CI is genuinely absent and the substitute has been re-run and recorded on it/.test(closeout),
@@ -5068,34 +5072,19 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
         'it must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
       assert.ok(/If no such Approve is on record on this ticket's own trail/.test(section),
         'it must state the no-Approve fallback');
-      assert.ok(/this ticket's own comment trail/.test(PROMPT_TEMPLATES.breakdown.aiHint.goal),
-        'the breakdown aiHint goal must name the same precondition');
-      assert.ok(/this ticket's own comment trail/.test(formatAIHintsForMetaPrompt()),
-        'the rendered aiHints must carry the precondition too (two-path parity)');
-      // R3: pin the aiHint precondition target AND its no-Approve fallback so the
-      // AI path cannot silently regress to "the Parent Task's comment trail" (M4) or
-      // lose the plain-acceptance-criteria fallback (M3).
-      const goal = PROMPT_TEMPLATES.breakdown.aiHint.goal;
-      assert.ok(/Only if this ticket's own comment trail/.test(goal),
-        'R3: the aiHint precondition must target this ticket\'s own comment trail');
-      assert.ok(/never its own rendered 'Parent Task' section/.test(goal),
-        'R3: the aiHint must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
-      assert.ok(/If no such Approve verdict is on this ticket's own comment trail, write a plain acceptance-criteria subtask instead — no session-fit line, no plan-review-due line\./.test(goal),
-        'R3: the aiHint must carry the no-Approve plain-acceptance-criteria fallback with no false session-fit/plan-review-due markers');
-      // R5: the aiHint workflow carries its own copy of the own-trail precondition
-      // and the plain fallback; formatAIHintsForMetaPrompt renders it beside the
-      // goal, so a regression to "the Parent Task's comment trail" here would put
-      // the F4 wrong-ticket instruction in the AI router's own hint while the goal
-      // stays correct and every other test stays green (M4w/M4w2).
-      const workflow = PROMPT_TEMPLATES.breakdown.aiHint.workflow;
-      assert.ok(/Check this ticket's own comment trail for a recorded `### Plan Review Verdict` of Approve/.test(workflow),
-        'R5: the aiHint workflow must check this ticket\'s own comment trail for an Approve verdict, not the Parent Task');
-      assert.ok(/otherwise write a plain acceptance-criteria subtask/.test(workflow),
-        'R5: the aiHint workflow must retain its plain acceptance-criteria fallback when no Approve verdict exists');
-      // R6: the goal must not copy a false `fits one session` onto a surface the
-      // approved plan itself could not scope to one session.
-      assert.ok(/omitting a false session-fit claim for a surface the plan could not scope to one session/.test(goal),
-        'R6: the aiHint goal must require omitting a false session-fit claim when the plan could not scope the surface to one session');
+      // Two-path parity (R3/R5/R6). LIN-3300 removed the breakdown aiHint, which was a
+      // second AI-path copy; the AI path's carrier is the Breakdown-prompts quality rule,
+      // pinned here so it cannot regress to "the Parent Task's comment trail" (M4), lose
+      // the plain-acceptance-criteria fallback (M3), or copy a false session fit (R6).
+      const meta = buildMetaPromptTemplate({
+        issueContext: 'CTX', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
+        remainingCount: 0, hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'breakdown', completionSignals: 'S'
+      });
+      const rule = meta.slice(meta.indexOf('- **Breakdown prompts**'), meta.indexOf('\n- **', meta.indexOf('- **Breakdown prompts**') + 5));
+      assert.ok(/check THIS TICKET'S OWN comment trail/.test(rule), 'R3: the precondition targets this ticket\'s own comment trail');
+      assert.ok(/never its own rendered Parent Task section/.test(rule), 'R3: it excludes the rendered Parent Task section (the F4 wrong-ticket trap)');
+      assert.ok(/it stays a plain acceptance-criteria subtask/.test(rule), 'R5: it keeps the plain acceptance-criteria fallback');
+      assert.ok(/must NOT be given a false session-fit or plan-review-due answer/.test(rule), 'R6: it forbids a false session-fit claim');
     });
   }
 

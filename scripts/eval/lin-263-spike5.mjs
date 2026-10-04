@@ -24,7 +24,7 @@ import { mkdirSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { formatIssueContext, parseRecommendationResponse } from '../../lib/openrouter.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
+import { formatStageOptions, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
 import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
 
@@ -90,7 +90,7 @@ function buildMeta(nComments) {
     identifier: baseIssue.identifier,
     hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
     hasComments: comments.length > 0, commentCount: comments.length,
-    aiHints: formatAIHintsForMetaPrompt(),
+    aiHints: formatStageOptions(),
     actionVocabulary: getAIRecommendationActionNames().join(', '),
     completionSignals: formatAllSignalsForMetaPrompt(),
     focusedSubtaskId: null, featureFlags: {}
