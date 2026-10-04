@@ -3,11 +3,12 @@
  * A/B eval for the plan-review GATE and its routing branch (LIN-1603, item 2.8).
  *
  * Modelled on scripts/eval-review-closeout.mjs, but pointed at the RECOMMENDER:
- * the thing under test is the Step-3 routing branch in
- * lib/prompts/meta-prompt-template.js, not a handwritten prompt. The sibling
- * harness measures a prompt's OUTPUT quality with an LLM judge; this one measures
- * a ROUTING DECISION, which is a single parseable token (`→ **action**`), so it is
- * scored deterministically by `parseRecommendedAction` with no judge in the loop.
+ * the thing under test is the Step-3 routing branch composed into
+ * lib/prompts/meta-prompt-template.js and owned by lib/stage-router.js (LIN-3304),
+ * not a handwritten prompt. The sibling harness measures a prompt's OUTPUT quality
+ * with an LLM judge; this one measures a ROUTING DECISION, which is a single
+ * parseable token (`→ **action**`), so it is scored deterministically by
+ * `parseRecommendedAction` — imported from the seam — with no judge in the loop.
  *
  * THE RISK BEING MEASURED IS OVER-FIRING. `plan-review` exists to protect the
  * throughput of the work that needs it, so the expensive failure is not "the gate
@@ -50,7 +51,9 @@ import { buildMetaPromptTemplate } from '../lib/prompts/meta-prompt-template.js'
 import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
 import { formatAllSignalsForMetaPrompt } from '../lib/completion-signals.js';
 import { deriveDispatchKind } from '../lib/prompt-templates.js';
-import { parseRecommendedAction } from '../lib/openrouter.js';
+// LIN-3304: the action parser now lives with the next-stage choice; import it from
+// the seam so this routing eval reads the decision through its one owner.
+import { parseRecommendedAction } from '../lib/stage-router.js';
 
 const KEY = process.env.OPENROUTER_API_KEY;
 if (!KEY) { console.error('Set OPENROUTER_API_KEY'); process.exit(1); }

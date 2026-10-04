@@ -27,6 +27,9 @@
  *                         source the frozen file does not itself contain)
  *   - Meta-prompt       : lib/prompts/meta-prompt-template.js, source + rendered
  *                         with the same leaf fixture the baseline snapshot uses
+ *   - Stage router      : lib/stage-router.js, source (LIN-3304) — the routing
+ *                         sections and parse the meta call's next-stage choice uses,
+ *                         given their own ceiling when they got their own home
  *   - Brief writer      : lib/prompts/brief-writer.js, source (LIN-3293)
  *   - Served runner     : docs/runner-prompt.md, source + buildRunnerKickoff() rendered
  *
@@ -90,9 +93,19 @@ export const TEMPLATES_RENDERED_CEILINGS = {
 };
 
 /** Meta-prompt, source bytes. */
-export const META_PROMPT_SOURCE_CEILING = 105791; // LIN-3299: the skeleton's Goal asks for a lead and a Process, no role; plan-review's verify-not-redesign is code's
+export const META_PROMPT_SOURCE_CEILING = 67740; // LIN-3304: -38051, the routing fragments moved into lib/stage-router.js; every byte is now owned once, there is no stale slack
 /** Meta-prompt, rendered bytes under META_PROMPT_ARGS (the baseline's leaf fixture). */
 export const META_PROMPT_RENDERED_CEILING = 103308;
+
+/**
+ * The stage router's source bytes (lib/stage-router.js, LIN-3304). This surface
+ * gets its own ceiling now that the routing fragments (moved out of the meta
+ * template) and the reply parse (moved out of the unfrozen openrouter.js) live here.
+ * The bytes are not new prompt text: they are the routing half the meta source already
+ * carried, plus the parse that was never frozen. Its own ceiling is what keeps the
+ * routing half from growing silently inside the meta-prompt's old slack.
+ */
+export const STAGE_ROUTER_SOURCE_CEILING = 45728;
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
@@ -120,8 +133,14 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * move a ceiling up only by moving another down by at least as much; raising
  * the total is a deliberate edit to THIS number, in the same change, so it is
  * reviewed rather than assumed.
+ *
+ * LIN-3304 raised it by 6990 (568534 -> 575524) when lib/stage-router.js joined the
+ * frozen surfaces. The meta-prompt's ceiling fell by 38051 as its routing fragments
+ * moved out; the net increase is the reply-parse code that moved in from
+ * lib/openrouter.js, which was never a frozen surface, plus the seam's docs. The sum
+ * still equals the total, so there is no new slack.
  */
-export const FROZEN_TOTAL_BYTES = 568534;
+export const FROZEN_TOTAL_BYTES = 575524;
 
 const BASE_URL = 'https://harbour.example';
 
@@ -209,6 +228,14 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
   });
 
+  test('stage router source bytes', () => {
+    const actual = sourceBytes('lib/stage-router.js');
+    assert.ok(actual <= STAGE_ROUTER_SOURCE_CEILING,
+      `lib/stage-router.js is ${actual} bytes, ${actual - STAGE_ROUTER_SOURCE_CEILING} over its ` +
+      `${STAGE_ROUTER_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - STAGE_ROUTER_SOURCE_CEILING} bytes ` +
+      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+  });
+
   test('brief writer source bytes', () => {
     const actual = sourceBytes('lib/prompts/brief-writer.js');
     assert.ok(actual <= BRIEF_WRITER_SOURCE_CEILING,
@@ -250,6 +277,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       ...Object.values(TEMPLATES_RENDERED_CEILINGS),
       META_PROMPT_SOURCE_CEILING,
       META_PROMPT_RENDERED_CEILING,
+      STAGE_ROUTER_SOURCE_CEILING,
       BRIEF_WRITER_SOURCE_CEILING,
       RUNNER_PROMPT_SOURCE_CEILING,
       RUNNER_PROMPT_RENDERED_CEILING,

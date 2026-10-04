@@ -100,6 +100,7 @@ lib/
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code after every stage's body on both paths
+  stage-router.js      The next-stage choice's own seam (LIN-3304): the routing sections (routerFragments), the routing-only prompt a writer-on call sends (buildRouterPrompt), and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo). lib/prompts/meta-prompt-template.js composes the SAME fragments into the full template, so the full path stays byte-identical and routing-only is no longer a subtractive mask; getRecommendation/getRecommendationStream call the seam. Behaviour is unchanged here — the known parser defects are follow-up work
   brief-writer.js      The brief writer's switch (the experimental `briefWriter` workspace feature) and model resolution (LIN-3293), and the two helpers every prompt surface uses: resolveRecommendModels (routed) and generateStagePrompt (pinned); the writing calls live in openrouter.js
   prompt-template-defs.js  Prompt template definitions (17 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source for the handwritten Goal and the brief writer (LIN-3299)
   completion-signals.js  Completion signals for prompt assessment

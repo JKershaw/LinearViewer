@@ -11,6 +11,10 @@
  * no copied writer-instruction phrases). It also writes a blind pack (briefs shuffled under
  * random labels) for grading by hand, and a re-grade pack (a random 20%, relabelled).
  *
+ * LIN-3304: the routing-only decision this harness records comes through
+ * lib/stage-router.js (the next-stage choice's seam) via getRecommendation's writer
+ * path — the same prompt and parse the live writer-on call uses.
+ *
  * Run (ticketDir holds proxy issue JSON, one ticket per file; models are comma-separated):
  *   OPENROUTER_API_KEY=... node scripts/eval/brief-writer-compare.mjs run <ticketDir> <outDir> \
  *     <model>,<model>,... [--router <model>] [--budget-multiple 20] [--seed 3294]

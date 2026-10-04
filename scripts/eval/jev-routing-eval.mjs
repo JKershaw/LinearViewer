@@ -11,7 +11,10 @@
  *   2. incumbent (gpt-5.4-mini) + distilled state         (model-vs-representation control)
  *   3. incumbent (gpt-5.4-mini) + raw state, via the LIVE  getRecommendation()  (the
  *      production incumbent; its cost/latency/prompt come from the graded call's own
- *      recorder hooks — no duplicate rebuild call)
+ *      recorder hooks — no duplicate rebuild call). LIN-3304: this arm still measures the
+ *      FULL prompt (no briefWriter), so it runs the full-mode parse, not buildRouterPrompt
+ *      or routeStage; the routing sections it renders come from lib/stage-router.js's
+ *      shared fragments and its action parse is the shared parseRecommendedAction.
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
