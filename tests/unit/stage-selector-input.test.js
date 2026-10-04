@@ -51,8 +51,9 @@ describe('trail facts (LIN-3300)', () => {
       { createdAt: at(4), body: `Now ${PR}` }
     ], '');
     assert.deepEqual(facts.prUrls, ['https://github.com/a/b/pull/1', PR]);
-    assert.equal(facts.latestRuling.at, at(3));
-    assert.match(facts.latestRuling.body, /^Go to implementation\./);
+    assert.equal(facts.latestPerson.at, at(3));
+    assert.equal(facts.latestPerson.ruling, true);
+    assert.match(facts.latestPerson.body, /^Go to implementation\./);
   });
 
   // Fix round: a ruling is a person's comment that ENDS with the mark the in-app route
@@ -68,21 +69,67 @@ describe('trail facts (LIN-3300)', () => {
       { createdAt: at(1), body: `Hold.\n\n${RULING_MARK}` },
       { createdAt: at(2), body: `### Plan Review Verdict\n\nQuotes "${RULING_MARK}" mid-text.\n\n**Verdict:** Approve.` }
     ], '');
-    assert.equal(facts.latestRuling.at, at(1), 'the quoting verdict is skipped');
+    assert.equal(facts.latestPerson.at, at(1), 'the quoting verdict is skipped');
   });
 
-  test('TRAIL FACTS says whether a ruling is on the trail', () => {
+  test('TRAIL FACTS names the latest person\'s comment, whether it is a ruling, and whether work followed it', () => {
     const withRuling = formatTrailFactsBlock(assembleTrailFacts([{ createdAt: at(3), body: `Go.\n\n${RULING_MARK}` }], ''), 1);
-    assert.match(withRuling, /- Latest ruling recorded via Harbour: 2026-10-03 \(shown with the comments\)/);
-    assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest ruling recorded via Harbour: none/);
+    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03, a ruling recorded via Harbour \(shown with the comments\); work reported after it: no/);
+    assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest person's comment[^:]*: none/);
+  });
+
+  // Eval fix round (K=3 on sol): the person-vs-agent read is LIN-3309's, in code.
+  test('the latest person\'s comment skips agent notes, landing reports, reviews, verdicts and close-outs', () => {
+    const facts = assembleTrailFacts([
+      { createdAt: at(1), body: '**Last round before re-review (FC, an engineering call):**\n- land F1.' },
+      { createdAt: at(2), body: '**Autopilot run summary: P0 landed.** https://github.com/o/r/pull/1' },
+      { createdAt: at(3), body: '### Plan Review Verdict\n\n**Verdict:** Approve.' }
+    ], '');
+    assert.equal(facts.latestPerson.at, at(1));
+    assert.equal(facts.latestPerson.ruling, false);
+    assert.equal(facts.latestPerson.workAfter, false, 'an agent note linking a PR is not work reported');
+    const headed = assembleTrailFacts([
+      { createdAt: at(1), body: 'Go on with the narrow revision.' },
+      { createdAt: at(2), body: '## Plan finalized — next action: breakdown' }
+    ], '');
+    assert.equal(headed.latestPerson.at, at(1), 'a headed stage report is not a person\'s comment');
+    const closed = assembleTrailFacts([
+      { createdAt: at(1), body: `Yes: merge #1616.\n\n${RULING_MARK}` },
+      { createdAt: at(2), body: '**Close-out: PR #1616 merged. The ticket stays open for L2.**' }
+    ], '');
+    assert.equal(closed.latestPerson.at, at(1), 'a close-out is not a person\'s comment');
+    assert.equal(closed.latestPerson.workAfter, true, 'a close-out after it carries out the ruling');
+    const fixed = assembleTrailFacts([
+      { createdAt: at(1), body: 'Addendum: two more items for this round.' },
+      { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }
+    ], '');
+    assert.equal(fixed.latestPerson.workAfter, true, 'a later landing report supersedes it');
+  });
+
+  test('work after the review ignores agent notes and an unheaded close-out', () => {
+    const facts = assembleTrailFacts([
+      review('Approve.', 1),
+      { createdAt: at(2), body: `**Close-out: PR #1747 merged.** ${PR}` },
+      { createdAt: at(3), body: `**Autopilot run summary (stepper): P0 landed.** ${PR}` }
+    ], '');
+    assert.equal(facts.workAfterReview, false);
+    assert.equal(facts.closeOutAfterReview, true);
+  });
+
+  test('a plan posted as a comment counts, and its session fit and plan-review answer are read from it', () => {
+    const plan = { createdAt: at(1), body: `**Plan — the migration (technical-planner pass).**\n\n${'x'.repeat(2500)}\n\nSession-fit: does NOT fit one session. 4 sessions.\n\nplan-review due: yes` };
+    const facts = assembleTrailFacts([plan], 'Finish it.', { leaf: true });
+    assert.deepEqual(facts.plan, { present: true, where: 'comment', at: at(1), revision: null, sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
+    assert.match(formatTrailFactsBlock(facts, 1), /- Implementation plan: in a comment \(2026-10-01\)/);
+    assert.match(formatTrailFactsBlock(facts, 1), /- Session fit stated: needs multiple sessions/);
   });
 
   test('a leaf gets its plan facts; the negated session fit reads as multiple sessions', () => {
     const description = 'Goal.\n\n## Implementation Plan\n\nRevision 3 — addresses plan-review F1.\n\nSession fit: does not fit one session.\n\nplan-review due: yes\n';
     const facts = assembleTrailFacts([], description, { leaf: true });
-    assert.deepEqual(facts.plan, { present: true, revision: 3, sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
+    assert.deepEqual(facts.plan, { present: true, where: 'description', at: null, revision: 3, sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
     assert.equal(assembleTrailFacts([], 'Plan-review due: no — covered by LIN-9.', { leaf: true }).plan.planReviewDue, 'no');
-    assert.deepEqual(assembleTrailFacts([], 'Just a goal.', { leaf: true }).plan, { present: false, revision: null, sessionFit: null, planReviewDue: null });
+    assert.deepEqual(assembleTrailFacts([], 'Just a goal.', { leaf: true }).plan, { present: false, where: null, at: null, revision: null, sessionFit: null, planReviewDue: null });
     assert.equal(assembleTrailFacts([], description, { leaf: false }).plan, null, 'a node reads session fit from FRONTIER FACTS instead');
   });
 
@@ -92,10 +139,10 @@ describe('trail facts (LIN-3300)', () => {
     assert.match(block, /Latest code review: approve-conditional/);
     assert.match(block, /Work reported after it \(a later comment links a PR\): no/);
     assert.match(block, /PRs linked on the trail: https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1747/);
-    assert.match(block, /Implementation plan in the description: no/);
+    assert.match(block, /- Implementation plan: none/);
     const none = formatTrailFactsBlock(assembleTrailFacts([], '', { leaf: false }), 0);
     assert.match(none, /Latest code review: none/);
-    assert.doesNotMatch(none, /Implementation plan in the description/);
+    assert.doesNotMatch(none, /Implementation plan:/);
   });
 });
 
@@ -196,6 +243,8 @@ describe('the selector view (LIN-3300)', () => {
   test('a ruling among the latest 3 is not shown twice', () => {
     const view = formatSelectorView(issue, { ...context, comments: comments.slice(0, 2) });
     assert.match(view, /Latest 2 of 2 comments/);
-    assert.doesNotMatch(view, /Latest ruling recorded via Harbour/);
+    assert.doesNotMatch(view, /Latest ruling recorded via Harbour/, 'not repeated above the comments');
+    assert.match(view, /\*\*Agent, the latest person's comment\*\*/, 'the latest person\'s comment is marked where it sits');
+    assert.equal(view.split('Ruling: plan first.').length, 2, 'shown once');
   });
 });

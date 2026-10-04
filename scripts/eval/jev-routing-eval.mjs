@@ -420,6 +420,8 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
   }
   return {
     action: rec.recommendedAction, deferTo: rec.deferTo || null, codeRoute: rec.codeRoute || null,
+    // The reply itself (LIN-3300), so a regression can be read from results.json.
+    reasoning: rec.reasoning || null,
     latencyMs: rec.codeRoute ? 0 : (llm[0].durationMs ?? wallMs), cost: rec.codeRoute ? 0 : (llm[0].cost ?? null),
     inputTokens: rec.codeRoute ? 0 : (llm[0].promptTokens ?? null), outputTokens: rec.codeRoute ? 0 : (llm[0].completionTokens ?? null),
     promptChars: (trace[0].metaPrompt || '').length, servedModel: rec.codeRoute ? 'code-route' : (llm[0].model || null),

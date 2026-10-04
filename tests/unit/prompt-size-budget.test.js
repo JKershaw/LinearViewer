@@ -59,7 +59,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 121985, // LIN-3300: -5252, each stage's route (when / when not / requires) replaces its aiHint
+  'lib/prompt-template-defs.js': 122236, // LIN-3300: -5001, each stage's route (when / when not / requires) replaces its aiHint
   'lib/prompt-templates.js': 20744, // LIN-3300: +37, formatStageOptions and defer's entry replace the aiHint formatter
   'lib/prompt-formatters.js': 52917, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3481,
@@ -111,11 +111,11 @@ export const META_PROMPT_RENDERED_CEILING = 102406; // LIN-3300: lowered to its 
  * carried, plus the parse that was never frozen. Its own ceiling is what keeps the
  * routing half from growing silently inside the meta-prompt's old slack.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 48221;
-// LIN-3300: +2493. The file now holds the stage selector (its rules, prompt and Why now
+export const STAGE_ROUTER_SOURCE_CEILING = 48199;
+// LIN-3300: +2471. The file now holds the stage selector (its rules, prompt and Why now
 // parse) beside the full meta path's routing half, which stays until the one-path change
 // deletes it. Paid by aiHint leaving the defs and the meta prompt; the selector itself
-// sends 10.3 KB of fixed text where the routing-only prompt sent 27.7 KB.
+// sends 10.6 KB of fixed text where the routing-only prompt sent 27.7 KB.
 
 /**
  * The brief writer's prompt, source bytes (lib/prompts/brief-writer.js, LIN-3293): its own
@@ -150,10 +150,10 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * lib/openrouter.js, which was never a frozen surface, plus the seam's docs. The sum
  * still equals the total, so there is no new slack.
  *
- * LIN-3300 lowered it by 3712 (575524 -> 571812): every ceiling now sits at its surface's
+ * LIN-3300 lowered it by 3483 (575524 -> 572041): every ceiling now sits at its surface's
  * size, and the stage selector's rules and options cost less than the aiHints they replace.
  */
-export const FROZEN_TOTAL_BYTES = 571812;
+export const FROZEN_TOTAL_BYTES = 572041;
 
 const BASE_URL = 'https://harbour.example';
 

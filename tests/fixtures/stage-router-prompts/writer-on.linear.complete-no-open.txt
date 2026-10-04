@@ -30,6 +30,7 @@ Approve — conditional on close-out.
 - Work reported after it (a later comment links a PR): no
 - Close-out reported after it: no
 - PRs linked on the trail: https://github.com/o/r/pull/7
+- Latest person's comment (not an agent note, landing report, review, verdict or close-out): none
 - Latest ruling recorded via Harbour: none
 - Subtasks: 2 (2 done, 0 in progress, 0 remaining)
 - Session fit stated in the plan: none
@@ -40,7 +41,7 @@ Approve — conditional on close-out.
   When: The work cannot proceed: an open blocker relation, a person's hold that nothing later lifted, or a decision only a person can make.
   Not when: Every blocker is resolved, even if the description still says "blocked until"; a label alone never blocks.
 - `bug`: Something behaves wrong.
-  When: Unexpected behaviour whose cause is not yet confirmed, or whose cause a later comment refuted or relocated, or whose deciding experiment never ran.
+  When: A `bug` label or unexpected behaviour whose cause is not confirmed: no investigation yet, its deciding experiment never ran, or a later comment refuted or relocated the cause (a relocated cause is a new hypothesis until it is confirmed).
   Not when: An investigation already names a root cause and fix direction that still stand at the end of the trail (`implementation`). The `bug` label alone does not mean investigation is owed.
 - `plan`: Work out how to make the change so it can be built in one session or split at real seams.
   When: The knowledge is gathered and the shape decided, but there is no plan with a session-fit answer, or the latest plan-review asked for a revision.
@@ -60,8 +61,8 @@ Approve — conditional on close-out.
   When: Doing the work well depends on knowledge not yet gathered: how the code behaves today, an unpinned external dependency, history or prior art, or every place a change must reach when the ticket names them only by description. Also when the ticket prescribes research as its method. In a close call, prefer research.
   Not when: The task is small and obvious, or the findings and a chosen approach are already in the description or comments.
 - `scoping`: The ticket is unclear about its goal: settle what it should deliver and what done means.
-  When: What to build is unclear: the goal, the boundaries or what done means, including a vague or empty description.
-  Not when: The requirements are clear and only the solution shape is open (`design`).
+  When: The goal or its boundaries are in dispute: what to build is a product or intent question that reading the code would not settle.
+  Not when: The gap is knowledge to gather, such as how the code behaves, a platform or dependency, or history, even when the ticket is terse (`research`); only the solution shape is open (`design`); unexpected behaviour (`bug`).
 - `design`: Several shapes could work; choose the one that best serves what the task is for.
   When: Two or more materially different solution shapes are viable and nothing has committed to one.
   Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered (`research`).
@@ -99,11 +100,11 @@ Approve — conditional on close-out.
 
 Take these in order; the first that applies decides.
 
-1. **A ruling.** The latest ruling recorded via Harbour (the trail facts say whether there is one) decides the stage it names, or holds the work, unless later work or a later comment superseded it. Why: a ruling is a person's decision on this work, and older material does not outrank it.
+1. **A person's word.** The latest person's comment the trail facts name (a ruling recorded via Harbour is one) decides the stage it names, or holds the work, unless work was reported after it. Why: a person's decision on this work outranks older material.
 2. **Landed work.** Route on the trail facts. Merged and Done with a code review on record → `retrospective-audit`. Otherwise, a terminal state with no open subtask, every subtask done, or a PR with no code review since → `review`. The latest code review approved and the work is not merged and Done → `close-out`. It requested changes or needs discussion and no work was reported since → `implementation`, the fix round on the same PR (`blocked` if only a person can settle a finding). Work reported after it → `review`. Red CI or a blocker found while landing goes to `implementation`, `bug` or `blocked` on this ticket, not to a new one. Why: only a code review authorizes close-out, and reviewing unchanged work repeats its verdict.
 3. **Blocked.** An open blocker or a hold nothing lifted → `blocked`. Resolved blockers do not block, whatever the description still says. Why: blocking is read from the relation, not from prose or labels.
 4. **Subtasks.** Open subtasks → `defer` to the frontier child unless the task needs its own work first. Why: the work lives in the children, and only you can tell a healthy container from one that needs decomposing.
-5. **A bug.** Unexpected behaviour: when a root cause and fix direction still stand at the end of the trail → `implementation` (`plan` if the fix spans surfaces); otherwise → `bug`. Why: never build on a refuted or unconfirmed cause, and never re-investigate a confirmed one.
+5. **A bug.** A `bug` label or unexpected behaviour: a confirmed root cause and fix direction that nothing later refuted or relocated → `implementation` (`plan` if the fix spans surfaces); otherwise → `bug`. Why: never build on a refuted or unconfirmed cause, and never re-investigate a confirmed one.
 6. **Knowledge.** Not yet gathered → `research` (`spike` for one sharp feasibility question); what to build is unclear → `scoping`. Why: committing on ungathered assumptions is expensive to unwind, and a needless research pass is cheap.
 7. **Shape.** Two or more viable shapes and none chosen → `design`. Why: a plan should not pick the architecture silently.
 8. **Plan.** No plan with a session-fit answer → `plan`, except that phases which each land alone are a "needs multiple sessions" answer. A plan-review is due and none has run → `plan-review`; once one has, follow the PLAN-REVIEW FACTS. Fits one session → `implementation`; needs multiple sessions → `breakdown`. A small task whose one surface and change are already named may go straight to `implementation`. Why: absent scope resolves down to `plan`, never up to `implementation`, and a settled plan is never re-planned.

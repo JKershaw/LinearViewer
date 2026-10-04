@@ -2541,7 +2541,7 @@ describe('meta-prompt design shape-fork routing + stage discriminators (LIN-878)
     const options = formatStageOptions();
     const entry = (key) => { const i = options.indexOf(`- \`${key}\`:`); return options.slice(i, options.indexOf('\n- `', i + 1)); };
     assert.match(entry('design'), /Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered \(`research`\)/);
-    assert.match(entry('scoping'), /Not when: The requirements are clear and only the solution shape is open \(`design`\)/);
+    assert.match(entry('scoping'), /Not when: The gap is knowledge to gather[^\n]*\(`research`\); only the solution shape is open \(`design`\)/);
     assert.match(entry('spike'), /Not when: The gap is broader understanding \(`research`\)/);
     assert.match(entry('retrospective-audit'), /Not when: The work has not merged \(`review`\)/);
   });

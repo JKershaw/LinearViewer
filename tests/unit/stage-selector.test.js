@@ -45,7 +45,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const rules = p.slice(p.indexOf('## How to choose'), p.indexOf('## Reply'));
     const steps = rules.match(/^\d+\. \*\*[^*]+\*\*/gm);
     assert.deepEqual(steps.map(s => s.replace(/^\d+\. /, '')), [
-      '**A ruling.**', '**Landed work.**', '**Blocked.**', '**Subtasks.**', '**A bug.**', '**Knowledge.**', '**Shape.**', '**Plan.**'
+      '**A person\'s word.**', '**Landed work.**', '**Blocked.**', '**Subtasks.**', '**A bug.**', '**Knowledge.**', '**Shape.**', '**Plan.**'
     ]);
     for (const line of rules.split('\n').filter(l => /^\d+\. /.test(l))) {
       assert.match(line, / Why: /, `every rule states its reason: ${line.slice(0, 40)}`);
@@ -64,7 +64,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const p = prompt();
     const rules = p.slice(p.indexOf('## How to choose'), p.indexOf('## Reply'));
     assert.doesNotMatch(rules, /person's comment among the latest/);
-    assert.match(rules, /1\. \*\*A ruling\.\*\* The latest ruling recorded via Harbour/);
+    assert.match(rules, /1\. \*\*A person's word\.\*\* The latest person's comment the trail facts name/);
     assert.doesNotMatch(rules, /John|Flight Companion/);
   });
 
@@ -76,9 +76,19 @@ describe('the selector prompt (LIN-3300)', () => {
     const p = prompt(leaf(), ctx({ comments: landed }));
     assert.match(p, /Implementation landed since the latest verdict: yes/);
     assert.doesNotMatch(p, /Step \d/, 'the selector has rules, not Steps');
+    assert.doesNotMatch(p, /Route on the landed-work rule \(`review`/, 'the facts do not steer a landed task to review; rule 2 reads the trail facts');
     assert.doesNotMatch(p, /fix it here first|is fixed here/);
     const closeOut = getSelectableStages().find(s => s.key === 'close-out');
     assert.match(closeOut.whenNot, /`implementation`/);
+  });
+
+  test('scoping does not claim terse or empty tickets, and a relocated bug cause is not a standing one', () => {
+    const stage = (k) => getSelectableStages().find(s => s.key === k);
+    assert.doesNotMatch(stage('scoping').when, /vague|empty|what done means/i);
+    assert.match(stage('scoping').whenNot, /`research`/);
+    assert.match(stage('bug').when, /relocated/);
+    const p = prompt();
+    assert.match(p, /5\. \*\*A bug\.\*\* A `bug` label or unexpected behaviour/);
   });
 
   test('stage purposes say what the stage is for, without the worker\'s instructions', () => {
@@ -99,7 +109,7 @@ describe('the selector prompt (LIN-3300)', () => {
     assert.doesNotMatch(p, /Comment number 1\./);
     assert.match(p, /Comment number 5\./);
     assert.match(p, /TRAIL FACTS \(computed in code from all 5 comments/);
-    assert.match(p, /Implementation plan in the description: no/);
+    assert.match(p, /- Implementation plan: none/);
   });
 
   test('a node sees its subtask facts and the suggested child', () => {
@@ -107,7 +117,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const p = prompt(leaf(), ctx({ children, focusedChild: { issue: children[0] } }));
     assert.match(p, /- Subtasks: 1 \(0 done, 0 in progress, 1 remaining\)/);
     assert.match(p, /Frontier next child[^\n]*LIN-2/);
-    assert.doesNotMatch(p, /Implementation plan in the description/, 'plan facts are a leaf\'s');
+    assert.doesNotMatch(p, /- Implementation plan:/, 'plan facts are a leaf\'s');
   });
 
   test('a plan-review verdict on the trail brings the PLAN-REVIEW FACTS block', () => {
