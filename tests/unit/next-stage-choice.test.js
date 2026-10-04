@@ -15,7 +15,7 @@ import { GraphQLClient } from 'graphql-request';
 import {
   assemblePlanReviewFacts, formatPlanReviewFactsBlock, REVISION_LABEL_RE
 } from '../../lib/recommendation-facts.js';
-import { formatIssueContext, getRecommendation, parseRecommendationResponse, setFetchImpl } from '../../lib/openrouter.js';
+import { formatIssueContext, getRecommendation, parseRecommendationResponse, setFetchImpl, resolveCodeRoutedAction } from '../../lib/openrouter.js';
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { readRunLedger } from '../../lib/run-ledger.js';
@@ -170,7 +170,7 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     assert.equal(facts.revised, true);
   });
 
-  test('the newest reply wins: a hold superseded by a go-ahead is not a hold (F3a)', () => {
+  test('a reply after the verdict is shown newest-first and defers the route to the model (FC narrowing)', () => {
     const holdThenGo = [
       RC('2026-01-01T00:00:00Z'),
       { createdAt: '2026-01-02T00:00:00Z', body: 'Hold until LIN-3098 ships.' },
@@ -178,14 +178,15 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     ];
     const facts = assemblePlanReviewFacts(holdThenGo);
     assert.deepEqual(facts.replies.map(r => r.text), ['OK, go on.', 'Hold until LIN-3098 ships.'], 'newest first');
-    assert.equal(facts.route, 'plan', 'the newest reply (go) wins over the older hold');
+    assert.equal(facts.route, null, 'a reply is language: the router reads it and decides');
     // The block tells the model to read the NEWEST reply, not any hold in the list.
     const block = formatPlanReviewFactsBlock(facts);
     assert.match(block, /The NEWEST reply wins: a hold a later reply superseded is not a hold/);
     assert.match(block, /unless the NEWEST reply after the latest verdict tells the work to continue/);
+    assert.doesNotMatch(block, /→ Route this pass:/, 'no code steer when the reply decides the route');
   });
 
-  test('the code route settles the no-reply cases (F1 + FC addendum)', () => {
+  test('the code route settles only the no-reply cases (F1 + the FC narrowing)', () => {
     const verdict = (v, at) => ({ createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: ${v}.**` });
     const oneRc = [verdict('Request Changes', '2026-01-01T00:00:00Z')];
     const twoRc = [...oneRc, verdict('Request Changes', '2026-01-02T00:00:00Z')];
@@ -198,26 +199,24 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     // revised -> plan-review (count 1 and count 2 + a revision, this ticket's own state)
     assert.equal(assemblePlanReviewFacts(oneRc, 'Revision 2 — addresses plan-review').route, 'plan-review');
     assert.equal(assemblePlanReviewFacts(twoRc, 'Revision 3 — addresses plan-review').route, 'plan-review');
-    // a reply is read in code when its newest word is recognisably go/hold
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }]).route, 'plan');
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'Hold until LIN-3098 ships.' }]).route, 'blocked');
-    // an ambiguous reply is left to the model
+    // ANY reply after the latest verdict goes to the router as text — the code does not
+    // classify it (no word-list go/hold classifier) and names no stage.
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }]).route, null);
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'Hold until LIN-3098 ships.' }]).route, null);
     assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'thanks, looking at this now' }]).route, null);
-    // an agent's plan-posted note is not a reply, so the code route still settles it
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: '**Plan posted** — plan revision written.' }]).route, 'blocked');
-    // an explicit implementation go-ahead routes to the fix round
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on, take it to implementation' }]).route, 'implementation');
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: '**Plan posted** — plan revision written.' }]).route, null);
+    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on, take it to implementation' }]).route, null);
     // Approve -> session-fit rules own it
     assert.equal(assemblePlanReviewFacts([verdict('Approve', '2026-01-01T00:00:00Z')]).route, null);
   });
 
-  test('a landed implementation dominates a stale Revision label (FC addendum 2)', () => {
+  test('a code review after a stale Revision label defers the route to the model (FC narrowing)', () => {
     const review = { createdAt: '2026-02-01T00:00:00Z', body: '## Review — LIN-3309\n\n### Verdict\nRequest Changes — F1' };
     const facts = assemblePlanReviewFacts([
       RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), review,
     ], '## Implementation Plan\n\nRevision 3 — addresses plan-review findings F1.');
     assert.equal(facts.revised, true, 'the stale label still reads revised');
-    assert.equal(facts.route, 'implementation', 'but the landed review sends it to the fix round, not plan-review');
+    assert.equal(facts.route, null, 'the review is a reply: the router reads it, no code rule sends it to implementation');
   });
 
   test('the planner template carries a line the reader regex reads (coupling test)', () => {
@@ -313,16 +312,12 @@ describe('the code route is not sent to the model (LIN-3309 F1 + addendum)', () 
     }
   });
 
-  test('a Request Changes review routes to the fix-round brief without the model', async () => {
-    setFetchImpl(async () => { throw new Error('the model must not be called for a code-settled route'); });
-    try {
-      const issue = { identifier: 'T-2', title: 't', description: 'do it', state: { name: 'In Progress', type: 'started' }, labels: [] };
-      const review = { createdAt: '2026-01-01T00:00:00Z', body: '## Review — T-2\n\n### Verdict\nRequest Changes — F1' };
-      const rec = await getRecommendation(issue, bundle(issue, [review]), { apiKey: 'stub', model: 'x', briefWriter: { model: 'x' }, deadline: 0 });
-      assert.equal(rec.codeRoute, 'implementation');
-      assert.match(rec.prompt, /### Revising After a Review/);
-    } finally {
-      setFetchImpl(null);
-    }
+  test('a Request Changes code review is left to the router (no code rule sends it to implementation)', () => {
+    const issue = { identifier: 'T-2', title: 't', description: 'do it', state: { name: 'In Progress', type: 'started' }, labels: [] };
+    const review = { createdAt: '2026-01-01T00:00:00Z', body: '## Review — T-2\n\n### Verdict\nRequest Changes — F1' };
+    // No plan-review verdict on the trail, so the code route is null; the router reads
+    // the review (a reply) and chooses — the fix-round brief then switches on in code.
+    assert.equal(resolveCodeRoutedAction(issue, { comments: [review] }), null);
+    assert.equal(resolveCodeRoutedAction(issue, { comments: [] }), null);
   });
 });

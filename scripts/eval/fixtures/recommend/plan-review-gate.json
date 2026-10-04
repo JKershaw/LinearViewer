@@ -34,8 +34,8 @@
     },
     {
       "id": "PR-1603-request-changes-2",
-      "role": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding (expect -> blocked: the one-cycle bound escalates to the human edge; a third plan-review or another plan is the failure this case exists to catch)",
-      "expect": ["blocked"],
+      "role": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding with no reply (expect -> plan: LIN-3309 moved the escalation point to the third unanswered Request Changes; the second is still the revision pass)",
+      "expect": ["plan"],
       "descentExpect": "PR-1603-request-changes-2"
     },
     {
