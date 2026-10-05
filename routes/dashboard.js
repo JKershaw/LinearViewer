@@ -53,9 +53,8 @@ import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
-import { readRunEvidence, buildRunEvidence, summarizeChecks } from '../lib/run-evidence.js';
-import { fetchPrStatus, resolveRepoAllowlist } from '../lib/github-pr-status.js';
-import { createProxyFetch } from '../lib/proxy-fetch.js';
+import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
+import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
@@ -90,49 +89,10 @@ import { hashSession } from '../lib/session-summary-cache.js';
 // the cache (keyed on the immutable run) would serve stale content.
 const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 
-// PR-state cache + upstream budget (LIN-3251, S1b of LIN-2948, condition C1).
-// The whole reader result is cached per `owner/repo#number`: 15 min while the PR
-// is open, 24 h once merged or closed. Run pages share a process-wide budget of
-// 36 upstream GitHub calls in any sliding 60-minute span — a log of call
-// timestamps, not a fixed window — so the cap holds across window boundaries.
-// When it is spent the route serves the stale value or "state not reported" and
-// never lets another reader see a 403.
-const PR_STATE_OPEN_TTL_MS = 15 * 60 * 1000;
-const PR_STATE_CLOSED_TTL_MS = 24 * 60 * 60 * 1000;
-// The per-workspace repo allowlist (a tracker `fetchProjects` read) is held for
-// the open-PR TTL. Comments are re-read every poll, so this is only the filter.
-const PR_STATE_ALLOWLIST_TTL_MS = 15 * 60 * 1000;
-const PR_STATE_UPSTREAM_LIMIT = 36;
-const PR_STATE_WINDOW_MS = 60 * 60 * 1000;
-// One `fetchPrStatus` read makes up to this many upstream calls (repo probe,
-// pull, check-runs, commit status). The precheck reserves the whole read so a
-// read that starts is never cut off mid-flight (which would waste its calls).
-const PR_STATE_READ_COST = 4;
-const PR_STATE_BUDGET_EXHAUSTED = 'PR_STATE_BUDGET_EXHAUSTED';
-
-// Test seam (LIN-3251, RC2). The default whole-reader cache is process-wide so
-// the NODE_ENV=test `/test/seed-pr-status` route can prime it (reusing LIN-3247's
-// existing seed) and an e2e can assert that the primed-cache path made no live
-// GitHub call. Unit tests inject their own cache, so this shared map and the
-// counter are only used by the real server.
-const prStateSharedCache = new Map();
-let prStateUpstreamFetches = 0;
-
-/** Prime the whole-reader cache for `owner/repo#number` (test-only caller). */
-export function primePrStateCache({ repo, number, value, ttlMs = PR_STATE_CLOSED_TTL_MS, now = Date.now } = {}) {
-  prStateSharedCache.set(`${repo}#${number}`, { value, expiresAt: now() + ttlMs });
-}
-
-/** Clear the shared whole-reader cache and the live-fetch counter (test-only). */
-export function clearPrStateCache() {
-  prStateSharedCache.clear();
-  prStateUpstreamFetches = 0;
-}
-
-/** Real upstream GitHub fetches the pr-state route has made (test-only read). */
-export function prStateUpstreamFetchCount() {
-  return prStateUpstreamFetches;
-}
+// PR-state cache + upstream budget (LIN-3251) live in `lib/pr-state-store.js`
+// since LIN-3311 (one store instance, shared by every reader server.js wires).
+// The test seams stay re-exported here so `routes/test.js` is unchanged.
+export { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from '../lib/pr-state-store.js';
 
 /**
  * `[evidence]` telemetry URLs across a session's runs — the corroborating (never
@@ -727,7 +687,13 @@ export function createDashboardRoutes({
   // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
   // store, which is process-wide in production (one router). Tests inject
   // `{ now, resolveProvider, loadRun, githubFetch, cache, allowlistCache, bucket }`.
-  prState = null
+  prState = null,
+  // LIN-3311 (S0 of LIN-2950): the ONE shared PR-state store server.js builds
+  // (`lib/pr-state-store.js`), so this router and later readers spend one 36/h
+  // budget and fill one cache. When given it wins over the store fields of the
+  // `prState` bag (`cache`/`allowlistCache`/`bucket`/`now`/`githubFetch`); the
+  // bag's route seams (`loadRun`/`resolveProvider`) still apply.
+  prStateStore: sharedPrStateStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -741,15 +707,14 @@ export function createDashboardRoutes({
   // first poll is picked up on the next one. The only thing cached across polls
   // is the per-workspace repo allowlist (a tracker `fetchProjects` read, not a
   // GitHub read), so a PR-state cache hit still runs no `fetchProjects`.
-  const prStateStore = {
-    cache: prStateSharedCache,
-    allowlistCache: new Map(),
-    bucket: [], // sliding log of upstream-call timestamps (ms), oldest first
-    now: Date.now,
-    resolveProvider: (workspace, selector) => resolveIssueBinding(workspace, selector),
-    loadRun: defaultLoadRun,
-    githubFetch: null,
-    ...(prState || {})
+  //
+  // Without an injected store the router builds its own from the `prState`
+  // bag: the shared process-wide cache, a fresh budget log and allowlist cache
+  // (the pre-LIN-3311 defaults, unchanged).
+  const prStateStore = sharedPrStateStore || createPrStateStore(prState || {});
+  const prStateSeams = {
+    resolveProvider: (prState && prState.resolveProvider) || ((workspace, selector) => resolveIssueBinding(workspace, selector)),
+    loadRun: (prState && prState.loadRun) || defaultLoadRun
   };
 
   /**
@@ -1488,120 +1453,9 @@ export function createDashboardRoutes({
   // stale value) resolve to the "state not reported" (`unknown`) state — never a
   // 403, never a thrown read.
 
-  /**
-   * The per-workspace repo allowlist, cached for 15 min. This is a tracker
-   * `fetchProjects` read — NOT a GitHub read — so a PR-state cache hit still
-   * costs no upstream GitHub call. Comments are re-read every request, so a
-   * newly posted PR URL is found on the next poll without this cache mattering.
-   */
-  async function prStateAllowlist(workspace, provider, callScope, nowMs) {
-    const cached = prStateStore.allowlistCache.get(workspace.urlKey);
-    if (cached && cached.expiresAt > nowMs) return cached.value;
-    let allowlist;
-    try {
-      allowlist = await resolveRepoAllowlist(provider, callScope);
-    } catch {
-      allowlist = new Set();
-    }
-    prStateStore.allowlistCache.set(workspace.urlKey, { value: allowlist, expiresAt: nowMs + PR_STATE_ALLOWLIST_TTL_MS });
-    return allowlist;
-  }
-
-  /** The C1 TTL for a reader result: 15 min while open, else 24 h. */
-  function prStateTtlMs(result) {
-    const open = result && result.readable !== false && result.merged !== true && result.state === 'open';
-    return open ? PR_STATE_OPEN_TTL_MS : PR_STATE_CLOSED_TTL_MS;
-  }
-
-  /** Shape a reader result into the route's JSON contract. */
-  function prStatePayload(result, ref) {
-    const fallbackNumber = ref ? ref.number : null;
-    const url = ref ? ref.url : null;
-    if (!result || result.readable === false) {
-      return { state: 'unknown', number: fallbackNumber, checks: null, url };
-    }
-    const state = result.merged ? 'merged'
-      : result.state === 'open' ? 'open'
-      : result.state === 'closed' ? 'closed'
-      : 'unknown';
-    const summary = summarizeChecks(result.checks);
-    const checks = summary === 'pending' ? 'running'
-      : (summary === 'passing' || summary === 'failing') ? summary
-      : null;
-    return { state, number: result.number ?? fallbackNumber, checks, url };
-  }
-
-  function prStateUnknown(ref) {
-    return { state: 'unknown', number: ref ? ref.number : null, checks: null, url: ref ? ref.url : null };
-  }
-
-  /**
-   * The sliding upstream-call log, pruned to the last 60 minutes. Entries are
-   * timestamps (ms), oldest first, capped at the limit. A log — not a fixed
-   * `{windowStart, count}` window — is what makes the 36 cap hold in ANY
-   * 60-minute span, not just aligned windows.
-   */
-  function prStateBudget(nowMs) {
-    const log = prStateStore.bucket;
-    const cutoff = nowMs - PR_STATE_WINDOW_MS;
-    while (log.length && log[0] <= cutoff) log.shift();
-    return log;
-  }
-
-  /** Upstream calls already made in the trailing 60-minute span. */
-  function prStateBudgetUsed(nowMs) {
-    return prStateBudget(nowMs).length;
-  }
-
-  /**
-   * A fetch wrapper that spends one budget unit per real upstream call and
-   * refuses (rather than overruns) once the span's 36 are used. This is the
-   * backstop behind the precheck's whole-read reservation; the refusal is a
-   * distinct thrown code the route turns into stale/unknown, never a 403.
-   */
-  function prStateCountingFetch(fetchImpl) {
-    return async (url, opts) => {
-      const now = prStateStore.now();
-      const log = prStateBudget(now);
-      if (log.length >= PR_STATE_UPSTREAM_LIMIT) {
-        const err = new Error('run-page PR-state upstream budget exhausted');
-        err.code = PR_STATE_BUDGET_EXHAUSTED;
-        throw err;
-      }
-      log.push(now);
-      prStateUpstreamFetches += 1;
-      return fetchImpl(url, opts);
-    };
-  }
-
-  /**
-   * The cached read for one resolved PR. On a fresh cache hit nothing upstream
-   * runs. Before starting a read it reserves room for the whole 4-call read in
-   * the trailing 60-minute span; if there is no room it serves the last value
-   * (or unknown) without starting a read that could be cut off mid-flight. A
-   * failed read is fail-open: the stale value when there is one, else unknown.
-   */
-  async function readPrState(ref, nowMs) {
-    const key = `${ref.repo}#${ref.number}`;
-    const cached = prStateStore.cache.get(key);
-    if (cached && cached.expiresAt > nowMs) {
-      return prStatePayload(cached.value, ref);
-    }
-    if (prStateBudgetUsed(nowMs) + PR_STATE_READ_COST > PR_STATE_UPSTREAM_LIMIT) {
-      return cached ? prStatePayload(cached.value, ref) : prStateUnknown(ref);
-    }
-    const fetchImpl = prStateStore.githubFetch || (await createProxyFetch()) || globalThis.fetch;
-    try {
-      const result = await fetchPrStatus(prStateCountingFetch(fetchImpl), { repo: ref.repo, number: ref.number });
-      prStateStore.cache.set(key, { value: result, expiresAt: nowMs + prStateTtlMs(result) });
-      return prStatePayload(result, ref);
-    } catch (err) {
-      if (err && err.code !== PR_STATE_BUDGET_EXHAUSTED) {
-        console.error('Run PR-state read failed:', err.message);
-      }
-      return cached ? prStatePayload(cached.value, ref) : prStateUnknown(ref);
-    }
-  }
+  // The allowlist cache, sliding budget, counting fetch, TTL rule and payload
+  // shapes are `lib/pr-state-store.js`'s (LIN-3311); this route only resolves
+  // the run's PR and asks the store.
 
   router.get('/workspace/:urlKey/api/run/:runId/pr-state', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -1614,13 +1468,13 @@ export function createDashboardRoutes({
       // Re-resolve the run's PR URL on EVERY request (no run->PR pointer cache),
       // so a PR posted after the first poll is seen on the next one. Only the
       // repo allowlist (a tracker read) is cached, not the PR URL or its state.
-      const run = await prStateStore.loadRun(workspace.urlKey, runId);
+      const run = await prStateSeams.loadRun(workspace.urlKey, runId);
       if (!run || !run.issueIdentifier) {
         return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
       }
-      const { provider, callScope } = prStateStore.resolveProvider(workspace, null);
+      const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
       const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-      const allowlist = await prStateAllowlist(workspace, provider, callScope, nowMs);
+      const allowlist = await prStateStore.allowlist(workspace.urlKey, provider, callScope, nowMs);
       // Through LIN-2949's run-evidence model, not a new parser.
       const model = buildRunEvidence({
         issueIdentifier: run.issueIdentifier,
@@ -1629,15 +1483,14 @@ export function createDashboardRoutes({
         evidenceUrls: run.evidenceUrls || [],
         prStatus: null
       });
-      const urls = (model.state && model.state.prUrls) || [];
-      if (urls.length !== 1) {
+      const { status, ref } = resolveRunPrRef(model);
+      if (status !== 'one') {
         // zero PRs -> "none"; several -> withhold (never pick one silently)
-        const state = urls.length === 0 ? 'none' : 'unknown';
+        const state = status === 'none' ? 'none' : 'unknown';
         const payload = { state, number: null, checks: null, url: null };
         return res.json({ ...payload, message: prStateCopy(payload) });
       }
-      const ref = { repo: urls[0].repo, number: urls[0].number, url: urls[0].url };
-      const payload = await readPrState(ref, nowMs);
+      const payload = await prStateStore.readPayload(ref, nowMs);
       return res.json({ ...payload, message: prStateCopy(payload) });
     } catch (error) {
       console.error('Run PR-state error:', error.message);
