@@ -32,8 +32,8 @@ export function createProxyAlarmRoutes({ livenessAlarmStore, proxyLimiter, authe
    * GET /api/proxy/alarms?state=open|cleared|all&limit=
    * Read scope is enough. Returns `{ alarms: [...], total }`, oldest-rule
    * irrelevant, newest-fired first. Each alarm is a plain advisory record:
-   * `{ id, rule, shape, members, dispatchIds, tickets, startedAt, firedAt,
-   * lastSeenAt, clearedAt, detail }`.
+   * `{ id, rule, shape, members, waiters, feeders, leafLineages, dispatchIds,
+   * tickets, startedAt, firedAt, lastSeenAt, clearedAt, reopenCount, detail }`.
    */
   router.get(ALARMS_ROUTE, proxyLimiter, authenticateProxyToken, async (req, res) => {
     if (!livenessAlarmStore) {
@@ -69,12 +69,16 @@ function toPublic(doc) {
     rule: doc.rule,
     shape: doc.shape || null,
     members: doc.members || [],
+    waiters: doc.waiters || [],
+    feeders: doc.feeders || [],
+    leafLineages: doc.leafLineages || [],
     dispatchIds: doc.dispatchIds || [],
     tickets: doc.tickets || [],
     startedAt: iso(doc.startedAt),
     firedAt: iso(doc.firedAt),
     lastSeenAt: iso(doc.lastSeenAt),
     clearedAt: iso(doc.clearedAt),
+    reopenCount: doc.reopenCount || 0,
     detail: doc.detail || {}
   };
 }

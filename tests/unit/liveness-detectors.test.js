@@ -382,7 +382,7 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
       })]]
     ]);
     const lineageInfo = mapOf([
-      [stoppedTicket, { loopId: stoppedTicket, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
+      [stoppedTicket, { loopId: stoppedTicket, issueIdentifier: 'LIN-200', terminalStatus: null, lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
     ]);
     const now = Date.parse('2026-10-02T10:00:00.000Z');
     const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });

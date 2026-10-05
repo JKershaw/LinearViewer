@@ -530,4 +530,209 @@ describe('liveness-alarm-sweep: tick simulator', () => {
     assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:06:00.000Z');
     assert.equal(d2[0].clearedAt, null);
   });
+
+  test('RC11: a second waiter joining one stopped leaf confirms the same orphan record', async () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000101';
+    const b = 'bbbbbbbb-0000-0000-0000-000000000102';
+    const c = 'cccccccc-0000-0000-0000-000000000103';
+    const rows = [
+      {
+        id: a, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-11',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T10:05:00.000Z' }]
+      },
+      {
+        id: b, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-11',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        // Not visible at the first tick (10:30): B becomes a waiter at 10:40.
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T10:32:00.000Z' }]
+      },
+      {
+        id: c, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-12',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: '[working] last moved long ago', timestamp: '2026-10-02T09:10:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await d2All();
+    assert.equal(d2.length, 1, `one orphan opens on the leaf, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    const openedId = d2[0]._id;
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:05:00.000Z');
+
+    nowRef.value = Date.parse('2026-10-02T10:40:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await d2All();
+    assert.equal(d2.length, 1, `a second waiter must not mint a second orphan, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    assert.equal(d2[0]._id, openedId, 'the orphan key is the stopped leaf, not the waiter walk');
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T10:05:00.000Z', 'onset is the incident onset, not the new waiter');
+    assert.ok(d2[0].waiters.includes(a) && d2[0].waiters.includes(b), 'both waiters are recorded on the one record');
+  });
+
+  test('RC11: a feeder joining an open orphan chain confirms the same record and grows feeders', async () => {
+    const f = 'ffffffff-0000-0000-0000-000000000111';
+    const a = 'aaaaaaaa-0000-0000-0000-000000000112';
+    const b = 'bbbbbbbb-0000-0000-0000-000000000113';
+    const c = 'cccccccc-0000-0000-0000-000000000114';
+    const rows = [
+      {
+        id: f, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-13',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${a}`, timestamp: '2026-10-02T10:38:00.000Z' }]
+      },
+      {
+        id: a, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-13',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on worker dispatch ${b}`, timestamp: '2026-10-02T10:05:00.000Z' }]
+      },
+      {
+        id: b, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-13',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T09:55:00.000Z' }]
+      },
+      {
+        id: c, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-14',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: '[working] last moved long ago', timestamp: '2026-10-02T09:10:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await d2All();
+    assert.equal(d2.length, 1);
+    const openedId = d2[0]._id;
+    assert.deepEqual(d2[0].feeders, [a].sort());
+
+    nowRef.value = Date.parse('2026-10-02T10:40:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await d2All();
+    assert.equal(d2.length, 1, `feeder join must not mint a second record, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    assert.equal(d2[0]._id, openedId);
+    assert.equal(d2[0].startedAt.toISOString(), '2026-10-02T09:55:00.000Z', 'onset is the direct waiter, not the feeder');
+    assert.ok(d2[0].feeders.includes(f), 'the new feeder is merged in while the incident persists');
+  });
+
+  test('an orphan whose leaf goes terminal keeps its record (leaf terminal is not a clear)', async () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000121';
+    const c = 'cccccccc-0000-0000-0000-000000000123';
+    const rows = [
+      {
+        id: a, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-15',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T09:55:00.000Z' }]
+      },
+      {
+        id: c, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-16',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [
+          { message: '[working] last moved long ago', timestamp: '2026-10-02T09:10:00.000Z' },
+          // The leaf finishes at 10:35, after the wait began.
+          { message: '[done] the leaf finished', timestamp: '2026-10-02T10:35:00.000Z' }
+        ]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await d2All();
+    assert.equal(d2.length, 1);
+    const openedId = d2[0]._id;
+
+    nowRef.value = Date.parse('2026-10-02T10:40:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await d2All();
+    assert.equal(d2.length, 1, `the leaf going terminal must not mint a second record, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    assert.equal(d2[0]._id, openedId);
+    assert.equal(d2[0].clearedAt, null, 'a terminal leaf is the lost-wake case, not a clear');
+    // The waiter still parked on the terminal leaf is not re-detected, so it
+    // accrues a miss but is not structurally resolved.
+    assert.equal(d2[0].missCount, 1);
+  });
+
+  test('every recorded waiter answered clears the orphan on the tick (the answered waiter is not lean-selected)', async () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000131';
+    const answer = 'aaaaaaaa-0000-0000-0000-000000000132';
+    const c = 'cccccccc-0000-0000-0000-000000000133';
+    const rows = [
+      {
+        id: a, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-17',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T09:55:00.000Z' }]
+      },
+      {
+        id: answer, kind: 'implementation', status: 'done', sessionId: null, followUpTo: a, issueIdentifier: 'LIN-17',
+        dispatchedAt: '2026-10-02T10:20:00.000Z', feedback: []
+      },
+      {
+        id: c, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-18',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: '[working] last moved long ago', timestamp: '2026-10-02T09:10:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:10:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    assert.equal((await d2All()).length, 1, 'orphan opens while the waiter is still parked');
+
+    // At 10:30 the answer row is the lineage's latest loop, so A is not in the
+    // lean waiter set; it is reached only through the open record's stored
+    // `waiters`. Its answered state must clear the record on this tick.
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    const d2 = await d2All();
+    assert.equal(d2.length, 1);
+    assert.ok(d2[0].clearedAt, 'the answered waiter clears the record immediately');
+  });
+
+  test('a cleared incident that recurs reopens the same record with its original onset', async () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000141';
+    const c = 'cccccccc-0000-0000-0000-000000000143';
+    const rows = [
+      {
+        id: a, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-19',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T09:55:00.000Z' }]
+      },
+      {
+        id: c, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-20',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: '[working] last moved long ago', timestamp: '2026-10-02T09:10:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+    assert.equal(d2.length, 1);
+    const openedId = d2[0]._id;
+    const startedAt = d2[0].startedAt.toISOString();
+
+    // A clear, then the same cause detected again: one durable row, reopened in
+    // place, with its FIRST onset (N13's reopen half).
+    await alarmStore.clear(openedId, { clearedAt: new Date('2026-10-02T10:35:00.000Z') });
+    nowRef.value = Date.parse('2026-10-02T10:40:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+    assert.equal(d2.length, 1);
+    assert.equal(d2[0]._id, openedId);
+    assert.equal(d2[0].clearedAt, null);
+    assert.equal(d2[0].startedAt.toISOString(), startedAt, 'reopen leaves the first onset unchanged');
+    assert.equal(d2[0].reopenCount, 1);
+  });
 });

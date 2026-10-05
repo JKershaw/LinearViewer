@@ -95,7 +95,11 @@ describe('liveness-alarm-store', () => {
     const second = await open('2026-10-02T20:00:00.000Z');
     assert.equal(second._id, first._id);
     assert.equal(second.clearedAt, null);
-    assert.equal(second.firedAt.toISOString(), '2026-10-02T20:00:00.000Z');
+    // Onset and first-fire belong to the record for its whole life: a reopen
+    // must NOT move them (N13's reopen half).
+    assert.equal(second.firedAt.toISOString(), '2026-10-02T15:20:00.000Z');
+    assert.equal(second.startedAt.toISOString(), '2026-10-02T15:20:00.000Z');
+    assert.equal(second.reopenCount, 1);
     assert.equal((await store.list('acme', { state: 'all' })).length, 1);
   });
 
