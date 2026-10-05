@@ -89,14 +89,14 @@ function sessionFor(workspace, features) {
   return { features, accountId: 'acct-1', workspaces: [workspace] };
 }
 
-export function buildWorkspaceApiApp({ workspace, features = {}, taskDecisionsStore = null, workspacePreferencesStore = {} }) {
+export function buildWorkspaceApiApp({ workspace, features = {}, taskDecisionsStore = null, workspacePreferencesStore = {}, dispatchQueueStore = {}, proxyTokenStore = {} }) {
   const app = express();
   app.use(express.json());
   app.use(createWorkspaceApiRoutes({
     workspaceFromUrl: (req, _res, next) => { req.workspace = workspace; req.session = sessionFor(workspace, features); next(); },
     freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {}, workspacePreferencesStore,
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {}, reportHistoryStore: {},
-    dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
+    dispatchQueueStore, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore,
     taskDecisionsStore,
   }));
   return app;
