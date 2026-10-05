@@ -126,7 +126,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const rc = (d) => ({ createdAt: `2026-01-0${d}T00:00:00Z`, body: '### Plan Review Verdict\n\n**Verdict: Request Changes.**' });
     const app = { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Approve.**' };
     const p = prompt(leaf(), ctx({ comments: [app, rc(2), rc(3), { createdAt: '2026-01-04T00:00:00Z', body: 'Go on with the narrow revision.' }] }));
-    assert.match(p, /- Plan-review verdicts: 3 \(1 approve, 2 request changes\); latest: request changes \(2026-01-03\)/);
+    assert.match(p, /- Plan-review verdicts: 3 \(1 approve, 2 request changes\); latest: request changes \(2026-01-03 00:00\)/);
     assert.match(p, /- Since the latest plan-review verdict: a person's comment: yes; landed work: none/);
     assert.doesNotMatch(p, /PLAN-REVIEW FACTS|first match wins|since the latest Approve|Count \d|third|escalat/i);
     assert.doesNotMatch(prompt(), /Plan-review verdicts:/, 'no verdict, no line');
@@ -141,6 +141,7 @@ describe('the selector prompt (LIN-3300)', () => {
     const stage = (k) => getSelectableStages().find(st => st.key === k);
     assert.doesNotMatch(stage('plan').when, /revision/, 'the plan stage does not restate it');
     assert.doesNotMatch(stage('plan-review').when, /revision|revised|landed/, 'nor does plan-review');
+    assert.doesNotMatch(stage('plan-review').when, /no plan-review verdict yet/, 'a revised plan is reviewed again, as rule 8 says');
   });
 
   // Coordinator fix round: a rule says only what relates the stages; when a stage

@@ -1,6 +1,6 @@
 {
   "name": "Plan-Review-Gate",
-  "note": "Deliberately-synthetic fixtures (LIN-1603) for the plan-review GATE and its routing branch in lib/prompts/meta-prompt-template.js — the Step-3 decision that sits between the plan-exists check and the session-fit routing. The gate is DUE when the plan (a) answers 'needs multiple sessions', (b) names a routed-around contract gap with a ticket identifier, (c) relaxes any validation/contract/guard, or (d) touches credential, merge-rule, or dispatch-contract surfaces; otherwise plan hands straight to implementation exactly as before the gate existed. The risk being measured here is OVER-FIRING, not under-firing: plan-review exists to protect the throughput of the work that needs it, so PR-1603-clean-small is the load-bearing case — a clean single-surface plan must still reach `implementation` with zero added dispatches. The two verdict-on-trail cases cover the one-cycle loop bound: a first Request Changes routes back to `plan` (the revision pass), a SECOND on the same task escalates to the human edge via `blocked` — never a third plan-review. Honest scope, mirroring closeout-review.json: this is live SHAPE-COVERAGE under continuous measurement, NOT a self-reproducing red test — the authoritative red→green guard is the deterministic structural test in tests/unit/openrouter.test.js ('plan-review gate and routing (LIN-1603)'), and the A/B measurement of the gate's marginal effect is scripts/eval-plan-review.mjs. Known from that harness (haiku-4.5, K=4): the gate fires reliably when the plan RECORDS its decision ('plan-review due: yes', which the plan template now instructs) and does not fire when the router must re-derive criteria (a)-(d) from plan prose — so PR-1603-gated-recorded carries the recorded line and PR-1603-gated-rederive deliberately does not, to keep that difference measured rather than assumed. Each target is a childless In-Progress leaf (no children/focusedChild) so the descent terminates on it.",
+  "note": "Deliberately-synthetic fixtures (LIN-1603) for the plan-review GATE and its routing branch in lib/prompts/meta-prompt-template.js — the Step-3 decision that sits between the plan-exists check and the session-fit routing. The gate is DUE when the plan (a) answers 'needs multiple sessions', (b) names a routed-around contract gap with a ticket identifier, (c) relaxes any validation/contract/guard, or (d) touches credential, merge-rule, or dispatch-contract surfaces; otherwise plan hands straight to implementation exactly as before the gate existed. The risk being measured here is OVER-FIRING, not under-firing: plan-review exists to protect the throughput of the work that needs it, so PR-1603-clean-small is the load-bearing case — a clean single-surface plan must still reach `implementation` with zero added dispatches. The two verdict-on-trail cases cover the one-cycle loop bound: a first Request Changes routes back to `plan` (the revision pass), a SECOND on the same task escalates to the human edge via `blocked` — never a third plan-review. Honest scope, mirroring closeout-review.json: this is live SHAPE-COVERAGE under continuous measurement, NOT a self-reproducing red test — the authoritative red→green guard is the deterministic structural test in tests/unit/openrouter.test.js ('plan-review gate and routing (LIN-1603)'), and the A/B measurement of the gate's marginal effect is scripts/eval-plan-review.mjs. Known from that harness (haiku-4.5, K=4): the gate fires reliably when the plan RECORDS its decision ('plan-review due: yes', which the plan template now instructs) and does not fire when the router must re-derive criteria (a)-(d) from plan prose — so PR-1603-gated-recorded carries the recorded line and PR-1603-gated-rederive deliberately does not, to keep that difference measured rather than assumed. Each target is a childless In-Progress leaf (no children/focusedChild) so the descent terminates on it. runHistory (LIN-3300, optional per bundle): the task's recent runs as Harbour's dispatch record gives them to the stage selector (lib/recent-runs.js, newest 5, oldest first), passed through as context.runs exactly as the live routes pass them. 'recorded' copies a real dispatch history cut to the fixture's snapshot moment (the run that wrote the latest thing the fixture shows included, since a run records its finish seconds after it posts); 'derived' is one done run per stage-written trail item (research notes, plan-review verdicts, planner notes, implementation summaries) at its timestamp, and none for an autopilot record or a person's comment. A bundle with no runHistory has no Harbour runs: the selector decides from the ticket alone.",
   "targets": [
     {
       "id": "PR-1603-gated-recorded",
@@ -104,6 +104,7 @@
       "focusedChild": null
     },
     "PR-1603-verdict-approve": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-22T01:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "pr-1603-verdict-approve-uuid",
         "identifier": "PR-1603-verdict-approve",
@@ -129,6 +130,7 @@
       "focusedChild": null
     },
     "PR-1603-request-changes-1": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-23T01:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "pr-1603-request-changes-1-uuid",
         "identifier": "PR-1603-request-changes-1",
@@ -154,6 +156,7 @@
       "focusedChild": null
     },
     "PR-1603-request-changes-2": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-24T01:00:00.000Z", "outcome": "done"}, {"stage": "plan", "at": "2026-07-24T02:00:00.000Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-07-24T03:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "pr-1603-request-changes-2-uuid",
         "identifier": "PR-1603-request-changes-2",
@@ -189,6 +192,7 @@
       "focusedChild": null
     },
     "PR-1603-request-changes-3": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-24T01:00:00.000Z", "outcome": "done"}, {"stage": "plan", "at": "2026-07-24T02:00:00.000Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-07-24T03:00:00.000Z", "outcome": "done"}, {"stage": "plan", "at": "2026-07-24T04:00:00.000Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-07-24T05:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "pr-1603-request-changes-3-uuid",
         "identifier": "PR-1603-request-changes-3",

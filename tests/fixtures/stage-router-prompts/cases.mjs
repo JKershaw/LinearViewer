@@ -52,7 +52,7 @@ const OPEN_CHILD_NODE = {
     focusedChild: { issue: { id: 'c4', identifier: 'ABC-32', title: 'open one', state: open } }
   }
 };
-// A planned leaf whose plan-review asked for changes, and a person's comment after it.
+// A planned leaf whose plan-review asked for changes, a person's comment after it, and its runs.
 const PLAN_REVIEWED = {
   issue: { id: 'pr', identifier: 'ABC-40', title: 'A planned leaf', description: 'Goal.\n\n## Implementation Plan\n\nRevision 2 — addresses plan-review F1.\n\nSession fit: fits one session.\n\nplan-review due: yes', state: open, labels: [] },
   context: {
@@ -60,7 +60,9 @@ const PLAN_REVIEWED = {
     comments: [
       { user: 'Agent', createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' },
       { user: 'John', createdAt: at(2), body: 'F1 is right; take the narrow revision.' }
-    ]
+    ],
+    // The task's recent runs (LIN-3300): the revision after the verdict is a run.
+    runs: [{ stage: 'plan-review', at: '2026-10-01T10:00:20.000Z', outcome: 'done' }, { stage: 'plan', at: at(3), outcome: 'done' }]
   }
 };
 

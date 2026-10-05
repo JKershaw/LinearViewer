@@ -1,6 +1,6 @@
 {
   "name": "Next-Stage-Choice",
-  "note": "LIN-3309 pass-bar fixtures: real LIN-2950 / LIN-2954 / LIN-3309 trails and the PR-1603 request-changes trail (from plan-review-gate.json), plus the post-verdict states the code-computed PLAN-REVIEW FACTS must route. Identifiers are unique NSC-* slugs so the dense-sweep stub action map cannot collide. Gold is the right route under the frozen precedence: a hold wins at any count, the newest reply wins over an older one, a revision routes to plan-review at any count, count 1-2 -> plan, count 3+ -> blocked unless a go-ahead, and only an Approve resets the count. A reply means a person's reply: planner/autopilot notes are part of the trail, so a revised plan with its planner note routes to plan-review in code; once an implementation has landed (a PR or a code review after the latest verdict) the plan-review verdicts no longer route the task, an Approve included.",
+  "note": "LIN-3309 pass-bar fixtures: real LIN-2950 / LIN-2954 / LIN-3309 trails and the PR-1603 request-changes trail (from plan-review-gate.json), plus the post-verdict states the code-computed PLAN-REVIEW FACTS must route. Identifiers are unique NSC-* slugs so the dense-sweep stub action map cannot collide. Gold is the right route under the frozen precedence: a hold wins at any count, the newest reply wins over an older one, a revision routes to plan-review at any count, count 1-2 -> plan, count 3+ -> blocked unless a go-ahead, and only an Approve resets the count. A reply means a person's reply: planner/autopilot notes are part of the trail, so a revised plan with its planner note routes to plan-review in code; once an implementation has landed (a PR or a code review after the latest verdict) the plan-review verdicts no longer route the task, an Approve included. runHistory (LIN-3300, optional per bundle): the task's recent runs as Harbour's dispatch record gives them to the stage selector (lib/recent-runs.js, newest 5, oldest first), passed through as context.runs exactly as the live routes pass them. 'recorded' copies a real dispatch history cut to the fixture's snapshot moment (the run that wrote the latest thing the fixture shows included, since a run records its finish seconds after it posts); 'derived' is one done run per stage-written trail item (research notes, plan-review verdicts, planner notes, implementation summaries) at its timestamp, and none for an autopilot record or a person's comment. A bundle with no runHistory has no Harbour runs: the selector decides from the ticket alone.",
   "targets": [
     {
       "id": "NSC-LIN-2950-R2",
@@ -125,6 +125,7 @@
   ],
   "bundles": {
     "NSC-LIN-2950-R2": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "research", "at": "2026-10-03T07:53:45.147Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:22:16.979Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T08:40:40.115Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:55:08.748Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-2950-R2",
         "identifier": "NSC-LIN-2950-R2",
@@ -304,6 +305,7 @@
       "focusedChild": null
     },
     "NSC-LIN-2950-GO": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "research", "at": "2026-10-03T07:53:45.147Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:22:16.979Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T08:40:40.115Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:55:08.748Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T09:10:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-2950-GO",
         "identifier": "NSC-LIN-2950-GO",
@@ -417,6 +419,7 @@
       "focusedChild": null
     },
     "NSC-LIN-2950-HOLD": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "research", "at": "2026-10-03T07:53:45.147Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:22:16.979Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T08:40:40.115Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:55:08.748Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T09:10:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-2950-HOLD",
         "identifier": "NSC-LIN-2950-HOLD",
@@ -530,6 +533,7 @@
       "focusedChild": null
     },
     "NSC-LIN-2950-NOTE": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-10-03T08:22:16.979Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T08:40:40.115Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:55:08.748Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T09:10:00.000Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T09:20:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-2950-NOTE",
         "identifier": "NSC-LIN-2950-NOTE",
@@ -642,6 +646,7 @@
       "focusedChild": null
     },
     "NSC-LIN-3309-REVISED": {
+      "runHistory": {"source": "recorded", "runs": [{"stage": "research", "at": "2026-10-04T14:26:42.273Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T14:34:25.926Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-04T14:46:34.964Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T14:51:34.828Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-3309-REVISED",
         "identifier": "NSC-LIN-3309-REVISED",
@@ -681,6 +686,7 @@
       "focusedChild": null
     },
     "NSC-LIN-3309-NOW": {
+      "runHistory": {"source": "recorded", "runs": [{"stage": "research", "at": "2026-10-04T14:26:42.273Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T14:34:25.926Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-04T14:46:34.964Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-3309-NOW",
         "identifier": "NSC-LIN-3309-NOW",
@@ -720,6 +726,7 @@
       "focusedChild": null
     },
     "NSC-PR-1603-RC1-REV": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-23T01:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-PR-1603-RC1-REV",
         "identifier": "NSC-PR-1603-RC1-REV",
@@ -751,6 +758,7 @@
       "focusedChild": null
     },
     "NSC-LIN-2950-GO-REV": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-10-03T08:22:16.979Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T08:40:40.115Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:55:08.748Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T09:10:00.000Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T09:30:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-2950-GO-REV",
         "identifier": "NSC-LIN-2950-GO-REV",
@@ -869,6 +877,7 @@
       "focusedChild": null
     },
     "NSC-PR-1603-RC1-HOLD": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-23T01:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-PR-1603-RC1-HOLD",
         "identifier": "NSC-PR-1603-RC1-HOLD",
@@ -904,6 +913,7 @@
       "focusedChild": null
     },
     "NSC-LIN-2950-LATEST-REPLY": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "research", "at": "2026-10-03T07:53:45.147Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:22:16.979Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-03T08:40:40.115Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-03T08:55:08.748Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-2950-LATEST-REPLY",
         "identifier": "NSC-LIN-2950-LATEST-REPLY",
@@ -1015,6 +1025,7 @@
       "focusedChild": null
     },
     "NSC-PR-1603-RC1-FC-RULING": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-23T01:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-PR-1603-RC1-FC-RULING",
         "identifier": "NSC-PR-1603-RC1-FC-RULING",
@@ -1050,6 +1061,7 @@
       "focusedChild": null
     },
     "NSC-LIN-3309-R2-REV": {
+      "runHistory": {"source": "recorded", "runs": [{"stage": "plan", "at": "2026-10-04T14:34:25.926Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-04T14:46:34.964Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T14:51:34.828Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-04T15:00:27.227Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T15:06:04.033Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-3309-R2-REV",
         "identifier": "NSC-LIN-3309-R2-REV",
@@ -1105,6 +1117,7 @@
       "focusedChild": null
     },
     "NSC-PR-1603-APPROVE-LANDED": {
+      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-22T01:00:00.000Z", "outcome": "done"}, {"stage": "implementation", "at": "2026-07-22T03:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-PR-1603-APPROVE-LANDED",
         "identifier": "NSC-PR-1603-APPROVE-LANDED",
@@ -1141,6 +1154,7 @@
       "focusedChild": null
     },
     "NSC-LIN-3309-LANDED": {
+      "runHistory": {"source": "recorded", "runs": [{"stage": "plan-review", "at": "2026-10-04T14:46:34.964Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T14:51:34.828Z", "outcome": "done"}, {"stage": "plan-review", "at": "2026-10-04T15:00:27.227Z", "outcome": "done"}, {"stage": "plan", "at": "2026-10-04T15:06:04.033Z", "outcome": "done"}, {"stage": "implementation", "at": "2026-10-04T15:56:19.886Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-LIN-3309-LANDED",
         "identifier": "NSC-LIN-3309-LANDED",

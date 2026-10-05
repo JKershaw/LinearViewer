@@ -73,7 +73,7 @@ describe('trail facts (LIN-3300)', () => {
 
   test('TRAIL FACTS names the latest person\'s comment, whether it is a ruling, and whether an agent acted after it', () => {
     const withRuling = formatTrailFactsBlock(assembleTrailFacts([{ createdAt: at(3), body: `Go.\n\n${RULING_MARK}` }], ''), 1);
-    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03, a ruling recorded via Harbour \(shown with the comments\); an agent acted after it \(a note, landed work or a close-out\): no/);
+    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03 10:00, a ruling recorded via Harbour \(shown with the comments\); an agent acted after it \(a note, landed work or a close-out\): no/);
     assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest person's comment[^:]*: none/);
   });
 
@@ -129,7 +129,7 @@ describe('trail facts (LIN-3300)', () => {
     const plan = { createdAt: at(1), body: `**Plan — the migration (technical-planner pass).**\n\n${'x'.repeat(2500)}\n\nSession-fit: does NOT fit one session. 4 sessions.\n\nplan-review due: yes` };
     const facts = assembleTrailFacts([plan], 'Finish it.', { leaf: true });
     assert.deepEqual(facts.plan, { where: 'comment', at: at(1), sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
-    assert.match(formatTrailFactsBlock(facts, 1), /- Implementation plan: in a comment \(2026-10-01\)/);
+    assert.match(formatTrailFactsBlock(facts, 1), /- Implementation plan: in a comment \(2026-10-01 10:00\)/);
     assert.match(formatTrailFactsBlock(facts, 1), /- Session fit stated: needs multiple sessions/);
   });
 
@@ -139,6 +139,7 @@ describe('trail facts (LIN-3300)', () => {
     assert.deepEqual(facts.plan, { where: 'description', at: null, sessionFit: 'needs multiple sessions', planReviewDue: 'yes' });
     assert.doesNotMatch(formatTrailFactsBlock(facts, 0), /revision/i, 'the revision label is not a computed fact');
     assert.equal(assembleTrailFacts([], 'Plan-review due: no — covered by LIN-9.', { leaf: true }).plan.planReviewDue, 'no');
+    assert.equal(assembleTrailFacts([], '**plan-review due:** yes — (b) a routed-around gap', { leaf: true }).plan.planReviewDue, 'yes', 'the bold form reads');
     assert.deepEqual(assembleTrailFacts([], 'Just a goal.', { leaf: true }).plan, { where: null, at: null, sessionFit: null, planReviewDue: null });
     assert.equal(assembleTrailFacts([], description, { leaf: false }).plan, null, 'a node reads session fit from FRONTIER FACTS instead');
   });

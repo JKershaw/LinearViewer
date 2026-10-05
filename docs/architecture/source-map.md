@@ -132,6 +132,7 @@ lib/
   description-edit.js  Pure splice helpers for partial issue-description edits
   trashed-signal.js    Trashed-issue (soft-delete) signal detection (LIN-401)
   recommend-recurse.js Server-side recommendation recursion (defer routing)
+  recent-runs.js       The task's recent runs for the stage selector (LIN-3300): loadRecentRuns reads the dispatch store's queue and history for one issue, recentRuns keeps the newest five stage runs (stage, finish time, outcome), formatRecentRuns renders them; every routed recommend surface passes them as context.runs
   recommendation-facts.js  Deterministic, network-free fact assembly: per-node facts (assembleNodeFacts), the selector's trail facts (assembleTrailFacts, condensePlan), the plan-review facts and the review loop bound (reviewLoopExhausted), and who wrote a comment (isAgentNote, isRuling, isPersonComment)
   session-store.js     MongoDB/MangoDB session store
   session-options.js   The express-session options factory, shared by server.js and the real-session email tests (LIN-1892)

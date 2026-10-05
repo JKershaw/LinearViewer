@@ -173,7 +173,15 @@ const waitFor = async (predicate, ms = 2000) => {
 
 // ── Proxy app ───────────────────────────────────────────────────────────────
 
-function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier = { count: 0, allowed: true }, addItem, events = [] } = {}) {
+/** A dispatch store holding finished runs per issue (LIN-3300: the selector reads them). */
+function runStore(rows) {
+  return {
+    listItems: async () => [],
+    listHistory: async (urlKey, { issueIdentifier }) => ({ items: rows.filter(r => r.issueIdentifier === issueIdentifier) })
+  };
+}
+
+function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier = { count: 0, allowed: true }, addItem, events = [], runRows = [] } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createProxyRoutes({
@@ -189,7 +197,8 @@ function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier 
     recapCacheStore: { get: async () => null, set: async () => {} },
     briefCacheStore: { get: async () => null, set: async () => {} },
     dispatchQueueStore: {
-      addItem: addItem || (async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item }))
+      addItem: addItem || (async (urlKey, item) => ({ _id: 'disp-1', dispatchedAt: '2026-06-28T00:00:00.000Z', ...item })),
+      ...runStore(runRows)
     },
     workspaceFromUrl: (req, res, next) => next(),
     workspacePreferencesStore: { getWorkspacePreferences: async (urlKey) => (urlKey === 'acme' ? { features } : {}) },
@@ -204,7 +213,7 @@ function buildProxyApp({ features = {}, openRouterKey = 'sk-test-key', freeTier 
 
 // ── Workspace (UI) app ──────────────────────────────────────────────────────
 
-function buildUiApp({ features = {}, sessionKey = 'sk-test', freeTier = { count: 0, allowed: true }, responses = [] } = {}) {
+function buildUiApp({ features = {}, sessionKey = 'sk-test', freeTier = { count: 0, allowed: true }, responses = [], runRows = [] } = {}) {
   const app = express();
   app.use(express.json());
   // The UI routes keep no event log: a test reads the status a route set on its
@@ -225,7 +234,8 @@ function buildUiApp({ features = {}, sessionKey = 'sk-test', freeTier = { count:
     briefCacheStore: {},
     reportHistoryStore: {},
     agentStatusStore: {},
-    promptTraceStore: {}
+    promptTraceStore: {},
+    dispatchQueueStore: runStore(runRows)
   }));
   return app;
 }
@@ -341,6 +351,32 @@ describe('routed surfaces: one routing call, then code assembles the stage promp
 });
 
 // ── Pinned surfaces ─────────────────────────────────────────────────────────
+
+describe('every routed surface gives the selector the task\'s recent runs (LIN-3300)', () => {
+  const planRun = (issue) => ({ issueIdentifier: issue.identifier, kind: 'plan', status: 'taken', feedback: [{ message: '[done] ok', timestamp: '2026-10-04T14:51:34.000Z' }] });
+  const RUN_LINE = '  - plan: done, 2026-10-04 14:51';
+
+  test('UI buffered GET, UI stream (leaf and each descent hop) and proxy GET recommend', async () => {
+    const rows = [planRun(LEAF), planRun(PARENT), planRun(CHILD)];
+    for (const [label, app, path] of [
+      ['UI buffered', buildUiApp({ runRows: rows }), `/workspace/acme/api/recommend/${LEAF.id}`],
+      ['UI stream leaf', buildUiApp({ runRows: rows }), `/workspace/acme/api/recommend/${LEAF.id}/stream`],
+      ['UI stream descent', buildUiApp({ runRows: rows }), `/workspace/acme/api/recommend/${PARENT.id}/stream`],
+      ['proxy GET', buildProxyApp({ runRows: rows }), `/api/proxy/issues/${LEAF.id}/recommend`]
+    ]) {
+      const calls = capture();
+      await request(app, path);
+      assert.ok(calls.length > 0, label);
+      for (const c of calls) assert.ok(c.content.includes(RUN_LINE), `${label}: every routing call carries the run`);
+    }
+  });
+
+  test('no runs, no list', async () => {
+    const calls = capture();
+    await request(buildUiApp(), `/workspace/acme/api/recommend/${LEAF.id}`);
+    assert.ok(!calls[0].content.includes('Recent runs'));
+  });
+});
 
 describe('pinned surfaces: no model call, no charge, generatePrompt byte for byte', () => {
   const free = (fn) => withEnv({ OPENROUTER_API_KEY: null, OPENROUTER_FREE_TIER_KEY: 'sk-free' }, fn);

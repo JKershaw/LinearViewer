@@ -61,7 +61,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 121218, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority. LIN-3300: +601, six stage rules moved in from the deleted meta-prompt; then -4378, each stage's route (when / when not / requires) replaces its aiHint
+  'lib/prompt-template-defs.js': 121192, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority. LIN-3300: +601, six stage rules moved in from the deleted meta-prompt; then -4404, each stage's route (when / when not / requires) replaces its aiHint
   'lib/prompt-templates.js': 19935, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority. LIN-3300: -455, formatStageOptions and defer's entry replace the aiHint formatter
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3424,
@@ -104,15 +104,15 @@ export const TEMPLATES_RENDERED_CEILINGS = {
  * the selector; the stage options it lists are each stage's `route`, counted in the
  * template defs.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 8125;
+export const STAGE_ROUTER_SOURCE_CEILING = 8115;
 /**
  * The routing prompt, rendered bytes for the eval baseline's leaf (a leaf with no
  * comments and no plan, its view a placeholder). LIN-3300: the meta-prompt's rendered
  * ceiling (103308) became the routing half's (40687) when the full path went; the stage
- * selector sends 9559. It also catches growth in the stage options and the facts code
+ * selector sends 9555. It also catches growth in the stage options and the facts code
  * renders (lib/recommendation-facts.js), which no source ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9559;
+export const ROUTER_PROMPT_RENDERED_CEILING = 9555;
 
 /**
  * Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js).
@@ -138,11 +138,11 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * (575524 before), so there is no slack. That includes +960 for the six stage rules
  * the meta-prompt alone carried, moved into their templates in the same change.
  *
- * LIN-3300's stage selector lowered it again (437765 -> 365034): the selector's rules,
+ * LIN-3300's stage selector lowered it again (437765 -> 364994): the selector's rules,
  * stage options and facts replace the decision tree and the aiHints, and the planner no
  * longer carries the loop bound. Every ceiling sits at its surface's size.
  */
-export const FROZEN_TOTAL_BYTES = 365034;
+export const FROZEN_TOTAL_BYTES = 364994;
 
 const BASE_URL = 'https://harbour.example';
 
