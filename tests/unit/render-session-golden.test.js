@@ -18,7 +18,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { renderSessionPage } from '../../lib/render-session.js';
+import { renderSessionPage, renderPrLine } from '../../lib/render-session.js';
+import { prStateCopy } from '../../lib/pr-state-copy.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(__dirname, '../fixtures/render-session-golden.json');
@@ -266,5 +267,39 @@ describe('render-session golden pin (LIN-3311, owner page byte-identity)', () =>
 
   test('rendering is deterministic (same input twice → same bytes)', () => {
     for (const name of Object.keys(CASES)) assert.equal(renderCase(name), renderCase(name), name);
+  });
+});
+
+// The extracted `renderPrLine` must reproduce the PR line the pre-change page
+// emitted inline, for every branch the golden cases cover: the neutral
+// "checking" copy (live and ended), each known state's copy, and hostile ids.
+describe('renderPrLine owner identity (LIN-3311)', () => {
+  const golden = existsSync(GOLDEN_PATH) ? JSON.parse(readFileSync(GOLDEN_PATH, 'utf8')) : {};
+  const prLineOf = html => {
+    const m = /<div class="sess-pr-state"[\s\S]*?<\/div>/.exec(html);
+    return m ? m[0] : null;
+  };
+  const pollUrl = (urlKey, sessionId) => `/workspace/${encodeURIComponent(urlKey)}/api/run/${encodeURIComponent(sessionId)}/pr-state`;
+
+  const ROWS = [
+    ['running-no-pr-state', { text: 'Checking for a pull request…', pollUrl: pollUrl('ws-a', 'sess-abc'), live: true }],
+    ['plain-terminal', { text: 'Checking for a pull request…', pollUrl: pollUrl('ws-a', 'sess-abc'), live: false }],
+    ['pr-state-open', { text: prStateCopy({ state: 'open', number: 12, checks: 'passing' }), pollUrl: pollUrl('ws-a', 'sess-abc'), live: false }],
+    ['pr-state-merged', { text: prStateCopy({ state: 'merged', number: 12, checks: null }), pollUrl: pollUrl('ws-a', 'sess-abc'), live: false }],
+    ['pr-state-unknown', { text: prStateCopy({ state: 'unknown', number: null, checks: null }), pollUrl: pollUrl('ws-a', 'sess-abc'), live: false }],
+    ['pr-state-none', { text: prStateCopy({ state: 'none', number: null, checks: null }), pollUrl: pollUrl('ws-a', 'sess-abc'), live: false }],
+    ['pr-line-hostile-ids', { text: 'Checking for a pull request…', pollUrl: pollUrl('ws "a"&<b>', 'sess/<x>&"y"'), live: true }],
+  ];
+
+  for (const [name, args] of ROWS) {
+    test(`renderPrLine reproduces the golden PR line: ${name}`, () => {
+      const expected = prLineOf(golden[name]);
+      assert.ok(expected, `golden ${name} has a PR line`);
+      assert.equal(renderPrLine(args), expected);
+    });
+  }
+
+  test('the not-found body has no PR line', () => {
+    assert.equal(prLineOf(golden['not-found']), null);
   });
 });
