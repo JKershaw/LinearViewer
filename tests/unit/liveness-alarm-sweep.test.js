@@ -235,9 +235,13 @@ describe('liveness-alarm-sweep: tick simulator', () => {
         feedback: [{ message: '[pending] I am waiting on the orchestrator to dispatch a beat', timestamp: '2026-10-02T10:06:00.000Z' }]
       },
       {
-        id: answer, kind: 'implementation', status: 'done', sessionId: null, followUpTo: child, issueIdentifier: 'LIN-1',
+        id: answer, kind: 'wake', status: 'done', sessionId: null, followUpTo: parent, issueIdentifier: 'LIN-1',
         dispatchedAt: '2026-10-02T10:45:00.000Z',
-        feedback: [{ message: '[done] the wait was answered by a landed step', timestamp: '2026-10-02T10:45:00.000Z' }]
+        // Rule (b): this must WAKE the parent's lineage (an answered wait is no
+        // longer a wait). A `[done]` follow-up on the CHILD would instead read
+        // as the child's terminal, which — because the parent's wait predates
+        // it — is a genuine lost wake and would (correctly) open an orphan.
+        feedback: []
       }
     ];
     const { nowRef, deps } = makeHarness({
@@ -655,9 +659,64 @@ describe('liveness-alarm-sweep: tick simulator', () => {
     assert.equal(d2.length, 1, `the leaf going terminal must not mint a second record, got ${JSON.stringify(d2.map((x) => x._id))}`);
     assert.equal(d2[0]._id, openedId);
     assert.equal(d2[0].clearedAt, null, 'a terminal leaf is the lost-wake case, not a clear');
-    // The waiter still parked on the terminal leaf is not re-detected, so it
-    // accrues a miss but is not structurally resolved.
-    assert.equal(d2[0].missCount, 1);
+    // Rule (b): the terminal leaf is still a dead leaf (the wait began before it
+    // terminated), so the incident is RE-DETECTED every tick and confirmed —
+    // never missed. Extend past CLEAR_CONFIRM_TICKS to prove it never clears.
+    assert.equal(d2[0].missCount, 0, 'a re-detected terminal-leaf orphan is confirmed, not missed');
+
+    for (const iso of ['2026-10-02T10:50:00.000Z', '2026-10-02T11:00:00.000Z']) {
+      nowRef.value = Date.parse(iso);
+      await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+      d2 = await d2All();
+      assert.equal(d2.length, 1, `still one record at ${iso}`);
+      assert.equal(d2[0]._id, openedId, `same record at ${iso}`);
+      assert.equal(d2[0].clearedAt, null, `still open past CLEAR_CONFIRM_TICKS at ${iso}`);
+      assert.equal(d2[0].missCount, 0, `never missed at ${iso}`);
+    }
+  });
+
+  test('N14 (M5): an orphan whose dead leaf is REVIVED clears immediately on that tick', async () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000151';
+    const c = 'cccccccc-0000-0000-0000-000000000153';
+    const revive = 'cccccccc-0000-0000-0000-000000000154';
+    const rows = [
+      {
+        id: a, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-21',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: `[pending] waiting on the dead worker dispatch ${c}`, timestamp: '2026-10-02T09:55:00.000Z' }]
+      },
+      {
+        id: c, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: null, issueIdentifier: 'LIN-22',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [{ message: '[working] last moved long ago', timestamp: '2026-10-02T09:10:00.000Z' }]
+      },
+      {
+        // A new row on the leaf's lineage, dispatched after `startedAt` and with
+        // a fresh heartbeat, so the leaf reads active: the incident is no longer
+        // detected, and the revived leaf clears it immediately rather than
+        // accruing a miss. Removing the leaf-revived clear leaves missCount 1.
+        id: revive, kind: 'implementation', status: 'taken', sessionId: null, followUpTo: c, issueIdentifier: 'LIN-22',
+        dispatchedAt: '2026-10-02T10:35:00.000Z',
+        feedback: [{ message: '[working] revived heartbeat', timestamp: '2026-10-02T10:35:00.000Z' }]
+      }
+    ];
+    const { nowRef, deps } = makeHarness({ rows, lastSeen: (t) => new Date(t - 60_000).toISOString() });
+    deps.alarmStore = alarmStore;
+    const d2All = () => alarmStore.list(URL_KEY, { state: 'all' }).then((a) => a.filter((x) => x.rule === 'stopped-or-circular-wait'));
+
+    nowRef.value = Date.parse('2026-10-02T10:30:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    let d2 = await d2All();
+    assert.equal(d2.length, 1, `orphan opens on the stopped leaf, got ${JSON.stringify(d2.map((x) => x._id))}`);
+    const openedId = d2[0]._id;
+    assert.equal(d2[0].clearedAt, null);
+
+    nowRef.value = Date.parse('2026-10-02T10:40:00.000Z');
+    await sweepOneWorkspace(URL_KEY, nowRef.value, deps);
+    d2 = await d2All();
+    assert.equal(d2.length, 1);
+    assert.equal(d2[0]._id, openedId);
+    assert.ok(d2[0].clearedAt, 'a revived leaf clears the orphan immediately, not after 2 misses');
   });
 
   test('every recorded waiter answered clears the orphan on the tick (the answered waiter is not lean-selected)', async () => {

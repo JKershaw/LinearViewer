@@ -370,7 +370,32 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     assert.ok(!chains[0].members.includes(liveSameTicket));
   });
 
-  test('RC6: a wait on a DIFFERENT ticket whose only lineage stopped is an orphan, not a cover', () => {
+  test('RC12 (rule b): a wait on a DIFFERENT ticket whose only lineage TERMINATED after the wait is an orphan (a lost wake), not a cover', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000050';
+    const doneTicket = 'c0c0c0c0-0000-0000-0000-000000000051';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        issueIdentifier: 'LIN-100',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[pending] waiting on the LIN-200 landed session to finish', '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    // The lineage is `done`, and it finished AFTER the wait began: a lost wake.
+    // Rule (b) makes it a dead leaf. (At head this covered and the fixture was
+    // edited to `null` to hide the regression.)
+    const lineageInfo = mapOf([
+      [doneTicket, { loopId: doneTicket, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:55:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:00:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1);
+    assert.equal(chains[0].shape, 'orphan');
+    assert.deepEqual(chains[0].members, ['ticket:LIN-200']);
+    assert.equal(chains[0].startedAt, '2026-10-02T09:55:00.000Z');
+  });
+
+  test('RC6/RC12: a wait on a DIFFERENT ticket whose only lineage STOPPED is an orphan, not a cover', () => {
     const a = 'aaaaaaaa-0000-0000-0000-000000000050';
     const stoppedTicket = 'c0c0c0c0-0000-0000-0000-000000000051';
     const rowsByLineage = mapOf([
@@ -388,6 +413,54 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
     assert.equal(chains.length, 1);
     assert.equal(chains[0].shape, 'orphan');
+  });
+
+  test('RC12 (rule b): a wait on a ticket that TERMINATED before the wait began is context and is covered', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000050';
+    const doneTicket = 'c0c0c0c0-0000-0000-0000-000000000051';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        issueIdentifier: 'LIN-100',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[pending] waiting on the LIN-200 landed session to finish', '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    // Done at 09:10, BEFORE the 09:50 wait: the id is context, not a target, so
+    // the edge is dropped and the waiter is covered — it neither covers nor fires.
+    const lineageInfo = mapOf([
+      [doneTicket, { loopId: doneTicket, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:00:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 0, `a pre-wait terminal is context, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+  });
+
+  test('N14 (M6): the onset is the FIRST [pending] of the run, not the latest hourly re-post', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-000000000090';
+    const c = 'cccccccc-0000-0000-0000-000000000091';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        // The LIN-3238 close-out shape: an hourly re-post of the same wait. The
+        // run is unbroken, so onset stays the first post.
+        feedback: [
+          feedback(`[pending] waiting on the dead worker dispatch ${c}`, '2026-10-02T09:50:00.000Z'),
+          feedback(`[pending] waiting on the dead worker dispatch ${c}`, '2026-10-02T10:50:00.000Z')
+        ]
+      })]],
+      [c, [row({
+        id: c,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[working] last moved long ago', '2026-10-02T09:10:00.000Z')]
+      })]]
+    ]);
+    const now = Date.parse('2026-10-02T11:00:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage });
+    assert.equal(chains.length, 1);
+    assert.equal(chains[0].shape, 'orphan');
+    assert.equal(chains[0].startedAt, '2026-10-02T09:50:00.000Z', 'onset is the run start, not the latest re-post');
   });
 
   test('RC8 (M12): an answered follow-up that is not a queued wake covers the chain', () => {
