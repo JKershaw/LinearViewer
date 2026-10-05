@@ -262,6 +262,38 @@ export function sessionIsTerminal(session) {
 }
 
 /**
+ * Per-loop terminal state plus the "settled" verdict (LIN-3311, S2a of
+ * LIN-2950; plan-review R4). Stricter than `sessionIsTerminal`: an ANCHORED
+ * session is terminal once its anchor is, even while a reply or proposal
+ * Apply runs a follow-up loop; it is SETTLED only when the anchor rule holds
+ * AND every loop is terminal.
+ *
+ *   settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(terminal)
+ *
+ * Each loop's `terminal` is the SAME private `loopIsTerminal` (`enrichLoop` →
+ * `effectiveAgentState`, so a markerless `complete`/`error` loop counts) that
+ * `sessionIsTerminal` uses — not the marker-only `gateFacts` view of the run
+ * paragraph module, which is deliberately left alone (LIN-3253). The
+ * returned `loops` array is the one the check counted, so a key built from it
+ * (LIN-2950's `settledKey`) agrees with the verdict by construction. A loop
+ * that never ends means "never settles", the safe direction.
+ *
+ * @param {Object} session - a reconstructed session (lean or non-lean)
+ * @returns {{ settled: boolean, loops: Array<{ loopId: (string|null), terminal: boolean }> }}
+ */
+export function sessionSettleState(session) {
+  const raw = Array.isArray(session?.loops) ? session.loops : [];
+  const loops = raw.map(loop => ({ loopId: loop.loopId ?? null, terminal: loopIsTerminal(loop) }));
+  const settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(l => l.terminal);
+  return { settled, loops };
+}
+
+/** The settled verdict alone; defined from `sessionSettleState`, never beside it. */
+export function sessionIsSettled(session) {
+  return sessionSettleState(session).settled;
+}
+
+/**
  * Is this a STANDALONE session — a single user-dispatched cli/web prompt that
  * `_buildSessions` pass 3 synthesized into its own single-loop session (LIN-1194)?
  *
@@ -1318,18 +1350,14 @@ export function createDashboardRoutes({
         return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
       }
 
-      // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
-      // `feedback[]`, but scoped to this session's issues, not the whole workspace.
-      const session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
-      if (!session) {
+      // The local half (LIN-3311): session, issue context, run view, stored
+      // paragraph — Mongo only, no request input. Everything below that reads
+      // `req` or is owner-only stays in this route.
+      const local = await loadRunLocal(workspace.urlKey, sessionId);
+      if (!local) {
         return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
       }
-
-      // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
-      // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
-      // loops cannot be cache-joined and are skipped best-effort (mirrors the
-      // lazy-hydration discipline). Never call the generating path on load.
-      const issueContext = await joinSessionIssueContext(session, workspace.urlKey);
+      const { session, issueContext, anchorLoop, anchorIssueTitle, runView, runParagraph } = local;
 
       // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
       // observation feed uses, computed here over the non-lean session's enriched
@@ -1372,10 +1400,8 @@ export function createDashboardRoutes({
       // rejects followUpTo for those anyway). Each run's own box replies via its
       // own `loop.target`, so the session-wide target no longer needs deriving
       // here — only the gate (from the anchor run) is still needed.
-      const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
-      const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
 
       // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
       // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
@@ -1384,9 +1410,6 @@ export function createDashboardRoutes({
       // per LIN-1585). The verdict itself is Beat 1's, computed inside
       // `listCredentialHealth`; nothing here re-derives it.
       const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
-
-      // The run view model is built ONCE here (the renderer only formats it).
-      const runView = buildRunView(session, { now: new Date() });
 
       // LIN-3254: the run's proposals, newest-first. Empty when the feature's
       // store is unwired; never a page-load failure.
@@ -1401,20 +1424,16 @@ export function createDashboardRoutes({
       // a broken page. The run's `stopAt`/variant come off its own dispatch row
       // (P1a/P1b): a standard run's box carries the seam-guard promise, a
       // stepped run's does not (N2).
+      //
+      // `runFacts` (a dispatch-row read) and `runnerReady` (a session feature
+      // flag) are owner inputs read here and handed to the external half.
       const runFacts = await readRunFacts(dispatchQueueStore, workspace.urlKey, session.seedIssue);
-      const runEvidence = (readRunEvidenceFn && session.seedIssue)
-        ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle, {
-          stopAt: runFacts.stopAt,
-          variant: runFacts.variant,
-          runnerReady: getFeatureFlags(req.session).dispatch === true,
-        })
-        : null;
-
-      // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
-      // generation. A miss — or an unwired store — renders nothing.
-      const runParagraph = runParagraphStore
-        ? ((await runParagraphStore.get(workspace.urlKey, sessionId))?.paragraph || null)
-        : null;
+      const runEvidence = await readRunExternal(workspace, session, {
+        asked: anchorIssueTitle,
+        viewerIsOwner: true,
+        runFacts,
+        runnerReady: getFeatureFlags(req.session).dispatch === true,
+      });
 
       // Bare-BLOCKED card inputs (LIN-3252 S2.7): the waiting producer loop
       // carries the reply target/issue the follow-up must resume and the latest
@@ -1626,36 +1645,102 @@ export function createDashboardRoutes({
   }
 
   /**
-   * Build the run-evidence model for the session page (LIN-3247). The provider
-   * read is delegated to the injected `readRunEvidence` (lib/run-evidence.js)
-   * so the page route stays free of the reader's internals and tests can skip
-   * it. Fail-open: any error renders no evidence, never a broken page.
+   * The run page's LOCAL half (LIN-3311, S2a of LIN-2950): everything the page
+   * model needs that is Mongo-only and request-free — the NON-lean session
+   * (LIN-1021 point-read), the brief/recap cache-join, the anchor loop and its
+   * title, the run view, and the stored run paragraph. No tracker or GitHub
+   * read, no `req`, no owner-only input, so a non-request caller (LIN-2950's
+   * share reader) can run it as its cheap local probe.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @param {{ now?: Date|string|number }} [opts] - the run view's clock
+   * @returns {Promise<null|{ session: Object, issueContext: Array, anchorLoop: (Object|null), anchorIssueTitle: (string|null), runView: Object, paragraph: (Object|null), runParagraph: (string|null) }>}
+   *   null when the session is gone; `paragraph` is the stored record
+   *   (`{ paragraph, inputHash, final, … }`), `runParagraph` its text.
+   */
+  async function loadRunLocal(urlKey, sessionId, { now = new Date() } = {}) {
+    // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
+    // `feedback[]`, but scoped to this session's issues, not the whole workspace.
+    const session = await loadSessionWithTranscript(urlKey, sessionId);
+    if (!session) return null;
+
+    // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
+    // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
+    // loops cannot be cache-joined and are skipped best-effort (mirrors the
+    // lazy-hydration discipline). Never call the generating path on load.
+    const issueContext = await joinSessionIssueContext(session, urlKey);
+
+    const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
+    const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
+
+    // The run view model is built ONCE here (the renderer only formats it).
+    const runView = buildRunView(session, { now });
+
+    // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
+    // generation. A miss — or an unwired store — renders nothing.
+    const paragraph = runParagraphStore
+      ? ((await runParagraphStore.get(urlKey, sessionId)) || null)
+      : null;
+
+    return { session, issueContext, anchorLoop, anchorIssueTitle, runView, paragraph, runParagraph: paragraph?.paragraph || null };
+  }
+
+  /**
+   * The run page's EXTERNAL half (LIN-3311, S2a; was LIN-3247's
+   * `readSessionRunEvidence`): the tracker evidence and the PR state the
+   * evidence model folds in, through the injected `readRunEvidence`
+   * (lib/run-evidence.js) so the route stays free of the reader's internals and
+   * tests can skip it. Skipped (null) when the reader is unwired or the run has
+   * no seed issue; fail-open: any error renders no evidence, never a broken page.
    *
    * `[evidence]` telemetry URLs from the session's runs are passed as the
    * corroborating source only — the reader never lets them be the sole PR-URL
    * source (S1).
    *
-   * @param {Function} reader
+   * Owner-only inputs come in as arguments, never read here: `viewerIsOwner`
+   * (default false), the dispatch-row `runFacts` and the `runnerReady` flag.
+   * Omitted, they take the guest-safe defaults (`stopAt: null`,
+   * `variant: 'unknown'`, not ready). `allowlist`/`readPrStatus` are passed to
+   * the reader only when given (e.g. from the shared PR-state store).
+   *
    * @param {Object} workspace
    * @param {Object} session
-   * @param {string|null} anchorIssueTitle
+   * @param {Object} [opts]
+   * @param {string|null} [opts.asked] - the "asked" line (the anchor title); falls back to the seed
+   * @param {boolean} [opts.viewerIsOwner=false]
+   * @param {{ stopAt?: ('pr'|null), variant?: string }|null} [opts.runFacts]
+   * @param {boolean} [opts.runnerReady=false]
+   * @param {Set<string>} [opts.allowlist]
+   * @param {Function} [opts.readPrStatus]
    * @returns {Promise<Object|null>}
    */
-  async function readSessionRunEvidence(reader, workspace, session, anchorIssueTitle, facts = {}) {
+  async function readRunExternal(workspace, session, {
+    asked = null,
+    viewerIsOwner = false,
+    runFacts = null,
+    runnerReady = false,
+    allowlist = null,
+    readPrStatus = null
+  } = {}) {
+    if (!readRunEvidenceFn || !session || !session.seedIssue) return null;
+    const facts = runFacts || {};
     try {
       const evidenceUrls = collectRunEvidenceUrls(session);
       const { provider, callScope } = resolveIssueBinding(workspace, null);
-      return await reader({
+      return await readRunEvidenceFn({
         issueIdentifier: session.seedIssue,
         provider,
         callScope,
-        viewerIsOwner: true,
+        viewerIsOwner: !!viewerIsOwner,
         evidenceUrls,
-        asked: anchorIssueTitle || session.seedIssue,
+        asked: asked || session.seedIssue,
         urlKey: workspace.urlKey,
         stopAt: facts.stopAt || null,
         variant: facts.variant || 'unknown',
-        runnerReady: !!facts.runnerReady,
+        runnerReady: !!runnerReady,
+        ...(allowlist ? { allowlist } : {}),
+        ...(readPrStatus ? { readPrStatus } : {}),
       });
     } catch (err) {
       console.error('Session page run-evidence read failed:', err.message);
@@ -3073,6 +3158,12 @@ export function createDashboardRoutes({
       res.json({ hydrated: false, reason: /not found/i.test(error?.message) ? 'not_found' : 'unavailable' });
     }
   });
+
+  // The run page's two request-free halves (LIN-3311, S2a of LIN-2950), so a
+  // caller outside this router (LIN-2950 Phase 3's share reader, wired in
+  // server.js) builds a run model through the SAME code as the owner page
+  // instead of a fork. Neither carries an owner-only or request-coupled input.
+  router.runLoader = { loadRunLocal, readRunExternal };
 
   return router;
 }
