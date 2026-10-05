@@ -52,7 +52,10 @@ test.describe('Periodicals group', () => {
     await expect(page.locator('.project-header:has-text("Project Alpha")')).toBeVisible();
   });
 
-  test('flag ON: distinct Periodicals group with a dispatchable Documentation Review row', async ({ page, localWorkerUrlKey }) => {
+  test('flag ON: distinct Periodicals group with a dispatchable Documentation Review row', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Proxy explicitly off: this case is about the plain-Mint row only (LIN-2944
+    // P3 made proxy default on, which would add the +Autopilot variant).
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -99,7 +102,9 @@ test.describe('Periodicals group', () => {
   // null fields and never passed `issueless: true`. The earlier test only asserts
   // the row *renders* a dispatch container — it never clicks dispatch, which is
   // why this regression slipped through. This test drives the real click path.
-  test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page, localWorkerUrlKey }) => {
+  test('flag ON: clicking dispatch on a Periodical actually queues it', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Proxy explicitly off so the plain-Mint disclosure is unambiguous (LIN-2944 P3).
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');
@@ -138,8 +143,9 @@ test.describe('Periodicals group', () => {
   // required for the group to render) AND the per-user `proxy` flag (its tail calls
   // the workspace-API kickoff endpoint, so it needs a proxy token). It must show
   // ONLY when both are on.
-  test('proxy flag OFF: periodical row shows plain Mint only, no Mint + Autopilot', async ({ page, localWorkerUrlKey }) => {
-    // beforeEach seeded the session WITHOUT the proxy feature.
+  test('proxy flag OFF: periodical row shows plain Mint only, no Mint + Autopilot', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    // Proxy explicitly off (LIN-2944 P3 made it default on).
+    await seedLocal(workspaceApiLocalSeed, { features: { proxy: false } });
     await setPeriodicalsFlag(page, localWorkerUrlKey, true);
     await page.goto(`/workspace/${localWorkerUrlKey}/`);
     await page.waitForLoadState('networkidle');

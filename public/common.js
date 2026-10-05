@@ -1859,15 +1859,17 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  * loaded on every authenticated surface (tree, dispatch, swipe, …).
  *
  * State model:
- *  - The toggle's on/off lives in a single localStorage key.
- *  - The *rendered* active look is driven by a `data-proxy-active` attribute on
+ *  - The toggle's on/off is the account's durable `prefs.proxyDefault`, emitted
+ *    by the server as `data-proxy-active` on <body> (LIN-2944 P3). Unset means
+ *    on. There is no localStorage key (addendum 15).
+ *  - The *rendered* active look is driven by that `data-proxy-active` attribute on
  *    <body> + CSS, NOT a per-button class — so buttons injected after load
  *    (lazy issue-detail blocks, swipe re-renders) inherit it automatically and
  *    can't "miss the restore" (LIN-525 #1).
  *  - The proxy feature flag is per-user/per-workspace and known only to the
  *    server; the page shell emits it as `data-proxy-feature` on <body>. When it
  *    is absent/off the toggle is inert — no block appended, no token minted —
- *    even if the global toggle key is on from a flag-on workspace (LIN-525 #2).
+ *    even if the account's proxy default is on (LIN-525 #2).
  *  - Bootstrap tokens are single-use (LIN-376): each is spent by the agent's
  *    one exchange at `POST /api/proxy/token`. They are therefore minted FRESH on
  *    every append and never cached — caching one and serving it to a later
@@ -1879,14 +1881,12 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
  * @global
  */
 window.ProxyToggle = (function () {
-  const TOGGLE_KEY = 'proxy-toggle-active';
-
+  // The active state is emitted SERVER-SIDE as `data-proxy-active` on <body>
+  // from the account's durable preference (LIN-2944 P3). Unset means on. There is
+  // no localStorage key and no client-side fallback (addendum 15/16): a session
+  // the server has not stamped yet reads as off until the next page render.
   function isActive() {
-    try {
-      return localStorage.getItem(TOGGLE_KEY) === 'true';
-    } catch {
-      return false;
-    }
+    return !!(document.body && document.body.dataset.proxyActive === 'true');
   }
 
   // The server-emitted proxy feature flag for the current workspace/user.
@@ -1894,19 +1894,43 @@ window.ProxyToggle = (function () {
     return document.body && document.body.dataset.proxyFeature === 'true';
   }
 
-  // Mirror the persisted toggle onto <body> so CSS styles every (current AND
-  // future-injected) +proxy button without per-button bookkeeping.
-  function syncBodyState() {
-    if (document.body) document.body.dataset.proxyActive = isActive() ? 'true' : 'false';
+  // LIN-2944 P3 R1: when the toggle-path mint is refused with 429, the append
+  // skips (the copy/download still completes without the block) and this
+  // one-shot flag tells the caller to show the notice. Consumed by the caller.
+  const RATE_LIMIT_SKIP_NOTICE = 'The agent-access link was skipped — the token limit was reached (60 per 15 minutes per account). Try again in a few minutes.';
+  let rateLimitSkip = false;
+  function takeRateLimitNotice() {
+    const v = rateLimitSkip;
+    rateLimitSkip = false;
+    return v;
   }
 
+  // The workspace key this page is scoped to, parsed from the path. `null` on
+  // non-workspace surfaces (landing), where the write route does not apply.
+  function currentUrlKey() {
+    const pathname = (window.location && window.location.pathname) || '';
+    const m = pathname.match(/^\/workspace\/([^/]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  // Flip the rendered state optimistically (the dataset drives body[data-proxy-
+  // active] CSS and every +proxy button), then persist fire-and-forget to the
+  // preference route. A failed write self-corrects on the next page load.
   function setActive(active) {
+    const next = active === true;
+    if (document.body) document.body.dataset.proxyActive = next ? 'true' : 'false';
+    const urlKey = currentUrlKey();
+    if (!urlKey) return;
     try {
-      localStorage.setItem(TOGGLE_KEY, active ? 'true' : 'false');
+      window.api(`/workspace/${encodeURIComponent(urlKey)}/settings/proxy-default`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ proxyDefault: next }),
+        on401: false
+      }).catch(() => {});
     } catch {
-      // ignore persistence failures (private mode etc.)
+      // ignore: the optimistic flip is the user-visible truth until reload
     }
-    syncBodyState();
   }
 
   /**
@@ -1938,8 +1962,9 @@ window.ProxyToggle = (function () {
     const purpose = opts && opts.purpose;
     if (purpose === 'driver') return getDriverCopyToken(urlKey);
     if (!urlKey) return { token: null, providerDisplayName: null };
+    let data;
     try {
-      const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
+      data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/proxy/tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // LIN-376: single-use bootstrap embedded in the appended block; the agent
@@ -1947,13 +1972,17 @@ window.ProxyToggle = (function () {
         body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }),
         on401: false
       });
-      return {
-        token: (data && data.token) || null,
-        providerDisplayName: (data && data.providerDisplayName) || null
-      };
-    } catch {
-      return { token: null, providerDisplayName: null };
+    } catch (err) {
+      // LIN-2944 P3 R1: distinguish the token-creation rate limit (429) from every
+      // other mint failure. A 429 makes the toggle-path append SKIP (the copy
+      // still completes without the agent-access block, with a visible notice);
+      // any other failure keeps the "surface, don't drop" throw in maybeAppend.
+      return { token: null, providerDisplayName: null, rateLimited: !!(err && err.status === 429) };
     }
+    return {
+      token: (data && data.token) || null,
+      providerDisplayName: (data && data.providerDisplayName) || null
+    };
   }
 
   /**
@@ -2126,6 +2155,12 @@ window.ProxyToggle = (function () {
    * (`purpose: 'driver'`, which holds the dispatch grant) and, if that is
    * refused, throws the mapped `DRIVER_COPY_ERROR_COPY` text — there is no
    * grant-less fallback. The unforced (toggle) path is unchanged.
+   *
+   * LIN-2944 P3 R1: the unforced toggle path treats a 429 (the default-copy
+   * per-account token limiter, 60/15min) as a SKIP, not a failure — the prompt
+   * is returned unchanged so the copy/download completes, and
+   * `takeRateLimitNotice()` reports the skip so the caller can name it. Every
+   * other mint failure still throws.
    * @param {string} text
    * @param {string} urlKey
    * @param {{ force?: boolean }} [opts]
@@ -2133,15 +2168,30 @@ window.ProxyToggle = (function () {
    * @throws {Error} when (active+enabled OR forced) but no block can be produced
    */
   async function maybeAppend(text, urlKey, opts) {
+    rateLimitSkip = false;
     const force = !!(opts && opts.force);
     if (!force) {
       if (!isActive()) return text;
       if (!isFeatureEnabled()) return text;
     }
     if (!urlKey) throw new Error('Proxy is enabled but no workspace context was found for this prompt.');
-    const { token, providerDisplayName, grants, error } = await getOrCreateToken(urlKey, force ? { purpose: 'driver' } : undefined);
+    const { token, providerDisplayName, grants, error, rateLimited } = await getOrCreateToken(urlKey, force ? { purpose: 'driver' } : undefined);
     if (force && error) throw new Error(error.message);
-    if (!token) throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+    if (!token) {
+      // R1: a toggle-path 429 completes WITHOUT the block and records the skip.
+      if (!force && rateLimited) {
+        rateLimitSkip = true;
+        try {
+          if (typeof document !== 'undefined' && typeof document.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+            document.dispatchEvent(new CustomEvent('harbour:proxy-rate-limited'));
+          }
+        } catch {
+          // no DOM / no CustomEvent — the caller still gets the flag
+        }
+        return text;
+      }
+      throw new Error('Proxy is enabled but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
+    }
     return text + buildBlock(token, providerDisplayName, grants);
   }
 
@@ -2163,11 +2213,12 @@ window.ProxyToggle = (function () {
   }
 
   /**
-   * Restore the rendered state and wire a single delegated click handler for
-   * every +proxy button on the page (current and future-injected).
+   * Wire a single delegated click handler for every +proxy button on the page
+   * (current and future-injected). The rendered active look comes from the
+   * server-emitted `data-proxy-active` body attribute, so there is nothing to
+   * restore here (LIN-2944 P3).
    */
   function init() {
-    syncBodyState();
     document.addEventListener('click', (e) => {
       const btn = e.target.closest('.prompt-proxy-toggle');
       if (!btn) return;
@@ -2175,9 +2226,18 @@ window.ProxyToggle = (function () {
       e.stopPropagation();
       setActive(!isActive());
     });
+    // R1: a toggle-path 429 skip is announced on every surface (the opened-task
+    // component also renders an inline notice beside the toggle).
+    document.addEventListener('harbour:proxy-rate-limited', () => {
+      try {
+        if (typeof window.toast === 'function') window.toast(RATE_LIMIT_SKIP_NOTICE, { type: 'info' });
+      } catch {
+        // no toast available — the caller's inline notice / flag still stands
+      }
+    });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive };
+  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

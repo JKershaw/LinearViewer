@@ -1276,8 +1276,9 @@ test.describe('Custom Prompt Dispatch', () => {
     await page.goto(`/test/clear-dispatch-tokens?urlKey=${URL_KEY}`);
     await page.goto(`/test/clear-recent-prompts?urlKey=${URL_KEY}`);
 
-    // Set up test session with dispatch feature enabled
-    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    // Set up test session with dispatch feature enabled (proxy explicitly off so
+    // the custom prompt dispatches bare — LIN-2944 P3 made proxy default on).
+    await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true, proxy: false }))}&urlKey=${URL_KEY}`);
   });
 
   /**

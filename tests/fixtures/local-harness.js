@@ -401,11 +401,14 @@ export function createLocalProvider() {
  *   Local has no live add-source POST to produce a real one from.
  * @returns {Promise<{urlKey: string, dashboard: string}>}
  */
-export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append, providerAdded } = {}) {
+export async function seedLocalWorkspace(page, seed = null, { features, openRouterConnected, freeTierEnabled, extraBindings, urlKey = LOCAL_WORKSPACE_URL_KEY, append, providerAdded, proxyDefault } = {}) {
   const data = { ...(seed ?? defaultLocalSeed(urlKey)), urlKey };
   if (features) data.features = features;
   if (openRouterConnected) data.openRouterConnected = openRouterConnected;
   if (freeTierEnabled) data.freeTierEnabled = freeTierEnabled;
+  // LIN-2944 P3: the +proxy toggle's session default (unset means on). Lets a
+  // spec run with the toggle explicitly off without touching localStorage.
+  if (proxyDefault !== undefined) data.proxyDefault = proxyDefault;
   // Make the seeded workspace explicitly multi-binding (LIN-717): the local
   // binding stays active, with each extra appended so the providers settings
   // surface can exercise the active-provider switch end-to-end.

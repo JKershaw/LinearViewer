@@ -372,6 +372,15 @@
   }
 
   /**
+   * The slot for the R1 token-limit skip notice, beside the action cluster. It
+   * is always rendered (empty or filled) so a copy/download can write into it
+   * directly without rebuilding the prompt body. Plain words, never an error.
+   */
+  function renderProxyLimitNotice(state) {
+    return `<div class="opened-task-proxy-limit" data-proxy-limit-slot aria-live="polite">${state.proxyLimitNotice ? esc(state.proxyLimitNotice) : ''}</div>`;
+  }
+
+  /**
    * Build the idle opened-task shell: the one-line why, the ✦ primary action,
    * the ladder, and the templates under "other prompts" (LIN-2944).
    */
@@ -396,7 +405,21 @@
       // Active look is driven by the body[data-proxy-active] CSS rule (LIN-525
       // #1), so no per-button class is rendered here. data-action is kept off
       // the button: ProxyToggle's delegated listener (common.js) owns the click.
-      html += `<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>`;
+      // LIN-2944 P3: a plain-words label sits beside it, with a "what's this?"
+      // disclosure that explains what turning the proxy on does and how to turn
+      // it off. Native <details> matches the settings-page disclosure pattern.
+      html += '<button class="prompt-proxy-toggle" title="Append proxy API instructions to prompt">+proxy</button>';
+      html += '<details class="opened-task-proxy">'
+        + '<summary class="opened-task-proxy-label">your agent can read &amp; update your tasks \u00b7 what\u2019s this? \u203A</summary>'
+        + '<div class="opened-task-proxy-faq">'
+        + '<p>With this on, every prompt you copy, download or dispatch carries a workspace API access block so your agent can read and update your tasks through Harbour\u2019s own API. Each copy mints a fresh single-use read/write token, valid for 48 hours, and it appears in this prompt only.</p>'
+        + '<p>It also enables the proxy page and nav link, Autopilot prompts and next-run dispatch, and it removes the \u201cproxy off\u201d notices on the surfaces that need it.</p>'
+        + '<p>Token creation for prompt copies is capped at 60 per 15 minutes per account. If the cap is reached, the copy or download still completes but skips the agent-access block, and a note beside the toggle says so \u2014 try again in a few minutes.</p>'
+        + '<p>Turn it off any time by pressing <strong>+proxy</strong> again, or by switching off <strong>Linear API proxy</strong> in <a href="/workspace/'
+        + esc(opts.urlKey || '')
+        + '/settings">Settings</a>.</p>'
+        + '</div>'
+        + '</details>';
     }
     if (dispatchEnabled) {
       // Shared dispatch disclosure (LIN-1137): composes the toggle, exec controls,
@@ -454,6 +477,7 @@
         <span class="swipe-prompt-name">${esc(name || 'prompt')}</span>${generatedLine}
         <div class="swipe-prompt-actions">${actions}</div>
       </div>
+      ${renderProxyLimitNotice(state)}
       ${warningBanner}
       ${reasoningBlock}
       ${renderLadder(opts, state)}
@@ -504,6 +528,9 @@
       activeLabelName: null,
       error: null,
       setupNotice: null,
+      // LIN-2944 P3 R1: a toggle-path token-mint 429 makes the copy/download
+      // skip the agent-access block; this notice names it beside the toggle.
+      proxyLimitNotice: null,
       // Load-time run allowance (LIN-3239). Only fetched when the caller marks
       // the workspace as free-tier, so ordinary units never hit the network
       // here. `null` until the read resolves; it gates ONLY the run rungs.
@@ -909,6 +936,16 @@
       // common.js (LIN-525 #7) — no per-section handling needed here.
     }
 
+    // LIN-2944 P3 R1: after a copy/download, surface the token-limit skip beside
+    // the toggle if maybeAppend had to omit the agent-access block.
+    function applyProxyLimitNotice() {
+      const T = window.ProxyToggle;
+      if (!(T && typeof T.takeRateLimitNotice === 'function' && T.takeRateLimitNotice())) return;
+      state.proxyLimitNotice = T.RATE_LIMIT_SKIP_NOTICE || 'The agent-access link was skipped — the token limit was reached. Try again in a few minutes.';
+      const slot = container.querySelector('[data-proxy-limit-slot]');
+      if (slot) slot.textContent = state.proxyLimitNotice;
+    }
+
     async function handleCopy(btn) {
       const raw = state.result && state.result.raw;
       if (!raw) return;
@@ -918,6 +955,7 @@
         // LIN-3079: an autopilot result forces the append regardless of the toggle.
         const force = !!(state.result && state.result.proxyForce);
         const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
+        applyProxyLimitNotice();
         await navigator.clipboard.writeText(text);
         recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy' });
         btn.textContent = 'copied!';
@@ -945,6 +983,7 @@
         // LIN-3079: same forced append as handleCopy for the autopilot result.
         const force = !!(state.result && state.result.proxyForce);
         const text = await window.ProxyToggle.maybeAppend(raw, opts.urlKey, { force });
+        applyProxyLimitNotice();
         const filename = buildPromptFilename(issue.identifier, (state.result && state.result.name) || 'prompt');
         downloadMarkdown(text, filename);
         recordTaskMode({ rung: isAutopilotResult() ? 'run-task' : 'copy', ready: true, needs: null, act: 'copy' });
