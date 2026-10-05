@@ -135,9 +135,23 @@ describe('the selector prompt (LIN-3300)', () => {
   test('rule 8 carries the plan-review guidance once, as judgement with its reason', () => {
     const p = prompt();
     const rule8 = p.slice(p.indexOf('8. **Plan.**'), p.indexOf('## Reply'));
-    assert.match(rule8, /The latest plan-review verdict asked for changes or discussion → `plan` for the revision, then `plan-review` once the revision is on the trail/);
+    assert.match(rule8, /The latest plan-review verdict asked for changes or discussion → `plan` for the revision, then `plan-review` once a revised plan is posted/);
     assert.match(rule8, /a verdict is answered before the plan is built on/);
     assert.equal(p.split('plan-review verdict asked for changes').length, 2, 'stated once');
+    const stage = (k) => getSelectableStages().find(st => st.key === k);
+    assert.doesNotMatch(stage('plan').when, /revision/, 'the plan stage does not restate it');
+    assert.doesNotMatch(stage('plan-review').when, /revision|revised|landed/, 'nor does plan-review');
+  });
+
+  // Coordinator fix round: a rule says only what relates the stages; when a stage
+  // applies is said once, in its own description.
+  test('rules do not restate the stages\' own descriptions', () => {
+    const p = prompt();
+    const rules = p.slice(p.indexOf('## How to choose'), p.indexOf('## Reply'));
+    for (const restated of ['Merged and Done with a code review on record', 'Resolved blockers do not block', 'Two or more viable shapes',
+      'phases which each land alone', 'one surface and change are already named', 'one sharp feasibility question', 'what to build is unclear']) {
+      assert.ok(!rules.includes(restated), `rules restate: ${restated}`);
+    }
   });
 
   test('a ruling older than the latest comments still reaches the selector', () => {

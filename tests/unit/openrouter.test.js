@@ -34,7 +34,8 @@ import {
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
-import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT, generatePrompt } from '../../lib/prompt-templates.js';
+import { getSelectableStages, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT, generatePrompt } from '../../lib/prompt-templates.js';
+const actionNames = () => getSelectableStages().map(s => s.name);
 import { guardNetwork } from '../fixtures/network-guard.js';
 
 // =============================================================================
@@ -565,8 +566,8 @@ describe('formatIssueContext cousins', () => {
 // =============================================================================
 
 describe('action vocabulary (kind derivation seam)', () => {
-  test('getAIRecommendationActionNames returns mappable names and excludes retro', () => {
-    const names = getAIRecommendationActionNames();
+  test('the selectable stage names are mappable and exclude retro', () => {
+    const names = actionNames();
     assert.ok(names.includes('plan'));
     assert.ok(names.includes('implement'));
     assert.ok(names.includes('review'));
@@ -575,7 +576,7 @@ describe('action vocabulary (kind derivation seam)', () => {
   });
 
   test('every recommended action name derives to a real (non-custom) kind', () => {
-    for (const name of getAIRecommendationActionNames()) {
+    for (const name of actionNames()) {
       assert.notStrictEqual(
         deriveDispatchKind(name), DISPATCH_KIND_DEFAULT,
         `recommended action "${name}" should map to a known kind, not "${DISPATCH_KIND_DEFAULT}"`
@@ -587,7 +588,7 @@ describe('action vocabulary (kind derivation seam)', () => {
   // a valid kind, and self-deriving (NOT the custom fallback), despite having no
   // PROMPT_TEMPLATES entry / no prompt body.
   test('defer is in the AI recommendation vocabulary', () => {
-    assert.ok(getAIRecommendationActionNames().includes('defer'),
+    assert.ok(actionNames().includes('defer'),
       'defer must be offered to the router as an emittable action');
   });
 
@@ -1577,7 +1578,6 @@ describe('getPaidEnvKey / hasPaidEnvKey (LIN-961)', () => {
 // =============================================================================
 describe('stage descriptions: approved-parent-plan child exemption (LIN-3049)', () => {
   test('plan and plan-review each name the breakdown child\'s approved parent slice', async () => {
-    const { getSelectableStages } = await import('../../lib/prompt-templates.js');
     const stage = (k) => getSelectableStages().find(st => st.key === k);
     assert.match(stage('plan').whenNot, /breakdown child's copied slice of an approved parent plan/);
     assert.match(stage('plan-review').whenNot, /breakdown child covered by its parent's approving plan-review/);

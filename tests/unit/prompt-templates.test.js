@@ -12,7 +12,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatStageOptions, getAIRecommendationActionNames, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatStageOptions, getSelectableStages, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
+const actionNames = () => getSelectableStages().map(s => s.name);
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -2271,21 +2272,23 @@ describe('capability-aware prompts: Linear byte-parity (LIN-177 S4/S5)', () => {
 });
 
 describe('selector rule 2: landed work (LIN-364, LIN-474, LIN-811)', () => {
-  test('every subtask done routes to review, only a code review authorizes close-out, and red CI stays on this ticket', () => {
-    const rule = selectorRule(2);
-    assert.match(rule, /every subtask done, or a PR with no code review since → `review`/);
-    assert.match(rule, /only a code review authorizes close-out/);
-    assert.match(rule, /Red CI or a blocker found while landing goes to `implementation`, `bug` or `blocked` on this ticket, not to a new one/);
+  test('rule 2 orders the landing stages; the stages say when each applies, said once', () => {
+    assert.match(selectorRule(2), /against `retrospective-audit`, `close-out`, the `implementation` fix round \(on the same PR\) and `review`, in that order; a terminal state with no open subtask counts as landed work/);
+    const options = formatStageOptions();
+    assert.match(options, /- `review`: [^\n]*\n  When: Work has landed \(a PR or completion summary on the trail, or every subtask done\)/);
+    assert.match(options, /Requires: An Approve from a code review; a plan-review Approve is not one\./);
+    assert.match(options, /CI is red, or verifying the work surfaced a blocker: that is `implementation` \(or `bug`, or `blocked` if only a person can settle it\) on this ticket first/);
   });
 });
 
 describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', () => {
   test('rule 2 names retrospective-audit for merged-and-Done work, distinct from review/close-out', () => {
-    assert.match(selectorRule(2), /Merged and Done with a code review on record → `retrospective-audit`/);
+    assert.match(selectorRule(2), /against `retrospective-audit`, `close-out`/);
+    assert.match(formatStageOptions(), /- `retrospective-audit`: [^\n]*\n  When: The work is merged and Done, with a code review on record\./);
   });
 
   test('retrospective-audit is offered in the AI recommendation vocabulary (unlike retro)', () => {
-    const names = getAIRecommendationActionNames();
+    const names = actionNames();
     assert.ok(names.includes('retrospective-audit'), 'retrospective-audit must be an emittable action');
     assert.ok(!names.includes('retro'), 'retro stays excluded from AI recommendation');
   });
@@ -2297,7 +2300,9 @@ describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', ()
 
 describe('selector design shape-fork routing + stage discriminators (LIN-878)', () => {
   test('rule 7 routes a contested shape to design, after knowledge and before the plan', () => {
-    assert.match(selectorRule(7), /Two or more viable shapes and none chosen → `design`\. Why: a plan should not pick the architecture silently\./);
+    assert.match(selectorRule(7), /Then `design`, when it applies\. Why: a plan should not pick the architecture silently\./);
+    const p = selectorPrompt();
+    assert.ok(p.indexOf('6. **Knowledge.**') < p.indexOf('7. **Shape.**') && p.indexOf('7. **Shape.**') < p.indexOf('8. **Plan.**'), 'after knowledge, before the plan');
   });
 
   // LIN-3300: the discriminators are each stage's own "Not when", rendered for every stage.
@@ -2312,7 +2317,7 @@ describe('selector design shape-fork routing + stage discriminators (LIN-878)', 
 
   test('every selectable stage says when it is next and when it is not', () => {
     const options = formatStageOptions();
-    const n = getAIRecommendationActionNames().length;
+    const n = actionNames().length;
     assert.strictEqual((options.match(/^  When: /gm) || []).length, n, 'one When per stage');
     assert.strictEqual((options.match(/^  Not when: /gm) || []).length, n, 'one Not when per stage');
   });
@@ -2343,7 +2348,7 @@ describe('retrospective-audit template', () => {
   });
 
   test('is part of the AI recommendation vocabulary (unlike retro)', () => {
-    const names = getAIRecommendationActionNames();
+    const names = actionNames();
     assert.ok(names.includes('retrospective-audit'), 'retrospective-audit must be recommendable');
   });
 
@@ -2789,7 +2794,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   });
 
   test('(meta) the selector offers close-out after a code review approves', () => {
-    assert.match(selectorRule(2), /The latest code review approved and the work is not merged and Done → `close-out`/);
+    assert.match(selectorRule(2), /`close-out`/);
     assert.match(formatStageOptions(), /- `close-out`: [^\n]*\n  When: The latest code review approved/);
   });
 
@@ -3502,7 +3507,7 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
 
 describe('selector rule 5: bug already investigated (LIN-366)', () => {
   test('a cause that still stands goes to the fix; the label alone is not a reason to re-investigate', () => {
-    assert.match(selectorRule(5), /when a root cause and fix direction still stand at the end of the trail → `implementation`/);
+    assert.match(selectorRule(5), /a cause that stands goes to its fix, `plan` if the fix spans surfaces/);
     assert.match(selectorRule(5), /never re-investigate a confirmed one/);
     const bug = formatStageOptions().split('\n- `').find(e => e.startsWith('bug`'));
     assert.match(bug, /The `bug` label alone does not mean investigation is owed/);

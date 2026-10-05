@@ -71,9 +71,9 @@ describe('trail facts (LIN-3300)', () => {
     assert.equal(facts.latestPerson.at, at(1), 'the quoting verdict is skipped');
   });
 
-  test('TRAIL FACTS names the latest person\'s comment, whether it is a ruling, and whether work followed it', () => {
+  test('TRAIL FACTS names the latest person\'s comment, whether it is a ruling, and whether an agent acted after it', () => {
     const withRuling = formatTrailFactsBlock(assembleTrailFacts([{ createdAt: at(3), body: `Go.\n\n${RULING_MARK}` }], ''), 1);
-    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03, a ruling recorded via Harbour \(shown with the comments\); work reported after it: no/);
+    assert.match(withRuling, /- Latest person's comment[^:]*: 2026-10-03, a ruling recorded via Harbour \(shown with the comments\); an agent acted after it \(a note, landed work or a close-out\): no/);
     assert.match(formatTrailFactsBlock(assembleTrailFacts([], ''), 0), /- Latest person's comment[^:]*: none/);
   });
 
@@ -86,7 +86,7 @@ describe('trail facts (LIN-3300)', () => {
     ], '');
     assert.equal(facts.latestPerson.at, at(1));
     assert.equal(facts.latestPerson.ruling, false);
-    assert.equal(facts.latestPerson.workAfter, false, 'an agent note linking a PR is not work reported');
+    assert.equal(facts.latestPerson.actedAfter, true, 'an autopilot run summary after it is an agent acting');
     const headed = assembleTrailFacts([
       { createdAt: at(1), body: 'Go on with the narrow revision.' },
       { createdAt: at(2), body: '## Plan finalized — next action: breakdown' }
@@ -97,12 +97,22 @@ describe('trail facts (LIN-3300)', () => {
       { createdAt: at(2), body: '**Close-out: PR #1616 merged. The ticket stays open for L2.**' }
     ], '');
     assert.equal(closed.latestPerson.at, at(1), 'a close-out is not a person\'s comment');
-    assert.equal(closed.latestPerson.workAfter, true, 'a close-out after it carries out the ruling');
+    assert.equal(closed.latestPerson.actedAfter, true, 'a close-out after it carries out the ruling');
+    // Coordinator fix: an agent's own note after the person's comment means the comment
+    // was acted on, so rule 1 does not pick its stage again on every pass.
+    const revised = assembleTrailFacts([
+      { createdAt: at(1), body: '### Plan Review Verdict\n\n**Verdict:** Request Changes.' },
+      { createdAt: at(2), body: 'Take the narrow revision.' },
+      { createdAt: at(3), body: '**Plan revised in the description (`## Implementation Plan`), answering the plan-review.**' }
+    ], '');
+    assert.equal(revised.latestPerson.at, at(2));
+    assert.equal(revised.latestPerson.actedAfter, true, 'the planner acted on it');
+    assert.match(formatTrailFactsBlock(revised, 3), /an agent acted after it \(a note, landed work or a close-out\): yes/);
     const fixed = assembleTrailFacts([
       { createdAt: at(1), body: 'Addendum: two more items for this round.' },
       { createdAt: at(2), body: `## Review fixes landed — PR updated\n\n${PR}` }
     ], '');
-    assert.equal(fixed.latestPerson.workAfter, true, 'a later landing report supersedes it');
+    assert.equal(fixed.latestPerson.actedAfter, true, 'a later landing report supersedes it');
   });
 
   test('work after the review ignores agent notes and an unheaded close-out', () => {

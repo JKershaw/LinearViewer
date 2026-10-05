@@ -7,16 +7,16 @@
  * over the live recommender vocabulary, with per-action criteria that are mutually
  * distinguishable — not the incumbent's reused `aiHint.situation` one-liners.
  *
- * Vocabulary source of truth: `getAIRecommendationActionNames()` (lib/prompt-templates.js)
+ * Vocabulary source of truth: `getSelectableStages()` names (lib/prompt-templates.js)
  * — the exact set the live meta-prompt injects (17 names, `defer` last). Criteria are
  * derived from each stage's own self-description (LIN-3300: purpose + when + when not),
  * so the routing call can never silently drift from the live action set. Nothing here
  * is wired into production; this is standalone research infra under scripts/eval/.
  */
-import { getAIRecommendationActionNames, getSelectableStages } from '../../lib/prompt-templates.js';
+import { getSelectableStages } from '../../lib/prompt-templates.js';
 
 /** The live recommender vocabulary, verbatim (17 names; `defer` last). */
-export const LIVE_VOCABULARY = getAIRecommendationActionNames();
+export const LIVE_VOCABULARY = getSelectableStages().map((s) => s.name);
 
 /** Same vocabulary with `defer` withheld — the leaf-time offer (arms 1/2 prompt-time filter). */
 export const LEAF_VOCABULARY = LIVE_VOCABULARY.filter((name) => name !== 'defer');
