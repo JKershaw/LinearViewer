@@ -249,6 +249,15 @@ function shareErrorMessage(e) {
   return (e && e.message) || 'Something went wrong.'
 }
 
+// The list label per share kind (LIN-3313, S8a of LIN-2950): a run share
+// (`kind: 'run'`, subjectId = the run's sessionId) is labelled as a run, not
+// lumped in with labels. An unrecognised kind is shown as itself.
+const SHARE_KIND_LABELS = { parent: 'parent task', label: 'label', run: 'run' }
+
+function shareKindLabel(kind) {
+  return Object.prototype.hasOwnProperty.call(SHARE_KIND_LABELS, kind) ? SHARE_KIND_LABELS[kind] : String(kind || 'share')
+}
+
 function renderShareList(container, shares) {
   if (!shares.length) {
     container.innerHTML = '<div class="node"><div class="line"><span class="settings-value share-list-empty" data-testid="share-list-empty">No share links yet</span></div></div>'
@@ -256,7 +265,7 @@ function renderShareList(container, shares) {
   }
   container.innerHTML = shares.map((s) => {
     const created = s.createdAt ? new Date(s.createdAt).toLocaleDateString() : ''
-    const kind = s.kind === 'parent' ? 'parent task' : 'label'
+    const kind = shareKindLabel(s.kind)
     const revoked = s.revokedAt ? ' · revoked' : ''
     const revokeBtn = s.revokedAt
       ? ''

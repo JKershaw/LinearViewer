@@ -12,6 +12,10 @@ import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createShareRoutes, createShareLimiters, FAILURE_BACKOFF_MS, SHARE_REFRESH_TIMEOUT_MS } from '../../routes/share.js';
+import {
+  createRunHarness, makeShareStore, runRecord, buildShareApp, age, resetCounts,
+  URL_KEY as RUN_URL_KEY, OWNER as RUN_OWNER, SID
+} from '../fixtures/share-run-harness.js';
 
 const TOKEN = `${'A'.repeat(43)}`;
 const OWNER_OK = async () => ({ status: 'owner' });
@@ -486,5 +490,97 @@ describe('LIN-3255 review: success must not read as failure', () => {
     } finally {
       mock.timers.reset();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3313 (Phase 3 of LIN-2950, S6b/S7b): run shares on /s/:token — the
+// guest run renderer, the scan at refresh and on every serve, the headers.
+// ---------------------------------------------------------------------------
+
+// Runtime-assembled secret (the repo's CI secret-scan reads this source).
+const PLANTED = ['gh', 'p_'].join('') + 'Qx7Rk2Vm9Lp4Wn8Tz3Yb6Hc1Js5Df0Gu2AeZq8Wx3Ec7Rv2Tb6Yn1Um5Ik9Ol4'.slice(0, 36);
+
+function assertSecurityHeaders(res) {
+  assert.equal(res.headers.get('referrer-policy'), 'no-referrer');
+  assert.equal(res.headers.get('cache-control'), 'private, no-store');
+  assert.equal(res.headers.get('x-robots-tag'), 'noindex');
+}
+
+describe('GET /s/:token — run shares (LIN-3313)', () => {
+  test('a run serves the run page in guest mode (not the collection page), with the security headers', async () => {
+    const h = createRunHarness();
+    const store = makeShareStore(runRecord());
+    const res = await request(buildShareApp({ store, harness: h }), `/s/${TOKEN}`);
+    assert.equal(res.status, 200);
+    assertSecurityHeaders(res);
+    assert.match(res.body, /data-testid="session-page"/);
+    assert.match(res.body, /<meta name="robots" content="noindex">/);
+    assert.ok(!res.body.includes('class="share-list"'), 'not the collection renderer');
+    assert.ok(!res.body.includes('data-url-key'), 'the guest page carries no workspace key');
+  });
+
+  test('a fresh stored snapshot is re-scanned on serve: a planted secret → 503, no body, headers still set', async () => {
+    const h = createRunHarness();
+    const { run } = await h.reader.readOwnerRun(RUN_URL_KEY, RUN_OWNER, SID);
+    run.session.loops[1].issueTitle = `deploy key ${PLANTED}`; // stored by a path that skipped the refresh scan
+    const store = makeShareStore(runRecord({ snapshot: run, snapshotAt: new Date() }));
+    resetCounts(h.counts);
+    const res = await request(buildShareApp({ store, harness: h }), `/s/${TOKEN}`);
+    assert.equal(res.status, 503);
+    assert.equal(res.body, '');
+    assertSecurityHeaders(res);
+    assert.equal(h.counts.access + h.counts.local, 0, 'a fresh serve reads nothing');
+  });
+
+  test('a stored snapshot the guest renderer cannot render (no session) → 503, no body', async () => {
+    const store = makeShareStore(runRecord({ snapshot: { settled: false }, snapshotAt: new Date() }));
+    const res = await request(buildShareApp({ store, harness: createRunHarness() }), `/s/${TOKEN}`);
+    assert.equal(res.status, 503);
+    assert.equal(res.body, '');
+  });
+
+  test('a secret at refresh keeps the last-good snapshot (row 6) and stamps a failed attempt', async () => {
+    const h = createRunHarness();
+    const store = makeShareStore(runRecord());
+    const app = buildShareApp({ store, harness: h });
+    assert.equal((await request(app, `/s/${TOKEN}`)).status, 200);
+    const lastGood = structuredClone(store.record.snapshot);
+
+    // The run changes (a new step) and its title now carries a token.
+    h.state.session.loops.push({ ...h.state.session.loops[1], loopId: 'f1', issueTitle: `deploy key ${PLANTED}` });
+    age(store);
+    const attemptsBefore = store.calls.saveSnapshot.length;
+    const res = await request(app, `/s/${TOKEN}`);
+    assert.equal(res.status, 200, 'last-good is served');
+    assert.ok(!res.body.includes(PLANTED));
+    assert.match(res.body, /data-testid="share-stale"/, 'marked "as of"');
+    assert.deepEqual(store.record.snapshot, lastGood, 'the secret-bearing snapshot was never stored');
+    const attempt = store.calls.saveSnapshot.slice(attemptsBefore);
+    assert.equal(attempt.length, 1);
+    assert.equal(attempt[0].snapshot, null, 'only the failed attempt was stamped (row 7 backoff)');
+  });
+
+  test('a secret on the FIRST refresh (no last-good) → 503, nothing stored', async () => {
+    const h = createRunHarness();
+    h.state.session.loops[1].issueTitle = `deploy key ${PLANTED}`;
+    const store = makeShareStore(runRecord());
+    const res = await request(buildShareApp({ store, harness: h }), `/s/${TOKEN}`);
+    assert.equal(res.status, 503);
+    assert.equal(res.body, '');
+    assert.equal(store.record.snapshot, null);
+  });
+
+  test('revoked and owner-gone run shares answer like collections (410), with the headers', async () => {
+    const h = createRunHarness();
+    const revoked = makeShareStore(runRecord({ revokedAt: new Date() }));
+    const a = await request(buildShareApp({ store: revoked, harness: h }), `/s/${TOKEN}`);
+    assert.equal(a.status, 410);
+    assertSecurityHeaders(a);
+    const gone = makeShareStore(runRecord());
+    const b = await request(buildShareApp({ store: gone, harness: h, workspaceOwnerCheck: async () => ({ status: 'not-owner' }) }), `/s/${TOKEN}`);
+    assert.equal(b.status, 410);
+    assert.equal(b.body, '');
+    assert.equal(h.counts.access + h.counts.local, 0);
   });
 });
