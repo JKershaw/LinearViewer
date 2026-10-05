@@ -31,6 +31,27 @@ window.escapeHtml = function(str) {
 };
 
 /**
+ * LIN-3240 / LIN-3126 residual: the shared `?source=...&bindingScope=...`
+ * query for an issue-scoped request. Moved here (from app.js) so every page
+ * script that loads common.js (observation, swipe, session, app) builds the
+ * selector query the SAME way instead of hand-rolling it. `bindingScope` is
+ * forwarded only when present, so an unstamped single-binding/legacy request
+ * stays byte-identical to the pre-slice `?source=...` (or no query at all).
+ * Both values are URL-encoded. `bindingScope` is selection-only, never a
+ * credential (B1).
+ * @global
+ * @param {string} [source] - resolved provider name
+ * @param {string} [bindingScope] - binding selector stamp
+ * @returns {string} a leading-`?` query string, or ''
+ */
+window.sourceBindingQuery = function sourceBindingQuery(source, bindingScope) {
+  const parts = [];
+  if (source) parts.push(`source=${encodeURIComponent(source)}`);
+  if (bindingScope) parts.push(`bindingScope=${encodeURIComponent(bindingScope)}`);
+  return parts.length ? `?${parts.join('&')}` : '';
+};
+
+/**
  * First-paint fit zoom (LIN-1221 F1). Mirror of lib/ship-layout.js
  * computeFitZoom — pick the largest scale at which the content box fits the
  * viewport (with padding), clamped to [minZoom, maxZoom]; never zoom IN on
@@ -850,6 +871,9 @@ window.ReplyDelivery = (function () {
   // object — forwarded alone whenever it's a non-blank string, regardless of
   // which (or neither) of the two pairs above is also present, so a
   // proposed-answer's durable option id can ride the ordinary comment write.
+  // LIN-3126 residual: `source`/`bindingScope` (the issue's own binding
+  // selector) are forwarded as URL query params, each only when present —
+  // selection-only provenance, never a credential (B1).
   function postComment(urlKey, issueId, prompt, decision) {
     var body = { body: prompt };
     if (decision && decision.decisionLoopId && decision.decisionId) {
@@ -863,7 +887,15 @@ window.ReplyDelivery = (function () {
     if (decision && typeof decision.optionId === 'string' && decision.optionId) {
       body.optionId = decision.optionId;
     }
-    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId), {
+    // LIN-3126 residual: the issue's own binding selector rides the URL so the
+    // comment route (which resolves strictly) honours the issue's binding, not
+    // the workspace's active one. SPARSE — absent on an unstamped caller, so
+    // the URL stays byte-identical. Shared builder, encoded.
+    var selectorQuery = window.sourceBindingQuery(
+      decision && decision.source,
+      decision && decision.bindingScope
+    );
+    return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId) + selectorQuery, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'same-origin',
@@ -984,7 +1016,7 @@ window.ReplyDelivery = (function () {
         onCommentFailed(new Error('cannot record an answer with no linked issue'));
         return Promise.resolve();
       }
-      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId }).then(
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
@@ -1012,7 +1044,7 @@ window.ReplyDelivery = (function () {
     // literal built here rather than the rest of `opts`, so this stays the
     // one place a caller's `opts.optionId` (when set) actually reaches
     // `postComment`'s own allowlist.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId }).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
@@ -1074,6 +1106,8 @@ window.ReplyDelivery = (function () {
         issueId: opts.issueId,
         followUpTo: opts.followUpTo || opts.stampLoopId,
         target: opts.target,
+        source: opts.source,
+        bindingScope: opts.bindingScope,
         force: true
       }, opts.prompt, handlers);
     });
@@ -1181,7 +1215,7 @@ window.ReplyDelivery = (function () {
           if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
           return;
         }
-        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId })
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             var recordOnNote = resolved.note
@@ -1233,7 +1267,7 @@ window.ReplyDelivery = (function () {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 
-        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId })
+        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             function startRun() {
@@ -1243,7 +1277,14 @@ window.ReplyDelivery = (function () {
                 promptName: RULING_DISPATCH_PROMPT_NAME,
                 kind: RULING_DISPATCH_KIND,
                 composedRunMarker: RULING_COMPOSED_RUN_MARKER,
-                issue: { id: opts.issueId || opts.issueIdentifier, identifier: opts.issueIdentifier },
+                issue: Object.assign(
+                  { id: opts.issueId || opts.issueIdentifier, identifier: opts.issueIdentifier },
+                  // LIN-3126 residual: forward the anchor's binding pair only
+                  // when present, so an unstamped dispatch body stays
+                  // byte-identical (no `source: undefined` keys).
+                  opts.source ? { source: opts.source } : {},
+                  opts.bindingScope ? { bindingScope: opts.bindingScope } : {}
+                ),
                 target: opts.target || 'cli'
               });
             }

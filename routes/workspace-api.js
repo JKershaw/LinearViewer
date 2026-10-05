@@ -2694,6 +2694,20 @@ ${goal}`
     if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
+    // LIN-3126 residual: persist the validated selector pair onto the durable
+    // scan row so a later rulings anchor (lib/unanswered-decisions.js) and a
+    // scan-due item can hand the browser the issue's own binding. Only a
+    // COMPLETE, non-blank pair is stored — a source-only hint or a legacy /
+    // single-binding scan adds no key (sparse, byte-identical). The pair was
+    // already validated by `resolveIssueBinding` above; `issueBindingScope` is
+    // selection-only provenance, never a credential (B1).
+    const scanBindingPair = (
+      typeof req.query.source === 'string' && req.query.source.trim() &&
+      typeof req.query.bindingScope === 'string' && req.query.bindingScope.trim()
+    )
+      ? { issueSource: req.query.source.trim(), issueBindingScope: req.query.bindingScope.trim() }
+      : {};
+
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
     }
@@ -2831,7 +2845,10 @@ ${goal}`
         // tier-1's basisVersion above — see lib/task-decisions-store.js's
         // [F-2] terminal-row patch for why the split is load-bearing.
         dueBasisVersion: BASIS_VERSION,
-        decision: scanResult.outcome === 'decision' ? scanResult.decision : null
+        decision: scanResult.outcome === 'decision' ? scanResult.decision : null,
+        // LIN-3126 residual: the issue's own binding pair, stored only when a
+        // complete validated selector was supplied (see `scanBindingPair`).
+        ...scanBindingPair
       });
       if (!record) {
         return keepalive.send(500, { error: 'Failed to record scan result' });
@@ -3383,7 +3400,13 @@ ${goal}`
             raisedDueBasisHash: row.dueBasisHash,
             raisedDueBasisVersion: row.dueBasisVersion,
             currentDueBasisHash
-          })
+          }),
+          // LIN-3126 residual: the row's own binding pair, recorded when it was
+          // scanned, rides the item so the client's bulk-scan POST can forward
+          // it (public/observation.js startDueBulkScan). SPARSE — a row with no
+          // pair emits no key. Selection-only (B1).
+          ...(row.issueSource != null ? { source: row.issueSource } : {}),
+          ...(row.issueBindingScope != null ? { bindingScope: row.issueBindingScope } : {})
         };
       });
 
@@ -3393,7 +3416,14 @@ ${goal}`
       // allSettled shape means every other row and the page's 200 are unaffected.
       const items = results.map((result, i) => result.status === 'fulfilled'
         ? result.value
-        : { issueId: page.items[i].issueId, issueIdentifier: page.items[i].issueIdentifier, dueStatus: null, error: true });
+        : {
+            issueId: page.items[i].issueId,
+            issueIdentifier: page.items[i].issueIdentifier,
+            dueStatus: null,
+            error: true,
+            ...(page.items[i].issueSource != null ? { source: page.items[i].issueSource } : {}),
+            ...(page.items[i].issueBindingScope != null ? { bindingScope: page.items[i].issueBindingScope } : {})
+          });
 
       keepalive.send(200, {
         items,

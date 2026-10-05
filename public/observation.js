@@ -1887,7 +1887,10 @@ function requestBasisCheck(anchor, noteEl) {
   basisCheckQueue.push(async () => {
     // `:urlKey` is the RULING's own workspace, not the page's — the rulings
     // feed is cross-workspace, the same reason dismiss/reply target the anchor.
-    const url = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}`;
+    // LIN-3126 residual: the anchor's binding pair rides the query so the scan
+    // read resolves the issue's binding on a two-binding workspace.
+    const url = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}`
+      + window.sourceBindingQuery(anchor.source, anchor.bindingScope);
     try {
       const data = await window.api(url, { on401: false });
       const verdict = data && typeof data.basisChanged === 'boolean' ? data.basisChanged : null;
@@ -2325,8 +2328,12 @@ function rulingRowControls(li) {
 // request promise; the caller owns the pending-guard/restore/feedback wiring.
 function issueDismissRequest(anchor, decisionId, stampLoopId) {
   const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
+  // LIN-3126 residual: the task-bound dismiss carries the anchor's binding pair
+  // so the scan dismiss route resolves the issue's binding, not the active one.
+  const dismissUrl = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`
+    + window.sourceBindingQuery(anchor.source, anchor.bindingScope);
   return isTaskBound
-    ? window.api(`/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`, {
+    ? window.api(dismissUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         on401: false,
@@ -3266,7 +3273,12 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         target: anchor.target || 'cli',
         decisionLoopId,
         decisionId,
-        optionId
+        optionId,
+        // LIN-3126 residual: the ruling anchor's own binding pair (beat 2) so
+        // the resume's comment write resolves the issue's binding, not the
+        // workspace's active one. Sparse — an unstamped anchor sends neither.
+        source: anchor.source,
+        bindingScope: anchor.bindingScope
       },
       prompt,
       {
@@ -3319,7 +3331,11 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       optionId,
       recordOn: decision?.on_answer?.record_on || null,
       prompt,
-      downgradeNote
+      downgradeNote,
+      // LIN-3126 residual: the anchor's binding pair rides both hops (the
+      // comment write and, when this downgrades to a dispatch, the run).
+      source: anchor.source,
+      bindingScope: anchor.bindingScope
     }, {
       onCommentFailed: (err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
       onNoTarget: () => { console.error('Ruling reply: no issue to record a comment against, cannot reply for an anchorless run'); restore(); setFeedback('cannot record a reply: no linked issue', true); },
@@ -3347,7 +3363,11 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       optionId,
       prompt,
       dispatchPrompt: composeDispatchPrompt(row, prompt),
-      recordOn: decision?.on_answer?.record_on || null
+      recordOn: decision?.on_answer?.record_on || null,
+      // LIN-3126 residual: the anchor's binding pair, forwarded to BOTH the
+      // comment write and the fresh-run dispatch by deliverRulingDispatch.
+      source: anchor.source,
+      bindingScope: anchor.bindingScope
     }, {
       onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
       onPartialFailure: makePartialFailureHandler('start a run'),
@@ -3381,7 +3401,11 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
     // option press / free-text reply) ever carries a proposed option.
     return window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, {
       taskDecisionId: anchor.taskDecisionId,
-      taskDecisionIssueId: anchor.issueId
+      taskDecisionIssueId: anchor.issueId,
+      // LIN-3126 residual: the task-decision anchor's binding pair, so the
+      // comment write resolves the issue's binding on a two-binding workspace.
+      source: anchor.source,
+      bindingScope: anchor.bindingScope
     })
       .then((commentResult) => {
         if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
@@ -3659,7 +3683,18 @@ function syncDueBulkBar() {
  */
 function startDueBulkScan() {
   const urlKey = observationData?.urlKey;
-  const items = [...dueSelectedIds].map((issueId) => ({ urlKey, identifier: issueId }));
+  // LIN-3126 residual (LIN-3256): carry each selected due row's own binding
+  // pair (emitted by the scan-due route from the row's recorded selector) so
+  // the per-item scan POST resolves the issue's binding, not the workspace's
+  // active one. Sparse — an unstamped row adds no keys, so the pool's
+  // postScan call stays byte-identical.
+  const items = [...dueSelectedIds].map((issueId) => {
+    const row = dueLoadedItems.find((i) => String(i.issueId) === String(issueId));
+    const item = { urlKey, identifier: issueId };
+    if (row && row.source) item.source = row.source;
+    if (row && row.bindingScope) item.bindingScope = row.bindingScope;
+    return item;
+  });
   startBulkScan(items, {
     onResult: paintBulkScanRowResult,
     onTeardown: () => { syncDueBulkBar(); }
