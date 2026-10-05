@@ -684,6 +684,8 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {string} opts.issue.identifier     Issue identifier, e.g. "LIN-42"
  * @param {string} [opts.issue.title]
  * @param {string} [opts.issue.url]
+ * @param {string} [opts.issue.source]       Issue row's provider/source stamp (LIN-3242); forwarded as `issueSource` when present
+ * @param {string} [opts.issue.bindingScope] Issue row's binding-scope stamp (LIN-3242); forwarded as `issueBindingScope` when present
  * @param {boolean} [opts.issueless=false]   Opt-out for issue-less dispatches (custom prompt page)
  * @param {string} [opts.promptName='Prompt']
  * @param {string} [opts.target='cli']       'cli' | 'web' | 'dash' | 'local'
@@ -742,6 +744,13 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     if (issue.identifier) payload.issueIdentifier = issue.identifier;
     if (issue.title) payload.issueTitle = issue.title;
     if (issue.url) payload.issueUrl = issue.url;
+    // LIN-3242 (LIN-3126 §4): forward the issue row's binding selector beside the
+    // identifier, so the dispatch is resolved against — and stamped with — the
+    // binding the row came from (data-source / data-binding-scope). Both keys are
+    // SPARSE: an unstamped row (or a legacy single-binding workspace) sends
+    // neither, keeping the request body byte-identical.
+    if (issue.source) payload.issueSource = issue.source;
+    if (issue.bindingScope) payload.issueBindingScope = issue.bindingScope;
   }
   if (repo) payload.repo = repo;
   // Blank/omitted model+harness stay off the payload entirely (not sent as

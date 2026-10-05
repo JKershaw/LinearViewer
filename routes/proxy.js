@@ -723,7 +723,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const effectiveSelector = selector !== undefined
       ? selector
       : (intentResolved === BINDING_INTENT.ISSUE ? issueSelectorFromQuery(req) : undefined);
-    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint, bindings } = await resolveWorkspaceAccess(urlKey, ownerAccountId, { intent: intentResolved, selector: effectiveSelector });
+    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint, bindings, selectedBinding } = await resolveWorkspaceAccess(urlKey, ownerAccountId, { intent: intentResolved, selector: effectiveSelector });
     if (req && (reason === 'binding_required' || reason === 'unknown_binding')) {
       // The refusal's public detail rides on `req` for workspaceUnavailable (and
       // the dispatch referent guard) to translate into the 422 envelope. It is
@@ -813,7 +813,13 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // `scope` contains, and `scope ?? token` falls back to the bare token for
     // linear/local (whose scope IS the token, byte-identical) or for any
     // provider-lane site that hasn't been given a structured scope yet.
-    return { provider: activeProvider, token: token ? (scope ?? token) : token, reason };
+    //
+    // LIN-3242 review R3: `selectedBinding` (the binding the seam's selector
+    // actually selected — see `resolveConnectionBackedAccess`) is passed through
+    // ONLY when the resolution served a credential and reported one, so an
+    // enqueue lane can stamp a validated pair. Additive and selection-only: it is
+    // never part of `token`/`scope ?? token`.
+    return { provider: activeProvider, token: token ? (scope ?? token) : token, reason, ...(token && selectedBinding ? { selectedBinding } : {}) };
   }
 
   /**
