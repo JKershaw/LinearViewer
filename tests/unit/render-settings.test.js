@@ -1199,4 +1199,19 @@ describe('renderSettingsPage — Share links section (LIN-3244)', () => {
     assert.ok(!/\.token\b/.test(renderer), 'the list renderer never reads s.token');
     assert.ok(!/tokenHash/.test(renderer), 'the list renderer never reads s.tokenHash');
   });
+
+  test('LIN-3313: the list labels a run share as a run, not as a label', async () => {
+    const src = await readFile(new URL('../../public/settings.js', import.meta.url), 'utf8');
+    const start = src.indexOf('const SHARE_KIND_LABELS');
+    const end = src.indexOf('function renderShareList', start);
+    assert.ok(start > -1 && end > start, 'the kind-label table sits before the list renderer');
+    // Evaluate exactly the shipped table + helper (a classic browser script, no exports).
+    const shareKindLabel = new Function(`${src.slice(start, end)}; return shareKindLabel;`)();
+    assert.equal(shareKindLabel('run'), 'run');
+    assert.equal(shareKindLabel('parent'), 'parent task');
+    assert.equal(shareKindLabel('label'), 'label');
+    assert.equal(shareKindLabel('toString'), 'toString', 'no prototype keys leak through');
+    const renderer = src.slice(end, src.indexOf('async function loadShareLinks', end));
+    assert.match(renderer, /shareKindLabel\(s\.kind\)/, 'the row label comes from the table');
+  });
 });

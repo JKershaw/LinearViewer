@@ -6,14 +6,11 @@
 import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
 import {
-  stripCodeBlockMarkers,
   formatSubtaskOverview,
   formatIssueContext,
   isEpicShapedParent,
   parseRecommendedAction,
   parseDeferTo,
-  parseRecommendationResponse,
-  applyGroundingToRecommendation,
   getRecommendationStream,
   getRecommendation,
   setLlmCallRecorder,
@@ -37,80 +34,9 @@ import {
   SIBLING_CAP,
   EPIC_TITLE_PATTERN
 } from '../../lib/openrouter.js';
-import { appendGroundingSections } from '../../lib/prompt-formatters.js';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
-import { getAIRecommendationActionNames, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT } from '../../lib/prompt-templates.js';
+import { getSelectableStages, deriveDispatchKind, isValidDispatchKind, DISPATCH_KIND_DEFAULT, generatePrompt } from '../../lib/prompt-templates.js';
+const actionNames = () => getSelectableStages().map(s => s.name);
 import { guardNetwork } from '../fixtures/network-guard.js';
-
-// =============================================================================
-// stripCodeBlockMarkers Tests
-// =============================================================================
-
-describe('stripCodeBlockMarkers', () => {
-  test('returns null for null input', () => {
-    assert.strictEqual(stripCodeBlockMarkers(null), null);
-  });
-
-  test('returns undefined for undefined input', () => {
-    assert.strictEqual(stripCodeBlockMarkers(undefined), undefined);
-  });
-
-  test('returns empty string for empty input', () => {
-    assert.strictEqual(stripCodeBlockMarkers(''), '');
-  });
-
-  test('returns text unchanged when no code blocks present', () => {
-    const input = '# Implement LIN-64\n\n## Goal\n\nFix the bug.';
-    assert.strictEqual(stripCodeBlockMarkers(input), input);
-  });
-
-  test('strips opening and closing triple backticks', () => {
-    const input = '```\n# Implement LIN-64\n\n## Goal\n\nFix the bug.\n```';
-    const expected = '# Implement LIN-64\n\n## Goal\n\nFix the bug.';
-    assert.strictEqual(stripCodeBlockMarkers(input), expected);
-  });
-
-  test('strips backticks with language specifier', () => {
-    const input = '```markdown\n# Implement LIN-64\n\n## Goal\n\nFix the bug.\n```';
-    const expected = '# Implement LIN-64\n\n## Goal\n\nFix the bug.';
-    assert.strictEqual(stripCodeBlockMarkers(input), expected);
-  });
-
-  test('strips backticks with various language specifiers', () => {
-    const variations = ['```md\n', '```text\n', '```txt\n', '```plaintext\n'];
-    const content = '# Implement LIN-64';
-
-    for (const prefix of variations) {
-      const input = `${prefix}${content}\n\`\`\``;
-      assert.strictEqual(stripCodeBlockMarkers(input), content);
-    }
-  });
-
-  test('handles backticks without newline after opening', () => {
-    const input = '```# Implement LIN-64\n```';
-    const expected = '# Implement LIN-64';
-    assert.strictEqual(stripCodeBlockMarkers(input), expected);
-  });
-
-  test('handles backticks without newline before closing', () => {
-    const input = '```\n# Implement LIN-64```';
-    const expected = '# Implement LIN-64';
-    assert.strictEqual(stripCodeBlockMarkers(input), expected);
-  });
-
-  test('does not strip backticks in the middle of text', () => {
-    const input = '# Implement\n\n```javascript\nconst x = 1;\n```\n\n## Goal';
-    // Only opening backticks at start should be stripped, not internal ones
-    assert.strictEqual(stripCodeBlockMarkers(input), input);
-  });
-
-  test('only strips one pair of markers', () => {
-    const input = '```\n```\n# Implement\n```\n```';
-    // Strips outer pair, leaves inner backticks
-    const expected = '```\n# Implement\n```';
-    assert.strictEqual(stripCodeBlockMarkers(input), expected);
-  });
-});
 
 // =============================================================================
 // formatSubtaskOverview Tests
@@ -634,1537 +560,14 @@ describe('formatIssueContext cousins', () => {
 });
 
 // =============================================================================
-// Meta-prompt: Plan completeness check (mirrors handwritten path)
-// =============================================================================
-
-describe('buildMetaPromptTemplate defer routing (LIN-327)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('node-shaped tasks get the defer-vs-node-work decision step', () => {
-    const text = build({ hasSubtasks: true, subtaskCount: 3, remainingCount: 2 });
-    assert.ok(text.includes('defer'), 'defer must appear in a node-shaped meta-prompt');
-    assert.ok(/defer.*vs.*node-work/i.test(text), 'the node-work-vs-defer decision must be present');
-  });
-
-  test('leaf tasks do NOT get the defer decision step (no child to defer to)', () => {
-    const text = build({ hasSubtasks: false });
-    assert.ok(!text.includes('vs. node-work'), 'leaf tasks must not see the defer decision step');
-  });
-
-  test('output contract documents the DeferTo line and the empty-prompt-on-defer rule', () => {
-    const text = build({ hasSubtasks: true, subtaskCount: 2, remainingCount: 2 });
-    assert.ok(text.includes('DeferTo:'), 'the structured DeferTo contract line must be documented');
-    assert.ok(/do NOT generate a prompt body/i.test(text) || /leave the Prompt section empty/i.test(text),
-      'the no-prompt-body rule for defer must be stated');
-  });
-
-  test('defer appears in the emittable action vocabulary list', () => {
-    const text = build({ hasSubtasks: true });
-    assert.ok(text.includes('defer'), 'defer must be in the action vocabulary the meta-prompt prints');
-  });
-});
-
-describe('buildMetaPromptTemplate terminal-state branch (LIN-353)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('a terminal leaf (no open children) gets a Done branch steering to review/close, not look-into', () => {
-    const text = build({ isTerminal: true, hasOpenChildren: false });
-    assert.ok(/terminal state/i.test(text), 'the Done branch must be present');
-    assert.ok(/\breview\b/.test(text), 'a terminal leaf must be steered toward review/close');
-    assert.ok(/do NOT recommend .*look-into/i.test(text) || /never to redo/i.test(text),
-      'the Done branch must forbid no-op look-into/busywork');
-  });
-
-  test('a non-terminal task does NOT get the Done branch', () => {
-    const text = build({ isTerminal: false, hasOpenChildren: false });
-    assert.ok(!/### Step 0:/.test(text), 'open tasks must not see the terminal Step 0');
-  });
-
-  test('a terminal task WITH open children is told to descend, not close (Scenario J)', () => {
-    const text = build({ isTerminal: true, hasOpenChildren: true, hasSubtasks: true, subtaskCount: 2, remainingCount: 1 });
-    assert.ok(/still has open children/i.test(text), 'the open-children terminal branch must be present');
-    assert.ok(/descend|route to the open child/i.test(text), 'it must steer toward the open child, not close');
-  });
-
-  test('an open parent whose every subtask is terminal gets the unified Step 0 review/close branch', () => {
-    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 3, remainingCount: 0, hasOpenChildren: false });
-    assert.ok(/### Step 0:/.test(text), 'the unified completion Step 0 must fire for an all-subtasks-done parent');
-    assert.ok(/\breview\b/.test(text), 'it must steer toward review/close');
-    assert.ok(/close it out|close-out/i.test(text), 'it must frame the remaining work as the parent close-out');
-    assert.ok(/do NOT \`?defer\`?/i.test(text), 'it must still forbid deferring into a finished child (LIN-364)');
-  });
-});
-
-// =============================================================================
-// Review routing (review-never-recommended fix): `review` is no longer gated to
-// terminal/all-subtasks-done states. Step 3 routes a leaf whose implementation has
-// already landed (completion signals recorded) to `review` instead of looping
-// `implementation` — the cause of merged-but-In-Progress tasks never advancing.
-// =============================================================================
-describe('buildMetaPromptTemplate review routing for landed implementation', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: true, commentCount: 2, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('Step 3 instructs routing an already-landed implementation to review', () => {
-    const text = build({ isTerminal: false, hasOpenChildren: false });
-    assert.ok(/already landed/i.test(text), 'Step 3 must check whether implementation has already landed');
-    assert.ok(/Recommend \`review\`/.test(text), 'a landed implementation must route to review');
-  });
-
-  test('Step 3 guards against re-recommending implementation on done work and on In Progress alone', () => {
-    const text = build({ isTerminal: false, hasOpenChildren: false });
-    assert.ok(/Do NOT re-recommend \`implementation\` on work that is already done/i.test(text),
-      'it must forbid re-implementing already-done work');
-    assert.ok(/In Progress state is NOT by itself evidence/i.test(text),
-      'an In Progress state alone must not be read as unfinished');
-  });
-});
-
-// =============================================================================
-// Review routing for a PLAN-LESS leaf (LIN-448) — LIN-431's already-landed guard
-// only fired inside the "a complete plan exists" branch, so a research→implementation
-// leaf (no `plan` step, no `## Implementation Plan` block, no session-fit answer)
-// bypassed it and fell through to "implementation readiness" (the "simple enough to
-// implement directly" path), looping `implementation` on a merged-but-In-Progress
-// leaf. The fix hoists the landed check ABOVE the plan gate so it fires for any leaf
-// carrying completion signals, planned or not.
-// =============================================================================
-describe('buildMetaPromptTemplate review routing for a plan-less landed leaf (LIN-448)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: true, commentCount: 1, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('the already-landed check is hoisted ABOVE the plan-exists gate, not nested under it', () => {
-    const text = build({ isTerminal: false, hasOpenChildren: false });
-    const landedIdx = text.indexOf('already landed');
-    const planGateIdx = text.indexOf('check whether a plan exists');
-    assert.ok(landedIdx !== -1, 'the already-landed check must be present in Step 3');
-    assert.ok(planGateIdx !== -1, 'the plan-exists gate must be present in Step 3');
-    assert.ok(landedIdx < planGateIdx,
-      'the already-landed check must precede the plan-exists gate so plan-less leaves still hit it');
-  });
-
-  test('the landed check explicitly covers the plan-less research→implementation leaf shape', () => {
-    const text = build({ isTerminal: false, hasOpenChildren: false });
-    assert.ok(/plan-less\s+\`research → implementation\`\s+leaf/i.test(text),
-      'the landed-check must name the plan-less research→implementation leaf shape from LIN-448');
-    assert.ok(/no \`plan\` step/i.test(text),
-      'it must acknowledge leaves that reached implementation with no plan step');
-  });
-
-  test('"simple enough to implement directly" is explicitly NOT a reason to skip the landed check', () => {
-    const text = build({ isTerminal: false, hasOpenChildren: false });
-    assert.ok(/small enough to just do it.*NOT a reason to skip this landed-evidence check/is.test(text),
-      'the "simple enough to implement directly" path must not bypass the landed-evidence check');
-  });
-
-  test('the guard applies to a childless open leaf (no subtasks, In Progress)', () => {
-    const text = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
-    // Step 0's deterministic review rule cannot fire for a childless open leaf...
-    assert.ok(!/### Step 0: The substantive work here is already complete/.test(text),
-      'Step 0 deterministic review must NOT fire for a childless open leaf (the LIN-448 gap)');
-    // ...so Step 3's hoisted soft check is the path that must route it to review.
-    assert.ok(/already landed/i.test(text) && /Recommend \`review\`/.test(text),
-      'Step 3 must carry the already-landed → review path for the childless open leaf');
-  });
-});
-
-// =============================================================================
-// Close-out routing gate (LIN-812) — close-out and review are the positive/negative
-// pair of ONE decision (the review→close-out split, LIN-550; the verdict-not-heading
-// relax, LIN-810; the positive-review-evidence requirement, LIN-811). The recommender
-// baseline did not cover `close-out` at all (LIN-804: it fired ~1/3 of the time it
-// should), so these structural guards pin the routing prose that the LLM shape-coverage
-// fixtures (scripts/eval/fixtures/recommend/closeout-review.json) measure under load.
-// The decision is driven by COMMENT-TRAIL state: an Approve verdict on record +
-// unmerged → close-out; work that merely looks done with NO review-verdict comment →
-// review. Step 0 carries it for the already-complete node; Step 3 for the landed leaf.
-// =============================================================================
-describe('buildMetaPromptTemplate close-out routing gate (LIN-812)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: true, commentCount: 2, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('Step 0 routes an approved-but-unmerged finished task to close-out, not another review', () => {
-    // All subtasks complete (hasSubtasks, no open children) arms the Step-0 branch.
-    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 2, completedCount: 2, hasOpenChildren: false });
-    assert.ok(/### Step 0: The substantive work here is already complete/.test(text),
-      'Step 0 must fire for a finished node with no open children');
-    assert.ok(/Approve \(or Approve — conditional\) verdict and a ledger, but the work is still unmerged \/ not Done → recommend \`close-out\`, NOT another \`review\`/i.test(text),
-      'Step 0 must route approved-but-unmerged work to close-out, not a repeated review');
-  });
-
-  test('Step 0 requires positive review evidence before close-out — looking done is not enough', () => {
-    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
-    assert.ok(/\`close-out\` requires positive evidence that a review actually ran/i.test(text),
-      'close-out must demand positive evidence (a review-verdict comment) on the trail');
-    assert.ok(/if no such review comment is on the trail, the review has not happened — recommend \`review\`/i.test(text),
-      'absent a review-verdict comment, the gate must route to review');
-    assert.ok(/When the evidence is ambiguous, default to \`review\`/i.test(text),
-      'ambiguous evidence must default to review, never close-out');
-  });
-
-  test('Step 3 carries the landed-leaf close-out path (approve-on-record + unmerged)', () => {
-    // Childless open leaf: Step 0 cannot fire, so Step 3 owns the close-out routing.
-    const text = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
-    assert.ok(!/### Step 0: The substantive work here is already complete/.test(text),
-      'Step 0 must NOT fire for a childless open leaf — Step 3 is the path');
-    assert.ok(/Implementation landed AND \`review\` has already recorded an Approve \(or Approve — conditional\) verdict.*Recommend \`close-out\`/is.test(text),
-      'Step 3 must route landed + approved-on-record + unmerged work to close-out');
-    assert.ok(/A rich, detailed, or complete-looking description is not that evidence.*recommend \`review\`/is.test(text),
-      'Step 3 must keep the LIN-811 positive-evidence requirement on the leaf path too');
-  });
-
-  test('the cannot-close branch routes landed-but-red / blocked work away from close-out', () => {
-    const text = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
-    assert.ok(/Cannot-close branch/i.test(text),
-      'Step 0 must carry the cannot-close branch');
-    assert.ok(/if the comments already show the work landed but CI is red.*do NOT keep routing to \`review\` or \`close-out\`/is.test(text),
-      'landed-but-red work must route to the blocker, not to review/close-out');
-  });
-
-  // LIN-823 — the LIN-811 review-evidence gate covered the generic "landed leaf, no
-  // review" shape but missed the BUG path: a `bug`-labelled fix posts its own rich
-  // investigation comments (`Root cause CONFIRMED`, findings, class-check, stepper
-  // run-summary) that read review-ish and fooled the recommender into close-out before
-  // review. The gate must now explicitly exclude that author-diagnosis commentary from
-  // counting as a review verdict. The prose is shared by Step 0 and Step 3, so both
-  // close-out decision points carry the exclusion.
-  test('the close-out gate excludes a bug\'s own investigation commentary from review evidence (LIN-823)', () => {
-    // Step 0 path (all subtasks complete) and Step 3 path (childless open leaf) must
-    // both carry the bug-investigation exclusion.
-    const step0 = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
-    const step3 = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
-    for (const [label, text] of [['Step 0', step0], ['Step 3', step3]]) {
-      assert.ok(/a \`bug\`'s own investigation commentary is NOT a review verdict/i.test(text),
-        `${label} must state that a bug's investigation commentary is not a review verdict`);
-      assert.ok(/do NOT count root-cause, findings, class-check, or run-summary comments as review evidence/i.test(text),
-        `${label} must exclude root-cause/findings/class-check/run-summary comments from review evidence`);
-      assert.ok(/Only an actual \`review\` verdict on the trail .* authorizes \`close-out\`/is.test(text),
-        `${label} must require an actual review verdict before close-out`);
-    }
-  });
-
-  // ---------------------------------------------------------------------------
-  // The plan-review carve-out (LIN-1603 item 2.5) — the same failure SHAPE as the
-  // LIN-823 bug-commentary exclusion above, one step earlier in the pipeline.
-  // `plan-review` deliberately reuses review's Approve / Request Changes / Needs
-  // Discussion vocabulary, so an Approve on a PLAN could otherwise satisfy the
-  // close-out evidence check and authorize the merge + Done transition on work that
-  // was never built. Deterministic and model-free: this pins the prose in BOTH
-  // close-out decision points, exactly as the bug carve-out is pinned.
-  // ---------------------------------------------------------------------------
-  test('a plan-review verdict is NOT close-out evidence — in both Step 0 and Step 3 (LIN-1603)', () => {
-    const step0 = build({ isTerminal: false, hasSubtasks: true, subtaskCount: 1, completedCount: 1, hasOpenChildren: false });
-    const step3 = build({ isTerminal: false, hasSubtasks: false, hasOpenChildren: false });
-    for (const [label, text] of [['Step 0', step0], ['Step 3', step3]]) {
-      assert.ok(/a \`plan-review\` verdict is NOT a review verdict either/i.test(text),
-        `${label} must exclude a plan-review verdict from review evidence`);
-      assert.ok(/would authorize \`close-out\` on unimplemented work/i.test(text),
-        `${label} must name the failure it prevents: close-out on unimplemented work`);
-      // The header is the DISAMBIGUATOR, never the thing the gate keys on (LIN-810):
-      // the exclusion must hold for a plan-review verdict posted WITHOUT the header.
-      assert.ok(/whether or not that header is present/i.test(text),
-        `${label} must exclude the plan verdict on substance, not on the presence of the header`);
-      assert.ok(/the header is a disambiguator between the two verdict kinds, not the thing the gate keys on/i.test(text),
-        `${label} must state the header is not a required format (LIN-810)`);
-      // Regression guard: the plan-review exclusion must not have displaced the
-      // bug-commentary one — both carve-outs live in this same sentence chain.
-      assert.ok(/a \`bug\`'s own investigation commentary is NOT a review verdict/i.test(text),
-        `${label} must still carry the LIN-823 bug-commentary exclusion`);
-    }
-  });
-});
-
-// =============================================================================
-// Plan-review gate + routing branch (LIN-1603, items 2.4 and 2.3) — the gate is
-// GATED, never universal: it exists to protect the throughput of the work that
-// needs it, so the risk being guarded here is OVER-firing. These pin (a) that the
-// branch is sited between the plan-exists gate and the session-fit routing, (b)
-// that a gate-not-met plan still falls through to the unchanged session-fit
-// routes, and (c) the one-cycle revision bound with its human-edge escalation.
-// The eval (scripts/eval-plan-review.mjs) measures the same two properties under
-// load; these are the deterministic half.
-// =============================================================================
-describe('buildMetaPromptTemplate plan-review gate and routing (LIN-1603)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: true, commentCount: 2, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '),
-      isTerminal: false, hasOpenChildren: false, ...overrides
-    });
-  }
-
-  test('the gate is sited AFTER the plan-exists check and BEFORE the session-fit routing', () => {
-    const text = build();
-    const planGate = text.indexOf('check whether a plan exists');
-    const reviewGate = text.indexOf('the plan-review gate');
-    const sessionFit = text.indexOf('Otherwise route on the session-fit answer');
-    assert.ok(planGate > -1 && reviewGate > -1 && sessionFit > -1,
-      'all three landmarks must be present in Step 3');
-    assert.ok(planGate < reviewGate,
-      'the plan-review gate must come after the plan-exists check — it reads a plan that exists');
-    assert.ok(reviewGate < sessionFit,
-      'the gate must come BEFORE the session-fit routing, or a gated plan would already have been routed');
-  });
-
-  test('all four gate criteria are stated, keyed to what the plan says', () => {
-    const text = build();
-    assert.ok(/\(a\) the session-fit answer is "needs multiple sessions"/i.test(text),
-      'criterion (a): the multi-session answer');
-    assert.ok(/\(b\) it names a routed-around contract gap with a ticket identifier/i.test(text),
-      'criterion (b): a named routed-around contract gap');
-    assert.ok(/\(c\) any step relaxes a validation, a contract, or a guard/i.test(text),
-      'criterion (c): a relaxed validation/contract/guard');
-    assert.ok(/\(d\) it touches credential, merge-rule, or dispatch-contract surfaces/i.test(text),
-      'criterion (d): credential / merge-rule / dispatch-contract surfaces');
-    // The plan writes the decision down (item 2.1); the router may read it directly.
-    assert.ok(/plan-review due: yes/i.test(text),
-      'the router must recognise the decision the plan phase records');
-  });
-
-  test('gate NOT met ⇒ no plan-review and no added dispatch — the over-fire guard', () => {
-    const text = build();
-    assert.ok(/When none of \(a\)–\(d\) holds, do NOT emit \`plan-review\`/i.test(text),
-      'the gate must state the negative case explicitly, not leave it implied');
-    assert.ok(/fall straight through to the session-fit routing below, exactly as before this gate existed/i.test(text),
-      'a gate-not-met plan must reach its old destination unchanged (zero added dispatches)');
-    assert.ok(/gated, not universal/i.test(text),
-      'the prose must say the step is gated rather than universal');
-    // The unchanged destinations themselves must survive alongside the new branch.
-    assert.ok(/fits one session.*\`implementation\`.*needs multiple sessions.*\`breakdown\`/is.test(text),
-      'both pre-existing session-fit routes must remain intact');
-  });
-
-  test('gate met + no verdict on the trail ⇒ plan-review, and only then', () => {
-    const text = build();
-    assert.ok(/Recommend \`plan-review\` when ALL of these hold: a plan exists; the gate is met; and NO plan-review verdict is on the trail yet/i.test(text),
-      'all three conditions must be required together');
-    assert.ok(/Do NOT re-emit \`plan-review\` on a plan that already has one/i.test(text),
-      'a plan that already carries a verdict must not be re-reviewed');
-  });
-
-  test('the revision loop is bounded at one cycle, escalating to the human edge on the second', () => {
-    const text = build();
-    assert.ok(/\*\*Request Changes \/ Needs Discussion \(the first one\)\*\* → \`plan\`/i.test(text),
-      'the first Request Changes must route back to plan for the revision pass');
-    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend \`blocked\`/i.test(text),
-      'the second must escalate to the human edge via blocked');
-    assert.ok(/Do NOT emit a third \`plan-review\`, and do NOT emit another \`plan\`/i.test(text),
-      'neither a third plan-review nor a further plan may be emitted after the second verdict');
-    assert.ok(/One revision cycle \(plan → plan-review → revised plan → plan-review\) is \*converging\*; a second is \*looping\*/i.test(text),
-      'the bound must name converging vs looping, matching the kickoff and handbook wording');
-  });
-
-  test('Approve routes on session-fit as before, and is explicitly not close-out evidence', () => {
-    const text = build();
-    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
-      'an approved plan must rejoin the unchanged session-fit routing');
-    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
-      'the carve-out must also be stated at the producing end of the verdict');
-  });
-
-  test('the Completed-prep rule carries the one exception the revision branch needs', () => {
-    const text = build();
-    // "Completed prep ⇒ never re-emit the prep verb" would otherwise out-argue the
-    // Request-Changes → `plan` branch, since a plan already exists on the trail.
-    assert.ok(/ONE exception, and only one: a \`plan-review\` that recorded \*\*Request Changes\*\* or \*\*Needs Discussion\*\* makes the plan's deliverable un-settled again/i.test(text),
-      'the never-re-emit-prep rule must name the revision pass as its single exception');
-    assert.ok(/Completed prep ⇒ never re-emit the prep verb/i.test(text),
-      'the rule itself must survive the exception');
-  });
-
-  test('S2 parity — the Plan-prompts quality rule carries the gate and the revision half', () => {
-    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan prompts**'));
-    assert.ok(rule, 'the meta-prompt must carry a Plan-prompts quality rule');
-    assert.ok(/plan-review due: yes.*plan-review due: no/is.test(rule),
-      'the rule must require the recorded gate decision');
-    assert.ok(/placed AFTER the Scope Assessment \/ session-fit step/i.test(rule),
-      'the rule must pin the gate BELOW session-fit, since criterion (a) reads that answer');
-    assert.ok(/revise against a prior plan-review verdict/i.test(rule),
-      'the rule must carry the revision half (item 2.2 parity)');
-    assert.ok(/never a required format to key on/i.test(rule),
-      'the header must stay a disambiguator in the meta path too (LIN-810)');
-    // LIN-1770: a revision replaces the prior plan section instead of appending.
-    assert.ok(/The revision REPLACES the plan section already in the description/.test(rule),
-      'the rule must carry the replace-not-append semantics for a plan revision');
-    assert.ok(/retaining only a short changelog line/i.test(rule),
-      'the rule must state the changelog stays short — the superseded plan\'s full text is not retained');
-  });
-
-  // LIN-1770: close-out's irreversible set now includes an archive+prune step. This
-  // is the same shape as the S2 parity test above, one template over — the quality
-  // rule that generates a `close-out` recommendation prompt must carry the same
-  // guardrails the handwritten close-out template hardcodes (see the (g*) tests in
-  // tests/unit/prompt-templates.test.js), or the two prompt paths diverge silently.
-  test('S3 parity — the Close-out prompts quality rule carries archive+prune with its guardrails', () => {
-    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
-    assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
-    assert.ok(/archive a pre-prune snapshot of the description and then prune/i.test(rule),
-      'the rule must require archiving before pruning');
-    assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
-      'the rule must carry the never-prune carve-out, including scope');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
-      'the rule must carry the verbatim marker-preservation mandate');
-    assert.ok(/this step runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
-      'the rule must scope the step to the all-clear path only, mirroring the handwritten template');
-  });
-
-  // LIN-1772: LIN-1770's review (finding F1) named no fallback for a snapshot
-  // verification that fails after the merge and Done have already landed. This
-  // pins the meta-path half of the fix — mirrors (g9) in prompt-templates.test.js.
-  test('S4 parity — the Close-out prompts quality rule carries the archive-verification skip-and-close failure branch', () => {
-    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
-    assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
-    const verifyAt = rule.search(/verify the archive landed/i);
-    const failureAt = rule.search(/if that verification fails, do not prune/i);
-    assert.ok(verifyAt > -1 && failureAt > -1 && verifyAt < failureAt,
-      'the failure branch is sited immediately after the archive-verification clause');
-    assert.ok(/record in the summary that the archive could not be confirmed and the prune was skipped/i.test(rule),
-      'the rule must require recording the skip in the summary');
-    assert.ok(/close the task anyway, since the merge and Done transition have already landed/i.test(rule),
-      'the rule must name the post-merge/Done discriminator that authorizes closing anyway');
-    assert.ok(/never holding open, re-routing, or reopening a task whose merge and Done have landed/i.test(rule),
-      'the rule must prohibit holding open, re-routing, or reopening');
-  });
-
-  // Ruling on LIN-2825: scope discharges by done or an explicit drop, never by
-  // filing. Extends the LIN-1871 class-bound enumeration and the LIN-550 ledger
-  // gate onto the meta-prompt's Review-prompts and Close-out-prompts quality
-  // rules, mirroring the handwritten-template pins in prompt-templates.test.js
-  // so each path fails independently.
-  describe('scope discharges by done, not by filing (LIN-2825, extending LIN-550 + LIN-1871)', () => {
-    function reviewRule() {
-      return build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Review prompts**'));
-    }
-    function closeoutRule() {
-      return build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
-    }
-
-    test('the Review-prompts rule requires marking class-check instances and ledger items inside/outside the ticket\'s bounded classes', () => {
-      const rule = reviewRule();
-      assert.ok(rule, 'the meta-prompt must carry a Review-prompts quality rule');
-      assert.ok(/inside or outside the ticket's own bounded classes/i.test(rule),
-        'the rule requires an inside/outside mark on class-check instances and ledger items');
-      assert.ok(/LIN-1871/.test(rule), 'the rule cites LIN-1871 as the bounding mechanism');
-      assert.ok(/a finding inside a bounded class is scope, and scope discharges by done or an explicit drop, never by filing/i.test(rule),
-        'the rule states the ruling\'s scope/discharge rule');
-      assert.ok(/close-out must not be able to discharge it merely by filing a ticket for it/i.test(rule),
-        'the rule states an inside instance cannot be discharged by filing');
-      assert.ok(/this marking is orthogonal to the proportional risk lanes/i.test(rule),
-        'the rule states the scope mark is a different axis from the named-monitor/named-rollback lanes');
-    });
-
-    test('the Review-prompts rule defines inside by kind (defect/idiom), not by research\'s enumerated list, and limits ruling options', () => {
-      const rule = reviewRule();
-      assert.ok(/same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i.test(rule),
-        'the rule defines inside by kind, not by the research list');
-      assert.ok(/genuinely different kind of problem/i.test(rule), 'outside is a genuinely different kind of problem');
-      assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
-        'the rule limits ruling options to outside-only filing');
-    });
-
-    // LIN-3006 review fixup: meta (5a) never carried the "or a claim this
-    // ticket's own change depends on" disjunct — a pre-existing parity gap with
-    // the handwritten path, same defect. This pin fails until the disjunct is
-    // mirrored here.
-    test('the Review-prompts rule\'s inside definition also covers a claim this ticket\'s own change depends on', () => {
-      const rule = reviewRule();
-      assert.ok(/whether or not research's enumeration listed it \(the list is evidence of the class, not its edge\), or a claim this ticket's own change depends on/i.test(rule),
-        'the dependency-claim disjunct sits alongside the kind-not-list definition');
-    });
-
-    test('the Review-prompts rule\'s ledger item (6) is marked inside/outside and routes discharge accordingly', () => {
-      const rule = reviewRule();
-      assert.ok(/each marked inside or outside per \(5a\) and stated with how it can be discharged/i.test(rule),
-        'ledger items are marked per (5a) before stating a discharge route');
-      assert.ok(/an inside item by a real-world check or a manual repro naming its exact distinguishing precondition \(filing a ticket for it is never a discharge, since it is this ticket's own scope\)/i.test(rule),
-        'an inside ledger item never discharges by filing');
-      assert.ok(/an outside item by a routed follow-up ticket that states the problem on its own terms/i.test(rule),
-        'an outside ledger item discharges by a self-contained filed ticket');
-    });
-
-    test('the Close-out-prompts rule discharges an inside item only by done or an explicit drop, never by filing', () => {
-      const rule = closeoutRule();
-      assert.ok(rule, 'the meta-prompt must carry a Close-out prompts quality rule');
-      assert.ok(/each gap's inside\/outside mark \(LIN-1871\)/i.test(rule),
-        'the rule reads the inside/outside mark from the review comment');
-      assert.ok(/an item marked \*\*inside\*\* the ticket's bounded classes \(this ticket's own unfinished scope\) discharges only by \(a\) cited evidence that it is done.*or \(b\) an explicit drop, warranted only when finishing the item is materially larger than this ticket's own change/is.test(rule),
-        'an inside item discharges only by done or a materially-gated explicit drop');
-      assert.ok(/filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(rule),
-        'filing is explicitly not a discharge for a dropped inside item, and it is never eligible for filing');
-      assert.ok(/a close-out that still has an undischarged inside item must not set Done/i.test(rule),
-        'close-out must not set Done over an undischarged inside item');
-    });
-
-    test('the Close-out-prompts rule lets an outside item discharge by a self-contained filed ticket, and gates follow-up eligibility', () => {
-      const rule = closeoutRule();
-      assert.ok(/an item marked \*\*outside\*\* every bounded class.*may be discharged by filing it as a follow-up ticket that states the problem on its own terms/is.test(rule),
-        'an outside item may discharge by a self-contained filed ticket');
-      assert.ok(/an inside-scope ledger item that is neither done nor dropped must be discharged first, never filed as a substitute/i.test(rule),
-        'an undischarged inside item must not be filed as a substitute for finishing it');
-    });
-
-    // LIN-3006 review fixup (non-blocking suggestion): rule (6)'s filing
-    // instruction was scoped to outside items but had no pin of its own.
-    test('the Close-out-prompts rule (6) scopes the irreversible-set filing step to outside-scope follow-ups', () => {
-      const rule = closeoutRule();
-      assert.ok(/file remaining outside-scope follow-ups/i.test(rule),
-        'rule (6) restricts the irreversible-set filing step to outside-scope follow-ups');
-    });
-
-    // LIN-3006: the drop-then-file route is removed on purpose — a dropped
-    // inside item is recorded, never filed. This pin asserts the OPPOSITE of
-    // what it asserted before LIN-3006 (that drop-then-file text is present);
-    // it must fail against the pre-LIN-3006 rule text.
-    test('the Close-out-prompts rule restricts filing to outside-scope items only — a dropped inside item is never filed', () => {
-      const rule = closeoutRule();
-      assert.ok(/\*\*only outside-scope items are eligible to be filed\*\*/i.test(rule),
-        'follow-up filing eligibility is restricted to outside-scope items only');
-      assert.ok(!/only outside-scope items, and inside-scope items explicitly dropped in the summary, are eligible to be filed/i.test(rule),
-        'the drop-then-file route is removed — a dropped inside item is not eligible to be filed');
-      assert.ok(/an inside-scope item explicitly dropped in the summary is recorded there, not filed/i.test(rule),
-        'a dropped inside item is recorded, not filed');
-      assert.ok(/the drop is not a license to file it/i.test(rule),
-        'states explicitly that a drop is not a license to file');
-      assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
-        'ruling options on close-out limit filing to outside-only');
-    });
-
-    test('the LIN-1579 named-monitor/named-rollback lanes remain untouched on the meta path — a different axis from scope', () => {
-      const review = reviewRule();
-      const closeout = closeoutRule();
-      assert.ok(/name the monitor/i.test(review) && /name the rollback/i.test(review),
-        'the Review-prompts rule still carries both named lanes');
-      assert.ok(/named monitor/i.test(closeout) && /named rollback/i.test(closeout),
-        'the Close-out-prompts rule still honours both named lanes');
-      assert.ok(/regardless of the item's inside\/outside mark — the named monitor stands as the cited evidence/i.test(closeout),
-        'the named-monitor discharge is explicitly independent of the scope mark');
-    });
-
-    // LIN-2917: the meta path carried the monitor list with no content pin at all —
-    // only lane survival above — so an edit to rules (6)(i) / (3a) shipped green
-    // either way. Pin the list itself, mirroring the handwritten pin in
-    // tests/unit/prompt-templates.test.js.
-    test('the meta-prompt monitor list names only things that fire — a routed ticket is cited beside a monitor, never as one', () => {
-      const review = reviewRule();
-      const closeout = closeoutRule();
-      assert.ok(/a log or oplog entry, a metric, a path that fails loudly/i.test(review),
-        'the meta Review rule still enumerates the nameable monitor kinds');
-      assert.ok(!/a routed follow-up that owns the watch/i.test(review),
-        'the meta Review rule no longer lists a routed follow-up as a monitor kind');
-      assert.ok(!/a routed follow-up that owns the watch/i.test(closeout),
-        'the meta Close-out rule no longer lists a routed follow-up as a monitor kind');
-      assert.ok(/a routed follow-up ticket is never the monitor and may only be cited BESIDE one, never instead of it/i.test(review),
-        'the meta Review rule states that a ticket is not a monitor');
-      assert.ok(/never a routed follow-up ticket, which does not fire and may only be cited beside the monitor, not as it/i.test(closeout),
-        'the meta Close-out rule refuses a ticket standing in for a monitor');
-      // The misfire guard is a required written line on the meta path too, and
-      // close-out rejects a lane entry that lacks it.
-      assert.ok(/the reviewer writes one line naming why no check short of production could prove the claim/i.test(review),
-        'the meta Review rule makes the misfire guard a written line');
-      assert.ok(/an entry with no such line does not take the lane and close-out rejects it/i.test(review),
-        'the meta Review rule states the consequence of a missing justification line');
-      assert.ok(/close-out rejects an entry missing that line as undischarged/i.test(closeout),
-        'the meta Close-out rule rejects a lane entry with no justification line');
-    });
-
-    describe('close-out authors only a trivial, review-named change (LIN-3033)', () => {
-      test('both rules stay one physical line', () => {
-        const review = reviewRule();
-        const closeout = closeoutRule();
-        assert.ok(review && closeout, 'both rules are present');
-        assert.ok(!review.includes('\n'), 'the Review-prompts rule stays a single line, since tests extract it by its line prefix');
-        assert.ok(!closeout.includes('\n'), 'the Close-out-prompts rule stays a single line, since tests extract it by its line prefix');
-      });
-
-      test('the Close-out rule carries the (a)+(b) trivial-and-named definition, the pin carve-out, and the evidence/CI-on-new-head requirement', () => {
-        const rule = closeoutRule();
-        assert.ok(/the diff is exactly the text, value, or line a review sentence quoted/i.test(rule),
-          'states condition (a): exact review-quoted content');
-        assert.ok(/an illustrative "e\.g\." does not qualify/i.test(rule), 'an "e.g." example does not qualify as exact content');
-        assert.ok(/at most 2 files and 3 hunks/i.test(rule), 'states the size bound');
-        assert.ok(/no new or changed test case, function, branch, condition, or control flow/i.test(rule),
-          'states condition (b): no new/changed test, function, branch, condition, or control flow');
-        assert.ok(/an update to an existing literal\/expected-string pin that review quoted verbatim is allowed/i.test(rule),
-          'the pin-update carve-out is present');
-        assert.ok(/writing a new witness test is never trivial/i.test(rule), 'a new witness test is never trivial');
-        assert.ok(/citing the commit and the review sentence verbatim/i.test(rule), 'requires citing commit + review sentence verbatim');
-        assert.ok(/re-establishing CI on the new head/i.test(rule) && /--match-head-commit/.test(rule),
-          'requires CI re-established on the new head, merged with --match-head-commit');
-      });
-
-      test('the Close-out rule states the authoring limit at CLASS level, not scoped to ledger discharge only (F1′ regression pin)', () => {
-        const rule = closeoutRule();
-        assert.ok(/whatever prompted it/i.test(rule), 'the class-level scope uses the generalizing phrase');
-        assert.ok(/conditional-Approve caveat/i.test(rule), 'names the caveat route');
-        assert.ok(/non-gating review finding/i.test(rule), 'names the non-gating-finding route');
-        assert.ok(/self-found sibling/i.test(rule), 'names the self-found-sibling route');
-        assert.ok(!/author a change to discharge a ledger item only when/i.test(rule),
-          'must NOT regress to the ledger-only scoping this pin exists to catch');
-      });
-
-      test('the Close-out rule names resolving a merge conflict as a bounded authoring route (F3 regression pin)', () => {
-        const rule = closeoutRule();
-        assert.ok(/resolving a conflict between the PR branch and its base while merging/i.test(rule),
-          'the class-level lead-in names the merge-conflict route — this pin fails against wording that never mentions a merge conflict');
-      });
-
-      test('clause (6) carries the merge-conflict corollary alongside the untouched merge/verify/summary text', () => {
-        const rule = closeoutRule();
-        assert.ok(/perform the irreversible set — merge, verify the change on the landed commit/i.test(rule),
-          'the pinned (6) merge/verify text is untouched');
-        assert.ok(/categorically fails the exact-content test in \(2\)/i.test(rule) && /resolving a conflict between the PR branch and its base while performing this merge/i.test(rule),
-          'a merge-conflict resolution while performing the merge categorically fails the exact-content test');
-        assert.ok(/a merge that lands with no conflict, whether by merge or rebase, with no hunk close-out chose or wrote, is ordinary merge mechanics and not authoring/i.test(rule),
-          'a conflict-free merge/rebase is explicitly excluded from authoring, worded neutrally over merge or rebase (plan-review advisory A2)');
-      });
-
-      test('clause (7) widens the next-action trigger to a non-trivial close-out-authored change, including a merge-conflict resolution', () => {
-        const rule = closeoutRule();
-        assert.ok(/is not trivial and review-named/i.test(rule), 'the next-action trigger names the non-trivial/non-named failure');
-        assert.ok(/a merge-conflict resolution/i.test(rule), 'the widened trigger names the merge-conflict route');
-        assert.ok(/a "do it here" ruling/i.test(rule), 'the widened trigger still names the do-it-here route');
-      });
-
-      test('clause (6b) carries the "do it here during close-out is not review-named" sentence after, not replacing, the pinned ruling-options text', () => {
-        const rule = closeoutRule();
-        assert.ok(/if a ruling is raised on a finding during close-out, an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(rule),
-          'the pinned ruling-options sentence is untouched');
-        assert.ok(/a "do it here" ruling on a finding raised during close-out is, by construction, not review-named/i.test(rule),
-          'the new sentence states a close-out-raised "do it here" ruling is never review-named');
-      });
-
-      test('the Review rule states the exact-change hand-off, scoped to the new clause only for the no-Linear check', () => {
-        const rule = reviewRule();
-        assert.ok(/must state the exact change/i.test(rule), 'review is told to state the exact change');
-        assert.ok(/never an illustrative "e\.g\." example/i.test(rule), 'an "e.g." example does not qualify as exact content');
-        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve naming a vague fix/i.test(rule),
-          'a vague or non-trivial hand-off forces Request Changes');
-        // Scoped no-Linear check (plan-review advisory): the review rule as a
-        // whole legitimately contains "Create a new Linear ticket" in its
-        // cannot-close branch, so only the new clause itself is checked here.
-        const m = rule.match(/when review wants close-out to make an edit rather than doing it itself.*?not a conditional Approve naming a vague fix\./is);
-        assert.ok(m, 'the new clause is present and extractable on its own');
-        assert.ok(!m[0].includes('Linear'), 'the new LIN-3033 clause introduces no literal "Linear" of its own');
-      });
-
-      test('the pre-existing inside/outside, done-or-drop, and outside-only-filing wording is untouched by the LIN-3033 additions', () => {
-        const review = reviewRule();
-        const closeout = closeoutRule();
-        assert.ok(/an inside item's options are "do it here" or "drop it, with the reason" — "file" is offered only for an outside item/i.test(review),
-          'review still limits ruling options to outside-only filing');
-        assert.ok(/"file" is offered only for an outside item/i.test(closeout), 'close-out still limits ruling options to outside-only filing');
-      });
-    });
-
-    // LIN-3056: mirrors the handwritten pin. The meta Review rule reserves the
-    // conditional form for a ledger close-out can actually discharge within
-    // LIN-3033's trivial review-named-edit bound, and routes an inside item
-    // needing authored test/code to Request Changes. Fails against the
-    // pre-LIN-3056 rule, which forced the conditional form for any non-empty
-    // ledger and said nothing about an inside item needing authored test/code.
-    describe('review reserves conditional Approve for a dischargeable ledger (LIN-3056)', () => {
-      test('the pre-existing conditional-Approve sentence is preserved verbatim, not replaced', () => {
-        const rule = reviewRule();
-        assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(rule),
-          'the original conditional-Approve wording survives the LIN-3056 addition');
-        assert.ok(/never a bare Approve/i.test(rule), 'the never-a-bare-Approve half is preserved');
-      });
-
-      test('the meta Review rule reserves the conditional form for a ledger close-out can discharge', () => {
-        const rule = reviewRule();
-        assert.ok(/close-out can actually discharge/i.test(rule),
-          'states the reservation: only a ledger close-out can discharge gets the conditional form');
-        assert.ok(/within its own trivial, review-named-edit bound/i.test(rule),
-          'names LIN-3033\'s trivial review-named-edit bound as the reservation boundary');
-      });
-
-      test('the meta Review rule routes an inside item needing authored test/code to Request Changes', () => {
-        const rule = reviewRule();
-        // Scoped to the LIN-3056 clause (F1): the whole rule also carries the
-        // pre-existing LIN-3033 sentence "…the verdict is Request Changes back
-        // to implementation, not a conditional Approve naming a vague fix", so
-        // an unscoped assertion passes even when the new clause routes
-        // elsewhere. Extract the LIN-3056 clause first, then assert it.
-        const m = rule.match(/Reserve that conditional form.*?not a conditional Approve\./is);
-        assert.ok(m, 'the LIN-3056 clause is present and extractable on its own');
-        // F3: pin the trigger condition, not just the outcome. Without this the
-        // clause can be inverted to "an outside item" (M8) or to "fits within
-        // that bound" (M13) and this pin stays green.
-        assert.ok(/holds an inside item whose discharge requires authoring beyond that bound/i.test(m[0]),
-          'the trigger is an inside item whose discharge requires authoring beyond the bound');
-        assert.ok(/a new or changed test, or a code change/i.test(m[0]),
-          'names the authoring examples that exceed close-out\'s bound');
-        // F4: pin the dischargeable-route list that defines "close-out can actually discharge".
-        assert.ok(/a routed outside follow-up, or an exactly-stated trivial edit/i.test(m[0]),
-          'names the dischargeable routes the conditional form is reserved for');
-        assert.ok(/the verdict is Request Changes back to implementation, not a conditional Approve\.$/i.test(m[0]),
-          'the verdict for such an inside item is Request Changes, not a conditional Approve');
-      });
-
-      test('the LIN-3056 clause introduces no literal "Linear" of its own (scoped extraction)', () => {
-        const rule = reviewRule();
-        const m = rule.match(/Reserve that conditional form.*?not a conditional Approve\./is);
-        assert.ok(m, 'the new clause is present and extractable on its own');
-        assert.ok(!m[0].includes('Linear'), 'the new LIN-3056 clause introduces no literal "Linear"');
-      });
-    });
-  });
-
-  test('the emitted action is dispatchable — `→ **plan-review**` round-trips to a valid kind', () => {
-    // The routing branch is only real if what the recommender emits survives the
-    // wire: parseRecommendedAction reads the `→ **name**` line, and the dispatch
-    // layer must accept the result as a kind.
-    assert.strictEqual(parseRecommendedAction('The gate is met.\n\n→ **plan-review**'), 'plan-review');
-    assert.strictEqual(deriveDispatchKind('plan-review'), 'plan-review');
-    assert.ok(isValidDispatchKind('plan-review'), 'plan-review must be a dispatchable kind');
-    assert.ok(getAIRecommendationActionNames().includes('plan-review'),
-      'plan-review must be in the vocabulary the meta-prompt is given');
-  });
-});
-
-// =============================================================================
-// Over-advance guard (LIN-597) — the engine's dominant front-half miss is reaching
-// too far down-lifecycle (e.g. `implement`) on a task with too little COMMITTED
-// SCOPE to act. Step 3 now makes the rule explicit and one-directional: absent
-// committed scope is itself the signal to plan/research, never implement — without
-// touching the clearly-planned `implement` case or the genuinely-small direct path.
-// =============================================================================
-describe('buildMetaPromptTemplate over-advance guard (LIN-597)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: true, commentCount: 1, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('Step 3 states the no-committed-scope rule explicitly', () => {
-    const text = build();
-    assert.ok(/no committed scope ⇒ never \`implement\`/i.test(text),
-      'Step 3 must carry the explicit "no committed scope ⇒ never implement" rule');
-  });
-
-  test('the rule is one-directional — resolve DOWN to plan/research when scope is weak/absent', () => {
-    const text = build();
-    assert.ok(/one-directional/i.test(text) && /resolve DOWN/i.test(text),
-      'the rule must name the one-directional bias and steer toward plan/research, not implement');
-  });
-
-  test('a rich-but-unscoped description is NOT treated as scoped', () => {
-    const text = build();
-    assert.ok(/NOT scoped merely because its intent is legible|rich-but-unscoped/i.test(text),
-      'the rule must reject legible-intent / long-description as a substitute for committed scope');
-  });
-
-  test('an existing plan still routes on its session-fit answer — the guard does not override it', () => {
-    const text = build();
-    // The no-scope guard must explicitly preserve BOTH committed-plan routes so it
-    // cannot erode the multi-session → breakdown branch (LIN-385@breakdown regression).
-    assert.ok(/never overrides a plan that exists/i.test(text),
-      'the guard must state it fires only when scope is absent, never overriding an existing plan');
-    assert.ok(/fits one session.*\`implementation\`.*needs multiple sessions.*\`breakdown\`/is.test(text),
-      'both session-fit routes (implementation AND breakdown) must be preserved against the guard');
-  });
-
-  test('"simple enough to implement directly" requires concrete in-hand small scope', () => {
-    const text = build();
-    assert.ok(/concrete, in-hand small scope — NOT by a legible intent on an unscoped/is.test(text),
-      'the direct-implement readiness path must require in-hand small scope, not just legible intent');
-  });
-});
-
-// =============================================================================
-// Single-action boundary (LIN-358) — the generated prompt body must stay within
-// the one recommended action and hand off by naming the follow-up, rather than
-// carrying the work into the next phase. The reported symptom was an "unblock"
-// prompt that, once unblocked, proceeded to implement; the fix is the general
-// boundary rule plus removing the "proceed to the next phase" trigger in Step 2.
-// =============================================================================
-
-describe('buildMetaPromptTemplate single-action boundary (LIN-358)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '), ...overrides
-    });
-  }
-
-  test('the prompt body is constrained to the single recommended action', () => {
-    const text = build();
-    assert.ok(
-      /Keep the generated prompt inside the single action you recommended/.test(text),
-      'the single-action boundary rule must be present'
-    );
-  });
-
-  test('the boundary rule routes the next phase through a handoff, not continuation', () => {
-    const text = build();
-    assert.ok(
-      /its final step names the follow-up action/.test(text),
-      'the rule must instruct the prompt to name the follow-up action'
-    );
-    assert.ok(
-      /each action gets its own prompt, generated fresh when it starts/.test(text),
-      'the rule must state each action gets its own prompt'
-    );
-  });
-
-  test('the blocked branch hands off rather than proceeding into the next phase', () => {
-    const text = build();
-    assert.ok(
-      /confirm the task is unblocked and recommend the next action/.test(text),
-      'the resolved-blocker shortcut must recommend the next action'
-    );
-    assert.ok(
-      !/remove label/.test(text),
-      'the abolished blocked-label mutation (LIN-357) must be gone from the meta-prompt'
-    );
-    assert.ok(
-      !/proceed to the next phase/.test(text),
-      'the "proceed to the next phase" wording that licensed implementation drift must be gone'
-    );
-  });
-});
-
-describe('buildMetaPromptTemplate plan completeness check', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-1',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  // The completeness check guards the breadth failure: the same concept is often
-  // implemented in more than one place under a different name, and a clean search
-  // for the cited symbol is not proof the surface list is complete.
-  test('Plan-prompts rule instructs a completeness check on the surface list', () => {
-    const result = build();
-    assert.ok(result.includes('completeness check'), 'meta-prompt must require a completeness check');
-  });
-
-  test('completeness check searches the concept, not just the cited symbol', () => {
-    const result = build();
-    assert.ok(
-      result.includes('not proof of completeness'),
-      'must state that a clean search for the cited symbol is not proof of completeness'
-    );
-  });
-
-  test('completeness check allows a genuinely single-surface result', () => {
-    const result = build();
-    assert.ok(
-      result.includes('single-surface result is valid'),
-      'must not misfire on genuinely localized changes'
-    );
-  });
-});
-
-// Slices one `- **<label>**` quality-rule bullet out of a generated meta-prompt, up to
-// (not including) the next named bullet. Asserts the match exists with a message naming
-// both bullets, rather than letting a renamed/reordered neighbour bullet turn a missing
-// match into an unguarded `.exec(...)[0]` TypeError on an otherwise unrelated edit.
-function extractQualityRuleBullet(metaPrompt, label, nextLabel) {
-  const pattern = new RegExp(`- \\*\\*${label}\\*\\*[\\s\\S]*?(?=\\n- \\*\\*${nextLabel}\\*\\*)`);
-  const match = pattern.exec(metaPrompt);
-  assert.ok(
-    match,
-    `expected a "**${label}**" quality-rule bullet followed by "**${nextLabel}**" in the generated meta-prompt`
-  );
-  return match[0];
-}
-
-// If Blocked / Principle 0 gate + ruling pointer mirror (LIN-2202) — the meta path
-// has no `## If Blocked` section to copy formatIfBlocked() into, so the worker-lane
-// obligation (Principle 0 gate; cite the manual's "The human's edge, and how to
-// hand back" section + GET /api/proxy/autopilot/manual rather than restate the
-// rubric) is mirrored as prose on the existing Plan-prompts / Implementation-prompts
-// quality rules. This is a parity check on citation intent, not string equality —
-// the two paths render the same anchor/endpoint inside different surrounding prose.
-describe('buildMetaPromptTemplate If Blocked / Principle 0 mirror (LIN-2202)', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-2202',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('Plan-prompts rule carries the Principle 0 sentinels and the manual pointer', () => {
-    const result = build();
-    const planBullet = extractQualityRuleBullet(result, 'Plan prompts', 'Plan-review prompts');
-    assert.ok(planBullet.includes('PENDING-EXTERNAL'), 'Plan-prompts must name PENDING-EXTERNAL');
-    assert.ok(planBullet.includes('BLOCKED:'), 'Plan-prompts must name BLOCKED:');
-    assert.ok(
-      planBullet.includes('The human\'s edge, and how to hand back'),
-      'Plan-prompts must cite the manual section by name'
-    );
-    assert.ok(
-      planBullet.includes('GET /api/proxy/autopilot/manual'),
-      'Plan-prompts must name the portable endpoint pointer'
-    );
-    assert.ok(
-      planBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
-      'Plan-prompts must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
-    );
-  });
-
-  test('Implementation-prompts rule carries the Principle 0 sentinels and the manual pointer', () => {
-    const result = build();
-    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
-    assert.ok(implBullet.includes('PENDING-EXTERNAL'), 'Implementation-prompts must name PENDING-EXTERNAL');
-    assert.ok(implBullet.includes('BLOCKED:'), 'Implementation-prompts must name BLOCKED:');
-    assert.ok(
-      implBullet.includes('The human\'s edge, and how to hand back'),
-      'Implementation-prompts must cite the manual section by name'
-    );
-    assert.ok(
-      implBullet.includes('GET /api/proxy/autopilot/manual'),
-      'Implementation-prompts must name the portable endpoint pointer'
-    );
-    assert.ok(
-      implBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
-      'Implementation-prompts must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
-    );
-  });
-
-  test('does not restate the manual rubric prose (one-source-of-truth)', () => {
-    const result = build();
-    assert.ok(
-      !result.includes('Merge sibling blockers before you bubble up'),
-      'meta prompt must not restate the manual\'s merge-sibling-blockers rubric text'
-    );
-  });
-
-  // F1/F2 remedy: the handwritten `blocked` template's Principle 0 gate + manual
-  // citation must also be mirrored on the meta path's **Blocked prompts** quality
-  // rule bullet — the pair docs/prompt-change-validation.md:33-42 governs — so a
-  // meta-generated `blocked` prompt reaches parity with the handwritten one.
-  test('Blocked-prompts rule carries the Principle 0 gate and the manual pointer', () => {
-    const result = build();
-    const blockedBullet = extractQualityRuleBullet(result, 'Blocked prompts', 'Triage prompts');
-    assert.ok(/Principle 0/.test(blockedBullet), 'Blocked-prompts must gate the blocker analysis on Principle 0');
-    assert.ok(/cost of doing nothing/.test(blockedBullet), 'Blocked-prompts must name the cost of doing nothing');
-    assert.ok(
-      blockedBullet.includes('The human\'s edge, and how to hand back'),
-      'Blocked-prompts must cite the manual section by name'
-    );
-    assert.ok(
-      blockedBullet.includes('GET /api/proxy/autopilot/manual'),
-      'Blocked-prompts must name the portable endpoint pointer'
-    );
-    assert.ok(
-      blockedBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
-      'Blocked-prompts must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
-    );
-  });
-});
-
-// Acceptance-witness discipline for implementation-authored tests (LIN-2219).
-// lib/prompt-template-defs.js:127 (the bug/investigate template's witness-validation
-// rule) is scoped to the lane that writes the fewest tests. Clause (10) of the
-// Implementation-prompts quality rule extends the same discipline — before trusting a
-// test as the acceptance witness, observe it fail (or run the mutation equivalent) —
-// to the meta path. Assertions are scoped to the extracted bullet and use distinctive
-// multi-word phrases so a neighbouring bullet's `red`/`fail` substrings cannot satisfy
-// them; the handwritten mirror lives in tests/unit/prompt-templates.test.js.
-describe('buildMetaPromptTemplate acceptance-witness discipline (LIN-2219)', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-2219',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('Implementation-prompts rule requires observing a real failure before trusting a test as the witness', () => {
-    const result = build();
-    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
-    assert.ok(/observe it fail/.test(implBullet), 'must require observing the test fail');
-    assert.ok(
-      /capture the actual failing output/.test(implBullet),
-      'must require capturing actual failing output, not an assertion it would fail'
-    );
-    assert.ok(/mutation equivalent/.test(implBullet), 'must name the mutation equivalent for an impossible-RED test');
-  });
-
-  test('the acceptance-witness clause stays tracker-neutral', () => {
-    const result = build();
-    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
-    assert.ok(!/\bLinear\b/.test(implBullet), 'the new clause must not hardcode a tracker noun');
-  });
-
-  test('does not restate the bug/investigate template\'s witness-validation wording (one-source-of-truth)', () => {
-    const result = build();
-    const implBullet = extractQualityRuleBullet(result, 'Implementation prompts', 'Defer replies');
-    assert.ok(
-      !implBullet.includes('must be validated or replaced before you optimize against it'),
-      'must not restate the bug rule\'s distinctive clause'
-    );
-    assert.ok(
-      !implBullet.includes('can read green while the outcome is still wrong'),
-      'must not restate the bug rule\'s distinctive clause'
-    );
-  });
-});
-
-// Class check (LIN-313) — bug and review prompts ask "isolated, or one of a
-// class?" so a narrowly-worded task doesn't clear while its siblings wait to
-// surprise the parent. Mirrors the handwritten path per
-// docs/architecture/prompt-system.md's both-paths rule (bug template step 4 /
-// review "Isolated, or One of a Class?" section).
-describe('buildMetaPromptTemplate class check (LIN-313)', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-1',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('Bug-prompts rule requires a class check once the root cause is in hand', () => {
-    const result = build();
-    assert.ok(
-      result.includes("widen the model, don't patch the witness"),
-      'the bug rule must carry the widen-the-model directive'
-    );
-    assert.ok(
-      result.includes('whether the same pattern produces siblings'),
-      'the bug rule must ask for pattern siblings, not only the cited symptom'
-    );
-  });
-
-  test('Bug class check keeps the fix minimal and records the class instead', () => {
-    const result = build();
-    assert.ok(
-      result.includes('the fix stays minimal'),
-      'a found class must not silently widen the fix'
-    );
-    assert.ok(
-      result.includes('record the unhandled instances as a comment'),
-      'unhandled instances must be recorded for follow-up scoping'
-    );
-  });
-
-  test('Review-prompts rule includes a class check before approving the close', () => {
-    const result = build();
-    assert.ok(
-      result.includes('class check before approving the close'),
-      'the review rule must include the close-out class check'
-    );
-    // LIN-3006: a sibling is no longer unconditionally routed to "record as a
-    // finding, rather than expanding the task" — it is marked inside/outside
-    // per (5a) first, and an inside sibling becomes a ledger item instead.
-    // LIN-3006 review fixup: "so the remaining work is scoped deliberately —
-    // review itself does not fix it" replaces the residual "follow-up work"
-    // framing, which implied an inside sibling is a follow-up rather than scope.
-    assert.ok(
-      result.includes('so the remaining work is scoped deliberately — review itself does not fix it'),
-      'siblings are marked inside/outside, not unconditionally expanded into new scope'
-    );
-  });
-
-  test('class check guards against manufactured work in both rules', () => {
-    const result = build();
-    assert.ok(
-      result.includes('genuinely isolated issue is a valid answer'),
-      'the bug rule must allow an isolated result'
-    );
-    assert.ok(
-      result.includes('genuinely isolated change is a valid result'),
-      'the review rule must allow an isolated result'
-    );
-  });
-});
-
-// Mutation-check directive (LIN-2274) — the Review-prompts rule must instruct
-// the agent to independently mutation-check the load-bearing new/changed
-// tests before approving the close. Mirrors the handwritten path per
-// docs/architecture/prompt-system.md's both-paths rule (review template's Test
-// Quality Check bullet + checklist item). Nothing pinned this on the meta
-// path either (LIN-2303).
-
-// LIN-1871 (revising LIN-1873) — argue the class, not the member, on the META
-// path, across all three templates (research/plan/plan-review) the ruling
-// names.
-//
-// The both-paths rule (docs/architecture/prompt-system.md,
-// docs/prompt-change-validation.md) is why this
-// file mirrors tests/unit/prompt-templates.test.js: a rule that lands only in
-// the handwritten templates silently does not apply to any AI-generated prompt,
-// and the two drift without anything noticing. LIN-2303 is the precedent —
-// LIN-2274's directive was unpinned on both paths until it added these.
-describe('buildMetaPromptTemplate class-not-member enumeration rule (LIN-1871, revising LIN-1873)', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-1',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('Research-prompts rule requires naming each class, its bound, and every member found', () => {
-    const result = build();
-    assert.ok(
-      result.includes('Research prompts must also require naming the classes the task touches'),
-      'the research rule must require class-naming, not just layer-auditing'
-    );
-    assert.ok(
-      result.includes('a reproducible query is one way to bound a class, not the only way'),
-      'a query must not be the only accepted form of bounding at research stage'
-    );
-    assert.ok(
-      result.includes('the plan step works from this list and adds a class of its own only if it can say why research missed it'),
-      'must hand the class list to the plan step with a justification bar for extending it'
-    );
-  });
-
-  test('Plan-prompts rule works from research\'s classes and requires the query as one way to bound', () => {
-    const result = build();
-    assert.ok(
-      result.includes('naming the class and how it was bounded, working from research\'s classes'),
-      'the plan rule must require class-not-member framing, keyed to research'
-    );
-    assert.ok(
-      result.includes('add a class of its own only if it can say why research missed it'),
-      'a plan-added class must be justified against what research found'
-    );
-    assert.ok(
-      result.includes('reproducible query whose output IS the enumeration'),
-      'the plan rule must still require a cited query where one applies'
-    );
-    assert.ok(
-      result.includes('which is one way to bound a class and the strongest one where it applies'),
-      'a query must not be presented as the only accepted bound'
-    );
-    assert.ok(
-      result.includes('the commit sha it was run at'),
-      'a query with no sha is not reproducible by the reviewer'
-    );
-  });
-
-  test('Plan-prompts rule carries the LIN-1871 evidence base, not a bare assertion', () => {
-    const result = build();
-    assert.ok(
-      result.includes('LIN-1871'),
-      'the rule should cite the four-ticket evidence base it came from'
-    );
-    assert.ok(
-      result.includes('4+ sessions and zero commits'),
-      'the cost of NOT having the rule is what motivates it'
-    );
-  });
-
-  test('Plan-prompts rule makes "no sweep" a first-class answer and names both shapes', () => {
-    const result = build();
-    assert.ok(
-      result.includes('some classes have no sweep and that saying so is a first-class answer'),
-      'without this the rule pushes plans toward inventing a query'
-    );
-    // The first form is what the meta rule actually says; an earlier version
-    // carried `|| result.includes('destinations')` as a fallback, which accepts
-    // the bare word anywhere in a ~10KB prompt and defeats the assertion it
-    // was guarding.
-    assert.ok(
-      result.includes('destinations* of new or moved code'),
-      'must name the moved-code-destinations shape'
-    );
-    assert.ok(
-      result.includes('production data rather than source'),
-      'must name the population-is-data shape'
-    );
-  });
-
-  test('Plan-prompts rule bounds the un-sweepable escape hatch with a criterion', () => {
-    // Mirrors the handwritten pin. Both paths carried this clause and NEITHER
-    // asserted it: review removed it from both files and both suites stayed
-    // fully green. An unbounded "some classes have no sweep" is an opt-out of
-    // the entire rule, so this is the load-bearing half of the escape hatch.
-    const result = build();
-    assert.ok(
-      result.includes('not in the current source tree at all'),
-      'the test for a third un-sweepable shape must be stated in the meta path too'
-    );
-    assert.ok(
-      result.includes('merely awkward to grep is a harder query rather than an absent one'),
-      'a hard-to-grep class must be excluded from the hatch by name'
-    );
-  });
-
-  test('Plan-prompts rule says where the class, its bound and its sha are recorded', () => {
-    const result = build();
-    assert.ok(
-      result.includes('recorded in the issue description alongside the plan'),
-      'the class, its bound and its sha need a stated destination'
-    );
-    assert.ok(
-      result.includes('where plan-review looks for them'),
-      'the destination must be tied to the reader who consumes it'
-    );
-  });
-
-  test('Plan-prompts rule warns against a query, a script, or a checklist that only looks authoritative', () => {
-    const result = build();
-    assert.ok(
-      result.includes('manufacturing a query, a script, or a checklist to fill the slot'),
-      'the anti-incentive must now exclude scripted forms too, not just a fabricated query'
-    );
-    assert.ok(
-      result.includes('the rule asks for reasoning shown, not a form filled'),
-      'must state the rule is about reasoning, not a fixed vocabulary'
-    );
-    assert.ok(
-      result.includes('looks authoritative and is quietly incomplete'),
-      'the anti-incentive is what keeps the rule from becoming a box to tick'
-    );
-  });
-
-  test('Plan-review-prompts rule (1) argues the class, not the member', () => {
-    const result = build();
-    assert.ok(
-      result.includes('completeness check — argue the class, not the member'),
-      'check (1) must be retitled to name the class-not-member rule'
-    );
-    assert.ok(
-      result.includes('re-derive that bound (re-run the query it cites at the sha it names, or redo the reasoning)'),
-      'the verifier must re-derive the plan\'s own bound, by query or by reasoning'
-    );
-    assert.ok(
-      result.includes('the verdict does not stop at the member'),
-      'a found member must not end the finding by itself'
-    );
-    assert.ok(
-      result.includes('how the verifier bounded that class, and every other member that bounding found'),
-      'the finding must widen to the whole class, not just the one member'
-    );
-    assert.ok(
-      result.includes('only where the plan cites no bound for a class it claims to cover does the verifier fall back'),
-      'the independent search is the fallback, not the primary path, and now keys on "bound" not "sweep"'
-    );
-    assert.ok(
-      result.includes('a plan is never sent back for a missing member inside a class already correctly bounded, only for a missing or wrongly-bounded class'),
-      'the class-not-member send-back rule must be stated explicitly on the meta path too'
-    );
-  });
-
-  test('Plan-review-prompts rule directs disagreement at the bound', () => {
-    const result = build();
-    assert.ok(
-      result.includes('argues about the BOUND'),
-      'a disputed enumeration must be argued as a bound, not just "the sweep"'
-    );
-    assert.ok(
-      result.includes('proposing the class, the query or reasoning they would use instead'),
-      'proposing a counter-class with its own bound is the concrete action'
-    );
-    // NOT a bare `includes('converge')`. `origin/main`'s Plan-prompts rule
-    // already says "migration / convergence / pre-launch parent epics", so that
-    // assertion passes with the entire LIN-1871/1873 meta text deleted — a
-    // witness that witnesses nothing, in the test file for a rule about
-    // exactly that.
-    assert.ok(
-      result.includes('converge once one of them runs it'),
-      'must say why — a bound converges where member-by-member discovery does not'
-    );
-  });
-
-  test('Plan-review-prompts rule checks the REASON when a class is declared un-sweepable', () => {
-    const result = build();
-    assert.ok(
-      result.includes('un-sweepable is not thereby incomplete'),
-      'the verifier must not treat an absent sweep as an automatic finding'
-    );
-    assert.ok(
-      result.includes('demand a sweep only where the verifier can name the query'),
-      'a demand must come with the query that would satisfy it'
-    );
-  });
-});
-
-// LIN-3202 (menu M14): the plan states what it adds beyond the research and
-// cites the findings it relies on instead of restating them. Meta-path mirror of
-// the handwritten pin in tests/unit/prompt-templates.test.js, so each path fails
-// independently.
-describe('buildMetaPromptTemplate cite, don\'t restate (LIN-3202)', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-1',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('Plan-prompts rule states what the plan adds beyond the research and cites the rest', () => {
-    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
-    assert.ok(rule.includes('state what it adds beyond the research and cite the rest'),
-      'the rule must carry the cite-don\'t-restate directive');
-    assert.ok(rule.includes('state what it adds beyond the research'),
-      'must ask what the plan adds beyond the research');
-    assert.ok(rule.includes('the research findings it relies on instead of restating them'),
-      'must ask for citations of the findings relied on');
-  });
-
-  test('Plan-prompts rule requires resolvable citations and forbids restatement to look self-contained', () => {
-    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
-    assert.ok(rule.includes('cite by comment (author/heading or id), file:line, or sha'),
-      'citations must be resolvable without the plan paraphrasing them');
-    assert.ok(rule.includes('never restate a finding to "make the plan self-contained"'),
-      'must not instruct restating a finding to appear self-contained');
-    assert.ok(rule.includes('there are no citations to manufacture'),
-      'the no-research case must forbid manufacturing citations');
-  });
-
-  test('Plan-prompts rule states the no-research and disagreement cases as additions, not restatements', () => {
-    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
-    assert.ok(rule.includes('the plan stands alone'),
-      'a plan with no prior research must be allowed to stand alone');
-    assert.ok(rule.includes('that is an addition, not a restatement'),
-      'a disagreement or stale finding must be named as an addition');
-    assert.ok(rule.includes('the citation covers the member list, not the verdict'),
-      'the in/out-of-scope verdict stays the plan\'s own decision');
-  });
-
-  test('Plan-prompts rule leaves the ordering and class-bound text intact', () => {
-    const rule = extractQualityRuleBullet(build(), 'Plan prompts', 'Plan-review prompts');
-    assert.ok(/Strategy Framing → Scope Assessment → session-fit/.test(rule),
-      'the ordering chain must survive the new sentence');
-    assert.ok(rule.includes('recorded in the issue description alongside the plan'),
-      'the class bound destination must survive the new sentence');
-  });
-});
-
-describe('buildMetaPromptTemplate mutation-check directive (LIN-2274)', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-1',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('Review-prompts rule instructs the agent to mutation-check the load-bearing tests', () => {
-    const result = build();
-    assert.ok(
-      result.includes('mutation-check the load-bearing tests (LIN-2274)'),
-      'the review rule must carry the mutation-check clause'
-    );
-    assert.ok(
-      result.includes('confirm it goes red'),
-      'the review rule must pin the substantive delete-and-confirm-red clause'
-    );
-  });
-
-  test('mutation-check clause precedes the class check within the Review-prompts rule', () => {
-    const result = build();
-    const mutationIndex = result.indexOf('mutation-check the load-bearing tests (LIN-2274)');
-    const classCheckIndex = result.indexOf('class check before approving the close');
-    assert.ok(mutationIndex > -1, 'mutation-check clause must be present');
-    assert.ok(classCheckIndex > -1, 'class check clause must be present');
-    assert.ok(mutationIndex < classCheckIndex, 'mutation-check clause must precede the class check');
-  });
-});
-
-// =============================================================================
-// Surface Assessment necessity gate (LIN-192 origin, LIN-397 gate) — AI path
-//
-// Research must gate the refactor verdict on necessity (consumer test + who-pays
-// test, third verdict, size routed to sequencing), and plan must sequence only a
-// necessary prerequisite refactor as a separate blocking subtask while rejecting
-// speculative ones. These pin the gate against drift and mirror the
-// handwritten-path tests in tests/unit/prompt-templates.test.js.
-// =============================================================================
-
-describe('buildMetaPromptTemplate Surface Assessment', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context',
-      identifier: 'LIN-1',
-      hasSubtasks: false,
-      subtaskCount: 0,
-      completedCount: 0,
-      inProgressCount: 0,
-      remainingCount: 0,
-      hasComments: false,
-      commentCount: 0,
-      aiHints: 'hints'
-    });
-  }
-
-  test('research-prompts rule gates the Surface Assessment on necessity, not availability', () => {
-    const result = build();
-    assert.ok(result.includes('Surface Assessment'), 'meta-prompt must require a Surface Assessment');
-    assert.ok(result.includes('refactor required'), 'must offer the refactor-required verdict');
-    assert.ok(result.includes('consumer test'), 'must require citing the in-task consumer of the new seam');
-    assert.ok(result.includes('who-pays test'), 'must require a beneficiary-or-bystander accounting per touched consumer');
-    assert.ok(
-      result.includes('improvement noticed, not required'),
-      'must offer the third verdict so noticed improvements have a non-blocking home'
-    );
-    assert.ok(
-      result.includes('Size is not a rejection criterion'),
-      'size must route to sequencing, never to worth'
-    );
-  });
-
-  test('plan-prompts rule sequences a necessary refactor and rejects speculative ones', () => {
-    const result = build();
-    assert.ok(
-      result.includes('separate blocking subtask'),
-      'plan rule must encode a necessary prerequisite refactor as a separate blocking subtask'
-    );
-    assert.ok(
-      result.includes('do not absorb the refactor into implementation steps'),
-      'plan rule must preserve the sequencing guarantee'
-    );
-    assert.ok(
-      result.includes('names its in-task consumer'),
-      'the blocking-subtask ratchet must be conditioned on a verdict naming its in-task consumer'
-    );
-    assert.ok(
-      result.includes('must not become a subtask'),
-      'consumer-less or bystander-taxing refactors are folded inline, scoped down, or noted'
-    );
-  });
-});
-
-// =============================================================================
-// Scale to the task (lower bound, LIN-260) — the meta-prompt must size the
-// generated prompt to the task, with the deceptive-small over-trim guard.
-// Proven via scripts/eval-prompt-scaling.mjs; mirrored in the handwritten path
-// (tests/unit/prompt-templates.test.js) per docs/architecture/prompt-system.md's
-// both-paths rule.
-// =============================================================================
-
-describe('buildMetaPromptTemplate scale to the task', () => {
-  function build() {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'hints'
-    });
-  }
-
-  test('meta-prompt includes the Scale To The Task rule', () => {
-    assert.ok(build().includes('## Scale To The Task'), 'meta-prompt must size output to the task');
-  });
-
-  test('scale rule licenses a short prompt for a small task', () => {
-    assert.ok(
-      build().includes('A short prompt for a small task is correct'),
-      'must license brevity so small tasks are not padded to fill the scaffold'
-    );
-  });
-
-  test('scale rule carries the deceptive-small over-trim guard', () => {
-    const result = build();
-    assert.ok(
-      result.includes('across the codebase') && result.includes('Do NOT infer "small" from a terse description'),
-      'must warn that a terse description does not imply a small task'
-    );
-  });
-});
-
-// =============================================================================
-// Action vocabulary — the meta-prompt's `→ **action**` must stay inside the
+// Action vocabulary — the routing prompt's `→ **action**` must stay inside the
 // vocabulary deriveDispatchKind() understands, so the fused recommend-and-dispatch
 // verb lands a real `kind` (not the `custom` fallback) for every known type.
 // =============================================================================
 
 describe('action vocabulary (kind derivation seam)', () => {
-  const base = {
-    issueContext: 'ctx', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0,
-    completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false,
-    commentCount: 0, aiHints: 'hints'
-  };
-
-  test('getAIRecommendationActionNames returns mappable names and excludes retro', () => {
-    const names = getAIRecommendationActionNames();
+  test('the selectable stage names are mappable and exclude retro', () => {
+    const names = actionNames();
     assert.ok(names.includes('plan'));
     assert.ok(names.includes('implement'));
     assert.ok(names.includes('review'));
@@ -2173,7 +576,7 @@ describe('action vocabulary (kind derivation seam)', () => {
   });
 
   test('every recommended action name derives to a real (non-custom) kind', () => {
-    for (const name of getAIRecommendationActionNames()) {
+    for (const name of actionNames()) {
       assert.notStrictEqual(
         deriveDispatchKind(name), DISPATCH_KIND_DEFAULT,
         `recommended action "${name}" should map to a known kind, not "${DISPATCH_KIND_DEFAULT}"`
@@ -2181,50 +584,12 @@ describe('action vocabulary (kind derivation seam)', () => {
     }
   });
 
-  test('meta-prompt embeds the supplied vocabulary and the verbatim-one instruction', () => {
-    const vocab = getAIRecommendationActionNames().join(', ');
-    const text = buildMetaPromptTemplate({ ...base, actionVocabulary: vocab });
-    assert.ok(text.includes(vocab), 'the action vocabulary list must appear in the meta-prompt');
-    assert.ok(text.includes('EXACTLY one action name'), 'the verbatim-one constraint must be stated');
-  });
-
-  test('falls back to an example set when no vocabulary is supplied', () => {
-    const text = buildMetaPromptTemplate({ ...base });
-    assert.ok(text.includes('plan, research, implement'), 'a sensible fallback list is present');
-  });
-
-  // The emitted skeleton must keep directives OFF the fill-in lines, so a literal
-  // model fills the slot instead of transcribing the guidance (the leak we saw on
-  // gpt-5.4-mini: "→ implement — use EXACTLY one action name, verbatim, from …").
-  test('the response skeleton presents a clean action line and never inlines the directive', () => {
-    const text = buildMetaPromptTemplate({ ...base });
-    assert.ok(text.includes('→ **<action>**'), 'the skeleton action line is a bare fill-in slot');
-    assert.ok(!text.includes('→ **[action]** —'), 'no directive prose is appended to the emitted action line');
-    assert.ok(text.includes('Keep the surrounding `**` bold markers'),
-      'the skeleton reminds the model to keep the bold markers the parser requires');
-    assert.ok(/do NOT copy these field descriptions/i.test(text),
-      'the model is told not to transcribe the field descriptions into its answer');
-  });
-
-  // DeferTo must NOT appear in the default skeleton — only as a conditional rule —
-  // so a non-defer reply that mirrors the skeleton omits it (no bare "DeferTo:").
-  test('DeferTo is a conditional rule, absent from the default skeleton', () => {
-    const text = buildMetaPromptTemplate({ ...base });
-    const skeletonStart = text.indexOf('## Reasoning');
-    const promptSlot = text.indexOf('<the complete prompt text');
-    const skeleton = text.slice(skeletonStart, promptSlot);
-    assert.ok(!skeleton.includes('DeferTo'),
-      'the default (non-defer) skeleton must not contain a DeferTo line');
-    assert.ok(/ONLY when the action is `defer`/.test(text),
-      'DeferTo is stated as a conditional rule below the skeleton');
-  });
-
   // LIN-327: `defer` is a recommend-meta action — emittable by the recommender,
   // a valid kind, and self-deriving (NOT the custom fallback), despite having no
   // PROMPT_TEMPLATES entry / no prompt body.
   test('defer is in the AI recommendation vocabulary', () => {
-    assert.ok(getAIRecommendationActionNames().includes('defer'),
-      'defer must be offered to the meta-prompt as an emittable action');
+    assert.ok(actionNames().includes('defer'),
+      'defer must be offered to the router as an emittable action');
   });
 
   test('defer is a valid dispatch kind and derives to itself (not custom)', () => {
@@ -2264,51 +629,6 @@ describe('parseDeferTo', () => {
 });
 
 // =============================================================================
-// parseRecommendationResponse Tests (LIN-327 — defer no-body cost contract)
-// =============================================================================
-
-describe('parseRecommendationResponse', () => {
-  test('a normal action carries its prompt body and a null deferTo', () => {
-    const content = '## Reasoning\n→ **research**\n**Next:** investigate\n\n## Prompt\nGo research the thing.';
-    const result = parseRecommendationResponse(content, 'stop', 120);
-    assert.strictEqual(result.recommendedAction, 'research');
-    assert.strictEqual(result.prompt, 'Go research the thing.');
-    assert.strictEqual(result.deferTo, null);
-  });
-
-  test('a defer reply carries NO prompt body and a deferTo target', () => {
-    const content = '## Reasoning\n→ **defer**\n**Next:** descend to the child\n**DeferTo:** LIN-297\n\n## Prompt\n';
-    const result = parseRecommendationResponse(content, 'stop', 30);
-    assert.strictEqual(result.recommendedAction, 'defer');
-    assert.strictEqual(result.deferTo, 'LIN-297');
-    assert.strictEqual(result.prompt, null, 'defer must not carry a prompt body (cost contract)');
-  });
-
-  test('a defer reply that emits a prompt body still drops it (no body ever survives)', () => {
-    const content = '## Reasoning\n→ **defer**\n**DeferTo:** LIN-300\n\n## Prompt\nStray body the model should not have written.';
-    const result = parseRecommendationResponse(content, 'stop', 40);
-    assert.strictEqual(result.recommendedAction, 'defer');
-    assert.strictEqual(result.deferTo, 'LIN-300');
-    assert.strictEqual(result.prompt, null, 'a defer prompt body is discarded, not returned');
-  });
-
-  test('a defer reply missing its DeferTo target throws', () => {
-    const content = '## Reasoning\n→ **defer**\n**Next:** descend\n\n## Prompt\n';
-    assert.throws(() => parseRecommendationResponse(content, 'stop', 10), /DeferTo target/);
-  });
-
-  test('a non-defer reply missing its prompt body throws', () => {
-    const content = '## Reasoning\n→ **plan**\n**Next:** plan it\n\n## Prompt\n';
-    assert.throws(() => parseRecommendationResponse(content, 'stop', 10), /missing ## Reasoning or ## Prompt/);
-  });
-
-  test('marks truncated when finish_reason is length', () => {
-    const content = '## Reasoning\n→ **plan**\n\n## Prompt\nPlan body.';
-    assert.strictEqual(parseRecommendationResponse(content, 'length', 8000).truncated, true);
-  });
-});
-
-// =============================================================================
 // parseRecommendedAction Tests (LIN-321)
 // =============================================================================
 
@@ -2327,7 +647,7 @@ describe('parseRecommendedAction', () => {
     assert.strictEqual(parseRecommendedAction('→ **look into**'), 'look into');
   });
 
-  test('matches the meta-prompt format with parenthetical examples after the line', () => {
+  test('matches the routing reply format with parenthetical examples after the line', () => {
     const reasoning = '**Signal Status:** met\n→ **bug**\n**Next:** verify the fix';
     assert.strictEqual(parseRecommendedAction(reasoning), 'bug');
   });
@@ -2392,43 +712,42 @@ describe('getRecommendationStream (LIN-346)', () => {
     };
   }
 
-  test('emits deltas AND returns the structured object equal to parseRecommendationResponse', async () => {
-    const raw = '## Reasoning\n→ **research**\nLook into it.\n## Prompt\nGo research the thing.';
+  test('emits reasoning deltas AND returns the routed recommendation, its prompt generatePrompt for the stage', async () => {
     // Split mid-section to exercise chunk-boundary buffering.
-    const pieces = ['## Reasoning\n→ **research**\nLook ', 'into it.\n## Prompt\nGo research ', 'the thing.'];
+    const pieces = ['## Reasoning\n→ **research**\nLook ', 'into it.\n**Next:** plan'];
     global.fetch = mock.fn(async () => mockStreamResponse(pieces, { completionTokens: 17 }));
 
     const events = [];
     const result = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
 
-    // (a) emits deltas for both sections
     const reasoningDeltas = events.filter(e => e.type === 'delta' && e.data.section === 'reasoning');
     const promptDeltas = events.filter(e => e.type === 'delta' && e.data.section === 'prompt');
-    assert.ok(reasoningDeltas.length > 0, 'streamed reasoning deltas');
-    assert.ok(promptDeltas.length > 0, 'streamed prompt deltas');
-    assert.strictEqual(reasoningDeltas.map(e => e.data.content).join(''), '→ **research**\nLook into it.');
-    // The LLM body streams first, then the deterministic grounding post-pass (LIN-435)
-    // streams as an additional prompt delta so the leaf view matches the shipped prompt.
-    const grounding = appendGroundingSections('', ISSUE, CONTEXT);
-    assert.strictEqual(promptDeltas.map(e => e.data.content).join(''), 'Go research the thing.' + grounding);
-
-    // emits a terminal done
+    assert.strictEqual(reasoningDeltas.map(e => e.data.content).join(''), '→ **research**\nLook into it.\n**Next:** plan');
+    // Code assembles the stage's prompt; it goes out as one delta after the reasoning.
+    const expected = generatePrompt('research', ISSUE, CONTEXT).prompt;
+    assert.strictEqual(promptDeltas.length, 1);
+    assert.strictEqual(promptDeltas[0].data.content, expected);
     assert.strictEqual(events.filter(e => e.type === 'done').length, 1);
 
-    // (b) returns a structured object equal to the buffered parse with the SAME grounding
-    // post-pass applied — proving the streamed and returned prompts both carry grounding.
-    assert.deepStrictEqual(
-      result,
-      applyGroundingToRecommendation(parseRecommendationResponse(raw, 'stop', 17), ISSUE, CONTEXT)
-    );
     assert.strictEqual(result.recommendedAction, 'research');
-    assert.strictEqual(result.prompt, 'Go research the thing.' + grounding);
+    assert.strictEqual(result.prompt, expected);
     assert.strictEqual(result.truncated, false);
     assert.strictEqual(result.completionTokens, 17);
   });
 
+  test('stream and buffered paths return the same recommendation', async () => {
+    const raw = '## Reasoning\n→ **plan**\nReady.\n**Next:** implement';
+    global.fetch = mock.fn(async () => mockStreamResponse([raw.slice(0, 20), raw.slice(20)], { completionTokens: 9 }));
+    const streamed = await getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key' }, () => {});
+    global.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: raw }, finish_reason: 'stop' }], usage: { completion_tokens: 9 } })
+    }));
+    const buffered = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key' });
+    assert.deepStrictEqual(streamed, buffered);
+  });
+
   test('defer-shaped stream returns recommendedAction:defer, deferTo set, prompt:null', async () => {
-    const raw = '## Reasoning\n→ **defer**\nThe real work is in the child.\nDeferTo: LIN-297';
     const pieces = ['## Reasoning\n→ **defer**\nThe real work ', 'is in the child.\nDeferTo: LIN-297'];
     global.fetch = mock.fn(async () => mockStreamResponse(pieces, { completionTokens: 9 }));
 
@@ -2440,14 +759,14 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.ok(events.some(e => e.type === 'delta' && e.data.section === 'reasoning'), 'streamed reasoning');
     assert.ok(!events.some(e => e.type === 'phase' && e.data.phase === 'prompt'), 'no prompt phase on a defer');
 
-    assert.deepStrictEqual(result, parseRecommendationResponse(raw, 'stop', 9));
     assert.strictEqual(result.recommendedAction, 'defer');
     assert.strictEqual(result.deferTo, 'LIN-297');
     assert.strictEqual(result.prompt, null);
+    assert.strictEqual(result.completionTokens, 9);
   });
 
   test('surfaces truncated:true when finish_reason is length (13ecc22 preserved)', async () => {
-    const pieces = ['## Reasoning\n→ **implement**\nBuild it.\n## Prompt\nDo the build'];
+    const pieces = ['## Reasoning\n→ **implement**\nBuild it.'];
     global.fetch = mock.fn(async () => mockStreamResponse(pieces, { finishReason: 'length', completionTokens: 8000 }));
 
     const events = [];
@@ -2456,6 +775,34 @@ describe('getRecommendationStream (LIN-346)', () => {
     assert.strictEqual(result.truncated, true, 'structured return carries truncated');
     const done = events.find(e => e.type === 'done');
     assert.strictEqual(done.data.truncated, true, 'done event carries truncated');
+  });
+
+  // LIN-3296: grounding is chosen per stage from the recommended action, on both the
+  // streamed and the buffered path. A look-back on a Done bug must not be told to close
+  // out or to move to implementing the fix.
+  const DONE_BUG = { ...ISSUE, state: { name: 'Done', type: 'completed' }, labels: ['bug'], createdAt: '2026-01-01T00:00:00.000Z' };
+  const WITH_COMMENT = { ...CONTEXT, comments: [{ body: 'Root cause is X', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }] };
+  const AUDIT_RAW = '## Reasoning\n→ **retrospective-audit**\nMerged and closed.\n**Next:** none';
+
+  test('streamed retrospective-audit on a Done bug carries no close-out or fix note (LIN-3296)', async () => {
+    global.fetch = mock.fn(async () => mockStreamResponse([AUDIT_RAW]));
+    const events = [];
+    const result = await getRecommendationStream(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' }, (type, data) => events.push({ type, data }));
+    const streamed = events.filter(e => e.type === 'delta' && e.data.section === 'prompt').map(e => e.data.content).join('');
+    assert.strictEqual(streamed, generatePrompt('retrospective-audit', DONE_BUG, WITH_COMMENT).prompt);
+    assert.strictEqual(result.prompt, streamed);
+    assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(streamed), 'look-back keeps its brief');
+    assert.ok(streamed.includes('Re-ground the Ticket'), 'the staleness check still fits an audit of landed code');
+  });
+
+  test('buffered retrospective-audit on a Done bug carries no close-out or fix note (LIN-3296)', async () => {
+    global.fetch = mock.fn(async () => ({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: AUDIT_RAW }, finish_reason: 'stop' }], usage: { completion_tokens: 5 } })
+    }));
+    const result = await getRecommendation(DONE_BUG, WITH_COMMENT, { apiKey: 'test-key' });
+    assert.strictEqual(result.prompt, generatePrompt('retrospective-audit', DONE_BUG, WITH_COMMENT).prompt);
+    assert.ok(!/Task Already Complete|Prior Investigation On Record/.test(result.prompt));
   });
 });
 
@@ -2988,8 +1335,8 @@ describe('prompt trace recorder (LIN-578)', () => {
   // the module-level `customFetch`, which is bound to native fetch at import time
   // (and only re-pointed when a proxy is configured), so a `global.fetch` mock can't
   // intercept it the way it does the streaming path. The non-stream seam wires the
-  // SAME recordPromptTrace(...) call over locals proven by parseRecommendationResponse
-  // / applyGroundingToRecommendation tests; the streaming test below exercises the
+  // SAME recordPromptTrace(...) call (pinned by recommend-stage-assembly.test.js through
+  // setFetchImpl); the streaming test below exercises the
   // recorder end-to-end. Mocking the non-stream HTTP would require a production
   // refactor (out of scope for LIN-578).
 
@@ -3006,9 +1353,10 @@ describe('prompt trace recorder (LIN-578)', () => {
       () => {}
     );
 
-    // User-facing result unchanged.
+    // User-facing result: code assembled the routed stage's prompt; the body the
+    // model wrote anyway is ignored.
     assert.strictEqual(result.recommendedAction, 'research');
-    assert.ok(result.prompt.startsWith('Go research.'));
+    assert.strictEqual(result.prompt, generatePrompt('research', ISSUE, CONTEXT).prompt);
 
     // Exactly one trace, carrying input + output + attribution.
     assert.strictEqual(traces.length, 1);
@@ -3020,8 +1368,8 @@ describe('prompt trace recorder (LIN-578)', () => {
     assert.strictEqual(t.model, 'openai/gpt-5.4-mini');
     assert.strictEqual(t.rawContent, pieces[0]);
     assert.strictEqual(t.reasoning, '→ **research**\nLook into it.');
-    assert.strictEqual(t.prompt, 'Go research.'); // parsed, pre-grounding
-    assert.strictEqual(t.finalPrompt, result.prompt); // post-grounding == what the user receives
+    assert.strictEqual(t.prompt, null); // a routing reply carries no body
+    assert.strictEqual(t.finalPrompt, result.prompt); // what the user receives
     assert.strictEqual(t.finishReason, 'stop');
     assert.strictEqual(t.truncated, false);
   });
@@ -3222,131 +1570,16 @@ describe('getPaidEnvKey / hasPaidEnvKey (LIN-961)', () => {
 });
 
 // =============================================================================
-// Breakdown-created subtask approved-parent-plan exemption (LIN-3049) — the
-// two-path fix so a child of an already-approved, decomposed plan carries its
-// own plan slice (plus a committed session-fit and a plan-review-due:no line
-// citing the approving verdict) into routing, while a child with no recorded
-// Approve on the decomposed ticket's own trail stays a plain acceptance-criteria
-// subtask. These are the deterministic structural pins; the live routing shape is
-// measured by scripts/eval/fixtures/recommend/approved-parent-breakdown.json.
+// Breakdown-created subtask approved-parent-plan exemption (LIN-3049): a child carrying
+// a copied slice of an approved parent plan is settled prep, and its own "plan-review
+// due: no" citing the parent's verdict is honored. The selector reads both from the
+// stages' own descriptions (LIN-3300); the live routing shape is measured by
+// scripts/eval/fixtures/recommend/approved-parent-breakdown.json.
 // =============================================================================
-describe('buildMetaPromptTemplate approved-parent-plan child exemption (LIN-3049)', () => {
-  function build(overrides = {}) {
-    return buildMetaPromptTemplate({
-      issueContext: 'Test context', identifier: 'LIN-1', hasSubtasks: false,
-      subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: true, commentCount: 2, aiHints: 'hints',
-      actionVocabulary: getAIRecommendationActionNames().join(', '),
-      isTerminal: false, hasOpenChildren: false, ...overrides
-    });
-  }
-
-  test('the Step 1 over-fire guard names the breakdown child slice as findings-plus-validated-approach', () => {
-    const text = build();
-    const guardIntro = text.indexOf('Guard against over-firing');
-    const addition = text.indexOf('counts as findings-plus-validated-approach already in hand');
-    const nextBranch = text.indexOf('→ If the knowledge the deliverable depends on is not yet gathered');
-    assert.ok(guardIntro > -1 && addition > -1 && nextBranch > -1, 'all three Step 1 landmarks must be present');
-    assert.ok(guardIntro < addition && addition < nextBranch,
-      'the addition must sit INSIDE the over-fire guard list, not in the routing branches below');
-    assert.ok(/copied slice of the parent's approved plan.*naming its surfaces, approach, and tests/is.test(text),
-      'the addition must name the copied approved-parent-plan slice explicitly');
-  });
-
-  test('the completed-prep addition is sited before the ONE exception and names the copied slice', () => {
-    const text = build();
-    const rule = text.indexOf('Completed prep ⇒ never re-emit the prep verb');
-    const addition = text.indexOf('copied approved-parent-plan slice with a committed session-fit answer');
-    const exception = text.indexOf('ONE exception, and only one:');
-    assert.ok(rule > -1 && addition > -1 && exception > -1, 'all three landmarks must be present');
-    assert.ok(rule < addition && addition < exception,
-      'the addition must sit after the base rule and before its single exception');
-    assert.ok(/treat it as settled prep even though the `plan` step never literally ran/is.test(text),
-      'the addition must say the breakdown child is settled prep without a plan session of its own');
-  });
-
-  test('the gate addition sits strictly between criterion (d) and the verdict routing, outside (a)-(d)', () => {
-    const text = build();
-    const criterionD = text.indexOf('(d) it touches credential, merge-rule, or dispatch-contract surfaces');
-    const addition = text.indexOf('copied approved-plan slice clears the gate');
-    const verdict = text.indexOf('Once a plan-review verdict IS on the trail');
-    assert.ok(criterionD > -1 && addition > -1 && verdict > -1, 'all three gate landmarks must be present');
-    assert.ok(criterionD < addition && addition < verdict,
-      'the addition must sit after the (a)-(d) criteria and before the verdict routing');
-    assert.ok(/does not re-fire solely because the underlying surface is the same dispatch-contract surface/is.test(text),
-      'the addition must name the criterion-(d) non-refire for a copied slice');
-    assert.ok(/Re-derive the gate independently only if the child's copied slice visibly diverges/i.test(text),
-      'the addition must keep the divergence re-derivation escape hatch');
-  });
-
-  test('all three new guards carry the divergence condition, not only the gate', () => {
-    const text = build();
-    const step1 = text.indexOf('counts as findings-plus-validated-approach already in hand');
-    const step1End = text.indexOf('→ If the knowledge the deliverable depends on is not yet gathered');
-    assert.ok(step1 > -1 && step1End > step1, 'the Step 1 addition must be present and bounded');
-    assert.ok(/unless the copied slice visibly diverges from what the cited approving verdict approved/.test(text.slice(step1, step1End)),
-      'R1: the Step 1 over-fire guard must not apply when the copied slice visibly diverges');
-
-    const prep = text.indexOf('treat it as settled prep even though the `plan` step never literally ran');
-    const prepEnd = text.indexOf('ONE exception, and only one:');
-    assert.ok(prep > -1 && prepEnd > prep, 'the completed-prep addition must be present and bounded');
-    assert.ok(/This settled-prep read does NOT apply when the child's copied slice visibly diverges/.test(text.slice(prep, prepEnd)),
-      'R1: the completed-prep rule must not apply when the copied slice visibly diverges');
-
-    const gate = text.indexOf('copied approved-plan slice clears the gate');
-    const gateEnd = text.indexOf('Once a plan-review verdict IS on the trail');
-    assert.ok(gate > -1 && gateEnd > gate, 'the gate addition must be present and bounded');
-    assert.ok(/Re-derive the gate independently only if the child's copied slice visibly diverges/.test(text.slice(gate, gateEnd)),
-      'R1: the gate must re-derive on the same visible divergence');
-  });
-
-  test('a Breakdown prompts quality rule exists and requires the this-ticket-own-trail Approve precondition FIRST', () => {
-    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
-    assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
-    assert.ok(/THIS TICKET'S OWN comment trail/.test(rule),
-      'the rule must target the decomposed ticket\'s own trail');
-    assert.ok(/never its own rendered Parent Task section/.test(rule),
-      'the rule must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
-    const precond = rule.indexOf('Approve on the plan being decomposed FIRST');
-    const slice = rule.indexOf('slice of the approved plan');
-    assert.ok(precond > -1 && slice > -1 && precond < slice,
-      'the Approve precondition must be stated BEFORE the copy mandate');
-    assert.ok(/Session fit: fits one session/.test(rule), 'the rule must require the committed session-fit');
-    assert.ok(/Plan-review due: no — covered by <parent>'s approving plan-review \(comment <id>, rev <N>\)/.test(rule),
-      'the rule must require the plan-review-due:no line citing the approving verdict');
-    assert.ok(/grounding SHA\(s\) the plan cited/.test(rule), 'the rule must require the grounding SHA(s)');
-    assert.ok(/the parent plan is the source of truth; do not redesign/.test(rule),
-      'the rule must carry the do-not-redesign line');
-  });
-
-  test('the Breakdown prompts rule states the no-Approve fallback with no false session-fit or plan-review-due claim', () => {
-    const rule = build().split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Breakdown prompts**'));
-    assert.ok(rule, 'the meta-prompt must carry a Breakdown prompts quality rule');
-    assert.ok(/a task broken down before any plan approval.*must NOT be given a false session-fit or plan-review-due answer/s.test(rule),
-      'the rule must forbid a false claim when no Approve is on this ticket\'s own trail');
-    assert.ok(/it stays a plain acceptance-criteria subtask and is expected to route through `research`\/`plan` normally/s.test(rule),
-      'the fallback must keep the child on the normal preparation path');
-  });
-
-  test('parity: the LIN-597 downward bias and the LIN-1603 verdict/revision pins are untouched byte-for-byte', () => {
-    const text = build();
-    assert.ok(/fits one session.*`implementation`.*needs multiple sessions.*`breakdown`/is.test(text),
-      'both pre-existing session-fit routes must survive');
-    assert.ok(/\*\*Approve\*\* → route on the session-fit answer exactly as today/i.test(text),
-      'the Approve routing pin (openrouter.test.js:993) must survive');
-    assert.ok(/this Approve authorizes implementation only — it is never close-out evidence/i.test(text),
-      'the Approve-not-close-out pin must survive');
-    assert.ok(/Completed prep ⇒ never re-emit the prep verb/i.test(text),
-      'the completed-prep rule itself must survive');
-    assert.ok(/ONE exception, and only one: a `plan-review` that recorded \*\*Request Changes\*\* or \*\*Needs Discussion\*\*/i.test(text),
-      'the single request-changes exception pin (openrouter.test.js:1005) must survive');
-    assert.ok(/A SECOND Request Changes \/ Needs Discussion on the same task\*\* → \*\*stop and escalate to the human edge: recommend `blocked`/i.test(text),
-      'the one-cycle bound pin must survive');
-    assert.ok(/no committed scope ⇒ never `implement`/i.test(text),
-      'the no-committed-scope rule must survive');
-    assert.ok(/one-directional/i.test(text) && /resolve DOWN/i.test(text),
-      'the one-directional downward bias must survive');
-    assert.ok(/never overrides a plan that exists/i.test(text),
-      'the guard-fires-only-when-scope-absent pin must survive');
+describe('stage descriptions: approved-parent-plan child exemption (LIN-3049)', () => {
+  test('plan and plan-review each name the breakdown child\'s approved parent slice', async () => {
+    const stage = (k) => getSelectableStages().find(st => st.key === k);
+    assert.match(stage('plan').whenNot, /breakdown child's copied slice of an approved parent plan/);
+    assert.match(stage('plan-review').whenNot, /breakdown child covered by its parent's approving plan-review/);
   });
 });

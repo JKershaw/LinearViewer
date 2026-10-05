@@ -5,7 +5,7 @@
  * model. This is the sibling of LIN-776, which closed the same class on the
  * deterministic generatePrompt paths.
  *
- * Why a ROUTE/META test and not a library test: the existing both-paths PARITY
+ * Why a ROUTE test and not a library test: the existing Attachments PARITY
  * tests pass `context` (with attachments) DIRECTLY into the library seam, so they
  * prove formatAttachmentsSection, not the route wiring. The bug lived purely in the
  * route layer — the handlers destructured `context` then rebuilt a reduced object

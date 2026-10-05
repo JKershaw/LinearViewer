@@ -3,9 +3,8 @@
  * Seeded-plan eval for the `plan-review` VERDICT (LIN-1603 acceptance criterion 2;
  * DEFECT 3 added by LIN-1859 for the 7th check, source-of-truth re-grounding).
  *
- * Sibling to scripts/eval-plan-review.mjs, which measures ROUTING — whether the
- * recommender reaches `plan-review` at all. This measures the thing the step exists
- * for: given a plan carrying KNOWN planted defects, does the handwritten template
+ * Routing — whether the recommender reaches `plan-review` at all — is measured by
+ * scripts/eval/jev-routing-eval.mjs. This measures the thing the step exists for: given a plan carrying KNOWN planted defects, does the handwritten template
  * actually catch them and say Request Changes?
  *
  *   "A seeded plan with a known missing sibling and a known unnamed relaxation

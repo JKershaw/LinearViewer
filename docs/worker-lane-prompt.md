@@ -23,7 +23,7 @@
 > [`buildPassagePlannerKickoff()`](../lib/prompts/passage-planner-kickoff.js). There is no new
 > dispatch kind: a lane dispatches like any other `implementation`-kind item, and this doc-only
 > graduation touches nothing in `lib/prompt-template-defs.js`, `lib/completion-signals.js`, or
-> the meta-prompt action vocabulary (that two-path rule governs the *registered template*
+> the router's action vocabulary (the prompt system governs the *registered template*
 > system; a lane isn't one, the same way passage-planner/runner aren't).
 >
 > **Validation.** Proven **retrospectively** against the six lanes that actually flew on

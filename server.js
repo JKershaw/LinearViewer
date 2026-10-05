@@ -90,6 +90,7 @@ import { RunProposalsStore } from './lib/run-proposals-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { TaskModeStore } from './lib/task-mode-store.js'
 import { FunnelEventStore } from './lib/funnel-event-store.js'
+import { CloseOutEventsStore } from './lib/close-out-events-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
@@ -120,6 +121,7 @@ import { createTaskModeRoutes } from './routes/task-mode.js'
 import { createShareRoutes } from './routes/share.js'
 import { ShareStore } from './lib/share-store.js'
 import { createReadOwnerIssues } from './lib/share-owner-reader.js'
+import { createShareRunReader } from './lib/share-run-reader.js'
 import { isTokenRefreshExempt } from './lib/root-route-exemption.js'
 import { createProxyRoutes, commentDedupe, withTimeout } from './routes/proxy.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
@@ -145,8 +147,9 @@ import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
-import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
+import { createDashboardRoutes, sessionIsTerminal, sessionIsSettled, sessionSettleState, enrichLoop } from './routes/dashboard.js'
 import { readRunEvidence } from './lib/run-evidence.js'
+import { createPrStateStore } from './lib/pr-state-store.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
@@ -687,6 +690,11 @@ const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collec
 const taskModeEventsCollection = db.collection('task-mode-events')
 const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
 
+// Close-out events (LIN-3248, P3 of LIN-2949): an append-only record of a
+// person's merge or their close-out press. Lifetime-retained, idempotent on
+// urlKey + prUrl + headSha + by (lib/close-out-events-store.js).
+const closeOutEventsStore = new CloseOutEventsStore({ collection: db.collection('close-out-events') })
+
 // Public share links (LIN-3243, Session A of LIN-3073). One store over the
 // `shares` collection; the route is mounted below and receives the store plus
 // the owner-reader/owner-check seams by injection (see lib/share-owner-reader.js).
@@ -987,7 +995,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, shareStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, shareStore, getShareRunReader: () => shareRunReader, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore }))
 }
 
 // =============================================================================
@@ -2308,6 +2316,12 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
+// The ONE PR-state store (LIN-3311, S0 of LIN-2950): the LIN-3251 cache,
+// sliding 36/h GitHub budget and repo-allowlist cache. Every reader of run PR
+// state (the dashboard router below; the share router from LIN-2950 Phase 3)
+// gets this instance, so the budget and the `repo#number` cache are shared.
+const prStateStore = createPrStateStore()
+
 // Public share route (LIN-3243). `readOwnerIssues` composes the hardened
 // `resolveWorkspaceAccess(urlKey, ownerAccountId)` (never UNSCOPED) with the
 // provider's `fetchProjects(scope ?? token)`. It is NOT the title resolver
@@ -2318,9 +2332,29 @@ const readOwnerIssues = createReadOwnerIssues({
   getProviderForWorkspace,
   getTestMockData: () => testMockData
 })
+// Run shares (LIN-3313, Phase 3 of LIN-2950): the run reader composes the same
+// hardened `resolveWorkspaceAccess` with the run page's two loader halves and
+// the ONE `prStateStore` above (one 36/h budget and cache with the dashboard
+// router). The loader halves are the dashboard router's `runLoader` handle;
+// that router is built further down (it needs stores declared after this
+// point), so they are bound lazily — first called on a request, long after
+// module init. The settle predicate and loop enrichment are injected (the
+// materializer pattern), keeping one definition of "terminal".
+const shareRunReader = createShareRunReader({
+  resolveWorkspaceAccess,
+  getProviderForWorkspace,
+  loadRunLocal: (...args) => dashboardRouter.runLoader.loadRunLocal(...args),
+  readRunExternal: (...args) => dashboardRouter.runLoader.readRunExternal(...args),
+  prStateStore,
+  sessionSettleState,
+  sessionIsSettled,
+  enrichLoop
+})
 app.use(createShareRoutes({
   shareStore,
   readOwnerIssues,
+  readOwnerRun: shareRunReader.readOwnerRun,
+  probeRun: shareRunReader.probeRun,
   workspaceOwnerCheck,
   workspaceFromUrl,
   getProviderForWorkspace,
@@ -2925,7 +2959,7 @@ app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, 
 app.use(createRunnerKitRoutes())
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args) }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
@@ -2935,7 +2969,8 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence }))
+const dashboardRouter = createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore })
+app.use(dashboardRouter)
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the

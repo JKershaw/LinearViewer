@@ -15,7 +15,7 @@ import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
 import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff.js';
-import { isValidIssueId, BINDING_INTENT } from '../lib/workspace.js';
+import { isValidIssueId, BINDING_INTENT, dispatchBindingPairFields } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { buildRunGate } from '../lib/chat-request.js';
@@ -136,7 +136,7 @@ export function createKickoffRoutes({
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks, maxSessionsPerTask } = req.body || {};
+      const { goal, mode, variant, issueIdentifier, issueSource, issueBindingScope, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks, maxSessionsPerTask } = req.body || {};
 
       // Validate caller-supplied inputs. (The composed body is server-generated
       // and trusted, so only these raw inputs are checked — same split as the
@@ -276,8 +276,17 @@ export function createKickoffRoutes({
       // can inherit the project repo (mirrors /prompt + recommend-and-dispatch).
       let issue = null;
       let resolvedRepo = repo || null;
+      // LIN-3242 (LIN-3126 §4): the validated, trimmed binding selector pair to
+      // stamp on a scoped run row. Stays empty for a goal-only kickoff (and for a
+      // lone `source` hint), so the store's sparse write adds no key.
+      let persistedBindingFields = {};
       if (issueIdentifier) {
-        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE });
+        // LIN-3242 (LIN-3126 §4): a scoped kickoff forwards the row's binding
+        // selector pair into the seam when the body supplies one; otherwise
+        // `selector` stays absent and the seam's query-selector fallback is
+        // preserved. Selection-only — the credential is the Connection's.
+        const issueBindingSelector = (issueSource != null || issueBindingScope != null) ? { source: issueSource, bindingScope: issueBindingScope } : undefined;
+        const { token: accessToken, reason, provider, selectedBinding } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
         // LIN-1980: stamp before any other logic (incl. the !accessToken early
         // return below) so the fingerprint is present even when this request
         // later 401s from a shared credential another site marked suspect.
@@ -302,6 +311,12 @@ export function createKickoffRoutes({
         }
         issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
         resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
+        // The seam above resolved the complete pair (an unknown one refused), so
+        // stamp the trimmed values it SELECTED (`selectedBinding`; none when
+        // selection never ran — review R3); a lone `source` hint stamps none.
+        persistedBindingFields = (issueSource != null && issueBindingScope != null)
+          ? dispatchBindingPairFields(issueSource, issueBindingScope, selectedBinding)
+          : {};
       }
 
       // Child-autopilot prompt inheritance (LIN-3246 / LIN-2949 P1b): a fresh
@@ -464,7 +479,16 @@ export function createKickoffRoutes({
           maxTasks: maxTasks ?? null,
           // Sibling per-task bound (LIN-2934): same rationale as maxTasks —
           // stored on the run row so the dispatch-factory seam can enforce it.
-          maxSessionsPerTask: maxSessionsPerTask ?? null
+          maxSessionsPerTask: maxSessionsPerTask ?? null,
+          // Run variant (LIN-3248 N2): the authoritative standard/stepper fact
+          // the run page reads for the seam-guard promise. `resolvedVariant` is
+          // the same value the kickoff body is built from; stamped here so the
+          // page and the guard agree (the row, not the response, is the source).
+          variant: resolvedVariant,
+          // LIN-3242 (LIN-3126 §4): a scoped run's validated, trimmed binding
+          // selector pair (`?? null`; the store writes it sparsely, S0).
+          issueSource: persistedBindingFields.issueSource ?? null,
+          issueBindingScope: persistedBindingFields.issueBindingScope ?? null
         }
       });
 

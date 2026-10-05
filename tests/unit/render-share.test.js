@@ -15,7 +15,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderPage, renderTaskRow } from '../../lib/render.js';
 import { renderPage as renderShellPage } from '../../lib/components/page.js';
-import { renderSharePage } from '../../lib/render-share.js';
+import { renderSharePage, renderGuestRunPage } from '../../lib/render-share.js';
+import { renderSessionPage } from '../../lib/render-session.js';
+import { buildGuestRunProjection, guestParagraphKey } from '../../lib/guest-run.js';
+import { sessionSettleState, enrichLoop } from '../../routes/dashboard.js';
+import { liveSession, evidenceModel, prRead, URL_KEY, CAPTURED_AT } from '../fixtures/guest-run-fixtures.js';
 
 // The exact bare pill `renderNode` emits for a state, pulled straight out of a
 // real landing render so the parity is proven against renderNode itself rather
@@ -179,5 +183,71 @@ describe('renderSharePage', () => {
 
     const stale = renderSharePage({ snapshot, snapshotAt: at, stale: true });
     assert.ok(stale.includes('as of 2026-10-02T00:00:00.000Z'));
+  });
+});
+
+// LIN-3312 (Phase 2 of LIN-2950, S6a): a shared RUN renders the run page in
+// guest mode from the stored projection — no separate share page.
+describe('renderGuestRunPage', () => {
+  function storedProjection() {
+    const session = liveSession();
+    return buildGuestRunProjection({
+      session,
+      runEvidence: evidenceModel(),
+      prRead: prRead(),
+      paragraph: { paragraph: 'The run shipped.', inputHash: guestParagraphKey(session), final: true },
+      urlKey: URL_KEY,
+      capturedAt: CAPTURED_AT
+    }, { sessionSettleState, enrichLoop });
+  }
+
+  test('is exactly renderSessionPage(…, {guest: true}) over the stored projection', () => {
+    const snapshot = storedProjection();
+    const html = renderGuestRunPage({ snapshot });
+    const direct = renderSessionPage({
+      session: snapshot.session,
+      runEvidence: snapshot.runEvidence,
+      runParagraph: snapshot.runParagraph,
+      prState: snapshot.prState,
+      prRef: snapshot.prRef,
+      sessionTerminal: snapshot.settled,
+      capturedAt: snapshot.capturedAt
+    }, { guest: true });
+    assert.strictEqual(html, direct);
+    assert.ok(html.includes('data-testid="session-page"'));
+    assert.ok(html.includes('data-testid="session-pr-link"'));
+    assert.ok(html.includes('<meta name="robots" content="noindex">'));
+    assert.strictEqual((html.match(/<script/g) || []).length, 1, 'only the theme pre-paint');
+    assert.ok(!html.includes('data-url-key'));
+  });
+
+  test('is pure: the same snapshot renders the same document', () => {
+    const snapshot = storedProjection();
+    assert.strictEqual(renderGuestRunPage({ snapshot }), renderGuestRunPage({ snapshot: structuredClone(snapshot) }));
+  });
+
+  test('a settled snapshot reads as settled; an unsettled one says it updates', () => {
+    const snapshot = storedProjection();
+    assert.strictEqual(snapshot.settled, true);
+    assert.ok(!renderGuestRunPage({ snapshot }).includes('updates while the run is in progress'));
+    assert.ok(renderGuestRunPage({ snapshot: { ...snapshot, settled: false } }).includes('updates while the run is in progress'));
+  });
+
+  test('shows the share-stale "as of" line only when stale (reused from the collection page)', () => {
+    const snapshot = storedProjection();
+    const at = '2026-10-02T00:00:00.000Z';
+    const fresh = renderGuestRunPage({ snapshot, snapshotAt: at, stale: false });
+    assert.ok(!fresh.includes('share-stale'));
+    const stale = renderGuestRunPage({ snapshot, snapshotAt: at, stale: true });
+    assert.ok(stale.includes('<p class="share-stale" data-testid="share-stale">as of 2026-10-02T00:00:00.000Z</p>'));
+    const staleNoTime = renderGuestRunPage({ snapshot, stale: true });
+    assert.ok(!staleNoTime.includes('share-stale'), 'no time, no line');
+  });
+
+  test('a snapshot with no session or capture time throws (the route answers 503)', () => {
+    const snapshot = storedProjection();
+    assert.throws(() => renderGuestRunPage({ snapshot: { ...snapshot, session: null } }), /needs a session/);
+    assert.throws(() => renderGuestRunPage({ snapshot: { ...snapshot, capturedAt: undefined } }), /needs capturedAt/);
+    assert.throws(() => renderGuestRunPage({}), /needs a session/);
   });
 });

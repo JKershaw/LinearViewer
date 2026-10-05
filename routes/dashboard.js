@@ -53,7 +53,10 @@ import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
-import { readRunEvidence } from '../lib/run-evidence.js';
+import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
+import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
+import { prStateCopy } from '../lib/pr-state-copy.js';
+import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -85,6 +88,31 @@ import { hashSession } from '../lib/session-summary-cache.js';
 // 'complete'/'error'; until then a summary would snapshot a moving target and
 // the cache (keyed on the immutable run) would serve stale content.
 const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
+
+// PR-state cache + upstream budget (LIN-3251) live in `lib/pr-state-store.js`
+// since LIN-3311 (one store instance, shared by every reader server.js wires).
+// The test seams stay re-exported here so `routes/test.js` is unchanged.
+export { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from '../lib/pr-state-store.js';
+
+/**
+ * `[evidence]` telemetry URLs across a session's runs — the corroborating (never
+ * sole) PR-URL source the run-evidence model takes (LIN-3247/LIN-3251).
+ * @param {Object|null} session
+ * @returns {string[]}
+ */
+function collectRunEvidenceUrls(session) {
+  const urls = [];
+  const loops = Array.isArray(session && session.loops) ? session.loops : [];
+  for (const loop of loops) {
+    const feedback = Array.isArray(loop && loop.feedback) ? loop.feedback : [];
+    for (const entry of feedback) {
+      if (entry && entry.url && typeof entry.message === 'string' && entry.message.startsWith('[evidence]')) {
+        urls.push(entry.url);
+      }
+    }
+  }
+  return urls;
+}
 
 // Map a dispatch terminal-feedback marker → a Loop agentState. `skipped`
 // (LIN-946/LIN-951) is terminal-BENIGN → 'complete', NOT 'error': the runner
@@ -231,6 +259,38 @@ export function sessionIsTerminal(session) {
   if (anchor) return loopIsTerminal(anchor);
   const loops = Array.isArray(session?.loops) ? session.loops : [];
   return loops.length > 0 && loops.every(loopIsTerminal);
+}
+
+/**
+ * Per-loop terminal state plus the "settled" verdict (LIN-3311, S2a of
+ * LIN-2950; plan-review R4). Stricter than `sessionIsTerminal`: an ANCHORED
+ * session is terminal once its anchor is, even while a reply or proposal
+ * Apply runs a follow-up loop; it is SETTLED only when the anchor rule holds
+ * AND every loop is terminal.
+ *
+ *   settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(terminal)
+ *
+ * Each loop's `terminal` is the SAME private `loopIsTerminal` (`enrichLoop` →
+ * `effectiveAgentState`, so a markerless `complete`/`error` loop counts) that
+ * `sessionIsTerminal` uses — not the marker-only `gateFacts` view of the run
+ * paragraph module, which is deliberately left alone (LIN-3253). The
+ * returned `loops` array is the one the check counted, so a key built from it
+ * (LIN-2950's `settledKey`) agrees with the verdict by construction. A loop
+ * that never ends means "never settles", the safe direction.
+ *
+ * @param {Object} session - a reconstructed session (lean or non-lean)
+ * @returns {{ settled: boolean, loops: Array<{ loopId: (string|null), terminal: boolean }> }}
+ */
+export function sessionSettleState(session) {
+  const raw = Array.isArray(session?.loops) ? session.loops : [];
+  const loops = raw.map(loop => ({ loopId: loop.loopId ?? null, terminal: loopIsTerminal(loop) }));
+  const settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(l => l.terminal);
+  return { settled, loops };
+}
+
+/** The settled verdict alone; defined from `sessionSettleState`, never beside it. */
+export function sessionIsSettled(session) {
+  return sessionSettleState(session).settled;
 }
 
 /**
@@ -406,16 +466,24 @@ export function deriveSessionWaiting(enrichedLoops) {
  * LIN-3252 G2: injects the SAME `liveDispatchOnAnchor` predicate the dashboard
  * rulings feed (`:1830`) and `routes/proxy-rulings.js` use — a live run already
  * on the anchor means `resolveEffect` branch 3, so a `gone` row answers
- * `record`, never a second run racing the live one. The source here is the
- * session's OWN loops (zero new reads); a live run in ANOTHER session on the
- * same issue is not seen — the residual named in the PR.
+ * `record`, never a second run racing the live one.
+ *
+ * LIN-3260: the predicate scans the `liveLoops` opt when supplied — the
+ * workspace-wide loop set the route reads from the warm `sessionsFeedCache`
+ * `rulings` entry — so a live run on the same issue in ANOTHER session is seen.
+ * Absent `liveLoops`, it scans the session's OWN loops (the prior behaviour,
+ * and the route's cold-cache fallback).
  *
  * @param {Array<Object>} enrichedLoops - loops already run through `enrichLoop`
- * @param {{now?: Date}} [opts]
+ * @param {{now?: Date, liveLoops?: Array<Object>}} [opts] - `liveLoops`: the
+ *   loop set the liveness predicate scans (defaults to `enrichedLoops`)
  * @returns {Array<Object>} `collectUnansweredDecisions` rows
  */
-export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
+export function deriveSessionDecisions(enrichedLoops, { now, liveLoops } = {}) {
   const loops = Array.isArray(enrichedLoops) ? enrichedLoops : [];
+  // The rows still come from the session's own loops (session membership); only
+  // the liveness predicate widens to the workspace set when one is supplied.
+  const livenessScope = Array.isArray(liveLoops) ? liveLoops : loops;
   return collectUnansweredDecisions(
     {
       loops,
@@ -429,7 +497,7 @@ export function deriveSessionDecisions(enrichedLoops, { now } = {}) {
       // (LIN-2934): a null anchor must never match another null anchor.
       liveDispatchOnAnchor: (issueIdentifier) =>
         issueIdentifier != null &&
-        loops.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
+        livenessScope.some(l => l.issueIdentifier === issueIdentifier && !isTerminalLoop(l))
     }
   );
 }
@@ -647,10 +715,49 @@ export function createDashboardRoutes({
   // Default null -> the mount is skipped entirely, so an unwired test (and every
   // existing session-page assertion) sees no provider I/O and no page change.
   // server.js injects the real `lib/run-evidence.js` reader.
-  readRunEvidence: readRunEvidenceFn = null
+  readRunEvidence: readRunEvidenceFn = null,
+  // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
+  // store, which is process-wide in production (one router). Tests inject
+  // `{ now, resolveProvider, loadRun, githubFetch, cache, allowlistCache, bucket }`.
+  prState = null,
+  // LIN-3311 (S0 of LIN-2950): the ONE shared PR-state store server.js builds
+  // (`lib/pr-state-store.js`), so this router and later readers spend one 36/h
+  // budget and fill one cache. When given it wins over the store fields of the
+  // `prState` bag (`cache`/`allowlistCache`/`bucket`/`now`/`githubFetch`); the
+  // bag's route seams (`loadRun`/`resolveProvider`) still apply.
+  prStateStore: sharedPrStateStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
+
+  // PR-state store (LIN-3251, C1). `cache`/`bucket` default to this router's own
+  // process-wide state; a test overrides any subset. `loadRun` and
+  // `resolveProvider` are seams so a route test needs no Mongo or provider bind.
+  //
+  // NOTE: there is deliberately NO run->PR pointer cache. Every GET re-reads the
+  // run's tracker comments and re-extracts the PR URL, so a PR posted after the
+  // first poll is picked up on the next one. The only thing cached across polls
+  // is the per-workspace repo allowlist (a tracker `fetchProjects` read, not a
+  // GitHub read), so a PR-state cache hit still runs no `fetchProjects`.
+  //
+  // Without an injected store the router builds its own from the `prState`
+  // bag: the shared process-wide cache, a fresh budget log and allowlist cache
+  // (the pre-LIN-3311 defaults, unchanged).
+  const prStateStore = sharedPrStateStore || createPrStateStore(prState || {});
+  const prStateSeams = {
+    resolveProvider: (prState && prState.resolveProvider) || ((workspace, selector) => resolveIssueBinding(workspace, selector)),
+    loadRun: (prState && prState.loadRun) || defaultLoadRun
+  };
+
+  /**
+   * Resolve a run id to its seed issue + the run's `[evidence]` telemetry URLs.
+   * The same non-lean point-read the page uses; null when the session is gone.
+   */
+  async function defaultLoadRun(urlKey, runId) {
+    const session = await loadSessionWithTranscript(urlKey, runId);
+    if (!session) return null;
+    return { issueIdentifier: session.seedIssue || null, evidenceUrls: collectRunEvidenceUrls(session) };
+  }
 
   /**
    * Merge Loops across every connected workspace, tagging each run with its
@@ -1243,18 +1350,14 @@ export function createDashboardRoutes({
         return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
       }
 
-      // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
-      // `feedback[]`, but scoped to this session's issues, not the whole workspace.
-      const session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
-      if (!session) {
+      // The local half (LIN-3311): session, issue context, run view, stored
+      // paragraph — Mongo only, no request input. Everything below that reads
+      // `req` or is owner-only stays in this route.
+      const local = await loadRunLocal(workspace.urlKey, sessionId);
+      if (!local) {
         return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
       }
-
-      // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
-      // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
-      // loops cannot be cache-joined and are skipped best-effort (mirrors the
-      // lazy-hydration discipline). Never call the generating path on load.
-      const issueContext = await joinSessionIssueContext(session, workspace.urlKey);
+      const { session, issueContext, anchorLoop, anchorIssueTitle, runView, runParagraph } = local;
 
       // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
       // observation feed uses, computed here over the non-lean session's enriched
@@ -1267,21 +1370,38 @@ export function createDashboardRoutes({
       const waiting = !sessionTerminal && rawWaiting;
       const waitingMessage = waiting ? rawWaitingMessage : null;
 
-      // Pinned question card (LIN-3252 S2): the session's unanswered decisions,
-      // read independently of `waiting` so the card shows on a non-waiting or
-      // finished session too. Session-membership scope; no shelves, no
-      // task-decisions — see `deriveSessionDecisions`.
-      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date() });
+      // Pinned question card (LIN-3252 S2 / LIN-3260): the session's unanswered
+      // decisions, read independently of `waiting` so the card shows on a
+      // non-waiting or finished session too. Rows stay session-membership scoped
+      // (no shelves, no task-decisions), but the liveness predicate must see a
+      // live run on the anchor in ANOTHER session — so feed `deriveSessionDecisions`
+      // the workspace-wide loop set from the warm `rulings` entry (the SAME cache
+      // the Rulings feed / nav-badge poll fills). This is a NON-producing `peek`:
+      // the run page must never trigger the whole-workspace reconstruction a
+      // producing `get` would (LIN-1021/H12). A cold cache falls back to the
+      // session's own loops (the prior behaviour).
+      //
+      // The `rulings` entry is merged across `req.session.workspaces`, and issue
+      // identifiers are only per-TEAM unique, so the SAME identifier can exist in
+      // two connected workspaces — scope the set to the workspace being viewed
+      // (`workspaceUrlKey`) so a same-named issue elsewhere cannot force `record`
+      // on this card.
+      const sessionWorkspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
+      const cachedLoopSet = typeof sessionsFeedCache.peek === 'function'
+        ? sessionsFeedCache.peek(sessionsFeedCache.keyFor(sessionWorkspaces, 'rulings'))
+        : undefined;
+      const liveLoops = Array.isArray(cachedLoopSet)
+        ? enrichedLoops.concat(cachedLoopSet.filter(l => l && l.workspaceUrlKey === workspace.urlKey))
+        : enrichedLoops;
+      const sessionDecisions = deriveSessionDecisions(enrichedLoops, { now: new Date(), liveLoops });
 
       // Per-run inline reply (LIN-1004/LIN-1133; LIN-1163 removed the page-level
       // box): gated to cli/web sessions (never dash/local — the dispatch route
       // rejects followUpTo for those anyway). Each run's own box replies via its
       // own `loop.target`, so the session-wide target no longer needs deriving
       // here — only the gate (from the anchor run) is still needed.
-      const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
-      const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
 
       // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
       // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
@@ -1291,28 +1411,29 @@ export function createDashboardRoutes({
       // `listCredentialHealth`; nothing here re-derives it.
       const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
 
-      // The run view model is built ONCE here (the renderer only formats it).
-      const runView = buildRunView(session, { now: new Date() });
-
       // LIN-3254: the run's proposals, newest-first. Empty when the feature's
       // store is unwired; never a page-load failure.
       const proposals = runProposalsStore
         ? await runProposalsStore.list(workspace.urlKey, sessionId)
         : [];
 
-      // LIN-3247: the evidence fragment mounted at the top of the session page,
-      // guarded to the ONE seam LIN-2948 will lift out. Skipped when the reader
-      // is not wired (tests, and any deployment without the module), and
-      // fail-open: a read error renders no evidence rather than a broken page.
-      const runEvidence = (readRunEvidenceFn && session.seedIssue)
-        ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle)
-        : null;
-
-      // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
-      // generation. A miss — or an unwired store — renders nothing.
-      const runParagraph = runParagraphStore
-        ? ((await runParagraphStore.get(workspace.urlKey, sessionId))?.paragraph || null)
-        : null;
+      // LIN-3247/3248: the evidence fragment + close-out box mounted at the top
+      // of the session page, guarded to the ONE seam LIN-2948 will lift out.
+      // Skipped when the reader is not wired (tests, and any deployment without
+      // the module), and fail-open: a read error renders no evidence rather than
+      // a broken page. The run's `stopAt`/variant come off its own dispatch row
+      // (P1a/P1b): a standard run's box carries the seam-guard promise, a
+      // stepped run's does not (N2).
+      //
+      // `runFacts` (a dispatch-row read) and `runnerReady` (a session feature
+      // flag) are owner inputs read here and handed to the external half.
+      const runFacts = await readRunFacts(dispatchQueueStore, workspace.urlKey, session.seedIssue);
+      const runEvidence = await readRunExternal(workspace, session, {
+        asked: anchorIssueTitle,
+        viewerIsOwner: true,
+        runFacts,
+        runnerReady: getFeatureFlags(req.session).dispatch === true,
+      });
 
       // Bare-BLOCKED card inputs (LIN-3252 S2.7): the waiting producer loop
       // carries the reply target/issue the follow-up must resume and the latest
@@ -1336,6 +1457,64 @@ export function createDashboardRoutes({
       res.send(html);
     } catch (error) {
       next(error);
+    }
+  });
+
+  // ─── Live PR state (LIN-3251, S1b of LIN-2948, condition C1) ────────────────
+  //
+  // GET /workspace/:urlKey/api/run/:runId/pr-state. Resolves the run's PR URL
+  // through LIN-2949's run-evidence model (tracker comments, allowlist-filtered,
+  // `[evidence]` corroborating only), then reads the live PR state through the
+  // shared `lib/github-pr-status.js` reader. It never calls LIN-2949's
+  // side-effecting POST `.../check`. The whole reader result is cached per
+  // `owner/repo#number`; run pages share the process-wide 36-calls/hour budget.
+  // Unreadable cases (private, off-allowlist, rate-limited, budget spent with no
+  // stale value) resolve to the "state not reported" (`unknown`) state — never a
+  // 403, never a thrown read.
+
+  // The allowlist cache, sliding budget, counting fetch, TTL rule and payload
+  // shapes are `lib/pr-state-store.js`'s (LIN-3311); this route only resolves
+  // the run's PR and asks the store.
+
+  router.get('/workspace/:urlKey/api/run/:runId/pr-state', workspaceFromUrl, async (req, res) => {
+    const workspace = req.workspace;
+    const { runId } = req.params;
+    if (!runId || runId.length > 200) {
+      return jsonError(res, 400, 'Invalid run id');
+    }
+    const nowMs = prStateStore.now();
+    try {
+      // Re-resolve the run's PR URL on EVERY request (no run->PR pointer cache),
+      // so a PR posted after the first poll is seen on the next one. Only the
+      // repo allowlist (a tracker read) is cached, not the PR URL or its state.
+      const run = await prStateSeams.loadRun(workspace.urlKey, runId);
+      if (!run || !run.issueIdentifier) {
+        return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
+      }
+      const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
+      const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
+      const allowlist = await prStateStore.allowlist(workspace.urlKey, provider, callScope, nowMs);
+      // Through LIN-2949's run-evidence model, not a new parser.
+      const model = buildRunEvidence({
+        issueIdentifier: run.issueIdentifier,
+        comments,
+        allowlist,
+        evidenceUrls: run.evidenceUrls || [],
+        prStatus: null
+      });
+      const { status, ref } = resolveRunPrRef(model);
+      if (status !== 'one') {
+        // zero PRs -> "none"; several -> withhold (never pick one silently)
+        const state = status === 'none' ? 'none' : 'unknown';
+        const payload = { state, number: null, checks: null, url: null };
+        return res.json({ ...payload, message: prStateCopy(payload) });
+      }
+      const payload = await prStateStore.readPayload(ref, nowMs);
+      return res.json({ ...payload, message: prStateCopy(payload) });
+    } catch (error) {
+      console.error('Run PR-state error:', error.message);
+      const payload = { state: 'unknown', number: null, checks: null, url: null };
+      return res.json({ ...payload, message: prStateCopy(payload) });
     }
   });
 
@@ -1466,45 +1645,152 @@ export function createDashboardRoutes({
   }
 
   /**
-   * Build the run-evidence model for the session page (LIN-3247). The provider
-   * read is delegated to the injected `readRunEvidence` (lib/run-evidence.js)
-   * so the page route stays free of the reader's internals and tests can skip
-   * it. Fail-open: any error renders no evidence, never a broken page.
+   * The run page's LOCAL half (LIN-3311, S2a of LIN-2950): everything the page
+   * model needs that is Mongo-only and request-free — the NON-lean session
+   * (LIN-1021 point-read), the brief/recap cache-join, the anchor loop and its
+   * title, the run view, and the stored run paragraph. No tracker or GitHub
+   * read, no `req`, no owner-only input, so a non-request caller (LIN-2950's
+   * share reader) can run it as its cheap local probe.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @param {{ now?: Date|string|number }} [opts] - the run view's clock
+   * @returns {Promise<null|{ session: Object, issueContext: Array, anchorLoop: (Object|null), anchorIssueTitle: (string|null), runView: Object, paragraph: (Object|null), runParagraph: (string|null) }>}
+   *   null when the session is gone; `paragraph` is the stored record
+   *   (`{ paragraph, inputHash, final, … }`), `runParagraph` its text.
+   */
+  async function loadRunLocal(urlKey, sessionId, { now = new Date() } = {}) {
+    // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
+    // `feedback[]`, but scoped to this session's issues, not the whole workspace.
+    const session = await loadSessionWithTranscript(urlKey, sessionId);
+    if (!session) return null;
+
+    // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
+    // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
+    // loops cannot be cache-joined and are skipped best-effort (mirrors the
+    // lazy-hydration discipline). Never call the generating path on load.
+    const issueContext = await joinSessionIssueContext(session, urlKey);
+
+    const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
+    const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
+
+    // The run view model is built ONCE here (the renderer only formats it).
+    const runView = buildRunView(session, { now });
+
+    // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
+    // generation. A miss — or an unwired store — renders nothing.
+    const paragraph = runParagraphStore
+      ? ((await runParagraphStore.get(urlKey, sessionId)) || null)
+      : null;
+
+    return { session, issueContext, anchorLoop, anchorIssueTitle, runView, paragraph, runParagraph: paragraph?.paragraph || null };
+  }
+
+  /**
+   * The run page's EXTERNAL half (LIN-3311, S2a; was LIN-3247's
+   * `readSessionRunEvidence`): the tracker evidence and the PR state the
+   * evidence model folds in, through the injected `readRunEvidence`
+   * (lib/run-evidence.js) so the route stays free of the reader's internals and
+   * tests can skip it. Skipped (null) when the reader is unwired or the run has
+   * no seed issue; fail-open: any error renders no evidence, never a broken page.
    *
    * `[evidence]` telemetry URLs from the session's runs are passed as the
    * corroborating source only — the reader never lets them be the sole PR-URL
    * source (S1).
    *
-   * @param {Function} reader
+   * Owner-only inputs come in as arguments, never read here: `viewerIsOwner`
+   * (default false), the dispatch-row `runFacts` and the `runnerReady` flag.
+   * Omitted, they take the guest-safe defaults (`stopAt: null`,
+   * `variant: 'unknown'`, not ready). `allowlist`/`readPrStatus` are passed to
+   * the reader only when given (e.g. from the shared PR-state store).
+   *
    * @param {Object} workspace
    * @param {Object} session
-   * @param {string|null} anchorIssueTitle
+   * @param {Object} [opts]
+   * @param {string|null} [opts.asked] - the "asked" line (the anchor title); falls back to the seed
+   * @param {boolean} [opts.viewerIsOwner=false]
+   * @param {{ stopAt?: ('pr'|null), variant?: string }|null} [opts.runFacts]
+   * @param {boolean} [opts.runnerReady=false]
+   * @param {Set<string>} [opts.allowlist]
+   * @param {Function} [opts.readPrStatus]
+   * @param {{ provider: Object, callScope: * }|null} [opts.binding] - an
+   *   already-resolved provider + call scope (LIN-3313: the share reader's
+   *   owner credential from `resolveWorkspaceAccess`). Omitted, the binding is
+   *   resolved from `workspace` as before; `workspace.urlKey` is still read.
+   * @param {boolean} [opts.failOpen=true] - false rethrows a read error
+   *   instead of returning null (LIN-3313: a share refresh must not mistake a
+   *   failed tracker read for "no evidence" and freeze that). The owner page
+   *   keeps the default.
    * @returns {Promise<Object|null>}
    */
-  async function readSessionRunEvidence(reader, workspace, session, anchorIssueTitle) {
+  async function readRunExternal(workspace, session, {
+    asked = null,
+    viewerIsOwner = false,
+    runFacts = null,
+    runnerReady = false,
+    allowlist = null,
+    readPrStatus = null,
+    binding = null,
+    failOpen = true
+  } = {}) {
+    if (!readRunEvidenceFn || !session || !session.seedIssue) return null;
+    const facts = runFacts || {};
     try {
-      const evidenceUrls = [];
-      const loops = Array.isArray(session.loops) ? session.loops : [];
-      for (const loop of loops) {
-        const feedback = Array.isArray(loop && loop.feedback) ? loop.feedback : [];
-        for (const entry of feedback) {
-          if (entry && entry.url && typeof entry.message === 'string' && entry.message.startsWith('[evidence]')) {
-            evidenceUrls.push(entry.url);
-          }
-        }
-      }
-      const { provider, callScope } = resolveIssueBinding(workspace, null);
-      return await reader({
+      const evidenceUrls = collectRunEvidenceUrls(session);
+      const { provider, callScope } = binding || resolveIssueBinding(workspace, null);
+      return await readRunEvidenceFn({
         issueIdentifier: session.seedIssue,
         provider,
         callScope,
-        viewerIsOwner: true,
+        viewerIsOwner: !!viewerIsOwner,
         evidenceUrls,
-        asked: anchorIssueTitle || session.seedIssue
+        asked: asked || session.seedIssue,
+        urlKey: workspace.urlKey,
+        stopAt: facts.stopAt || null,
+        variant: facts.variant || 'unknown',
+        runnerReady: !!runnerReady,
+        ...(allowlist ? { allowlist } : {}),
+        ...(readPrStatus ? { readPrStatus } : {}),
       });
     } catch (err) {
+      if (!failOpen) throw err;
       console.error('Session page run-evidence read failed:', err.message);
       return null;
+    }
+  }
+
+  /**
+   * The run's boundary facts for the close-out box, off its own dispatch row(s)
+   * (LIN-3248). `stopAt: 'pr'` is P1a's run fact; the run variant is the row's
+   * own persisted `variant` field (`resolveRunVariant`, never `promptName`), so
+   * N2's copy can be chosen at render time. Fail-open to the safe defaults:
+   * no stop, `unknown` variant (the promise stays closed), never a broken page.
+   *
+   * @param {Object} store - dispatchQueueStore
+   * @param {string} urlKey
+   * @param {string|null} issueIdentifier
+   * @returns {Promise<{stopAt: ('pr'|null), variant: ('standard'|'stepper'|'unknown')}>}
+   */
+  async function readRunFacts(store, urlKey, issueIdentifier) {
+    const defaults = { stopAt: null, variant: 'unknown' };
+    if (!store || !urlKey || !issueIdentifier) return defaults;
+    try {
+      const rows = [];
+      const live = await Promise.resolve(store.listItems(urlKey, { issueIdentifier })).catch(() => []);
+      rows.push(...listRows(live));
+      const hist = await Promise.resolve(store.listHistory(urlKey, { issueIdentifier })).catch(() => null);
+      rows.push(...listRows(hist));
+      const stopAt = rows.some(row => row && row.stopAt === 'pr') ? 'pr' : null;
+      const kickoff = rows.find(row => row && row.kind === 'autopilot') || null;
+      // The row's own persisted `variant` is the authoritative source (never
+      // `promptName` — a real stepper kickoff is named `Autopilot (LIN-NNNN)`).
+      // Fail closed: a missing/unknown/non-autopilot row is `unknown`, so N2's
+      // promise is shown only for a positively-standard run.
+      const variant = resolveRunVariant(kickoff);
+      return { stopAt, variant };
+    } catch (err) {
+      console.error('Session page run-facts read failed:', err.message);
+      return defaults;
     }
   }
 
@@ -1730,7 +2016,6 @@ export function createDashboardRoutes({
       const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || ARCHIVE_PAGE_SIZE), recentLimit);
       const recent = archive.slice(offset, offset + limit);
 
-      keepalive.stop();
       keepalive.send(200, {
         workspaces,
         view: isSessionsView ? 'sessions' : 'autopilot',
@@ -1744,7 +2029,6 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Observation sessions error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not load sessions' });
     }
   });
@@ -1762,7 +2046,6 @@ export function createDashboardRoutes({
       const active = merged.filter(l => !isTerminalLoop(l));
       const recent = merged.filter(isTerminalLoop).slice(0, recentLimit);
 
-      keepalive.stop();
       keepalive.send(200, {
         workspaces,
         active,
@@ -1772,7 +2055,6 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard loops error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not load runs' });
     }
   });
@@ -1861,7 +2143,6 @@ export function createDashboardRoutes({
         suggestions
       );
 
-      keepalive.stop();
       keepalive.send(200, {
         workspaces,
         count: rulings.length,
@@ -1870,7 +2151,6 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard rulings error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not load rulings' });
     }
   });
@@ -2295,11 +2575,9 @@ export function createDashboardRoutes({
     const keepalive = armKeepalive(res);
     try {
       const kpis = await computeWorkspaceEscalationKpis(workspaces, { windowMs: windowDays * 24 * 60 * 60 * 1000, now, targetPerDay });
-      keepalive.stop();
       keepalive.send(200, { windowDays, generatedAt: now.toISOString(), ...kpis });
     } catch (error) {
       console.error('Escalation KPIs error:', error);
-      keepalive.stop();
       keepalive.send(500, { error: 'Could not compute escalation KPIs' });
     }
   });
@@ -2333,33 +2611,70 @@ export function createDashboardRoutes({
     // set scored cannot drift.
     const identifiers = eligibleIssueIdentifiers({ liveRows, historyRows });
 
-    // One binding for the whole read, resolved from the workspace itself — a
-    // dispatch row carries no per-issue provenance to thread as `source`. On a
-    // multi-binding workspace a foreign-source issue therefore reads against
-    // the wrong provider and fails; that failure is counted as a skip and
-    // DISCLOSED in `completeness` rather than silently dropped, so the page
-    // under-reports honestly instead of mis-attributing. Threading per-issue
-    // provenance would need a `source` on the dispatch row itself.
-    const { provider, callScope } = resolveIssueBinding(workspace, null);
-    const supports = (name) => typeof provider?.supports === 'function' && provider.supports(name);
-    const survivalAvailable = supports('fetchIssueComments');
-    // `description` is what `GATE_DUE_MARKER` matches for gateDue/gateHonoured.
-    // Without it those two fields would render a uniform zero that is not a
-    // measurement, so the compute layer omits them instead.
-    const gateFieldsAvailable = supports('fetchIssueFields');
+    // LIN-3242 (LIN-3126 §4): group the eligible population by the dispatch row's
+    // OWN binding selector (`issueSource`/`issueBindingScope`), not by the
+    // workspace's active binding. Each DISTINCT stamped key resolves ONCE via
+    // slice-1's `resolveIssueBinding`; the call scope/credential always comes from
+    // the hydrated binding, never from `bindingScope` itself (B1/LIN-2473), and
+    // this path adds no `workspaceTokenCache` usage. An UNSTAMPED issue on a
+    // multi-binding connection-backed workspace is NOT guessed from the active
+    // binding: it is counted as skipped and disclosed in `completeness`. So is a
+    // stamped key whose binding no longer resolves. A single-binding/legacy
+    // workspace keeps today's behaviour for unstamped rows exactly (the null
+    // group resolves to the workspace's active pair).
+    const stampByIdentifier = new Map();
+    for (const row of [...liveRows, ...historyRows]) {
+      const id = row.issueIdentifier;
+      if (!id) continue;
+      const stamped = row.issueSource != null && row.issueBindingScope != null;
+      const existing = stampByIdentifier.get(id);
+      if (existing === undefined || (existing === null && stamped)) {
+        stampByIdentifier.set(id, stamped ? { source: row.issueSource, bindingScope: row.issueBindingScope } : null);
+      }
+    }
+    const groups = new Map();
+    for (const identifier of identifiers) {
+      const selector = stampByIdentifier.get(identifier) ?? null;
+      const key = selector ? `${selector.source}\u0000${selector.bindingScope}` : '';
+      let group = groups.get(key);
+      if (!group) {
+        group = { selector, identifiers: [] };
+        groups.set(key, group);
+      }
+      group.identifiers.push(identifier);
+    }
 
+    // Capability flags: the workspace's own default resolution (today's single
+    // read) PLUS every resolved stamped group, so a stamped binding that can serve
+    // comments still lights the survival columns even when the active binding
+    // refuses.
+    const defaultBinding = resolveIssueBinding(workspace, null);
+    const defaultSupports = (name) => typeof defaultBinding.provider?.supports === 'function' && defaultBinding.provider.supports(name);
+    const supportsFns = [defaultSupports];
     const issueContext = new Map();
     let skipped = 0;
 
-    if (survivalAvailable && identifiers.length) {
-      const settled = await settleWithConcurrency(identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
+    for (const group of groups.values()) {
+      const binding = resolveIssueBinding(workspace, group.selector);
+      if (binding.error) {
+        // Unstamped on a multi-binding workspace, or a stale stamped key:
+        // disclose by counting the whole group as skipped, never throw.
+        skipped += group.identifiers.length;
+        continue;
+      }
+      const { provider, callScope } = binding;
+      const supports = (name) => typeof provider?.supports === 'function' && provider.supports(name);
+      supportsFns.push(supports);
+      if (!supports('fetchIssueComments')) continue;
+
+      const settled = await settleWithConcurrency(group.identifiers, EFFORT_READOUT_ISSUE_CONCURRENCY, async (identifier) => {
         // `fetchIssueComments` (not `fetchIssueContext`) because the verdict
         // walk needs each comment's own `id` + `createdAt`, which only this
         // reader emits. `fetchIssueFields` supplies the description the gate
         // fields are derived from.
         const [comments, fields] = await Promise.all([
           provider.fetchIssueComments(callScope, identifier),
-          gateFieldsAvailable ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
+          supports('fetchIssueFields') ? provider.fetchIssueFields(callScope, identifier) : Promise.resolve(null),
         ]);
         return {
           identifier,
@@ -2384,6 +2699,9 @@ export function createDashboardRoutes({
         skipped += 1;
       }
     }
+
+    const survivalAvailable = supportsFns.some((fn) => fn('fetchIssueComments'));
+    const gateFieldsAvailable = supportsFns.some((fn) => fn('fetchIssueFields'));
 
     return computeEffortReadout({
       liveRows,
@@ -2429,7 +2747,6 @@ export function createDashboardRoutes({
     const keepalive = armKeepalive(res);
     try {
       const readout = await computeWorkspaceEffortReadout(workspace, { now });
-      keepalive.stop();
       keepalive.send(200, { generatedAt: now.toISOString(), ...readout });
     } catch (error) {
       keepalive.stop();
@@ -2766,7 +3083,6 @@ export function createDashboardRoutes({
         session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
       }
       if (!session) {
-        keepalive.stop();
         return keepalive.send(404, { error: 'Session not found' });
       }
 
@@ -2775,7 +3091,6 @@ export function createDashboardRoutes({
         window: { start: session.dispatchedAt, end: session.completedAt }
       });
 
-      keepalive.stop();
       return keepalive.send(200, {
         sessionId,
         seedIssue: session.seedIssue,
@@ -2854,6 +3169,12 @@ export function createDashboardRoutes({
       res.json({ hydrated: false, reason: /not found/i.test(error?.message) ? 'not_found' : 'unavailable' });
     }
   });
+
+  // The run page's two request-free halves (LIN-3311, S2a of LIN-2950), so a
+  // caller outside this router (LIN-2950 Phase 3's share reader, wired in
+  // server.js) builds a run model through the SAME code as the owner page
+  // instead of a fork. Neither carries an owner-only or request-coupled input.
+  router.runLoader = { loadRunLocal, readRunExternal };
 
   return router;
 }

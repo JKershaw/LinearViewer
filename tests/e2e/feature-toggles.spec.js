@@ -32,7 +32,6 @@ test.describe('Feature Toggle Settings', () => {
 
     // All feature toggle labels should be present (split across sections)
     await expect(page.locator('.feature-toggle-label:has-text("Reference Linear in prompts")')).toBeVisible();
-    await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Code review before completing")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Dispatch queue")')).toBeVisible();
     await expect(page.locator('.feature-toggle-label:has-text("Linear API proxy")')).toBeVisible();
@@ -45,9 +44,8 @@ test.describe('Feature Toggle Settings', () => {
     await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
     await page.waitForLoadState('networkidle');
 
-    // Defaults: linearMcp ON, featureBranches OFF, codeReview OFF, dispatch OFF, proxy OFF, aiRecommendations ON, promptButtons ON, roadmap OFF
+    // Defaults: linearMcp ON, codeReview OFF, dispatch OFF, proxy OFF, aiRecommendations ON, promptButtons ON, roadmap OFF
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
-    await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="proxy"] .toggle-state')).toHaveText('○ off');
@@ -107,7 +105,7 @@ test.describe('Feature Toggle Settings', () => {
 
     // linearMcp should be off, but others unchanged
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
-    await expect(page.locator('[data-feature="featureBranches"] .toggle-state')).toHaveText('○ off');
+    await expect(page.locator('[data-feature="codeReview"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="dispatch"] .toggle-state')).toHaveText('○ off');
     await expect(page.locator('[data-feature="aiRecommendations"] .toggle-state')).toHaveText('● on');
     await expect(page.locator('[data-feature="promptButtons"] .toggle-state')).toHaveText('● on');
@@ -141,29 +139,28 @@ test.describe('Feature Toggle Settings', () => {
   });
 
   // =========================================================================
-  // LIN-169: Feature branch toggle affects prompt content
+  // LIN-3296: the featureBranches toggle is gone. Its git block only ever
+  // reached plan, which must not branch or open a PR; implementation carries
+  // its own branch and PR steps.
   // =========================================================================
 
-  test('prompts exclude git workflow by default', async ({ page, localWorkerUrlKey }) => {
-    // Default: featureBranches is OFF
+  test('settings no longer offers a feature branch toggle', async ({ page, localWorkerUrlKey }) => {
+    await page.goto(`/workspace/${localWorkerUrlKey}/settings`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.locator('.settings-header:text-is("Workflow")')).toBeVisible();
+    await expect(page.locator('[data-feature="featureBranches"]')).toHaveCount(0);
+    await expect(page.locator('.feature-toggle-label:has-text("Feature branch workflow")')).toHaveCount(0);
+  });
+
+  test('plan prompt has no git workflow', async ({ page, localWorkerUrlKey }) => {
     const response = await page.request.get(
       `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
     );
     expect(response.ok()).toBeTruthy();
     const data = await response.json();
     expect(data.prompt).not.toContain('Git Workflow');
-  });
-
-  test('prompts include git workflow when featureBranches is on', async ({ page, seedLocal, localWorkerUrlKey }) => {
-    // Set session with featureBranches ON
-    await seedLocal(workspaceApiLocalSeed, { features: { featureBranches: true } });
-
-    const response = await page.request.get(
-      `/workspace/${localWorkerUrlKey}/api/prompt/${TEST_ISSUE_ID}/plan`
-    );
-    expect(response.ok()).toBeTruthy();
-    const data = await response.json();
-    expect(data.prompt).toContain('Git Workflow');
+    expect(data.prompt).not.toMatch(/create a pull request/i);
   });
 
   // =========================================================================

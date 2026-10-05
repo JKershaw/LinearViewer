@@ -15,6 +15,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createShareRoutes, createShareLimiters } from '../../routes/share.js';
+import { createRunHarness, SID, URL_KEY as RUN_URL_KEY } from '../fixtures/share-run-harness.js';
 
 const OWNER_OK = async () => ({ status: 'owner' });
 const NOOP_TIMEOUT = (promise) => promise;
@@ -43,7 +44,7 @@ function makeStore() {
         urlKey,
         workspaceId,
         ownerAccountId,
-        subject: { type: 'collection', kind: subject.kind, id: subject.id },
+        subject: { type: subject.type || 'collection', kind: subject.kind, id: subject.id },
         includeDescriptions: includeDescriptions === true,
         createdAt: new Date(),
         revokedAt: null,
@@ -93,6 +94,8 @@ function makeStore() {
 function buildApp({
   store,
   readOwnerIssues,
+  readOwnerRun,
+  probeRun,
   workspaceOwnerCheck = OWNER_OK,
   getProviderForWorkspace = () => ({ ui: { subtasks: true } }),
   withTimeout = NOOP_TIMEOUT,
@@ -112,6 +115,8 @@ function buildApp({
   app.use(createShareRoutes({
     shareStore: store,
     readOwnerIssues,
+    readOwnerRun,
+    probeRun,
     workspaceOwnerCheck,
     workspaceFromUrl,
     getProviderForWorkspace,
@@ -405,5 +410,129 @@ describe('owner revoke', () => {
     const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }) });
     const res = await request(app, '/workspace/ws-1/shares/does-not-exist/revoke', { method: 'POST' });
     assert.equal(res.status, 404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3313 (Phase 3 of LIN-2950): run shares through the owner routes. The run
+// reader is the REAL one over the counting harness (tests/fixtures/
+// share-run-harness.js), whose runs live in workspace RUN_URL_KEY only.
+// ---------------------------------------------------------------------------
+
+// Runtime-assembled secret (the repo's CI secret-scan reads this source).
+const PLANTED = ['gh', 'p_'].join('') + 'Qx7Rk2Vm9Lp4Wn8Tz3Yb6Hc1Js5Df0Gu2AeZq8Wx3Ec7Rv2Tb6Yn1Um5Ik9Ol4'.slice(0, 36);
+
+describe('owner create — run shares (LIN-3313)', () => {
+  function runApp({ store = makeStore(), harness = createRunHarness(), readOwnerIssues, getProviderForWorkspace } = {}) {
+    let issueReads = 0;
+    let providerLookups = 0;
+    const app = buildApp({
+      store,
+      readOwnerIssues: readOwnerIssues || (async () => { issueReads++; return { reason: 'ok', issues: [] }; }),
+      readOwnerRun: harness.reader.readOwnerRun,
+      probeRun: harness.reader.probeRun,
+      getProviderForWorkspace: getProviderForWorkspace || (() => { providerLookups++; return { ui: { subtasks: true } }; })
+    });
+    return { app, store, harness, counts: () => ({ issueReads, providerLookups }) };
+  }
+  const RUN_BODY = { subject: { kind: 'run', id: SID } };
+
+  test('creates a run share: subject normalised to { type: run, kind: run, id }, first snapshot stored, parent-only branches skipped', async () => {
+    const { app, store, harness, counts } = runApp();
+    const res = await request(app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: { subject: { kind: 'run', id: `  ${SID}  ` }, includeDescriptions: true } });
+    assert.equal(res.status, 201);
+    assert.deepEqual(Object.keys(res.json).sort(), ['token', 'url']);
+    const [record] = [...store.byId.values()];
+    assert.deepEqual(record.subject, { type: 'run', kind: 'run', id: SID });
+    assert.equal(record.includeDescriptions, false, 'descriptions are a collection option');
+    assert.equal(record.snapshot.session.sessionId, SID, 'the first snapshot is the guest projection');
+    assert.deepEqual(counts(), { issueReads: 0, providerLookups: 0 }, 'no collection read and no ui.subtasks check');
+    assert.equal(harness.counts.access, 1, 'the owner credential was resolved once');
+
+    const page = await request(app, `/s/${res.json.token}`);
+    assert.equal(page.status, 200);
+    assert.match(page.body, /data-testid="session-page"/);
+  });
+
+  test('an unknown run, or a run from another workspace, is refused 404 before any credential read; nothing minted', async () => {
+    for (const [urlKey, id] of [[RUN_URL_KEY, 'no-such-run'], ['ws-other', SID]]) {
+      const { app, store, harness } = runApp();
+      const res = await request(app, `/workspace/${urlKey}/shares`, { method: 'POST', body: { subject: { kind: 'run', id } } });
+      assert.equal(res.status, 404, `${urlKey}/${id}`);
+      assert.equal(res.json.code, 'SHARE_RUN_NOT_FOUND');
+      assert.equal(store.calls.create, 0);
+      assert.equal(harness.counts.access, 0, 'no owner credential was resolved');
+    }
+  });
+
+  test('no first snapshot → 503 and nothing minted (credential failure, thrown read, probe throw)', async () => {
+    const credential = runApp();
+    credential.harness.state.access = { token: null, reason: 'session_expired' };
+    const a = await request(credential.app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: RUN_BODY });
+    assert.equal(a.status, 503);
+    assert.equal(a.json.code, 'SHARE_SNAPSHOT_UNAVAILABLE');
+    assert.equal(a.json.reason, 'session_expired');
+    assert.equal(credential.store.calls.create, 0);
+
+    const thrown = runApp();
+    thrown.harness.provider.fetchIssueComments = async () => { throw new Error('tracker down'); };
+    const b = await request(thrown.app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: RUN_BODY });
+    assert.equal(b.status, 503);
+    assert.equal(thrown.store.calls.create, 0);
+
+    const probe = runApp();
+    probe.harness.state.localThrows = true;
+    const c = await request(probe.app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: RUN_BODY });
+    assert.equal(c.status, 503);
+    assert.equal(probe.store.calls.create, 0);
+  });
+
+  test('a first snapshot the secret scan rejects refuses the share (422) and persists nothing', async () => {
+    const { app, store, harness } = runApp();
+    harness.state.session.loops[1].issueTitle = `deploy key ${PLANTED}`;
+    const res = await request(app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: RUN_BODY });
+    assert.equal(res.status, 422);
+    assert.equal(res.json.code, 'SHARE_SCAN_REFUSED');
+    assert.ok(!res.body.includes(PLANTED), 'the refusal never echoes the finding');
+    assert.equal(store.calls.create, 0);
+    assert.equal(store.calls.saveSnapshot, 0);
+  });
+
+  test('without a run reader wired, a run create is refused 503 and nothing minted', async () => {
+    const store = makeStore();
+    const app = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }) });
+    const res = await request(app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: RUN_BODY });
+    assert.equal(res.status, 503);
+    assert.equal(res.json.code, 'RUN_SHARES_UNAVAILABLE');
+    assert.equal(store.calls.create, 0);
+  });
+
+  test('an over-long run id or an empty one → 400, nothing minted', async () => {
+    const { app, store } = runApp();
+    for (const id of ['', '   ', 'x'.repeat(201)]) {
+      const res = await request(app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: { subject: { kind: 'run', id } } });
+      assert.equal(res.status, 400);
+    }
+    assert.equal(store.calls.create, 0);
+  });
+
+  test('list shows a run row (kind run, subjectId = sessionId, no token); revoke makes /s/:token 410', async () => {
+    const { app } = runApp();
+    const created = await request(app, `/workspace/${RUN_URL_KEY}/shares`, { method: 'POST', body: RUN_BODY });
+    const token = created.json.token;
+    const listed = await request(app, `/workspace/${RUN_URL_KEY}/shares`);
+    assert.equal(listed.status, 200);
+    assert.equal(listed.json.shares.length, 1);
+    const row = listed.json.shares[0];
+    assert.equal(row.kind, 'run');
+    assert.equal(row.subjectId, SID);
+    assert.ok(!listed.body.includes(token));
+    assert.ok(!/tokenHash|snapshot/.test(listed.body), 'no hash and no snapshot in the list');
+
+    const revoke = await request(app, `/workspace/${RUN_URL_KEY}/shares/${row.id}/revoke`, { method: 'POST' });
+    assert.equal(revoke.status, 200);
+    assert.equal(revoke.json.share.kind, 'run');
+    const after = await request(app, `/s/${token}`);
+    assert.equal(after.status, 410);
   });
 });

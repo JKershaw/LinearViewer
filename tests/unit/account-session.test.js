@@ -287,3 +287,95 @@ describe('establishAccount with a null workspace (LIN-1892 identity-only sign-in
     assert.strictEqual(await edges.countDocuments({}), 1);
   });
 });
+
+// LIN-3140 (A1 freshness hole): the freshness stamp is BRANCH-AWARE. It must
+// be written only when the arriving identity proves the LIVE account's own
+// identity — re-proof of an identity P already owns (B1), front-door sign-in
+// with no live account (B2), or mint/adoption of a brand-new account (B4).
+// Linking a NEW, unowned identity onto an already-live `session.accountId`
+// (B3, e.g. `POST /workspace/new` from a signed-in session, or an add-source)
+// proves only the ARRIVING identity, never P — so it must leave P's prior
+// stamp exactly as it was, including absent.
+describe('establishAccount branch-aware freshness stamp (LIN-3140)', () => {
+  let client;
+  let dbDir;
+  let counter = 0;
+
+  before(async () => {
+    dbDir = mkdtempSync(join(tmpdir(), 'account-session-b3-'));
+    client = new MangoClient(dbDir);
+    await client.connect();
+  });
+
+  after(async () => {
+    if (client?.close) await client.close();
+    if (dbDir) rmSync(dbDir, { recursive: true, force: true });
+  });
+
+  function freshStores() {
+    const db = client.db(`acct_b3_${counter++}`);
+    return {
+      accountStore: new AccountStore({ collection: db.collection('accounts') }),
+      accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+    };
+  }
+
+  test('B3 link-onto-live: a stale live stamp is preserved exactly (not re-stamped)', async () => {
+    const { accountStore, accountWorkspaceStore } = freshStores();
+    const session = {};
+    await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-P', {}, 'ws-p');
+    session.identityAuthenticatedAt = 0;
+
+    const b3 = await establishAccount(session, accountStore, accountWorkspaceStore, 'local', 'url-key-X', {}, 'ws-p');
+
+    assert.deepStrictEqual(b3, { ok: true, accountId: session.accountId });
+    assert.strictEqual(session.identityAuthenticatedAt, 0, 'B3 proves only the arriving identity, not P — the stale stamp is untouched');
+    const account = await accountStore.getAccount(session.accountId);
+    assert.deepStrictEqual(account.identities.map(i => `${i.provider}:${i.scope}`), ['linear:viewer-P', 'local:url-key-X']);
+  });
+
+  test('B3 link-onto-live: an absent stamp stays absent (never Date.now())', async () => {
+    const { accountStore, accountWorkspaceStore } = freshStores();
+    const session = {};
+    await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-P', {}, 'ws-p');
+    delete session.identityAuthenticatedAt;
+
+    const b3 = await establishAccount(session, accountStore, accountWorkspaceStore, 'local', 'url-key-X', {}, 'ws-p');
+
+    assert.strictEqual(b3.ok, true);
+    assert.strictEqual(session.identityAuthenticatedAt, undefined, 'B3 must not invent a stamp where there was none');
+  });
+
+  test('B1 re-proof of an owned identity still re-stamps', async () => {
+    const { accountStore, accountWorkspaceStore } = freshStores();
+    const session = {};
+    await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-P', {}, 'ws-p');
+    session.identityAuthenticatedAt = 0;
+
+    const b1 = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-P', {}, 'ws-p');
+
+    assert.strictEqual(b1.ok, true);
+    assert.ok(session.identityAuthenticatedAt > 0, 'B1 is a genuine re-proof of P and re-stamps');
+  });
+
+  test('B2 front-door sign-in of an already-owned identity still stamps', async () => {
+    const { accountStore, accountWorkspaceStore } = freshStores();
+    await establishAccount({}, accountStore, accountWorkspaceStore, 'linear', 'viewer-returning', {}, 'ws-1');
+
+    const session = {};
+    const b2 = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-returning', {}, 'ws-2');
+
+    assert.strictEqual(b2.ok, true);
+    assert.ok(session.identityAuthenticatedAt > 0, 'B2 signs in AS the owner — there is no prior account to be stale against');
+  });
+
+  test('B4 mint of a brand-new account still stamps', async () => {
+    const { accountStore, accountWorkspaceStore } = freshStores();
+    const session = {};
+
+    const b4 = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-new', {}, 'ws-1');
+
+    assert.strictEqual(b4.ok, true);
+    assert.ok(session.identityAuthenticatedAt > 0, 'B4 proves the only identity the account has and stamps');
+  });
+});

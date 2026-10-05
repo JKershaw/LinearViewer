@@ -149,6 +149,119 @@ describe('render-run-evidence: the close-out box', () => {
   });
 });
 
+describe('render-run-evidence: P3 close-out box states (LIN-3248)', () => {
+  const readyState = (over = {}) => ({
+    owner: true, status: 'ready', variant: 'standard', stopAt: 'pr',
+    urlKey: 'ws', issueIdentifier: 'LIN-1',
+    pr: { url: 'https://github.com/acme/widget/pull/12', number: 12, headSha: 'deadbeef' },
+    message: null, ...over,
+  });
+
+  test('ready shows the press button, the merge-yourself link and (standard) the promise', () => {
+    const html = renderCloseOutBox(readyState());
+    assert.match(html, /data-state="ready"/);
+    assert.match(html, /data-testid="run-evidence-closeout-ready">✓ PR ready for close-out/);
+    assert.match(html, /data-testid="run-evidence-closeout-press"[^>]*>\[ close out &amp; merge \]/);
+    assert.match(html, /data-testid="run-evidence-closeout-merge-yourself"[^>]*>or merge it yourself on GitHub ›/);
+    assert.match(html, /data-testid="run-evidence-closeout-promise">Harbour never merges on its own\./);
+    assert.match(html, /data-variant="standard"/);
+    assert.match(html, /data-stop-at="pr"/);
+  });
+
+  test('N2: a stepped run omits the promise and preserves the stepper variant', () => {
+    const html = renderCloseOutBox(readyState({ variant: 'stepper' }));
+    assert.match(html, /data-variant="stepper"/);
+    assert.ok(!html.includes('Harbour never merges on its own'));
+    assert.ok(!html.includes('data-testid="run-evidence-closeout-promise"'));
+    // The press itself is still offered.
+    assert.match(html, /data-testid="run-evidence-closeout-press"/);
+  });
+
+  test('M9: an unknown variant (missing/legacy row) withholds the promise — never coerced to standard', () => {
+    const html = renderCloseOutBox(readyState({ variant: 'unknown' }));
+    assert.match(html, /data-variant="unknown"/);
+    assert.ok(!html.includes('Harbour never merges on its own'));
+    assert.ok(!html.includes('data-testid="run-evidence-closeout-promise"'));
+    assert.match(html, /data-testid="run-evidence-closeout-press"/);
+  });
+
+  test('not-ready shows ○ set up › and is never hidden', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'not-ready', variant: 'standard', message: 'no runner is set up for this workspace yet' });
+    assert.match(html, /data-state="not-ready"/);
+    assert.match(html, /data-testid="run-evidence-closeout-setup">○ set up ›/);
+    assert.ok(!html.includes('data-testid="run-evidence-closeout-press"'));
+  });
+
+  test('merged by you is a distinct recorded state (stop-at-PR person merge)', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'merged', variant: 'standard', mergedByYou: true, message: 'PR #12 merged' });
+    assert.match(html, /data-state="merged"/);
+    assert.match(html, /data-merged-by-you="true"/);
+    assert.match(html, /data-testid="run-evidence-closeout-merged">✓ merged by you/);
+  });
+
+  test('F1: a neutral merged box (non-stop-at or close-out merge) never says "merged by you"', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'merged', variant: 'standard', mergedByYou: false, message: 'the pull request is already merged' });
+    assert.match(html, /data-merged-by-you="false"/);
+    assert.match(html, /data-testid="run-evidence-closeout-neutral">the pull request is already merged/);
+    assert.ok(!html.includes('merged by you'));
+  });
+
+  test('multi-PR partial renders the merged·open copy and stays In Progress', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'partial', variant: 'standard', mergedByYou: true, message: 'PR #12 merged · 1 more PR open' });
+    assert.match(html, /data-state="partial"/);
+    assert.match(html, /PR #12 merged · 1 more PR open/);
+    assert.ok(!html.includes('data-testid="run-evidence-closeout-press"'));
+  });
+
+  test('an unreadable PR state still renders a withheld box (fail open)', () => {
+    const html = renderCloseOutBox({ owner: true, status: 'unknown', variant: 'standard', message: 'the pull request could not be read — not checked' });
+    assert.match(html, /data-state="unknown"/);
+    assert.match(html, /data-testid="run-evidence-closeout-withheld">the pull request could not be read/);
+  });
+});
+
+describe('render-run-evidence: open ledger items at a self-merge (LIN-3248)', () => {
+  test('a merged run marks every undischarged item "open at merge", inside with no follow-up says so', () => {
+    const m = model();
+    m.ledger.ledger.items = [
+      { id: 'L1', claim: 'an inside claim', scope: 'inside', discharge: 'manual repro', dischargedBy: null, discharged: false, followUp: null, raw: '' },
+      { id: 'L2', claim: 'an outside claim', scope: 'outside', discharge: 'file a follow-up', dischargedBy: null, discharged: false, followUp: 'LIN-999', raw: '' },
+    ];
+    m.closeOut = { owner: true, status: 'merged', variant: 'standard', message: 'PR #12 merged' };
+    const html = renderEvidence(m);
+    assert.match(html, /data-testid="run-evidence-ledger-open-at-merge">open at merge/);
+    assert.match(html, /data-testid="run-evidence-ledger-open-no-followup">open, no follow-up filed/);
+    // The outside item keeps its follow-up link; only the inside one is "no follow-up filed".
+    assert.equal((html.match(/run-evidence-ledger-open-no-followup/g) || []).length, 1);
+    assert.match(html, /data-testid="run-evidence-ledger-followup">LIN-999/);
+  });
+
+  test('a discharged item is not marked open at merge', () => {
+    const m = model();
+    m.ledger.ledger.items = [{ id: 'L1', claim: 'done', scope: 'inside', discharge: 'done', dischargedBy: 'evidence', discharged: true, followUp: null, raw: '' }];
+    m.closeOut = { owner: true, status: 'merged', variant: 'standard' };
+    const html = renderEvidence(m);
+    assert.ok(!html.includes('run-evidence-ledger-open-at-merge'));
+  });
+
+  test('an open PR (ready) run does not mark items open at merge', () => {
+    const m = model();
+    m.closeOut = { owner: true, status: 'ready', variant: 'standard' };
+    assert.ok(!renderEvidence(m).includes('run-evidence-ledger-open-at-merge'));
+  });
+
+  test('no stragglers: open items stay inside the collapsed ledger, never hoisted above the evidence rows', () => {
+    const m = model();
+    m.ledger.ledger.items = [{ id: 'L1', claim: 'an inside claim', scope: 'inside', discharge: null, dischargedBy: null, discharged: false, followUp: null, raw: '' }];
+    m.closeOut = { owner: true, status: 'merged', variant: 'standard' };
+    const html = renderEvidence(m);
+    const askedIdx = html.indexOf('data-testid="run-evidence-asked"');
+    const ledgerIdx = html.indexOf('data-testid="run-evidence-ledger"');
+    const openIdx = html.indexOf('run-evidence-ledger-open-at-merge');
+    assert.ok(askedIdx >= 0 && ledgerIdx > askedIdx && openIdx > ledgerIdx, 'open items sit inside the ledger, after the asked row');
+  });
+});
+
 describe('render-run-evidence: the mount', () => {
   test('no model renders nothing (the existing page is unchanged)', () => {
     assert.equal(renderRunEvidence(null), '');

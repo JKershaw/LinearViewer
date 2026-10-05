@@ -188,6 +188,27 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the close-out-events idempotency and per-task indexes, neither a TTL (LIN-3248)', () => {
+    // The unique key is the record's idempotency contract (urlKey + prUrl +
+    // headSha + by — a press and the person's later merge are distinct); the
+    // per-task key backs listForIssue's oldest-first read. The log is
+    // lifetime-retained, so neither may be a TTL.
+    const unique = INDEX_SPECS.find(s =>
+      s.collection === 'close-out-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, prUrl: 1, headSha: 1, by: 1 })
+    );
+    assert.ok(unique, 'close-out-events must have a {urlKey:1,prUrl:1,headSha:1,by:1} index');
+    assert.deepStrictEqual(unique.options, { unique: true });
+    assert.strictEqual(unique.options?.expireAfterSeconds, undefined);
+
+    const perTask = INDEX_SPECS.find(s =>
+      s.collection === 'close-out-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, issueIdentifier: 1, at: 1 })
+    );
+    assert.ok(perTask, 'close-out-events must have a {urlKey:1,issueIdentifier:1,at:1} index');
+    assert.strictEqual(perTask.options?.expireAfterSeconds, undefined);
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an
@@ -463,6 +484,7 @@ describe('db-indexes', () => {
       s.keySpec.issueIdentifier === undefined;
     const cases = [
       { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listEvents('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('proxy-events') },
+      { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listSelfCredentialTrail('parity-ws', 'parity-token', { limit: 5 }), match: pagedListSpec('proxy-events') },
       { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('prompt-traces') },
       { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('llm-call-log') },
       { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('foreman-status') },

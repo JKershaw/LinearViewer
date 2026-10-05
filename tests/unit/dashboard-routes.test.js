@@ -113,7 +113,7 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
   return { req, res };
 }
 
-function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore } = {}) {
+function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore, prState } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
@@ -123,6 +123,7 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
     runSummaryCacheStore: runSummaryCacheStore || new InMemoryRunSummaryCacheStore(),
     sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
     runParagraphStore: runParagraphStore || new InMemoryRunParagraphStore(),
+    prState: prState || null,
     freeTierStore: { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     // Default touched-task state is NOT done, so the LIN-1258 bounded feed
@@ -4408,6 +4409,51 @@ describe('deriveSessionDecisions — pinned question card read (LIN-3252 S2)', (
     const rows = deriveSessionDecisions([], { now: new Date() });
     assert.deepEqual(rows, [], 'no loops → no card rows, regardless of scan store');
   });
+
+  // ─── LIN-3260: cross-session live run on the anchor ──────────────────────────
+  //
+  // The G2 predicate above scans only the session's OWN loops, so a live run in
+  // ANOTHER session on the same issue is invisible and the gone row resolves
+  // `dispatch` — starting a second run that races the live one. The `liveLoops`
+  // opt lets the route hand `deriveSessionDecisions` the workspace-wide loop set
+  // (the warm `sessionsFeedCache` `rulings` entry) for the PREDICATE only; rows
+  // still come from `enrichedLoops` (session membership).
+  test('LIN-3260: a gone row with a live loop on its anchor from ANOTHER session (via liveLoops) resolves "record"', () => {
+    const gone = decisionLoop({ loopId: 'l-gone-a', decisionId: 'd-gone-a', terminalStatus: 'done', agentState: 'complete' });
+    const otherSessionLive = {
+      loopId: 'l-live-b', lineageId: 'l-live-b', workspaceUrlKey: 'ws-a',
+      issueIdentifier: 'LIN-1', target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    // The session's OWN loops (enrichedLoops) carry NO live run on LIN-1.
+    const rows = deriveSessionDecisions([gone], { now: new Date(), liveLoops: [gone, otherSessionLive] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-gone-a');
+    assert.ok(row, 'the gone decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'record', 'the workspace-wide liveLoops set supplies the other-session live run (resolveEffect branch 3)');
+  });
+
+  // Mutation M5 (LIN-3252 pass 3) survived because nothing exercised the
+  // `issueIdentifier != null` guard: a null anchor must never match another null
+  // anchor. The null-anchored live loop is present in BOTH the session's own
+  // loops and the workspace-wide `liveLoops`, so the guard is exercised on the
+  // session-scope predicate (where M5 lived) AND the workspace-wide one.
+  test('LIN-3260/null-pin: a null-anchored gone row beside a null-anchored live loop stays "dispatch", never "record"', () => {
+    const goneNull = {
+      loopId: 'l-gone-null', lineageId: 'l-gone-null', workspaceUrlKey: 'ws-a',
+      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO,
+      terminalStatus: 'done', agentState: 'complete',
+      decision: { decision_id: 'd-null-gone', question: 'Proceed?' }
+    };
+    const liveNull = {
+      loopId: 'l-live-null', lineageId: 'l-live-null', workspaceUrlKey: 'ws-a',
+      issueIdentifier: null, target: 'cli', dispatchedAt: NOW_ISO, agentState: 'running'
+    };
+    const rows = deriveSessionDecisions([goneNull, liveNull], { now: new Date(), liveLoops: [goneNull, liveNull] });
+    const row = rows.find(r => r.decision && r.decision.decision_id === 'd-null-gone');
+    assert.ok(row, 'the null-anchored decision is on the card');
+    assert.equal(row.disposition, 'gone');
+    assert.equal(row.effect, 'dispatch', 'a null anchor must never match another null anchor (LIN-2934 guard)');
+  });
 });
 
 // ─── LIN-3252 S2.7: the bare-BLOCKED card's producer routing ───────────────────
@@ -4564,6 +4610,230 @@ describe('GET /observation/session/:sessionId — issue-scoped read, no whole-wo
     await handler(req, res);
     assert.equal(res.statusCode, 404, 'unknown session 404s');
     assert.ok(stores.unscoped.length > 0, 'the full-read fallback ran (issue-scoping found nothing)');
+  });
+});
+
+// ─── LIN-3260: the run page sees live runs in OTHER sessions on the same issue ─
+//
+// The residual named by the LIN-3252 pass-3 review (G2, mutation M5). The card's
+// `liveDispatchOnAnchor` predicate must consult the workspace-wide loop set the
+// rulings feed uses — the warm `sessionsFeedCache` `rulings` entry — NOT the
+// session's own loops alone. The read is a NON-producing `peek`: the run page
+// must never trigger a whole-workspace reconstruction (LIN-1021/H12); a cold
+// cache falls back to the session's own loops.
+describe('GET /observation/session/:sessionId — cross-session live anchor (LIN-3260)', () => {
+  const OLD_ISO = new Date(Date.now() - 7 * 60 * 60 * 1000).toISOString(); // 7h ago, past the 6h reap window
+
+  // A worker whose decision is terminal + reaped (past the reap window) — the
+  // `gone` row whose answer would start a fresh run.
+  function goneDecisionWorker({ id, identifier, sessionId, decisionId, ts = OLD_ISO }) {
+    return {
+      id, sessionId, issueIdentifier: identifier, issueTitle: `Title ${identifier}`,
+      promptName: 'implementation', prompt: 'p', dispatchedAt: ts, resolvedAt: ts, status: 'taken',
+      feedback: [
+        { kind: 'decision', message: JSON.stringify({ decision_id: decisionId, question: 'Proceed?' }), timestamp: ts },
+        { message: '[done] shipped it', timestamp: ts }
+      ]
+    };
+  }
+
+  function makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache }) {
+    return createDashboardRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore,
+      agentStatusStore,
+      observationSessionsStore: null,
+      runSummaryCacheStore: new InMemoryRunSummaryCacheStore(),
+      sessionSummaryCacheStore: new InMemorySessionSummaryCacheStore(),
+      briefCacheStore: { async get() { return null; } },
+      recapCacheStore: { async get() { return null; } },
+      freeTierStore: { async tryUse() { return { allowed: true }; } },
+      getWorkspaceAccessToken: async () => 'token',
+      fetchIssueContext: async () => ({}),
+      fetchWorkspaceIssues: async () => [],
+      getOpenRouterSource: () => 'env',
+      getDeployInfo: () => ({}),
+      sessionsFeedCache
+    });
+  }
+
+  // The workspaces carry EXTRA fields beyond { urlKey, name }. `keyFor`
+  // (lib/sessions-feed-cache.js:55-58) derives the key from `urlKey`s ONLY
+  // (sorted), so the Rulings route's raw objects and the run page's mapped
+  // `{ urlKey, name }` must collapse to one key — this proves it end to end.
+  const SESSION = {
+    ...ENABLED,
+    workspaces: [{ urlKey: 'ws-a', name: 'Alpha', provider: 'linear', nwo: 'acme/widget', pinned: 42 }]
+  };
+
+  async function renderSession(router, sessionId, session = SESSION) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/observation/session/:sessionId');
+    const { req, res } = makeReqRes({ session, workspace: { urlKey: 'ws-a' }, params: { sessionId } });
+    await handler(req, res);
+    return res;
+  }
+
+  // Warm the SHARED cache through the REAL Rulings route — its own
+  // `keyFor(req.session.workspaces, 'rulings')` producer — never a hand-rolled
+  // stub, so the test exercises the actual key derivation both sides use.
+  async function warmRulings(router, session = SESSION) {
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/rulings');
+    const { req, res } = makeReqRes({ session, workspace: { urlKey: 'ws-a' } });
+    await handler(req, res);
+    return res;
+  }
+
+  const cardFor = (html, decisionId) =>
+    (html.match(/data-testid="session-question-card"[^>]*/g) || []).find(c => c.includes(`data-decision-id="${decisionId}"`));
+
+  test('acceptance: a gone row with a live run on the same issue in ANOTHER session renders data-effect="record"', async () => {
+    // Session A: terminal anchor + a reaped-decision worker on LIN-1. Its OWN
+    // loops carry NO live run on LIN-1 (both terminal), so before LIN-3260 the
+    // card would resolve `dispatch` and race session B's live run below.
+    // Session B: a DIFFERENT session with a live run on the same issue.
+    const { dispatchQueueStore, agentStatusStore } = makeStores({
+      'ws-a': {
+        live: [workerLiveItem('b-live', 'LIN-1', 'sess-B')],
+        history: [
+          autopilotHistoryItem('sess-B', 'LIN-1', NOW_ISO),
+          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
+          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
+        ],
+        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
+      }
+    });
+    // ONE real cache, shared by the Rulings route (which fills it) and the run
+    // page (which peeks it).
+    const cache = createSessionsFeedCache();
+    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
+
+    // 1) Warm through the REAL Rulings path (its own keyFor over the raw,
+    //    extra-field workspace objects).
+    const warmed = await warmRulings(router);
+    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
+    // Key parity: the run page's mapped `{ urlKey, name }` must resolve to the
+    // entry the Rulings route actually filled.
+    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
+    assert.notEqual(cache.peek(runPageKey), undefined, 'the real Rulings path warmed the key the run page peeks');
+
+    // 2) Render session A — the card must now see session B's live run.
+    const res = await renderSession(router, 'sess-A');
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-A');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'a live run on the anchor in ANOTHER session forces record (no racing dispatch)');
+    assert.ok(!/data-effect="dispatch"/.test(card), 'must NOT render dispatch');
+  });
+
+  test('cold cache: no `rulings` entry → falls back to the session\'s own loops (same-session record) with NO unscoped whole-workspace read (LIN-1021 preserved)', async () => {
+    const stores = scopedStore({
+      live: [
+        { id: 'w-live-same', sessionId: 'sess-C', issueIdentifier: 'LIN-1', issueTitle: 'Title LIN-1', promptName: 'implementation', prompt: 'p', dispatchedAt: NOW_ISO }
+      ],
+      history: [
+        autopilotHistoryItem('sess-C', 'LIN-1', OLD_ISO),
+        goneDecisionWorker({ id: 'w-C', identifier: 'LIN-1', sessionId: 'sess-C', decisionId: 'd-gone-C' })
+      ],
+      agentStatus: [agentStatusDone('sess-C', 'LIN-1', OLD_ISO)]
+    });
+    const router = makeSessionPageRouter({
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      // A REAL cache that is never warmed — genuinely cold, so `peek` returns
+      // undefined and the route must fall back without a producing `get`.
+      sessionsFeedCache: createSessionsFeedCache()
+    });
+
+    const res = await renderSession(router, 'sess-C');
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-C');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'the session-local live run still forces record on the cold-cache fallback');
+    assert.deepEqual(stores.unscoped, [], 'peek never produces: the run page does no unscoped whole-workspace read (LIN-1021)');
+  });
+
+  // E1 (review F1): the warm cached set must be ADDED to the session's own
+  // loops, not REPLACE them. `peek` never revalidates and starting a dispatch
+  // does not `clear()` the entry, so the cached set can be arbitrarily stale and
+  // can be missing a live run in THIS session on the anchor. With a replacement
+  // the card regresses to `dispatch`; the concat keeps the pre-PR `record`.
+  test('E1: a warm-but-stale rulings entry that lacks the session\'s own live loop still renders data-effect="record"', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [], // warmed while the session has NO live run …
+        history: [
+          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
+          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
+        ],
+        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    const cache = createSessionsFeedCache();
+    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
+
+    const warmed = await warmRulings(router);
+    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
+    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }], 'rulings');
+    // The warm set carries NO live run on LIN-1 (the session had none yet) …
+    assert.ok(!(cache.peek(runPageKey) || []).some(l => l.id === 'a-live'), 'sanity: the cached set is stale, lacking the run below');
+
+    // … then THIS session starts a live run on the anchor, without clearing the
+    // cached set. Only concat with the own loops can see it.
+    perWorkspace['ws-a'].live.push(workerLiveItem('a-live', 'LIN-1', 'sess-A'));
+
+    const res = await renderSession(router, 'sess-A');
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-A');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="record"/, 'E1: the stale cached set must be ADDED to the session own loops, not replace them');
+  });
+
+  // E2 (review M3 survivor): the workspace filter must be pinned. The `rulings`
+  // entry spans every connected workspace, and identifiers are only per-team
+  // unique, so a same-identifier live loop in ANOTHER workspace must NOT force
+  // `record` on this card. Warm the cache over two workspaces with a live loop
+  // on LIN-1 tagged `ws-b`, then render `ws-a`: expect `dispatch`.
+  test('E2: a live loop on the same identifier in a DIFFERENT connected workspace is filtered out (data-effect="dispatch")', async () => {
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [
+          autopilotHistoryItem('sess-A', 'LIN-1', OLD_ISO),
+          goneDecisionWorker({ id: 'w-A', identifier: 'LIN-1', sessionId: 'sess-A', decisionId: 'd-gone-A' })
+        ],
+        agentStatus: [agentStatusDone('sess-A', 'LIN-1', OLD_ISO)]
+      },
+      'ws-b': {
+        live: [workerLiveItem('b-live', 'LIN-1', 'sess-B')],
+        history: [autopilotHistoryItem('sess-B', 'LIN-1', NOW_ISO)],
+        agentStatus: []
+      }
+    };
+    const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
+    const cache = createSessionsFeedCache();
+    const router = makeSessionPageRouter({ dispatchQueueStore, agentStatusStore, sessionsFeedCache: cache });
+
+    const twoWsSession = {
+      ...ENABLED,
+      workspaces: [
+        { urlKey: 'ws-a', name: 'Alpha' },
+        { urlKey: 'ws-b', name: 'Beta' }
+      ]
+    };
+    const warmed = await warmRulings(router, twoWsSession);
+    assert.equal(warmed.statusCode, 200, 'the Rulings feed rendered');
+    const runPageKey = cache.keyFor([{ urlKey: 'ws-a', name: 'Alpha' }, { urlKey: 'ws-b', name: 'Beta' }], 'rulings');
+    const snapshot = cache.peek(runPageKey) || [];
+    assert.ok(snapshot.some(l => l.issueIdentifier === 'LIN-1' && l.workspaceUrlKey === 'ws-b'),
+      'the warm set really does carry the ws-b live loop on LIN-1');
+
+    const res = await renderSession(router, 'sess-A', twoWsSession);
+    assert.equal(res.statusCode, 200, 'the run page rendered');
+    const card = cardFor(res.sentBody, 'd-gone-A');
+    assert.ok(card, 'the gone decision card rendered');
+    assert.match(card, /data-effect="dispatch"/,
+      'a same-identifier loop from ANOTHER workspace must not force record (workspace filter pinned)');
   });
 });
 
@@ -5914,5 +6184,259 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     await getRulings(refreshed.req, refreshed.res);
     assert.equal(refreshed.res.jsonBody.rulings[0].decision.decision_id, 'd-2', 'the refreshed value is now served');
     assert.equal(reads, 2, 'no extra production for the fresh read');
+  });
+});
+
+// ─── LIN-3251 (LIN-2948 S1b): live PR state, cache and upstream budget ────────
+//
+// The route resolves the run's PR URL through LIN-2949's run-evidence model and
+// reads the live state through lib/github-pr-status.js. These tests use a
+// counting fetch stub (upstream GitHub) and a counting fetchProjects, with an
+// injected clock — no sleeps, no network. They discharge condition C1.
+describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
+  const PATH = '/workspace/:urlKey/api/run/:runId/pr-state';
+  const PR_URL = 'https://github.com/acme/widget/pull/12';
+
+  const prComment = (body, createdAt) => ({ body, createdAt, user: 'worker' });
+
+  function jsonResponse(status, body) {
+    return { ok: status >= 200 && status < 300, status, async json() { return body; } };
+  }
+
+  // Counts every real upstream GitHub GET `fetchPrStatus` makes: the repo
+  // visibility probe, the pull, the check-runs, and the commit-status reads.
+  function githubStub({ state = 'open', merged = false, sha = 'abc1234', checkRuns = [{ name: 'unit', conclusion: 'success' }], counts }) {
+    return async (url) => {
+      counts.github += 1;
+      if (/\/repos\/[^/]+\/[^/]+$/.test(url)) return jsonResponse(200, { private: false });
+      if (/\/pulls\/\d+$/.test(url)) return jsonResponse(200, { state, merged, head: { ref: 'feature', sha }, base: { ref: 'main' }, mergeable: true });
+      if (/\/check-runs$/.test(url)) return jsonResponse(200, { check_runs: checkRuns });
+      if (/\/status$/.test(url)) return jsonResponse(200, { statuses: [] });
+      return jsonResponse(404, {});
+    };
+  }
+
+  function makePrStateRouter({
+    repo = 'acme/widget',
+    comments = [],
+    github = {},
+    now = () => Date.now(),
+    bucket,
+    cache,
+    allowlistCache,
+    loadRun,
+    commentsThrow = false
+  } = {}) {
+    const counts = { github: 0, fetchProjects: 0, comments: 0 };
+    const provider = {
+      async fetchIssueComments() { counts.comments += 1; if (commentsThrow) throw new Error('tracker read failed'); return comments; },
+      async fetchProjects() {
+        counts.fetchProjects += 1;
+        return { projects: [{ id: 'p1', name: 'P', content: `repo=${repo}` }], issues: [] };
+      }
+    };
+    const router = makeRouter({}, {
+      prState: {
+        now,
+        cache: cache || new Map(),
+        allowlistCache: allowlistCache || new Map(),
+        bucket: bucket || [],
+        resolveProvider: () => ({ provider, callScope: 'scope' }),
+        loadRun: loadRun || (async () => ({ issueIdentifier: 'LIN-1', evidenceUrls: [] })),
+        githubFetch: githubStub({ ...github, counts })
+      }
+    });
+    return { router, counts, provider };
+  }
+
+  async function callPrState(router, runId = 'run-1') {
+    const handler = getHandler(router, 'get', PATH);
+    const { req, res } = makeReqRes({ workspace: { urlKey: 'ws-a' }, params: { runId } });
+    await handler(req, res);
+    return res;
+  }
+
+  test('two GETs within 15 min make one fetchPrStatus (4 upstream calls) and one fetchProjects', async () => {
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' }
+    });
+
+    const first = await callPrState(router);
+    const second = await callPrState(router);
+
+    assert.equal(first.statusCode, 200);
+    assert.equal(first.jsonBody.state, 'open');
+    assert.equal(first.jsonBody.number, 12);
+    assert.equal(first.jsonBody.checks, 'passing');
+    assert.equal(first.jsonBody.url, PR_URL);
+    assert.equal(second.jsonBody.state, 'open');
+    assert.equal(counts.github, 4, 'the 4-call reader ran exactly once');
+    assert.equal(counts.fetchProjects, 1, 'the allowlist was read exactly once');
+  });
+
+  test('a merged PR is not re-read within 24 h (injected clock, no sleeps)', async () => {
+    let clock = 1_000_000;
+    const bucket = [];
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'closed', merged: true },
+      now: () => clock,
+      bucket
+    });
+
+    const first = await callPrState(router);
+    assert.equal(first.jsonBody.state, 'merged');
+    assert.equal(counts.github, 4);
+
+    clock += 20 * 60 * 60 * 1000; // 20 h later, still inside the 24 h closed TTL
+    const second = await callPrState(router);
+    assert.equal(second.jsonBody.state, 'merged');
+    assert.equal(counts.github, 4, 'no re-read inside the 24 h closed TTL');
+  });
+
+  test('with the budget spent, a GET serves the stale value with zero upstream fetches and status 200', async () => {
+    let clock = 2_000_000;
+    const bucket = [];
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' },
+      now: () => clock,
+      bucket
+    });
+
+    const first = await callPrState(router);
+    assert.equal(first.jsonBody.state, 'open');
+    assert.equal(counts.github, 4);
+
+    // Spend the trailing 60-minute span's whole 36-call budget.
+    bucket.splice(0, bucket.length, ...Array(36).fill(clock));
+    clock += 16 * 60 * 1000; // past the 15 min open TTL, so a refresh would run
+    const second = await callPrState(router);
+    assert.equal(second.statusCode, 200);
+    assert.equal(second.jsonBody.state, 'open', 'the stale cached value is served');
+    assert.equal(counts.github, 4, 'the spent budget made zero upstream fetches');
+  });
+
+  test('budget spent with no stale value returns state not reported, status 200, zero upstream fetches', async () => {
+    const nowMs = 3_000_000;
+    const allowlistCache = new Map([['ws-a', { value: new Set(['acme/widget']), expiresAt: nowMs + 15 * 60 * 1000 }]]);
+    const bucket = Array(36).fill(nowMs);
+    const { router, counts } = makePrStateRouter({
+      now: () => nowMs,
+      bucket,
+      allowlistCache,
+      cache: new Map(),
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' }
+    });
+
+    const res = await callPrState(router, 'run-x');
+    assert.equal(res.statusCode, 200, 'never a 403');
+    assert.equal(res.jsonBody.state, 'unknown');
+    assert.equal(res.jsonBody.number, 12);
+    assert.equal(counts.github, 0, 'zero upstream GitHub fetches');
+    assert.equal(counts.fetchProjects, 0, 'the cached allowlist means no fetchProjects');
+  });
+
+  test('the sliding window holds across a boundary: 36 calls during the hour refuse a t=61min read, but age out by t=120min', async () => {
+    const base = 10_000_000;
+    let clock = base + 61 * 60 * 1000;
+    // 36 calls, one per minute from t=0 to t=35min. At t=61min the recent ones
+    // are still inside the trailing 60 min, so a sliding window still refuses;
+    // a fixed window that started at t=0 would have reset and wrongly allowed.
+    const bucket = Array.from({ length: 36 }, (_, i) => base + i * 60 * 1000);
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' },
+      now: () => clock,
+      bucket
+    });
+
+    const refused = await callPrState(router);
+    assert.equal(refused.statusCode, 200);
+    assert.equal(refused.jsonBody.state, 'unknown', 'no room for the 4-call read → state not reported');
+    assert.equal(counts.github, 0, 'zero upstream fetches at t=61min');
+
+    clock = base + 120 * 60 * 1000; // all 36 calls are now older than 60 min
+    const allowed = await callPrState(router);
+    assert.equal(allowed.statusCode, 200);
+    assert.equal(allowed.jsonBody.state, 'open', 'the aged-out budget permits a fresh read');
+    assert.equal(counts.github, 4, 'the read ran upstream once the window emptied');
+  });
+
+  test('reserving the whole read: 34 calls used leaves no room, so a new read makes zero upstream calls', async () => {
+    const nowMs = 20_000_000;
+    const bucket = Array(34).fill(nowMs);
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' },
+      now: () => nowMs,
+      bucket
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.state, 'unknown');
+    assert.equal(counts.github, 0, '34 + 4 > 36 → the read never starts');
+  });
+
+  test('a tracker read that throws returns 200 unknown, never a 403 (N2)', async () => {
+    const nowMs = 30_000_000;
+    const { router, counts } = makePrStateRouter({
+      commentsThrow: true,
+      github: { state: 'open' },
+      now: () => nowMs
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.statusCode, 200, 'a failed tracker read is not a 403');
+    assert.equal(res.jsonBody.state, 'unknown');
+    assert.equal(res.jsonBody.number, null);
+    assert.equal(counts.github, 0, 'no PR resolved → no GitHub read');
+  });
+
+  test('a PR URL newly posted on the run is picked up on the next poll (one fetchPrStatus)', async () => {
+    const comments = []; // the provider reads this live reference each GET
+    const { router, counts } = makePrStateRouter({
+      comments,
+      github: { state: 'open' }
+    });
+
+    const first = await callPrState(router);
+    assert.equal(first.jsonBody.state, 'none', 'no PR on record yet');
+
+    // the worker posts the PR URL after the first poll
+    comments.push(prComment(`opened ${PR_URL}`, '2026-07-01T00:00:00.000Z'));
+
+    const second = await callPrState(router);
+    assert.equal(second.jsonBody.state, 'open', 'the newly posted PR is seen on the next poll');
+    assert.equal(second.jsonBody.number, 12);
+    assert.equal(counts.github, 4, 'exactly one fetchPrStatus call (4 upstream)');
+  });
+
+  test('no PR URL on the run returns the none state with zero upstream fetches', async () => {
+    const { router, counts } = makePrStateRouter({
+      comments: [prComment('opened a draft, no pull request link yet', '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' }
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.jsonBody.state, 'none');
+    assert.equal(res.jsonBody.url, null);
+    assert.equal(counts.github, 0, 'no PR -> no GitHub read');
+  });
+
+  test('a repo off the workspace allowlist is not read (state not reported)', async () => {
+    const { router, counts } = makePrStateRouter({
+      repo: 'acme/other',
+      comments: [prComment(PR_URL, '2026-07-01T00:00:00.000Z')],
+      github: { state: 'open' }
+    });
+
+    const res = await callPrState(router);
+    assert.equal(res.jsonBody.state, 'none', 'the URL is filtered out by the allowlist');
+    assert.equal(counts.github, 0);
   });
 });

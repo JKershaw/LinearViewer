@@ -9,8 +9,8 @@
  * asserts that all 55 registrations still resolve"). This file is that
  * replacement, landed as PR-0 (no handler moves) before any group is moved.
  *
- * 75 covered (method, URL) forms (3 `routes/proxy-rulings.js` forms
- * known-uncovered; see the Group K comment below) — 65 route registrations,
+ * 76 covered (method, URL) forms (3 `routes/proxy-rulings.js` forms
+ * known-uncovered; see the Group K comment below) — 66 route registrations,
  * 10 of them array-path aliases (2 URL forms each) — are driven through
  * `createProxyRoutes` over REAL HTTP (an express app + `fetch`, the pattern
  * already established by tests/unit/proxy-route-aliases.test.js), each
@@ -102,7 +102,7 @@ function runnerApp(overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// 76 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
+// 77 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
 // own group letter. `run` builds the app + issues the one deterministic
 // offline request and returns { status }.
 // ---------------------------------------------------------------------------
@@ -160,6 +160,11 @@ const ROWS = [
     group: 'D', method: 'GET', url: '/api/proxy/credential-health', expect: 200,
     note: 'listSelfCredentialHealth() (:1939)',
     run: () => call(buildApp(), 'GET', '/api/proxy/credential-health'),
+  },
+  {
+    group: 'D', method: 'GET', url: '/api/proxy/credential-trail', expect: 200,
+    note: 'listSelfCredentialTrail() (routes/proxy-reads.js, LIN-3282)',
+    run: () => call(buildApp(), 'GET', '/api/proxy/credential-trail'),
   },
   {
     group: 'D', method: 'GET', url: '/api/proxy/teams', expect: 200,
@@ -607,7 +612,8 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // registration in any proxy file (or a dropped/added alias) changes the
   // derived figure and fails here until the table is re-derived — the same
   // mechanical guard `router.stack` used to give, without a literal every
-  // LIN-679 stage had to bump. The 75 behavioural rows themselves are unchanged.
+  // LIN-679 stage had to bump. The behavioural rows themselves are unchanged
+  // by that refactor; LIN-3282 later adds one row (GET /api/proxy/credential-trail).
   test('the ROWS table covers exactly the URL forms derived from the proxy route sources', () => {
     const read = (rel) => readFileSync(join(__dirname, '../..', rel), 'utf8');
     const subRouterFiles = readdirSync(join(__dirname, '../../routes'))
@@ -655,7 +661,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (76 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (77 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();
