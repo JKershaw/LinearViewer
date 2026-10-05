@@ -17,6 +17,8 @@ import { LocalStore } from '../../lib/local-store.js';
 import { URL_KEY_REGEX } from '../../lib/workspace.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { establishAccount } from '../../lib/account-session.js';
+import { respondToAccountConflict } from '../../lib/account-conflict.js';
 
 // Minimal in-memory collection matching the Mango/Mongo surface LocalStore uses.
 function makeCollection() {
@@ -255,5 +257,63 @@ describe('POST /workspace/new (local bootstrap)', () => {
     const account = await accountStore.getAccount(session.accountId);
     assert.ok(account, 'attempt 2: the newly established account is real and durable');
     assert.strictEqual(session.workspaces.length, 2, 'attempt 2: the retried workspace is created alongside the attempt-1 residue');
+  });
+
+  // LIN-3140 (A1 freshness hole): creating a local workspace while signed in
+  // is a B3 link-onto-live — it attaches the freshly-random local urlKey to
+  // the live account P but proves nothing about P. It must not refresh P's
+  // `identityAuthenticatedAt`, or a stale session could make itself look
+  // freshly authenticated here and then be offered a merge (instead of
+  // re-auth) on a later conflict. Fail-first: on baseline the route stamps.
+  const localUrlKeyOf = (req) => req.session.workspaces[req.session.workspaces.length - 1].urlKey;
+
+  test('LIN-3140: a stale live stamp survives POST /workspace/new exactly (no refresh)', async () => {
+    const store = new LocalStore({ collection: makeCollection() });
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const handler = getHandler(createWorkspaceRoutes({ localStore: store, accountStore, accountWorkspaceStore }));
+
+    const p = await accountStore.createAccount();
+    await accountStore.linkIdentity(p._id, 'linear', 'viewer-P', {});
+    const g = await accountStore.createAccount();
+    await accountStore.linkIdentity(g._id, 'linear', 'viewer-G', {});
+
+    const session = { accountId: p._id, identityAuthenticatedAt: 0 };
+    const { req, res } = makeReqRes({ body: { name: 'Created By Stale P' }, session });
+    await handler(req, res);
+
+    assert.strictEqual(session.accountId, p._id, 'P stays the live account');
+    assert.strictEqual(session.identityAuthenticatedAt, 0, 'creating a workspace proves nothing about P — the stale stamp is untouched');
+    assert.ok(localUrlKeyOf(req), 'a workspace was actually created (B3 ran)');
+
+    // A later conflict with G, on the same session: because P is still stale,
+    // the A1 merge gate must refuse the offer and demand re-auth.
+    const conflict = await establishAccount(session, accountStore, accountWorkspaceStore, 'linear', 'viewer-G', {}, 'ws-later');
+    assert.deepStrictEqual(conflict, { ok: false, conflict: { accountId: g._id } });
+
+    const conflictRes = makeReqRes().res;
+    await respondToAccountConflict({
+      req: { session }, res: conflictRes, established: conflict, workspace: null,
+      mode: 'new', returnUrlKey: 'ws-later', identityLabel: 'Linear', reauthUrl: '/auth/linear', provider: 'linear',
+    });
+
+    assert.strictEqual(conflictRes.statusCode, 409);
+    assert.match(conflictRes.sentBody, /data-testid="merge-reauth-required-page"/);
+    assert.doesNotMatch(conflictRes.sentBody, /data-testid="merge-confirm-page"/);
+    assert.strictEqual(session.pendingMerge, undefined, 'no merge offer from a stale session');
+  });
+
+  test('LIN-3140: an absent stamp stays absent after POST /workspace/new', async () => {
+    const store = new LocalStore({ collection: makeCollection() });
+    const { accountStore, accountWorkspaceStore } = freshAccountStores();
+    const handler = getHandler(createWorkspaceRoutes({ localStore: store, accountStore, accountWorkspaceStore }));
+
+    const p = await accountStore.createAccount();
+    await accountStore.linkIdentity(p._id, 'linear', 'viewer-P', {});
+
+    const session = { accountId: p._id };
+    const { req } = makeReqRes({ body: { name: 'Absent Stamp P' }, session });
+    await handler(req, makeReqRes().res);
+
+    assert.strictEqual(session.identityAuthenticatedAt, undefined, 'B3 must not invent a freshness stamp where there was none');
   });
 });

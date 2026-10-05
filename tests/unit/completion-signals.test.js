@@ -16,8 +16,7 @@ import {
   getSignal,
   assessCompletion,
   getBlockers,
-  formatSignalsForPrompt,
-  formatAllSignalsForMetaPrompt
+  formatSignalsForPrompt
 } from '../../lib/completion-signals.js';
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 
@@ -297,38 +296,6 @@ describe('formatSignalsForPrompt', () => {
 });
 
 // =============================================================================
-// formatAllSignalsForMetaPrompt Tests
-// =============================================================================
-
-describe('formatAllSignalsForMetaPrompt', () => {
-  test('returns non-empty string', () => {
-    const formatted = formatAllSignalsForMetaPrompt();
-    assert.ok(typeof formatted === 'string');
-    assert.ok(formatted.length > 0);
-  });
-
-  test('includes both label signal types', () => {
-    const formatted = formatAllSignalsForMetaPrompt();
-    const types = ['blocked', 'bug'];
-    for (const type of types) {
-      assert.ok(formatted.includes(type), `Should include ${type}`);
-    }
-  });
-
-  test('includes Core and Check for each type', () => {
-    const formatted = formatAllSignalsForMetaPrompt();
-    assert.ok(formatted.includes('**Core:**'));
-    assert.ok(formatted.includes('**Check:**'));
-  });
-
-  test('uses markdown headers for each type', () => {
-    const formatted = formatAllSignalsForMetaPrompt();
-    assert.ok(formatted.includes('### blocked'));
-    assert.ok(formatted.includes('### bug'));
-  });
-});
-
-// =============================================================================
 // Integration Tests
 // =============================================================================
 
@@ -384,17 +351,10 @@ describe('Integration', () => {
     }
   });
 
-  test('aiHint does not have redundant readinessCheck', async () => {
+  test('no template carries the retired aiHint (LIN-3300: route replaced it)', async () => {
     const { PROMPT_TEMPLATES } = await import('../../lib/prompt-templates.js');
-    const allTypes = Object.keys(PROMPT_TEMPLATES);
-
-    for (const type of allTypes) {
-      const template = PROMPT_TEMPLATES[type];
-      assert.strictEqual(
-        template.aiHint?.readinessCheck,
-        undefined,
-        `${type} aiHint should not have readinessCheck (use completionSignals instead)`
-      );
+    for (const [type, template] of Object.entries(PROMPT_TEMPLATES)) {
+      assert.strictEqual(template.aiHint, undefined, `${type} should describe itself with route, not aiHint`);
     }
   });
 });

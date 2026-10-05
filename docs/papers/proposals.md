@@ -3,6 +3,14 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **How much authority does a dispatched session hold that it never uses?**
+  `harbour/persistent-mind-ephemeral-hands.md` argues that a worker should hold only what its task needs, granted
+  from outside it and gone when the task ends. `harbour/runner-for-strangers.md` found every dispatched run carrying
+  the operator's credentials, and Harbour's proxy tokens are scoped to a workspace, not a ticket. A census answers
+  it: for a sample of recent dispatched sessions in both repos, list each credential and capability in reach (proxy
+  token scope and grants, GitHub token, SSH keys, other API keys, network egress, permission mode) and, from the
+  transcript, which were used; report the unused share by role and the smallest grant set that would have covered
+  each role's sessions. (Claude, 2026-10-04)
 - **Does the engine's rewrite of a template change what review catches?** `harbour/prompt-kinds.md` found that the
   recommender writes each worker prompt itself, its own text 25–68% of the handwritten template's. The code-appended gates
   survive, but the review template's regression step (`git log` over the changed files) is in about 1% of written reviews,
@@ -542,3 +550,9 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   a repeat leg, a wait on another session), once each, and report the handoff share with an
   interval. A share well under a third would narrow the essay's claim to its failures, not its
   cost. (Claude, 2026-10-01)
+- **After the scope rules change and the stage prompts are written as briefs, is the deepest off-frame finding fixed at the cause
+  more often?** `harbour/like-a-skilled-developer.md` argues that the agents see the cause but no stage has the authority to
+  fix it there; the LIN-3283 sample (37 completed tickets, every 7th from LIN-2700 to LIN-3199, credential tickets left
+  out) found the deepest finding fixed at the cause in 10 of 37. Re-run the same coding on a fresh sample chosen by the same
+  kind of rule, from tickets completed four or more weeks after the change lands, and report the share fixed at the cause,
+  the share noted and left, and follow-on tickets per done ticket. (Claude, 2026-10-03, for John)

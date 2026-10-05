@@ -14,8 +14,8 @@ title: Harbour
   @identifier: LV-3
   @priority: 2
   @completedAt: 2026-01-15T10:00:00.000Z
-- ✓ Grounded prompts, two ways
-  14 deterministic templates plus an LLM meta-prompt, both re-grounded against your current code before they run.
+- ✓ Grounded prompts
+  14 deterministic templates, chosen by an LLM router and re-grounded against your current code before they run.
   @identifier: LV-4
   @priority: 2
   @completedAt: 2026-02-01T10:00:00.000Z

@@ -279,9 +279,8 @@ sits **orthogonal to `mode`** — they compose, so a stepper run can still be `w
 A `standard` kickoff is exactly the guide above. A `stepper` kickoff (`variant: 'stepper'`) inserts
 one extra disposition section between the guide and the snapshot; the four lines, instruments, and
 halt rules above still hold, but the loop Autopilot actually runs is the stepped one below. This is
-an **orchestrator** disposition (how Autopilot drives), not a worker prompt template, so it is *not*
-subject to the both-paths parity rule — the worker prompts the stepper dispatches still come from the
-normal engine and keep their own parity. (The disposition text lives in `buildStepperDisposition()`
+an **orchestrator** disposition (how Autopilot drives), not a worker prompt template — the worker
+prompts the stepper dispatches still come from the normal engine. (The disposition text lives in `buildStepperDisposition()`
 in [`autopilot-kickoff.js`](../lib/prompts/autopilot-kickoff.js), gated on `variant`, so it never
 enters a `standard` kickoff — which stays byte-identical. It is deliberately **not** in the shared
 `autopilot-operating-manual.md`, which is composed inline into *every* run.)

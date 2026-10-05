@@ -235,6 +235,37 @@
     });
   }
 
+  // --- Milestone funnel: login → connected → pr opened (people per step) ---
+  // Counts canonical people, so it is separate from the work funnel above. A
+  // step whose instrument does not exist (merge clicked) is reported no-signal
+  // server-side and simply is not a bar here — never a zero.
+  const milestone = data.milestoneFunnel;
+  if (milestone && milestone.steps) {
+    const stepLabels = { login: 'login', connected: 'connected', firstGo: 'first go', prOpened: 'pr opened' };
+    const stepKeys = ['login', 'connected', 'firstGo', 'prOpened'];
+    const reached = stepKeys
+      .map(function (key) { return { key: key, step: milestone.steps[key] }; })
+      .filter(function (e) { return e.step && e.step.state === 'reached'; });
+    const milestoneTotal = reached.reduce(function (sum, e) { return sum + (e.step.count || 0); }, 0);
+    if (!emptyUnless('chart-milestone-funnel', milestoneTotal)) {
+      new Chart(document.getElementById('chart-milestone-funnel'), {
+        type: 'bar',
+        data: {
+          labels: reached.map(function (e) { return stepLabels[e.key]; }),
+          datasets: [{ data: reached.map(function (e) { return e.step.count; }), backgroundColor: COLORS.green }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, grid: { color: COLORS.grid }, ticks: { precision: 0 } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    }
+  }
+
   // --- Proxy response classes doughnut ---
   const proxyStatus = data.proxyStatus;
   const statusLabels = ['2xx ok', '4xx client error', '5xx server error'];

@@ -25,12 +25,12 @@ for splitting.
 | `fixtures-widened/` | class-D fixtures + their `_source/` captures |
 | `jev-routing-out/` | generated `results.json` + `report.md` (+ `stability.md` — the run-to-run go/no-go evidence; the K=5 run is canonical) |
 
-## Fixture population — 66
+## Fixture population — 90
 
 | class | source | count |
 |---|---|---|
 | A | `scripts/eval/fixtures/*.json` (7 real frozen) | 7 |
-| B | `scripts/eval/fixtures/recommend/*.json` (30 targets over 8 files) | 30 |
+| B | `scripts/eval/fixtures/recommend/*.json` (54 targets over 10 files) | 54 |
 | C | `scripts/eval-research-routing.mjs` inline `CASES[]` (read-only extraction) | 24 |
 | D | `scripts/eval/fixtures-widened/*.json` (`LIN-830@implement`, `LIN-830@review`, `LIN-1084`, `breakdown-fork-neg`, `all-terminal-node`) | 5 |
 
@@ -54,10 +54,11 @@ Arm 3's cost, latency and captured prompt come from the graded call's **own** re
 and **one** `recordPromptTrace` per graded arm-3 call, and unregisters both hooks in a
 `finally`. There is no duplicate rebuild call, and the harness never imports `server.js`.
 
-**Cost/latency labelling.** Arm 3 runs the full `getRecommendation()` call, so its figures are
-the **full choose-and-write call** (it generates the whole `## Prompt`). Arm 2 — the incumbent
-choosing only, over the same distilled state — is the **like-for-like step-one comparator**.
-Jev's arm-1 cost is therefore **not** presented as a straight replacement for arm 3's figure.
+**Cost/latency labelling.** Arm 3 runs the full `getRecommendation()` call. Until LIN-3300
+that was a **choose-and-write call** (it generated the whole `## Prompt`), so runs recorded
+before it are not like-for-like with arm 1; since LIN-3300 it is the routing call alone and
+code assembles the stage prompt. Arm 2 — the incumbent choosing only, over the same distilled
+state — isolates the representation.
 
 ## The `defer` rule (evaluation-only) and its asymmetry
 

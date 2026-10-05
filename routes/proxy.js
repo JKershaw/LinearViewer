@@ -64,6 +64,7 @@ import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
+import { loadRecentRuns } from '../lib/recent-runs.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
@@ -364,7 +365,8 @@ const GRAPHQL_TIMEOUT_MS = 25_000;
 // with provider routing and output size; the previous 50s cap surfaced as
 // intermittent 504s whose root cause was this leg, not Linear (the error text
 // misattributed it). The armed keepalive (http-keepalive.js) writes a heartbeat
-// space every 15s after its 25s flush, so the socket stays alive for an
+// space every 15s after its flush (20s after the router took the request, at
+// most 25s after arming), so the socket stays alive for an
 // arbitrarily long wait — the keepalive, not this number, is what keeps Heroku's
 // H12 at bay. This cap is therefore just a generous backstop against a genuinely
 // hung generation.
@@ -372,7 +374,7 @@ const LLM_TIMEOUT_MS = 180_000;
 
 // Backstop for the Linear context fetch on recommendation-style endpoints
 // (recommend/recap/brief/status). These fetches run behind an armed keepalive
-// (http-keepalive.js flushes a 200 + heartbeat at 25s and then holds the
+// (http-keepalive.js flushes a 200 + heartbeat by 25s and then holds the
 // connection open), so a 25s cap on the fetch would fire at the same instant
 // the keepalive starts covering for slowness — surfacing a 504 on healthy large
 // epics instead of letting the request complete. A larger budget keeps the cap
@@ -697,6 +699,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       if (req) {
         req.resolvedCredentialFingerprint = null;
         req.resolvedCredentialExpiresAt = null;
+        // LIN-3282: stamped beside the fingerprint for the identical reason —
+        // a reused `req`-shaped object must never read a stale credential
+        // source from a prior request. This branch calls no
+        // `resolveWorkspaceAccess`, so there is no `source` to record.
+        req.resolvedCredentialSource = null;
         // LIN-2351: stamped here too, for the identical reason LIN-1980
         // duplicated the fingerprint stamp on this branch — a reused
         // `req`-shaped object in a test harness must never read a stale
@@ -738,6 +745,14 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // code review). Per-request storage makes the transient-vs-terminal
       // classification race-free by construction.
       req.resolvedCredentialExpiresAt = Number.isFinite(expiresAt) ? expiresAt : null;
+      // LIN-3282: the credential's SOURCE (cache | session-scan |
+      // refresh-on-resolve | connection), stamped per request beside the
+      // fingerprint — deliberately NOT read back from `credentialResolutions`
+      // (a shared per-(urlKey, owner) correlation that can lag under
+      // interleaving; the fingerprint comment above applies identically).
+      // Persisted onto the proxy-event row so the live 401/200 toggle can be
+      // attributed to a source from a proxy token via /credential-trail.
+      req.resolvedCredentialSource = source ?? null;
     }
     const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
     if (req) {
@@ -1129,7 +1144,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       status,
       note,
       stage,
-      credentialFingerprint: req.resolvedCredentialFingerprint ?? null
+      credentialFingerprint: req.resolvedCredentialFingerprint ?? null,
+      // LIN-3282: how the resolved credential was obtained, persisted at this
+      // single write seam for the same reason as the fingerprint above.
+      // `undefined` (nothing resolved) and `null` both land as null on the row.
+      credentialSource: req.resolvedCredentialSource ?? null
     }).catch(err => console.error('Failed to log proxy event:', err));
   }
 
@@ -1525,7 +1544,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * with recommendErrorResponse(). `sessionApiKey` may be passed in to avoid a
    * second key lookup when the caller already resolved it for its precheck.
    */
-  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false }) {
+  async function computeRecommendation({ urlKey, createdBy, identifier, accessToken, provider, isTestMode, sessionApiKey, deadline, noDescend = false, clientSignal = null }) {
     if (sessionApiKey === undefined) {
       sessionApiKey = await getWorkspaceOpenRouterKey(urlKey, createdBy);
     }
@@ -1619,19 +1638,21 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // getRecommendation now honors options.signal (gap #2). The per-hop deadline guard
     // (gap #3) bounds each hop by the REMAINING shared descent budget so a stalled hop
     // can't overrun it — released on settle so the timer can't leak across hops.
-    const hop = armHopSignal({ deadline });
+    // clientSignal: the caller hung up (clientGoneSignal), so stop paying for the hop.
+    const hop = armHopSignal({ clientSignal, deadline });
     let recommendation;
     try {
+      // The task's recent runs (LIN-3300) are read inside the hop's deadline too.
       recommendation = await fetchWithTimeout(
-        (signal) => getRecommendation(
+        async (signal) => getRecommendation(
           issue,
-          // Forward `attachments` (LIN-777) so getRecommendation's meta-prompt
-          // (formatIssueContext → formatAttachmentsSection) surfaces the worker-facing
+          // Forward `attachments` (LIN-777) so getRecommendation's routing prompt
+          // (formatIssueContext → formatAttachmentsSection) and the stage prompt carry the
           // ## Attachments section. fetchRecommendationContext carries it at top level
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
-          // deterministic LIN-776 fix. `focusedChild` stays (the meta path reads it).
-          { parent, siblings, project, children, comments, focusedChild, attachments },
+          // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
+          { parent, siblings, project, children, comments, focusedChild, attachments, runs: await loadRecentRuns(dispatchQueueStore, urlKey, issue.identifier) },
           {
             apiKey: resolvedApiKey,
             model: selectedModel,

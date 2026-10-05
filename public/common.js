@@ -542,15 +542,6 @@ window.api = async function api(url, opts = {}) {
 
   const response = await fetch(url, fetchOpts);
 
-  // 401 → redirect by default (session expired). `on401:false` falls through to
-  // the normal throw path so the caller can branch on `err.status === 401`.
-  if (response.status === 401 && on401 !== false) {
-    window.location.href = on401;
-    const err = new Error('Unauthorized');
-    err.status = 401;
-    throw err;
-  }
-
   // Parse the body once, best-effort — used for both the success value and the
   // error shape. An empty/non-JSON body leaves it null.
   let body = null;
@@ -560,13 +551,24 @@ window.api = async function api(url, opts = {}) {
     // Non-JSON or empty body — leave body null.
   }
 
-  if (!response.ok) {
-    const message = (body && (body.error || body.message)) || `HTTP ${response.status}`;
+  const status = response.status;
+
+  // 401 → redirect by default (session expired). `on401:false` falls through to
+  // the normal throw path so the caller can branch on `err.status === 401`.
+  if (status === 401 && on401 !== false) {
+    window.location.href = on401;
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    throw err;
+  }
+
+  if (status < 200 || status > 299) {
+    const message = (body && (body.error || body.message)) || `HTTP ${status}`;
     if (toastOnError && typeof window.toast === 'function') {
       window.toast(message, { type: 'error' });
     }
     const err = new Error(message);
-    err.status = response.status;
+    err.status = status;
     err.body = body;
     throw err;
   }
@@ -707,7 +709,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt, surface } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -771,6 +773,10 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // sends the boundary; the server validates it (only 'pr', fresh autopilot
   // dispatch), and every other launcher sends nothing and is unchanged.
   if (stopAt) payload.stopAt = stopAt;
+  // LIN-3248 (N2): the authoritative run variant the run page reads for the
+  // "never merges on its own" promise. Only the ladder's own autopilot run
+  // sends it; the server validates it and every other launcher omits it.
+  if (variant) payload.variant = variant;
   // LIN-2944 P1 (handover d610edd0): the opened-task surface the ladder press
   // came from ('home' | 'swipe'), forwarded so the dispatch route records it.
   // Omitted by every other caller (periodical / Setup Prompt / dispatch page /

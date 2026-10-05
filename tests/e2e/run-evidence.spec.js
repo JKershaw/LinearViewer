@@ -62,6 +62,7 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
   const resp = await page.request.post('/test/set-local-session', {
     data: {
       urlKey: URL_KEY,
+      features: { dispatch: true },
       projects: [{ id: id('rev-proj'), name: 'Evidence Project', content: `repo=${REPO}`, sortOrder: 1 }],
       issues: [{
         id: id('rev-issue'), identifier: 'LOCAL-EV1', title: 'Finished run evidence', description: 'Seeded run-evidence task',
@@ -78,7 +79,7 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
 // resolves to it and the run reconstructs with a transcript.
 async function seedFinishedRun(page) {
   const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
-    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LOCAL-EV1', issueTitle: 'Finished run evidence', target: 'cli' },
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LOCAL-EV1', issueTitle: 'Finished run evidence', target: 'cli', stopAt: 'pr' },
   });
   expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
   const anchorId = (await anchor.json()).item.id;
@@ -106,7 +107,7 @@ async function discoverSessionId(page) {
   expect(resp.status(), `sessions feed failed: ${await resp.text()}`).toBe(200);
   const body = await resp.json();
   const all = [...(body.active || []), ...(body.recent || [])];
-  const seeded = all.find(s => String(s.sessionId || '').length > 0);
+  const seeded = all.find(s => s.seedIssue === 'LOCAL-EV1' && String(s.sessionId || '').length > 0);
   expect(seeded, `no reconstructed session: ${JSON.stringify(body.counts)}`).toBeTruthy();
   return seeded.sessionId;
 }
@@ -126,13 +127,19 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     const sessionId = await discoverSessionId(page);
     await gotoSession(page, sessionId);
 
-    const mount = page.locator('[data-testid="run-evidence-mount"]');
-    await expect(mount).toBeVisible();
+    const evidence = page.locator('[data-testid="run-evidence"]');
+    await expect(evidence).toBeVisible();
 
-    // Mounted at the top: the evidence block precedes the run-header section.
-    const mountBox = await mount.boundingBox();
+    // LIN-3251 §4 slots: evidence after the header strip and before the steps;
+    // the close-out box after the steps. (The paragraph slot is omitted here when
+    // empty, so the evidence/step/box positions are the load-bearing assertion.)
+    const evidenceBox = await evidence.boundingBox();
     const headerBox = await page.locator('.sess-run-header').boundingBox();
-    expect(mountBox.y).toBeLessThan(headerBox.y);
+    const stepsBox = await page.locator('.sess-steps').boundingBox();
+    const closeOutBox = await page.locator('[data-testid="run-evidence-closeout"]').boundingBox();
+    expect(headerBox.y).toBeLessThan(evidenceBox.y);
+    expect(evidenceBox.y).toBeLessThan(stepsBox.y);
+    expect(stepsBox.y).toBeLessThan(closeOutBox.y);
 
     // No straggler waiting/parked flags above it — a finished run is finished.
     await expect(page.locator('[data-testid="session-waiting-banner"]')).toHaveCount(0);
@@ -192,5 +199,45 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="multiple-prs"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout-withheld"]')).toContainText('more than one PR');
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toHaveCount(0);
+  });
+});
+
+// ─── LIN-3251 (RC2): the live PR line, hermetic ──────────────────────────────
+//
+// LIN-3247's `/test/seed-pr-status` primes BOTH the evidence fail-open cache and
+// the pr-state route's whole-reader cache, so the header line is served from the
+// stub. The route makes zero live GitHub calls; the server-side counter proves it.
+test.describe('Header PR line on the session page (LIN-3251)', () => {
+  async function noLiveGitHubFetches(page) {
+    const resp = await page.request.get('/test/pr-state-upstream-count');
+    expect(resp.ok(), `count read failed: ${await resp.text()}`).toBeTruthy();
+    return (await resp.json()).count;
+  }
+
+  test('open PR: the header line shows the open copy, with no live GitHub fetch', async ({ page }) => {
+    await seedLocalWorkspaceWithEvidence(page);
+    await seedFinishedRun(page);
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: REPO, number: 12, readable: true, state: 'open', merged: false, headSha: PR_HEAD, checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverSessionId(page);
+    await gotoSession(page, sessionId);
+
+    await expect(page.locator('[data-testid="session-pr-line"]'))
+      .toHaveText('Nothing has been merged. PR #12 is open: checks passing.');
+    expect(await noLiveGitHubFetches(page)).toBe(0, 'the primed route cache made no live GitHub call');
+  });
+
+  test('merged PR: the header line shows the merged copy, with no live GitHub fetch', async ({ page }) => {
+    await seedLocalWorkspaceWithEvidence(page);
+    await seedFinishedRun(page);
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: REPO, number: 12, readable: true, state: 'closed', merged: true, headSha: PR_HEAD, checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverSessionId(page);
+    await gotoSession(page, sessionId);
+
+    await expect(page.locator('[data-testid="session-pr-line"]')).toHaveText('PR #12 was merged.');
+    expect(await noLiveGitHubFetches(page)).toBe(0, 'the primed route cache made no live GitHub call');
   });
 });

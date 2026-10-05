@@ -12,7 +12,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatAIHintsForMetaPrompt, getAIRecommendationActionNames, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
+import { hasPrompt, getPromptLabels, generatePrompt, getAvailablePrompts, getPromptDescriptionsForAI, PROMPT_TEMPLATES, PROMPT_CATEGORIES, formatStageOptions, getSelectableStages, RECOMMEND_META_ACTIONS, DISPATCH_KINDS, isValidDispatchKind, deriveDispatchKind } from '../../lib/prompt-templates.js';
+const actionNames = () => getSelectableStages().map(s => s.name);
 import { WORK_ISSUE_LABELS } from '../../lib/workflow-config.js';
 import { COMPLETION_SIGNALS } from '../../lib/completion-signals.js';
 
@@ -140,6 +141,16 @@ describe('defer recommend-meta action', () => {
     assert.strictEqual(deriveDispatchKind('defer'), 'defer');
     assert.strictEqual(deriveDispatchKind('DEFER'), 'defer');
   });
+
+  // A router that writes `→ **close out**` named close-out. Read as custom, it named no
+  // stage and failed the hop (LIN-3292).
+  test('deriveDispatchKind reads a space, underscore or hyphen alike', () => {
+    for (const [name, kind] of [['close out', 'close-out'], ['Close_Out', 'close-out'], ['plan review', 'plan-review'],
+      ['look-into', 'look-into'], ['look into', 'look-into'], ['retrospective audit', 'retrospective-audit'], ['implement', 'implementation']]) {
+      assert.strictEqual(deriveDispatchKind(name), kind, name);
+    }
+    assert.strictEqual(deriveDispatchKind('closeout'), 'custom', 'only separators are normalised, not spelling');
+  });
 });
 
 // =============================================================================
@@ -219,7 +230,7 @@ describe('current-state docs keep the prompt-template count in sync with PROMPT_
 
   const CURRENT_STATE_DOCS = [
     { file: 'docs/architecture/source-map.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
-    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `aiHint`/ },
+    { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `route`/ },
   ];
 
   for (const { file, pattern } of CURRENT_STATE_DOCS) {
@@ -510,11 +521,13 @@ describe('bug template', () => {
     // Note: the template's section array is .filter(Boolean)-ed, which strips empty
     // strings — so adjacent items end up separated by a single '\n', not '\n\n'.
     // This snapshot reflects the post-filter shape.
+    // LIN-3299: the role line became the Goal's lead, and the steps moved under ## Process.
     const expectedGoalBlock = [
       '## Goal',
-      '**Role**: Act as a software debugger investigating unexpected behavior. You have authority to reproduce issues, trace root causes, and propose fixes, but should not deploy changes without review.',
+      // LIN-3299: code adds Scope and Authority after the lead, on every path.
+      'Something behaves wrong. Find its cause for certain, with evidence, before anything is fixed; nothing ships without review.' + formatStageIntent('bug') + '\n',
+      '## Process',
       'Start by reading any prior investigation notes in comments. Confirm the reproduction steps and root-cause hypotheses still match what you can observe now. If the behavior has changed since investigation, note it and re-verify before proposing a fix.',
-      'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.',
       'Investigation process:',
       '1. Reproduce the issue (document exact steps)',
       '2. Validate the acceptance witness: confirm the signal you will call "fixed" (the failing test, log line, assertion, or observable behavior) actually tracks the real outcome. A witness that can read green while the outcome is still wrong (or red while it is already right) must be validated or replaced before you optimize against it. A witness that genuinely tracks the outcome is a valid answer — state it explicitly.',
@@ -526,7 +539,7 @@ describe('bug template', () => {
       '4. Debug systematically (add logging, trace execution)',
       '5. Confirm the cause before building the fix: name the single decisive experiment that disambiguates the leading hypothesis from its rivals, and run it. Evidence the cause is confirmed — not merely plausible — is required before you propose or hand off a fix. An investigation that proposes a fix while stating the decisive experiment was not run is NOT done; a genuinely confirmed cause is a valid answer and must be stated explicitly.',
       '6. Widen the model — isolated, or one of a class? Once the root cause is in hand, check whether the same pattern produces siblings: search for the pattern itself (the failure mode, a shared helper, a parallel code path), not only the symptom the ticket cites. A genuinely isolated issue is a valid answer — state it explicitly.',
-      '7. Propose fix with minimal scope. If step 6 found a class, the fix stays minimal — name the class and list the unhandled instances in your findings comment instead of silently widening the fix.',
+      '7. Propose the fix at the cause: the change that removes it and reaches every instance step 6 found, refactoring where that simplifies the code. A change you would need to tell the team about first goes to the human as a ruling.',
       '8. Verify fix doesn\'t introduce regressions',
       '**When fixed**: Leave the `bug` label in place — moving the task to Done marks it resolved. The label is the lasting record that this was a bug (used by reports and prioritization), so do not remove it.'
     ].join('\n');
@@ -617,9 +630,10 @@ describe('plan template', () => {
     assert.ok(result.prompt.includes('Next: TEST-C1'));
   });
 
-  test('uses planning role, not implementation role', () => {
+  // LIN-3299: the role line is the Goal's lead now; it keeps the role's limit.
+  test('leads with planning, and makes no code changes', () => {
     const result = generatePrompt('plan', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('technical planner'));
+    assert.ok(result.prompt.split('## Process')[1].includes('Make no code changes here: the next stage builds the plan.'));
     assert.ok(!result.prompt.includes('implementation engineer'));
   });
 
@@ -799,13 +813,13 @@ describe('code-review consolidated into review (LIN-523)', () => {
 
   test('review does not instruct merge or Done (close-out split at the merge line)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('does NOT merge') || result.prompt.includes('not merge'));
-    assert.ok(result.prompt.includes('Do NOT mark this task Done') || result.prompt.includes('Do NOT mark the task Done'));
+    // Said once, in the hand-off, with its reason (LIN-3293 dedup).
+    assert.ok(/You do NOT merge, mark the task Done, or file follow-ups/.test(result.prompt));
   });
 });
 
 // =============================================================================
-// Terminal-state note — handwritten path (LIN-353, both-paths mirror)
+// Terminal-state note (LIN-353; the router's Step 0 routes on the same state)
 // =============================================================================
 
 describe('generatePrompt terminal-state note (LIN-353)', () => {
@@ -871,8 +885,8 @@ describe('generatePrompt all-subtasks-complete note (LIN-364)', () => {
     };
     const result = generatePrompt('review', issue, context);
     assert.ok(/All Subtasks Complete/i.test(result.prompt), 'the all-complete note must be present');
-    assert.ok(/review\/verification pass|close it out|add up to this task/i.test(result.prompt),
-      'it must steer toward review/close, not defer');
+    assert.ok(/holds up against this task's goal/i.test(result.prompt),
+      'it must steer toward checking the parent against its goal, not defer');
   });
 
   test('canceled and duplicate children also count as complete (all terminal states)', () => {
@@ -933,10 +947,16 @@ describe('generatePrompt bug-already-investigated note (LIN-366)', () => {
   const noComments = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
 
   test('a bug issue WITH prior comments gets the "Don\'t Loop" note steering to the fix', () => {
-    const result = generatePrompt('bug', baseIssue, withComments);
+    const result = generatePrompt('implementation', baseIssue, withComments);
     assert.ok(/Prior Investigation On Record/i.test(result.prompt), 'the bug-investigated note must be present');
     assert.ok(/do NOT.*investigate again|investigation is DONE|move to implementing the fix/i.test(result.prompt),
       'it must steer toward the fix, not re-investigation');
+  });
+
+  test('the bug investigation stage itself does NOT get the note (it proposes the fix, it does not apply it; LIN-3296)', () => {
+    const result = generatePrompt('bug', baseIssue, withComments);
+    assert.ok(!/Prior Investigation On Record|move to implementing the fix/i.test(result.prompt),
+      'the bug stage stays an investigation; the fix is a separate implementation dispatch');
   });
 
   test('a bug issue with NO comments does NOT get the note (nothing investigated yet)', () => {
@@ -980,10 +1000,10 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
     assert.ok(/search for the pattern itself/i.test(result.prompt), 'must search the pattern, not only the cited symptom');
   });
 
-  test('bug class check keeps the fix minimal — instances recorded, not silently fixed', () => {
+  test('bug class check proposes the fix at the cause, reaching every instance (LIN-3291)', () => {
     const result = generatePrompt('bug', bugIssue, ctx);
-    assert.ok(/the fix stays minimal/i.test(result.prompt), 'a found class must not widen the fix');
-    assert.ok(/list the unhandled instances/i.test(result.prompt), 'unhandled instances must be recorded');
+    assert.ok(/Propose the fix at the cause/i.test(result.prompt), 'the proposal is at the cause');
+    assert.ok(/reaches every instance step 6 found/i.test(result.prompt), 'a found class is reached by the fix, not just listed');
   });
 
   test('bug class check guards against manufactured work (isolated is a valid answer)', () => {
@@ -1009,8 +1029,9 @@ describe('class check — isolated or one of a class (LIN-313)', () => {
 
   test('review checklist carries the class-check item', () => {
     const result = generatePrompt('review', reviewIssue, ctx);
-    assert.ok(result.prompt.includes('- [ ] Class check answered: isolated, or class named with unhandled instances listed'),
-      'checklist must include the class-check line');
+    // The class check is its own section; the checklist no longer restates it (LIN-3293 dedup).
+    assert.ok(/### Isolated, or One of a Class\?/.test(result.prompt), 'the class check stays required');
+    assert.ok(!result.prompt.includes('- [ ] Class check answered'), 'and is said once');
   });
 });
 
@@ -1042,8 +1063,9 @@ describe('mutation-check directive — pin the review institutionalization (LIN-
 
   test('review checklist carries the mutation-check item', () => {
     const result = generatePrompt('review', reviewIssue, ctx);
-    assert.ok(result.prompt.includes('- [ ] At least the load-bearing new/changed tests were mutation-checked (code path deleted, test confirmed red, then restored) rather than merely inspected'),
-      'checklist must include the mutation-check line');
+    // The mutation check lives in Test Quality Check; the checklist no longer restates it (LIN-3293 dedup).
+    assert.ok(/\*\*Mutation-check the load-bearing tests/.test(result.prompt), 'the mutation check stays required');
+    assert.ok(!result.prompt.includes('- [ ] At least the load-bearing'), 'and is said once');
   });
 
   test('mutation-check directive stays inside Test Quality Check, ahead of the Review Checklist', () => {
@@ -1099,6 +1121,16 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
       'a query must not be the only accepted form of bounding at research stage');
   });
 
+  // LIN-3299: research's Goal told it to recommend "not final decisions on direction",
+  // which contradicts its Scope and Authority (engineering choices are the agent's).
+  test('research recommends an approach without being told the direction is not its to decide', () => {
+    const { prompt } = generatePrompt('research', researchIssue, ctx);
+    assert.doesNotMatch(prompt, /final decisions on direction/i);
+    assert.match(prompt, /recommend an approach the next stage can build on/);
+    const withComments = generatePrompt('research', researchIssue, { ...ctx, comments: [{ body: 'notes', user: 'Dev', createdAt: '2026-01-02T00:00:00.000Z' }] }).prompt;
+    assert.ok(withComments.split('## Process')[1].includes('build on existing findings'), 'prior research is a process step, printed by code');
+  });
+
   test('treats an unbound class as a first-class answer, naming the two recurring shapes', () => {
     const result = generatePrompt('research', researchIssue, ctx);
     assert.ok(/A class you could not bound is a first-class answer/i.test(result.prompt),
@@ -1129,9 +1161,9 @@ describe('class-not-member enumeration rule — research template (LIN-1871)', (
     assert.ok(classes < surface, 'and precedes the Surface Assessment verdict');
   });
 
-  test('lists the class list among the research comment output', () => {
+  test('lists the class list among the research description output, where research records it', () => {
     const result = generatePrompt('research', researchIssue, ctx);
-    assert.ok(/the class list \(each class named, bounded, and its members\)/i.test(result.prompt),
+    assert.ok(/\*\*Description\*\*: Key findings, the class list/i.test(result.prompt),
       'the Output section must name the class list as a deliverable, not just imply it');
   });
 });
@@ -1429,9 +1461,9 @@ describe('retro template', () => {
   });
 
   test('is excluded from the AI recommendation meta-prompt (user-initiated only)', () => {
-    const hints = formatAIHintsForMetaPrompt();
+    const hints = formatStageOptions();
     assert.ok(!hints.includes('reorient'),
-      'retro aiHint should not appear in the meta-prompt');
+      'retro should not appear in the stage options');
     assert.ok(!/\*\*retro\*\*/.test(hints), 'retro should not be listed as an action type');
     // Sanity check: other prompts still flow into the meta-prompt
     assert.ok(hints.includes('research') || hints.includes('plan'),
@@ -1515,9 +1547,7 @@ describe('triage template', () => {
   });
 
   // LIN-1227: triage must not change task scope — no description/scope rewrite, no
-  // follow-up task/subtask creation. Both prompt paths must carry the prohibition
-  // (docs/architecture/prompt-system.md "two independent paths" rule), mirroring
-  // breakdown's scope guardrail.
+  // follow-up task/subtask creation, mirroring breakdown's scope guardrail.
   test('(handwritten) forbids rewriting scope and creating follow-up tasks/subtasks', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
     assert.ok(/preserves? scope/i.test(result.prompt),
@@ -1528,20 +1558,6 @@ describe('triage template', () => {
       'handwritten triage should forbid creating follow-up tasks or subtasks');
   });
 
-  test('(meta) mirrors the triage scope-preservation prohibition (both-paths rule)', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-1227',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'triage, plan, review',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(/preserves? scope/i.test(p),
-      'meta-prompt triage rule should state that triage preserves scope');
-    assert.ok(/rewrite the task's description/i.test(p),
-      'meta-prompt triage rule should forbid rewriting the task description');
-    assert.ok(/follow-up tasks or subtasks/i.test(p),
-      'meta-prompt triage rule should forbid creating follow-up tasks or subtasks');
-  });
 
   // ===========================================================================
   // LIN-2316: the displayed priority must never be a bare native (descending)
@@ -1576,12 +1592,15 @@ describe('triage template', () => {
     assert.strictEqual(priorityLine, '**Priority:** Not set');
   });
 
-  test('(f3) the Role authority line names priorityLevel as the sole priority write field', () => {
+  // LIN-3299: the role line became the Goal's lead, which grants the authority without
+  // naming a field; the write field is named once, in the metadata bullet (f4).
+  test('(f3) the Goal lead grants the metadata authority without naming any priority field', () => {
     const result = generatePrompt('triage', mockIssue, mockContext);
-    const roleLine = result.prompt.split('\n').find(l => l.startsWith('**Role**:'));
-    assert.ok(roleLine, 'the Role authority line is present');
-    assert.deepStrictEqual(namedPriorityFields(roleLine), ['priorityLevel'],
-      'the Role line names exactly priorityLevel as a priority-family field — never a bare native `priority` alongside it');
+    const lines = result.prompt.split('\n');
+    const lead = lines[lines.indexOf('## Goal') + 1];
+    assert.match(lead, /priority/, 'the lead is the authority line');
+    assert.deepStrictEqual(namedPriorityFields(lead), [],
+      'the lead names no priority-family field, so never a bare native `priority`');
   });
 
   test('(f4) the Other Metadata Priority bullet names priorityLevel as the sole write field', () => {
@@ -1602,25 +1621,16 @@ describe('triage template', () => {
   // WHICH field is named, not on specific prose.
   // ===========================================================================
 
-  test('(meta f5) the Triage-prompts quality rule names priorityLevel as the sole priority write field', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-2317',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'triage, plan, review',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    const triageBullet = extractQualityRuleBullet(p, 'Triage prompts', 'Bug prompts');
-    assert.deepStrictEqual(namedPriorityFields(triageBullet), ['priorityLevel'],
-      'the Triage-prompts quality rule names exactly priorityLevel as a priority-family field — an unnamed write field or a bare native `priority` both fail this');
-  });
 
-  test('(meta f6) the triage aiHint.goal fed into the meta-prompt names priorityLevel as the sole priority write field', () => {
-    const hints = formatAIHintsForMetaPrompt();
-    // Extract the triage entry specifically: the block starting at "**triage** (" up to the next blank line.
-    const triageBlock = hints.slice(hints.indexOf('**triage** ('), hints.indexOf('\n\n', hints.indexOf('**triage** (')));
-    assert.ok(triageBlock.includes('**triage** ('), 'the meta-prompt aiHints include a triage entry');
-    assert.deepStrictEqual(namedPriorityFields(triageBlock), ['priorityLevel'],
-      'the triage aiHint block names exactly priorityLevel as a priority-family field — an unnamed write field or a bare native `priority` both fail this');
+  // LIN-3300: the triage aiHint (a second copy of this write instruction) is gone. The
+  // stage options say when triage is next and give no write instruction at all.
+  test('(meta f6) the triage stage option carries no priority write field', () => {
+    const options = formatStageOptions();
+    const start = options.indexOf('- `triage`:');
+    const triageBlock = options.slice(start, options.indexOf('\n- `', start + 1));
+    assert.ok(start >= 0, 'the stage options include a triage entry');
+    assert.deepStrictEqual(namedPriorityFields(triageBlock), [],
+      'the triage option names no priority-family write field');
   });
 
   test('(f7) canonical priority 0 is annotated as unknown/none, not only the top of the scale', () => {
@@ -1742,10 +1752,8 @@ describe('review template', () => {
   test('Test Quality Check names e2e/integration and a checklist item locks the wording', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(result.prompt.includes('e2e'), 'should reference e2e in test-level guidance');
-    assert.ok(
-      result.prompt.includes('Tests exist at the appropriate level (e2e/integration for cross-module or user-facing behavior, not only unit tests)'),
-      'should include the new Review Checklist item phrase verbatim'
-    );
+    assert.ok(/UI\/route\/cross-module → e2e; pure function → unit/.test(result.prompt),
+      'the test-level rule is stated once, in Test Quality Check');
   });
 
   test('Test Quality Check is positioned between Gap Analysis and Review Checklist', () => {
@@ -1795,8 +1803,8 @@ describe('review template', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/Review is write-only/i.test(result.prompt), 'states review is write-only');
     assert.ok(/CI is green on the PR/i.test(result.prompt), 'confirms CI green on the PR');
-    assert.ok(/does NOT merge, does NOT mark the task Done, and does NOT file the close-out follow-ups/i.test(result.prompt),
-      'review does not merge, mark Done, or file close-out follow-ups');
+    assert.ok(/You do NOT merge, mark the task Done, or file follow-ups/i.test(result.prompt),
+      'review does not merge, mark Done, or file follow-ups: close-out files them (LIN-3293)');
     assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(result.prompt),
       'a non-empty ledger forces a conditional approval');
     assert.ok(/hand off to `close-out`/i.test(result.prompt), 'hands off to the close-out step');
@@ -1811,17 +1819,23 @@ describe('review template', () => {
     assert.ok(/Approve.*Request Changes.*Needs Discussion/s.test(result.prompt), 'lists the three verdicts');
   });
 
-  test('Close-Out Gate cannot-close branch files a `blocks` ticket and routes to it, not another review', () => {
+  test('Close-Out Gate cannot-close branch keeps a surfaced problem in this task and routes to the stage that fixes it (LIN-3291)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/cannot-close branch/i.test(result.prompt), 'names the cannot-close branch');
     assert.ok(/do NOT loop back into another `review`/i.test(result.prompt), 'forbids looping back to review');
-    assert.ok(/as a `blocks` relation on the current task/i.test(result.prompt), 'files/links the blocker as `blocks`');
-    assert.ok(/A `blocks` relation does not make the engine descend/i.test(result.prompt),
-      'next action must be named explicitly because `blocks` does not drive descent');
-    assert.ok(/closes only once the blocker is resolved and CI is green/i.test(result.prompt),
-      'original closes only after blocker resolves and CI green');
-    assert.ok(/distinct from a plan-phase prerequisite-refactor subtask/i.test(result.prompt),
-      'closure blocker kept distinct from plan refactor-subtask');
+    assert.ok(/that is still this task's work, its cause included/i.test(result.prompt), 'a bigger problem the fix exposed stays this work');
+    assert.ok(/File no new ticket for it/.test(result.prompt), 'no new ticket is filed for it');
+    assert.ok(!/Create a new Linear ticket for the surfaced work/.test(result.prompt), 'the old split-off instruction is gone');
+    assert.ok(/name the stage that does it on this task as the next action: `implementation`, `bug`/.test(result.prompt),
+      'the next action is the stage that fixes it here');
+    assert.ok(/A `blocks` relation does not make the engine descend|a `blocks` relation does not make the engine descend/i.test(result.prompt),
+      'linking an owning task still names the next action, because `blocks` does not drive descent');
+    assert.ok(/Only a fix the team would need to hear about before it happens makes it \*\*Needs Discussion\*\*/.test(result.prompt),
+      'only a team-level change goes to the human');
+    // LIN-3293: John's definition is the clause itself. A bracketed list of
+    // categories read as the definition and was turned into the test by a writer.
+    assert.ok(!/before it happens \(/.test(result.prompt), 'no category list stands in for the definition');
+    assert.ok(/stays open until it is fixed and CI is green/i.test(result.prompt), 'closes only after the fix and green CI');
   });
 
   test('review completion signals reflect verdict-based, pre-merge close-out (LIN-523)', () => {
@@ -1835,8 +1849,8 @@ describe('review template', () => {
       'signals include CI green on the PR'
     );
     assert.ok(
-      reviewSignal.signals.some(s => /closure blocker filed\/linked as `blocks`/i.test(s)),
-      'signals include the blocker-filed-and-routed close-out outcome'
+      reviewSignal.signals.some(s => /Request Changes, naming the stage that fixes it here \(no new ticket\)/i.test(s)),
+      'signals include the cannot-close outcome: the fix stays in this task (LIN-3291)'
     );
     // The retired post-merge signals must be gone
     assert.ok(
@@ -1965,12 +1979,10 @@ describe('getPromptDescriptionsForAI', () => {
 // =============================================================================
 // Surface Assessment necessity gate (LIN-192 origin, LIN-397 gate) — handwritten path
 //
-// The handwritten path must match the meta-prompt: research ends with a Surface
-// Assessment gated on necessity (consumer test + who-pays test, third verdict for
-// noticed-but-not-required improvements, size routed to sequencing), and plan turns
-// only a necessary prerequisite refactor into a separate blocking subtask. These
-// pin the gate, not just the section's presence. The mirror tests for the AI path
-// live in tests/unit/openrouter.test.js.
+// Research ends with a Surface Assessment gated on necessity (consumer test +
+// who-pays test, third verdict for noticed-but-not-required improvements, size
+// routed to sequencing), and plan turns only a necessary prerequisite refactor into
+// a separate blocking subtask. These pin the gate, not just the section's presence.
 // =============================================================================
 
 describe('Surface Assessment (handwritten path)', () => {
@@ -1993,7 +2005,7 @@ describe('Surface Assessment (handwritten path)', () => {
 
   test('research gates the refactor verdict on necessity, not availability', () => {
     const result = generatePrompt('research', mockIssue, mockContext);
-    assert.ok(result.prompt.includes('Consumer test'), 'must require citing the in-task consumer of the new seam');
+    assert.ok(result.prompt.includes('Cause-or-consumer test'), 'must require the cause removed or the in-task consumer of the new seam');
     assert.ok(result.prompt.includes('Who-pays test'), 'must require a beneficiary-or-bystander accounting per touched consumer');
     assert.ok(
       result.prompt.includes('improvement noticed, not required'),
@@ -2045,7 +2057,7 @@ describe('Surface Assessment (handwritten path)', () => {
 // then CLOSE the set (prove it complete). Generative, not a fixed category list (a list
 // anchors and the agent skips the unnamed layer — the LIN-735/295/579 gap). Keeps the
 // obligation axes as per-layer seed reasoning, the duplicate-representation Surface-
-// Assessment trigger, the small-task off-ramp, and the both-paths mirror; adds the
+// Assessment trigger and the small-task off-ramp; adds the
 // per-layer brief artifact, the cite-your-sources rule, and the coverage-not-speed license.
 describe('Audit the Layers (handwritten path)', () => {
   const mockIssue = {
@@ -2147,30 +2159,10 @@ describe('Audit the Layers (handwritten path)', () => {
       'the gate must positively state when the section applies');
   });
 
-  test('meta-prompt mirrors the audit directives in the Research-prompts rule', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-901',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, research',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(/Audit the Layers pass/.test(p), 'meta-prompt must require an Audit the Layers pass');
-    assert.ok(/cite a source for each claim/.test(p), 'meta-prompt must require a cited source per claim');
-    assert.ok(/state the layer set as complete/.test(p), 'meta-prompt must require closing the layer set');
-    assert.ok(/seed examples, not a fixed checklist/.test(p), 'meta-prompt must frame the axes as seed examples, not a checklist');
-    assert.ok(/adversarial self-review pass/.test(p), 'meta-prompt must require the adversarial self-review pass');
-    assert.ok(
-      /second representation of something already modelled/.test(p),
-      'meta-prompt Surface Assessment must treat a duplicate representation as refactor required'
-    );
-    assert.ok(/does not pay the obligation tax/.test(p), 'meta-prompt must keep the scale-to-task guard over the new content');
-  });
 });
 
 // Scale-to-task (lower bound, LIN-260). The heavy generative phases must tell the
-// agent to size output to the task — proven on the meta-prompt path via
-// scripts/eval-prompt-scaling.mjs and mirrored here per
-// docs/architecture/prompt-system.md's both-paths rule.
+// agent to size output to the task.
 describe('Scale to the task (handwritten path)', () => {
   const mockIssue = {
     id: 'issue-st', identifier: 'TEST-ST1', title: 'Add a thing',
@@ -2203,12 +2195,22 @@ describe('Scale to the task (handwritten path)', () => {
 });
 
 // =============================================================================
-// LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into both paths)
+// LIN-177 S4/S5: Capability-aware prompts (provider.ui threaded into the stage and router prompts)
 // =============================================================================
 import { generateCustomPrompt } from '../../lib/prompt-templates.js';
 import { resolvePromptUi, applyPromptCapabilities, DEFAULT_PROMPT_UI, formatSubtaskSummary, appendGroundingSections, formatPlanFidelityCheck, formatAttachmentsSection, formatAttachmentPerceptionCheck, formatIfBlocked } from '../../lib/prompt-formatters.js';
-import { applyGroundingToRecommendation, formatIssueContext } from '../../lib/openrouter.js';
-import { buildMetaPromptTemplate } from '../../lib/prompts/meta-prompt-template.js';
+import { formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
+import { buildRouterPrompt } from '../../lib/stage-router.js';
+
+/** The stage selector's prompt for a small open leaf (LIN-3300). */
+const selectorPrompt = (providerUi = null) => buildRouterPrompt(buildSelectorArgs(
+  { identifier: 'LIN-900', title: 't', description: 'd', state: { name: 'Todo', type: 'unstarted' }, labels: [] },
+  { parent: null, siblings: [], project: null, children: [], comments: [] }, {}, providerUi));
+/** One numbered rule of the selector's "How to choose", up to the next. */
+const selectorRule = (n) => { const p = selectorPrompt(); const a = p.indexOf(`${n}. **`); return p.slice(a, p.indexOf('\n', a)); };
+import { formatStageContract } from '../../lib/prompt-contract.js';
+import { formatNodeFactsBlock } from '../../lib/recommendation-facts.js';
+import { formatStageIntent, withStageIntent } from '../../lib/prompts/stage-intent.js';
 
 describe('resolvePromptUi (LIN-177 S4)', () => {
   test('no provider → Linear floor (every capability on, displayName Linear)', () => {
@@ -2264,188 +2266,29 @@ describe('capability-aware prompts: Linear byte-parity (LIN-177 S4/S5)', () => {
     }
   });
 
-  test('meta-prompt: explicit Linear ui is a no-op vs. no provider', () => {
-    const args = {
-      issueContext: 'CTX', identifier: 'LIN-900', hasSubtasks: true, subtaskCount: 1,
-      completedCount: 0, inProgressCount: 0, remainingCount: 1, hasComments: true, commentCount: 1,
-      aiHints: 'H', actionVocabulary: 'plan, implement', completionSignals: 'S',
-      isTerminal: false, hasOpenChildren: true
-    };
-    const base = buildMetaPromptTemplate(args);
-    const withUi = buildMetaPromptTemplate({ ...args, providerUi: LINEAR_UI });
-    assert.strictEqual(withUi, base);
+  test('routing prompt: explicit Linear ui is a no-op vs. no provider', () => {
+    assert.strictEqual(selectorPrompt(LINEAR_UI), selectorPrompt());
   });
 });
 
-describe('meta-prompt Step 0: open parent, all subtasks complete (LIN-364)', () => {
-  const baseArgs = {
-    issueContext: 'CTX', identifier: 'LIN-900',
-    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
-    hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
-    completionSignals: 'S', focusedSubtaskId: null
-  };
-
-  test('open parent with all subtasks complete gets the unified review/close branch forbidding defer', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: false });
-    assert.ok(/Step 0: The substantive work here is already complete/i.test(p), 'the unified completion Step 0 branch must be present');
-    assert.ok(/all \d+ of its subtasks are in a terminal state/i.test(p), 'it must name the all-subtasks-complete case');
-    assert.ok(/Do NOT `?defer`?/i.test(p), 'it must explicitly forbid defer');
-    assert.ok(/recommend `?review`?/i.test(p), 'it must steer toward review/close');
-  });
-
-  test('open parent with an open child does NOT get the branch (descent still applies)', () => {
-    const p = buildMetaPromptTemplate({
-      ...baseArgs, completedCount: 1, remainingCount: 1, isTerminal: false, hasOpenChildren: true
-    });
-    assert.ok(!/The substantive work here is already complete/i.test(p), 'a parent with an open child is not short-circuited');
-  });
-
-  test('a leaf (no subtasks) does NOT get the branch', () => {
-    const p = buildMetaPromptTemplate({
-      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(!/The substantive work here is already complete/i.test(p), 'a leaf with no subtasks is not short-circuited at Step 0');
-  });
-
-  test('a terminal parent gets the unified Step 0 with the terminal clause, not the all-subtasks clause', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
-    assert.ok(/Step 0: The substantive work here is already complete/i.test(p), 'a terminal task gets the unified completion Step 0');
-    assert.ok(/its state is already a terminal state/i.test(p), 'with the terminal-state clause');
-    assert.ok(!/all \d+ of its subtasks are in a terminal state/i.test(p), 'and NOT the non-terminal all-subtasks-complete clause');
-  });
-});
-
-describe('meta-prompt review close-out gate + cannot-close routing (LIN-474)', () => {
-  const baseArgs = {
-    issueContext: 'CTX', identifier: 'LIN-900',
-    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
-    hasComments: true, commentCount: 2, aiHints: 'H', actionVocabulary: 'plan, review, implementation, bug',
-    completionSignals: 'S', focusedSubtaskId: null
-  };
-
-  test('Review rule is trimmed to WRITE-ONLY + ledger + conditional verdict; a SEPARATE Close-out rule owns the gate (LIN-550)', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: true });
-    const reviewMatches = p.match(/\*\*Review prompts\*\* must:/g) || [];
-    assert.strictEqual(reviewMatches.length, 1, 'there is exactly one Review-prompts rule');
-    assert.ok(/explicit verdict \(Approve \/ Request Changes \/ Needs Discussion\)/i.test(p), 'the verdict is encoded');
-    assert.ok(/write a `### What CI Did Not Prove` ledger/i.test(p), 'review writes the ledger');
-    assert.ok(/Approve — conditional on close-out discharging the ledger/i.test(p), 'conditional approval encoded');
-    assert.ok(/Review is WRITE-ONLY/i.test(p), 'review is write-only — no merge/Done/follow-ups');
-    assert.ok(/must NOT loop back into another review/i.test(p), 'forbids looping back to review');
-    assert.ok(/as `blocks` the current task/i.test(p), 'files/links the blocker as `blocks`');
-    assert.ok(/a `blocks` relation alone does not make the engine descend/i.test(p),
-      'next action named because `blocks` does not drive descent');
-    // The retired fused-gate + undefined-merger framing must be gone from the review rule.
-    assert.ok(!/PRE-MERGE close-out gate/i.test(p), 'no fused pre-merge close-out gate language');
-    assert.ok(!/belong to the merger/i.test(p), 'no undefined-merger handoff');
-    // A SEPARATE Close-out rule now owns the ledger gate (the three blocking invariants).
-    const closeoutMatches = p.match(/\*\*Close-out prompts\*\* must/g) || [];
-    assert.strictEqual(closeoutMatches.length, 1, 'exactly one Close-out-prompts rule exists');
-    assert.ok(/gate on the review verdict rather than any specific format/i.test(p), 'close-out gates on the verdict, not the exact heading (LIN-810)');
-    assert.ok(/it never discharges a flagged gap/i.test(p), 'green CI never discharges a flagged gap');
-    assert.ok(/names the exact precondition they exercised/i.test(p), 'human acceptance must name the exact precondition');
-    // LIN-1365 parity with the handwritten close-out gate: the recorded Approve + discharged
-    // ledger IS the authorization; no fresh in-session human go-ahead, floors untouched.
-    assert.ok(/IS the authorization to perform the finish/i.test(p),
-      'meta close-out rule: recorded Approve + discharged/empty ledger IS the authorization (LIN-1365)');
-    assert.ok(/fresh in-session human "go ahead" is not additionally required/i.test(p),
-      'meta close-out rule: no fresh in-session human go-ahead required (LIN-1365)');
-    assert.ok(/must not be discounted because other context over-asserts authority/i.test(p),
-      'meta close-out rule: recorded verdict not discounted for over-asserted authority (LIN-1365)');
-  });
-
-  test('close-out requires positive evidence of a review; absent it, default to review (LIN-811)', () => {
-    // Step 0 (already-complete) path renders when terminal with no open children.
-    const step0 = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
-    assert.ok(/requires positive evidence that a review actually ran/i.test(step0),
-      'Step 0 close-out branch carries the review-evidence gate');
-    assert.ok(/complete-looking description is not that evidence/i.test(step0),
-      'a rich description is explicitly not evidence of a review');
-    assert.ok(/When the evidence is ambiguous, default to `review`/i.test(step0),
-      'ambiguous evidence defaults to review');
-    // Step 3 (landed implementation) path renders independently (no Step 0 here).
-    const step3 = buildMetaPromptTemplate({
-      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
-      isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(/requires positive evidence that a review actually ran/i.test(step3),
-      'Step 3 close-out branch carries the review-evidence gate');
-  });
-
-  test('Step 0 completion branch carries the cannot-close branch routing to a blocker', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
-    assert.ok(/\*\*Cannot-close branch:\*\*/i.test(p), 'Step 0 names the cannot-close branch');
-    assert.ok(/do NOT keep routing to `?review`?/i.test(p), 'it must not keep routing to review on CI-red/blocker');
-    assert.ok(/route instead via Step 2 to the blocker/i.test(p), 'it routes to the blocker via Step 2');
-  });
-
-  test('Step 3 already-landed seam routes a CI-red / surfaced-blocker case to the blocker, not a repeated review', () => {
-    const p = buildMetaPromptTemplate({
-      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
-      isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(/neither to `?implementation`? nor to a repeated `?review`?/i.test(p),
-      'Step 3 carries the cannot-close exception');
-    assert.ok(/route the next action to that blocker/i.test(p), 'it routes the next action to the blocker');
-  });
-
-  test('Step 0 and Step 3 stuck-review-signal bullets name archive+prune in the same order as the Close-out quality rule (LIN-1773)', () => {
-    const step0 = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
-    const step3 = buildMetaPromptTemplate({
-      ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0,
-      isTerminal: false, hasOpenChildren: false
-    });
-    const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
-    const assertOrdered = (text, label) => {
-      const lower = text.toLowerCase();
-      const positions = keywords.map(k => lower.indexOf(k));
-      assert.ok(positions.every(p => p > -1), `${label} mentions every keyword (${keywords.join(', ')})`);
-      for (let i = 1; i < positions.length; i++) {
-        assert.ok(positions[i] > positions[i - 1],
-          `${label}: "${keywords[i]}" must appear after "${keywords[i - 1]}"`);
-      }
-    };
-    const step0Bullet = step0.split('\n').find(l => /inverted stuck-review signal/i.test(l));
-    const step3Bullet = step3.split('\n').find(l => /the next step is the close, not another review pass/i.test(l));
-    assert.ok(step0Bullet, 'Step 0 stuck-review-signal bullet is present');
-    assert.ok(step3Bullet, 'Step 3 stuck-review-signal bullet is present');
-    assertOrdered(step0Bullet, 'Step 0 stuck-review-signal bullet');
-    assertOrdered(step3Bullet, 'Step 3 stuck-review-signal bullet');
+describe('selector rule 2: landed work (LIN-364, LIN-474, LIN-811)', () => {
+  test('rule 2 orders the landing stages; the stages say when each applies, said once', () => {
+    assert.match(selectorRule(2), /against `retrospective-audit`, `close-out`, the `implementation` fix round \(on the same PR\) and `review`, in that order; a terminal state with no open subtask counts as landed work/);
+    const options = formatStageOptions();
+    assert.match(options, /- `review`: [^\n]*\n  When: Work has landed \(a PR or completion summary on the trail, or every subtask done\)/);
+    assert.match(options, /Requires: An Approve from a code review; a plan-review Approve is not one\./);
+    assert.match(options, /CI is red, or verifying the work surfaced a blocker: that is `implementation` \(or `bug`, or `blocked` if only a person can settle it\) on this ticket first/);
   });
 });
 
 describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', () => {
-  const baseArgs = {
-    issueContext: 'CTX', identifier: 'LIN-2261',
-    hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0,
-    hasComments: true, commentCount: 2, aiHints: 'H', actionVocabulary: 'plan, review, retrospective-audit, implementation, bug',
-    completionSignals: 'S', focusedSubtaskId: null
-  };
-
-  test('Step 0 names retrospective-audit as a third branch, distinct from review/close-out', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: true, hasOpenChildren: false });
-    assert.ok(/Step 0: The substantive work here is already complete — recommend `review`, `close-out`, or `retrospective-audit`/.test(p),
-      'Step 0 heading names all three branches');
-    assert.ok(/already merged and Done \(close-out has already run\) → recommend `retrospective-audit`/i.test(p),
-      'a third bullet routes fully-closed work to retrospective-audit');
-    assert.ok(/NOT another `review` or `close-out`/i.test(p), 'it forbids re-recommending review or close-out');
-    assert.ok(/does not change state or file follow-ups/i.test(p), 'the bullet states the read-only contract');
-  });
-
-  test('the retrospective-audit quality rule is present exactly once and mirrors the read-only contract', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, isTerminal: false, hasOpenChildren: true });
-    const matches = p.match(/\*\*Retrospective-audit prompts\*\* must/g) || [];
-    assert.strictEqual(matches.length, 1, 'exactly one Retrospective-audit-prompts rule exists');
-    assert.ok(/open from the fact that the work is already merged/i.test(p), 'must open from already-merged');
-    assert.ok(/must NOT re-verify overall correctness/i.test(p), 'must not re-verify correctness');
-    assert.ok(/audit the claims/i.test(p) && /audit test integrity/i.test(p) && /ownership orphans/i.test(p),
-      'must cover claims, test integrity, and ownership orphans');
-    assert.ok(/forbid changing status, labels/i.test(p), 'must forbid state changes');
-    assert.ok(/forbid filing follow-up tickets/i.test(p), 'must forbid filing follow-ups');
+  test('rule 2 names retrospective-audit for merged-and-Done work, distinct from review/close-out', () => {
+    assert.match(selectorRule(2), /against `retrospective-audit`, `close-out`/);
+    assert.match(formatStageOptions(), /- `retrospective-audit`: [^\n]*\n  When: The work is merged and Done, with a code review on record\./);
   });
 
   test('retrospective-audit is offered in the AI recommendation vocabulary (unlike retro)', () => {
-    const names = getAIRecommendationActionNames();
+    const names = actionNames();
     assert.ok(names.includes('retrospective-audit'), 'retrospective-audit must be an emittable action');
     assert.ok(!names.includes('retro'), 'retro stays excluded from AI recommendation');
   });
@@ -2455,51 +2298,28 @@ describe('meta-prompt retrospective-audit routing + quality rule (LIN-2261)', ()
   });
 });
 
-describe('meta-prompt design shape-fork routing + aiHint discriminators (LIN-878)', () => {
-  const baseArgs = {
-    issueContext: 'CTX', identifier: 'LIN-878',
-    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-    hasComments: true, commentCount: 2, aiHints: 'H',
-    actionVocabulary: 'plan, research, design, scoping, spike, implement, review, breakdown',
-    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-  };
-
-  test('Step 3 carries the guarded design shape-fork branch at the research→plan seam', () => {
-    const p = buildMetaPromptTemplate(baseArgs);
-    assert.ok(/check whether the solution \*shape\* is still contested/i.test(p), 'the shape-fork branch is present');
-    assert.ok(/Recommend `design`/i.test(p), 'it routes to design');
-    assert.ok(/≥2 genuinely viable, materially-different solution shapes/i.test(p), 'it names the ≥2-shapes condition');
-    assert.ok(/settled silently inside planning/i.test(p), 'it names the silent-shape-decision failure mode');
-    // the four explicit over-fire guards
-    assert.ok(/Over-fire guards — do NOT fire `design` when:/i.test(p), 'it lists explicit over-fire guards');
-    assert.ok(/still ungathered — that is `research`/i.test(p), 'guard (a): ungathered → research');
-    assert.ok(/one obvious shape/i.test(p), 'guard (b): one obvious shape → plan/implement');
-    assert.ok(/already committed to an approach, or the work is already built\/landed/i.test(p), 'guard (c): committed/landed → plan/review');
-    assert.ok(/that is `scoping`, not `design`/i.test(p), 'guard (d): requirements ambiguity → scoping');
-    // ordering: the hatch sits at the research→plan seam — before the plan-exists check…
-    assert.ok(p.indexOf('the design hatch') < p.indexOf('check whether a plan exists'),
-      'the shape-fork branch sits before the plan-exists check');
-    // …but AFTER the already-landed guard, so landed work still routes to review first.
-    assert.ok(p.indexOf('check whether the implementation has ALREADY landed') < p.indexOf('the design hatch'),
-      'the already-landed guard retains priority over the design hatch');
+describe('selector design shape-fork routing + stage discriminators (LIN-878)', () => {
+  test('rule 7 routes a contested shape to design, after knowledge and before the plan', () => {
+    assert.match(selectorRule(7), /Then `design`, when it applies\. Why: a plan should not pick the architecture silently\./);
+    const p = selectorPrompt();
+    assert.ok(p.indexOf('6. **Knowledge.**') < p.indexOf('7. **Shape.**') && p.indexOf('7. **Shape.**') < p.indexOf('8. **Plan.**'), 'after knowledge, before the plan');
   });
 
-  test('formatAIHintsForMetaPrompt renders whenNot/chooseOver discriminators for design/scoping/spike', () => {
-    const hints = formatAIHintsForMetaPrompt();
-    assert.ok(/\*\*design\*\*/.test(hints), 'design is listed');
-    assert.ok(/When NOT: the shape is already decided/i.test(hints), 'design When NOT rendered');
-    assert.ok(/Choose over: choose `design` over `plan`/i.test(hints), 'design Choose over rendered');
-    assert.ok(/Choose over: choose `scoping` over/i.test(hints), 'scoping Choose over rendered');
-    assert.ok(/Choose over: choose `spike` over `research`/i.test(hints), 'spike Choose over rendered');
+  // LIN-3300: the discriminators are each stage's own "Not when", rendered for every stage.
+  test('formatStageOptions renders the design/scoping/spike discriminators', () => {
+    const options = formatStageOptions();
+    const entry = (key) => { const i = options.indexOf(`- \`${key}\`:`); return options.slice(i, options.indexOf('\n- `', i + 1)); };
+    assert.match(entry('design'), /Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered \(`research`\)/);
+    assert.match(entry('scoping'), /Not when: The gap is knowledge to gather[^\n]*\(`research`\); only the solution shape is open \(`design`\)/);
+    assert.match(entry('spike'), /Not when: The gap is broader understanding \(`research`\)/);
+    assert.match(entry('retrospective-audit'), /Not when: The work has not merged \(`review`\)/);
   });
 
-  test('discriminators are additive — only the tagged kinds emit them (back-compatible)', () => {
-    const hints = formatAIHintsForMetaPrompt();
-    // LIN-2261 added retrospective-audit as a fourth tagged kind (disambiguating it from review/retro).
-    assert.strictEqual((hints.match(/When NOT:/g) || []).length, 4, 'exactly design/scoping/spike/retrospective-audit emit When NOT');
-    assert.strictEqual((hints.match(/Choose over:/g) || []).length, 4, 'exactly design/scoping/spike/retrospective-audit emit Choose over');
-    // core kinds still render their situation/goal/workflow untouched
-    assert.ok(/\*\*research\*\*/.test(hints) && /\*\*review\*\*/.test(hints), 'core kinds still present');
+  test('every selectable stage says when it is next and when it is not', () => {
+    const options = formatStageOptions();
+    const n = actionNames().length;
+    assert.strictEqual((options.match(/^  When: /gm) || []).length, n, 'one When per stage');
+    assert.strictEqual((options.match(/^  Not when: /gm) || []).length, n, 'one Not when per stage');
   });
 });
 
@@ -2519,16 +2339,16 @@ describe('retrospective-audit template', () => {
   };
   const mockContext = { parent: null, siblings: [], project: null, children: [], comments: [] };
 
-  test('is registered with category UNIVERSAL, an aiHint, and completionSignals', () => {
+  test('is registered with category UNIVERSAL, a route, and completionSignals', () => {
     const template = PROMPT_TEMPLATES['retrospective-audit'];
     assert.ok(template, 'retrospective-audit template must exist');
     assert.strictEqual(template.category, PROMPT_CATEGORIES.UNIVERSAL);
-    assert.ok(template.aiHint, 'must have an aiHint so it is AI-recommendable');
+    assert.ok(template.route, 'must have a route so the selector offers it');
     assert.ok(template.completionSignals, 'must have completionSignals');
   });
 
   test('is part of the AI recommendation vocabulary (unlike retro)', () => {
-    const names = getAIRecommendationActionNames();
+    const names = actionNames();
     assert.ok(names.includes('retrospective-audit'), 'retrospective-audit must be recommendable');
   });
 
@@ -2551,7 +2371,7 @@ describe('retrospective-audit template', () => {
     const result = generatePrompt('retrospective-audit', mockIssue, mockContext);
     assert.ok(/do not change status, labels/i.test(result.prompt), 'must forbid status/label changes');
     assert.ok(/do not merge or mark anything Done/i.test(result.prompt), 'must forbid merge/Done');
-    assert.ok(/do not file follow-up tickets/i.test(result.prompt), 'must forbid filing follow-ups');
+    assert.ok(/file a follow-up ticket, readable on its own, for each finding that still matters/i.test(result.prompt), 'must file follow-ups for findings that matter (LIN-3291)');
   });
 
   test('reports findings as a comment (read-only workflow), not a Linear write beyond the comment', () => {
@@ -2577,7 +2397,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const t = PROMPT_TEMPLATES['close-out'];
     assert.strictEqual(t.name, 'close-out');
     assert.strictEqual(t.category, PROMPT_CATEGORIES.UNIVERSAL);
-    assert.ok(t.aiHint, 'has an aiHint so it is AI-recommendable');
+    assert.ok(t.route, 'has a route so the selector offers it');
     assert.ok(COMPLETION_SIGNALS['close-out'], 'has a registered completion signal');
     assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['close-out'], 'template wires its completion signal');
   });
@@ -2599,8 +2419,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   // Ruling on LIN-2825: scope discharges by done or an explicit drop, never by
   // filing. Extends the LIN-550 ledger gate and the LIN-1871 class-bound
-  // enumeration with an inside/outside mark, on both paths, failing
-  // independently of the plain LIN-550 pins above.
+  // enumeration with an inside/outside mark, failing independently of the plain
+  // LIN-550 pins above.
   describe('scope discharges by done, not by filing (LIN-2825, extending LIN-550 + LIN-1871)', () => {
     test('review marks class-check instances and ledger items inside/outside the ticket\'s bounded classes', () => {
       const { prompt } = generatePrompt('review', issue, context);
@@ -2617,7 +2437,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const { prompt } = generatePrompt('close-out', issue, context);
       assert.ok(/An item marked inside scope.*discharges only by \(a\) cited evidence that it is \*\*done\*\*/is.test(prompt),
         'an inside item discharges by cited evidence of done');
-      assert.ok(/\(b\) an \*\*explicit drop\*\*, warranted only when finishing the item is materially larger than this ticket's own change/i.test(prompt),
+      assert.ok(/\(b\) an \*\*explicit drop\*\*, warranted only when finishing the item is a change you would need to tell the team about first/i.test(prompt),
         'an inside item may also discharge by an explicit drop, gated on the materiality bar');
       assert.ok(/Filing a follow-up ticket for a dropped inside item is NOT a discharge and is never eligible for filing/i.test(prompt),
         'filing a ticket for a dropped inside item is explicitly not a discharge and not eligible for filing');
@@ -2669,9 +2489,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
     test('inside is defined by kind (defect/idiom), not by research\'s enumerated list', () => {
       const review = generatePrompt('review', issue, context).prompt;
-      const kindNotList = /same defect or the same idiom as a class this ticket bounded, whether or not research's enumeration listed it/i;
+      const kindNotList = /its cause included wherever it lives, or the same defect or idiom as a class this ticket bounded, whether or not research\'s enumeration listed it/i;
       assert.ok(kindNotList.test(review), 'review defines inside by kind, not by the research list');
-      assert.ok(/genuinely different kind of problem/i.test(review), 'outside is a genuinely different kind of problem');
+      assert.ok(/a different problem — not this ticket\'s or its cause/i.test(review), 'outside is a different problem, never this ticket\'s cause');
     });
 
     // LIN-3006 review fixup: the kind-not-list rewrite dropped the pre-existing
@@ -2690,7 +2510,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const closeout = generatePrompt('close-out', issue, context).prompt;
       assert.ok(/name the monitor/i.test(review) && /name the rollback/i.test(review), 'review still carries both named lanes');
       assert.ok(/named monitor/i.test(closeout) && /named rollback/i.test(closeout), 'close-out still honours both named lanes');
-      assert.ok(/which are about verification depth, not about whether the work itself is done/i.test(review),
+      assert.ok(/which concern verification depth, not whether the work is done/i.test(review),
         'review states the scope mark is orthogonal to the proportional risk lanes');
     });
   });
@@ -2838,17 +2658,18 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const existingTicketClause = /before filing an outside item.*search the anchor's relations.*GET \/api\/proxy\/issues\/\{id\}\/relations.*GET \/api\/proxy\/search.*if one exists,? link it/is;
     const noReRaiseClause = /before raising a `DECISION:` on a finding.*GET \/api\/proxy\/rulings\?issueIdentifier=<anchor>&includeResolved=true.*do not re-raise a finding.*includeResolved.*covers loop-backed rulings only, never a task-bound one/is;
 
-    test('review carries both clauses, immediately after (not before) the LIN-3006 eligibility clause and before Test Quality Check', () => {
+    // LIN-3293: one owner for filing. Review files nothing, so it carries the
+    // no-re-raise check but not the filing check; close-out files the outside
+    // items and runs the existing-ticket check before each.
+    test('review carries the no-re-raise clause after the LIN-3006 eligibility clause, and leaves filing to close-out', () => {
       const review = generatePrompt('review', issue, context).prompt;
       const eligibilityIdx = review.search(/"file" is offered only for an outside item/i);
-      const existingIdx = review.search(existingTicketClause);
       const noReRaiseIdx = review.search(noReRaiseClause);
       const nextSectionIdx = review.indexOf('### Test Quality Check');
       assert.ok(eligibilityIdx > -1, 'sanity: LIN-3006\'s eligibility clause is present');
-      assert.ok(existingIdx > -1, 'the existing-ticket-check clause is present');
-      assert.ok(noReRaiseIdx > -1, 'the no-re-raise clause is present');
-      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx,
-        'both clauses sit after the eligibility clause and before the next section, in order');
+      assert.ok(eligibilityIdx < noReRaiseIdx && noReRaiseIdx < nextSectionIdx, 'the no-re-raise clause sits after the eligibility clause');
+      assert.equal(review.search(existingTicketClause), -1, 'review files nothing, so it has no filing check');
+      assert.match(review, /close-out files it, after checking it does not already exist/);
     });
 
     test('close-out step 8 checks for an existing ticket before filing', () => {
@@ -2878,38 +2699,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       assert.ok(rulingClause.test(closeout), 'close-out still limits ruling options to outside-only filing, unchanged');
     });
 
-    function metaRule(name) {
-      const meta = buildMetaPromptTemplate({
-        issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
-        completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-        aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
-      });
-      return meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith(name));
-    }
-
-    test('meta (5b/5c): the Review-prompts quality rule carries both clauses, immediately after (5a)\'s eligibility sentence and before (6)', () => {
-      const rule = metaRule('- **Review prompts**');
-      assert.ok(rule, 'the Review-prompts quality rule exists');
-      const eligibilityIdx = rule.search(/"file" is offered only for an outside item/i);
-      const existingIdx = rule.search(existingTicketClause);
-      const noReRaiseIdx = rule.search(noReRaiseClause);
-      const nextItemIdx = rule.indexOf('(6) **write a `### What CI Did Not Prove` ledger**');
-      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three markers are present');
-      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < nextItemIdx,
-        'both new sub-items sit after (5a)\'s eligibility sentence and before (6), in order');
-    });
-
-    test('meta (6c/6d): the Close-out quality rule carries both clauses, immediately after (6b)\'s eligibility sentence and before the priority/label instruction', () => {
-      const rule = metaRule('- **Close-out prompts**');
-      assert.ok(rule, 'the Close-out prompts quality rule exists');
-      const eligibilityIdx = rule.search(/"file" is offered only for an outside item/i);
-      const existingIdx = rule.search(existingTicketClause);
-      const noReRaiseIdx = rule.search(noReRaiseClause);
-      const priorityIdx = rule.indexOf('every follow-up ticket filed above must additionally carry a priority');
-      assert.ok(eligibilityIdx > -1 && existingIdx > -1 && noReRaiseIdx > -1, 'all three markers are present');
-      assert.ok(eligibilityIdx < existingIdx && existingIdx < noReRaiseIdx && noReRaiseIdx < priorityIdx,
-        'both new sub-items sit after (6b)\'s eligibility sentence and before the priority/label instruction, in order');
-    });
   });
 
   test('(b) review writes a structured ledger; close-out reads the verdict/gaps without keying on the heading (LIN-810 decoupling)', () => {
@@ -2917,8 +2706,10 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     const closeout = generatePrompt('close-out', issue, context).prompt;
     // Review still emits the structured heading — helpful structure when present.
     assert.ok(review.includes('### What CI Did Not Prove'), 'review writes the ### What CI Did Not Prove ledger');
-    assert.ok(/add a summary comment containing the `### What CI Did Not Prove` ledger/i.test(review),
+    assert.ok(/record it in one summary comment: the ledger/i.test(review),
       'review records the ledger into its summary comment (the carrier)');
+    assert.ok(/Put the ledger under `### What CI Did Not Prove`/.test(review),
+      'the ledger heading is the stage contract\'s (LIN-3292)');
     // Close-out no longer requires that exact string — it reads the verdict and flagged gaps fuzzily.
     assert.ok(!closeout.includes('### What CI Did Not Prove'),
       'close-out does not key on the literal heading (decoupled)');
@@ -2942,8 +2733,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     // 1. gate on the review verdict — an absent ledger under an Approve is treated as empty (LIN-810)
     assert.ok(/Gate on the review verdict/i.test(prompt),
       'close-out gates on the verdict, treating an absent ledger under an Approve as empty');
-    assert.ok(/treat the absence of such gaps as an empty ledger/i.test(prompt),
-      'an absent ledger under an Approve is read as empty, not a block');
+    assert.ok(/a review with no ledger at all is not empty: hold the close and name `review` next, to confirm empty or missing/i.test(prompt),
+      'a missing ledger under an Approve goes back to review, never read as empty (LIN-3291)');
     // 2. green CI alone never discharges a ledger item
     assert.ok(/Green CI is never evidence for a ledger item/i.test(prompt),
       'green CI never discharges a ledger item');
@@ -2954,7 +2745,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'explicit human acceptance must name the exact precondition');
   });
 
-  test('(f) close-out relaxes the missing-ledger block: verdict-gated, absent-is-empty, only no-verdict routes to review (LIN-810)', () => {
+  test('(f) close-out is verdict-gated; an explicitly empty ledger passes, a missing one goes back to review (LIN-810, LIN-3291)', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     // The old hard block on a missing/unparseable heading is gone.
     assert.ok(!/Missing or unparseable ledger BLOCKS/i.test(prompt),
@@ -2964,8 +2755,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     // Gate on the verdict; absence of flagged gaps under an Approve is an empty ledger.
     assert.ok(/When the latest review records an \*\*Approve\*\*/i.test(prompt),
       'proceeds when the review recorded an Approve');
-    assert.ok(/note that in your summary/i.test(prompt),
-      'records the absence of an explicit ledger in the summary');
+    assert.ok(/An explicitly empty ledger passes through \(say so in your summary\)/i.test(prompt),
+      'an explicitly empty ledger passes and is recorded in the summary');
     // Only a complete lack of a review verdict is unauthorized to close.
     assert.ok(/no review verdict at all is unauthorized to close/i.test(prompt),
       'only a task with no review verdict at all routes back to review');
@@ -3002,16 +2793,9 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.strictEqual(withUi, base, 'close-out must be byte-identical for Linear');
   });
 
-  test('(meta) both paths render close-out: routing offers it after review approval (Step 0 + Step 3 + priority line)', () => {
-    const baseArgs = {
-      issueContext: 'CTX', identifier: 'LIN-901', hasComments: true, commentCount: 2,
-      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
-    };
-    const step0 = buildMetaPromptTemplate({ ...baseArgs, hasSubtasks: true, subtaskCount: 2, completedCount: 2, inProgressCount: 0, remainingCount: 0, isTerminal: true, hasOpenChildren: false });
-    assert.ok(/recommend `close-out`, NOT another `review`/i.test(step0), 'Step 0 offers close-out after approval');
-    assert.ok(/then `close-out` once review has approved/i.test(step0), 'priority line sequences review→close-out');
-    const step3 = buildMetaPromptTemplate({ ...baseArgs, hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0, isTerminal: false, hasOpenChildren: false });
-    assert.ok(/Recommend `close-out` — the ledger-gated finish/i.test(step3), 'Step 3 landed-guard offers close-out after approval');
+  test('(meta) the selector offers close-out after a code review approves', () => {
+    assert.match(selectorRule(2), /`close-out`/);
+    assert.match(formatStageOptions(), /- `close-out`: [^\n]*\n  When: The latest code review approved/);
   });
 
   // ===========================================================================
@@ -3059,11 +2843,12 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
 
   test('(g5) the stub must preserve the session-fit phrase or Implementation Plan heading verbatim', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
-    assert.ok(/retain, word for word, the committed session-fit phrase/i.test(prompt),
+    // Carried by the stage contract (LIN-3292), appended by code after the brief.
+    assert.ok(/keep word for word any `Implementation Plan` heading/i.test(prompt),
       'the marker-preservation mandate is explicit and verbatim');
     assert.ok(/fits one session.*needs multiple sessions/.test(prompt), 'both session-fit phrases are named');
-    assert.ok(/`Implementation Plan` heading/.test(prompt), 'the Implementation Plan heading alternative is named');
-    assert.ok(/Two other deterministic readers key on exactly these literals/i.test(prompt),
+    assert.ok(/any `plan-review due:` line/.test(prompt), 'LIN-3296: the plan-review gate marker survives the prune');
+    assert.ok(/code reads them there/i.test(prompt),
       'the prompt explains WHY the literals matter, so an implementer does not "clean up" the wording');
   });
 
@@ -3075,14 +2860,13 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the prune step explicitly excludes the cannot-close / stays-open branches');
   });
 
-  test('(g7) comments stay untouched by policy — the prune is a description-only edit, and the existing comment-edit route is named for corrections', () => {
+  test('(g7) comments stay untouched by policy — the prune is a description-only edit', () => {
     const { prompt } = generatePrompt('close-out', issue, context);
     assert.ok(/Comments are untouched by policy/i.test(prompt),
       'comments are explicitly out of scope for the prune, stated as a policy choice rather than a capability gap');
     assert.ok(/the prune is a description edit only/i.test(prompt), 'the policy distinction is preserved');
-    assert.ok(/adds no new capability/i.test(prompt), 'the prune uses only existing write surfaces');
-    assert.ok(/PATCH \/api\/proxy\/issues\/:issueId\/comments\/:commentId/i.test(prompt),
-      'the existing comment-edit route is named, acknowledging it exists for corrections');
+    assert.ok(/using the existing write surface/i.test(prompt), 'the prune uses only existing write surfaces');
+    // The comment-edit route aside was a note for rule authors, not the agent (LIN-3293 dedup).
   });
 
   test('(g8) close-out still emits no literal "Linear" with the archive+prune section included (LIN-177 parity)', () => {
@@ -3110,47 +2894,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       'the branch names the post-merge/Done discriminator — this is what distinguishes it from the pre-merge gate');
   });
 
-  test('(meta g10) the Close-out quality rule also carries the archive+prune step and its never-prune/marker guardrails', () => {
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
-    });
-    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
-    assert.ok(rule, 'the Close-out prompts quality rule exists');
-    assert.ok(/archive a pre-prune snapshot/i.test(rule), 'meta rule requires archiving before pruning');
-    assert.ok(/verify the archive landed/i.test(rule), 'meta rule requires verifying the archive before editing');
-    assert.ok(/NEVER prune the original problem statement, acceptance criteria, reproduction steps, or scope/i.test(rule),
-      'meta rule carries the same never-prune carve-out');
-    assert.ok(/"fits one session" \/ "needs multiple sessions"\) and\/or an "Implementation Plan" heading/i.test(rule),
-      'meta rule carries the same marker-preservation mandate');
-    assert.ok(/runs only on the all-clear path, never on a cannot-close branch/i.test(rule),
-      'meta rule scopes the step to the all-clear path only');
-  });
-
-  test('(meta g11) the Close-out quality rule also carries the skip-and-close failure branch, sited at the archive-verification clause', () => {
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
-    });
-    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
-    assert.ok(rule, 'the Close-out prompts quality rule exists');
-    const verifyAt = rule.search(/verify the archive landed/i);
-    const failureAt = rule.search(/if that verification fails, do not prune/i);
-    const pruneAt = rule.search(/otherwise rewrite the description removing embedded stage-artifact sections/i);
-    assert.ok(verifyAt > -1 && failureAt > -1 && pruneAt > -1, 'all three clauses are present');
-    assert.ok(verifyAt < failureAt && failureAt < pruneAt,
-      'the failure branch sits between verification and the prune rewrite, mirroring the handwritten siting');
-    assert.ok(/record in the summary that the archive could not be confirmed and the prune was skipped/i.test(rule),
-      'meta rule requires recording the skip in the summary');
-    assert.ok(/close the task anyway, since the merge and Done transition have already landed/i.test(rule),
-      'meta rule names the post-merge/Done discriminator and closes anyway');
-    assert.ok(/never holding open, re-routing, or reopening a task whose merge and Done have landed/i.test(rule),
-      'meta rule carries the same hold-open/re-route/reopen prohibition');
-    assert.ok(rule.split('\n').length === 1 || !rule.includes('\n'),
-      'the Close-out prompts rule stays a single line, since tests extract it by its line prefix');
-  });
 
   test('(g12) coreOutcome and readinessCheck carry the "(or the skip recorded)" wording together — never readinessCheck alone', () => {
     const sig = COMPLETION_SIGNALS['close-out'];
@@ -3165,7 +2908,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
   });
 
   // ===========================================================================
-  // Catalog/aiHint text pinned to the template body's step ordering (LIN-1773)
+  // Catalog text pinned to the template body's step ordering (LIN-1773)
   // ===========================================================================
 
   test('(h1) sanity: the On All-Clear body itself states merge→done→summary→archive→prune→follow-up in order', () => {
@@ -3180,7 +2923,8 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     }
   });
 
-  test('(h2) description, aiHint.goal, and aiHint.workflow name every irreversible-set step in the body\'s order', () => {
+  // LIN-3300: aiHint.goal and aiHint.workflow (two more copies) are gone; the description stays.
+  test('(h2) the description names every irreversible-set step in the body\'s order', () => {
     const keywords = ['merge', 'done', 'summary', 'archive', 'prune', 'follow-up'];
     const assertOrdered = (text, label) => {
       const lower = text.toLowerCase();
@@ -3193,8 +2937,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     };
     const t = PROMPT_TEMPLATES['close-out'];
     assertOrdered(t.description, 'close-out.description');
-    assertOrdered(t.aiHint.goal, 'close-out.aiHint.goal');
-    assertOrdered(t.aiHint.workflow, 'close-out.aiHint.workflow');
   });
 
   // ===========================================================================
@@ -3237,8 +2979,6 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.ok(/best-effort, never blocking/i.test(prompt), 'triage is explicitly best-effort, never blocking');
     assert.ok(/record a one-line note on the ticket saying so instead of retrying or failing the close/i.test(prompt),
       'degrades to a stated note rather than retrying or failing the close');
-    assert.ok(/does not change which follow-ups get filed or expand close-out's authority/i.test(prompt),
-      'metadata-only — does not widen close-out\'s mandate');
   });
 
   test('(i5) the workflow list and the All-Clear list both point filers at Follow-up Triage', () => {
@@ -3277,58 +3017,23 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
     assert.strictEqual(withUi, base, 'close-out must stay byte-identical for Linear with Follow-up Triage included');
   });
 
-  test('(meta i9) the Close-out quality rule also requires a priority and a type label on every filed follow-up', () => {
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-901', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'review, close-out, implementation', completionSignals: 'S'
-    });
-    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Close-out prompts**'));
-    assert.ok(rule, 'the Close-out prompts quality rule exists');
-    assert.ok(/every follow-up ticket filed above must additionally carry a priority and a type label/i.test(rule),
-      'meta rule requires priority + type label on every filed follow-up');
-    assert.ok(/derive the priority from the finding's own risk/i.test(rule), 'meta rule derives priority from risk');
-    assert.ok(/setting it via the provider-neutral `priorityLevel`.*never a hand-invented numeric scale/i.test(rule),
-      'meta rule forbids a hand-invented numeric scale');
-    // Field-scoped, not phrase-locked (LIN-2315): a paraphrase that still names the
-    // native field (e.g. "or `priority`, the provider-native equivalent") fails this
-    // even though it doesn't match the literal phrase the old assertion keyed on.
-    assert.deepStrictEqual(namedPriorityFields(rule), ['priorityLevel'],
-      'the Close-out prompts rule names exactly priorityLevel as a priority-family field — its scale is inverted on the native field (LIN-2311), so naming that field there under any wording is the hazard');
-    assert.ok(/GET \/api\/proxy\/labels/.test(rule), 'meta rule sources labels from the workspace catalog');
-    assert.ok(/say so explicitly on the ticket rather than inventing one/i.test(rule),
-      'meta rule requires an explicit note instead of inventing a label');
-    assert.ok(/best-effort — when a provider silently drops priority on write, or offers no usable label catalog, record a one-line note/i.test(rule),
-      'meta rule degrades best-effort to a stated note');
-    assert.ok(/this adds metadata only and does not change which follow-ups get filed/i.test(rule),
-      'meta rule stays metadata-only, does not widen close-out\'s mandate');
-    assert.ok(rule.split('\n').length === 1 || !rule.includes('\n'),
-      'the Close-out prompts rule stays a single line, since tests extract it by its line prefix');
-  });
 });
 
 // =============================================================================
-// plan-review template: registration + the seven checks in BOTH paths
+// plan-review template: registration + the seven checks
 // (LIN-1602; 7th check — source-of-truth re-grounding — added by LIN-1859)
 //
-// The acceptance criterion is that the seven checks are present AND ORDERED in
-// both prompt paths, so the assertions below anchor on CONTENT, never on list
-// numbering. Two traps make numbering useless here:
-//   1. The rendered body opens with formatReadOnlyWorkflow's own `1./2./3.`
-//      list, ABOVE the checks — a bare `^\d\. \*\*` scan anchors on that and
-//      proves nothing. Every ordering assertion is therefore scoped to the
-//      `### The Seven Checks` section.
-//   2. The two paths number differently — the template emits `1.`…`7.` as
-//      separate lines, the meta-prompt rule numbers `(1)`…`(7)` inline inside a
-//      single bullet — so no shared numbering regex can span both. Each path is
-//      sliced to its own region and checked separately against shared anchors.
-// The anchors are case- and hyphen-tolerant because the two paths legitimately
-// differ in casing (`Prerequisite refactor` vs `prerequisite-refactor`).
+// The acceptance criterion is that the seven checks are present AND ORDERED, so
+// the assertions below anchor on CONTENT, never on list numbering: the rendered
+// body opens with formatReadOnlyWorkflow's own `1./2./3.` list, ABOVE the checks —
+// a bare `^\d\. \*\*` scan anchors on that and proves nothing. Every ordering
+// assertion is therefore scoped to the `### The Seven Checks` section. The anchors
+// are case- and hyphen-tolerant.
 // =============================================================================
 
 import { formatReadOnlyWorkflow, formatDiscussionReference } from '../../lib/prompt-formatters.js';
 
-describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-1859)', () => {
+describe('plan-review template + the seven checks (LIN-1602 / LIN-1859)', () => {
   const issue = {
     id: 'pr-1', identifier: 'LIN-903', title: 'Verify the plan',
     description: 'a plan', url: 'https://linear.app/test/issue/LIN-903',
@@ -3365,7 +3070,7 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
     // `→ **name**` and _DISPATCH_KIND_BY_ALIAS maps it back (the close-out precedent).
     assert.strictEqual(t.name, 'plan-review');
     assert.strictEqual(t.category, PROMPT_CATEGORIES.UNIVERSAL);
-    assert.ok(t.aiHint, 'has an aiHint so it is AI-recommendable');
+    assert.ok(t.route, 'has a route so the selector offers it');
     assert.ok(COMPLETION_SIGNALS['plan-review'], 'has a registered completion signal');
     assert.strictEqual(t.completionSignals, COMPLETION_SIGNALS['plan-review'], 'template wires its completion signal');
   });
@@ -3383,48 +3088,18 @@ describe('plan-review template + the seven checks in both paths (LIN-1602 / LIN-
     assertSevenChecksOrdered(section, 'handwritten');
   });
 
-  test('(b) meta path: the Plan-review quality rule carries the same seven checks in the same order', () => {
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-903', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'plan, plan-review, implementation', completionSignals: 'S'
-    });
-    const rules = meta.split('\n').filter(l => l.startsWith('- **'));
-    const ruleIdx = rules.findIndex(r => r.startsWith('- **Plan-review prompts**'));
-    assert.ok(ruleIdx > -1, 'the meta-prompt carries a Plan-review quality rule');
-    // S2 placement: in the plan/breakdown quality-rule block, immediately after
-    // the Plan-prompts rule. LIN-3049 inserted the Breakdown-prompts rule between
-    // them (an approved two-path addition), so Plan-review is now two slots down
-    // but stays adjacent to the plan-family rules — which is the property S2 pins.
-    const planIdx = rules.findIndex(r => r.startsWith('- **Plan prompts**'));
-    const breakdownIdx = rules.findIndex(r => r.startsWith('- **Breakdown prompts**'));
-    assert.strictEqual(breakdownIdx, planIdx + 1, 'the Breakdown-prompts rule sits between Plan and Plan-review');
-    assert.strictEqual(ruleIdx, planIdx + 2, 'the Plan-review rule stays adjacent to the plan-family rules');
-    // Trap 2: scoped to the single bullet, so the template's line numbering is irrelevant.
-    assertSevenChecksOrdered(rules[ruleIdx], 'meta');
-  });
 
-  test('(c) both paths carry the verdict vocabulary and the verify-don\'t-redesign, write-only stance', () => {
+  test('(c) the prompt carries the verdict vocabulary and the verify-don\'t-redesign, write-only stance', () => {
     const { prompt } = generatePrompt('plan-review', issue, context);
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-903', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'plan, plan-review, implementation', completionSignals: 'S'
-    });
-    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan-review prompts**'));
-    for (const [pathName, text] of [['handwritten', prompt], ['meta', rule]]) {
-      assert.ok(/Approve/.test(text) && /Request Changes/.test(text) && /Needs Discussion/.test(text),
-        `${pathName}: carries the Approve / Request Changes / Needs Discussion vocabulary`);
-      assert.ok(/second planner/i.test(text), `${pathName}: forbids becoming a second planner`);
-      assert.ok(/do not add requirements/i.test(text), `${pathName}: verifies against the plan's own claims`);
-      assert.ok(/claims verified; proceed to implementation/i.test(text),
-        `${pathName}: cheap-when-clean line`);
-    }
+    // LIN-3299: verify-don't-redesign is a Scope and Authority line, which code adds.
+    assert.ok(/Verify, do not redesign: another reasonable approach is not a finding/.test(prompt));
+    assert.ok(/Approve/.test(prompt) && /Request Changes/.test(prompt) && /Needs Discussion/.test(prompt),
+      'carries the Approve / Request Changes / Needs Discussion vocabulary');
+    assert.ok(/against its own claims, adding no requirements of (your|its) own/i.test(prompt), 'verifies against the plan\'s own claims');
+    assert.ok(/claims verified; proceed to implementation/i.test(prompt), 'cheap-when-clean line');
     // Write-only: no plan edits, no implementing, no follow-ups filed.
     assert.ok(/You do NOT edit the plan, do NOT implement any part of it, and do NOT file follow-up tickets/i.test(prompt),
-      'handwritten: plan-review is write-only');
-    assert.ok(/no edits to the plan, no implementing, and no follow-up tickets filed/i.test(rule),
-      'meta: plan-review is write-only');
+      'plan-review is write-only');
   });
 
   test('(d) plan-review uses the shared read-only workflow (verify → comment, no status write)', () => {
@@ -3492,13 +3167,15 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
     assert.ok(/\*\*\(b\)\*\* Strategy Framing names a routed-around contract gap/.test(p), 'criterion (b)');
     assert.ok(/\*\*\(c\)\*\* Any step in the plan relaxes a validation, a contract, or a guard/.test(p), 'criterion (c)');
     assert.ok(/\*\*\(d\)\*\* The plan touches credential, merge-rule, or dispatch-contract surfaces/.test(p), 'criterion (d)');
-    assert.ok(/"plan-review due: yes" or "plan-review due: no", naming which of \(a\)–\(d\) fired/.test(p),
-      'the decision must be recorded in the description, in the form the router reads');
+    assert.ok(/Record the decision in the issue description, naming which of \(a\)–\(d\) fired/.test(p),
+      'the decision must be recorded in the description');
+    assert.ok(/`plan-review due: yes` or `plan-review due: no`/.test(p),
+      'in the form the router reads, carried by the stage contract (LIN-3292)');
   });
 
   test('the gate is sited AFTER the session-fit answer — criterion (a) reads it', () => {
     const p = plan();
-    const sessionFit = p.indexOf('phrased as either "fits one session" or "needs multiple sessions."');
+    const sessionFit = p.indexOf('Document the answer in the issue description alongside the plan.');
     const gate = p.indexOf('### Plan-review Gate');
     assert.ok(sessionFit > -1 && gate > -1, 'both landmarks must be present');
     assert.ok(sessionFit < gate,
@@ -3541,8 +3218,8 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
     // Without this the header has two consumers (the close-out exclusions and the
     // plan's revision half) and no producer.
     const { prompt } = generatePrompt('plan-review', issue, context);
-    assert.ok(/add a comment headed \`### Plan Review Verdict\`/.test(prompt),
-      'plan-review must head its verdict comment with the disambiguator');
+    assert.ok(/one comment that starts with \`### Plan Review Verdict\`/.test(prompt),
+      'plan-review must head its verdict comment with the disambiguator (the stage contract, LIN-3292)');
     assert.ok(/an Approve here must never be mistaken for authorization to close the task out/.test(prompt),
       'the template must say why the header exists — the close-out confusion it prevents');
   });
@@ -3584,21 +3261,6 @@ describe('plan-review gate + revision half in the plan template (LIN-1603)', () 
       'the replace instruction sits inside the revision section, before Strategy Framing');
   });
 
-  test('(meta h4) the Plan-prompts quality rule also carries replace-not-append revision semantics', () => {
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-904', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'plan, plan-review, implementation', completionSignals: 'S'
-    });
-    const rule = meta.split('\n').filter(l => l.startsWith('- **')).find(r => r.startsWith('- **Plan prompts**'));
-    assert.ok(rule, 'the Plan prompts quality rule exists');
-    assert.ok(/The revision REPLACES the plan section already in the description/.test(rule),
-      'meta rule states the replace-not-append contract');
-    assert.ok(/rather than leaving the superseded plan in place beside it/.test(rule),
-      'meta rule forbids leaving the superseded plan in place');
-    assert.ok(/retaining only a short changelog line/.test(rule),
-      'meta rule mirrors the short-changelog instruction');
-  });
 
   test('the gate did not disturb the pre-existing plan apparatus', () => {
     // Regression guard: two additive sections were spliced into the middle of this
@@ -3659,7 +3321,7 @@ describe('ledger proportionality for low-risk changes (LIN-898)', () => {
     const closeout = generatePrompt('close-out', issue, context).prompt;
     assert.ok(/Proportional to risk class — low-risk post-merge-observation discharge/i.test(closeout),
       'close-out has the low-risk discharge path');
-    assert.ok(/that routing to normal post-merge observation .* IS its discharge under \(a\)/is.test(closeout),
+    assert.ok(/that routing to normal post-merge observation.* IS its discharge under \(a\)/is.test(closeout),
       'the routing itself is the discharge under option (a)');
     assert.ok(/without a pre-merge human sign-off ceremony/i.test(closeout),
       'no pre-merge human sign-off ceremony for a low-risk item');
@@ -3688,19 +3350,6 @@ describe('ledger proportionality for low-risk changes (LIN-898)', () => {
       'risky-surface claims stay hard gate items in the review authoring rule');
   });
 
-  test('BOTH PATHS: the meta-prompt mirrors the proportional lane in Review and Close-out rules', () => {
-    const p = buildMetaPromptTemplate(metaArgs);
-    // Review rule mirror.
-    assert.ok(/make each item PROPORTIONAL to the change's risk class/i.test(p),
-      'meta Review rule carries the proportionality principle');
-    assert.ok(/keying the lane on the risk surface not LOC \/ t-shirt size \/ literal file type/i.test(p),
-      'meta Review rule keys the lane on the risk surface, not LOC / size / file type');
-    // Close-out rule mirror (clause 3a) + retained floors in the meta path.
-    assert.ok(/honour review's PROPORTIONAL lane/i.test(p),
-      'meta Close-out rule honours the proportional lane');
-    assert.ok(/does NOT relax the two floors \(green CI still never discharges; a risky item still needs cited evidence or a human naming the exact precondition — never the reviewer's own self-assessment\)/i.test(p),
-      'meta Close-out rule keeps the two hard floors intact');
-  });
 
   test('completion signals stay coherent with the proportional lane', () => {
     const sig = COMPLETION_SIGNALS['close-out'];
@@ -3842,26 +3491,6 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
       'every claim CI does not exercise is still enumerated');
   });
 
-  test('(6) BOTH PATHS: the meta-prompt mirrors both named lanes and the close-on-merge rule', () => {
-    const p = buildMetaPromptTemplate(metaArgs);
-    // Review rule mirror.
-    assert.ok(/NAMING is the price of both lanes and an unnamed monitor or an unnamed rollback does not get either/i.test(p),
-      'meta Review rule makes naming the price of both lanes');
-    assert.ok(/\(i\) \*\*name the monitor\*\*/.test(p), 'meta Review rule carries the named-monitor lane');
-    assert.ok(/\(ii\) \*\*name the rollback\*\*/.test(p), 'meta Review rule carries the named-rollback lane');
-    assert.ok(/data-path, security, and external-contract surfaces are NOT widened into this lane/i.test(p),
-      'meta Review rule keeps the three surfaces out of the lane');
-    // Close-out rule mirror (clause 3a).
-    assert.ok(/two NAMED routes carry the same weight/i.test(p),
-      'meta Close-out rule accepts both named routes');
-    assert.ok(/an UNNAMED monitor or an UNNAMED rollback does NOT get the lane/i.test(p),
-      'meta Close-out rule refuses an unnamed discharge');
-    // Close-out rule mirror (clause 6 — close on merge).
-    assert.ok(/verify the change on the landed commit as this session's last step/i.test(p),
-      'meta Close-out rule verifies on the landed commit');
-    assert.ok(/close the bookkeeping on merge rather than holding the task open for a separate verification pass/i.test(p),
-      'meta Close-out rule closes bookkeeping on merge');
-  });
 
   test('(7) completion signals stay coherent with the named lanes and close-on-merge', () => {
     const sig = COMPLETION_SIGNALS['close-out'];
@@ -3876,31 +3505,12 @@ describe('named-discharge lanes and close-on-merge (LIN-1579)', () => {
   });
 });
 
-describe('meta-prompt Step 2: bug already investigated (LIN-366)', () => {
-  const baseArgs = {
-    issueContext: 'CTX', identifier: 'LIN-900',
-    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-    hasComments: true, commentCount: 2, aiHints: 'H', actionVocabulary: 'plan, implementation, review, bug',
-    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-  };
-
-  test('Step 2 carries the "already investigated → advance to the fix" escape hatch', () => {
-    const p = buildMetaPromptTemplate(baseArgs);
-    assert.ok(/already been investigated/i.test(p), 'the bug-investigated escape hatch must be present');
-    assert.ok(/do NOT loop research/i.test(p), 'it must explicitly forbid looping research');
-    assert.ok(/Recommend `?implementation`?/i.test(p), 'it must route a done investigation to implementation');
-  });
-
-  test('it ties the decision to the bug completion signal, not just the label', () => {
-    const p = buildMetaPromptTemplate(baseArgs);
-    assert.ok(/completion signal/i.test(p), 'the escape hatch references the bug completion signal');
-    assert.ok(/label.*(alone|mere presence) is NOT a reason/i.test(p),
-      'the label alone must not be treated as a reason to re-investigate');
-  });
-
-  test('with comments present, it directs the model to read them', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, hasComments: true, commentCount: 3 });
-    assert.ok(/There are 3 comment\(s\) — read them/i.test(p), 'comment-count phrasing must surface when comments exist');
+describe('selector rule 5: bug already investigated (LIN-366)', () => {
+  test('a cause that still stands goes to the fix; the label alone is not a reason to re-investigate', () => {
+    assert.match(selectorRule(5), /a cause that stands goes to its fix, `plan` if the fix spans surfaces/);
+    assert.match(selectorRule(5), /never re-investigate a confirmed one/);
+    const bug = formatStageOptions().split('\n- `').find(e => e.startsWith('bug`'));
+    assert.match(bug, /The `bug` label alone does not mean investigation is owed/);
   });
 });
 
@@ -3916,32 +3526,14 @@ describe('FRONTIER FACTS fact-surfacing (LIN-433)', () => {
     nextChild: 'LIN-428',
     sessionFit: 'fits one session'
   };
-  const baseArgs = {
-    issueContext: 'CTX', identifier: 'LIN-385',
-    hasSubtasks: true, subtaskCount: 4, completedCount: 1, inProgressCount: 0, remainingCount: 3,
-    hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, implementation, review, breakdown, defer',
-    completionSignals: 'S', focusedSubtaskId: 'LIN-428', isTerminal: false, hasOpenChildren: true
-  };
 
-  test('meta-prompt renders the deterministic block when frontierFacts is supplied', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, frontierFacts });
-    assert.ok(/FRONTIER FACTS \(deterministic/i.test(p), 'the block header must be present');
-    assert.ok(/Open children: 3 \(1 blocked, 2 actionable\)/.test(p), 'open/blocked/actionable counts surface');
+  test('the selector renders the node facts from frontierFacts, and none for a leaf', () => {
+    const p = formatNodeFactsBlock({ completedCount: 1, inProgressCount: 0, remainingCount: 3, frontierFacts }, 4);
+    assert.ok(/- Subtasks: 4 \(1 done, 0 in progress, 3 remaining\)/.test(p), 'counts surface');
     assert.ok(/LIN-401 \[blocked\]/.test(p) && /LIN-428 \[actionable\]/.test(p), 'per-child blocker status surfaces');
-    assert.ok(/Frontier next child[^\n]*: LIN-428/.test(p), 'the frontier next child surfaces');
-    assert.ok(/Plan session-fit answer: fits one session/.test(p), 'the extracted session-fit hint surfaces');
-  });
-
-  test('meta-prompt omits the block when frontierFacts is absent (Linear-parity default)', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, frontierFacts: null });
-    assert.ok(!/FRONTIER FACTS/.test(p), 'no block without frontierFacts (the parity default)');
-  });
-
-  test('SUGGESTED NEXT prose advertises the frontier picker, not the stale priority order', () => {
-    const p = buildMetaPromptTemplate({ ...baseArgs, frontierFacts });
-    assert.ok(/Blocked children are skipped/i.test(p), 'prose names the skip-blocked behavior');
-    assert.ok(/unblocks-most then critical-path/i.test(p), 'prose names the frontier ranking');
-    assert.ok(!/first non-blocked todo > first incomplete/i.test(p), 'the stale priority wording is gone');
+    assert.ok(/Frontier next child \(skip-blocked, unblocks-most\/critical-path ranked\): LIN-428/.test(p), 'the frontier next child and its ranking surface');
+    assert.ok(/Session fit stated in the plan: fits one session/.test(p), 'the extracted session-fit hint surfaces');
+    assert.equal(formatNodeFactsBlock({ frontierFacts: null }, 0), '', 'no block for a leaf');
   });
 
   test('handwritten path mirrors the same facts via formatSubtaskSummary', () => {
@@ -3998,16 +3590,74 @@ describe('capability-aware prompts: non-Linear providers (LIN-177 S4/S5)', () =>
     assert.ok(!/^\*\*Existing Subtasks:\*\*/m.test(p), 'subtask section dropped');
   });
 
-  test('meta-prompt read-only provider: renamed tracker + read-only workflow note', () => {
-    const meta = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'GH-7', hasSubtasks: false, subtaskCount: 0,
-      completedCount: 0, inProgressCount: 0, remainingCount: 0, hasComments: false, commentCount: 0,
-      aiHints: 'H', actionVocabulary: 'plan, implement', completionSignals: 'S',
-      providerUi: { write: false, comments: false, estimates: false, subtasks: false, displayName: 'Docs' }
+  test('routing prompt, read-only provider: no hardcoded Linear', () => {
+    const meta = selectorPrompt({ write: false, comments: false, estimates: false, subtasks: false, displayName: 'Docs' });
+    assert.ok(!meta.includes('Linear'), 'no hardcoded Linear in the routing prompt');
+  });
+});
+
+// LIN-3296 (B): the subtask strip ended a multi-line "**Subtasks:**" block at the next
+// blank line, but templates build their lines with `.filter(Boolean)` (the '' spacers are
+// gone), so no blank line followed the block and the strip ate everything after it —
+// the whole `## Goal` section for `context`. Latent only because the GitHub providers
+// return no hierarchy today.
+describe('subtask strip removes only the subtask list (LIN-3296)', () => {
+  const issue = {
+    identifier: 'GH-7', title: 'Sample', description: 'd',
+    state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-01-01T00:00:00.000Z', labels: []
+  };
+  const ctx = (children) => ({ project: { name: 'P' }, parent: null, siblings: [], children, comments: [] });
+  const children = [
+    { identifier: 'GH-8', title: 'Child one', state: { name: 'Todo', type: 'unstarted' } },
+    { identifier: 'GH-9', title: 'Child two', state: { name: 'In Progress', type: 'started' } }
+  ];
+  const ui = { write: true, comments: true, estimates: true, subtasks: false, displayName: 'GitHub' };
+
+  // context/plan/implementation/look-into render "**Subtasks:**"; breakdown renders
+  // "**Existing Subtasks:**".
+  for (const template of ['context', 'plan', 'implementation', 'look-into', 'breakdown']) {
+    test(`${template}: subtask lines are removed and the following sections survive`, () => {
+      const withChildren = generatePrompt(template, { ...issue, labels: [template] }, ctx(children), {}, ui).prompt;
+      const withoutChildren = generatePrompt(template, { ...issue, labels: [template] }, ctx([]), {}, ui).prompt;
+      assert.ok(!/^\*\*(Existing Subtasks|Subtasks):\*\*/m.test(withChildren), 'subtask header removed');
+      assert.ok(!/GH-8|GH-9/.test(withChildren), 'subtask list lines removed');
+      assert.ok(withChildren.includes('## Goal'), '## Goal survives the strip');
+      // Structural: nothing of the no-children prompt is lost — its lines appear, in
+      // order, in the stripped prompt. (Not strict equality: a template may add
+      // child-conditional prose of its own, and the inline summary leaves its trailing
+      // blank line, neither of which is the strip's concern.)
+      const kept = withChildren.split('\n');
+      let at = 0;
+      for (const line of withoutChildren.split('\n')) {
+        const found = kept.indexOf(line, at);
+        assert.ok(found !== -1, `line lost by the strip: ${JSON.stringify(line.slice(0, 80))}`);
+        at = found + 1;
+      }
     });
-    assert.ok(!meta.includes('Linear'), 'no hardcoded Linear in the meta-prompt');
-    assert.ok(meta.includes('Docs task'), 'tracker renamed to displayName');
-    assert.ok(meta.includes('read-only'), 'read-only workflow note present');
+  }
+
+  test('context: a provider without subtasks sees exactly the no-children prompt', () => {
+    const withChildren = generatePrompt('context', { ...issue, labels: ['context'] }, ctx(children), {}, ui).prompt;
+    const withoutChildren = generatePrompt('context', { ...issue, labels: ['context'] }, ctx([]), {}, ui).prompt;
+    assert.strictEqual(withChildren, withoutChildren);
+  });
+
+  test('a provider that keeps subtasks still renders the list unchanged', () => {
+    const keep = { ...ui, subtasks: true };
+    const p = generatePrompt('context', { ...issue, labels: ['context'] }, ctx(children), {}, keep).prompt;
+    assert.ok(p.includes('**Subtasks:**\n- GH-8: "Child one" (Todo)\n- GH-9: "Child two" (In Progress)\n'));
+  });
+
+  test('the strip stops at the first non-list line, blank line or not', () => {
+    const caps = { write: true, subtasks: false, displayName: 'Linear', includeTracker: true, fixedStates: null };
+    const prompt = [
+      '**Subtasks:**', '- GH-8: "Child one" (Todo)', '- GH-9: "Child two" (In Progress)',
+      '**Labels:** x', '## Goal', '- keep this bullet'
+    ].join('\n');
+    assert.strictEqual(applyPromptCapabilities(prompt, caps), '**Labels:** x\n## Goal\n- keep this bullet');
+    // Inline forms are still dropped line-by-line, as before.
+    const inline = '**Subtasks:** 0/2 done → Next: GH-8\n**Frontier facts:** 2 open\nafter';
+    assert.strictEqual(applyPromptCapabilities(inline, caps), 'after');
   });
 });
 
@@ -4036,14 +3686,11 @@ describe('applyPromptCapabilities is a no-op for the Linear floor (LIN-177 S4)',
 });
 
 // =============================================================================
-// Cross-path grounding parity (LIN-435: ONE source of truth for the
-// deterministic re-grounding rules). The handwritten path (generatePrompt) and
-// the AI meta-prompt path (applyGroundingToRecommendation) must append
-// byte-identical grounding sections from the same appendGroundingSections seam,
-// so the rules can never drift between paths (the broken meta staleness date is
-// the defect this kills).
+// Grounding is one seam (LIN-435: ONE source of truth for the deterministic
+// re-grounding rules): finishStagePrompt appends appendGroundingSections after the
+// stage contract, so a routed recommendation and a pinned stage carry the same text.
 // =============================================================================
-describe('cross-path grounding parity (LIN-435)', () => {
+describe('grounding is one seam (LIN-435)', () => {
   const issue = {
     identifier: 'LIN-700', title: 'T', description: 'd',
     state: { name: 'Todo', type: 'unstarted' },
@@ -4051,43 +3698,32 @@ describe('cross-path grounding parity (LIN-435)', () => {
   };
   const context = { children: [], comments: [] };
 
-  test('handwritten and meta paths append byte-identical grounding sections', () => {
+  test('the stage prompt ends with the contract, then the shared grounding sections', () => {
     const grounding = appendGroundingSections('', issue, context);
     assert.ok(grounding.length > 0, 'fixture produces a non-empty grounding (staleness is unconditional)');
-
-    // Handwritten path: generatePrompt ends with exactly these grounding sections
-    // (the capability post-pass is a no-op for Linear and for grounding text).
     const hw = generatePrompt('implementation', issue, context).prompt;
-    assert.ok(hw.endsWith(grounding), 'handwritten prompt ends with the shared grounding sections');
-
-    // Meta path: the post-pass appends the identical grounding to the LLM body.
-    const meta = applyGroundingToRecommendation(
-      { reasoning: 'r', prompt: 'BODY', truncated: false, recommendedAction: 'implement', deferTo: null, completionTokens: 1 },
-      issue, context
-    );
-    assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path appends the identical grounding');
+    assert.ok(hw.endsWith(grounding), 'the prompt ends with the shared grounding sections');
+    const contract = formatStageContract('implementation', issue.identifier);
+    assert.ok(hw.includes(contract + grounding), 'the stage contract, then the grounding (LIN-3292)');
   });
 
   test('staleness --since date is injected deterministically from issue.createdAt (no placeholder)', () => {
-    const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, issue, context);
-    assert.ok(
-      meta.prompt.includes('git log --since="2026-03-01T00:00:00.000Z"'),
-      'the real createdAt is substituted into --since'
-    );
-    assert.ok(
-      !/\[ticket created date\]|<the ticket's Created date>/.test(meta.prompt),
-      'no meta-prompt placeholder leaks into the grounded prompt'
-    );
+    const prompt = generatePrompt('implementation', issue, context).prompt;
+    assert.ok(prompt.includes('git log --since="2026-03-01T00:00:00.000Z"'), 'the real createdAt is substituted into --since');
+    assert.ok(!/\[ticket created date\]|<the ticket's Created date>/.test(prompt), 'no placeholder leaks into the grounded prompt');
   });
 
-  test('defer replies (prompt:null) get NO grounding — the no-body cost contract (LIN-327/328)', () => {
-    const deferReply = { reasoning: 'r', prompt: null, truncated: false, recommendedAction: 'defer', deferTo: 'LIN-2', completionTokens: 1 };
-    const out = applyGroundingToRecommendation(deferReply, issue, context);
-    assert.strictEqual(out.prompt, null, 'a defer body stays null');
-    assert.deepStrictEqual(out, deferReply, 'a defer reply is returned unchanged');
+  // LIN-3299: a research run adopted a ticket's prescribed limit ("leave this file
+  // unchanged") as its own. The one hypothesis sentence covers the ticket's proposed fix
+  // as well as its account of the code.
+  test('the hypothesis sentence covers the ticket\'s proposed fix', () => {
+    const sentence = appendGroundingSections('', issue, context).split('\n').find(l => l.startsWith('Treat this ticket'));
+    assert.match(sentence, /\*\*hypothesis\*\*/);
+    assert.match(sentence, /any solution or limit it proposes/);
+    assert.ok(generatePrompt('research', issue, context).prompt.includes(sentence));
   });
 
-  test('terminal-state + bug-investigated sections also match across paths', () => {
+  test('terminal-state + bug-investigated sections reach the implementation prompt', () => {
     const terminalBug = {
       identifier: 'LIN-701', title: 'T', description: 'd',
       state: { name: 'Done', type: 'completed' },
@@ -4097,20 +3733,87 @@ describe('cross-path grounding parity (LIN-435)', () => {
     const grounding = appendGroundingSections('', terminalBug, ctx);
     assert.ok(/Task Already Complete/.test(grounding), 'terminal-state note present in the shared grounding');
     assert.ok(/Prior Investigation On Record/.test(grounding), 'bug-investigated note present in the shared grounding');
-
-    const meta = applyGroundingToRecommendation({ prompt: 'BODY' }, terminalBug, ctx);
-    assert.strictEqual(meta.prompt, 'BODY' + grounding, 'meta path matches for the terminal+bug case too');
+    assert.ok(generatePrompt('implementation', terminalBug, ctx).prompt.endsWith(appendGroundingSections('', terminalBug, ctx, 'implementation')));
   });
 });
 
 // =============================================================================
-// Cross-path Attachments section parity (LIN-772). The handwritten path
-// (generatePrompt post-pass) and the AI meta-prompt path (formatIssueContext
-// context block) must emit the SAME formatAttachmentsSection output, so a worker
-// sees an identical attachment set regardless of surface. Attachment-less issues
-// must stay byte-identical on both paths (the section self-gates to '').
+// Grounding notes are chosen per stage (LIN-3296). appendGroundingSections used
+// to append every note to every template, so a look-back on a Done ticket was told
+// to "close out", triage to re-ground code it never reads, and the bug
+// investigation to "move to implementing the fix". The expected matrix below is
+// the spec, written independently of the table in lib/prompt-formatters.js:
+// S staleness, T terminal-state, C all-subtasks-complete, B bug-investigated.
 // =============================================================================
-describe('cross-path Attachments section parity (LIN-772)', () => {
+describe('grounding notes chosen per stage (LIN-3296)', () => {
+  const EXPECTED = {
+    implementation: 'STCB',
+    blocked: 'STC', bug: 'STC', plan: 'STC', breakdown: 'STC', research: 'STC',
+    scoping: 'STC', design: 'STC', spike: 'STC', 'plan-review': 'STC',
+    review: 'STC', 'close-out': 'STC',
+    'look-into': 'S', context: 'S',
+    'retrospective-audit': 'S', retro: 'S',
+    triage: ''
+  };
+  const HEADINGS = {
+    S: '## Re-ground the Ticket (staleness check)',
+    T: '## Task Already Complete',
+    C: '## All Subtasks Complete',
+    B: "## Prior Investigation On Record — Don't Loop"
+  };
+  const base = {
+    id: 'issue-g', identifier: 'LIN-3296', title: 'Grounding fixture', description: 'Some work',
+    url: 'https://linear.app/test/issue/LIN-3296', createdAt: '2026-03-01T00:00:00.000Z'
+  };
+  const comment = { body: 'Root cause is X; fix is Y', user: 'Dev', createdAt: '2026-03-02T00:00:00.000Z' };
+  // Done bug with a prior comment: triggers S, T and B.
+  const doneBug = {
+    issue: { ...base, state: { name: 'Done', type: 'completed' }, labels: ['bug'] },
+    context: { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [comment] }
+  };
+  // Open parent whose every subtask is Done: triggers S and C.
+  const kidsDone = {
+    issue: { ...base, state: { name: 'In Progress', type: 'started' }, labels: [] },
+    context: {
+      parent: null, siblings: [], project: { name: 'P' }, comments: [],
+      children: [{ identifier: 'LIN-3297', title: 'c', state: { name: 'Done', type: 'completed' } }]
+    }
+  };
+  const present = (prompt, letter) => prompt.includes(HEADINGS[letter]);
+
+  test('the expected matrix covers every template kind (a new stage must choose its notes)', () => {
+    assert.deepStrictEqual(Object.keys(EXPECTED).sort(), Object.keys(PROMPT_TEMPLATES).sort());
+  });
+
+  for (const [kind, want] of Object.entries(EXPECTED)) {
+    test(`${kind}: handwritten path carries exactly ${want || 'no'} grounding notes`, () => {
+      const a = generatePrompt(kind, doneBug.issue, doneBug.context).prompt;
+      const b = generatePrompt(kind, kidsDone.issue, kidsDone.context).prompt;
+      assert.strictEqual(present(a, 'S'), want.includes('S'), `${kind}: staleness`);
+      assert.strictEqual(present(a, 'T'), want.includes('T'), `${kind}: terminal-state on a Done task`);
+      assert.strictEqual(present(a, 'B'), want.includes('B'), `${kind}: bug-investigated on a bug with comments`);
+      assert.strictEqual(present(b, 'C'), want.includes('C'), `${kind}: children-complete on an open parent`);
+    });
+
+  }
+
+  test('an unknown kind keeps every note (custom prompts unchanged)', () => {
+    const all = appendGroundingSections('', doneBug.issue, doneBug.context);
+    for (const letter of 'STB') assert.ok(present(all, letter), `no kind: ${letter} kept`);
+    assert.strictEqual(appendGroundingSections('', doneBug.issue, doneBug.context, 'custom'), all);
+    assert.strictEqual(appendGroundingSections('', doneBug.issue, doneBug.context, 'toString'), all,
+      'an Object.prototype key is not a table row');
+  });
+});
+
+// =============================================================================
+// Attachments section parity (LIN-772). The stage prompt (generatePrompt post-pass)
+// and the router prompt (formatIssueContext context block) must emit the SAME
+// formatAttachmentsSection output, so the router and the worker see an identical
+// attachment set. Attachment-less issues stay byte-identical (the section
+// self-gates to '').
+// =============================================================================
+describe('Attachments section parity, stage and router prompts (LIN-772)', () => {
   const issue = {
     identifier: 'LIN-720', title: 'T', description: 'd',
     state: { name: 'Todo', type: 'unstarted' },
@@ -4123,21 +3826,21 @@ describe('cross-path Attachments section parity (LIN-772)', () => {
   const ctxWith = { children: [], comments: [], attachments };
   const ctxWithout = { children: [], comments: [], attachments: [] };
 
-  test('attachment-less context is byte-identical to no-attachments-field (both paths)', () => {
+  test('attachment-less context is byte-identical to no-attachments-field (stage and router prompts)', () => {
     // Handwritten path: empty attachments must not change the rendered prompt.
     const hwNone = generatePrompt('implementation', issue, { children: [], comments: [] }).prompt;
     const hwEmpty = generatePrompt('implementation', issue, ctxWithout).prompt;
     assert.strictEqual(hwEmpty, hwNone, 'handwritten prompt unchanged by an empty attachments array');
     assert.ok(!hwEmpty.includes('## Attachments'), 'no Attachments section when there is nothing attached');
 
-    // Meta path: the context block is likewise unchanged.
+    // Router prompt: the context block is likewise unchanged.
     const metaNone = formatIssueContext(issue, { children: [], comments: [] });
     const metaEmpty = formatIssueContext(issue, ctxWithout);
     assert.strictEqual(metaEmpty, metaNone, 'meta context block unchanged by an empty attachments array');
     assert.ok(!metaEmpty.includes('## Attachments'), 'no Attachments section in meta context when empty');
   });
 
-  test('both paths embed the byte-identical shared Attachments section when attachments exist', () => {
+  test('stage and router prompts embed the byte-identical shared Attachments section when attachments exist', () => {
     const section = formatAttachmentsSection(ctxWith);
     assert.ok(section.length > 0, 'fixture with attachments produces a non-empty section');
     assert.ok(section.includes('## Attachments'), 'section carries the heading');
@@ -4146,7 +3849,7 @@ describe('cross-path Attachments section parity (LIN-772)', () => {
     const hw = generatePrompt('implementation', issue, ctxWith).prompt;
     assert.ok(hw.includes(section), 'handwritten prompt embeds the shared Attachments section verbatim');
 
-    // Meta path folds the identical section into the context block.
+    // The router prompt folds the identical section into its context block.
     const meta = formatIssueContext(issue, ctxWith);
     assert.ok(meta.includes(section), 'meta context block embeds the identical Attachments section');
   });
@@ -4294,41 +3997,13 @@ describe('plan-fidelity reconciliation + refactor-equivalence (LIN-698)', () => 
     );
   });
 
-  test('meta-prompt mirrors the plan-fidelity + refactor-equivalence directives (both-paths rule)', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-902',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(/reconcile the plan against the research/.test(p), 'meta-prompt must require plan-vs-research reconciliation');
-    assert.ok(/research's reasoning wins/.test(p), 'meta-prompt must give the research priority on conflict');
-    assert.ok(/characterization test/.test(p), 'meta-prompt must require characterizing old behavior for refactor labels');
-  });
 });
 
 // =============================================================================
 // Principle 0 gate + self-sufficient ruling pointer for the worker lane (LIN-2202,
 // the worker-path half of LIN-1732's escalation-discipline rubric). formatIfBlocked()
-// is the single shared seam for both handwritten worker templates (plan,
-// implementation); the meta path has no `## If Blocked` section, so its mirror is a
-// prose clause on the existing Plan-prompts / Implementation-prompts quality rules,
-// same LIN-698 pattern as plan-fidelity above.
+// is the single shared seam for both worker templates (plan, implementation).
 // =============================================================================
-
-// Slices one `- **<label>**` quality-rule bullet out of a generated meta-prompt, up to
-// (not including) the next named bullet. Asserts the match exists with a message naming
-// both bullets, rather than letting a renamed/reordered neighbour bullet turn a missing
-// match into an unguarded `.exec(...)[0]` TypeError on an otherwise unrelated edit.
-function extractQualityRuleBullet(metaPrompt, label, nextLabel) {
-  const pattern = new RegExp(`- \\*\\*${label}\\*\\*[\\s\\S]*?(?=\\n- \\*\\*${nextLabel}\\*\\*)`);
-  const match = pattern.exec(metaPrompt);
-  assert.ok(
-    match,
-    `expected a "**${label}**" quality-rule bullet followed by "**${nextLabel}**" in the generated meta-prompt`
-  );
-  return match[0];
-}
 
 describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
   const mockIssue = {
@@ -4420,38 +4095,11 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
     );
   });
 
-  test('meta-prompt mirrors the Principle 0 gate + manual pointer on both Plan and Implementation quality rules', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-2202',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    const planBullet = extractQualityRuleBullet(p, 'Plan prompts', 'Plan-review prompts');
-    const implBullet = extractQualityRuleBullet(p, 'Implementation prompts', 'Defer replies');
-    for (const [label, bullet] of [['Plan', planBullet], ['Implementation', implBullet]]) {
-      assert.ok(/PENDING-EXTERNAL/.test(bullet), `${label}-prompts bullet must name PENDING-EXTERNAL`);
-      assert.ok(/BLOCKED:/.test(bullet), `${label}-prompts bullet must name BLOCKED:`);
-      assert.ok(
-        bullet.includes('The human\'s edge, and how to hand back'),
-        `${label}-prompts bullet must cite the manual section by name`
-      );
-      assert.ok(
-        bullet.includes('GET /api/proxy/autopilot/manual'),
-        `${label}-prompts bullet must name the portable endpoint pointer`
-      );
-      assert.ok(
-        bullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
-        `${label}-prompts bullet must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)`
-      );
-    }
-  });
 
   // F1/F2 remedy: the `blocked` template (lib/prompt-template-defs.js) is the closest
-  // ungated sibling of the worker-lane rubric this ticket adds, and its meta-path
-  // counterpart — the **Blocked prompts** quality-rule bullet — must carry the same
-  // Principle 0 gate + manual citation, structurally tested on both paths so removing
-  // either directive fails a focused assertion rather than passing silently.
+  // ungated sibling of the worker-lane rubric this ticket adds, so it must carry the
+  // same Principle 0 gate + manual citation, structurally tested so removing either
+  // directive fails a focused assertion rather than passing silently.
   test('the handwritten blocked template also gates the blocker analysis on Principle 0 and cites the manual', () => {
     const result = generatePrompt('blocked', mockIssue, mockContext);
     assert.ok(
@@ -4479,35 +4127,6 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
     );
   });
 
-  test('the meta-path Blocked-prompts quality rule mirrors the same Principle 0 gate + manual pointer', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-2202',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    const blockedBullet = extractQualityRuleBullet(p, 'Blocked prompts', 'Triage prompts');
-    assert.ok(
-      /Principle 0/.test(blockedBullet),
-      'Blocked-prompts bullet must gate the blocker analysis on Principle 0'
-    );
-    assert.ok(
-      /cost of doing nothing/.test(blockedBullet),
-      'Blocked-prompts bullet must name the cost of doing nothing'
-    );
-    assert.ok(
-      blockedBullet.includes('The human\'s edge, and how to hand back'),
-      'Blocked-prompts bullet must cite the manual section by name'
-    );
-    assert.ok(
-      blockedBullet.includes('GET /api/proxy/autopilot/manual'),
-      'Blocked-prompts bullet must name the portable endpoint pointer'
-    );
-    assert.ok(
-      blockedBullet.includes('Does this genuinely require the human, right now — or is it just something the human might like to see?'),
-      'Blocked-prompts bullet must instruct the generated prompt to carry the Principle 0 test sentence itself (LIN-2973)'
-    );
-  });
 });
 
 // =============================================================================
@@ -4515,9 +4134,8 @@ describe('If Blocked / Principle 0 gate + ruling pointer (LIN-2202)', () => {
 // lib/prompt-template-defs.js:127 (the bug/investigate template's witness-validation
 // rule) is scoped to the lane that writes the fewest tests. This extends the same
 // discipline — before trusting a test as the acceptance witness, observe it fail (or
-// run the mutation equivalent) — to guideline 6 of the implementation template and its
-// meta-path mirror, clause (10) of the Implementation-prompts quality rule. Assertions
-// are scoped to the guidelines block / quality-rule bullet and use distinctive
+// run the mutation equivalent) — to guideline 6 of the implementation template.
+// Assertions are scoped to the guidelines block and use distinctive
 // multi-word phrases so a pre-existing `red`/`fail` substring elsewhere in the prompt
 // (CI language) cannot satisfy them (measured false positive: `includes('red')` already
 // passes today via guideline 3's "required").
@@ -4565,30 +4183,6 @@ describe('acceptance-witness discipline for authored tests (LIN-2219)', () => {
     );
   });
 
-  test('meta-prompt Implementation-prompts rule mirrors the acceptance-witness discipline', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-2219',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, review, implement',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    const implBullet = extractQualityRuleBullet(p, 'Implementation prompts', 'Defer replies');
-    assert.ok(/observe it fail/.test(implBullet), 'meta Implementation-prompts bullet must require observing the test fail');
-    assert.ok(
-      /capture the actual failing output/.test(implBullet),
-      'meta Implementation-prompts bullet must require capturing actual failing output'
-    );
-    assert.ok(/mutation equivalent/.test(implBullet), 'meta Implementation-prompts bullet must name the mutation equivalent');
-    assert.ok(!/\bLinear\b/.test(implBullet), 'meta Implementation-prompts bullet must stay tracker-neutral');
-    assert.ok(
-      !implBullet.includes('must be validated or replaced before you optimize against it'),
-      'meta bullet must not restate the bug rule\'s distinctive clause'
-    );
-    assert.ok(
-      !implBullet.includes('can read green while the outcome is still wrong'),
-      'meta bullet must not restate the bug rule\'s distinctive clause'
-    );
-  });
 });
 
 // =============================================================================
@@ -4597,8 +4191,7 @@ describe('acceptance-witness discipline for authored tests (LIN-2219)', () => {
 // explicitly, and hard-stop + escalate (recommend `blocked`) on an unperceivable
 // one — closing the gap where the shared Attachments section (LIN-772) only says
 // "read any that are relevant." Scoped to research/plan/review only, wired inline
-// (never through the universal appendGroundingSections seam), mirrored in the
-// meta-prompt's Research/Plan/Review quality rules.
+// (never through the universal appendGroundingSections seam).
 // =============================================================================
 describe('attachment perception discipline (LIN-872)', () => {
   const attachments = [
@@ -4676,21 +4269,6 @@ describe('attachment perception discipline (LIN-872)', () => {
     );
   });
 
-  test('meta-prompt mirrors the attachment-perception discipline for research, plan, and review', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-903',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'research, plan, review',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false
-    });
-    assert.ok(/perceiving EVERY one of them/.test(p), 'meta-prompt must require perceiving every attachment');
-    assert.ok(
-      /referring collectively to "the attachments"/.test(p),
-      'meta-prompt must require explicit enumeration, not a collective reference'
-    );
-    assert.ok(/recommend `blocked`/.test(p), 'meta-prompt must pin the blocked escalation for an unperceivable attachment');
-    assert.ok(/side-by-side/.test(p), 'meta-prompt review rule must require viewing spec and result side-by-side');
-  });
 });
 
 // =============================================================================
@@ -4742,10 +4320,6 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
   test('implementation/review/close-out CI mentions are conditional, not a bare unconditional gate', () => {
     const review = generatePrompt('review', issue, context).prompt;
     const closeout = generatePrompt('close-out', issue, context).prompt;
-    assert.ok(
-      /CI green \(or, in a repo with no CI, the established-absence substitute recorded\)/.test(PROMPT_TEMPLATES['implementation'].aiHint.goal),
-      'implementation aiHint goal is conditional'
-    );
     assert.ok(/or, if CI is genuinely absent, that the substitute above has been independently re-run and recorded/.test(review),
       'review\'s pre-Approve CI confirmation is conditional');
     assert.ok(/or CI is genuinely absent and the substitute has been re-run and recorded on it/.test(closeout),
@@ -4758,8 +4332,8 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
       'review readinessCheck no longer routes CI-absence to a closure blocker');
     assert.ok(review.signals.some(s => /genuinely absent and the two-branch substitute recorded/.test(s)),
       'review signals name the no-CI substitute');
-    assert.ok(review.signals.some(s => /CI genuinely absent with no substitute recorded, or a blocker surfaced/.test(s)),
-      'review signals route an unrecorded no-CI substitute to the closure blocker, same as CI-red');
+    assert.ok(review.signals.some(s => /CI genuinely absent with no substitute recorded, or a bigger problem surfaced/.test(s)),
+      'review signals route an unrecorded no-CI substitute the same way as CI-red');
   });
 
   test('completion signals: close-out signal accepts the recorded substitute alongside green CI', () => {
@@ -4770,36 +4344,7 @@ describe('capability-gated CI/checks directive (LIN-1455)', () => {
       'the never-discharges-a-ledger-item parenthetical is preserved verbatim');
   });
 
-  test('meta-prompt mirrors the conditional CI gate in all three stage rules and the close-out routing clause', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-1455',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'implementation, review, close-out',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: true, hasOpenChildren: false
-    });
-    assert.ok(/if CI is genuinely absent, say so explicitly and run the substitute/.test(p),
-      'meta-prompt implementation rule is conditional');
-    assert.ok(/reviewer independently RE-RAN the substitute/.test(p),
-      'meta-prompt review rule requires an independent re-run');
-    assert.ok(/CI is genuinely absent and the substitute is recorded on it/.test(p),
-      'meta-prompt close-out rule is conditional');
-    assert.ok(/the close can only proceed when CI is green \(or CI is genuinely absent and the two-branch substitute has been run and recorded\)/.test(p),
-      'meta-prompt close-out routing clause (Step 0 Cannot-close branch) is conditional');
-    assert.ok(/never a Monitor armed on a check set not observed to exist/.test(p),
-      'meta-prompt close-out rule forbids arming a watch on an unobserved check set');
-  });
 
-  test('meta-prompt CI/CD flag-gated block also names the no-CI substitute', () => {
-    const p = buildMetaPromptTemplate({
-      issueContext: 'CTX', identifier: 'LIN-1455',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'implementation',
-      completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false,
-      featureFlags: { codeReview: true, codeReviewCicd: true }
-    });
-    assert.ok(/If the repo has no CI configured, say so explicitly and run the local-suite substitute/.test(p),
-      'flag-gated CI/CD block is conditional');
-  });
 });
 
 // =============================================================================
@@ -4850,34 +4395,6 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
         'it must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
       assert.ok(/If no such Approve is on record on this ticket's own trail/.test(section),
         'it must state the no-Approve fallback');
-      assert.ok(/this ticket's own comment trail/.test(PROMPT_TEMPLATES.breakdown.aiHint.goal),
-        'the breakdown aiHint goal must name the same precondition');
-      assert.ok(/this ticket's own comment trail/.test(formatAIHintsForMetaPrompt()),
-        'the rendered aiHints must carry the precondition too (two-path parity)');
-      // R3: pin the aiHint precondition target AND its no-Approve fallback so the
-      // AI path cannot silently regress to "the Parent Task's comment trail" (M4) or
-      // lose the plain-acceptance-criteria fallback (M3).
-      const goal = PROMPT_TEMPLATES.breakdown.aiHint.goal;
-      assert.ok(/Only if this ticket's own comment trail/.test(goal),
-        'R3: the aiHint precondition must target this ticket\'s own comment trail');
-      assert.ok(/never its own rendered 'Parent Task' section/.test(goal),
-        'R3: the aiHint must exclude the rendered Parent Task section (the F4 wrong-ticket trap)');
-      assert.ok(/If no such Approve verdict is on this ticket's own comment trail, write a plain acceptance-criteria subtask instead — no session-fit line, no plan-review-due line\./.test(goal),
-        'R3: the aiHint must carry the no-Approve plain-acceptance-criteria fallback with no false session-fit/plan-review-due markers');
-      // R5: the aiHint workflow carries its own copy of the own-trail precondition
-      // and the plain fallback; formatAIHintsForMetaPrompt renders it beside the
-      // goal, so a regression to "the Parent Task's comment trail" here would put
-      // the F4 wrong-ticket instruction in the AI router's own hint while the goal
-      // stays correct and every other test stays green (M4w/M4w2).
-      const workflow = PROMPT_TEMPLATES.breakdown.aiHint.workflow;
-      assert.ok(/Check this ticket's own comment trail for a recorded `### Plan Review Verdict` of Approve/.test(workflow),
-        'R5: the aiHint workflow must check this ticket\'s own comment trail for an Approve verdict, not the Parent Task');
-      assert.ok(/otherwise write a plain acceptance-criteria subtask/.test(workflow),
-        'R5: the aiHint workflow must retain its plain acceptance-criteria fallback when no Approve verdict exists');
-      // R6: the goal must not copy a false `fits one session` onto a surface the
-      // approved plan itself could not scope to one session.
-      assert.ok(/or, for a surface the plan itself could not scope to one session, omit the false claim/.test(goal),
-        'R6: the aiHint goal must require omitting a false session-fit claim when the plan could not scope the surface to one session');
     });
   }
 
@@ -4888,7 +4405,7 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const b = section.indexOf('(b) `Session fit: fits one session`');
     const c = section.indexOf('(c) `Plan-review due: no');
     const d = section.indexOf('(d) The grounding commit SHA(s)');
-    const e = section.indexOf('(e) An explicit "the parent\'s plan is the source of truth');
+    const e = section.indexOf('(e) A line saying the parent\'s approved plan is this surface\'s starting point');
     assert.ok(a > -1 && b > -1 && c > -1 && d > -1 && e > -1, 'all five approved-path bullets must be present');
     assert.ok(a < b && b < c && c < d && d < e, 'the five bullets must appear in (a)-(e) order');
     // N2: bullet (c) names this ticket's own approving verdict, not the parent's.
@@ -4915,8 +4432,8 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     // R4: the focused, per-surface acceptance-criteria guidance must survive as the
     // fallback's description wording (it was deleted, leaving the precondition pointing
     // at wording that no longer existed).
-    assert.ok(/Description with acceptance criteria for just this surface — the parent task carries the full scope and sibling context flows in at runtime, so keep the description focused on this surface alone/.test(section),
-      'R4: the no-Approve fallback must restore the focused per-surface acceptance-criteria guidance');
+    assert.ok(/Description with acceptance criteria for this surface — the child sees its parent only as a title, so say where the parent's scope and design can be read/.test(section),
+      'R4: the no-Approve fallback must keep the per-surface acceptance-criteria guidance (LIN-3296: and point the child at the parent it cannot see)');
     assert.ok(/none of bullets \(a\)–\(e\) below apply, and the subtask is expected to route through `research`\/`plan` normally/.test(section),
       'the fallback must withhold every approved-path bullet, (a) the plan slice included');
   });
@@ -4925,5 +4442,174 @@ describe('breakdown template subtask-description mandate (LIN-3049)', () => {
     const base = generatePrompt('breakdown', baseIssue, baseContext, {}).prompt;
     const withUi = generatePrompt('breakdown', baseIssue, baseContext, {}, { ...DEFAULT_PROMPT_UI }).prompt;
     assert.strictEqual(withUi, base, 'the new breakdown content must remain byte-identical for Linear');
+  });
+});
+
+// =============================================================================
+// The stage contract (LIN-3292) is appended by code, once, between the body and
+// the grounding, and is said nowhere else in the prompt.
+// =============================================================================
+describe('the stage contract (LIN-3292)', () => {
+  const issue = {
+    id: 'issue-c', identifier: 'LIN-3292', title: 'Contract fixture', description: 'd',
+    url: 'https://linear.app/test/issue/LIN-3292', createdAt: '2026-03-01T00:00:00.000Z',
+    state: { name: 'In Progress', type: 'started' }, labels: []
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+  const HEADING = '## Formats Later Steps Read';
+  const count = (text, needle) => text.split(needle).length - 1;
+
+  for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+    test(`${kind}: the contract appears exactly once, after the body`, () => {
+      const contract = formatStageContract(kind, issue.identifier);
+      const hw = generatePrompt(kind, issue, context).prompt;
+      const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});
+      assert.ok(hw.startsWith(withStageIntent(body, kind) + contract), `${kind}: body (with its scope lines, LIN-3299) + contract + …`);
+      assert.strictEqual(count(hw, HEADING), contract ? 1 : 0);
+    });
+  }
+
+  test('each format the contract carries is said once: the body no longer asks for it', () => {
+    const formats = {
+      plan: ['## Implementation Plan', 'plan-review due: yes'],
+      'plan-review': ['### Plan Review Verdict'],
+      review: ['ledger empty', `## Review — ${issue.identifier}`],
+      'close-out': ['plan-review due:', `## Close-out — ${issue.identifier}`]
+    };
+    for (const [kind, needles] of Object.entries(formats)) {
+      const body = PROMPT_TEMPLATES[kind].generate(issue, context, {});
+      const contract = formatStageContract(kind, issue.identifier);
+      for (const needle of needles) {
+        assert.ok(contract.includes(needle), `${kind}: the contract carries ${needle}`);
+        assert.ok(!body.includes(needle), `${kind}: the body no longer asks for ${needle}`);
+      }
+    }
+  });
+
+  test('a read-only tracker gets no contract', () => {
+    const ui = { write: false, subtasks: false, displayName: 'Jira', fixedStates: false };
+    assert.ok(!generatePrompt('review', issue, context, {}, ui).prompt.includes(HEADING));
+  });
+});
+
+// =============================================================================
+// A finished task's notes fit the stage routing sent it to (LIN-3292). Review
+// authorizes the close and does not perform it; in-scope findings are never filed
+// as follow-ups; and a work stage sent a Done task (to fix red CI, say) is told to
+// fix that, not that the work is complete and should be closed out.
+// =============================================================================
+describe('finished-task notes ask what their stage does (LIN-3292)', () => {
+  const base = {
+    id: 'issue-f', identifier: 'LIN-3292', title: 'Finished fixture', description: 'work',
+    url: 'https://linear.app/test/issue/LIN-3292', createdAt: '2026-03-01T00:00:00.000Z', labels: []
+  };
+  const done = { issue: { ...base, state: { name: 'Done', type: 'completed' } }, context: { children: [], comments: [] } };
+  const kids = {
+    issue: { ...base, state: { name: 'In Progress', type: 'started' } },
+    context: { children: [{ identifier: 'LIN-1', title: 'c', state: { name: 'Done', type: 'completed' } }], comments: [] }
+  };
+  const WORK_STAGES = ['implementation', 'blocked', 'bug', 'plan', 'breakdown', 'research', 'scoping', 'design', 'spike', 'plan-review'];
+
+  for (const { issue, context } of [done, kids]) {
+    const label = issue.state.type === 'completed' ? 'Done task' : 'open parent, subtasks Done';
+    test(`${label}: no stage is told to file what is missing as a follow-up`, () => {
+      for (const kind of [...WORK_STAGES, 'review', 'close-out']) {
+        const notes = appendGroundingSections('', issue, context, kind);
+        assert.ok(notes.length > 0, `${kind}: a note is present`);
+        assert.ok(!/as a follow-up/i.test(notes), `${kind}: no follow-up filing`);
+      }
+    });
+
+    test(`${label}: review checks and gives a verdict; it does not close`, () => {
+      const notes = appendGroundingSections('', issue, context, 'review');
+      assert.match(notes, /put it in your verdict rather than filing it/);
+      assert.match(notes, /authorizes the close; it does not perform it/);
+      assert.ok(!/close (it )?out/i.test(notes), 'review is not told to close out');
+    });
+
+    test(`${label}: close-out lands it and sends what is missing back to implementation`, () => {
+      const notes = appendGroundingSections('', issue, context, 'close-out');
+      assert.match(notes, /close it out/);
+      assert.match(notes, /back to `implementation` rather than filing it/);
+    });
+
+    // Stage-neutral (LIN-3292 review O2): plan-review is write-only and research, scoping
+    // and design build nothing, so the note asks for this stage's part, not a fix.
+    test(`${label}: a work stage routing sent here does its own part for what is missing`, () => {
+      for (const kind of WORK_STAGES) {
+        const notes = appendGroundingSections('', issue, context, kind);
+        assert.match(notes, /do this stage's part for what is still missing, at its cause/, kind);
+        assert.ok(!/\bfix\b/i.test(notes), `${kind}: not told to fix something its stage may not touch`);
+        assert.ok(!/close (it )?out|verdict/i.test(notes), `${kind}: no close-out or verdict ask`);
+      }
+    });
+
+  }
+});
+
+// =============================================================================
+// LIN-3299: a stage's Goal is its intent, the lead; the process code prints as written
+// follows under ## Process.
+// =============================================================================
+describe('the Goal lead and the Process (LIN-3299)', () => {
+  test('every template leads its Goal with the intent and puts its steps under ## Process', () => {
+    const issue = { identifier: 'LIN-3299', title: 'T', description: 'd', state: { name: 'Todo', type: 'unstarted' }, createdAt: '2026-03-01T00:00:00.000Z', labels: [] };
+    for (const kind of Object.keys(PROMPT_TEMPLATES)) {
+      const { prompt } = generatePrompt(kind, issue, { children: [], comments: [] });
+      assert.ok(prompt.indexOf('## Goal') < prompt.indexOf('## Process'), kind);
+      assert.equal(prompt.split('\n## Process\n').length, 2, `${kind}: one process section`);
+      assert.doesNotMatch(prompt, /\*\*Role\*\*|\bAct as\b/, kind);
+    }
+  });
+
+});
+
+// =============================================================================
+// LIN-3300: the stage rules that lived only in the deleted meta-prompt's writing
+// blocks, moved into the template of the stage they govern. Prompt-writing rules
+// (prompt sizing, skeleton, comment-vs-description guidance) were dropped, not moved.
+// =============================================================================
+describe('stage rules moved from the deleted meta-prompt (LIN-3300)', () => {
+  const issue = {
+    id: 'issue-m', identifier: 'LIN-3300', title: 'Moved-rules fixture', description: 'd',
+    url: 'https://linear.app/test/issue/LIN-3300', createdAt: '2026-03-01T00:00:00.000Z',
+    state: { name: 'In Progress', type: 'started' }, labels: []
+  };
+  const context = { parent: null, siblings: [], project: { name: 'P' }, children: [], comments: [] };
+  const prompt = (kind) => generatePrompt(kind, issue, context).prompt;
+
+  test('implementation tests for unintended side effects, not only intended ones', () => {
+    assert.match(prompt('implementation'), /cover intended effects, unintended side effects, and any interactions the plan flagged/);
+  });
+
+  test('implementation finds a shared system\'s dependents before changing it', () => {
+    assert.match(prompt('implementation'), /Before changing a shared system, find its dependents in the codebase\./);
+  });
+
+  test('plan states how requirements that share a path, state or interface are expected to interact', () => {
+    assert.match(prompt('plan'), /Where requirements share a code path, state, or interface, state how they are expected to interact\./);
+  });
+
+  test('review verifies a visual or behavioural change by running it', () => {
+    assert.match(prompt('review'), /verify the result directly where possible \(run the app, take screenshots, check viewports\)/);
+  });
+
+  test('scoping says when the ticket is aimed at a symptom', () => {
+    const p = prompt('scoping');
+    assert.match(p, /If the ticket is aimed at a symptom of something deeper, say so\./);
+    assert.ok(p.indexOf('aimed at a symptom') > p.indexOf('## Process'), 'in the process, not the lead');
+  });
+
+  test('context says how done work is known and which decisions were overturned', () => {
+    const p = prompt('context');
+    assert.match(p, /\*\*Completed\*\*: What's already done, and how that is known/);
+    assert.match(p, /\*\*Key Decisions\*\*: Important choices made, and any since overturned/);
+  });
+
+  test('close-out of a bug-labelled task keeps the bug label when it sets Done; other tasks are not told', () => {
+    const rule = 'Leave the `bug` label in place: Done marks it resolved';
+    const bug = generatePrompt('close-out', { ...issue, labels: ['Bug'] }, context).prompt;
+    assert.ok(bug.includes(`set the task to Done. ${rule}`), 'beside the Done transition');
+    assert.ok(!prompt('close-out').includes(rule));
   });
 });

@@ -21,18 +21,24 @@ for (const key of Object.keys(templates.PROMPT_TEMPLATES || {})) {
   try { out = templates.generatePrompt(key, issue, context, {}); } catch {}
   rows.push([key, bytes(out?.prompt ?? out)]);
 }
-// The AI path: the meta-prompt a cheap model reads to WRITE the worker prompt, on every recommend-and-dispatch.
+// The AI path: the meta-prompt a cheap model read to WRITE the worker prompt, on every recommend-and-dispatch,
+// until LIN-3300; since then the routing prompt it reads to pick the stage (null where a commit lacks it).
 const mp = await tryImport('lib/prompts/meta-prompt-template.js');
+const sr = await tryImport('lib/stage-router.js');
 const cs = await tryImport('lib/completion-signals.js');
+const or = await tryImport('lib/openrouter.js');
+const routerArgs = {
+  issueContext: '', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
+  remainingCount: 0, hasComments: false, commentCount: 0, aiHints: templates.formatAIHintsForMetaPrompt?.() ?? '',
+  actionVocabulary: templates.getAIRecommendationActionNames?.().join(', '), completionSignals: cs.formatAllSignalsForMetaPrompt?.() ?? '',
+};
 let meta = null;
-try {
-  meta = mp.buildMetaPromptTemplate?.({
-    issueContext: '', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
-    remainingCount: 0, hasComments: false, commentCount: 0, aiHints: templates.formatAIHintsForMetaPrompt?.() ?? '',
-    actionVocabulary: templates.getAIRecommendationActionNames?.().join(', '), completionSignals: cs.formatAllSignalsForMetaPrompt?.() ?? '',
-  });
-} catch {}
+try { meta = mp.buildMetaPromptTemplate?.(routerArgs); } catch {}
 rows.push(['meta-prompt (AI path, per recommendation)', bytes(meta)]);
+let router = null;
+// Since LIN-3300's stage selector the routing prompt takes the selector's args.
+try { router = sr.buildRouterPrompt?.(or.buildSelectorArgs ? or.buildSelectorArgs({ ...issue }, {}) : routerArgs); } catch {}
+rows.push(['routing prompt (per recommendation)', bytes(router)]);
 const ap = await tryImport('lib/prompts/autopilot-kickoff.js');
 let apText = null;
 try { apText = ap.buildAutopilotKickoff?.({ baseUrl: 'http://x', issue }); } catch {}

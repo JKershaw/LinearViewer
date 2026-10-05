@@ -72,6 +72,26 @@ describe('account-workspace-store', () => {
     assert.deepStrictEqual(workspaces, [workspaceId]);
   });
 
+  // LIN-2952: the funnel's "connected" step needs createdAt, which the
+  // listWorkspacesForAccount/listAllEdges shapes deliberately drop.
+  test('listEdgesForAccounts returns the group\'s edges WITH createdAt', async () => {
+    const store = freshStore();
+    const a = randomUUID();
+    const b = randomUUID();
+    const stranger = randomUUID();
+    await store.bindAccountToWorkspace(a, 'ws-a');
+    await store.bindAccountToWorkspace(b, 'ws-b');
+    await store.bindAccountToWorkspace(stranger, 'ws-s');
+
+    const edges = await store.listEdgesForAccounts([a, b]);
+    assert.deepStrictEqual(
+      edges.map(e => [e.accountId, e.workspaceId]).sort(),
+      [[a, 'ws-a'], [b, 'ws-b']].sort()
+    );
+    for (const edge of edges) assert.ok(edge.createdAt instanceof Date, 'createdAt must survive the accessor');
+    assert.deepStrictEqual(await store.listEdgesForAccounts([]), []);
+  });
+
   // A2 - many-to-many direction 1: one account, two workspaces
   test('one account binds to two workspaces', async () => {
     const store = freshStore();

@@ -540,6 +540,49 @@ Response:
   clamped to at least 60 seconds — a shorter window can land entirely inside one
   phase of a periodic fault and read falsely clean.
 
+#### Get Own Credential Trail (LIN-3282)
+
+Read-only view of **this token's own provider-lane credential trail**, newest
+first: the credential **source** and **fingerprint** each of your provider-lane
+calls actually resolved. Use it to attribute an intermittent `401`/`200` toggle
+to a source (`connection`, `session-scan`, `cache`, `refresh-on-resolve`)
+instead of inferring it from status codes. Needs no new grant (same as
+`/credential-health`) and never exposes token bytes — `credentialFingerprint` is
+a one-way 12-hex digest.
+
+```
+GET /api/proxy/credential-trail
+GET /api/proxy/credential-trail?limit=50&windowMs=900000
+```
+
+Response:
+```json
+{
+  "windowMs": 900000,
+  "items": [
+    {
+      "timestamp": "2026-10-03T09:35:00.000Z",
+      "method": "GET",
+      "endpoint": "/api/proxy/issues/:id",
+      "status": 200,
+      "credentialSource": "connection",
+      "credentialFingerprint": "388d2df2db5b"
+    }
+  ]
+}
+```
+
+- Only rows with `stage: "provider-lane"` appear — this endpoint's own reads are
+  `proxy-token`-staged, so they never pollute the window.
+- `endpoint` is the **route pattern** the handler logs (for example
+  `/api/proxy/issues/:id`), never the concrete issue id; `method`
+  disambiguates a `GET` read from a `PATCH` on the same pattern.
+- `credentialSource` is the closed enum `cache` | `session-scan` |
+  `refresh-on-resolve` | `connection`. Rows written before this field existed
+  read `null` — there is no backfill.
+- `limit` defaults to `50` (cap `100`); `windowMs` defaults to `900000`
+  (15 min, cap 86400000). Both are clamped server-side.
+
 #### List Teams
 
 ```
@@ -1631,7 +1674,7 @@ A compact orientation projection: each task drops the full `description` for a d
 GET /api/proxy/issues/{identifier}/prompt/{templateKey}
 ```
 
-Generates a deterministic, template-based prompt for an issue. `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
+Generates a deterministic, template-based prompt for an issue: the same bytes `recommend?kind=` returns for that stage, and the same prompt a routed recommendation assembles when it picks it (one path, LIN-3300). `templateKey` must be a known template (e.g. `work-issue`, `plan`, `code-review`, `triage`, `breakdown`) — an unknown key returns `404`.
 
 ```json
 {
@@ -2356,7 +2399,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 | `repoInherited` | bool | No | Default `false`. Marks `repo` as **inherited** (forwarded from a parent context) rather than user-explicit. When `true`, a cross-project descent's child repo — or the named node's own project `repo=` on a `kind` override — wins over the inherited `repo`; a repo-less child still falls back to it. Leave it off (or `false`) for a deliberately chosen repo, which keeps winning (see below) |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
-| `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated deterministically for the **named issue** with that template (see below) |
+| `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated for the **named issue** with that template (see below) |
 | `sessionId` | string (opaque) | No | The autopilot dispatch id driving this run. Stamp it on every fan-out so the whole multi-task run reconstructs as one session. An **opaque grouping key, not a UUID** (LIN-1118): non-empty, ≤128 chars, no control characters, `__meta__` reserved; existing UUIDs stay valid. Any target; stored and forwarded verbatim. See LIN-591 |
 | `periodicalId` | string | No | The periodical-template join key: the id of a periodicals-registry template (e.g. `documentation-review`) this dispatch was minted from. Stamped once at dispatch time, never maintained, and does **not** propagate to a `followUpTo` beat or a wake. Validated against the live registry — an unknown/typo id is rejected `400`. Stored and forwarded verbatim; inert to execution. Stamped onto whichever `createDispatchItem` call this route resolves to — the verb-override branch (`kind` set) and the recommendation-derived branch (`kind` omitted, the branch autopilot's normal trigger actually takes) both carry it. See LIN-1825/LIN-2385 |
 
@@ -2365,7 +2408,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 **`kind` — pin the verb when the engine is wrong.** The recommendation engine is ~90% right but occasionally picks the wrong step (e.g. refuses to hand you a `review` for a task that is plainly ready for one). Rather than hand-writing the prompt that broken verb would have produced — which violates the server-side-only invariant — pass `kind` to **pin the step**. The server still **writes the body**; you only choose the verb. You pick the verb, never the words.
 
 When `kind` is present the verb:
-- **bypasses the LLM** recommendation and descent entirely (no OpenRouter call, no free-tier charge);
+- **bypasses the LLM** recommendation and descent entirely (no OpenRouter call, no free-tier charge); the body is the same one a routed recommendation assembles for that stage;
 - generates the body for the **named issue with no descent** (the wobble is the verb, not the target);
 - accepts only real prompt-template keys — `plan`, `implementation`, `review`, `research`, `design`, `breakdown`, `look-into`, `triage`, `scoping`, `spike`, `context`, `retro`, `blocked`. Meta-kinds (`defer`, `custom`, `autopilot`, `periodical`) and any unknown key are rejected with `400`, because they have no template body and would dispatch an empty prompt;
 - returns the same headers-only response plus `"override": true`.

@@ -11,15 +11,17 @@
  *   2. incumbent (gpt-5.4-mini) + distilled state         (model-vs-representation control)
  *   3. incumbent (gpt-5.4-mini) + raw state, via the LIVE  getRecommendation()  (the
  *      production incumbent; its cost/latency/prompt come from the graded call's own
- *      recorder hooks — no duplicate rebuild call)
+ *      recorder hooks — no duplicate rebuild call). Since LIN-3300 that is the one path:
+ *      the routing prompt (buildRouterPrompt) and its parse (routeStage); code assembles
+ *      the stage prompt with no further model call.
  *
  * Fixture classes (see the README):
  *   A. scripts/eval/fixtures/*.json                       (7 real frozen)
- *   B. scripts/eval/fixtures/recommend/*.json             (30 targets over 8 files)
+ *   B. scripts/eval/fixtures/recommend/*.json             (54 targets over 10 files)
  *   C. scripts/eval-research-routing.mjs inline CASES[]   (24 inline)
  *   D. scripts/eval/fixtures-widened/*.json               (5 targets: LIN-830 x2, LIN-1084,
  *                                                          breakdown-fork-neg, all-terminal-node)
- *   Total 7 + 30 + 24 + 5 = 66 fixtures.
+ *   Total 7 + 54 + 24 + 5 = 90 fixtures.
  *
  * Grading is deterministic (no LLM judge). Gold overrides are harness-side only; the frozen
  * fixture files are read, never written.
@@ -358,21 +360,29 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
     parent: bundle.parent, siblings: bundle.siblings || [], siblingsTotal: bundle.siblingsTotal || 0,
     project: bundle.project, children: bundle.children || [], comments: bundle.comments || [],
     focusedChild: bundle.focusedChild || null,
+    // The task's recent runs (LIN-3300), passed as the live routes pass them.
+    runs: bundle.runHistory?.runs || [],
   };
   const callMeta = { evalCallId, issueIdentifier: issue.identifier };
   const t0 = performance.now();
-  const rec = await getRecommendation(issue, context, { apiKey: KEY, model: MODEL, featureFlags: {}, callMeta });
+  const rec = await getRecommendation(issue, context, {
+    apiKey: KEY, model: MODEL, featureFlags: {}, callMeta,
+  });
   const wallMs = Math.round(performance.now() - t0);
   const llm = recorders.llm.filter((r) => r.evalCallId === evalCallId);
   const trace = recorders.trace.filter((r) => r.evalCallId === evalCallId);
-  if (llm.length !== 1 || trace.length !== 1) {
-    throw new Error(`recorder correlation failed for ${evalCallId}: llm=${llm.length} trace=${trace.length}`);
+  // LIN-3309: a code-settled route (no reply after the latest verdict) skips the
+  // routing LLM call entirely — 0 llm records, 1 trace — so the correlation check
+  // accepts that shape too instead of failing the run.
+  const expectedLlm = rec.codeRoute ? 0 : 1;
+  if (llm.length !== expectedLlm || trace.length !== 1) {
+    throw new Error(`recorder correlation failed for ${evalCallId}: llm=${llm.length} (expected ${expectedLlm}) trace=${trace.length}`);
   }
   return {
-    action: rec.recommendedAction, deferTo: rec.deferTo || null,
-    latencyMs: llm[0].durationMs ?? wallMs, cost: llm[0].cost ?? null,
-    inputTokens: llm[0].promptTokens ?? null, outputTokens: llm[0].completionTokens ?? null,
-    promptChars: (trace[0].metaPrompt || '').length, servedModel: llm[0].model || null,
+    action: rec.recommendedAction, deferTo: rec.deferTo || null, codeRoute: rec.codeRoute || null,
+    latencyMs: rec.codeRoute ? 0 : (llm[0].durationMs ?? wallMs), cost: rec.codeRoute ? 0 : (llm[0].cost ?? null),
+    inputTokens: rec.codeRoute ? 0 : (llm[0].promptTokens ?? null), outputTokens: rec.codeRoute ? 0 : (llm[0].completionTokens ?? null),
+    promptChars: (trace[0].metaPrompt || '').length, servedModel: rec.codeRoute ? 'code-route' : (llm[0].model || null),
   };
 }
 
@@ -464,8 +474,8 @@ async function main() {
   const armKeys = ['1', '2', '3'].filter((a) => ARMS.includes(a)).map((a) => `arm${a}`);
 
   // Expected total count check (only when unfiltered).
-  if (!ONLY.length && cases.length !== 66) {
-    console.warn(`WARNING: expected 66 fixtures, loaded ${cases.length}`);
+  if (!ONLY.length && cases.length !== 90) {
+    console.warn(`WARNING: expected 90 fixtures, loaded ${cases.length}`);
   }
 
   const recorders = registerRecorders();
@@ -684,7 +694,7 @@ function writeReport(r, corpus, path) {
   L.push('## Heads-up on what each arm measures');
   L.push('- **Arm 1** = Jev choosing over the distilled state (the candidate).');
   L.push('- **Arm 2** = the incumbent (gpt-5.4-mini) choosing over the SAME distilled state — this is the **like-for-like step-one cost/latency comparator**.');
-  L.push('- **Arm 3** = the incumbent over the raw state via the live `getRecommendation()`. Its latency and cost are the **full choose-and-write call** (it generates the whole `## Prompt`), so Jev\'s arm-1 cost is **not** a straight like-for-like replacement for arm 3\'s figure — arm 2 is.');
+  L.push('- **Arm 3** = the incumbent over the raw state via the live `getRecommendation()`. Its latency and cost are the **routing call** (code assembles the stage prompt), so Jev\'s arm-1 cost compares with it directly; arm 2 isolates the representation.');
   L.push('');
   L.push('## Hit rates (per run) and Wilson intervals');
   L.push('| arm | hits/runs | rate | Wilson 95% | loop-repeat | off-gold avoid |');

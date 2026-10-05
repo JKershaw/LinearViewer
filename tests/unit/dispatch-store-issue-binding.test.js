@@ -33,7 +33,10 @@ import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
-// Captured at the pre-change HEAD. Sorted, full key sets.
+// Captured at the pre-change HEAD. Sorted, full key sets. `variant` was added
+// deliberately on merging main: LIN-3248 N2 writes it unconditionally
+// (`?? null`) on every queue row and across the archive hop — main's own key,
+// not this slice's, so the S0 property (the pair adds no key when absent) holds.
 const QUEUE_KEYS_GOLDEN = [
   '_id', 'abort', 'abortTo', 'bootstrapToken', 'cascade', 'consumerLastSeenAt',
   'dispatchedAt', 'dispatchedBy', 'effort', 'expiresAt', 'followUpTo', 'force',
@@ -41,7 +44,7 @@ const QUEUE_KEYS_GOLDEN = [
   'maxSessionsPerTask', 'maxTasks', 'model', 'periodicalId', 'presetConfig',
   'presetName', 'producingItemAttempt', 'producingItemId', 'prompt', 'promptName',
   'queueIfBusy', 'repo', 'rootItemId', 'sessionGroupId', 'sessionId', 'stopAt',
-  'subscription', 'target', 'terminal', 'urlKey', 'waitForFollowUps',
+  'subscription', 'target', 'terminal', 'urlKey', 'variant', 'waitForFollowUps',
 ];
 
 const HISTORY_KEYS_GOLDEN = [
@@ -53,7 +56,7 @@ const HISTORY_KEYS_GOLDEN = [
   'prompt', 'promptName', 'queueIfBusy', 'repo', 'resolvedAt', 'rootItemId',
   'sessionGroupId', 'sessionId', 'status', 'stopAt', 'subscription',
   'takenByTokenId', 'takenByTokenLabel', 'target', 'terminal', 'trimHistory',
-  'urlKey', 'waitForFollowUps',
+  'urlKey', 'variant', 'waitForFollowUps',
 ];
 
 function makeStore() {

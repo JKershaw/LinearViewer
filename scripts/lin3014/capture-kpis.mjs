@@ -54,7 +54,7 @@ export async function captureKpiReads(collectKpiStats) {
     KPI_STATS_COLLECTION_NAMES.map((name) => [name, recordingCollection(name, reads)])
   );
   try {
-    await collectKpiStats(collections);
+    await collectKpiStats(collections, { milestoneFunnelDeps: emptyMilestoneFunnelDeps() });
   } catch {
     // Expected: the recording stubs return empty arrays/0, which downstream
     // aggregation/derivation code may not tolerate. Only the READ SHAPES
@@ -64,6 +64,30 @@ export async function captureKpiReads(collectKpiStats) {
     dispatchHistory: reads.dispatchHistory,
     proxyEvents: reads.proxyEvents,
     reportHistory: reads.reportHistory
+  };
+}
+
+/**
+ * No-op milestone-funnel deps (LIN-2952). The capture records kpi-stats' OWN
+ * reads keyed by collection NAME, so the aggregate must not read through the
+ * recording collection handles — a second `dispatchHistory` read would
+ * overwrite the `$project`-bearing pipeline this script exists to capture.
+ * These stubs return empty and record nothing.
+ */
+function emptyMilestoneFunnelDeps() {
+  const emptyCollection = { find: () => ({ toArray: async () => [] }) };
+  const emptyStore = {
+    collection: emptyCollection,
+    firstPerAccount: async () => [],
+    countByEntryRung: async () => ({ total: 0, byRung: [], coverage: { surfaces: [] } })
+  };
+  return {
+    taskModeStore: emptyStore,
+    accountStore: emptyStore,
+    accountWorkspaceStore: emptyStore,
+    funnelEventStore: emptyStore,
+    dispatchQueue: emptyCollection,
+    dispatchHistory: emptyCollection
   };
 }
 

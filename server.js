@@ -87,6 +87,8 @@ import { SavedChatStore } from './lib/saved-chat-store.js'
 import { RunProposalsStore } from './lib/run-proposals-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { TaskModeStore } from './lib/task-mode-store.js'
+import { FunnelEventStore } from './lib/funnel-event-store.js'
+import { CloseOutEventsStore } from './lib/close-out-events-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
 import { NotImplementedError } from './lib/providers/interface.js'
@@ -119,6 +121,7 @@ import { ShareStore } from './lib/share-store.js'
 import { createReadOwnerIssues } from './lib/share-owner-reader.js'
 import { isTokenRefreshExempt } from './lib/root-route-exemption.js'
 import { createProxyRoutes, commentDedupe, withTimeout } from './routes/proxy.js'
+import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
 import { createWorkspaceApiRoutes, shouldMockAi, decisionStampDedupe } from './routes/workspace-api.js'
@@ -683,10 +686,23 @@ const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collec
 const taskModeEventsCollection = db.collection('task-mode-events')
 const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
 
+// Close-out events (LIN-3248, P3 of LIN-2949): an append-only record of a
+// person's merge or their close-out press. Lifetime-retained, idempotent on
+// urlKey + prUrl + headSha + by (lib/close-out-events-store.js).
+const closeOutEventsStore = new CloseOutEventsStore({ collection: db.collection('close-out-events') })
+
 // Public share links (LIN-3243, Session A of LIN-3073). One store over the
 // `shares` collection; the route is mounted below and receives the store plus
 // the owner-reader/owner-check seams by injection (see lib/share-owner-reader.js).
 const shareStore = new ShareStore({ collection: db.collection('shares') })
+
+// Funnel events (LIN-2952): append-only record of a milestone step a person
+// witnessed per account — today just the merge click LIN-2949 will record.
+// Generic seam, never a dispatch-row stamp, so the funnel reports merge-click
+// as "no signal available" until LIN-2949's close-out calls record(). The route
+// and the KPI aggregate that consume it land in later beats.
+const funnelEventsCollection = db.collection('funnel-events')
+const funnelEventStore = new FunnelEventStore({ collection: funnelEventsCollection })
 
 // Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
 // epic). One current, versioned state document per observer instance, advanced by
@@ -2151,7 +2167,20 @@ async function refreshKpiStats() {
     recapCache: recapCacheCollection,
     briefCache: briefCacheCollection,
     reportHistory: reportHistoryCollection
-  }, { dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb' })
+  }, {
+    dbBackend: process.env.MONGODB_URI ? 'mongodb' : 'mangodb',
+    // LIN-2952: the milestone-funnel aggregate's own deps (stores + the dispatch
+    // collections), passed in OPTIONS so the aggregate never re-reads through
+    // `collections.dispatchHistory`.
+    milestoneFunnelDeps: {
+      taskModeStore,
+      accountStore,
+      accountWorkspaceStore,
+      funnelEventStore,
+      dispatchQueue: dispatchQueueCollection,
+      dispatchHistory: dispatchHistoryCollection
+    }
+  })
   const ms = Date.now() - startedAt
   if (ms > 5000) console.warn(`KPI stats collection slow: ${ms}ms`)
   else console.log(`KPI stats collected in ${ms}ms`)
@@ -2248,6 +2277,7 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
+app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
 // Public share route (LIN-3243). `readOwnerIssues` composes the hardened
 // `resolveWorkspaceAccess(urlKey, ownerAccountId)` (never UNSCOPED) with the
@@ -2866,7 +2896,7 @@ app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, 
 app.use(createRunnerKitRoutes())
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args) }))
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.

@@ -120,6 +120,42 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
   });
 
   /**
+   * GET /api/proxy/credential-trail
+   *
+   * Consumer-lane, token-scoped read-only view of THIS token's own
+   * provider-lane credential trail (LIN-3282). Every row names the credential
+   * source and fingerprint a provider-lane call resolved, newest first, so the
+   * live 401/200 toggle can be attributed to a source (`connection` /
+   * `session-scan` / `cache` / `refresh-on-resolve`) from a proxy token rather
+   * than inferred from status codes. Read-only, needs no new grant (same as
+   * `/credential-health`), and never exposes token bytes — `credentialFingerprint`
+   * is the 12-hex digest from lib/credential-diagnostics.js.
+   *
+   * `endpoint` is the ROUTE PATTERN the handler logs (e.g. `/api/proxy/issues/:id`),
+   * not the concrete issue id; `method` disambiguates a GET read from a PATCH on
+   * the same pattern. Filtered to `stage: 'provider-lane'` rows, so this
+   * endpoint's own reads (staged `proxy-token`) never pollute the window.
+   * `limit` (default 50, cap 100) and `windowMs` (default 15 min, 24 h cap) are
+   * clamped server-side.
+   */
+  router.get('/api/proxy/credential-trail', proxyLimiter, authenticateProxyToken, async (req, res) => {
+    try {
+      const requestedWindowMs = req.query.windowMs !== undefined ? parseInt(req.query.windowMs, 10) : undefined;
+      const requestedLimit = req.query.limit !== undefined ? parseInt(req.query.limit, 10) : undefined;
+      const trail = await proxyEventStore.listSelfCredentialTrail(req.proxyUrlKey, req.proxyTokenId, {
+        windowMs: requestedWindowMs,
+        limit: requestedLimit,
+      });
+      logEvent(req, '/api/proxy/credential-trail', 200);
+      res.json(trail);
+    } catch (err) {
+      logEvent(req, '/api/proxy/credential-trail', 500);
+      console.error('Proxy consumer credential-trail error:', err.message);
+      jsonError(res, 500, 'Failed to read credential trail');
+    }
+  });
+
+  /**
    * GET /api/proxy/teams
    */
   router.get('/api/proxy/teams', proxyLimiter, authenticateProxyToken, async (req, res) => {

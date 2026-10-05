@@ -156,6 +156,59 @@ describe('db-indexes', () => {
     }
   });
 
+  test('declares the funnel-events first-per-account index, not a TTL (LIN-2952)', () => {
+    // FunnelEventStore.firstPerAccount reads {step, accountId} sorted by `at`
+    // oldest first; the `step` prefix also serves the instance-wide aggregate
+    // read. The log is lifetime-retained, so it may not be a TTL.
+    const spec = INDEX_SPECS.find(s =>
+      s.collection === 'funnel-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ step: 1, accountId: 1, at: 1 })
+    );
+    assert.ok(spec, 'funnel-events must have a {step:1, accountId:1, at:1} index');
+    assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
+  });
+
+  test('declares the per-account dispatch indexes on both collections (LIN-2952 + LIN-3238)', () => {
+    // ONE index per collection serves both readers: the milestone funnel reads a
+    // person's dispatches by `dispatchedBy`, earliest `dispatchedAt` first
+    // (lib/milestone-funnel.js, LIN-2952), and countFreshRunsSince range-scans the
+    // UTC day by attribution, queue first then history (LIN-3238). Without it the
+    // read is an unindexed collection scan. Plain, non-TTL.
+    for (const collection of ['dispatch-queue', 'dispatch-history']) {
+      const spec = INDEX_SPECS.find(s =>
+        s.collection === collection &&
+        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
+      );
+      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index`);
+      assert.strictEqual(
+        spec.options?.expireAfterSeconds,
+        undefined,
+        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
+      );
+    }
+  });
+
+  test('declares the close-out-events idempotency and per-task indexes, neither a TTL (LIN-3248)', () => {
+    // The unique key is the record's idempotency contract (urlKey + prUrl +
+    // headSha + by — a press and the person's later merge are distinct); the
+    // per-task key backs listForIssue's oldest-first read. The log is
+    // lifetime-retained, so neither may be a TTL.
+    const unique = INDEX_SPECS.find(s =>
+      s.collection === 'close-out-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, prUrl: 1, headSha: 1, by: 1 })
+    );
+    assert.ok(unique, 'close-out-events must have a {urlKey:1,prUrl:1,headSha:1,by:1} index');
+    assert.deepStrictEqual(unique.options, { unique: true });
+    assert.strictEqual(unique.options?.expireAfterSeconds, undefined);
+
+    const perTask = INDEX_SPECS.find(s =>
+      s.collection === 'close-out-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, issueIdentifier: 1, at: 1 })
+    );
+    assert.ok(perTask, 'close-out-events must have a {urlKey:1,issueIdentifier:1,at:1} index');
+    assert.strictEqual(perTask.options?.expireAfterSeconds, undefined);
+  });
+
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {
     // cleanup() (lib/observer-state-store.js) evicts on last-SEEN, not
     // last-CHANGED — updatedAt only moves on a genuine transition, so an
@@ -223,23 +276,6 @@ describe('db-indexes', () => {
         JSON.stringify(s.keySpec) === JSON.stringify({ urlKey: 1, producingItemId: 1, producingItemAttempt: -1 })
       );
       assert.ok(hasIt, `${collection} must have a {urlKey:1, producingItemId:1, producingItemAttempt:-1} index`);
-    }
-  });
-
-  test('declares the run-count indexes on both dispatch collections (LIN-3238)', () => {
-    // Backs countFreshRunsSince: a per-account attached range scan over the UTC
-    // day, in the queue and (after the archive hop) in history. Plain, non-TTL.
-    for (const collection of ['dispatch-queue', 'dispatch-history']) {
-      const spec = INDEX_SPECS.find(s =>
-        s.collection === collection &&
-        JSON.stringify(s.keySpec) === JSON.stringify({ dispatchedBy: 1, dispatchedAt: 1 })
-      );
-      assert.ok(spec, `${collection} must have a {dispatchedBy:1, dispatchedAt:1} index (LIN-3238)`);
-      assert.strictEqual(
-        spec.options?.expireAfterSeconds,
-        undefined,
-        `${collection} {dispatchedBy:1, dispatchedAt:1} must be a plain index, not a TTL`
-      );
     }
   });
 
@@ -422,6 +458,7 @@ describe('db-indexes', () => {
       s.keySpec.issueIdentifier === undefined;
     const cases = [
       { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listEvents('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('proxy-events') },
+      { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listSelfCredentialTrail('parity-ws', 'parity-token', { limit: 5 }), match: pagedListSpec('proxy-events') },
       { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('prompt-traces') },
       { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('llm-call-log') },
       { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('foreman-status') },

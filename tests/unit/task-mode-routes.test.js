@@ -418,3 +418,57 @@ describe('LIN-2942 — POST and GET /workspace/:urlKey/api/task-mode', () => {
     assert.deepEqual(res.body, { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe', 'home'] } });
   });
 });
+
+/**
+ * LIN-2952 characterization: the exact account set `resolveAccountGroup` hands
+ * to the read. The funnel route (LIN-2952) reuses this same resolution, so the
+ * expansion order/dedup and the throw-narrowing are pinned here before the
+ * funnel route is added. Capture the query on a stub store instead of asserting
+ * through real events, so the set itself — not just its length — is pinned.
+ */
+describe('LIN-2952 characterization — resolveAccountGroup expansion (via the GET route)', () => {
+  function capturingStore() {
+    const captured = {};
+    return {
+      captured,
+      async getTaskMode(query) {
+        captured.query = query;
+        return { entry: null, taken: null, furthest: null, events: [], coverage: { surfaces: ['swipe'] } };
+      }
+    };
+  }
+
+  test('reads the deduplicated {canonical, merged, session} set for one workspace task', async () => {
+    const taskModeStore = capturingStore();
+    const accountStore = {
+      resolveCanonicalAccountId: async (id) => (id === 'stale-session' ? 'canonical' : id),
+      listMergedAccounts: async (id) => (id === 'canonical' ? [{ _id: 'stale-session' }, { _id: 'merged-away' }] : [])
+    };
+    const res = await call(
+      buildTaskModeApp({ taskModeStore, accountStore, session: { accountId: 'stale-session' } }),
+      'get',
+      `${TASK_MODE_PATH}/LIN-42`
+    );
+
+    assert.equal(res.status, 200, res.text);
+    assert.deepEqual(taskModeStore.captured.query.accountIds, ['canonical', 'stale-session', 'merged-away']);
+    assert.equal(taskModeStore.captured.query.urlKey, 'acme');
+    assert.equal(taskModeStore.captured.query.issueIdentifier, 'LIN-42');
+  });
+
+  test('narrows to the session account alone when canonicalization throws', async () => {
+    const taskModeStore = capturingStore();
+    const accountStore = {
+      resolveCanonicalAccountId: async () => { throw new Error('cycle detected'); },
+      listMergedAccounts: async () => [{ _id: 'merged-away' }]
+    };
+    const res = await call(
+      buildTaskModeApp({ taskModeStore, accountStore, session: { accountId: 'stale-session' } }),
+      'get',
+      `${TASK_MODE_PATH}/LIN-42`
+    );
+
+    assert.equal(res.status, 200, res.text);
+    assert.deepEqual(taskModeStore.captured.query.accountIds, ['stale-session']);
+  });
+});

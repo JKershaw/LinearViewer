@@ -83,7 +83,7 @@ const ADD_ITEM_DOC_KEYS = [
   'maxSessionsPerTask', 'maxTasks', 'model', 'periodicalId', 'presetConfig',
   'presetName', 'producingItemAttempt', 'producingItemId', 'prompt', 'promptName',
   'queueIfBusy', 'repo', 'rootItemId', 'sessionGroupId', 'sessionId',
-  'stopAt', 'subscription', 'target', 'terminal', 'urlKey', 'waitForFollowUps'
+  'stopAt', 'subscription', 'target', 'terminal', 'urlKey', 'variant', 'waitForFollowUps'
 ];
 
 const ARCHIVE_HISTORY_DOC_KEYS = [
@@ -96,7 +96,7 @@ const ARCHIVE_HISTORY_DOC_KEYS = [
   'rootItemId', 'sessionGroupId', 'sessionId', 'status', 'stopAt',
   'subscription',
   'takenByTokenId', 'takenByTokenLabel', 'target', 'terminal', 'trimHistory',
-  'urlKey', 'waitForFollowUps'
+  'urlKey', 'variant', 'waitForFollowUps'
 ];
 
 const FORMAT_ITEM_KEYS = [
@@ -106,7 +106,7 @@ const FORMAT_ITEM_KEYS = [
   'kind', 'maxSessionsPerTask', 'maxTasks', 'model', 'periodicalId',
   'presetConfig', 'presetName', 'prompt', 'promptName', 'queueIfBusy', 'repo',
   'rootItemId', 'sessionGroupId', 'sessionId', 'stopAt', 'subscription',
-  'target', 'terminal', 'trimHistory', 'waitForFollowUps', 'workspace'
+  'target', 'terminal', 'trimHistory', 'variant', 'waitForFollowUps', 'workspace'
 ];
 
 const FORMAT_HISTORY_ITEM_KEYS = [
@@ -117,7 +117,7 @@ const FORMAT_HISTORY_ITEM_KEYS = [
   'periodicalId', 'presetConfig', 'presetName', 'prompt', 'promptName',
   'queueIfBusy', 'repo', 'resolvedAt', 'rootItemId', 'sessionGroupId',
   'sessionId', 'status', 'stopAt', 'subscription', 'takenByTokenLabel', 'target',
-  'terminal', 'trimHistory', 'waitForFollowUps'
+  'terminal', 'trimHistory', 'variant', 'waitForFollowUps'
 ];
 
 const DECLARED_ROW_FIELDS = ['grantDeclaration', 'grantRefusal'];

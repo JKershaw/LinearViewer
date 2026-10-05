@@ -216,7 +216,7 @@ test.describe('KPIs page', () => {
     // Each chart box ends up with either a live canvas or a "no data yet"
     // note — never an empty hole.
     const boxes = page.locator('.kpi-chart-box');
-    await expect(boxes).toHaveCount(11);
+    await expect(boxes).toHaveCount(12);
     const count = await boxes.count();
     for (let i = 0; i < count; i++) {
       const box = boxes.nth(i);

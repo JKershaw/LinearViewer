@@ -8,14 +8,14 @@
  * (no LLM judge — deterministic and cheap).
  *
  *   scripts/eval/meta-prompt.baseline.txt   Arm A — faithful snapshot of the LIVE
- *                                           meta-prompt (regenerate when lib changes:
- *                                           see scripts/eval/README or the snapshot note).
+ *                                           routing prompt (regenerate when lib changes:
+ *                                           node scripts/eval/regen-baseline.mjs).
  *   scripts/eval/meta-prompt.candidate.txt  Arm B — the variant under test. Edit the
  *                                           Step-1 research-routing wording HERE.
  *
  * Workflow: iterate candidate.txt → run AB → when Arm B lifts research recall on the
  * LIN-325 gold case WITHOUT raising over-fire on the guard cases, make ONE manual edit
- * to lib/prompts/meta-prompt-template.js (+ the research aiHint, per
+ * to lib/stage-router.js (+ the research aiHint, per
  * docs/architecture/prompt-system.md). The
  * live prompt stays plain text; nothing here is wired into it.
  *
