@@ -2168,6 +2168,7 @@ window.ProxyToggle = (function () {
    * @throws {Error} when (active+enabled OR forced) but no block can be produced
    */
   async function maybeAppend(text, urlKey, opts) {
+    rateLimitSkip = false;
     const force = !!(opts && opts.force);
     if (!force) {
       if (!isActive()) return text;

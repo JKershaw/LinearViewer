@@ -210,4 +210,23 @@ describe('LIN-2944 P3 — the default-copy token mint gets its own higher per-ac
     assert.equal(bStatuses[0], 201,
       `account B must be unaffected by account A's exhausted allowance (got ${bStatuses[0]})`);
   });
+
+  // N1 (review df4ed4dc, mutation MD): the safety claim behind the per-account
+  // allowance is that a default-copy mint with NO session account is NOT
+  // unbounded — it falls through to the per-IP `proxyTokenCreationLimiter`
+  // (routes/proxy.js:283, whose `skip` requires `!!req.session?.accountId`).
+  // Drop that `&& accountId` clause (MD) and this test goes RED: the no-account
+  // default-copy request is skipped by BOTH limiters and the 11th is a 201.
+  test('the 11th no-account default-copy mint from one IP is 429 (per-IP still bounds it)', async () => {
+    const { proxyTokenStore } = harness();
+    const app = buildApp({ proxyTokenStore });
+    const statuses = await postMany(app, 11, DEFAULT_COPY_BODY, null);
+    for (let i = 0; i < 10; i++) {
+      assert.notEqual(statuses[i], 429,
+        `no-account default-copy request ${i + 1} must not be rate-limited yet (statuses ${statuses.join(',')})`);
+    }
+    assert.equal(statuses[10], 429,
+      `the 11th no-account default-copy request must hit the per-IP limit, not mint unbounded ` +
+      `(statuses ${statuses.join(',')})`);
+  });
 });
