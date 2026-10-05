@@ -32,6 +32,20 @@ describe('recentRuns (LIN-3300)', () => {
     ]);
   });
 
+  // A killed run never posts its own terminal marker: the [aborted] lands on the abort
+  // row, linked by abortTo (LIN-1257). Without the harvest it would read running forever.
+  test('a run an abort stopped reads as aborted; a run with no time sorts last', () => {
+    const killed = row('implementation', { id: 'run-1', feedback: [fb('[working] on it', '2026-10-04T15:00:00.000Z')] });
+    const abort = row('implementation', { id: 'abort-1', abort: true, abortTo: 'run-1', feedback: [fb('[aborted] stopped by the operator', '2026-10-04T15:05:00.000Z')] });
+    const undated = row('review', { dispatchedAt: null });
+    assert.deepEqual(recentRuns([undated, abort, killed, done('plan', '2026-10-04T14:00:00.000Z')]), [
+      { stage: 'plan', at: '2026-10-04T14:00:00.000Z', outcome: 'done' },
+      { stage: 'implementation', at: '2026-10-04T15:05:00.000Z', outcome: 'aborted' },
+      { stage: 'review', at: null, outcome: 'running' }
+    ]);
+    assert.equal(recentRuns([killed])[0].outcome, 'running', 'no abort on record: the store says running');
+  });
+
   test('only stage runs that ran count, and only the newest few', () => {
     const notStages = [row('custom'), row('autopilot'), row('wake'), row('plan', { abort: true }),
       row('plan', { status: 'cancelled' }), row('plan', { status: 'expired' })];
@@ -53,6 +67,10 @@ describe('recentRuns (LIN-3300)', () => {
     ]);
     assert.deepEqual(await loadRecentRuns(null, 'acme', 'LIN-1'), []);
     assert.deepEqual(await loadRecentRuns({ listItems: async () => { throw new Error('down'); } }, 'acme', 'LIN-1'), []);
+    const asked = [];
+    const projecting = { listItems: async (u, q) => { asked.push(q.projection); return []; }, listHistory: async (u, q) => { asked.push(q.projection); return { items: [] }; } };
+    await loadRecentRuns(projecting, 'acme', 'LIN-1');
+    assert.deepEqual(asked, [{ prompt: 0 }, { prompt: 0 }], 'prompt bodies are projected out of both reads');
   });
 
   test('no runs, no lines', () => {

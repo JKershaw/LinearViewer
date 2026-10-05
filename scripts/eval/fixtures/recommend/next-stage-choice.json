@@ -726,7 +726,6 @@
       "focusedChild": null
     },
     "NSC-PR-1603-RC1-REV": {
-      "runHistory": {"source": "derived", "runs": [{"stage": "plan-review", "at": "2026-07-23T01:00:00.000Z", "outcome": "done"}]},
       "issue": {
         "id": "NSC-PR-1603-RC1-REV",
         "identifier": "NSC-PR-1603-RC1-REV",

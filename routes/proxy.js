@@ -1625,7 +1625,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // Linear API call + an OpenRouter LLM call.
     const context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
     const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
-    const runs = await loadRecentRuns(dispatchQueueStore, urlKey, issue.identifier);
 
     // Resolve the effective key (free-tier when no session/env key) so both
     // recommend surfaces send a valid key. Metering is NOT done here — this runs
@@ -1643,8 +1642,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     const hop = armHopSignal({ clientSignal, deadline });
     let recommendation;
     try {
+      // The task's recent runs (LIN-3300) are read inside the hop's deadline too.
       recommendation = await fetchWithTimeout(
-        (signal) => getRecommendation(
+        async (signal) => getRecommendation(
           issue,
           // Forward `attachments` (LIN-777) so getRecommendation's routing prompt
           // (formatIssueContext → formatAttachmentsSection) and the stage prompt carry the
@@ -1652,7 +1652,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          { parent, siblings, project, children, comments, focusedChild, attachments, runs },
+          { parent, siblings, project, children, comments, focusedChild, attachments, runs: await loadRecentRuns(dispatchQueueStore, urlKey, issue.identifier) },
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
