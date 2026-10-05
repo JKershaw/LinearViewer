@@ -38,7 +38,9 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { installGitHubProvider, makeTwoRepoWorkspace, REPO_A, REPO_B } from './lin-3126-harness.js';
-import { makeTwoRepoResolver, buildProxyApp, callProxy } from './lin-3126-proxy-harness.js';
+import { makeTwoRepoResolver, makeVmResolver, githubConnection, buildProxyApp, callProxy, CONNECTION_ID, BUFFER, OWNER } from './lin-3126-proxy-harness.js';
+import { createConnectionAccess } from '../../lib/connection-credential.js';
+import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 
 const ISSUE = { promptName: 'implementation', issueIdentifier: 'GB-1' };
 
@@ -417,5 +419,171 @@ describe('LIN-3242 review F2 — kickoff forwards the selector', () => {
     assert.equal(res.status, 422, JSON.stringify(res.body));
     assert.equal(res.body.code, 'UNKNOWN_BINDING');
     assert.equal(captured.item, undefined);
+  });
+});
+
+// ── R2 (re-review): every proxy site persists only a validated, trimmed pair ─
+//
+// The F1 fix was pinned only at `/dispatch`'s ISSUE arm. These pin it per site
+// so reverting any one of them to the raw-body write (`issueSource ?? null`)
+// turns a test red. A lone `issueSource` must resolve (not 422) for its pin to
+// mean anything, so those use a ONE-binding owner, where the source-only hint
+// selects that binding (ruling lin3240-f8-default-source-only).
+
+function realProxyStore() {
+  return new DispatchQueueStore({
+    collection: createMockCollection(),
+    historyCollection: createMockCollection(),
+  });
+}
+
+/** The real vm resolver over the real arm for an arbitrary owner row (null = no session row). */
+function makeResolverForOwnerRow(ownerRow) {
+  const connectionAccess = createConnectionAccess({
+    connectionStore: { readConnectionsByReferent: async () => [githubConnection()] },
+    ownerCredentialStore: { getByConnection: async () => null },
+    refreshConnection: async () => null,
+    resolveCanonicalAccountId: async (id) => id,
+    selectOwnerSessionRow: () => ownerRow,
+    normalizeProvider: (ws) => ws?.provider || 'linear',
+    fingerprintCredential,
+    gate: { shouldAttempt: () => true },
+    lifecycleEventStore: { recordEvent: async () => {} },
+    bufferMs: BUFFER,
+  });
+  const sessions = ownerRow ? [{ _id: 'sid', session: { accountId: OWNER, workspaces: ownerRow.session.workspaces } }] : [];
+  return makeVmResolver({ sessions, connectionAccess }).fn;
+}
+
+function oneRepoOwnerRow() {
+  return {
+    session: {
+      workspaces: [{
+        urlKey: 'acme',
+        provider: 'github',
+        bindings: [{ provider: 'github', scope: REPO_B, connectionId: CONNECTION_ID }],
+        activeBinding: { provider: 'github', scope: REPO_B },
+      }],
+    },
+    workspaceIndex: 0,
+  };
+}
+
+function appWithStore(resolveWorkspaceAccess) {
+  const store = realProxyStore();
+  const { app } = buildProxyApp({
+    resolveWorkspaceAccess,
+    provider: recordingDispatchProvider(),
+    extraDeps: { dispatchQueueStore: store },
+  });
+  return { app, store };
+}
+
+function assertUnstamped(doc, why) {
+  assert.ok(doc, 'a row was enqueued');
+  assert.equal('issueSource' in doc, false, why);
+  assert.equal('issueBindingScope' in doc, false, why);
+}
+
+const KICKOFF = '/api/proxy/autopilot/kickoff';
+const RAD = '/api/proxy/recommend-and-dispatch';
+
+describe('LIN-3242 review R2 — kickoff persists only a validated, trimmed pair', () => {
+  test('a padded valid pair is stored trimmed', async () => {
+    const { app, store } = appWithStore(makeTwoRepoResolver().fn);
+    const res = await callProxy(app, 'POST', KICKOFF, {
+      goal: 'walk the stack', target: 'cli', issueIdentifier: 'GB-1',
+      issueSource: ' github ', issueBindingScope: ` ${REPO_B} `,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const doc = store.collection._docs[0];
+    assert.equal(doc.issueSource, 'github', 'padded source is stored trimmed');
+    assert.equal(doc.issueBindingScope, REPO_B, 'padded scope is stored trimmed');
+  });
+
+  test('a lone issueSource (source-only hint) resolves but stamps nothing', async () => {
+    const { app, store } = appWithStore(makeResolverForOwnerRow(oneRepoOwnerRow()));
+    const res = await callProxy(app, 'POST', KICKOFF, {
+      goal: 'walk the stack', target: 'cli', issueIdentifier: 'GB-1', issueSource: 'github',
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'a lone source is a hint, never half a pair');
+  });
+
+  test('a goal-only kickoff with a valid string pair stamps nothing', async () => {
+    const { app, store } = appWithStore(makeTwoRepoResolver().fn);
+    const res = await callProxy(app, 'POST', KICKOFF, {
+      goal: 'walk the stack', target: 'cli', issueSource: 'github', issueBindingScope: REPO_B,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'no issue named, so no selector is validated or stamped');
+  });
+});
+
+describe('LIN-3242 review R2 — recommend-and-dispatch persists only a validated, trimmed pair', () => {
+  test('a padded valid pair is stored trimmed', async () => {
+    const { app, store } = appWithStore(makeTwoRepoResolver().fn);
+    const res = await callProxy(app, 'POST', RAD, {
+      issueIdentifier: 'GB-1', kind: 'implementation',
+      issueSource: ' github ', issueBindingScope: ` ${REPO_B} `,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const doc = store.collection._docs[0];
+    assert.equal(doc.issueSource, 'github', 'padded source is stored trimmed');
+    assert.equal(doc.issueBindingScope, REPO_B, 'padded scope is stored trimmed');
+  });
+
+  test('a lone issueSource (source-only hint) resolves but stamps nothing', async () => {
+    const { app, store } = appWithStore(makeResolverForOwnerRow(oneRepoOwnerRow()));
+    const res = await callProxy(app, 'POST', RAD, {
+      issueIdentifier: 'GB-1', kind: 'implementation', issueSource: 'github',
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'a lone source is a hint, never half a pair');
+  });
+});
+
+describe('LIN-3242 review R2 — /dispatch repo-only arm stamps nothing', () => {
+  test('a repo-only dispatch with a valid STRING pair stamps nothing', async () => {
+    const { app, store } = appWithStore(makeTwoRepoResolver().fn);
+    const res = await callProxy(app, 'POST', '/api/proxy/dispatch', {
+      prompt: 'run me', repo: 'octo/repoB', issueSource: 'github', issueBindingScope: REPO_B,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'the WORKSPACE arm never sees the selector, so it must not stamp it');
+  });
+});
+
+// recommend-and-dispatch has a SECOND field block: the recommendation-derived
+// (LLM descent) arm, reached with no `kind`. It is driven here through the
+// test-token short-circuit in `computeRecommendation` (fixture TEST-14 resolves
+// to an `implement` action), while the REAL arm still runs the selection: the
+// wrapper only swaps the resolved credential for the hermetic sentinel AFTER the
+// seam has validated (or refused) the selector, and keeps every other field.
+function withTestTokenAfterSelection(fn) {
+  return async (urlKey, ownerAccountId, opts) => {
+    const out = await fn(urlKey, ownerAccountId, opts);
+    return out?.token ? { ...out, token: 'test-token', scope: undefined } : out;
+  };
+}
+
+describe('LIN-3242 review R2 — recommend-and-dispatch LLM arm persists only a validated, trimmed pair', () => {
+  test('a padded valid pair is stored trimmed', async () => {
+    const { app, store } = appWithStore(withTestTokenAfterSelection(makeTwoRepoResolver().fn));
+    const res = await callProxy(app, 'POST', RAD, {
+      issueIdentifier: 'TEST-14', issueSource: ' github ', issueBindingScope: ` ${REPO_B} `,
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    const doc = store.collection._docs[0];
+    assert.equal(doc.issueIdentifier, 'TEST-14', 'the recommendation-derived arm enqueued the row');
+    assert.equal(doc.issueSource, 'github', 'padded source is stored trimmed');
+    assert.equal(doc.issueBindingScope, REPO_B, 'padded scope is stored trimmed');
+  });
+
+  test('a lone issueSource (source-only hint) resolves but stamps nothing', async () => {
+    const { app, store } = appWithStore(withTestTokenAfterSelection(makeResolverForOwnerRow(oneRepoOwnerRow())));
+    const res = await callProxy(app, 'POST', RAD, { issueIdentifier: 'TEST-14', issueSource: 'github' });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'a lone source is a hint, never half a pair');
   });
 });
