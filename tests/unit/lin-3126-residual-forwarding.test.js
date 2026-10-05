@@ -498,3 +498,143 @@ describe('LIN-3126 residual sender 4 — swipe loadComments forwards the pair', 
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Session-lane client join (review `5902c5c1`): the run page's inline reply
+// reads its own `data-source`/`data-binding-scope` stamps and hands them to
+// ReplyDelivery (Send-and-continue) or postComment (Save). Both mutations on
+// these reads (session.js:355-356) survived the unit suite before this.
+// ---------------------------------------------------------------------------
+class ReplyEl {
+  constructor(tag = 'div') {
+    this.tagName = tag;
+    this.dataset = {};
+    this.value = '';
+    this.textContent = '';
+    this.className = '';
+    this.innerHTML = '';
+    this.disabled = false;
+    this.hidden = false;
+    this.isConnected = true;
+    this._listeners = {};
+  }
+  addEventListener(type, fn) { (this._listeners[type] = this._listeners[type] || []).push(fn); }
+  click() { (this._listeners.click || []).forEach((fn) => fn({ preventDefault() {} })); }
+  querySelector() { return null; }
+  querySelectorAll() { return []; }
+}
+
+function makeInlineReplySandbox({ onDeliverReply, onPostComment } = {}) {
+  const textarea = new ReplyEl('textarea');
+  textarea.value = 'a reply';
+  const sendBtn = new ReplyEl('button');
+  const saveBtn = new ReplyEl('button');
+  const feedback = new ReplyEl('div');
+  const thread = new ReplyEl('ul');
+  const box = new ReplyEl('div');
+  box.dataset = {
+    urlKey: 'acme', loopId: 'follow-1', target: 'cli', terminal: 'false', sessionWaiting: 'false',
+    issueId: '11111111-2222-3333-4444-555555555555', issueIdentifier: 'GB-1',
+    source: SOURCE, bindingScope: REPO_B
+  };
+  box.querySelector = (sel) => {
+    if (sel.includes('reply-input')) return textarea;
+    if (sel.includes('sess-reply-send')) return sendBtn;
+    if (sel.includes('sess-reply-save')) return saveBtn;
+    if (sel.includes('feedback')) return feedback;
+    if (sel.includes('thread')) return thread;
+    return null;
+  };
+
+  const sandbox = {
+    module: { exports: {} },
+    window: {
+      addEventListener() {},
+      ChatUI: { appendMessage() {} },
+      ReplyDelivery: {
+        deliverRulingAnswer(opts, handlers) { onDeliverReply({ opts }); handlers.onDispatchOk(); return Promise.resolve(); },
+        postComment(urlKey, issueId, prompt, decision) { onPostComment({ urlKey, issueId, prompt, decision }); return Promise.resolve({ ok: true, status: 201, data: {} }); },
+        deliveredEffect(opts) { return opts.effect || 'resume'; }
+      }
+    },
+    document: {
+      addEventListener() {},
+      querySelectorAll: (sel) => (sel.includes('session-inline-reply') ? [box] : []),
+      querySelector: () => null,
+      createElement: (tag) => new ReplyEl(tag),
+      getElementById: () => null
+    },
+    console: { warn() {}, error() {}, log() {} },
+    setTimeout,
+    clearTimeout,
+  };
+  sandbox.window.window = sandbox.window;
+  vm.createContext(sandbox);
+  vm.runInContext(read('public/session.js'), sandbox, { filename: 'session.js' });
+  return { sandbox, box, sendBtn, saveBtn };
+}
+
+describe('LIN-3126 residual session-lane join — the inline reply forwards its stamps', () => {
+  test('Send-and-continue hands the box data-source/data-binding-scope to deliverReply', async () => {
+    const delivered = [];
+    const { sandbox, sendBtn } = makeInlineReplySandbox({ onDeliverReply: (e) => delivered.push(e) });
+    sandbox.module.exports.initInlineReplies();
+    sendBtn.click();
+    await flush();
+
+    assert.equal(delivered.length, 1, 'one reply delivered');
+    assert.equal(delivered[0].opts.source, SOURCE, 'deliverReply opts.source');
+    assert.equal(delivered[0].opts.bindingScope, REPO_B, 'deliverReply opts.bindingScope');
+  });
+
+  test('Save (comment-only) hands the same stamps to postComment', async () => {
+    const comments = [];
+    const { sandbox, saveBtn } = makeInlineReplySandbox({ onPostComment: (e) => comments.push(e) });
+    sandbox.module.exports.initInlineReplies();
+    saveBtn.click();
+    await flush();
+
+    assert.equal(comments.length, 1, 'one comment written');
+    assert.equal(comments[0].decision.source, SOURCE, 'postComment decision.source');
+    assert.equal(comments[0].decision.bindingScope, REPO_B, 'postComment decision.bindingScope');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pre-PR due rows (review `5902c5c1` "What CI Did Not Prove" item 3): a row
+// scanned before this PR stored no pair, so its bulk scan resolves strictly and
+// 422s. This drives `startDueBulkScan` itself: the failing row is one item's
+// error and the stamped sibling still POSTs — the batch is not aborted. It
+// resolves itself once the task is re-scanned from its row (the scan route then
+// stores the pair); no migration is needed.
+// ---------------------------------------------------------------------------
+describe('LIN-3126 residual due rows — an unstamped pre-PR row fails per row, not the batch', () => {
+  test('startDueBulkScan still issues the stamped sibling when an unstamped row 422s', async () => {
+    const calls = [];
+    const { sandbox } = makeObservationSandbox({ api: async () => ({ comments: [] }) });
+    sandbox.window.ScanSection.postScan = async (urlKey, identifier, itemSource, itemScope) => {
+      calls.push({ identifier, itemSource, itemScope });
+      if (identifier === '11111111-2222-3333-4444-555555555555') {
+        throw Object.assign(new Error('BINDING_REQUIRED'), { status: 422 });
+      }
+      return { ok: true };
+    };
+    const obs = sandbox.module.exports;
+
+    obs.paintDuePage([
+      { issueId: '11111111-2222-3333-4444-555555555555', issueIdentifier: 'GB-1', dueStatus: true }, // pre-PR: no pair
+      { issueId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', issueIdentifier: 'GA-1', dueStatus: true, source: SOURCE, bindingScope: REPO_A },
+    ], 2, { append: false });
+    obs.toggleDueSelection('11111111-2222-3333-4444-555555555555', true);
+    obs.toggleDueSelection('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', true);
+
+    assert.doesNotThrow(() => obs.startDueBulkScan());
+    await flush();
+
+    assert.equal(calls.length, 2, 'both rows POSTed — the 422 row did not abort the batch');
+    const failed = calls.find((c) => c.identifier === '11111111-2222-3333-4444-555555555555');
+    const ok = calls.find((c) => c.identifier === 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+    assert.equal(failed.itemSource, undefined, 'the pre-PR row POSTs with no source');
+    assert.equal(ok.itemScope, REPO_A, 'the re-scanned sibling carries its pair');
+  });
+});

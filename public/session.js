@@ -45,7 +45,7 @@
     feedback.textContent = '';
     feedback.className = 'sess-reply-feedback';
 
-    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId })
+    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, source: opts.source, bindingScope: opts.bindingScope })
       .then(function (result) {
         if (!result.ok) throw window.ReplyDelivery.errorFromResult(result);
         appendYouBubble(thread, prompt);
@@ -893,6 +893,6 @@
   // is unit-tested directly, so the effect branch it hands to
   // window.ReplyDelivery is pinned without a full browser DOM.
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { initQuestionCards: initQuestionCards, initPrState: initPrState, pollAction: pollAction, pressCloseOut: pressCloseOut, closeOutContext: closeOutContext };
+    module.exports = { initQuestionCards: initQuestionCards, initInlineReplies: initInlineReplies, initPrState: initPrState, pollAction: pollAction, pressCloseOut: pressCloseOut, closeOutContext: closeOutContext };
   }
 })();
