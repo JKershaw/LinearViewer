@@ -2665,6 +2665,46 @@ DELETE /api/proxy/dispatch/halt
 { "success": true }
 ```
 
+#### Liveness Alarms (LIN-3258, M21 option A)
+
+Read-only, **advisory** liveness records for the Flight Companion. Nothing acts on an alarm: the sweep that writes them never aborts, re-dispatches or messages an agent.
+
+```
+GET /api/proxy/alarms?state=open|cleared|all&limit=
+```
+
+Read scope is enough. `state` defaults to `open`; `limit` defaults to 200 (max 1000). Returns newest-fired first.
+
+```json
+{
+  "alarms": [
+    {
+      "id": "stopped-or-circular-wait:cycle:2550fd09-3567-4416-8eb5-b4d3750a285f,8608873d-af0f-47fd-8dea-61c36f85d8e5",
+      "rule": "stopped-or-circular-wait",
+      "shape": "cycle",
+      "members": ["2550fd09-3567-4416-8eb5-b4d3750a285f", "8608873d-af0f-47fd-8dea-61c36f85d8e5"],
+      "waiters": ["2550fd09-3567-4416-8eb5-b4d3750a285f", "8608873d-af0f-47fd-8dea-61c36f85d8e5"],
+      "feeders": [],
+      "leafLineages": [],
+      "dispatchIds": ["2550fd09-3567-4416-8eb5-b4d3750a285f", "8608873d-af0f-47fd-8dea-61c36f85d8e5"],
+      "tickets": ["LIN-3238"],
+      "startedAt": "2026-10-02T15:12:57.700Z",
+      "firedAt": "2026-10-02T15:20:00.000Z",
+      "lastSeenAt": "2026-10-02T15:20:00.000Z",
+      "clearedAt": null,
+      "reopenCount": 0,
+      "detail": { "edges": [{ "from": "...", "to": "...", "kind": "parent" }] }
+    }
+  ],
+  "total": 1
+}
+```
+
+- `rule` is `dispatcher-silent` (no consumer poll for >20 min while a queued/taken item exists) or `stopped-or-circular-wait` (a parked `[pending]` wait whose chain has stopped — `shape: "orphan"` — or loops back on itself — `shape: "cycle"`).
+- `id` is a deterministic dedupe key (`rule:shape:sorted key members`), so re-wording a wait every hour updates one record rather than minting a second. For a cycle the key is its strongly-connected core; for an orphan it is the **cause** — the dead leaf's ticket (`ticket:LIN-x`) when it has one, else the lineage id — so several waiters (or feeders) reaching one stopped leaf share ONE record. `members` is the key; `waiters`/`feeders` are the upstream victims, merged in while the incident persists; `leafLineages` lists an orphan's dead leaves.
+- A confirming tick only refreshes `lastSeenAt` (and merges new victims); `startedAt`/`firedAt` are set once and never move, including across a clear→reopen (`reopenCount`).
+- **A3 dilution (stated, accepted for v1):** `dispatcher-silent` reads token `lastUsedAt` poll recency, which `validateToken` bumps on *every* proxy call — so a runner that stopped polling but still calls the proxy can mask silence (a false negative). The real fixes are the per-machine poll record (LIN-2883) and the runner heartbeat (LIN-1952), both out of scope here.
+
 ## Error Handling
 
 | Status | Error | Description |

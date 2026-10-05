@@ -94,6 +94,12 @@ export const BASE_DEPS = () => ({
     setWorkspaceHalt: async () => {},
     clearWorkspaceHalt: async () => {},
   },
+  // LIN-3258: routes/proxy-alarms.js's required dep. The composed composer
+  // mount needs it present; the alarms probes override it.
+  livenessAlarmStore: {
+    list: async () => [],
+    listOpenWorkspaceKeys: async () => [],
+  },
   // LIN-3130 S2a: routes/proxy-runner.js's dispatch deps. The first slice that
   // needs them, so they are added here rather than hand-wired per row. A dispatch
   // row that needs specific results (e.g. an empty fold or a by-id 404) still

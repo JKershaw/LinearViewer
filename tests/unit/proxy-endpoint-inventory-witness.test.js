@@ -523,6 +523,12 @@ const ROWS = [
     note: 'clears an already-unset halt — BASE_DEPS() default workspaceHaltStore.clearWorkspaceHalt is a harmless no-op',
     run: () => call(buildApp(), 'DELETE', '/api/proxy/dispatch/halt'),
   },
+  {
+    group: 'K', method: 'GET', url: '/api/proxy/alarms', expect: 200,
+    note: 'LIN-3258: BASE_DEPS() default livenessAlarmStore.list resolves []',
+    expectBody: { alarms: [], total: 0 },
+    run: () => call(buildApp(), 'GET', '/api/proxy/alarms'),
+  },
 
   // --- Group L: runner routes (LIN-3130 S2a, routes/proxy-runner.js; and
   // LIN-3098 S3, routes/proxy-runner-prompt.js, mounted BEFORE it) ---
