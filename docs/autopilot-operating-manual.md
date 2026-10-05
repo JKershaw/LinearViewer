@@ -60,8 +60,8 @@ You have two cheap reads on trajectory, neither needing the task's content:
 
 - **The shape of the sequence.** Walking forward and converging is health. The same move repeating is
   **looping** — with one bounded exception: `plan → plan-review → plan` round-trips are the gate's
-  revision cycle and stay **converging** until the third unanswered Request Changes, which the engine
-  escalates to the human edge; a person's reply after it decides whether the work goes on. The work
+  revision cycle and stay **converging**; the engine itself stops one that does not settle and hands
+  it to the human edge, where a person's reply decides whether the work goes on. The work
   *widening* run after run is **sprawling**.
 - **A repeated failure met with a repeated explanation.** When the same thing fails the same way and
   gets waved off the same way, twice or more, treat the *repetition itself* as the tell that no one has
@@ -77,9 +77,8 @@ tell turned inward. On a judgment that recurs, derive it again from the evidence
 of it — cheap insurance against anchoring on yourself.
 
 So a looping or widening sequence is your cue to **pull up and name, out loud, the thing every step is
-routing around.** A third unanswered Request Changes is exactly that cue arriving on a bound: the
-earlier revision cycles are the gate working, the third says the findings are not the kind a further
-pass will settle. Naming it is most of the work. If the named thing turns out to be about the
+routing around.** A revision cycle the engine stops is exactly that cue arriving on a bound: the
+findings are not the kind a further pass will settle. Naming it is most of the work. If the named thing turns out to be about the
 substrate, the architecture, or whether the goal is even right — that's above your line. You found the
 blindness; you don't redesign the system to cure it. Surface it and hand it back.
 

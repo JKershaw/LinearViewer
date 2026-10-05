@@ -32,8 +32,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
-import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
+import { buildSelectorArgs } from '../../lib/openrouter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (relPath) => readFileSync(join(__dirname, '../..', relPath), 'utf8');
@@ -148,17 +147,8 @@ describe('no-re-raise guidance literal list (LIN-2891/LIN-3038)', () => {
     assert.strictEqual(countOccurrences(baselineSource, 'answered, or dismissed'), 0,
       'the baseline snapshot carries no stale list');
 
-    const fresh = buildRouterPrompt({
-      issueContext: '{{ISSUE_CONTEXT}}',
-      identifier: '{{IDENTIFIER}}',
-      hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-      hasComments: false, commentCount: 0,
-      aiHints: formatAIHintsForMetaPrompt(),
-      actionVocabulary: getAIRecommendationActionNames().join(', '),
-      completionSignals: formatAllSignalsForMetaPrompt(),
-      focusedSubtaskId: null,
-      featureFlags: {}
-    });
+    const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, {});
+    const fresh = buildRouterPrompt({ ...leaf, view: '{{ISSUE_CONTEXT}}', featureFlags: {} });
     assert.strictEqual(baselineSource, fresh,
       'scripts/eval/meta-prompt.baseline.txt is stale — run `node scripts/eval/regen-baseline.mjs`');
   });

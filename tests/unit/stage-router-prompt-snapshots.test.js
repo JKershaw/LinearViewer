@@ -1,14 +1,12 @@
 /**
  * LIN-3304 review addendum 1: real, checked-in byte snapshots of the router prompt.
  *
- * This file pins the rendered routing prompt itself, as expected text generated from
- * base 75b5c924 (before the seam moved), so a one-character change to the prompt, or a
- * skipped provider capability pass (review finding 1), fails. Since LIN-3300 it is the
- * only prompt a recommendation call sends; the snapshots were carried over unchanged
- * (renamed from `writer-on.*`) when the full-prompt path was deleted.
- *
- * The matrix covers a non-Linear provider (GitHub Issues, Local, tracker flag off)
- * and the Step 0 decision-tree branches.
+ * This file pins the rendered routing prompt itself — since LIN-3300 the stage
+ * selector, the only prompt a recommendation call sends — so a one-character change to
+ * the prompt, or a skipped provider capability pass (review finding 1), fails. The
+ * matrix covers a non-Linear provider (GitHub Issues, Local, tracker flag off) and the
+ * ticket shapes the rules branch on (leaf, finished node, node with an open subtask, a
+ * plan with a plan-review verdict).
  *
  * Run with: node --test tests/unit/stage-router-prompt-snapshots.test.js
  */
@@ -18,6 +16,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
+import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { CASES, renderCase } from '../fixtures/stage-router-prompts/cases.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -27,7 +26,7 @@ const snapshot = (id) => readFileSync(join(SNAP_DIR, `${id}.txt`), 'utf8');
 describe('stage-router prompt byte snapshots (LIN-3304)', () => {
   test('every case renders byte-for-byte to its checked-in snapshot', () => {
     for (const entry of CASES) {
-      const actual = renderCase(entry, { buildRouterPrompt });
+      const actual = renderCase(entry, { buildRouterPrompt, buildSelectorArgs });
       assert.equal(actual, snapshot(entry.id),
         `${entry.id} drifted from its checked-in snapshot — a prompt text changed, or the capability pass ` +
         `was skipped. If the change is intended, regenerate with ` +
@@ -43,16 +42,15 @@ describe('stage-router prompt byte snapshots (LIN-3304)', () => {
 
   test('a non-Linear provider is renamed in the routing prompt', () => {
     const github = CASES.find((c) => c.id === 'router.github-issues.leaf');
-    const router = renderCase(github, { buildRouterPrompt });
+    const router = renderCase(github, { buildRouterPrompt, buildSelectorArgs });
     assert.ok(!/\bLinear\b/.test(router), 'the routing prompt must not name Linear for GitHub');
-    assert.ok(router.includes('on a GitHub Issues task.'), 'the role line is renamed to the provider display name');
+    assert.ok(router.includes('for one GitHub Issues ticket.'), 'the role line is renamed to the provider display name');
   });
 
-  test('the Step 0 variants are distinct', () => {
-    const complete = snapshot('router.linear.complete-no-open');
-    const terminal = snapshot('router.linear.terminal-open-child');
-    assert.ok(complete.includes('already complete'), 'the completion branch is present');
-    assert.ok(terminal.includes('terminal but still has open children'), 'the terminal-with-open-children branch is present');
+  test('the ticket shapes are distinct where the rules branch', () => {
+    assert.ok(snapshot('router.linear.complete-no-open').includes('- Latest code review: approve-conditional'), 'the finished node carries its code review');
+    assert.ok(snapshot('router.linear.terminal-open-child').includes('- Frontier next child'), 'the open-child node carries its frontier');
+    assert.ok(snapshot('router.linear.plan-reviewed').includes('- Plan-review verdicts: 1 (1 request changes)'), 'the planned leaf carries its verdicts');
   });
 
   test('the routing prompt carries no prompt-writing blocks', () => {

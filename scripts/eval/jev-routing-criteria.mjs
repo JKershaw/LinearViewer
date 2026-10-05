@@ -9,11 +9,11 @@
  *
  * Vocabulary source of truth: `getAIRecommendationActionNames()` (lib/prompt-templates.js)
  * — the exact set the live meta-prompt injects (17 names, `defer` last). Criteria are
- * derived from each template's own `aiHint` (situation + goal + whenNot + chooseOver),
+ * derived from each stage's own self-description (LIN-3300: purpose + when + when not),
  * so the routing call can never silently drift from the live action set. Nothing here
  * is wired into production; this is standalone research infra under scripts/eval/.
  */
-import { getAIRecommendationActionNames, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { getAIRecommendationActionNames, getSelectableStages } from '../../lib/prompt-templates.js';
 
 /** The live recommender vocabulary, verbatim (17 names; `defer` last). */
 export const LIVE_VOCABULARY = getAIRecommendationActionNames();
@@ -32,19 +32,14 @@ export function norm(action) {
   return a === 'implementation' ? 'implement' : a;
 }
 
-const templateByName = {};
-for (const t of Object.values(PROMPT_TEMPLATES)) if (t.aiHint) templateByName[t.name] = t;
+const stageByName = {};
+for (const s of getSelectableStages()) stageByName[s.name] = s;
 
-/** Compose the contrastive criterion string for one live action from its own aiHint. */
+/** Compose the contrastive criterion string for one live action from its own self-description. */
 function criterionFor(name) {
-  const t = templateByName[name];
-  if (!t) return null;
-  const { situation, goal, whenNot, chooseOver } = t.aiHint;
-  const parts = [situation ? `Situation: ${situation}.` : ''];
-  if (goal) parts.push(`Goal: ${goal}`);
-  if (whenNot) parts.push(`When NOT: ${whenNot}`);
-  if (chooseOver) parts.push(`Choose over: ${chooseOver}`);
-  return parts.filter(Boolean).join(' ');
+  const s = stageByName[name];
+  if (!s) return null;
+  return [`Purpose: ${s.purpose}`, `When: ${s.when}`, `When NOT: ${s.whenNot}`].join(' ');
 }
 
 /**

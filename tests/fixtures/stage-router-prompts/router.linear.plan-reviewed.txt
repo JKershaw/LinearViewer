@@ -1,22 +1,41 @@
-You choose the next stage of work for one Local ticket. You do not do the work or write its prompt: code assembles the chosen stage's prompt.
+You choose the next stage of work for one Linear ticket. You do not do the work or write its prompt: code assembles the chosen stage's prompt.
 
 ## The ticket
 
-**Issue:** ABC-10 - A leaf task
+**Issue:** ABC-40 - A planned leaf
 **State:** In Progress (started)
-**Project:** Project
-**Description:** Make the thing work.
+**Description:** Goal.
+
+## Implementation Plan
+
+Revision 2 — addresses plan-review F1.
+
+Session fit: fits one session.
+
+plan-review due: yes
+
+**Comments:** Latest 2 of 2 comments, oldest first (older bodies are not shown; the trail facts read all of them).
+
+**Agent** (2026-10-01):
+### Plan Review Verdict
+
+**Verdict:** Request Changes.
+
+**John, the latest person's comment** (2026-10-02):
+F1 is right; take the narrow revision.
 
 ## Facts computed in code
 
-**TRAIL FACTS (computed in code from all 0 comments — do not re-derive):**
+**TRAIL FACTS (computed in code from all 2 comments — do not re-derive):**
 - Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)
 - PRs linked on the trail: none
-- Latest person's comment (not an agent note, landing report, review, verdict or close-out): none
+- Latest person's comment (not an agent note, landing report, review, verdict or close-out): 2026-10-02 (shown with the comments); work reported after it: no
 - Latest ruling recorded via Harbour: none
-- Implementation plan: none
-- Session fit stated: none
-- Plan-review due stated: none
+- Plan-review verdicts: 1 (1 request changes); latest: request changes (2026-10-01)
+- Since the latest plan-review verdict: a person's comment: yes; landed work: none
+- Implementation plan: in the description
+- Session fit stated: fits one session
+- Plan-review due stated: yes
 
 ## Stages
 

@@ -49,6 +49,21 @@ describe('recommendation-facts: extractSessionFit', () => {
     const desc = 'Originally fits one session, but on reflection it needs multiple sessions.';
     assert.strictEqual(extractSessionFit(desc), 'needs multiple sessions');
   });
+
+  // LIN-3300: a negated fit used to match the positive phrase, so "Does not fit one
+  // session" read as fitting (LIN-385's and LIN-2944's own plans say it that way).
+  test('a negated fit reads as needing multiple sessions, never as fitting', () => {
+    for (const desc of [
+      'Session fit: Does not fit one session.',
+      'Session-fit: does NOT fit one session. 4 sessions',
+      'It doesn\'t fit in one focused session.',
+      'This does not fit into one session; each phase is its own implementation session.',
+      'It will not fit one session.',
+      'It cannot fit one session.'
+    ]) {
+      assert.strictEqual(extractSessionFit(desc), 'needs multiple sessions', desc);
+    }
+  });
 });
 
 describe('recommendation-facts: computeNodeStateCounts', () => {

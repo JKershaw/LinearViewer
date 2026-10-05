@@ -41,7 +41,7 @@ lib/
   tree.js              Transforms flat issues → nested tree structure (frontier ranking in selectFocusSubtask)
   graph-features.js    Network-free blocking-graph / critical-path primitives (shared by swipe + frontier ranking)
   context-graph.js     Network-free relationship-neighborhood builder for the Context section (blockers/blocked/parent/children/related; LIN-572)
-  openrouter.js        OpenRouter API client; recommendations take one path (LIN-3300): one routing call (or a code-settled route), then composeRoutedRecommendation assembles the routed stage's prompt with generatePrompt
+  openrouter.js        OpenRouter API client; recommendations take one path (LIN-3300): one routing call to the stage selector (buildSelectorArgs: formatSelectorView + the trail facts), or the review loop bound in code, then composeRoutedRecommendation assembles the routed stage's prompt with generatePrompt
   openrouter-catalog.js  Live OpenRouter model catalog (LIN-1111): in-process TTL-cached wrapper over GET /api/v1/models, mocked in tests via the same `shouldMockAi` predicate that gates the AI recommendation mock; supplements (never replaces) the static DISPATCH_MODEL_SUGGESTIONS datalists in public/common.js + lib/render-settings.js, consumed server-side by Settings and client-side via GET /workspace/:urlKey/api/openrouter/models (routes/workspace-api.js) — one shared source of truth for both surfaces
   providers/           Provider abstraction (decouples views from Linear specifics)
     index.js           Provider barrel (LIN-2010) — the single entry point for provider registration: owns the five self-registering `<provider>/index.js` imports (moved out of server.js:68-72) and re-exports the `registry.js` readers plus `localProvider` (server.js still needs `localProvider.configure({ store: localStore })`). NOT claimed as the only path to the registry — ~15 pre-existing modules import `registry.js` directly and stay that way; the barrel owns registration and the display/identity reads LIN-2010 migrated. Its import order (`linear, github, github-projects, jira, local`) is load-bearing: `lib/render-settings.js`'s add-row loop iterates `getAllProviders().filter(p => p.addProvider)`, so registration order IS the rendered row order. Caveat recorded in the file: order is really set by the whole ENTRY import graph — an import above server.js:66 that transitively reaches a provider would register it first, and the unit test (barrel-first by construction) would not catch it
@@ -100,7 +100,7 @@ lib/
   prompt-templates.js  Prompt template query functions and main entry point
   prompt-formatters.js Shared formatting helpers for prompt templates
   prompt-contract.js   The stage contract (LIN-3292): the formats later steps parse, appended by code (finishStagePrompt) after every stage's body
-  stage-router.js      The next-stage choice's own seam (LIN-3304): the routing prompt every recommendation call sends (routerFragments → buildRouterPrompt, pinned by tests/fixtures/stage-router-prompts/) and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo); getRecommendation/getRecommendationStream call the seam
+  stage-router.js      The next-stage choice's own seam (LIN-3304): the stage selector every recommendation call sends (LIN-3300: SELECTOR_RULES + the stages' own `route` descriptions → buildRouterPrompt, pinned by tests/fixtures/stage-router-prompts/) and the reply parse/contract (routeStage/parseRouteDecision, plus parseRecommendedAction/parseDeferTo/parseWhyNow); getRecommendation/getRecommendationStream call the seam
   prompt-template-defs.js  Prompt template definitions (17 templates), and STAGE_LEADS: each stage's Goal lead, the one intent source per stage (LIN-3299)
   completion-signals.js  Completion signals for prompt assessment
   custom-prompts-store.js  Custom prompt template storage (per workspace)
@@ -132,7 +132,7 @@ lib/
   description-edit.js  Pure splice helpers for partial issue-description edits
   trashed-signal.js    Trashed-issue (soft-delete) signal detection (LIN-401)
   recommend-recurse.js Server-side recommendation recursion (defer routing)
-  recommendation-facts.js  Deterministic, network-free per-node fact assembly (assembleNodeFacts) — single fact seam for both prompt paths
+  recommendation-facts.js  Deterministic, network-free fact assembly: per-node facts (assembleNodeFacts), the selector's trail facts (assembleTrailFacts, condensePlan), the plan-review facts and the review loop bound (reviewLoopExhausted), and who wrote a comment (isAgentNote, isRuling, isPersonComment)
   session-store.js     MongoDB/MangoDB session store
   session-options.js   The express-session options factory, shared by server.js and the real-session email tests (LIN-1892)
   email-availability.js  Zero-import email sign-in predicate + transport kind + refusal reason + link origin (LIN-1892); the only reader of the email env vars besides email-transport.js

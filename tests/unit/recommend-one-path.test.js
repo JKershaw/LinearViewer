@@ -244,7 +244,7 @@ const streamedPrompt = (events) => events.filter(e => e.type === 'delta' && e.da
 
 // ── Routed surfaces ─────────────────────────────────────────────────────────
 
-const isRoutingPrompt = (content) => content.includes('## Instructions') && !content.includes('## Prompt Structure') && !content.includes('\n## Prompt\n');
+const isRoutingPrompt = (content) => content.includes('## How to choose') && !content.includes('## Prompt Structure') && !content.includes('\n## Prompt\n');
 
 describe('routed surfaces: one routing call, then code assembles the stage prompt', () => {
   test('UI stream, leaf: one routing call, no writing phase, the prompt is generatePrompt for the stage', async () => {

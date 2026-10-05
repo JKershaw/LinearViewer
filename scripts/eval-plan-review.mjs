@@ -47,9 +47,6 @@
  * Usage:   OPENROUTER_API_KEY=... node scripts/eval-plan-review.mjs
  * Env knobs: GEN_MODEL, K (runs per arm per case), ONLY (case-id filter).
  */
-import { buildRouterPrompt } from '../lib/stage-router.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../lib/prompt-templates.js';
-import { formatAllSignalsForMetaPrompt } from '../lib/completion-signals.js';
 import { deriveDispatchKind } from '../lib/prompt-templates.js';
 // LIN-3304: the action parser now lives with the next-stage choice; import it from
 // the seam so this routing eval reads the decision through its one owner.
@@ -310,26 +307,11 @@ Claims verified; proceed to implementation.
 ];
 
 /** Build both arms for a case. Arm A excises the gate; the excision must bite. */
-function buildArms(context) {
-  const common = {
-    issueContext: context, identifier: context.match(/# (\S+):/)?.[1] || 'LIN-1',
-    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
-    remainingCount: 0, hasComments: true, commentCount: 1,
-    aiHints: formatAIHintsForMetaPrompt(),
-    actionVocabulary: getAIRecommendationActionNames().join(', '),
-    completionSignals: formatAllSignalsForMetaPrompt(),
-    isTerminal: false, hasOpenChildren: false
-  };
-  const B = buildRouterPrompt(common);
-
-  // Arm A = pre-LIN-1603: remove the Step-3 gate branch (through the verdict
-  // routing, up to the session-fit routing) and the completed-prep exception.
-  let A = B.replace(/\*\*Before routing on session-fit, check whether a `plan-review` is due[\s\S]*?(?=\*\*Otherwise route on the session-fit answer)/, '');
-  if (A === B) throw new Error('gate branch not found to strip');
-  const step = A;
-  A = A.replace(/ ONE exception, and only one: a `plan-review` that recorded[\s\S]*?see the plan-review gate just below\./, '');
-  if (A === step) throw new Error('Completed-prep exception not found to strip');
-  return { A, B };
+function buildArms() {
+  // LIN-3300: the decision tree whose Step-3 gate Arm A excised is gone; the stage
+  // selector states plan-review once, in rule 8, and code bounds the loop. This A/B no
+  // longer has an arm to build; the selector is measured by scripts/eval/jev-routing-eval.mjs.
+  throw new Error('obsolete since LIN-3300: the decision-tree gate this A/B excised no longer exists');
 }
 
 // The prompt is sent EXACTLY as production sends it — no output override, so the

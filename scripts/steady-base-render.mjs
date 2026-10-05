@@ -26,6 +26,7 @@ for (const key of Object.keys(templates.PROMPT_TEMPLATES || {})) {
 const mp = await tryImport('lib/prompts/meta-prompt-template.js');
 const sr = await tryImport('lib/stage-router.js');
 const cs = await tryImport('lib/completion-signals.js');
+const or = await tryImport('lib/openrouter.js');
 const routerArgs = {
   issueContext: '', identifier: 'LIN-1', hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0,
   remainingCount: 0, hasComments: false, commentCount: 0, aiHints: templates.formatAIHintsForMetaPrompt?.() ?? '',
@@ -35,7 +36,8 @@ let meta = null;
 try { meta = mp.buildMetaPromptTemplate?.(routerArgs); } catch {}
 rows.push(['meta-prompt (AI path, per recommendation)', bytes(meta)]);
 let router = null;
-try { router = sr.buildRouterPrompt?.(routerArgs); } catch {}
+// Since LIN-3300's stage selector the routing prompt takes the selector's args.
+try { router = sr.buildRouterPrompt?.(or.buildSelectorArgs ? or.buildSelectorArgs({ ...issue }, {}) : routerArgs); } catch {}
 rows.push(['routing prompt (per recommendation)', bytes(router)]);
 const ap = await tryImport('lib/prompts/autopilot-kickoff.js');
 let apText = null;

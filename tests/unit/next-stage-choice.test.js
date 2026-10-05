@@ -3,7 +3,7 @@
  *
  * Covers the four fixes and their seams:
  *   - relations reach the router (render + Local's two encodings);
- *   - plan-review verdict facts (count/reset/revision/replies) and the router block;
+ *   - plan-review verdict facts (count/reset/person/landed) and the review loop bound;
  *   - the fix-round implementation brief (continue the reviewed PR, temp N+1 where used);
  *   - D1 (a `**Reasoning**`/headerless reply still streams reasoning) and D2 (`retro` refused).
  *
@@ -13,9 +13,9 @@ import { test, describe, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { GraphQLClient } from 'graphql-request';
 import {
-  assemblePlanReviewFacts, formatPlanReviewFactsBlock, REVISION_LABEL_RE
+  assemblePlanReviewFacts, reviewLoopExhausted, REVIEW_LOOP_BOUND
 } from '../../lib/recommendation-facts.js';
-import { formatIssueContext, getRecommendation, setFetchImpl, setPromptTraceRecorder, resolveCodeRoutedAction } from '../../lib/openrouter.js';
+import { formatIssueContext, getRecommendation, getRecommendationStream, setFetchImpl } from '../../lib/openrouter.js';
 import { routeStage, parseRouteDecision, parseRecommendedAction } from '../../lib/stage-router.js';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { readRunLedger } from '../../lib/run-ledger.js';
@@ -110,40 +110,21 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
       { createdAt: '2026-01-04T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Needs Discussion.**' },
     ]);
     assert.equal(facts.verdicts, 3, 'autopilot record is not a verdict');
+    assert.deepEqual(facts.byKind, { 'request changes': 2, 'needs discussion': 1 });
     assert.equal(facts.count, 3);
     assert.equal(facts.latestVerdict, 'needs discussion');
+    assert.equal(facts.latestAt, '2026-01-04T00:00:00Z');
   });
 
   test('only an Approve resets the count; a revision alone does not', () => {
-    const c = (verdict, at) => ({ createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: ${verdict}.**` });
-    assert.equal(assemblePlanReviewFacts([c('Request Changes', '2026-01-01T00:00:00Z')]).count, 1);
-    assert.equal(assemblePlanReviewFacts([c('Request Changes', '2026-01-01T00:00:00Z'), c('Request Changes', '2026-01-02T00:00:00Z')]).count, 2);
-    assert.equal(assemblePlanReviewFacts([c('Request Changes', '2026-01-01T00:00:00Z'), c('Request Changes', '2026-01-02T00:00:00Z'), c('Request Changes', '2026-01-03T00:00:00Z')]).count, 3);
-    assert.equal(assemblePlanReviewFacts([c('Request Changes', '2026-01-01T00:00:00Z'), c('Request Changes', '2026-01-02T00:00:00Z'), c('Request Changes', '2026-01-03T00:00:00Z'), c('Request Changes', '2026-01-04T00:00:00Z')]).count, 4);
-    assert.equal(assemblePlanReviewFacts([c('Request Changes', '2026-01-01T00:00:00Z'), c('Approve', '2026-01-02T00:00:00Z'), c('Request Changes', '2026-01-03T00:00:00Z')]).count, 1);
-    assert.equal(assemblePlanReviewFacts([c('Request Changes', '2026-01-01T00:00:00Z'), c('Needs Discussion', '2026-01-02T00:00:00Z')]).count, 2);
-  });
-
-  test('replies are the newest non-verdict comments after the latest verdict, newest first', () => {
-    const facts = assemblePlanReviewFacts([
-      RC('2026-01-01T00:00:00Z'),
-      { createdAt: '2026-01-02T00:00:00Z', body: 'First reply' },
-      { createdAt: '2026-01-03T00:00:00Z', body: 'Newest reply' },
-      { createdAt: '2026-01-04T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Request Changes.**' },
-    ]);
-    assert.equal(facts.latestVerdict, 'request changes');
-    assert.deepEqual(facts.replies.map(r => r.text), [], 'nothing follows the LATEST verdict');
-    const trailing = assemblePlanReviewFacts([
-      RC('2026-01-01T00:00:00Z'),
-      { createdAt: '2026-01-02T00:00:00Z', body: 'Older reply' },
-      { createdAt: '2026-01-03T00:00:00Z', body: 'Newest reply' },
-    ]);
-    assert.deepEqual(trailing.replies.map(r => r.text), ['Newest reply', 'Older reply']);
-  });
-
-  test('commentsRead reflects the trail length', () => {
-    assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), { createdAt: '2026-01-02T00:00:00Z', body: 'x' }]).commentsRead, 2);
-    assert.equal(assemblePlanReviewFacts([]).commentsRead, 0);
+    const c = (verdict, d) => ({ createdAt: `2026-01-0${d}T00:00:00Z`, body: `### Plan Review Verdict\n\n**Verdict: ${verdict}.**` });
+    const count = (...vs) => assemblePlanReviewFacts(vs.map((v, i) => c(v, i + 1))).count;
+    assert.equal(count('Request Changes'), 1);
+    assert.equal(count('Request Changes', 'Request Changes', 'Request Changes', 'Request Changes'), 4);
+    assert.equal(count('Request Changes', 'Approve', 'Request Changes'), 1);
+    assert.equal(count('Request Changes', 'Needs Discussion'), 2);
+    assert.equal(count('Request Changes', 'Approve'), 0);
+    assert.equal(assemblePlanReviewFacts([]).count, 0);
   });
 
   test('shuffled input order yields the same facts (the reader sorts by createdAt)', () => {
@@ -151,164 +132,54 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     // time but before it in array order, so a reader that trusts input order differs.
     const trail = [RC('2026-01-03T00:00:00Z'), { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }, RC('2026-01-01T00:00:00Z')];
     const a = assemblePlanReviewFacts(trail);
-    const b = assemblePlanReviewFacts([...trail].reverse());
-    assert.deepEqual(a, b);
-    assert.deepEqual(a.replies.map(r => r.text), ['go on'], 'the reply after the latest verdict is kept');
+    assert.deepEqual(a, assemblePlanReviewFacts([...trail].reverse()));
+    assert.equal(a.personSince, true, 'the reply after the latest verdict is seen');
   });
 
-  test('revised reads the HIGHEST Revision N label against the verdict count (F4)', () => {
-    const desc = (n) => `## Implementation Plan\n\nthings\n\nRevision ${n} — addresses plan-review findings F1.`;
-    assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z')], desc(2)).revised, true);
-    assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')], desc(2)).revised, false);
-    assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z')], 'no label here').revised, false);
-    assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), APP('2026-01-02T00:00:00Z')], desc(3)).revised, false, 'not computed after an Approve');
-    // A description that carries Revision 2 AND Revision 3 with 2 verdicts: the first
-    // match (2) would say not-revised and redo finished work; the highest (3) is right.
-    const twoLabels = `${desc(2)}\n\nRevision 3 — addresses plan-review findings F2.`;
-    const facts = assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')], twoLabels);
-    assert.equal(facts.revisionN, 3);
-    assert.equal(facts.revised, true);
-  });
-
-  test('a reply after the verdict is shown newest-first and defers the route to the model (FC narrowing)', () => {
-    const holdThenGo = [
-      RC('2026-01-01T00:00:00Z'),
-      { createdAt: '2026-01-02T00:00:00Z', body: 'Hold until LIN-3098 ships.' },
-      { createdAt: '2026-01-03T00:00:00Z', body: 'OK, go on.' },
-    ];
-    const facts = assemblePlanReviewFacts(holdThenGo);
-    assert.deepEqual(facts.replies.map(r => r.text), ['OK, go on.', 'Hold until LIN-3098 ships.'], 'newest first');
-    assert.equal(facts.route, null, 'a reply is language: the router reads it and decides');
-    // The block tells the model to read the NEWEST reply, not any hold in the list.
-    const block = formatPlanReviewFactsBlock(facts);
-    assert.match(block, /The NEWEST reply wins: a hold a later reply superseded is not a hold/);
-    assert.match(block, /unless the NEWEST reply after the latest verdict tells the work to continue/);
-    assert.doesNotMatch(block, /→ Route this pass:/, 'no code steer when the reply decides the route');
-  });
-
-  test('the code route settles only the no-reply cases (F1 + the FC narrowing)', () => {
-    const verdict = (v, at) => ({ createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: ${v}.**` });
-    const oneRc = [verdict('Request Changes', '2026-01-01T00:00:00Z')];
-    const twoRc = [...oneRc, verdict('Request Changes', '2026-01-02T00:00:00Z')];
-    const threeRc = [...twoRc, verdict('Request Changes', '2026-01-03T00:00:00Z')];
-    // count 1 or 2, no reply, not revised -> plan
-    assert.equal(assemblePlanReviewFacts(oneRc).route, 'plan');
-    assert.equal(assemblePlanReviewFacts(twoRc).route, 'plan');
-    // count 3, no reply -> blocked
-    assert.equal(assemblePlanReviewFacts(threeRc).route, 'blocked');
-    // revised -> plan-review (count 1 and count 2 + a revision, this ticket's own state)
-    assert.equal(assemblePlanReviewFacts(oneRc, 'Revision 2 — addresses plan-review').route, 'plan-review');
-    assert.equal(assemblePlanReviewFacts(twoRc, 'Revision 3 — addresses plan-review').route, 'plan-review');
-    // ANY reply after the latest verdict goes to the router as text — the code does not
-    // classify it (no word-list go/hold classifier) and names no stage.
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on' }]).route, null);
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'Hold until LIN-3098 ships.' }]).route, null);
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'thanks, looking at this now' }]).route, null);
-    // An agent's own note is part of the trail, not a reply (FC 10c608df): code still settles.
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: '**Plan posted** — plan revision written.' }]).route, 'blocked');
-    assert.equal(assemblePlanReviewFacts([...threeRc, { createdAt: '2026-01-04T00:00:00Z', body: 'go on, take it to implementation' }]).route, null);
-    // Approve -> session-fit rules own it
-    assert.equal(assemblePlanReviewFacts([verdict('Approve', '2026-01-01T00:00:00Z')]).route, null);
-  });
-
-  test('a code review after a stale Revision label defers the route to the model (FC narrowing)', () => {
-    const review = { createdAt: '2026-02-01T00:00:00Z', body: '## Review — LIN-3309\n\n### Verdict\nRequest Changes — F1' };
-    const facts = assemblePlanReviewFacts([
-      RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), review,
-    ], '## Implementation Plan\n\nRevision 3 — addresses plan-review findings F1.');
-    assert.equal(facts.revised, true, 'the stale label still reads revised');
-    assert.equal(facts.landed, 'a code review is on the trail');
-    assert.equal(facts.route, null, 'the landed review hands the route to the router; no code rule sends it to implementation');
-  });
-
-  describe('a reply means a person\'s reply (FC 10c608df)', () => {
-    const twoRc = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')];
-    const rev3 = '## Implementation Plan\n\nRevision 3 — addresses plan-review 53e4757c.';
+  describe('a reply means a person\'s comment (FC 10c608df)', () => {
     const note = (body) => ({ createdAt: '2026-01-03T00:00:00Z', body });
+    const twoRc = [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')];
 
-    test('a revised plan with its planner note routes to plan-review in code (this ticket\'s own trail)', () => {
-      // LIN-3309 at 15:05: two Request Changes, then the planner's own note for Revision 3.
-      const facts = assemblePlanReviewFacts([...twoRc, note('**Plan revised in the description (`## Implementation Plan`, Revision 3), answering plan-review 53e4757c.** Plan-review is due again.')], rev3);
-      assert.deepEqual(facts.replies, [], 'the planner note is not a reply');
-      assert.equal(facts.route, 'plan-review');
-      const block = formatPlanReviewFactsBlock(facts);
-      assert.match(block, /→ Route this pass: `plan-review`/);
-      assert.match(block, /agent notes are not replies\): none/);
-    });
-
-    test('each agent note form is part of the trail, not a reply', () => {
+    test('each agent note form is part of the trail, not a person\'s comment', () => {
       for (const body of [
         '**Plan posted in the description (`## Implementation Plan`).** One PR.',
         '**Plan revision 1 written** (`## Implementation Plan` in the description).',
+        '**Plan revised in the description (`## Implementation Plan`, Revision 3), answering plan-review 53e4757c.**',
         'Revision 4 — addresses plan-review findings.',
         '**Autopilot step record — plan revision 1 done (verified); plan-review round 2 started.**',
         '## Autopilot plan step done',
       ]) {
-        assert.deepEqual(assemblePlanReviewFacts([...twoRc, note(body)]).replies, [], body);
+        assert.equal(assemblePlanReviewFacts([...twoRc, note(body)]).personSince, false, body);
       }
     });
 
-    test('a person\'s reply, an FC ruling included, still defers to the model', () => {
+    test('a person\'s comment, an FC ruling included, is one', () => {
       for (const body of ['Decision (FC): go on — take the revision.', '**Note for the plan revision (FC).** F3 is right.', 'Hold until LIN-3098 ships.']) {
-        const facts = assemblePlanReviewFacts([...twoRc, note(body)], rev3);
-        assert.equal(facts.replies.length, 1, body);
-        assert.equal(facts.route, null, body);
+        assert.equal(assemblePlanReviewFacts([...twoRc, note(body)]).personSince, true, body);
       }
     });
   });
 
-  describe('an implementation that landed ends the plan-review routing (FC 10c608df)', () => {
+  describe('work that landed after the latest verdict (FC 10c608df)', () => {
     const summary = (at = '2026-01-03T00:00:00Z') => ({ createdAt: at, body: '**Implementation complete — PR opened: https://github.com/JKershaw/LinearViewer/pull/1748** (commit e1287c0c).' });
 
-    test('an earlier Approve no longer points at implementation once a PR has landed', () => {
-      const facts = assemblePlanReviewFacts([APP('2026-01-01T00:00:00Z'), summary()]);
-      assert.equal(facts.landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
-      assert.equal(facts.route, null);
-      const block = formatPlanReviewFactsBlock(facts);
-      assert.match(block, /Implementation landed since the latest verdict: yes \(https:\/\/github\.com\/JKershaw\/LinearViewer\/pull\/1748\)/);
-      assert.match(block, /an Approve does not point at `implementation` again/);
-      assert.doesNotMatch(block, /Latest verdict is Approve → route on the session-fit answer/, 'rule 1 is not offered on a landed trail');
-      assert.doesNotMatch(block, /→ Route this pass:/);
-    });
-
-    test('a landed PR also releases a revised Request Changes trail from the code route', () => {
-      const facts = assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), summary()], '## Implementation Plan\n\nRevision 3 — addresses plan-review.');
-      assert.equal(facts.revised, true);
-      assert.deepEqual(facts.replies, [], 'the implementation summary is a stage note, not a reply');
-      assert.equal(facts.route, null, 'never plan-review again after the build');
+    test('a PR or a code review after the latest verdict is landed work', () => {
+      assert.equal(assemblePlanReviewFacts([APP('2026-01-01T00:00:00Z'), summary()]).landed, 'https://github.com/JKershaw/LinearViewer/pull/1748');
+      const review = { createdAt: '2026-02-01T00:00:00Z', body: '## Review — LIN-3309\n\n### Verdict\nRequest Changes — F1' };
+      assert.equal(assemblePlanReviewFacts([RC('2026-01-01T00:00:00Z'), review]).landed, 'a code review');
     });
 
     test('a PR only before the latest verdict, or cited in a planner note, is not landed', () => {
       assert.equal(assemblePlanReviewFacts([summary('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z')]).landed, null);
       const plannerCites = { createdAt: '2026-01-03T00:00:00Z', body: '**Plan revised in the description (Revision 2)**, grounded on https://github.com/JKershaw/LinearViewer/pull/1747.' };
-      const facts = assemblePlanReviewFacts([RC('2026-01-02T00:00:00Z'), plannerCites], 'Revision 2 — addresses plan-review');
-      assert.equal(facts.landed, null);
-      assert.equal(facts.route, 'plan-review');
+      assert.equal(assemblePlanReviewFacts([RC('2026-01-02T00:00:00Z'), plannerCites]).landed, null);
     });
   });
 
-  test('the planner template carries a line the reader regex reads (coupling test)', () => {
+  test('the planner records what a revision addresses, with no exact form for code to read', () => {
     const plan = generatePrompt('plan', REVIEW, { comments: [] }).prompt;
-    assert.ok(plan.includes('Revision N — addresses plan-review'), 'the planner writes the exact form the reader counts');
-    assert.equal('Revision 2 — addresses plan-review findings F1'.match(REVISION_LABEL_RE)[1], '2', 'the reader regex reads the concrete line');
-  });
-
-  test('the facts block renders only when a verdict exists, with the frozen precedence', () => {
-    assert.equal(formatPlanReviewFactsBlock(null), '');
-    assert.equal(formatPlanReviewFactsBlock({ verdicts: 0, count: 0, latestVerdict: null, revised: false, revisionN: 1, replies: [], commentsRead: 0 }), '');
-    const hold = formatPlanReviewFactsBlock({
-      verdicts: 1, count: 1, latestVerdict: 'request changes', revised: false, revisionN: 1,
-      replies: [{ text: 'Hold until LIN-9 ships' }], commentsRead: 2
-    });
-    assert.match(hold, /Request Changes \/ Needs Discussion since the latest Approve: 1/);
-    assert.match(hold, /A person's reply after the latest verdict \(agent notes are not replies\): "Hold until LIN-9 ships"/);
-    assert.match(hold, /hold \(stop, wait, do not proceed\) → \`blocked\`, at any count/);
-    const revised = formatPlanReviewFactsBlock({
-      verdicts: 3, count: 3, latestVerdict: 'request changes', revised: true, revisionN: 4,
-      replies: [{ text: 'go on' }], commentsRead: 8
-    });
-    assert.match(revised, /Revision landed since the latest verdict: yes \(revision 4\)/);
-    assert.match(revised, /A revision has landed since the latest verdict → \`plan-review\`, at any count/);
+    assert.match(plan, /\*\*Record what changed\*\*: add a short changelog line/);
+    assert.doesNotMatch(plan, /Code reads that number|EXACTLY this form|third verdict/i);
   });
 });
 
@@ -362,117 +233,73 @@ describe('D2: excluded kinds are refused (LIN-3309 S5)', () => {
   });
 });
 
-describe('the code route is not sent to the model (LIN-3309 F1 + addendum)', () => {
-  const bundle = (issue, comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
-  const planReviewRc = { createdAt: '2026-01-01T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Request Changes.**' };
-
-  test('getRecommendation skips the routing call when the facts settle the route', async () => {
-    setFetchImpl(async () => { throw new Error('the model must not be called for a code-settled route'); });
-    try {
-      const issue = { identifier: 'T-1', title: 't', description: '## Implementation Plan\n\nRevision 2 — addresses plan-review findings.', state: { name: 'In Progress', type: 'started' }, labels: [] };
-      const rec = await getRecommendation(issue, bundle(issue, [planReviewRc]), { apiKey: 'stub', model: 'x' });
-      assert.equal(rec.codeRoute, 'plan-review');
-      assert.equal(rec.recommendedAction, 'plan-review');
-    } finally {
-      setFetchImpl(null);
-    }
-  });
-
-  test('a Request Changes code review is left to the router (no code rule sends it to implementation)', () => {
-    const issue = { identifier: 'T-2', title: 't', description: 'do it', state: { name: 'In Progress', type: 'started' }, labels: [] };
-    const review = { createdAt: '2026-01-01T00:00:00Z', body: '## Review — T-2\n\n### Verdict\nRequest Changes — F1' };
-    // No plan-review verdict on the trail, so the code route is null; the router reads
-    // the review (a reply) and chooses — the fix-round brief then switches on in code.
-    assert.equal(resolveCodeRoutedAction(issue, { comments: [review] }), null);
-    assert.equal(resolveCodeRoutedAction(issue, { comments: [] }), null);
-  });
-});
-
-describe('code settles a route only where the router\'s earlier steps cannot apply (LIN-3309 review F1)', () => {
-  // One Request Changes, no reply: on an open, active leaf the facts settle `plan`. Every
-  // other case below must return null, so the model still runs Step 0 / Step 2 / Step 4.
+describe('the review loop bound: the one route code settles (LIN-3309)', () => {
   const open = { name: 'In Progress', type: 'started' };
   const leaf = (over = {}) => ({ identifier: 'T-9', title: 't', description: 'A plan.', state: open, labels: [], ...over });
-  const child = (id, type) => ({ id, identifier: id, title: id, state: { name: type, type } });
-  const oneRc = { comments: [RC('2026-01-01T00:00:00Z')] };
-  const threeRc = { comments: [RC('2026-01-01T00:00:00Z'), RC('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')] };
+  const bundle = (comments) => ({ parent: null, siblings: [], project: null, children: [], comments, focusedChild: null });
+  const rcs = (n) => Array.from({ length: n }, (_, i) => RC(`2026-01-0${i + 1}T00:00:00Z`));
+  const after = (body) => ({ createdAt: '2026-01-09T00:00:00Z', body });
 
-  test('control: an open, active leaf with no blockers is settled in code', () => {
-    assert.equal(resolveCodeRoutedAction(leaf(), oneRc), 'plan');
-    assert.equal(resolveCodeRoutedAction(leaf(), threeRc), 'blocked');
+  test(`${REVIEW_LOOP_BOUND} verdicts asking for changes since the latest Approve stop the loop`, () => {
+    assert.equal(REVIEW_LOOP_BOUND, 3);
+    assert.equal(reviewLoopExhausted(leaf(), rcs(2)), false);
+    assert.equal(reviewLoopExhausted(leaf(), rcs(3)), true);
+    assert.equal(reviewLoopExhausted(leaf(), [RC('2026-01-01T00:00:00Z'), ND('2026-01-02T00:00:00Z'), RC('2026-01-03T00:00:00Z')]), true);
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), APP('2026-01-08T00:00:00Z')]), false, 'an Approve resets it');
   });
 
-  test('a Canceled issue is left to the model (Step 0)', () => {
-    assert.equal(resolveCodeRoutedAction(leaf({ state: { name: 'Canceled', type: 'canceled' } }), oneRc), null);
+  test('a person\'s comment since the latest verdict lifts it; an agent note does not', () => {
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('go on, take it to implementation')]), false);
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('Hold until LIN-3098 ships.')]), false);
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('**Plan posted** — plan revision written.')]), true);
   });
 
-  test('a Done issue is left to the model (Step 0)', () => {
-    assert.equal(resolveCodeRoutedAction(leaf({ state: { name: 'Done', type: 'completed' } }), oneRc), null);
+  test('landed work since the latest verdict, or a terminal task, is not a running loop', () => {
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('Implementation landed: https://github.com/o/r/pull/7')]), false);
+    assert.equal(reviewLoopExhausted(leaf({ state: { name: 'Canceled', type: 'canceled' } }), rcs(3)), false);
+    assert.equal(reviewLoopExhausted(leaf({ state: { name: 'Done', type: 'completed' } }), rcs(3)), false);
   });
 
-  test('a Canceled issue with 3 Request Changes is not sent to `blocked` in code', () => {
-    assert.equal(resolveCodeRoutedAction(leaf({ state: { name: 'Canceled', type: 'canceled' } }), threeRc), null);
-  });
-
-  test('an open blocker is left to the model (Step 2)', () => {
-    const issue = leaf({ blockedBy: [{ identifier: 'T-1', title: 'b', state: { name: 'In Progress', type: 'started' } }] });
-    assert.equal(resolveCodeRoutedAction(issue, oneRc), null);
-  });
-
-  test('a resolved blocker does not stop code settling (Done and Canceled count as resolved)', () => {
-    const issue = leaf({ blockedBy: [
-      { identifier: 'T-1', title: 'b', state: { name: 'Done', type: 'completed' } },
-      { identifier: 'T-2', title: 'c', state: { name: 'Canceled', type: 'canceled' } }
-    ] });
-    assert.equal(resolveCodeRoutedAction(issue, oneRc), 'plan');
-  });
-
-  test('open children are left to the model (Step 4 / defer)', () => {
-    assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, children: [child('T-10', 'unstarted')] }), null);
-  });
-
-  test('all-terminal children are left to the model (Step 0: the node\'s close-out)', () => {
-    assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, children: [child('T-10', 'completed'), child('T-11', 'canceled')] }), null);
-  });
-
-  test('a focused child is left to the model (defer)', () => {
-    assert.equal(resolveCodeRoutedAction(leaf(), { ...oneRc, focusedChild: { issue: child('T-10', 'started') } }), null);
-  });
-
-  test('the routing prompt names the steer only where code may settle the route', async () => {
-    // The code-settled case makes no model call; its routing prompt is still built and
-    // recorded in the trace, so both cases are read from there.
-    const traces = [];
-    setPromptTraceRecorder((t) => traces.push(t.metaPrompt));
-    setFetchImpl(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) }));
+  test('getRecommendation stops at blocked without a routing call, with the blocked stage prompt', async () => {
+    setFetchImpl(async () => { throw new Error('the model must not be called at the bound'); });
     try {
-      const bundle = (over) => ({ parent: null, siblings: [], project: null, children: [], focusedChild: null, ...oneRc, ...over });
-      const settled = await getRecommendation(leaf(), bundle({}), { apiKey: 'stub', model: 'x' });
-      await getRecommendation(leaf(), bundle({ children: [child('T-10', 'unstarted')] }), { apiKey: 'stub', model: 'x' });
-      assert.equal(settled.codeRoute, 'plan');
-      assert.match(traces[0], /Route this pass: `plan`/);
-      assert.doesNotMatch(traces[1], /Route this pass/);
-      assert.match(traces[1], /Plan-review verdicts on the trail: 1/);
+      const rec = await getRecommendation(leaf(), bundle(rcs(3)), { apiKey: 'stub', model: 'x' });
+      assert.equal(rec.codeRoute, 'blocked');
+      assert.equal(rec.recommendedAction, 'blocked');
+      assert.equal(rec.prompt, generatePrompt('blocked', leaf(), bundle(rcs(3))).prompt);
     } finally {
       setFetchImpl(null);
-      setPromptTraceRecorder(null);
     }
   });
 
-  test('getRecommendation sends a guarded case to the model, which still sees the facts block', async () => {
+  test('the stream takes the same route and emits the reasoning and the prompt', async () => {
+    setFetchImpl(async () => { throw new Error('the model must not be called at the bound'); });
+    const events = [];
+    try {
+      const rec = await getRecommendationStream(leaf(), bundle(rcs(3)), { apiKey: 'stub', model: 'x' }, (type, data) => events.push([type, data]));
+      assert.equal(rec.codeRoute, 'blocked');
+      assert.deepEqual(events.filter(([t]) => t === 'delta').map(([, d]) => d.section), ['reasoning', 'prompt']);
+      assert.equal(events.at(-1)[0], 'done');
+    } finally {
+      setFetchImpl(null);
+    }
+  });
+
+  test('below the bound, or with a person\'s comment, the model chooses from plain facts', async () => {
     const calls = [];
     setFetchImpl(async (url, opts = {}) => {
       calls.push(JSON.parse(opts.body).messages[0].content);
-      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **review**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
+      return { ok: true, json: async () => ({ choices: [{ message: { content: '## Reasoning\n→ **plan**' }, finish_reason: 'stop' }], usage: { completion_tokens: 3 } }) };
     });
     try {
-      const issue = leaf({ state: { name: 'Canceled', type: 'canceled' } });
-      const rec = await getRecommendation(issue, { parent: null, siblings: [], project: null, children: [], focusedChild: null, ...threeRc }, { apiKey: 'stub', model: 'x' });
-      assert.equal(calls.length, 1, 'the router model is called');
-      assert.equal(rec.codeRoute, undefined);
-      assert.equal(rec.recommendedAction, 'review');
-      assert.match(calls[0], /Plan-review verdicts on the trail: 3/);
-      assert.doesNotMatch(calls[0], /Route this pass/, 'no code steer pins a stage the model must decide');
+      for (const comments of [rcs(1), rcs(2), [...rcs(3), after('Decision: go on with the revision.')]]) {
+        const rec = await getRecommendation(leaf(), bundle(comments), { apiKey: 'stub', model: 'x' });
+        assert.equal(rec.codeRoute, undefined);
+        assert.equal(rec.recommendedAction, 'plan');
+      }
+      assert.equal(calls.length, 3, 'the router model is called each time');
+      assert.match(calls[2], /- Plan-review verdicts: 3 \(3 request changes\); latest: request changes/);
+      for (const c of calls) assert.doesNotMatch(c, /Route this pass|since the latest Approve|first match wins/, 'no steer and no loop count');
     } finally {
       setFetchImpl(null);
     }
