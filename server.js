@@ -146,6 +146,7 @@ import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
 import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
 import { readRunEvidence } from './lib/run-evidence.js'
+import { createPrStateStore } from './lib/pr-state-store.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
 import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
@@ -2279,6 +2280,12 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
+// The ONE PR-state store (LIN-3311, S0 of LIN-2950): the LIN-3251 cache,
+// sliding 36/h GitHub budget and repo-allowlist cache. Every reader of run PR
+// state (the dashboard router below; the share router from LIN-2950 Phase 3)
+// gets this instance, so the budget and the `repo#number` cache are shared.
+const prStateStore = createPrStateStore()
+
 // Public share route (LIN-3243). `readOwnerIssues` composes the hardened
 // `resolveWorkspaceAccess(urlKey, ownerAccountId)` (never UNSCOPED) with the
 // provider's `fetchProjects(scope ?? token)`. It is NOT the title resolver
@@ -2906,7 +2913,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the

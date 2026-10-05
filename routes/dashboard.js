@@ -53,9 +53,8 @@ import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
-import { readRunEvidence, buildRunEvidence, summarizeChecks } from '../lib/run-evidence.js';
-import { fetchPrStatus, resolveRepoAllowlist } from '../lib/github-pr-status.js';
-import { createProxyFetch } from '../lib/proxy-fetch.js';
+import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
+import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
@@ -90,49 +89,10 @@ import { hashSession } from '../lib/session-summary-cache.js';
 // the cache (keyed on the immutable run) would serve stale content.
 const TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
 
-// PR-state cache + upstream budget (LIN-3251, S1b of LIN-2948, condition C1).
-// The whole reader result is cached per `owner/repo#number`: 15 min while the PR
-// is open, 24 h once merged or closed. Run pages share a process-wide budget of
-// 36 upstream GitHub calls in any sliding 60-minute span — a log of call
-// timestamps, not a fixed window — so the cap holds across window boundaries.
-// When it is spent the route serves the stale value or "state not reported" and
-// never lets another reader see a 403.
-const PR_STATE_OPEN_TTL_MS = 15 * 60 * 1000;
-const PR_STATE_CLOSED_TTL_MS = 24 * 60 * 60 * 1000;
-// The per-workspace repo allowlist (a tracker `fetchProjects` read) is held for
-// the open-PR TTL. Comments are re-read every poll, so this is only the filter.
-const PR_STATE_ALLOWLIST_TTL_MS = 15 * 60 * 1000;
-const PR_STATE_UPSTREAM_LIMIT = 36;
-const PR_STATE_WINDOW_MS = 60 * 60 * 1000;
-// One `fetchPrStatus` read makes up to this many upstream calls (repo probe,
-// pull, check-runs, commit status). The precheck reserves the whole read so a
-// read that starts is never cut off mid-flight (which would waste its calls).
-const PR_STATE_READ_COST = 4;
-const PR_STATE_BUDGET_EXHAUSTED = 'PR_STATE_BUDGET_EXHAUSTED';
-
-// Test seam (LIN-3251, RC2). The default whole-reader cache is process-wide so
-// the NODE_ENV=test `/test/seed-pr-status` route can prime it (reusing LIN-3247's
-// existing seed) and an e2e can assert that the primed-cache path made no live
-// GitHub call. Unit tests inject their own cache, so this shared map and the
-// counter are only used by the real server.
-const prStateSharedCache = new Map();
-let prStateUpstreamFetches = 0;
-
-/** Prime the whole-reader cache for `owner/repo#number` (test-only caller). */
-export function primePrStateCache({ repo, number, value, ttlMs = PR_STATE_CLOSED_TTL_MS, now = Date.now } = {}) {
-  prStateSharedCache.set(`${repo}#${number}`, { value, expiresAt: now() + ttlMs });
-}
-
-/** Clear the shared whole-reader cache and the live-fetch counter (test-only). */
-export function clearPrStateCache() {
-  prStateSharedCache.clear();
-  prStateUpstreamFetches = 0;
-}
-
-/** Real upstream GitHub fetches the pr-state route has made (test-only read). */
-export function prStateUpstreamFetchCount() {
-  return prStateUpstreamFetches;
-}
+// PR-state cache + upstream budget (LIN-3251) live in `lib/pr-state-store.js`
+// since LIN-3311 (one store instance, shared by every reader server.js wires).
+// The test seams stay re-exported here so `routes/test.js` is unchanged.
+export { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from '../lib/pr-state-store.js';
 
 /**
  * `[evidence]` telemetry URLs across a session's runs — the corroborating (never
@@ -299,6 +259,38 @@ export function sessionIsTerminal(session) {
   if (anchor) return loopIsTerminal(anchor);
   const loops = Array.isArray(session?.loops) ? session.loops : [];
   return loops.length > 0 && loops.every(loopIsTerminal);
+}
+
+/**
+ * Per-loop terminal state plus the "settled" verdict (LIN-3311, S2a of
+ * LIN-2950; plan-review R4). Stricter than `sessionIsTerminal`: an ANCHORED
+ * session is terminal once its anchor is, even while a reply or proposal
+ * Apply runs a follow-up loop; it is SETTLED only when the anchor rule holds
+ * AND every loop is terminal.
+ *
+ *   settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(terminal)
+ *
+ * Each loop's `terminal` is the SAME private `loopIsTerminal` (`enrichLoop` →
+ * `effectiveAgentState`, so a markerless `complete`/`error` loop counts) that
+ * `sessionIsTerminal` uses — not the marker-only `gateFacts` view of the run
+ * paragraph module, which is deliberately left alone (LIN-3253). The
+ * returned `loops` array is the one the check counted, so a key built from it
+ * (LIN-2950's `settledKey`) agrees with the verdict by construction. A loop
+ * that never ends means "never settles", the safe direction.
+ *
+ * @param {Object} session - a reconstructed session (lean or non-lean)
+ * @returns {{ settled: boolean, loops: Array<{ loopId: (string|null), terminal: boolean }> }}
+ */
+export function sessionSettleState(session) {
+  const raw = Array.isArray(session?.loops) ? session.loops : [];
+  const loops = raw.map(loop => ({ loopId: loop.loopId ?? null, terminal: loopIsTerminal(loop) }));
+  const settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(l => l.terminal);
+  return { settled, loops };
+}
+
+/** The settled verdict alone; defined from `sessionSettleState`, never beside it. */
+export function sessionIsSettled(session) {
+  return sessionSettleState(session).settled;
 }
 
 /**
@@ -727,7 +719,13 @@ export function createDashboardRoutes({
   // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
   // store, which is process-wide in production (one router). Tests inject
   // `{ now, resolveProvider, loadRun, githubFetch, cache, allowlistCache, bucket }`.
-  prState = null
+  prState = null,
+  // LIN-3311 (S0 of LIN-2950): the ONE shared PR-state store server.js builds
+  // (`lib/pr-state-store.js`), so this router and later readers spend one 36/h
+  // budget and fill one cache. When given it wins over the store fields of the
+  // `prState` bag (`cache`/`allowlistCache`/`bucket`/`now`/`githubFetch`); the
+  // bag's route seams (`loadRun`/`resolveProvider`) still apply.
+  prStateStore: sharedPrStateStore = null
 }) {
   const router = Router();
   const loopDeps = { dispatchStore: dispatchQueueStore, agentStatusStore };
@@ -741,15 +739,14 @@ export function createDashboardRoutes({
   // first poll is picked up on the next one. The only thing cached across polls
   // is the per-workspace repo allowlist (a tracker `fetchProjects` read, not a
   // GitHub read), so a PR-state cache hit still runs no `fetchProjects`.
-  const prStateStore = {
-    cache: prStateSharedCache,
-    allowlistCache: new Map(),
-    bucket: [], // sliding log of upstream-call timestamps (ms), oldest first
-    now: Date.now,
-    resolveProvider: (workspace, selector) => resolveIssueBinding(workspace, selector),
-    loadRun: defaultLoadRun,
-    githubFetch: null,
-    ...(prState || {})
+  //
+  // Without an injected store the router builds its own from the `prState`
+  // bag: the shared process-wide cache, a fresh budget log and allowlist cache
+  // (the pre-LIN-3311 defaults, unchanged).
+  const prStateStore = sharedPrStateStore || createPrStateStore(prState || {});
+  const prStateSeams = {
+    resolveProvider: (prState && prState.resolveProvider) || ((workspace, selector) => resolveIssueBinding(workspace, selector)),
+    loadRun: (prState && prState.loadRun) || defaultLoadRun
   };
 
   /**
@@ -1353,18 +1350,14 @@ export function createDashboardRoutes({
         return res.status(404).send(renderSessionPage({ session: null, sessionId: '', urlKey: workspace.urlKey }, pageOptions));
       }
 
-      // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
-      // `feedback[]`, but scoped to this session's issues, not the whole workspace.
-      const session = await loadSessionWithTranscript(workspace.urlKey, sessionId);
-      if (!session) {
+      // The local half (LIN-3311): session, issue context, run view, stored
+      // paragraph — Mongo only, no request input. Everything below that reads
+      // `req` or is owner-only stays in this route.
+      const local = await loadRunLocal(workspace.urlKey, sessionId);
+      if (!local) {
         return res.status(404).send(renderSessionPage({ session: null, sessionId, urlKey: workspace.urlKey }, pageOptions));
       }
-
-      // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
-      // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
-      // loops cannot be cache-joined and are skipped best-effort (mirrors the
-      // lazy-hydration discipline). Never call the generating path on load.
-      const issueContext = await joinSessionIssueContext(session, workspace.urlKey);
+      const { session, issueContext, anchorLoop, anchorIssueTitle, runView, runParagraph } = local;
 
       // Session-level "waiting on user" banner (LIN-1005): the SAME rollup the
       // observation feed uses, computed here over the non-lean session's enriched
@@ -1407,10 +1400,8 @@ export function createDashboardRoutes({
       // rejects followUpTo for those anyway). Each run's own box replies via its
       // own `loop.target`, so the session-wide target no longer needs deriving
       // here — only the gate (from the anchor run) is still needed.
-      const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
       const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
-      const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
 
       // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
       // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
@@ -1419,9 +1410,6 @@ export function createDashboardRoutes({
       // per LIN-1585). The verdict itself is Beat 1's, computed inside
       // `listCredentialHealth`; nothing here re-derives it.
       const credentialByToken = await readSessionCredentials(workspace.urlKey, session);
-
-      // The run view model is built ONCE here (the renderer only formats it).
-      const runView = buildRunView(session, { now: new Date() });
 
       // LIN-3254: the run's proposals, newest-first. Empty when the feature's
       // store is unwired; never a page-load failure.
@@ -1436,20 +1424,16 @@ export function createDashboardRoutes({
       // a broken page. The run's `stopAt`/variant come off its own dispatch row
       // (P1a/P1b): a standard run's box carries the seam-guard promise, a
       // stepped run's does not (N2).
+      //
+      // `runFacts` (a dispatch-row read) and `runnerReady` (a session feature
+      // flag) are owner inputs read here and handed to the external half.
       const runFacts = await readRunFacts(dispatchQueueStore, workspace.urlKey, session.seedIssue);
-      const runEvidence = (readRunEvidenceFn && session.seedIssue)
-        ? await readSessionRunEvidence(readRunEvidenceFn, workspace, session, anchorIssueTitle, {
-          stopAt: runFacts.stopAt,
-          variant: runFacts.variant,
-          runnerReady: getFeatureFlags(req.session).dispatch === true,
-        })
-        : null;
-
-      // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
-      // generation. A miss — or an unwired store — renders nothing.
-      const runParagraph = runParagraphStore
-        ? ((await runParagraphStore.get(workspace.urlKey, sessionId))?.paragraph || null)
-        : null;
+      const runEvidence = await readRunExternal(workspace, session, {
+        asked: anchorIssueTitle,
+        viewerIsOwner: true,
+        runFacts,
+        runnerReady: getFeatureFlags(req.session).dispatch === true,
+      });
 
       // Bare-BLOCKED card inputs (LIN-3252 S2.7): the waiting producer loop
       // carries the reply target/issue the follow-up must resume and the latest
@@ -1488,120 +1472,9 @@ export function createDashboardRoutes({
   // stale value) resolve to the "state not reported" (`unknown`) state — never a
   // 403, never a thrown read.
 
-  /**
-   * The per-workspace repo allowlist, cached for 15 min. This is a tracker
-   * `fetchProjects` read — NOT a GitHub read — so a PR-state cache hit still
-   * costs no upstream GitHub call. Comments are re-read every request, so a
-   * newly posted PR URL is found on the next poll without this cache mattering.
-   */
-  async function prStateAllowlist(workspace, provider, callScope, nowMs) {
-    const cached = prStateStore.allowlistCache.get(workspace.urlKey);
-    if (cached && cached.expiresAt > nowMs) return cached.value;
-    let allowlist;
-    try {
-      allowlist = await resolveRepoAllowlist(provider, callScope);
-    } catch {
-      allowlist = new Set();
-    }
-    prStateStore.allowlistCache.set(workspace.urlKey, { value: allowlist, expiresAt: nowMs + PR_STATE_ALLOWLIST_TTL_MS });
-    return allowlist;
-  }
-
-  /** The C1 TTL for a reader result: 15 min while open, else 24 h. */
-  function prStateTtlMs(result) {
-    const open = result && result.readable !== false && result.merged !== true && result.state === 'open';
-    return open ? PR_STATE_OPEN_TTL_MS : PR_STATE_CLOSED_TTL_MS;
-  }
-
-  /** Shape a reader result into the route's JSON contract. */
-  function prStatePayload(result, ref) {
-    const fallbackNumber = ref ? ref.number : null;
-    const url = ref ? ref.url : null;
-    if (!result || result.readable === false) {
-      return { state: 'unknown', number: fallbackNumber, checks: null, url };
-    }
-    const state = result.merged ? 'merged'
-      : result.state === 'open' ? 'open'
-      : result.state === 'closed' ? 'closed'
-      : 'unknown';
-    const summary = summarizeChecks(result.checks);
-    const checks = summary === 'pending' ? 'running'
-      : (summary === 'passing' || summary === 'failing') ? summary
-      : null;
-    return { state, number: result.number ?? fallbackNumber, checks, url };
-  }
-
-  function prStateUnknown(ref) {
-    return { state: 'unknown', number: ref ? ref.number : null, checks: null, url: ref ? ref.url : null };
-  }
-
-  /**
-   * The sliding upstream-call log, pruned to the last 60 minutes. Entries are
-   * timestamps (ms), oldest first, capped at the limit. A log — not a fixed
-   * `{windowStart, count}` window — is what makes the 36 cap hold in ANY
-   * 60-minute span, not just aligned windows.
-   */
-  function prStateBudget(nowMs) {
-    const log = prStateStore.bucket;
-    const cutoff = nowMs - PR_STATE_WINDOW_MS;
-    while (log.length && log[0] <= cutoff) log.shift();
-    return log;
-  }
-
-  /** Upstream calls already made in the trailing 60-minute span. */
-  function prStateBudgetUsed(nowMs) {
-    return prStateBudget(nowMs).length;
-  }
-
-  /**
-   * A fetch wrapper that spends one budget unit per real upstream call and
-   * refuses (rather than overruns) once the span's 36 are used. This is the
-   * backstop behind the precheck's whole-read reservation; the refusal is a
-   * distinct thrown code the route turns into stale/unknown, never a 403.
-   */
-  function prStateCountingFetch(fetchImpl) {
-    return async (url, opts) => {
-      const now = prStateStore.now();
-      const log = prStateBudget(now);
-      if (log.length >= PR_STATE_UPSTREAM_LIMIT) {
-        const err = new Error('run-page PR-state upstream budget exhausted');
-        err.code = PR_STATE_BUDGET_EXHAUSTED;
-        throw err;
-      }
-      log.push(now);
-      prStateUpstreamFetches += 1;
-      return fetchImpl(url, opts);
-    };
-  }
-
-  /**
-   * The cached read for one resolved PR. On a fresh cache hit nothing upstream
-   * runs. Before starting a read it reserves room for the whole 4-call read in
-   * the trailing 60-minute span; if there is no room it serves the last value
-   * (or unknown) without starting a read that could be cut off mid-flight. A
-   * failed read is fail-open: the stale value when there is one, else unknown.
-   */
-  async function readPrState(ref, nowMs) {
-    const key = `${ref.repo}#${ref.number}`;
-    const cached = prStateStore.cache.get(key);
-    if (cached && cached.expiresAt > nowMs) {
-      return prStatePayload(cached.value, ref);
-    }
-    if (prStateBudgetUsed(nowMs) + PR_STATE_READ_COST > PR_STATE_UPSTREAM_LIMIT) {
-      return cached ? prStatePayload(cached.value, ref) : prStateUnknown(ref);
-    }
-    const fetchImpl = prStateStore.githubFetch || (await createProxyFetch()) || globalThis.fetch;
-    try {
-      const result = await fetchPrStatus(prStateCountingFetch(fetchImpl), { repo: ref.repo, number: ref.number });
-      prStateStore.cache.set(key, { value: result, expiresAt: nowMs + prStateTtlMs(result) });
-      return prStatePayload(result, ref);
-    } catch (err) {
-      if (err && err.code !== PR_STATE_BUDGET_EXHAUSTED) {
-        console.error('Run PR-state read failed:', err.message);
-      }
-      return cached ? prStatePayload(cached.value, ref) : prStateUnknown(ref);
-    }
-  }
+  // The allowlist cache, sliding budget, counting fetch, TTL rule and payload
+  // shapes are `lib/pr-state-store.js`'s (LIN-3311); this route only resolves
+  // the run's PR and asks the store.
 
   router.get('/workspace/:urlKey/api/run/:runId/pr-state', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -1614,13 +1487,13 @@ export function createDashboardRoutes({
       // Re-resolve the run's PR URL on EVERY request (no run->PR pointer cache),
       // so a PR posted after the first poll is seen on the next one. Only the
       // repo allowlist (a tracker read) is cached, not the PR URL or its state.
-      const run = await prStateStore.loadRun(workspace.urlKey, runId);
+      const run = await prStateSeams.loadRun(workspace.urlKey, runId);
       if (!run || !run.issueIdentifier) {
         return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
       }
-      const { provider, callScope } = prStateStore.resolveProvider(workspace, null);
+      const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
       const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-      const allowlist = await prStateAllowlist(workspace, provider, callScope, nowMs);
+      const allowlist = await prStateStore.allowlist(workspace.urlKey, provider, callScope, nowMs);
       // Through LIN-2949's run-evidence model, not a new parser.
       const model = buildRunEvidence({
         issueIdentifier: run.issueIdentifier,
@@ -1629,15 +1502,14 @@ export function createDashboardRoutes({
         evidenceUrls: run.evidenceUrls || [],
         prStatus: null
       });
-      const urls = (model.state && model.state.prUrls) || [];
-      if (urls.length !== 1) {
+      const { status, ref } = resolveRunPrRef(model);
+      if (status !== 'one') {
         // zero PRs -> "none"; several -> withhold (never pick one silently)
-        const state = urls.length === 0 ? 'none' : 'unknown';
+        const state = status === 'none' ? 'none' : 'unknown';
         const payload = { state, number: null, checks: null, url: null };
         return res.json({ ...payload, message: prStateCopy(payload) });
       }
-      const ref = { repo: urls[0].repo, number: urls[0].number, url: urls[0].url };
-      const payload = await readPrState(ref, nowMs);
+      const payload = await prStateStore.readPayload(ref, nowMs);
       return res.json({ ...payload, message: prStateCopy(payload) });
     } catch (error) {
       console.error('Run PR-state error:', error.message);
@@ -1773,36 +1645,102 @@ export function createDashboardRoutes({
   }
 
   /**
-   * Build the run-evidence model for the session page (LIN-3247). The provider
-   * read is delegated to the injected `readRunEvidence` (lib/run-evidence.js)
-   * so the page route stays free of the reader's internals and tests can skip
-   * it. Fail-open: any error renders no evidence, never a broken page.
+   * The run page's LOCAL half (LIN-3311, S2a of LIN-2950): everything the page
+   * model needs that is Mongo-only and request-free — the NON-lean session
+   * (LIN-1021 point-read), the brief/recap cache-join, the anchor loop and its
+   * title, the run view, and the stored run paragraph. No tracker or GitHub
+   * read, no `req`, no owner-only input, so a non-request caller (LIN-2950's
+   * share reader) can run it as its cheap local probe.
+   *
+   * @param {string} urlKey
+   * @param {string} sessionId
+   * @param {{ now?: Date|string|number }} [opts] - the run view's clock
+   * @returns {Promise<null|{ session: Object, issueContext: Array, anchorLoop: (Object|null), anchorIssueTitle: (string|null), runView: Object, paragraph: (Object|null), runParagraph: (string|null) }>}
+   *   null when the session is gone; `paragraph` is the stored record
+   *   (`{ paragraph, inputHash, final, … }`), `runParagraph` its text.
+   */
+  async function loadRunLocal(urlKey, sessionId, { now = new Date() } = {}) {
+    // NON-lean, issue-scoped point-read (LIN-1021) — the transcript needs
+    // `feedback[]`, but scoped to this session's issues, not the whole workspace.
+    const session = await loadSessionWithTranscript(urlKey, sessionId);
+    if (!session) return null;
+
+    // Brief/recap cache-join over the session's distinct non-null issue UUIDs.
+    // `.get()` is a pure Mongo lookup (no LLM, null on miss); null `issueId`
+    // loops cannot be cache-joined and are skipped best-effort (mirrors the
+    // lazy-hydration discipline). Never call the generating path on load.
+    const issueContext = await joinSessionIssueContext(session, urlKey);
+
+    const anchorLoop = findAnchorLoop(session) || (session.loops && session.loops[0]) || null;
+    const anchorIssueTitle = (anchorLoop && anchorLoop.issueTitle) || null;
+
+    // The run view model is built ONCE here (the renderer only formats it).
+    const runView = buildRunView(session, { now });
+
+    // The stored run paragraph (LIN-3253, S3): ONE read-only lookup, never a
+    // generation. A miss — or an unwired store — renders nothing.
+    const paragraph = runParagraphStore
+      ? ((await runParagraphStore.get(urlKey, sessionId)) || null)
+      : null;
+
+    return { session, issueContext, anchorLoop, anchorIssueTitle, runView, paragraph, runParagraph: paragraph?.paragraph || null };
+  }
+
+  /**
+   * The run page's EXTERNAL half (LIN-3311, S2a; was LIN-3247's
+   * `readSessionRunEvidence`): the tracker evidence and the PR state the
+   * evidence model folds in, through the injected `readRunEvidence`
+   * (lib/run-evidence.js) so the route stays free of the reader's internals and
+   * tests can skip it. Skipped (null) when the reader is unwired or the run has
+   * no seed issue; fail-open: any error renders no evidence, never a broken page.
    *
    * `[evidence]` telemetry URLs from the session's runs are passed as the
    * corroborating source only — the reader never lets them be the sole PR-URL
    * source (S1).
    *
-   * @param {Function} reader
+   * Owner-only inputs come in as arguments, never read here: `viewerIsOwner`
+   * (default false), the dispatch-row `runFacts` and the `runnerReady` flag.
+   * Omitted, they take the guest-safe defaults (`stopAt: null`,
+   * `variant: 'unknown'`, not ready). `allowlist`/`readPrStatus` are passed to
+   * the reader only when given (e.g. from the shared PR-state store).
+   *
    * @param {Object} workspace
    * @param {Object} session
-   * @param {string|null} anchorIssueTitle
+   * @param {Object} [opts]
+   * @param {string|null} [opts.asked] - the "asked" line (the anchor title); falls back to the seed
+   * @param {boolean} [opts.viewerIsOwner=false]
+   * @param {{ stopAt?: ('pr'|null), variant?: string }|null} [opts.runFacts]
+   * @param {boolean} [opts.runnerReady=false]
+   * @param {Set<string>} [opts.allowlist]
+   * @param {Function} [opts.readPrStatus]
    * @returns {Promise<Object|null>}
    */
-  async function readSessionRunEvidence(reader, workspace, session, anchorIssueTitle, facts = {}) {
+  async function readRunExternal(workspace, session, {
+    asked = null,
+    viewerIsOwner = false,
+    runFacts = null,
+    runnerReady = false,
+    allowlist = null,
+    readPrStatus = null
+  } = {}) {
+    if (!readRunEvidenceFn || !session || !session.seedIssue) return null;
+    const facts = runFacts || {};
     try {
       const evidenceUrls = collectRunEvidenceUrls(session);
       const { provider, callScope } = resolveIssueBinding(workspace, null);
-      return await reader({
+      return await readRunEvidenceFn({
         issueIdentifier: session.seedIssue,
         provider,
         callScope,
-        viewerIsOwner: true,
+        viewerIsOwner: !!viewerIsOwner,
         evidenceUrls,
-        asked: anchorIssueTitle || session.seedIssue,
+        asked: asked || session.seedIssue,
         urlKey: workspace.urlKey,
         stopAt: facts.stopAt || null,
         variant: facts.variant || 'unknown',
-        runnerReady: !!facts.runnerReady,
+        runnerReady: !!runnerReady,
+        ...(allowlist ? { allowlist } : {}),
+        ...(readPrStatus ? { readPrStatus } : {}),
       });
     } catch (err) {
       console.error('Session page run-evidence read failed:', err.message);
@@ -3220,6 +3158,12 @@ export function createDashboardRoutes({
       res.json({ hydrated: false, reason: /not found/i.test(error?.message) ? 'not_found' : 'unavailable' });
     }
   });
+
+  // The run page's two request-free halves (LIN-3311, S2a of LIN-2950), so a
+  // caller outside this router (LIN-2950 Phase 3's share reader, wired in
+  // server.js) builds a run model through the SAME code as the owner page
+  // instead of a fork. Neither carries an owner-only or request-coupled input.
+  router.runLoader = { loadRunLocal, readRunExternal };
 
   return router;
 }
