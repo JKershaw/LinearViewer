@@ -759,3 +759,29 @@
    global `.status-pill--running .status-pill__dot` rule in style.css, gated
    there by prefers-reduced-motion — no page-local duplicate here. */
 .sess-run-cost { color: var(--muted); }
+
+/* ── Guest run page (LIN-3312, LIN-2950 S5b) ──────────────────────────────────
+   The page a share-link holder sees: the PR line's plain "PR #n ↗" link, the
+   per-source "as of" stamps (the PR read's own time, never the page's), and the
+   page-level capture line. No script runs on the guest page, so every clock
+   is static text stamped "as of". */
+.sess-pr-link {
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  color: var(--brand);
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+.sess-pr-asof,
+.rev-now-asof {
+  font-family: var(--font-structural);
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-left: 0.5rem;
+}
+.sess-guest-asof {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: var(--space-2) 0 0;
+}

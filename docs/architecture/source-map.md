@@ -123,6 +123,7 @@ lib/
   run-summary.js       On-demand short summary of a single autopilot run (Loop); mirrors recap.js (LIN-509)
   run-summary-cache.js Cache for AI run summaries, keyed ${workspaceId}:${loopId}, 30-day TTL (LIN-509)
   run-view.js          Pure run-page view model (LIN-3250, S1 of LIN-2948): `buildRunView(session, { now })` (no I/O) → `{ runId, title, steps[], progress, next, cost, time, waiting }`. Owns `groupLoopsByLineage` (moved here from render-session.js, one definition), the fixed spine `plan → implementation → review → close-out`, `tierOf(model)` (premium/standard/small/"not reported" by family; the identifier is never printed), the honest cost reduce (last valid `[usage]` per lineage; a header total only when every lineage is priced and cumulative, never 0/partial/pricedUsd), the active/wall clocks, and the waiting clock (scans `[blocked]` by kind, skipping the three decision-lifecycle stamp kinds). The route builds it ONCE and passes it to render-session.js
+  guest-run.js         Strict guest run projection for a shared run link (LIN-3312, Phase 2 of LIN-2950): `guestSession()` (idempotent allow-list copier shared by the projection and `renderSessionPage(…, {guest:true})`), the evidence cut to `{evidence, ledger, closeOut:{status}}`, the workspace-key scrub, `paragraphKey`/`settledKey`, `lastFinishedAt` (computed from the LIVE session) and the pure settling gate. Library only until Phase 3 wires `/s/:token`
   session-summary.js   On-demand summary of a whole autopilot session (sessionId group) prompt + handling (LIN-592)
   session-summary-cache.js  Cache for AI session summaries (LIN-592)
   dispatch-terminal.js Terminal-marker detection for dispatch runs ([done]/[failed]/… feedback → terminal status); shared by proxy watch endpoints + dashboard Loop feed (LIN-400/LIN-509)
@@ -172,6 +173,7 @@ lib/
   free-tier-store.js   Free tier usage tracking and rate limiting
   secret-scan.js       High-confidence secret scanner for source and served JS (LIN-2573)
   scan-public-pages.js Public pages crawler and secret scanner (landing, /kpis, /archive/:n; LIN-2573)
+  share-run-scan.js    `scanGuestHtml()`: `scanText` over the final guest run page, failing closed (LIN-3312, LIN-2950 S7a)
   proxy-tokens.js      Proxy token hashing and validation
   proxy-events.js      Proxy event audit logging
   proxy-fetch.js       Proxy-aware fetch for HTTP_PROXY environments
