@@ -52,7 +52,7 @@ Since LIN-3300 this is the one path for every recommendation: an LLM (via OpenRo
 2. Are there blockers or bugs?
 3. Is planning needed, or is it ready for implementation?
 
-The routing prompt includes every recommendable template's `aiHint` metadata (situation, goal, workflow) so the LLM can select the most appropriate one; it writes no prompt.
+The routing prompt (the stage selector) lists every recommendable stage as it describes itself (its purpose, and its `route`: when, when not, what it requires) beside the rules for choosing, so the LLM can select the most appropriate one; it writes no prompt.
 
 **Two-tier context mode** (for parent tasks with subtasks): the routing prompt receives both a parent overview (all subtasks at a glance) and focused context for the recommended next subtask.
 
@@ -157,7 +157,7 @@ The planned feature — **follow-on prompts triggered by Claude Code** — would
 
 | Component | File | Role |
 |-----------|------|------|
-| Template definitions | `lib/prompt-template-defs.js` | 17 prompt templates with `aiHint` and `completionSignals` |
+| Template definitions | `lib/prompt-template-defs.js` | 17 prompt templates with `route` and `completionSignals` |
 | Template engine | `lib/prompt-templates.js` | `generatePrompt()` entry point, availability rules |
 | Formatting helpers | `lib/prompt-formatters.js` | Shared section formatters |
 | Routing prompt | `lib/stage-router.js` | AI decision tree for recommendation (picks the stage) |

@@ -8,7 +8,7 @@
  *
  * Three questions, one model:
  *   1. routing   — a `choice` over the recommender's own action vocabulary
- *                  (getAIRecommendationActionNames, criteria = each template's aiHint.situation),
+ *                  (getSelectableStages names, criteria = each template's route.when (was aiHint.situation)),
  *                  graded against the seven real frozen routing fixtures
  *                  (scripts/eval/fixtures/*.json, their `expect` / `avoid` sidecars).
  *   2. operator  — a `noul` "does this task carry a decision only the operator can make", asked
@@ -31,7 +31,7 @@
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { getAIRecommendationActionNames, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
+import { getSelectableStages, PROMPT_TEMPLATES } from '../../lib/prompt-templates.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KEY = process.env.OPENROUTER_API_KEY;
@@ -55,8 +55,8 @@ const fixtures = readdirSync(FIXTURE_DIR)
 // node has an open child to descend into (lib/prompts/meta-prompt-template.js). Scoped to this
 // re-test only — not a general leaf detector, and not a production change.
 const situationByName = {};
-for (const t of Object.values(PROMPT_TEMPLATES)) if (t.aiHint) situationByName[t.name] = t.aiHint.situation;
-const ACTIONS = getAIRecommendationActionNames().filter((name) => name !== 'defer');
+for (const t of Object.values(PROMPT_TEMPLATES)) if (t.route) situationByName[t.name] = t.route.when;
+const ACTIONS = getSelectableStages().map((s) => s.name).filter((name) => name !== 'defer');
 const routingCriteria = Object.fromEntries(ACTIONS.map((name) => [name, situationByName[name]]));
 // Fixture sidecars say "implementation" where the vocabulary says "implement".
 const norm = (a) => (a === 'implementation' ? 'implement' : a);

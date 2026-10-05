@@ -360,6 +360,8 @@ async function armIncumbentRaw(bundle, evalCallId, recorders) {
     parent: bundle.parent, siblings: bundle.siblings || [], siblingsTotal: bundle.siblingsTotal || 0,
     project: bundle.project, children: bundle.children || [], comments: bundle.comments || [],
     focusedChild: bundle.focusedChild || null,
+    // The task's recent runs (LIN-3300), passed as the live routes pass them.
+    runs: bundle.runHistory?.runs || [],
   };
   const callMeta = { evalCallId, issueIdentifier: issue.identifier };
   const t0 = performance.now();

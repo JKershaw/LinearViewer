@@ -92,8 +92,8 @@ describe('one routing call, then code assembles the stage prompt', () => {
     await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k' });
     assert.equal(calls.length, 1);
     assert.doesNotMatch(calls[0].content, /## Prompt Structure|Quality rules for generated prompts|\n## Prompt\n|Generate a tailored prompt/);
-    assert.match(calls[0].content, /## CRITICAL: Sequential Workflow Decision/);
-    assert.match(calls[0].content, /→ \*\*<action>\*\*/);
+    assert.match(calls[0].content, /## How to choose/);
+    assert.match(calls[0].content, /→ \*\*<stage>\*\*/);
   });
 
   test('every routable stage: the prompt is generatePrompt, every format once, grounding once', async () => {

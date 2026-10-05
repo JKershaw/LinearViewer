@@ -24,6 +24,7 @@ import { isRecommendationEnabled, getRecommendation, getRecommendationStream, ge
 import { resolveChatCredential, checkFreeTierGate, buildRunGate } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
+import { loadRecentRuns } from '../lib/recent-runs.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
 
 // Shared cross-hop budget for the recommend recursion (LIN-329) on the human UI
@@ -1019,7 +1020,8 @@ ${goal}`
               ctx.issue,
               // Forward `attachments` (LIN-777) so the routing prompt and the stage
               // prompt carry the ## Attachments section on this recommendation hop.
-              { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
+              { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments,
+                runs: await loadRecentRuns(dispatchQueueStore, workspace.urlKey, ctx.issue.identifier) },
               { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null,
                 signal: hop.signal,
                 callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } }
@@ -1361,7 +1363,8 @@ ${goal}`
                 ctx.issue,
                 // Forward `attachments` (LIN-777) so the routing and stage prompts
                 // carry the ## Attachments section on each descent hop.
-                { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments },
+                { parent: ctx.parent, siblings: ctx.siblings, project: ctx.project, children: ctx.children, comments: ctx.comments, focusedChild: ctx.focusedChild, attachments: ctx.attachments,
+                  runs: await loadRecentRuns(dispatchQueueStore, workspace.urlKey, ctx.issue.identifier) },
                 { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null, signal: hop.signal,
                   callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } },
                 (type, data) => {
@@ -1432,7 +1435,7 @@ ${goal}`
           // Forward `attachments` (LIN-777) so the terminal hop's routing and stage
           // prompts carry the ## Attachments section, matching the proxy
           // recommendation path. fetchRecommendationContext carries it (LIN-772/773).
-          { parent, siblings, project, children, comments, focusedChild, attachments },
+          { parent, siblings, project, children, comments, focusedChild, attachments, runs: await loadRecentRuns(dispatchQueueStore, workspace.urlKey, issue.identifier) },
           {
             apiKey: apiKeyToUse,
             model: selectedModel,

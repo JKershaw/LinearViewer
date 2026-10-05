@@ -16,20 +16,11 @@ import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
-import { formatAIHintsForMetaPrompt, getAIRecommendationActionNames } from '../../lib/prompt-templates.js';
-import { formatAllSignalsForMetaPrompt } from '../../lib/completion-signals.js';
+import { buildSelectorArgs } from '../../lib/openrouter.js';
 
-const text = buildRouterPrompt({
-  issueContext: '{{ISSUE_CONTEXT}}',
-  identifier: '{{IDENTIFIER}}',
-  hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-  hasComments: false, commentCount: 0,
-  aiHints: formatAIHintsForMetaPrompt(),
-  actionVocabulary: getAIRecommendationActionNames().join(', '),
-  completionSignals: formatAllSignalsForMetaPrompt(),
-  focusedSubtaskId: null,
-  featureFlags: {}
-});
+// The facts a leaf with no comments and no plan gets (LIN-3300: the selector's facts).
+const leaf = buildSelectorArgs({ identifier: '{{IDENTIFIER}}', title: '', state: {}, labels: [] }, {});
+const text = buildRouterPrompt({ ...leaf, view: '{{ISSUE_CONTEXT}}', featureFlags: {} });
 
 const out = join(dirname(fileURLToPath(import.meta.url)), 'meta-prompt.baseline.txt');
 writeFileSync(out, text);

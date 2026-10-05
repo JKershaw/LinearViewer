@@ -99,7 +99,7 @@ The `/llms.txt` file provides guidance for AI agents navigating the site, includ
 
 ## Invariants
 
-- One path for every recommendation: a routing call (`lib/openrouter.js` → `lib/stage-router.js`) picks the stage and `generatePrompt()` (`lib/prompt-templates.js`) assembles its prompt; no model writes a prompt. Prompt-behavior changes (feature flags, workflow instructions, context formatting) land in the stage templates, routing changes in the router; full detail in `docs/architecture/prompt-system.md`.
+- One path for every recommendation: the stage selector (`lib/openrouter.js` → `lib/stage-router.js`) picks the stage from the stages' own descriptions, rules written once and facts computed in code, and `generatePrompt()` (`lib/prompt-templates.js`) assembles its prompt; no model writes a prompt, and code settles only the review loop bound. Prompt-behavior changes (feature flags, workflow instructions, context formatting) land in the stage templates, routing changes in the selector; full detail in `docs/architecture/prompt-system.md`.
 - This file must stay ≤110 lines / ≤12,000 bytes (bytes binding); the `docs/architecture/` citations above must resolve to real content, not just to an existing file.
 - `ci-success` must be green on a PR before merging (it aggregates the unit and e2e jobs).
 - A PAT-mode session still supports OAuth if OAuth vars are configured; see `docs/architecture/auth.md`.

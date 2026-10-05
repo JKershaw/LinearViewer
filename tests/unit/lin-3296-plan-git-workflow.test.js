@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { generatePrompt } from '../../lib/prompt-templates.js';
 import { buildRouterPrompt } from '../../lib/stage-router.js';
+import { buildSelectorArgs } from '../../lib/openrouter.js';
 import { FEATURE_DEFAULTS, getFeatureFlags, isValidFeatureKey } from '../../lib/feature-defaults.js';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 
@@ -35,13 +36,8 @@ test('implementation still branches and opens a PR', () => {
 });
 
 test('the routing prompt has no git workflow block', () => {
-  const p = buildRouterPrompt({
-    issueContext: 'CTX', identifier: 'TEST-1',
-    hasSubtasks: false, subtaskCount: 0, completedCount: 0, inProgressCount: 0, remainingCount: 0,
-    hasComments: false, commentCount: 0, aiHints: 'H', actionVocabulary: 'plan, implementation',
-    completionSignals: 'S', focusedSubtaskId: null, isTerminal: false, hasOpenChildren: false,
-    featureFlags: {}
-  });
+  const p = buildRouterPrompt(buildSelectorArgs(
+    { identifier: 'TEST-1', title: 't', description: 'd', state: { name: 'Todo', type: 'unstarted' }, labels: [] }, {}));
   assert.ok(!p.includes('## Git Workflow'));
 });
 
