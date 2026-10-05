@@ -414,7 +414,7 @@
         + '<div class="opened-task-proxy-faq">'
         + '<p>With this on, every prompt you copy, download or dispatch carries a workspace API access block so your agent can read and update your tasks through Harbour\u2019s own API. Each copy mints a fresh single-use read/write token, valid for 48 hours, and it appears in this prompt only.</p>'
         + '<p>It also enables the proxy page and nav link, Autopilot prompts and next-run dispatch, and it removes the \u201cproxy off\u201d notices on the surfaces that need it.</p>'
-        + '<p>Token creation is capped at 10 per 15 minutes for everyone sharing an address. If the cap is reached, the copy or download still completes but skips the agent-access block, and a note beside the toggle says so \u2014 try again in a few minutes.</p>'
+        + '<p>Token creation for prompt copies is capped at 60 per 15 minutes per account. If the cap is reached, the copy or download still completes but skips the agent-access block, and a note beside the toggle says so \u2014 try again in a few minutes.</p>'
         + '<p>Turn it off any time by pressing <strong>+proxy</strong> again, or by switching off <strong>Linear API proxy</strong> in <a href="/workspace/'
         + esc(opts.urlKey || '')
         + '/settings">Settings</a>.</p>'

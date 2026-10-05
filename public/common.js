@@ -1897,7 +1897,7 @@ window.ProxyToggle = (function () {
   // LIN-2944 P3 R1: when the toggle-path mint is refused with 429, the append
   // skips (the copy/download still completes without the block) and this
   // one-shot flag tells the caller to show the notice. Consumed by the caller.
-  const RATE_LIMIT_SKIP_NOTICE = 'The agent-access link was skipped — the token limit was reached (10 per 15 minutes). Try again in a few minutes.';
+  const RATE_LIMIT_SKIP_NOTICE = 'The agent-access link was skipped — the token limit was reached (60 per 15 minutes per account). Try again in a few minutes.';
   let rateLimitSkip = false;
   function takeRateLimitNotice() {
     const v = rateLimitSkip;
@@ -2156,10 +2156,11 @@ window.ProxyToggle = (function () {
    * refused, throws the mapped `DRIVER_COPY_ERROR_COPY` text — there is no
    * grant-less fallback. The unforced (toggle) path is unchanged.
    *
-   * LIN-2944 P3 R1: the unforced toggle path treats a 429 (the 10-per-15-min
-   * token limiter) as a SKIP, not a failure — the prompt is returned unchanged
-   * so the copy/download completes, and `takeRateLimitNotice()` reports the skip
-   * so the caller can name it. Every other mint failure still throws.
+   * LIN-2944 P3 R1: the unforced toggle path treats a 429 (the default-copy
+   * per-account token limiter, 60/15min) as a SKIP, not a failure — the prompt
+   * is returned unchanged so the copy/download completes, and
+   * `takeRateLimitNotice()` reports the skip so the caller can name it. Every
+   * other mint failure still throws.
    * @param {string} text
    * @param {string} urlKey
    * @param {{ force?: boolean }} [opts]

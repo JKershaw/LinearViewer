@@ -26,8 +26,25 @@ import { ownerMintRefusal } from '../lib/owner-mint-refusals.js';
 // from accumulating for the 90-day default TTL, give them a short TTL so they
 // self-prune. 48h comfortably outlives the 24h dispatch-queue item lifetime
 // plus the agent run that consumes the token, while bounding the exposure window.
-const PROMPT_PROXY_LABEL = 'prompt-proxy';
+export const PROMPT_PROXY_LABEL = 'prompt-proxy';
 const PROMPT_PROXY_TOKEN_TTL_SECONDS = 48 * 60 * 60;
+
+/**
+ * The default ("prompt-proxy") copy mint, as the client sends it: the toggle
+ * path's `getOrCreateToken` posts exactly `{ label: 'prompt-proxy',
+ * scope: 'readWrite', bootstrap: true }` (public/common.js). Both halves are
+ * required so the per-account allowance below is scoped to the actual
+ * default-copy token and not to any other request that merely borrows the
+ * label (the label is client-supplied). Exported so `routes/proxy.js` can key
+ * its `defaultCopyTokenCreationLimiter` off the SAME definition the route uses,
+ * with no string duplicated across the two files.
+ */
+export function isDefaultCopyMint(req) {
+  const body = req?.body;
+  return !!body
+    && body.label === PROMPT_PROXY_LABEL
+    && (body.bootstrap === true || body.bootstrap === 'true');
+}
 
 // LIN-3131 S2b.2 / LIN-3137 — the P5 refusal vocabulary for the owner-checked
 // runner copy mint now lives in the shared lib/owner-mint-refusals.js, so this
@@ -82,14 +99,27 @@ function invalidPurpose(res) {
  * @param {Object} deps.proxyEventStore - Proxy event/audit storage instance
  * @param {Function} deps.workspaceFromUrl - Session-cookie workspace resolution middleware
  * @param {Function} deps.proxyTokenCreationLimiter - Per-IP rate limiter middleware, POST /tokens only (process-global across every createProxyRoutes() instance; injected here rather than redeclared so that lifetime is preserved)
+ * @param {Function} deps.defaultCopyTokenCreationLimiter - Per-ACCOUNT rate limiter for the default-copy mint only, mounted as path-scoped middleware on the tokens path; keys on req.session.accountId (LIN-2944 P3, ruling lin2944-p3-r1-mint-limit)
  */
-export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter }) {
+export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter, defaultCopyTokenCreationLimiter }) {
   const router = Router();
 
   /**
    * POST /workspace/:urlKey/api/proxy/tokens
    * Create a new proxy token.
+   *
+   * LIN-2944 P3 (ruling lin2944-p3-r1-mint-limit): with the proxy on by
+   * default, every task-prompt copy/download mints the default-copy token, so
+   * it carries its own per-account budget. The limiter is mounted as its own
+   * path-scoped middleware just below rather than inline on the POST chain,
+   * because the LIN-2534 source-text witnesses pin that chain's literal shape
+   * (`proxyTokenCreationLimiter, workspaceFromUrl, async`). `skip()` keeps it
+   * to the default-copy mint only; proxyTokenCreationLimiter skips exactly
+   * those requests. Every other mint is still bounded per IP by the first
+   * limiter.
    */
+  router.use('/workspace/:urlKey/api/proxy/tokens', defaultCopyTokenCreationLimiter);
+
   router.post('/workspace/:urlKey/api/proxy/tokens', proxyTokenCreationLimiter, workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
 

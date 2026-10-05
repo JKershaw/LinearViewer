@@ -13,14 +13,14 @@
  */
 
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { createDedupeCache, createGenerationTracker } from '../lib/proxy-dedupe.js';
 import { createCredentialTrail } from '../lib/proxy-credential-trail.js';
 import { buildInstructions } from '../lib/proxy-instructions.js';
 import { createAgentStatusRoutes } from './proxy-agent-status.js';
 import { createProxyHaltRoutes } from './proxy-halt.js';
 import { createRulingsRoutes } from './proxy-rulings.js';
-import { createTokensAdminRoutes } from './proxy-tokens-admin.js';
+import { createTokensAdminRoutes, isDefaultCopyMint } from './proxy-tokens-admin.js';
 import { createTokenExchangeRoutes } from './proxy-token-exchange.js';
 import { createReadRoutes } from './proxy-reads.js';
 import { createProxyWriteRoutes } from './proxy-writes.js';
@@ -268,13 +268,44 @@ const proxyLimiter = rateLimit({
 // per-instance instead, which is a behaviour change (LIN-679 Stage 2 /
 // LIN-2534 plan-review R4). Group A's sub-router (routes/proxy-tokens-admin.js)
 // receives this instance injected, never redeclares it.
+//
+// LIN-2944 P3 (ruling lin2944-p3-r1-mint-limit): this per-IP budget stays the
+// bound for every token creation EXCEPT the default ("prompt-proxy") copy
+// mint, which is now default-on and gets its own per-account budget below. A
+// default-copy request that carries a session account is skipped here; one
+// without an account still falls through to this per-IP limit.
 const proxyTokenCreationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many token creation requests, please try again later' },
-  skip: () => process.env.NODE_ENV === 'test'
+  skip: (req) => process.env.NODE_ENV === 'test' || (isDefaultCopyMint(req) && !!req.session?.accountId)
+});
+
+// LIN-2944 P3 (ruling lin2944-p3-r1-mint-limit): the proxy is on by default, so
+// every task-prompt copy/download mints the default-copy token. The per-IP
+// proxyTokenCreationLimiter above (10 / 15 min, shared by everyone behind one
+// address) is too small for that default-on path — the 11th copy got a 429.
+// The default-copy mint therefore gets its OWN allowance, keyed per account
+// (`req.session.accountId`, resolved by the session middleware mounted before
+// the proxy router), HIGHER than the per-IP limit but still bounded — an
+// account cannot mint without limit (the `skip` below removes exactly one
+// clause from the unbounded set). Every other token creation keeps the per-IP
+// limit above. Mounted as path-scoped middleware in routes/proxy-tokens-admin.js;
+// `skip` excludes any non-default-copy mint and any no-account default-copy
+// (which the per-IP limiter still counts).
+const DEFAULT_COPY_TOKEN_LIMIT = 60;
+const defaultCopyTokenCreationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: DEFAULT_COPY_TOKEN_LIMIT,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many token creation requests, please try again later' },
+  keyGenerator: (req) => req.session?.accountId
+    ? `account:${req.session.accountId}`
+    : ipKeyGenerator(req.ip),
+  skip: (req) => process.env.NODE_ENV === 'test' || !isDefaultCopyMint(req) || !req.session?.accountId
 });
 
 // MAX_NAME_LENGTH / MAX_DESCRIPTION_LENGTH now imported from
@@ -1441,7 +1472,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group A tokens-admin (LIN-679 Stage 2 / LIN-2534): extracted to
   // routes/proxy-tokens-admin.js, mounted at its original position.
-  router.use(createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter }));
+  router.use(createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter, defaultCopyTokenCreationLimiter }));
 
   // =========================================================================
   // Consumer API - Agent Instructions (llms.txt)
