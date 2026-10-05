@@ -286,7 +286,7 @@ export function createKickoffRoutes({
         // `selector` stays absent and the seam's query-selector fallback is
         // preserved. Selection-only — the credential is the Connection's.
         const issueBindingSelector = (issueSource != null || issueBindingScope != null) ? { source: issueSource, bindingScope: issueBindingScope } : undefined;
-        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
+        const { token: accessToken, reason, provider, selectedBinding } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
         // LIN-1980: stamp before any other logic (incl. the !accessToken early
         // return below) so the fingerprint is present even when this request
         // later 401s from a shared credential another site marked suspect.
@@ -312,9 +312,10 @@ export function createKickoffRoutes({
         issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
         resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
         // The seam above resolved the complete pair (an unknown one refused), so
-        // stamp the trimmed values it matched; a lone `source` hint stamps none.
+        // stamp the trimmed values it SELECTED (`selectedBinding`; none when
+        // selection never ran — review R3); a lone `source` hint stamps none.
         persistedBindingFields = (issueSource != null && issueBindingScope != null)
-          ? dispatchBindingPairFields(issueSource, issueBindingScope)
+          ? dispatchBindingPairFields(issueSource, issueBindingScope, selectedBinding)
           : {};
       }
 

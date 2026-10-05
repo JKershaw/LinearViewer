@@ -415,9 +415,11 @@ export function createDispatchRoutes({
       // `findBindingBySelector` matched, never the raw body. A repo-only /
       // issueless / abort request, or a lone `source` hint, stamps nothing (the
       // store's sparse write then adds no key). The ISSUE arm above is what
-      // validates the pair: an unknown one refuses before this point.
+      // validates the pair: an unknown one refuses before this point, and only
+      // a pair equal to the seam's reported `selectedBinding` is stamped (none
+      // when selection never ran — no owner session row, review R3).
       const persistedBindingFields = (!isAbort && issueIdentifier && issueSource != null && issueBindingScope != null)
-        ? dispatchBindingPairFields(issueSource, issueBindingScope)
+        ? dispatchBindingPairFields(issueSource, issueBindingScope, providerAccess?.selectedBinding)
         : {};
 
       if (!isAbort && issueIdentifier) {
@@ -930,7 +932,7 @@ export function createDispatchRoutes({
       // pair into the seam when the body supplies one; otherwise `selector` stays
       // absent and the seam's query-selector fallback is preserved. Selection-only.
       const issueBindingSelector = (issueSource != null || issueBindingScope != null) ? { source: issueSource, bindingScope: issueBindingScope } : undefined;
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
+      const { token: accessToken, reason, provider, selectedBinding } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { intent: BINDING_INTENT.ISSUE, ...(issueBindingSelector ? { selector: issueBindingSelector } : {}) });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -945,10 +947,11 @@ export function createDispatchRoutes({
 
       // LIN-3242 (LIN-3126 §4): persist the pair ONLY when the named-issue request
       // supplied a complete one AND the seam resolved it (an unknown pair already
-      // 422'd above). Trimmed to the values `findBindingBySelector` matched; a
-      // lone `source` hint stamps nothing.
+      // 422'd above). Trimmed to the values `findBindingBySelector` matched and
+      // checked against the seam's `selectedBinding` (none when selection never
+      // ran — review R3); a lone `source` hint stamps nothing.
       const persistedBindingFields = (issueIdentifier && issueSource != null && issueBindingScope != null)
-        ? dispatchBindingPairFields(issueSource, issueBindingScope)
+        ? dispatchBindingPairFields(issueSource, issueBindingScope, selectedBinding)
         : {};
 
       // ── Verb-override path (LIN-573) ──────────────────────────────────────

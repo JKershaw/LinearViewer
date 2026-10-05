@@ -587,3 +587,51 @@ describe('LIN-3242 review R2 — recommend-and-dispatch LLM arm persists only a 
     assertUnstamped(store.collection._docs[0], 'a lone source is a hint, never half a pair');
   });
 });
+
+// ── R3 (re-review): stamp only a pair the seam actually SELECTED ─────────────
+//
+// With no owner session row (logout / session expiry while a proxy token is
+// live), the connection-first arm skips selection entirely (LIN-3241 F1's
+// deliberate headless path) and serves the Connection — so `findBindingBySelector`
+// never saw the body's pair. The route must not stamp it: the seam reports the
+// binding it selected (`selectedBinding`), and only that is persisted.
+//
+// Fails before (recorded 2026-10-05, at merge head c45f8723 + the R2 tests): all
+// four return 201 with the body pair stamped —
+//   AssertionError [ERR_ASSERTION]: selection never ran, so the pair is unvalidated
+//     actual: true, expected: false
+// Mutations after the fix: the seam never reporting `selectedBinding` turns 8
+// stamp assertions red (this file + the witness); the helper ignoring it turns
+// these 4 red.
+
+describe('LIN-3242 review R3 — no owner session row: the unvalidated pair is never stamped', () => {
+  const PAIR = { issueSource: 'github', issueBindingScope: REPO_B };
+
+  test('/api/proxy/dispatch serves headless but stamps nothing', async () => {
+    const { app, store } = appWithStore(makeResolverForOwnerRow(null));
+    const res = await callProxy(app, 'POST', '/api/proxy/dispatch', { prompt: 'run me', ...ISSUE, ...PAIR });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'selection never ran, so the pair is unvalidated');
+  });
+
+  test('kickoff serves headless but stamps nothing', async () => {
+    const { app, store } = appWithStore(makeResolverForOwnerRow(null));
+    const res = await callProxy(app, 'POST', KICKOFF, { goal: 'walk the stack', target: 'cli', issueIdentifier: 'GB-1', ...PAIR });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'selection never ran, so the pair is unvalidated');
+  });
+
+  test('recommend-and-dispatch (verb-override) serves headless but stamps nothing', async () => {
+    const { app, store } = appWithStore(makeResolverForOwnerRow(null));
+    const res = await callProxy(app, 'POST', RAD, { issueIdentifier: 'GB-1', kind: 'implementation', ...PAIR });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'selection never ran, so the pair is unvalidated');
+  });
+
+  test('recommend-and-dispatch (LLM arm) serves headless but stamps nothing', async () => {
+    const { app, store } = appWithStore(withTestTokenAfterSelection(makeResolverForOwnerRow(null)));
+    const res = await callProxy(app, 'POST', RAD, { issueIdentifier: 'TEST-14', ...PAIR });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+    assertUnstamped(store.collection._docs[0], 'selection never ran, so the pair is unvalidated');
+  });
+});
