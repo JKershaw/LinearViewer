@@ -18,7 +18,10 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { createSession } from '../helpers.js';
+import { localSeedId } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { scanPublicPages } from '../../lib/scan-public-pages.js';
+import { scanText } from '../../lib/secret-scan.js';
 
 async function seedShare(request, urlKey, body) {
   const res = await request.post(`/test/seed-share?urlKey=${encodeURIComponent(urlKey)}`, { data: body });
@@ -243,5 +246,185 @@ test.describe('Share link — local scan proof (LIN-3244)', () => {
     expect(result.scannedPages).toContain('/');
     expect(result.scannedPages).toContain('/kpis');
     expect(result.scannedPages).toContain(`/s/${seeded.token}`);
+  });
+});
+// ---------------------------------------------------------------------------
+// Run share links (LIN-3313, Phase 3 of LIN-2950). The run is a REAL
+// reconstructed session on a local workspace (seeded through the dispatch API
+// as tests/e2e/run-evidence.spec.js does), its PR state primed through the
+// LIN-3251 seam (`/test/seed-pr-status` fills the shared PR-state store the
+// share reader reads, so no live GitHub call is made), and the share is created
+// through the OWNER route. The guest is a signed-out browser context with no
+// storage, reaching `/s/<token>` through the real `/s/` exemption.
+// ---------------------------------------------------------------------------
+
+const RUN_REPO = 'acme/widget';
+const RUN_PR = `https://github.com/${RUN_REPO}/pull/12`;
+const RUN_REVIEW_BODY = [
+  '## Review — seeded',
+  '',
+  'CI on `abc1234` is green.',
+  '',
+  '### What CI Did Not Prove',
+  '| # | Claim | In/Out | Discharge |',
+  '|---|---|---|---|',
+  '| L1 | the socket path handles a foreign user (EACCES) | inside | manual repro on a real host |',
+  '',
+  '**Verdict: Approve.**',
+].join('\n');
+
+async function seedRunWorkspace(page, urlKey) {
+  const id = (raw) => localSeedId(urlKey, raw);
+  const resp = await page.request.post('/test/set-local-session', {
+    data: {
+      urlKey,
+      features: { dispatch: true },
+      projects: [{ id: id('share-run-proj'), name: 'Share Run Project', content: `repo=${RUN_REPO}`, sortOrder: 1 }],
+      issues: [{
+        id: id('share-run-issue'), identifier: 'LOCAL-SR1', title: 'Shared run task', description: 'Seeded shared-run task',
+        projectId: id('share-run-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' },
+        url: `/workspace/${urlKey}/issue/${id('share-run-issue')}`,
+        comments: [
+          { id: 'c-pr', body: `Opened the pull request: ${RUN_PR}`, createdAt: '2026-07-01T10:00:00Z', user: 'Runner' },
+          { id: 'c-review', body: RUN_REVIEW_BODY, createdAt: '2026-07-02T10:00:00Z', user: 'Reviewer' },
+        ],
+      }],
+    },
+  });
+  expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+}
+
+async function seedFinishedRunFor(page, urlKey) {
+  const anchor = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LOCAL-SR1', issueTitle: 'Shared run task', target: 'cli', stopAt: 'pr' },
+  });
+  expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+  const anchorId = (await anchor.json()).item.id;
+  const worker = await page.request.post(`/workspace/${urlKey}/api/dispatch`, {
+    data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LOCAL-SR1', issueTitle: 'Shared run worker', target: 'cli', sessionId: anchorId },
+  });
+  expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+  const workerId = (await worker.json()).item.id;
+  const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner&urlKey=${urlKey}`)).json();
+  const auth = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  expect((await page.request.post(`/api/dispatch/take/${workerId}`, { headers: auth })).status()).toBe(200);
+  await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+    headers: auth, data: { message: `[evidence] opened PR ${RUN_PR}`, url: RUN_PR, urlLabel: 'PR #12' },
+  });
+  await page.request.post(`/api/dispatch/feedback/${workerId}`, { headers: auth, data: { message: '[done] landed the change' } });
+}
+
+async function discoverRunSessionId(page, urlKey) {
+  const resp = await page.request.get(`/workspace/${urlKey}/api/dashboard/sessions`);
+  expect(resp.status(), `sessions feed failed: ${await resp.text()}`).toBe(200);
+  const body = await resp.json();
+  const all = [...(body.active || []), ...(body.recent || [])];
+  const seeded = all.find(s => s.seedIssue === 'LOCAL-SR1' && String(s.sessionId || '').length > 0);
+  expect(seeded, `no reconstructed session: ${JSON.stringify(body.counts)}`).toBeTruthy();
+  return seeded.sessionId;
+}
+
+async function resetRunWorkspace(page, urlKey) {
+  await page.request.get('/test/clear-pr-status');
+  await page.goto('/test/clear-local-store');
+  await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-agent-status?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-observation-sessions?urlKey=${urlKey}`);
+  await page.goto(`/test/clear-sessions-feed-cache?urlKey=${urlKey}`);
+}
+
+test.describe('Run share link — signed-out guest (LIN-3313)', () => {
+  test.afterEach(async ({ page }) => {
+    await page.request.get('/test/clear-pr-status');
+  });
+
+  test('owner creates a run share; a signed-out /s/<token> is 200, scans clean, goes stale "as of", and 410s on revoke', async ({ page, browser, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    await resetRunWorkspace(page, urlKey);
+    await seedRunWorkspace(page, urlKey);
+    // The share owner routes are owner-gated: this session's account owns it.
+    await seedWorkspaceOwnership(page, urlKey, 'owner');
+    await seedFinishedRunFor(page, urlKey);
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: RUN_REPO, number: 12, readable: true, state: 'open', merged: false, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverRunSessionId(page, urlKey);
+    await clearShares(page.request, urlKey);
+
+    // Owner create through the REAL owner route (first snapshot read + scan).
+    const created = await page.request.post(`/workspace/${encodeURIComponent(urlKey)}/shares`, {
+      data: { subject: { kind: 'run', id: sessionId } },
+    });
+    expect(created.status(), `run share create failed: ${await created.text()}`).toBe(201);
+    const { token, url } = await created.json();
+    expect(url).toBe(`/s/${token}`);
+
+    // An unknown run is refused and mints nothing.
+    const unknown = await page.request.post(`/workspace/${encodeURIComponent(urlKey)}/shares`, {
+      data: { subject: { kind: 'run', id: 'no-such-run' } },
+    });
+    expect(unknown.status()).toBe(404);
+    expect((await unknown.json()).code).toBe('SHARE_RUN_NOT_FOUND');
+
+    // The owner list carries the run row (kind run, subject = the run id), no token.
+    const listed = await listShares(page.request, urlKey);
+    const runRow = listed.find(r => r.kind === 'run' && !r.revokedAt);
+    expect(runRow).toBeTruthy();
+    expect(runRow.subjectId).toBe(sessionId);
+    expect(JSON.stringify(listed)).not.toContain(token);
+
+    // A signed-out context (no storage) gets the run page in guest mode.
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    const consoleErrors = [];
+    guestPage.on('console', (msg) => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
+    const response = await guestPage.goto(`/s/${token}`);
+    expect(response.status()).toBe(200);
+    const headers = response.headers();
+    expect(headers['referrer-policy']).toBe('no-referrer');
+    expect(headers['cache-control']).toBe('private, no-store');
+    expect(headers['x-robots-tag']).toBe('noindex');
+    await expect(guestPage.locator('[data-testid="session-page"]')).toBeVisible();
+    await expect(guestPage.locator('[data-testid="session-title"]')).toContainText('Shared run task');
+    await expect(guestPage.locator('[data-testid="run-evidence"]')).toBeVisible();
+    await expect(guestPage.locator('[data-testid="run-evidence-done"]')).toContainText('PR #12');
+    await expect(guestPage.locator('[data-testid="session-pr-link"]')).toHaveAttribute('href', RUN_PR);
+    // Guest mode: no owner affordances, no close-out box, no back link.
+    await expect(guestPage.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
+    await expect(guestPage.locator('[data-testid="session-back"]')).toHaveCount(0);
+    await expect(guestPage.locator('[data-testid="session-run-chat"]')).toHaveCount(0);
+    await expect(guestPage.locator('[data-testid="share-stale"]')).toHaveCount(0);
+    const fullHtml = await response.text();
+    expect(fullHtml).not.toContain('data-url-key');
+    expect(scanText(fullHtml)).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+
+    // The public-pages scan over the explicit list is clean and lists the share.
+    const baseUrl = new URL(page.url()).origin;
+    const result = await scanPublicPages({ baseUrl, explicitPages: ['/', '/kpis', `/s/${token}`] });
+    expect(result.errors).toEqual([]);
+    expect(result.clean).toBe(true);
+    expect(result.scannedPages).toContain(`/s/${token}`);
+
+    // Forced stale refresh: age the snapshot past the TTL, then remove the run
+    // so the due refresh fails → last-good, marked "as of" (matrix row 6).
+    const aged = await page.request.post('/test/age-share', { data: { token, ageMs: 120_000 } });
+    expect(aged.ok()).toBeTruthy();
+    await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
+    await page.goto(`/test/clear-dispatch-history?urlKey=${urlKey}`);
+    await page.goto(`/test/clear-observation-sessions?urlKey=${urlKey}`);
+    const staleResponse = await guestPage.goto(`/s/${token}`);
+    expect(staleResponse.status()).toBe(200);
+    await expect(guestPage.locator('[data-testid="share-stale"]')).toContainText('as of');
+    await expect(guestPage.locator('[data-testid="session-title"]')).toContainText('Shared run task');
+
+    // Revoke through the owner route → the same URL is 410 with no run content.
+    await revokeShare(page.request, urlKey, runRow.id);
+    const gone = await guestPage.goto(`/s/${token}`);
+    expect(gone.status()).toBe(410);
+    expect(await gone.text()).not.toContain('Shared run task');
+
+    await guest.close();
   });
 });

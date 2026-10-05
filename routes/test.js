@@ -61,7 +61,7 @@ import { primePrStateCache, clearPrStateCache, prStateUpstreamFetchCount } from 
  * @param {Object|null} [options.taskModeStore] - Task-mode event store (LIN-2942), for /test/clear-task-mode-events
  * @returns {Router} Express router
  */
-export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, shareStore = null, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null }) {
+export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache, workspaceHaltStore, shareStore = null, getShareRunReader = null, emailTransport = null, commentDedupe = null, decisionStampDedupe = null, taskModeStore = null }) {
   const router = Router();
 
   // ── Connection-backed fixture variants (LIN-3124 PR3 checkpoint F, T27) ────
@@ -712,6 +712,15 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // `issues` overrides the default Linear mock set (for exclusion tests); a
   // parent `id` may be the human identifier and is resolved like the owner
   // route does. Returns { token, url, subject, snapshot }.
+  //
+  // LIN-3313 (S9 of LIN-2950): `subject: { kind: 'run', id: <sessionId> }`
+  // seeds a RUN share. The run itself is a real reconstructed session (seed it
+  // through the dispatch API first, as the run-evidence e2e does; prime its PR
+  // with `/test/seed-pr-status` — the LIN-3251 priming fills the shared
+  // PR-state store the reader reads), and the snapshot is built by the REAL
+  // share run reader on the owner's credential, so `/s/<token>` serves exactly
+  // what production would. The seed is NOT scanned (the route scans on every
+  // serve). An unknown run answers 404 with the reader's reason.
   router.post('/test/seed-share', async (req, res) => {
     try {
       if (!shareStore) return res.status(503).json({ error: 'no share store' });
@@ -723,8 +732,23 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
 
       const body = req.body || {};
       const subject = body.subject || { kind: 'parent', id: 'issue-1' };
+      if (subject && subject.kind === 'run' && typeof subject.id === 'string' && subject.id.trim()) {
+        const reader = typeof getShareRunReader === 'function' ? getShareRunReader() : null;
+        if (!reader) return res.status(503).json({ error: 'no share run reader' });
+        const normalized = { type: 'run', kind: 'run', id: subject.id.trim() };
+        const { reason, run } = await reader.readOwnerRun(workspace.urlKey, ownerAccountId, normalized.id);
+        if (!run) return res.status(reason === 'run_not_found' ? 404 : 503).json({ error: 'run snapshot unavailable', reason });
+        const { token, record } = await shareStore.create({
+          urlKey: workspace.urlKey,
+          workspaceId: workspace.id,
+          ownerAccountId,
+          subject: normalized
+        });
+        await shareStore.saveSnapshot(record.tokenHash, run, { at: new Date() });
+        return res.json({ token, url: `/s/${token}`, id: publicShareId(record._id), subject: normalized, snapshot: run });
+      }
       if (!subject || (subject.kind !== 'parent' && subject.kind !== 'label') || typeof subject.id !== 'string' || !subject.id.trim()) {
-        return res.status(400).json({ error: 'subject must be { kind: "parent"|"label", id }' });
+        return res.status(400).json({ error: 'subject must be { kind: "parent"|"label"|"run", id }' });
       }
       const issues = Array.isArray(body.issues) ? body.issues : testMockData.issues;
       const includeDescriptions = body.includeDescriptions === true;
@@ -745,6 +769,24 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       });
       await shareStore.saveSnapshot(record.tokenHash, snapshot, { at: new Date() });
       res.json({ token, url: `/s/${token}`, id: publicShareId(record._id), subject: normalized, snapshot });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Age a share's snapshot (LIN-3313): move `snapshotAt` and
+  // `lastRefreshAttemptAt` back by `ageMs`, so the next `/s/<token>` GET is a
+  // DUE refresh (past the 60 s TTL and interval) without waiting. Body:
+  // `{ token, ageMs }`. Touches nothing else on the record.
+  router.post('/test/age-share', async (req, res) => {
+    try {
+      if (!shareStore) return res.status(503).json({ error: 'no share store' });
+      const { token, ageMs = 120_000 } = req.body || {};
+      const record = await shareStore.getByToken(token);
+      if (!record) return res.status(404).json({ error: 'share not found' });
+      const at = new Date(Date.now() - Number(ageMs));
+      await shareStore.collection.updateOne({ _id: record._id }, { $set: { snapshotAt: at, lastRefreshAttemptAt: at } });
+      res.json({ ok: true, snapshotAt: at.toISOString() });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

@@ -15,7 +15,8 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { createHash } from 'node:crypto';
-import { ShareStore } from '../../lib/share-store.js';
+import { ShareStore, SUBJECT_KINDS, validSubject, subjectTypeForKind } from '../../lib/share-store.js';
+import { readFileSync } from 'node:fs';
 import { ensureIndexes } from '../../lib/db-indexes.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
@@ -181,5 +182,72 @@ describe('share-store', () => {
     const second = await store.revokeById(record._id, 'ws-9');
     assert.strictEqual(second.revokedAt.getTime(), stamp, 'a second revoke preserves the timestamp');
     assert.strictEqual(await store.revokeById('missing-id', 'ws-9'), null);
+  });
+
+  // --- LIN-3313 (Phase 3 of LIN-2950): the run subject ---
+
+  test('validSubject accepts the run shape beside the collection shape', () => {
+    assert.strictEqual(validSubject({ type: 'run', kind: 'run', id: 'sess-1' }), true);
+    assert.strictEqual(validSubject({ type: 'collection', kind: 'parent', id: 'p' }), true);
+    assert.strictEqual(validSubject({ type: 'collection', kind: 'label', id: 'bug' }), true);
+  });
+
+  test('validSubject rejects an unknown kind, a missing/empty id and a type that disagrees with the kind', () => {
+    const bad = [
+      null,
+      'run',
+      { type: 'run', kind: 'nope', id: 'x' },
+      { type: 'run', kind: 'run' },
+      { type: 'run', kind: 'run', id: '' },
+      { type: 'run', kind: 'run', id: 42 },
+      { type: 'collection', kind: 'run', id: 'sess-1' },
+      { type: 'run', kind: 'label', id: 'bug' },
+      { type: 'run', kind: 'parent', id: 'p' },
+      { kind: 'run', id: 'sess-1' }
+    ];
+    for (const subject of bad) assert.strictEqual(validSubject(subject), false, JSON.stringify(subject));
+  });
+
+  test('SUBJECT_KINDS is the one copy: parent, label, run; routes/share.js imports it and keeps none of its own', () => {
+    assert.deepStrictEqual([...SUBJECT_KINDS], ['parent', 'label', 'run']);
+    assert.ok(Object.isFrozen(SUBJECT_KINDS));
+    assert.strictEqual(subjectTypeForKind('run'), 'run');
+    assert.strictEqual(subjectTypeForKind('parent'), 'collection');
+    assert.strictEqual(subjectTypeForKind('label'), 'collection');
+    const routeSrc = readFileSync(new URL('../../routes/share.js', import.meta.url), 'utf8');
+    assert.ok(!/const\s+SUBJECT_KINDS\b/.test(routeSrc), 'no duplicate SUBJECT_KINDS in routes/share.js');
+    assert.match(routeSrc, /import\s*\{[^}]*\bSUBJECT_KINDS\b[^}]*\}\s*from\s*'\.\.\/lib\/share-store\.js'/);
+  });
+
+  test('create persists a run subject verbatim as { type: "run", kind: "run", id }', async () => {
+    const store = freshStore();
+    const { token, record } = await store.create({ urlKey: 'ws-r', ownerAccountId: 'acct', subject: { type: 'run', kind: 'run', id: 'sess-1', extra: 'dropped' } });
+    assert.deepStrictEqual(record.subject, { type: 'run', kind: 'run', id: 'sess-1' });
+    const fetched = await store.getByToken(token);
+    assert.deepStrictEqual(fetched.subject, { type: 'run', kind: 'run', id: 'sess-1' });
+    assert.strictEqual(fetched.includeDescriptions, false);
+    await assert.rejects(
+      () => store.create({ urlKey: 'ws-r', ownerAccountId: 'acct', subject: { type: 'collection', kind: 'run', id: 'sess-1' } }),
+      /subject must be/
+    );
+  });
+
+  test('list, revoke and saveSnapshot work for run rows like any other', async () => {
+    const store = freshStore();
+    const run = await store.create({ urlKey: 'ws-rl', ownerAccountId: 'acct', subject: { type: 'run', kind: 'run', id: 'sess-1' } });
+    await store.create({ urlKey: 'ws-rl', ownerAccountId: 'acct', subject: SUBJECT });
+    const rows = await store.listByUrlKey('ws-rl');
+    assert.deepStrictEqual(rows.map(r => r.subject.kind).sort(), ['parent', 'run']);
+
+    const projection = { session: { sessionId: 'sess-1', loops: [] }, settled: true, settledKey: 'k', capturedAt: '2026-07-04T11:00:00.000Z' };
+    const at = new Date('2026-07-04T11:00:00.000Z');
+    assert.strictEqual(await store.saveSnapshot(run.record.tokenHash, projection, { at }), true);
+    const saved = await store.getByToken(run.token);
+    assert.deepStrictEqual(saved.snapshot, projection);
+    assert.strictEqual(saved.snapshotAt.getTime(), at.getTime());
+
+    const revoked = await store.revokeById(run.record._id, 'ws-rl');
+    assert.ok(revoked.revokedAt instanceof Date);
+    assert.deepStrictEqual(revoked.snapshot, projection, 'revoke keeps the frozen snapshot; the route answers 410');
   });
 });

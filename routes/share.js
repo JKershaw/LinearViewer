@@ -7,6 +7,21 @@
  * by injection, so it imports nothing from the owner-credential / connection
  * stores and `tests/unit/connection-access-guard.test.js` stays green.
  *
+ * Run shares (LIN-3313, Phase 3 of LIN-2950) ride the SAME record, token,
+ * matrix, TTL, backoff, single-flight and limiters. What differs is chosen by
+ * `record.subject.type`:
+ *   - refresh reads through the injected `readOwnerRun` (lib/share-run-reader.js)
+ *     and stores the guest projection; a SETTLED snapshot is first checked with
+ *     the Mongo-only `probeRun` and, when the run is still settled with the
+ *     same `settledKey`, REVALIDATED (`saveSnapshot` of the same snapshot, zero
+ *     provider reads) instead of re-read. There is no TTL exemption: a settled
+ *     snapshot is still probed at most every MIN_REFRESH_INTERVAL_MS;
+ *   - serve renders `renderGuestRunPage` (the run page in guest mode), never
+ *     `renderSharePage`, and runs `scanGuestHtml` over the final HTML on EVERY
+ *     serve: a hit returns 503 with no body (PROVISIONAL #2, fail closed). A
+ *     hit at refresh keeps the last-good snapshot (row 6) and, on create,
+ *     refuses the share.
+ *
  * Every GET runs the owner/revocation matrix BEFORE any cached content:
  *   1. unknown token                                    → 404
  *   2. revoked (`revokedAt` set)                        → 410
@@ -40,8 +55,9 @@ import rateLimit from 'express-rate-limit';
 import { createHash } from 'node:crypto';
 import { badRequest, jsonError } from '../lib/errors.js';
 import { buildShareSnapshot } from '../lib/share-snapshot.js';
-import { isWellFormedShareToken } from '../lib/share-store.js';
-import { renderSharePage } from '../lib/render-share.js';
+import { isWellFormedShareToken, SUBJECT_KINDS, subjectTypeForKind } from '../lib/share-store.js';
+import { renderSharePage, renderGuestRunPage } from '../lib/render-share.js';
+import { scanGuestHtml } from '../lib/share-run-scan.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 
 export const SNAPSHOT_TTL_MS = 60_000;
@@ -105,13 +121,15 @@ export function createShareLimiters({
 export const shareReadLimiter = createShareLimiters().read;
 export const shareCreationLimiter = createShareLimiters().create;
 
-const SUBJECT_KINDS = ['parent', 'label'];
+// A run share's subject id is a sessionId; the pr-state route's bound.
+const MAX_RUN_ID_LENGTH = 200;
 
 /**
  * Validate the create body's subject. `id` is the provider-native collection
  * key: for a parent it is the parent issue's `id` (the SAME value
  * `fetchProjects` emits as `issue.parent.id` — L9), for a label it is the label
- * name. It is stored verbatim, never resolved or transformed.
+ * name, for a run (LIN-3313) the run's sessionId. It is stored verbatim, never
+ * resolved or transformed (a parent identifier is mapped to its id below).
  *
  * @param {unknown} subject
  * @returns {boolean}
@@ -122,7 +140,8 @@ function isValidSubjectInput(subject) {
     typeof subject === 'object' &&
     SUBJECT_KINDS.includes(subject.kind) &&
     typeof subject.id === 'string' &&
-    subject.id.trim().length > 0
+    subject.id.trim().length > 0 &&
+    (subject.kind !== 'run' || subject.id.trim().length <= MAX_RUN_ID_LENGTH)
   );
 }
 
@@ -161,19 +180,64 @@ function ownerRefusalResponse(res, refusal, workspace) {
   });
 }
 
-function serve(res, record, stale) {
+function isRunRecord(record) {
+  return record?.subject?.type === 'run';
+}
+
+/**
+ * Render a run snapshot as the guest run page and scan the final HTML
+ * (S7b). Never throws: a render throw (a snapshot with no session or capture
+ * time) or a scan hit/error is `{ ok: false }`.
+ *
+ * @returns {{ok: true, html: string}|{ok: false, reason: string}}
+ */
+function renderScannedRun(snapshot, snapshotAt, stale) {
+  let html;
+  try {
+    html = renderGuestRunPage({ snapshot, snapshotAt, stale });
+  } catch (err) {
+    return { ok: false, reason: 'render_error' };
+  }
+  const scan = scanGuestHtml(html);
+  if (!scan.ok) return { ok: false, reason: scan.reason || 'scan_failed' };
+  return { ok: true, html };
+}
+
+/**
+ * Serve a snapshot by subject type (S6b). A run is rendered with
+ * `renderGuestRunPage` and re-scanned on EVERY serve; a scan hit (or a render
+ * failure) answers 503 with no content, never the page (PROVISIONAL #2). The
+ * route's security headers are already set on every response.
+ */
+function serveSnapshot(res, record, { snapshot, snapshotAt, stale }) {
+  if (isRunRecord(record)) {
+    const page = renderScannedRun(snapshot, snapshotAt, stale);
+    if (!page.ok) {
+      console.warn(`Run share serve refused: ${page.reason} — LIN-3313`);
+      return res.status(503).end();
+    }
+    return res.status(200).type('html').send(page.html);
+  }
   return res.status(200).type('html').send(renderSharePage({
-    snapshot: record.snapshot,
+    snapshot,
     includeDescriptions: record.includeDescriptions,
-    snapshotAt: record.snapshotAt,
+    snapshotAt,
     stale
   }));
+}
+
+function serve(res, record, stale) {
+  return serveSnapshot(res, record, { snapshot: record.snapshot, snapshotAt: record.snapshotAt, stale });
 }
 
 /**
  * @param {Object} deps
  * @param {import('../lib/share-store.js').ShareStore} deps.shareStore
  * @param {(urlKey: string, ownerAccountId: string) => Promise<{reason: string, issues: Object[]|null}>} deps.readOwnerIssues
+ * @param {(urlKey: string, ownerAccountId: string, sessionId: string) => Promise<{reason: string, run: Object|null}>} [deps.readOwnerRun]
+ *   - the run reader (lib/share-run-reader.js); absent, run shares cannot refresh or be created
+ * @param {(urlKey: string, sessionId: string) => Promise<{reason: string, settled: boolean, settledKey: (string|null)}>} [deps.probeRun]
+ *   - the Mongo-only local probe for the settled revalidate
  * @param {(args: {workspaceId?: string, accountId?: string}) => Promise<{status: string}>} deps.workspaceOwnerCheck
  * @param {Function} [deps.workspaceFromUrl] - session/workspace middleware for the owner routes; when absent (Session A unit apps) the owner surface is not mounted
  * @param {(workspace: Object) => Object} [deps.getProviderForWorkspace] - resolves the workspace provider for the parent-share `ui.subtasks` check
@@ -185,6 +249,8 @@ function serve(res, record, stale) {
 export function createShareRoutes({
   shareStore,
   readOwnerIssues,
+  readOwnerRun,
+  probeRun,
   workspaceOwnerCheck,
   workspaceFromUrl,
   getProviderForWorkspace,
@@ -202,6 +268,78 @@ export function createShareRoutes({
   // pruning entries older than FAILURE_BACKOFF_MS on write and read.
   const attempts = new Map();
 
+  /**
+   * A collection refresh's read + build (the LIN-3243 path, unchanged).
+   * Returns `{ok:false, reason}` for a read that produced nothing; throws on a
+   * build failure (the caller's L4 catch).
+   */
+  async function readCollection(record) {
+    let outcome;
+    try {
+      outcome = await withTimeout(
+        readOwnerIssues(record.urlKey, record.ownerAccountId),
+        SHARE_REFRESH_TIMEOUT_MS
+      );
+    } catch (err) {
+      outcome = { reason: 'refresh_error', issues: null };
+    }
+    const ok = outcome != null && outcome.issues != null && outcome.reason === 'ok';
+    if (!ok) return { ok: false, reason: outcome?.reason ?? 'refresh_error' };
+    const snapshot = buildShareSnapshot({
+      subject: record.subject,
+      issues: outcome.issues,
+      includeDescriptions: record.includeDescriptions
+    });
+    return { ok: true, snapshot, reason: outcome.reason };
+  }
+
+  /**
+   * A run refresh's read (LIN-3313, S4): probe → revalidate, or full read →
+   * projection → scan. Returns `{ok, snapshot, revalidated?}` or
+   * `{ok:false, reason}`; a throw is the caller's L4 catch (row 6/7).
+   *
+   *   - REVALIDATE: the stored snapshot is settled, and the Mongo-only probe
+   *     says the run is still settled with the same `settledKey` → the stored
+   *     snapshot is re-saved as-is (zero tracker/GitHub reads). The key moves
+   *     when a loop appears, flips terminal or a marker lands (R4), so a
+   *     reopened run — a follow-up loop running, or one that started and
+   *     ended between two probes, markerless or not — gets a full read.
+   *   - FULL READ: the owner-credential reader builds a fresh projection; it
+   *     is rendered and scanned BEFORE it is stored, so a scan hit keeps the
+   *     last-good snapshot (row 6) instead of replacing it.
+   */
+  async function readRun(record) {
+    if (typeof readOwnerRun !== 'function') return { ok: false, reason: 'run_reader_unavailable' };
+    const sessionId = record.subject.id;
+    const prior = record.snapshot;
+    if (prior != null && prior.settled === true && typeof probeRun === 'function') {
+      // A probe throw/timeout propagates: a failed probe is a failed refresh.
+      const probe = await withTimeout(probeRun(record.urlKey, sessionId), SHARE_REFRESH_TIMEOUT_MS);
+      if (probe && probe.reason === 'ok' && probe.settled === true && probe.settledKey === prior.settledKey) {
+        return { ok: true, snapshot: prior, revalidated: true, reason: 'ok' };
+      }
+    }
+    let outcome;
+    try {
+      outcome = await withTimeout(
+        readOwnerRun(record.urlKey, record.ownerAccountId, sessionId),
+        SHARE_REFRESH_TIMEOUT_MS
+      );
+    } catch (err) {
+      outcome = { reason: 'refresh_error', run: null };
+    }
+    const ok = outcome != null && outcome.run != null && outcome.reason === 'ok';
+    if (!ok) return { ok: false, reason: outcome?.reason ?? 'refresh_error' };
+    // S7b: scan at refresh. The stamp the guest sees on a fresh serve is this
+    // snapshot's own capture, so render it as served (not stale).
+    const page = renderScannedRun(outcome.run, outcome.run.capturedAt, false);
+    if (!page.ok) {
+      console.warn(`Run share refresh refused: ${page.reason} — LIN-3313`);
+      return { ok: false, reason: page.reason };
+    }
+    return { ok: true, snapshot: outcome.run, reason: outcome.reason };
+  }
+
   async function refresh(record) {
     const key = record.tokenHash;
     const existing = inflight.get(key);
@@ -215,37 +353,24 @@ export function createShareRoutes({
         if (at.getTime() - ts >= FAILURE_BACKOFF_MS) attempts.delete(k);
       }
       attempts.set(key, at.getTime());
-      let outcome;
+      // A read, probe, projection, scan, store write or snapshot build failure
+      // is a REFRESH failure, not an unhandled rejection: the handler then
+      // serves last-good (row 6) or 503 (row 7). Without this the rejection
+      // escapes and production returns 500. The whole run path sits inside it
+      // (LIN-3243 L4).
       try {
-        outcome = await withTimeout(
-          readOwnerIssues(record.urlKey, record.ownerAccountId),
-          SHARE_REFRESH_TIMEOUT_MS
-        );
-      } catch (err) {
-        outcome = { reason: 'refresh_error', issues: null };
-      }
-
-      const ok = outcome != null && outcome.issues != null && outcome.reason === 'ok';
-      // A store write or snapshot build failure is a REFRESH failure, not an
-      // unhandled rejection: the handler then serves last-good (row 6) or 503
-      // (row 7). Without this the rejection escapes and production returns 500.
-      try {
-        if (!ok) {
+        const result = isRunRecord(record) ? await readRun(record) : await readCollection(record);
+        if (!result.ok) {
           // A failed attempt still stamps `lastRefreshAttemptAt` (row 7 backoff)
           // but must never disturb the last good snapshot (row 6).
           await shareStore.saveSnapshot(key, null, { at });
-          return { ok: false, reason: outcome?.reason ?? 'refresh_error' };
+          return { ok: false, reason: result.reason };
         }
-
-        const snapshot = buildShareSnapshot({
-          subject: record.subject,
-          issues: outcome.issues,
-          includeDescriptions: record.includeDescriptions
-        });
-        await shareStore.saveSnapshot(key, snapshot, { at });
+        // A revalidate re-saves the SAME snapshot, which bumps `snapshotAt`.
+        await shareStore.saveSnapshot(key, result.snapshot, { at });
         // Success persisted the stamp; a stale-record GET must not read this as a failure.
         attempts.delete(key);
-        return { ok: true, snapshot, snapshotAt: at, reason: outcome.reason };
+        return { ok: true, snapshot: result.snapshot, snapshotAt: at, reason: result.reason, revalidated: result.revalidated === true };
       } catch (err) {
         return { ok: false, reason: 'refresh_error' };
       }
@@ -312,12 +437,7 @@ export function createShareRoutes({
     if (due) {
       const result = await refresh(record);
       if (result.ok) {
-        return res.status(200).type('html').send(renderSharePage({
-          snapshot: result.snapshot,
-          includeDescriptions: record.includeDescriptions,
-          snapshotAt: result.snapshotAt,
-          stale: false
-        }));
+        return serveSnapshot(res, record, { snapshot: result.snapshot, snapshotAt: result.snapshotAt, stale: false });
       }
       if (record.snapshot != null) {
         // A stale snapshot whose refresh failed serves last-good, marked
@@ -349,6 +469,66 @@ export function createShareRoutes({
       subject: 'a share link'
     });
 
+    /**
+     * Create a RUN share (LIN-3313): the run must exist in THIS workspace (the
+     * Mongo-only probe is scoped by `urlKey`, so an unknown run and another
+     * workspace's run are both refused 404 before any credential or provider
+     * read); then the first snapshot is read on the owner's credential,
+     * rendered and scanned synchronously — no first snapshot, or a first
+     * snapshot the scan rejects, refuses the share and persists nothing.
+     */
+    async function createRunShare(req, res, normalized) {
+      const { workspace } = req;
+      if (typeof readOwnerRun !== 'function' || typeof probeRun !== 'function') {
+        return jsonError(res, 503, 'Run share links are not available here.', { code: 'RUN_SHARES_UNAVAILABLE' });
+      }
+      let probe;
+      try {
+        probe = await probeRun(workspace.urlKey, normalized.id);
+      } catch {
+        return jsonError(res, 503, 'Could not read the run to share; nothing was created. Try again.',
+          { code: 'SHARE_SNAPSHOT_UNAVAILABLE', reason: 'refresh_error' });
+      }
+      if (!probe || probe.reason !== 'ok') {
+        return jsonError(res, 404, 'Run not found in this workspace; nothing was created.', { code: 'SHARE_RUN_NOT_FOUND' });
+      }
+
+      let outcome;
+      try {
+        outcome = await readOwnerRun(workspace.urlKey, req.session.accountId, normalized.id);
+      } catch {
+        outcome = { reason: 'refresh_error', run: null };
+      }
+      if (outcome == null || outcome.run == null || outcome.reason !== 'ok') {
+        return jsonError(res, 503, 'Could not read the run to share; nothing was created. Try again.',
+          { code: 'SHARE_SNAPSHOT_UNAVAILABLE', reason: outcome?.reason ?? 'refresh_error' });
+      }
+      // S7b: a first snapshot the secret scan rejects is never stored, so the
+      // share is refused rather than minted with nothing servable.
+      const page = renderScannedRun(outcome.run, outcome.run.capturedAt, false);
+      if (!page.ok) {
+        console.warn(`Run share create refused: ${page.reason} (urlKey=${workspace.urlKey}) — LIN-3313`);
+        return jsonError(res, 422,
+          'This run\'s page did not pass the secret scan, so it cannot be shared; nothing was created.',
+          { code: 'SHARE_SCAN_REFUSED' });
+      }
+
+      let created;
+      try {
+        created = await shareStore.create({
+          urlKey: workspace.urlKey,
+          workspaceId: workspace.id,
+          ownerAccountId: req.session.accountId,
+          subject: normalized
+        });
+        await shareStore.saveSnapshot(created.record.tokenHash, outcome.run, { at: new Date() });
+      } catch (err) {
+        console.error('Share creation error:', err.message);
+        return jsonError(res, 500, 'Failed to create share link');
+      }
+      return res.status(201).json({ token: created.token, url: `/s/${created.token}` });
+    }
+
     // Create: refusal gate → subject validation → provider capability → first
     // snapshot synchronously → persist. A refused or unsupported request mints
     // nothing; a failed first read persists nothing.
@@ -359,7 +539,13 @@ export function createShareRoutes({
 
       const { subject, includeDescriptions } = req.body || {};
       if (!isValidSubjectInput(subject)) {
-        return badRequest.json(res, 'subject must be { kind: "parent"|"label", id }');
+        return badRequest.json(res, 'subject must be { kind: "parent"|"label"|"run", id }');
+      }
+      // A run share takes its own path: none of the collection branches below
+      // (the parent-only provider check and identifier mapping, descriptions)
+      // apply to it.
+      if (subject.kind === 'run') {
+        return createRunShare(req, res, { type: subjectTypeForKind('run'), kind: 'run', id: subject.id.trim() });
       }
       // L9: `id` is the provider-native key. For a parent it is the parent
       // issue's `id`, the exact value `fetchProjects` emits as `issue.parent.id`
@@ -369,7 +555,7 @@ export function createShareRoutes({
       // against the issue set this request already fetched, using the codebase's
       // existing id-or-identifier idiom (routes/proxy.js:163,
       // routes/workspace-api.js:2196). No new resolver route is added.
-      const normalized = { type: 'collection', kind: subject.kind, id: subject.id.trim() };
+      const normalized = { type: subjectTypeForKind(subject.kind), kind: subject.kind, id: subject.id.trim() };
 
       // Approving verdict (b): refuse a parent share when the provider cannot
       // represent subtasks — `github`/`github-projects` declare `ui.subtasks:
