@@ -545,3 +545,105 @@ describe('Rule D2: cycles, orphans, coverage and the RC1/RC4/RC5 precedence', ()
     assert.equal(chains[0].shape, 'orphan');
   });
 });
+
+describe('RC13: context (terminated-before-wait) is dropped, not a cover', () => {
+  test('P1: an older finished lineage does not hide a stopped current lineage of the same ticket', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-0000000000a1';
+    const contextDone = 'c0c0c0c0-0000-0000-0000-0000000000a2';
+    const stopped = 'c0c0c0c0-0000-0000-0000-0000000000a3';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        issueIdentifier: 'LIN-100',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[pending] waiting on the LIN-200 landed session to finish', '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    // Production shape: a ticket's first dispatch (contextDone) finished on
+    // 1 Oct; the current dispatch stopped. The context lineage must not cover.
+    const lineageInfo = mapOf([
+      [contextDone, { loopId: contextDone, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-01T12:00:00.000Z') }],
+      [stopped, { loopId: stopped, issueIdentifier: 'LIN-200', terminalStatus: null, lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:30:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1, `expected one orphan, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+    assert.equal(chains[0].shape, 'orphan');
+    assert.deepEqual(chains[0].members, ['ticket:LIN-200']);
+    assert.deepEqual(chains[0].leafLineages, [stopped], 'only the non-context (stopped) lineage is a leaf');
+  });
+
+  test('P2: an older finished lineage does not hide a lost-wake terminal lineage of the same ticket', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-0000000000b1';
+    const contextDone = 'c0c0c0c0-0000-0000-0000-0000000000b2';
+    const lostWake = 'c0c0c0c0-0000-0000-0000-0000000000b3';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        issueIdentifier: 'LIN-100',
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback('[pending] waiting on the LIN-200 landed session to finish', '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    const lineageInfo = mapOf([
+      [contextDone, { loopId: contextDone, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-01T12:00:00.000Z') }],
+      [lostWake, { loopId: lostWake, issueIdentifier: 'LIN-200', terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:55:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:30:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1, `expected one orphan, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+    assert.equal(chains[0].shape, 'orphan');
+    assert.deepEqual(chains[0].members, ['ticket:LIN-200']);
+    assert.deepEqual(chains[0].leafLineages, [lostWake], 'the lost-wake terminal is the only leaf');
+    assert.equal(chains[0].startedAt, '2026-10-02T09:55:00.000Z', 'onset is the lost wake, not the context mention');
+  });
+
+  test('R2: a dispatch target that finished before the wait is dropped, so a co-named stopped target still fires', () => {
+    const a = 'aaaaaaaa-0000-0000-0000-0000000000c1';
+    const contextX = 'c0c0c0c0-0000-0000-0000-0000000000c2';
+    const stoppedY = 'c0c0c0c0-0000-0000-0000-0000000000c3';
+    const rowsByLineage = mapOf([
+      [a, [row({
+        id: a,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on worker dispatch ${contextX} and worker dispatch ${stoppedY}`, '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    // X finished at 09:10, before the 09:50 wait (context); Y stopped. Keeping
+    // X's edge would let it cover the waiter and hide the Y orphan (mutation R2).
+    const lineageInfo = mapOf([
+      [contextX, { loopId: contextX, terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }],
+      [stoppedY, { loopId: stoppedY, terminalStatus: null, lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:30:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1, `expected one orphan on Y, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+    assert.equal(chains[0].shape, 'orphan');
+    assert.deepEqual(chains[0].members, [stoppedY], 'the pre-wait terminal X is dropped, not a cover');
+  });
+
+  test('parent: a parent that finished before the wait is dropped, so a co-named stopped target still fires', () => {
+    const child = 'aaaaaaaa-0000-0000-0000-0000000000d1';
+    const parent = 'dddddddd-0000-0000-0000-0000000000d2';
+    const stoppedY = 'dddddddd-0000-0000-0000-0000000000d3';
+    const rowsByLineage = mapOf([
+      [child, [row({
+        id: child,
+        sessionId: parent,
+        dispatchedAt: '2026-10-02T09:00:00.000Z',
+        feedback: [feedback(`[pending] waiting on the orchestrator to dispatch a beat; also the worker dispatch ${stoppedY}`, '2026-10-02T09:50:00.000Z')]
+      })]]
+    ]);
+    // The parent finished at 09:10, before the 09:50 wait (context). Keeping the
+    // parent edge would cover the waiter and hide the Y orphan.
+    const lineageInfo = mapOf([
+      [parent, { loopId: parent, terminalStatus: 'done', lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }],
+      [stoppedY, { loopId: stoppedY, terminalStatus: null, lineageLastActivityMs: Date.parse('2026-10-02T09:10:00.000Z') }]
+    ]);
+    const now = Date.parse('2026-10-02T10:30:00.000Z');
+    const { chains } = detectStoppedOrCircularWait({ now, waiters: waitersFor(rowsByLineage), rowsByLineage, lineageInfo });
+    assert.equal(chains.length, 1, `expected one orphan on Y, got ${JSON.stringify(chains.map((x) => [x.shape, x.members]))}`);
+    assert.equal(chains[0].shape, 'orphan');
+    assert.deepEqual(chains[0].members, [stoppedY], 'the pre-wait terminal parent is dropped, not a cover');
+  });
+});
