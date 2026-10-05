@@ -608,3 +608,45 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
     assert.equal(classifyBulkScanResult(entry), 'terminal-row-no-op');
   });
 });
+
+// LIN-3126 residual, pre-PR due rows (review `5902c5c1` "What CI Did Not
+// Prove" item 3): a row scanned before this PR stored no pair, so
+// startDueBulkScan builds an unstamped item and its POST resolves strictly,
+// 422ing BINDING_REQUIRED. This is the pool `startDueBulkScan` drives; the
+// witness proves that failure is ONE item's error — the batch still completes
+// and every other row still scans. Needs no migration: once the task is
+// re-scanned from its row, the pair is stored and the next bulk scan carries it.
+test.describe('LIN-3126 residual — an unstamped (pre-PR) due row fails per row, not the batch', () => {
+  test('one 422 row is isolated; the stamped sibling still fulfils and the run tears down', async () => {
+    const calls = [];
+    const postScan = async (urlKey, identifier, source, bindingScope) => {
+      calls.push({ identifier, source, bindingScope });
+      if (identifier === 'pre-pr-row') {
+        throw Object.assign(new Error('BINDING_REQUIRED'), { status: 422 });
+      }
+      return { ok: true };
+    };
+    const sandbox = makeSandbox(postScan);
+    const { startBulkScan, BULK_SCAN_CONCURRENCY } = sandbox.module.exports;
+    assert.ok(BULK_SCAN_CONCURRENCY >= 2, 'the fixture needs both rows in flight together');
+
+    let results = null;
+    startBulkScan(
+      [
+        { urlKey: 'acme', identifier: 'pre-pr-row' }, // no source/bindingScope — the pre-PR shape
+        { urlKey: 'acme', identifier: 're-scanned-row', source: 'github', bindingScope: 'octo/repoB' }
+      ],
+      { onTeardown: (r) => { results = r; } }
+    );
+    await flush();
+
+    assert.ok(results, 'the run tore down');
+    assert.equal(results.length, 2, 'both rows settled — one failure did not abort the batch');
+    const failed = results.find((r) => r.item.identifier === 'pre-pr-row');
+    const ok = results.find((r) => r.item.identifier === 're-scanned-row');
+    assert.notEqual(failed.outcome, 'fulfilled', 'the unstamped row is that row\'s own error');
+    assert.equal(failed.error?.status, 422, 'the 422 is recorded against the row, not swallowed');
+    assert.equal(ok.outcome, 'fulfilled', 'the stamped sibling scanned successfully');
+    assert.deepEqual(calls.map((c) => c.identifier).sort(), ['pre-pr-row', 're-scanned-row'], 'both POSTs were issued');
+  });
+});

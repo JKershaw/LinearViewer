@@ -984,3 +984,62 @@ test('deliverRulingAnswer effect=resume (and an absent effect): the ordinary com
   }
 });
 
+
+// ── LIN-3126 residual: the issue's binding selector rides the comment URL ────
+// Review `5902c5c1`'s mutation table found the `deliverReply` → `postComment`
+// and `dismissRuling` resume hops unpinned: deleting `source`/`bindingScope`
+// from either call left the unit suite green. Both now assert the URL query the
+// comment route resolves the issue's binding from.
+test('deliverReply forwards opts.source/opts.bindingScope as the comment URL selector (mutation: common.js:1019/1047)', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    return jsonResponse(true, 200, { success: true });
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli', source: 'github', bindingScope: 'octo/repoB' },
+    'hello',
+    handlers
+  );
+
+  const comment = calls.find(c => String(c.url).includes('/api/comments/'));
+  assert.ok(comment, 'a comment was written');
+  assert.match(String(comment.url), /\?source=github&bindingScope=octo%2FrepoB$/);
+});
+
+test('deliverReply without a pair leaves the comment URL byte-identical (no query)', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    return jsonResponse(true, 200, { success: true });
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.deliverReply(
+    { urlKey: 'w', issueId: 'i1', followUpTo: 'lp', target: 'cli' },
+    'hello',
+    handlers
+  );
+
+  const comment = calls.find(c => String(c.url).includes('/api/comments/'));
+  assert.match(String(comment.url), /\/api\/comments\/i1$/);
+});
+
+test('dismissRuling resume forwards opts.source/opts.bindingScope to the follow-up comment (mutation: common.js:1109-1110)', async () => {
+  const { window, calls } = makeSandbox((url) => {
+    if (String(url).includes('/api/dashboard/rulings/dismiss')) return jsonResponse(true, 200, { success: true });
+    if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
+    if (String(url).includes('/api/dispatch')) return jsonResponse(true, 200, { success: true });
+    throw new Error('unexpected fetch: ' + url);
+  });
+  const { handlers } = trackedHandlers();
+
+  await window.ReplyDelivery.dismissRuling(
+    { urlKey: 'w', stampLoopId: 'lp', decisionId: 'd-wait', followUpTo: 'lp', target: 'cli', issueId: 'i1', disposition: 'resumable', source: 'github', bindingScope: 'octo/repoB', prompt: 'proceed' },
+    handlers
+  );
+
+  const comment = calls.find(c => String(c.url).includes('/api/comments/'));
+  assert.ok(comment, 'the resumable dismiss wrote its follow-up comment');
+  assert.match(String(comment.url), /\?source=github&bindingScope=octo%2FrepoB$/);
+});

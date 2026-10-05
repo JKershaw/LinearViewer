@@ -83,21 +83,10 @@ function downloadMarkdown(text, filename) {
 // converges onto the superset (whole-string fence strip + marked-absent fallback);
 // relativeTime is the same "Behavior B" format this page's local copy seeded.
 
-/**
- * LIN-3240: the `?source=...&bindingScope=...` query for an issue-scoped fetch.
- * `bindingScope` is the row's own binding stamp (`data-binding-scope`); it is
- * forwarded only when present, so an unstamped single-binding/legacy request
- * stays byte-identical to the pre-slice `?source=...`.
- * @param {string} [source] - resolved provider name
- * @param {string} [bindingScope] - binding selector stamp
- * @returns {string} a leading-`?` query string, or ''
- */
-function sourceBindingQuery(source, bindingScope) {
-  const parts = []
-  if (source) parts.push(`source=${encodeURIComponent(source)}`)
-  if (bindingScope) parts.push(`bindingScope=${encodeURIComponent(bindingScope)}`)
-  return parts.length ? `?${parts.join('&')}` : ''
-}
+// LIN-3240 / LIN-3126 residual: `sourceBindingQuery(source, bindingScope)` now
+// lives in common.js as `window.sourceBindingQuery` (the one shared builder
+// every page script uses). This page is always loaded after common.js, so the
+// call site below resolves to it.
 
 /**
  * Load and render comments for an issue

@@ -48,6 +48,16 @@ function makeSandbox({ api } = {}) {
       addEventListener() {},
       matchMedia: () => ({ matches: false }),
       ChatUI: { appendOptions() {} },
+      // LIN-3126 residual: common.js's shared selector-query builder. On every
+      // real page common.js is loaded before observation.js; this DOM-free
+      // harness loads observation.js alone, so the shared builder is stubbed
+      // here (the real one is exercised by lin-3126-residual-forwarding.test.js).
+      sourceBindingQuery(source, bindingScope) {
+        const parts = [];
+        if (source) parts.push(`source=${encodeURIComponent(source)}`);
+        if (bindingScope) parts.push(`bindingScope=${encodeURIComponent(bindingScope)}`);
+        return parts.length ? `?${parts.join('&')}` : '';
+      },
       api: api || (async () => { throw new Error('no api stub'); })
     },
     document: {

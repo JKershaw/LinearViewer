@@ -64,7 +64,7 @@ import { settleWithConcurrency } from './dashboard.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceMirrorToken, resolveIssueBinding, resolveDefaultBinding, bindingRefusalResponse, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceMirrorToken, resolveIssueBinding, resolveDefaultBinding, resolveDefaultBindingSelection, bindingRefusalResponse, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
 import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
 import { isConnectionBacked, setBindingCredential, setWorkspaceCredential } from '../lib/connection-binding.js';
 import { fingerprintCredential } from '../lib/credential-diagnostics.js';
@@ -2694,6 +2694,20 @@ ${goal}`
     if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
+    // LIN-3126 residual: persist the validated selector pair onto the durable
+    // scan row so a later rulings anchor (lib/unanswered-decisions.js) and a
+    // scan-due item can hand the browser the issue's own binding. Only a
+    // COMPLETE, non-blank pair is stored — a source-only hint or a legacy /
+    // single-binding scan adds no key (sparse, byte-identical). The pair was
+    // already validated by `resolveIssueBinding` above; `issueBindingScope` is
+    // selection-only provenance, never a credential (B1).
+    const scanBindingPair = (
+      typeof req.query.source === 'string' && req.query.source.trim() &&
+      typeof req.query.bindingScope === 'string' && req.query.bindingScope.trim()
+    )
+      ? { issueSource: req.query.source.trim(), issueBindingScope: req.query.bindingScope.trim() }
+      : {};
+
     if (!isValidIssueId(issueId)) {
       return badRequest.json(res, 'Invalid issue ID format');
     }
@@ -2831,7 +2845,10 @@ ${goal}`
         // tier-1's basisVersion above — see lib/task-decisions-store.js's
         // [F-2] terminal-row patch for why the split is load-bearing.
         dueBasisVersion: BASIS_VERSION,
-        decision: scanResult.outcome === 'decision' ? scanResult.decision : null
+        decision: scanResult.outcome === 'decision' ? scanResult.decision : null,
+        // LIN-3126 residual: the issue's own binding pair, stored only when a
+        // complete validated selector was supplied (see `scanBindingPair`).
+        ...scanBindingPair
       });
       if (!record) {
         return keepalive.send(500, { error: 'Failed to record scan result' });
@@ -3383,7 +3400,13 @@ ${goal}`
             raisedDueBasisHash: row.dueBasisHash,
             raisedDueBasisVersion: row.dueBasisVersion,
             currentDueBasisHash
-          })
+          }),
+          // LIN-3126 residual: the row's own binding pair, recorded when it was
+          // scanned, rides the item so the client's bulk-scan POST can forward
+          // it (public/observation.js startDueBulkScan). SPARSE — a row with no
+          // pair emits no key. Selection-only (B1).
+          ...(row.issueSource != null ? { source: row.issueSource } : {}),
+          ...(row.issueBindingScope != null ? { bindingScope: row.issueBindingScope } : {})
         };
       });
 
@@ -3393,7 +3416,14 @@ ${goal}`
       // allSettled shape means every other row and the page's 200 are unaffected.
       const items = results.map((result, i) => result.status === 'fulfilled'
         ? result.value
-        : { issueId: page.items[i].issueId, issueIdentifier: page.items[i].issueIdentifier, dueStatus: null, error: true });
+        : {
+            issueId: page.items[i].issueId,
+            issueIdentifier: page.items[i].issueIdentifier,
+            dueStatus: null,
+            error: true,
+            ...(page.items[i].issueSource != null ? { source: page.items[i].issueSource } : {}),
+            ...(page.items[i].issueBindingScope != null ? { bindingScope: page.items[i].issueBindingScope } : {})
+          });
 
       keepalive.send(200, {
         items,
@@ -3724,7 +3754,14 @@ ${goal}`
           issueTitle: issue.title || null,
           issueUrl: issue.url || null,
           dispatchedBy: session?.accountId || null,
-          target: 'cli'
+          target: 'cli',
+          // LIN-3126 residual (producer sweep): the created issue's own binding
+          // pair, so a reply/Close out on this run resolves the same binding.
+          // `?? null` (never a `fields` spread — the LIN-3138 census forbids one
+          // here); the store's `addItem` writes a null selector sparsely, so a
+          // legacy/marker-less workspace keeps the S0 key set.
+          issueSource: overrides.bindingPair?.issueSource ?? null,
+          issueBindingScope: overrides.bindingPair?.issueBindingScope ?? null
         }
       });
       return null;
@@ -3829,7 +3866,12 @@ ${goal}`
           issueTitle: issue.title || null,
           issueUrl: issue.url || null,
           dispatchedBy: session?.accountId || null,
-          target: 'cli'
+          target: 'cli',
+          // LIN-3126 residual (producer sweep): same created-issue binding pair
+          // as `enqueueFeedbackTriage` above (`?? null`; the store writes it
+          // sparsely).
+          issueSource: overrides.bindingPair?.issueSource ?? null,
+          issueBindingScope: overrides.bindingPair?.issueBindingScope ?? null
         }
       });
       return { launched: true };
@@ -3878,9 +3920,23 @@ ${goal}`
     // requires an explicit, validated `source`+`bindingScope`; absent means the
     // default, never a silent pick. Call scope always comes from the binding
     // (`getBindingCallScope`), never from `bindingScope`.
-    const issueBinding = resolveDefaultBinding(workspace, issueBindingSelector(req.body?.source ?? req.query.source, req.body?.bindingScope ?? req.query.bindingScope));
+    const feedbackBindingSelector = issueBindingSelector(req.body?.source ?? req.query.source, req.body?.bindingScope ?? req.query.bindingScope);
+    const issueBinding = resolveDefaultBindingSelection(workspace, feedbackBindingSelector);
     if (issueBinding.error) return sendBindingRefusal(res, issueBinding);
     const provider = issueBinding.provider;
+    // LIN-3126 residual (producer sweep): the feedback triage/autopilot rows are
+    // issue-addressed and never reach the factory's §5.5a pair inheritance (no
+    // `followUpTo`), so the row must carry the created issue's own binding pair
+    // or the run page's reply / Close out senders 422 BINDING_REQUIRED on a
+    // two-binding connection-backed workspace. The pair is taken from the SAME
+    // selected binding that produced `provider`/`callScope` — one selection, so
+    // the binding the issue is created in and the stamped pair cannot drift. A
+    // legacy/marker-less workspace selects no binding (`binding` absent) and adds
+    // no key, keeping the S0 sparse shape. Selection-only provenance, never a
+    // credential (B1).
+    const persistedBindingPair = issueBinding.binding
+      ? { issueSource: issueBinding.binding.provider, issueBindingScope: issueBinding.binding.scope }
+      : {};
     // Provider call scope: bare token for Linear/local (byte-identical), or a
     // { token, repo } GitHub App credential so createIssue builds a request-time
     // client from the installation token (LIN-713). uploadFile is capability-gated
@@ -4053,11 +4109,11 @@ ${goal}`
       let autopilot = null;
       let triage = null;
       if (action === 'triage') {
-        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate });
+        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
       } else if (action === 'autopilot') {
-        autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness, runGate });
+        autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
       } else if (!action && getFeatureFlags(req.session).feedbackTriage) {
-        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate });
+        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
       }
 
       // LIN-3136 M4 / LIN-3238: the ticket is filed either way; a refused run

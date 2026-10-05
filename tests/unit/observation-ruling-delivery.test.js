@@ -4254,3 +4254,77 @@ describe('no rendered .obs-ruling-* control reads a bare "agree" (LIN-2757 accep
     assertNoBareAgree(collectRulingControls(list.children[0]));
   });
 });
+
+// ─── LIN-3126 residual: the anchor pair must reach ReplyDelivery ────────────
+// Review `5902c5c1`'s mutation table found observation.js's three handoffs
+// (record, dispatch, task-bound) unpinned: deleting `source`/`bindingScope`
+// from any of them left the unit suite green. These witnesses pin all three,
+// each against a stamped anchor, so removing the handoff reddens exactly one.
+const STAMPED_ANCHOR = { ...ANCHOR, source: 'github', bindingScope: 'octo/repoB' };
+const pairFlush = async () => { for (let i = 0; i < 6; i++) await new Promise((r) => setImmediate(r)); };
+
+describe('LIN-3126 residual — the ruling anchors forward source/bindingScope to ReplyDelivery', () => {
+  test('gone/dispatch: the comment write AND the fresh run both carry the anchor pair', async () => {
+    let capturedExtra = null;
+    let capturedOpts = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async (opts) => { capturedOpts = opts; return { id: 'dispatched-1' }; },
+      api: nonTerminalHydrateApi()
+    });
+    const { deliverRulingReply } = module.exports;
+    deliverRulingReply(
+      makeRow({ anchor: STAMPED_ANCHOR, decision: { decision_id: 'd-pair-dispatch' } }),
+      'Approve', makeLi()
+    );
+    await pairFlush();
+
+    assert.ok(capturedExtra, 'the comment write happened');
+    assert.equal(capturedExtra.source, 'github', 'comment write forwards the anchor source');
+    assert.equal(capturedExtra.bindingScope, 'octo/repoB', 'comment write forwards the anchor scope');
+    assert.ok(capturedOpts, 'the fresh run dispatched');
+    assert.equal(capturedOpts.issue.source, 'github', 'fresh run issue.source');
+    assert.equal(capturedOpts.issue.bindingScope, 'octo/repoB', 'fresh run issue.bindingScope');
+  });
+
+  test('gone/record: the comment write carries the anchor pair (mutation: observation.js:3337-3338)', async () => {
+    let capturedExtra = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+      api: async () => { throw new Error('no record_on declared — the hydrate route must not be called'); }
+    });
+    const { deliverRulingReply } = module.exports;
+    deliverRulingReply(
+      makeRow({ anchor: STAMPED_ANCHOR, decision: { decision_id: 'd-pair-record' }, effect: 'record', alternate: null }),
+      'Approve', makeLi()
+    );
+    await pairFlush();
+
+    assert.ok(capturedExtra, 'the record comment write happened');
+    assert.equal(capturedExtra.source, 'github');
+    assert.equal(capturedExtra.bindingScope, 'octo/repoB');
+  });
+
+  test('task-bound: the comment write carries the anchor pair (mutation: observation.js:3407-3408)', async () => {
+    let capturedExtra = null;
+    const { module } = makeSandbox({
+      postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
+      dispatchPrompt: async () => ({ id: 'dispatched-1' }),
+    });
+    const { deliverRulingReply } = module.exports;
+    deliverRulingReply(
+      makeRow({
+        anchor: { ...STAMPED_ANCHOR, loopId: null, taskDecisionId: 'td-pair-1' },
+        decision: { decision_id: 'd-pair-taskbound' },
+        disposition: 'task-bound'
+      }),
+      'Approve', makeLi()
+    );
+    await pairFlush();
+
+    assert.ok(capturedExtra, 'the task-bound comment write happened');
+    assert.equal(capturedExtra.source, 'github');
+    assert.equal(capturedExtra.bindingScope, 'octo/repoB');
+  });
+});

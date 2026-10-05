@@ -872,6 +872,16 @@ function handleAccordionClick(e) {
   }
 }
 
+// LIN-3126 residual: the swipe card's issue already carries its own
+// `source`/`bindingScope` (lib/render-swipe.js), so the comments read forwards
+// them via the one shared builder — the comment route resolves strictly, and a
+// two-binding workspace refuses a bare request. Sparse: an unstamped issue
+// yields the byte-identical pre-residual URL.
+function swipeCommentsUrl(apiPrefix, issue) {
+  return `${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`
+    + window.sourceBindingQuery(issue.source, issue.bindingScope);
+}
+
 async function loadComments(container) {
   const issue = filteredIssues[currentIndex];
   if (!issue) return;
@@ -881,7 +891,7 @@ async function loadComments(container) {
   try {
     // on401:false — keep throwing into the inline catch below (renders
     // "Could not load comments") rather than redirecting on 401.
-    const result = await window.api(`${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`, { on401: false });
+    const result = await window.api(swipeCommentsUrl(apiPrefix, issue), { on401: false });
     const comments = result.comments || [];
 
     if (comments.length === 0) {
