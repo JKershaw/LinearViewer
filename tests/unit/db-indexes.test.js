@@ -473,9 +473,7 @@ describe('db-indexes', () => {
     // this fails — the exact drift that produced the production blocking sort.
     // The four A2/B paged lists all declare a `urlKey:1,timestamp:-1` key (the
     // issue-scoped llm-call-log successor is excluded by the `issueIdentifier`
-    // guard). The share list (LIN-3243) is the same rule with a `createdAt`
-    // primary key — kept as its own `match` so the four existing predicates are
-    // unchanged.
+    // guard).
     const pagedListSpec = (collection) => (s) =>
       s.collection === collection &&
       s.keySpec.urlKey === 1 &&

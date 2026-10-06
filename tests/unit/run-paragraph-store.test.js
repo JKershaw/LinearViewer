@@ -3,8 +3,7 @@
  *
  * Run with: node --test tests/unit/run-paragraph-store.test.js
  *
- * Against a REAL MangoDB tmpdir instance (precedent:
- * tests/unit/share-store.test.js) because the store's claims ARE the index
+ * Against a REAL MangoDB tmpdir instance because the store's claims ARE the index
  * posture and the persistence contract — a mock would encode the assumptions
  * instead of testing them. The load-bearing assertion is the NO-TTL one: the
  * paragraph must outlive every cache, so no `expireAfterSeconds` index may

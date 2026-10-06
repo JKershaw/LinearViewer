@@ -686,6 +686,9 @@ const credentialLifecycleEventStore = new CredentialLifecycleEventStore({ collec
 const taskModeEventsCollection = db.collection('task-mode-events')
 const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection })
 
+// Close-out events (LIN-3248, P3 of LIN-2949): an append-only record of a
+// person's merge or their close-out press. Lifetime-retained, idempotent on
+// urlKey + prUrl + headSha + by (lib/close-out-events-store.js).
 const closeOutEventsStore = new CloseOutEventsStore({ collection: db.collection('close-out-events') })
 
 // Funnel events (LIN-2952): append-only record of a milestone step a person
