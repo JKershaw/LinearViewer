@@ -694,7 +694,14 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
     const guardIdx = flat.indexOf('ownerAccountId !== UNSCOPED');
     const refreshIdx = flat.indexOf('refreshOwnerWorkspaceToken(');
     const ifRefreshedIdx = flat.indexOf('if (refreshed)');
-    const okReturnIdx = flat.indexOf("reason: 'ok'", ifRefreshedIdx);
+    // LIN-3323: success envelopes are now built by the single `grant`
+    // constructor (`const grant = (fields) => ({ ...fields, reason: 'ok' })`),
+    // so the refreshed branch's envelope is the `grant(` that follows
+    // `if (refreshed)` — the literal `reason: 'ok'` now lives in the
+    // constructor's own definition far above, which `indexOf(..., ifRefreshedIdx)`
+    // would miss. Pin the `grant(` inside the block so the witness stays on the
+    // behaviour (a success envelope gated on a successful refresh).
+    const okReturnIdx = flat.indexOf('grant(', ifRefreshedIdx);
     const classifyIdx = flat.indexOf('classifyWorkspaceFailure(', ifRefreshedIdx);
 
     // Refresh-on-resolve is owner-scoped: the UNSCOPED guard textually precedes
@@ -705,8 +712,8 @@ describe('LIN-1544 durable-credential resolve witness (logout -> headless resolv
     // The ok-envelope is gated on a SUCCESSFUL durable refresh, and is emitted
     // BEFORE the classify fallthrough — i.e. a fresh durable-minted token wins.
     assert.ok(ifRefreshedIdx > refreshIdx, 'the ok-envelope must sit inside the `if (refreshed)` success block');
-    assert.ok(okReturnIdx >= 0, "resolveWorkspaceAccess must return reason: 'ok' inside the `if (refreshed)` block");
-    assert.ok(classifyIdx === -1 || okReturnIdx < classifyIdx, "the `if (refreshed)` reason: 'ok' return must precede the classifyWorkspaceFailure fallthrough");
+    assert.ok(okReturnIdx >= 0, "resolveWorkspaceAccess must return the success envelope (grant(...), reason: 'ok') inside the `if (refreshed)` block");
+    assert.ok(classifyIdx === -1 || okReturnIdx < classifyIdx, "the `if (refreshed)` success envelope must precede the classifyWorkspaceFailure fallthrough");
 
     // LIN-1547 (ledger item 2): pin the DURABLE-STORE WIRING ARGS the production
     // refresh call passes, not just the guard->refresh->ok ORDERING above. The
