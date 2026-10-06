@@ -13,10 +13,12 @@
  * refresh) failed on the first try.
  *
  * This drives the REAL `resolveWorkspaceAccess` body (server.js) + the REAL
- * `createConnectionAccess` arm over real in-process (`@jkershaw/mangodb`) stores,
- * with only the provider's issue read stubbed, and asserts the first read (empty
- * cache — never a cache hit, per the ticket's "avoid test assumptions that only
- * pass via cache") reaches the share and renders as success.
+ * `createConnectionAccess` arm over real in-process (`@jkershaw/mangodb`)
+ * credential stores, with only the provider's issue read stubbed, and asserts
+ * the first read (empty cache — never a cache hit, per the ticket's "avoid test
+ * assumptions that only pass via cache") reaches the share and renders as
+ * success. The share STORE is a small hand-rolled in-memory stub (below,
+ * mirroring tests/unit/share-owner-routes.test.js); the share ROUTE is real.
  *
  * It is deliberately NOT built on the run-share feature (LIN-2950, being removed
  * next): the issue-list (collection) share path is the target.
@@ -61,6 +63,7 @@ const ACCT = 'acct-3323';
 const URL_KEY = 'acme';
 const SCOPE = 'org-3323';
 const CONNECTION_TOKEN = 'lin_connection_live_3323';
+const SESSION_TOKEN = 'lin_session_live_3323';
 const CONNECTION_ID = `${ACCT}::linear::${SCOPE}`;
 const OWNER_OK = async () => ({ status: 'owner' });
 const NOOP_TIMEOUT = (promise) => promise;
@@ -102,6 +105,16 @@ async function failureWorld(client) {
   return { connectionStore, ownerCredentialStore, rows };
 }
 
+/** A world whose only owner session row is LIVE and NOT Connection-backed — the session-scan route. */
+async function sessionWorld(client) {
+  const db = client.db(`l3323s_${Math.random().toString(36).slice(2)}`);
+  const connectionStore = new ConnectionStore({ collection: db.collection('connections') });
+  const ownerCredentialStore = new OwnerCredentialStore({ collection: db.collection('owner-credentials') });
+  const live = { id: 'ws-1', urlKey: URL_KEY, provider: 'linear', accessToken: SESSION_TOKEN, tokenExpiresAt: Date.now() + 3_600_000, bindings: [] };
+  const rows = [{ _id: 'sid-live', session: { accountId: ACCT, workspaces: [live] } }];
+  return { connectionStore, ownerCredentialStore, rows };
+}
+
 /** Execute the REAL resolveWorkspaceAccess body with injected collaborators. */
 function makeResolver(w, cache) {
   const registry = createRejectedCredentialRegistry();
@@ -125,7 +138,10 @@ function makeResolver(w, cache) {
   return vm.runInContext(`${sliceServerFunction('resolveWorkspaceAccess')}\nresolveWorkspaceAccess`, context);
 }
 
-/** A tiny in-memory share store (mirrors tests/unit/share-owner-routes.test.js). */
+/** A tiny in-memory share store (mirrors tests/unit/share-owner-routes.test.js).
+ *  Only the share STORE is hand-rolled here; the credential stores, the share
+ *  route and the resolver are the real modules. The bug path does not go through
+ *  the share store, so this is sufficient — but "all real stores" would overstate it. */
 function makeStore() {
   const byToken = new Map();
   const byId = new Map();
@@ -212,6 +228,18 @@ describe('LIN-3323 — a Connection-resolved owner login is valid on the first s
     assert.equal(out.reason, 'ok', 'a valid owner login resolved through a Connection reads as valid');
   });
 
+  test('a NON-Connection session-scan success also carries reason "ok" (pins the shared grant)', async () => {
+    // The Connection arm stamps `ok` on its own, so the first test would still
+    // pass if the resolver's shared `grant` constructor were a no-op. This drives
+    // a second success route — a live, non-Connection session row — so a broken
+    // `grant` is caught here rather than only incidentally elsewhere.
+    const w = await sessionWorld(client);
+    const fn = makeResolver(w, createWorkspaceTokenCache());
+    const out = await fn(URL_KEY, ACCT);
+    assert.equal(out.token, SESSION_TOKEN, 'the live session credential resolves');
+    assert.equal(out.reason, 'ok', 'the session-scan success route also reads as a valid login');
+  });
+
   test('readOwnerIssues on the FIRST read (empty cache) returns reason "ok" with the issues', async () => {
     const w = await world(client);
     const cache = createWorkspaceTokenCache();
@@ -268,5 +296,10 @@ describe('LIN-3323 — a Connection-resolved owner login is valid on the first s
     const guest = await request(app, `/s/${created.json.token}`);
     assert.equal(guest.status, 200, 'the guest opens the share on the first try');
     assert.match(guest.text, /Current content/, 'the guest sees current content, not an "as of" copy');
+    // The "not an as-of copy" half: a last-good serve carries the stale marker
+    // (lib/render-share.js's `data-testid="share-stale"`). Without pinning its
+    // ABSENCE, a stale serve still contains "Current content" and the test would
+    // pass — which is exactly the acceptance claim this test must prove.
+    assert.doesNotMatch(guest.text, /data-testid="share-stale"/, 'the guest sees current content, not an "as of" copy');
   });
 });
