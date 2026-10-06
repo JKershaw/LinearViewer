@@ -1,6 +1,14 @@
 # Review and close-out: from rules to briefs
 
 Read at the working tree in `/home/user/LinearViewer` on 2026-10-03 (no git checkout, so no sha).
+
+> **Superseded in part by LIN-3326 (2026-10-06).** Close-out has no authoring bound now: it makes the
+> fixes review asked for itself, however many files they touch, as long as they stay the size of
+> fixes, and resolves a merge conflict landing needs; only new design or new behaviour goes back to
+> review. A step that can only run once the change is live (a live check, a data clean-up) is a
+> post-deploy step close-out does after the merge, never a condition on it. Where B2's "What you may
+> write yourself", B5's numeric bound and the LIN-3033 floor below say otherwise, the templates in
+> `lib/prompt-template-defs.js` are current.
 Sources read in full:
 
 - `review` `generate()` at `lib/prompt-template-defs.js:997-1128` and `close-out` `generate()` at

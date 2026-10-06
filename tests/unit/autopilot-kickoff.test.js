@@ -55,21 +55,19 @@ describe('buildAutopilotKickoff (shared guide)', () => {
     assert.ok(text.includes('The token authenticates the channel; it is not permission to merge.'));
   });
 
-  test('restates the named-discharge lanes, not an unqualified human sign-off (LIN-1579)', () => {
+  test('restates how ledger items settle, not an unqualified human sign-off (LIN-1579, LIN-3326)', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL });
     // The old blanket clause contradicted every other surface once the lane widened.
     assert.ok(!/a human sign-off for\s+risky merges/.test(text),
       'drops the unqualified "human sign-off for risky merges" clause');
-    // An unprovable item discharges through the monitor review named — no box to tick.
-    assert.ok(/discharges through the \*\*named\*\* monitor review wrote for it/.test(text),
-      'a ledger item unprovable before merge discharges via its named monitor');
-    assert.ok(/reversible runtime-logic change through the \*\*named\*\* rollback/.test(text),
-      'a reversible runtime-logic change discharges via its named rollback');
-    assert.ok(/no human has to tick a box for\s+either/.test(text),
-      'neither named lane requires a fresh human sign-off');
-    // The floor the widening does NOT touch.
-    assert.ok(/a human naming the exact precondition is still required for an item review left\s+undischarged on a security, data-path, or external-contract surface/.test(text),
-      'undischarged items on risky surfaces still need a human naming the precondition');
+    assert.ok(/No human has to tick a box\s+for a ledger item/.test(text),
+      'no ledger item waits on a fresh human sign-off');
+    // A claim only production can show settles through the monitor review named.
+    assert.ok(/a claim only production can show settles through the \*\*named\*\* monitor review\s+wrote for it/.test(text),
+      'an item unprovable before merge settles via its named monitor');
+    // LIN-3326: a post-deploy step is close-out's after the merge, not a merge condition.
+    assert.ok(/a step that can only run once the change is live is done after the merge, once\s+the deploy lands/.test(text),
+      'a post-deploy step runs after the merge');
     // Naming is review's job — the orchestrator cites, it never supplies.
     assert.ok(/you cite a name, you never supply one/.test(text),
       'the orchestrator cites review\'s name rather than authoring its own');

@@ -498,16 +498,19 @@ the blocked branches named in the case itself (there's no separate field for thi
 And the irreversible finish itself — the merge, the Done, the summary, the follow-ups — is no longer
 something you reach down and do by hand. It's a **dispatched step of its own**. `review` only
 *authorizes* the close: it issues a verdict and writes a ledger of what CI didn't prove, but never
-merges or marks the task done. A separate **`close-out`** worker performs it, discharging or explicitly
-accepting each ledger item before it merges and sets Done — and per John's ruling on LIN-2825 (amended by
-LIN-3006), an item is **inside** when it's the same defect or the same idiom as a class this ticket
+merges or marks the task done. A separate **`close-out`** worker finishes the work the way a developer
+finishes their own: it makes the fixes review asked for (however many files they touch, as long as they
+stay fixes — new design or new behaviour goes back to `review`), settles each ledger item, merges, does
+the post-deploy steps (a live check, a data clean-up) once the deploy lands, and sets Done. Per John's
+ruling on LIN-2825 (amended by LIN-3006 and LIN-3291), an item is **inside** when it's part of solving
+this ticket's problem, its cause included, or the same defect or the same idiom as a class this ticket
 bounded, whether or not research's enumeration listed it — the list is evidence of the class, not its
-edge — or a claim this ticket's own change depends on. An inside item discharges only by cited evidence it's done, or an explicit drop naming what's left
-and why (warranted only when finishing it is materially larger than this ticket's own change, not merely
-inconvenient); **filing a follow-up ticket for it is never a discharge**, however well the ticket reads,
-and a dropped inside item stays dropped — it is not filed later. Only an item **outside** every bounded
-class — a genuinely different kind of problem — may be filed, and only when the filing states the
-problem on its own terms. So when a review lands an Approve (or a
+edge — or a claim this ticket's own change depends on. An inside item settles only by cited evidence
+it's done, or by being left undone with what's left and why (warranted only when finishing it is a
+change the team would need to hear about first); **filing a follow-up ticket for it is never a
+discharge**, however well the ticket reads, and an inside item left undone is not filed later. Only an
+item **outside** every bounded class — a genuinely different kind of problem — may be filed, and only
+when the filing states the problem on its own terms. So when a review lands an Approve (or a
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —
 **dispatch the next step and verify it landed**, not drop down and close it yourself: re-recommend the
 task (the engine routes you to `close-out`), then confirm the close really happened — PR merged, CI
@@ -517,11 +520,6 @@ any step. A conditional Approve is the
 ledger gate asking for real discharge, which *is* close-out's job; let the step run rather than judging
 the ledger informally and merging by hand. (This `close-out` is the dispatched finish step, not an
 inline orchestrator pass — closing is something you *dispatch and verify*, never something you perform.)
-That job has a size limit: close-out may write the discharge itself only when review named it with its
-exact content and it is trivially small — whatever prompted it (a ledger item, a caveat, a non-gating
-finding, a self-found sibling, a "do it here" ruling it raised, or a merge conflict it resolved while
-landing the PR) — otherwise it holds the merge, leaves the task open, and names `implementation` then
-`review` instead of authoring the fix itself.
 
 ## Knowing when to stop
 
