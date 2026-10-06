@@ -1,0 +1,155 @@
+/* Task page (LIN-3329, Subtask B of LIN-3324).
+ *
+ * Rides session.css for the shared step-row face (`.sess-run*`) and page frame
+ * (`.sess-page`, `.sess-section`, `.sess-kv`); this file holds only what is the
+ * task page's own. Anything the task page hides of the lifted face is hidden
+ * HERE, never by changing `renderStepFace`, so the run page stays byte-identical.
+ * Theme tokens only, AA-safe `-dim` text companions for coloured text.
+ */
+
+/* ── The answer: status pill + one sentence ─────────────────────────────── */
+.task-ident {
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--muted);
+  margin-right: 0.35rem;
+}
+.task-title { font-family: var(--font-content); }
+.task-status {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.task-status-pill { flex-shrink: 0; }
+.task-sentence {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ── Progress: the track ─────────────────────────────────────────────────── */
+.task-track { list-style: none; margin: 0; padding: 0; }
+/* The face's per-row identifier and issue title repeat the page header on every
+   row; the stage word on `.task-step-line` names the row instead. */
+.task-step .sess-run-ident,
+.task-step .sess-run-kind,
+.task-step .sess-run-title { display: none; }
+.task-step-line {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--text);
+  margin-top: 0.25rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-step-stage { font-weight: 600; }
+.task-step-summary { color: var(--muted); }
+.task-step[data-state="waiting"] .task-step-summary { color: var(--amber-dim); }
+.task-step-body {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  cursor: auto;
+}
+.task-step-message {
+  margin: 0 0 0.4rem;
+  font-family: var(--font-content);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.task-step-links {
+  list-style: none;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+}
+.task-step-links li { overflow-wrap: anywhere; }
+.task-ext,
+.task-ref-ident { color: var(--brand-dim); text-underline-offset: 2px; }
+.task-step-evidence:empty { display: none; }
+.task-step-evidence { font-size: 0.85rem; overflow-wrap: anywhere; }
+.task-step-evidence .rev-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.15rem 0; }
+.task-step-evidence .rev-row-label { color: var(--muted); font-family: var(--font-content); min-width: 4.5rem; }
+.task-step-evidence .rev-row-body { min-width: 0; }
+.task-step-evidence a { color: var(--brand-dim); }
+
+/* The usual stages ahead — drawn quietly, a guess, not a promise. */
+.task-guesses {
+  margin-top: 0.4rem;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.task-guesses-label { display: block; margin-bottom: 0.25rem; font-style: italic; }
+.task-guess-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.85rem;
+  border-left: 2px dashed var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+.task-guess-dot { font-family: var(--font-structural); }
+
+/* ── Brief and recap ─────────────────────────────────────────────────────── */
+.task-context { display: grid; gap: 0.75rem; }
+@media (min-width: 720px) {
+  .task-context { grid-template-columns: 1fr 1fr; }
+}
+.task-ctx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.task-ask {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--brand-dim);
+  cursor: pointer;
+}
+.task-ask[disabled] { opacity: 0.6; cursor: progress; }
+.task-ask-note { font-size: 0.8rem; color: var(--muted); }
+
+/* ── Task details (closed to start with) ─────────────────────────────────── */
+.task-details { margin: var(--space-4, 1rem) 0; }
+.task-details .sess-v { min-width: 0; overflow-wrap: anywhere; }
+.task-refs { margin-top: 0.6rem; }
+.task-refs-label {
+  display: block;
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.task-ref-list { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; }
+.task-ref { overflow-wrap: anywhere; }
+.task-ref-glyph, .task-ref-ident { font-family: var(--font-structural); }
+.task-ref-state { color: var(--muted); font-size: 0.8rem; }
+
+.task-share-slot:empty { display: none; }
+
+/* ── Phone: the track stays calm ─────────────────────────────────────────────
+   Counts and chips belong inside an opened session (John's check-in, 6 Oct):
+   a closed row shows its stage, how it went and when — nothing more. */
+@media (max-width: 720px) {
+  .task-step:not(.sess-run--expanded) .sess-chips,
+  .task-step:not(.sess-run--expanded) .sess-run-cost,
+  .task-step:not(.sess-run--expanded) .sess-ticket-walk,
+  .task-step:not(.sess-run--expanded) .sess-run-times { display: none; }
+}

@@ -143,7 +143,7 @@ import { renderSwipePage, orderIssuesForSwipe } from './lib/render-swipe.js'
 import { renderSwimPage } from './lib/render-swim.js'
 import { renderShipPage } from './lib/render-ship.js'
 import { createCollectiveRoutes } from './routes/collective.js'
-import { createDashboardRoutes, sessionIsTerminal } from './routes/dashboard.js'
+import { createDashboardRoutes, sessionIsTerminal, enrichLoop, deriveSessionWaiting } from './routes/dashboard.js'
 import { readRunEvidence } from './lib/run-evidence.js'
 import { createPrStateStore } from './lib/pr-state-store.js'
 import { createSessionsFeedCache } from './lib/sessions-feed-cache.js'
@@ -151,6 +151,8 @@ import { fetchIssueContext } from './lib/linear.js'
 import { createTaskChatRoutes } from './routes/task-chat.js'
 import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createTaskCreateRoutes } from './routes/task-create.js'
+import { createTaskPageRoutes } from './routes/task-page.js'
+import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
@@ -2958,6 +2960,18 @@ app.use(createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployI
 // the inline create form formerly rendered inline per-project. No feature flag:
 // it is a drill-down page, gated only on the provider's ui.inlineCreate.
 app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))
+
+// Mount the task page (LIN-3329) — one page per task, owner view: status, every
+// session oldest-first, brief/recap, details. A drill-down, no feature flag.
+// MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
+// `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
+// `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
+app.use(createTaskPageRoutes({
+  workspaceFromUrl,
+  getOpenRouterSource,
+  getDeployInfo,
+  loader: createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting })
+}))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
 app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, reportHistoryStore }))
