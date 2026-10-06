@@ -163,7 +163,7 @@ describe('createEnsurePATSession', () => {
 
   test('skips auth/test/logout/legal routes even with no session workspaces', async () => {
     const middleware = createEnsurePATSession(freshStores());
-    for (const path of ['/auth/linear', '/logout', '/test/set-session', '/privacy', '/terms', '/styleguide', '/s/abc']) {
+    for (const path of ['/auth/linear', '/logout', '/test/set-session', '/privacy', '/terms', '/styleguide']) {
       const { req, res } = makeReqRes({ path });
       let nextCalled = false;
       await middleware(req, res, () => { nextCalled = true; });
@@ -172,51 +172,8 @@ describe('createEnsurePATSession', () => {
     }
   });
 
-  test('exempts /s/ so an anonymous share GET never mints a session or reads the provider (LIN-3243 F1)', async () => {
-    class CountingLinearProvider extends ProviderInterface {
-      constructor() { super(); this.name = 'linear'; this.calls = 0; }
-      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
-      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
-    }
-    const counting = new CountingLinearProvider();
-    registerProvider(counting);
-    try {
-      const middleware = createEnsurePATSession(freshStores());
-      const { req, res } = makeReqRes({ path: `/s/${'a'.repeat(43)}` });
-      let nextCalled = false;
-      await middleware(req, res, () => { nextCalled = true; });
-      assert.strictEqual(nextCalled, true);
-      assert.strictEqual(counting.calls, 0, 'zero provider reads on an anonymous share GET');
-      assert.strictEqual(req.session.workspaces, undefined, 'no PAT session minted');
-    } finally {
-      registerProvider(new FakeLinearProvider());
-    }
-  });
-
-  test('does NOT exempt /swipe or /settings — they still run the identity path and mint a PAT session (LIN-3243 L3)', async () => {
-    class CountingLinearProvider extends ProviderInterface {
-      constructor() { super(); this.name = 'linear'; this.calls = 0; }
-      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
-      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
-    }
-    for (const path of ['/swipe', '/settings']) {
-      const counting = new CountingLinearProvider();
-      registerProvider(counting);
-      try {
-        const middleware = createEnsurePATSession(freshStores());
-        const { req, res } = makeReqRes({ path });
-        let nextCalled = false;
-        await middleware(req, res, () => { nextCalled = true; });
-        assert.strictEqual(nextCalled, true);
-        assert.ok(counting.calls > 0, `${path} must still reach the provider (not exempt)`);
-        assert.strictEqual(req.session.workspaces.length, 1, `${path} mints a PAT session`);
-      } finally {
-        registerProvider(new FakeLinearProvider());
-      }
-    }
-  });
-
-
+  // LIN-1892 (N1): an email-only signed-in session (accountId, zero
+  // workspaces) is not a signed-out visitor. Keep the guard if S2 is reverted.
   describe('N1: a signed-in account with zero workspaces is never auto-logged-in (LIN-1892)', () => {
     class CountingLinearProvider extends ProviderInterface {
       constructor() { super(); this.name = 'linear'; this.calls = 0; }

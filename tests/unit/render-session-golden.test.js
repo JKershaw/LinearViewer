@@ -1,12 +1,12 @@
 /**
- * LIN-3311 (Phase 1 of LIN-2950, S5a) — owner golden pin for the run page.
+ * LIN-3311 — owner golden pin for the run page.
  *
  * Byte-parity characterisation of `renderSessionPage` over the existing
  * render-session fixtures (plus every close-out-box state and the PR-line
  * branches). The golden file was captured at the PRE-change commit
- * (`b35d1d8c`), before any renderer parameter existed, so every later
- * guest-mode change (LIN-2950 Phase 2) must keep the owner page identical to
- * it. If a case legitimately changes, regenerate deliberately with
+ * (`b35d1d8c`), before any renderer parameter existed, so every later change
+ * must keep the owner page identical to it. If a case legitimately changes,
+ * regenerate deliberately with
  * `UPDATE_RENDER_SESSION_GOLDEN=1 node --test tests/unit/render-session-golden.test.js`
  * and say why in the commit — never by widening an assertion.
  *

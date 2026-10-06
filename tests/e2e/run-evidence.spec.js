@@ -12,8 +12,7 @@ import { localSeedId } from '../fixtures/local-harness.js';
 //
 // Guest / non-owner coverage is at unit level (tests/unit/render-run-evidence
 // .test.js: "a guest / non-owner renders no box at all"): this harness has no
-// non-owner session — `workspaceFromUrl` requires `req.session.workspaces` —
-// and the guest view is LIN-2950's surface, not built here.
+// non-owner session — `workspaceFromUrl` requires `req.session.workspaces`.
 
 const REPO = 'acme/widget';
 const PR = `https://github.com/${REPO}/pull/12`;

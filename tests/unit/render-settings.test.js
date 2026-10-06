@@ -5,7 +5,6 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { readFile } from 'node:fs/promises';
 import { renderSettingsPage } from '../../lib/render-settings.js';
 import { AVAILABLE_MODELS } from '../../lib/openrouter.js';
 import { PROMPT_TEMPLATES } from '../../lib/prompt-template-defs.js';
@@ -1159,59 +1158,5 @@ describe('renderSettingsPage — Dispatch preset per-kind (byKind) overrides (LI
       }]
     });
     assert.match(html, /<details class="dispatch-preset-kind-overrides" open data-testid="dispatch-preset-row-p1-kind-overrides">/);
-  });
-});
-
-describe('renderSettingsPage — Share links section (LIN-3244)', () => {
-  test('renders the section, the create controls, and the list container', () => {
-    const html = renderSettingsPage('Acme', BASE);
-    assert.match(html, /data-testid="settings-section-share-links"/);
-    assert.match(html, /data-testid="share-kind-select"/);
-    assert.match(html, /data-testid="share-subject-input"/);
-    assert.match(html, /data-testid="share-descriptions-input"/);
-    assert.match(html, /data-testid="share-create-btn"/);
-    assert.match(html, /data-testid="share-list"/);
-    assert.match(html, /data-testid="share-created"/);
-    // Both subject kinds are offered, and the copy-once URL host is empty on render.
-    assert.match(html, /<option value="label">label<\/option>/);
-    assert.match(html, /<option value="parent">parent task<\/option>/);
-    assert.match(html, /<span class="token-value share-url-value" data-testid="share-created-url"><\/span>/);
-  });
-
-  test('the rendered section carries no token, hash, or share URL', () => {
-    const html = renderSettingsPage('Acme', BASE);
-    const start = html.indexOf('data-testid="settings-section-share-links"');
-    assert.ok(start > -1, 'section must be present');
-    const section = html.slice(start, html.indexOf('data-testid="settings-section-', start + 10));
-    assert.ok(section.length > 0);
-    assert.ok(!/tokenHash/.test(section), 'no stored hash in the section markup');
-    assert.ok(!/\/s\/[A-Za-z0-9_-]{43}/.test(section), 'no share token/URL in the section markup');
-    assert.ok(!/data-token=/.test(section), 'no token data attribute');
-  });
-
-  test('the client list renderer reads only the opaque id, never a token or hash', async () => {
-    const src = await readFile(new URL('../../public/settings.js', import.meta.url), 'utf8');
-    const start = src.indexOf('function renderShareList');
-    assert.ok(start > -1, 'renderShareList must exist');
-    const end = src.indexOf('async function loadShareLinks', start);
-    const renderer = src.slice(start, end > start ? end : undefined);
-    assert.match(renderer, /s\.id/, 'the row uses the opaque list id');
-    assert.ok(!/\.token\b/.test(renderer), 'the list renderer never reads s.token');
-    assert.ok(!/tokenHash/.test(renderer), 'the list renderer never reads s.tokenHash');
-  });
-
-  test('LIN-3313: the list labels a run share as a run, not as a label', async () => {
-    const src = await readFile(new URL('../../public/settings.js', import.meta.url), 'utf8');
-    const start = src.indexOf('const SHARE_KIND_LABELS');
-    const end = src.indexOf('function renderShareList', start);
-    assert.ok(start > -1 && end > start, 'the kind-label table sits before the list renderer');
-    // Evaluate exactly the shipped table + helper (a classic browser script, no exports).
-    const shareKindLabel = new Function(`${src.slice(start, end)}; return shareKindLabel;`)();
-    assert.equal(shareKindLabel('run'), 'run');
-    assert.equal(shareKindLabel('parent'), 'parent task');
-    assert.equal(shareKindLabel('label'), 'label');
-    assert.equal(shareKindLabel('toString'), 'toString', 'no prototype keys leak through');
-    const renderer = src.slice(end, src.indexOf('async function loadShareLinks', end));
-    assert.match(renderer, /shareKindLabel\(s\.kind\)/, 'the row label comes from the table');
   });
 });

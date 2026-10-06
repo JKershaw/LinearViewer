@@ -1,13 +1,12 @@
 /**
- * LIN-3311 (S0 of LIN-2950) — the lifted PR-state store, `lib/pr-state-store.js`.
+ * LIN-3311 — the lifted PR-state store, `lib/pr-state-store.js`.
  *
  * The LIN-3251 route behaviour itself stays pinned, unedited, by the
  * `GET /api/run/:runId/pr-state` block in dashboard-routes.test.js. This file
  * pins what the lift adds: one budget and one cache shared by every caller of
  * one instance (including the real dashboard router), `fetchedAt`/`via`,
- * the `minFetchedAt` floor, unknown age, the shared allowlist cache, the pure
- * one-URL rule, and the server's single instance. Injected clock, counting
- * fetch stub: no sleeps, no network.
+ * the shared allowlist cache, the pure one-URL rule, and the server's single
+ * instance. Injected clock, counting fetch stub: no sleeps, no network.
  */
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -163,65 +162,6 @@ describe('pr-state-store: fetchedAt and via', () => {
     assert.equal(store.cache.get('acme/widget#12').expiresAt, 5_000_000 + PR_STATE_CLOSED_TTL_MS);
     clock.t += 20 * 60 * 60 * 1000;
     assert.equal((await store.readResult(REF, clock.t)).via, PR_STATE_VIA.CACHE);
-    assert.equal(counts.github, 4);
-  });
-});
-
-describe('pr-state-store: minFetchedAt floor and unknown age', () => {
-  test('a cache entry older than minFetchedAt forces exactly one re-read', async () => {
-    const clock = { t: 6_000_000 };
-    const counts = { github: 0 };
-    const store = makeStore({ clock, counts });
-    await store.readResult(REF, clock.t);
-    clock.t += 60_000; // still inside the 15 min TTL
-
-    const reread = await store.readResult(REF, clock.t, { minFetchedAt: 6_000_000 + 1 });
-    assert.equal(reread.via, PR_STATE_VIA.FRESH);
-    assert.equal(reread.fetchedAt, 6_060_000);
-    assert.equal(counts.github, 8, 'one re-read (4 calls)');
-
-    const satisfied = await store.readResult(REF, clock.t, { minFetchedAt: 6_060_000 });
-    assert.equal(satisfied.via, PR_STATE_VIA.CACHE, 'an entry at the floor satisfies it');
-    assert.equal(counts.github, 8);
-  });
-
-  test('without minFetchedAt the TTL alone decides (the route behaviour)', async () => {
-    const clock = { t: 7_000_000 };
-    const counts = { github: 0 };
-    const store = makeStore({ clock, counts });
-    await store.readResult(REF, clock.t);
-    clock.t += 60_000;
-    assert.equal((await store.readResult(REF, clock.t)).via, PR_STATE_VIA.CACHE);
-    assert.equal((await store.readResult(REF, clock.t, { minFetchedAt: null })).via, PR_STATE_VIA.CACHE);
-    assert.equal(counts.github, 4);
-  });
-
-  test('an entry with no fetchedAt has unknown age: it serves a plain read but never meets a floor', async () => {
-    const clock = { t: 8_000_000 };
-    const counts = { github: 0 };
-    const legacy = { value: { readable: true, state: 'open', merged: false, number: 12, checks: [] }, expiresAt: clock.t + 60_000 };
-    const store = makeStore({ clock, counts, cache: new Map([['acme/widget#12', legacy]]) });
-
-    const plain = await store.readResult(REF, clock.t);
-    assert.equal(plain.via, PR_STATE_VIA.CACHE);
-    assert.equal(plain.fetchedAt, null, 'no stamp for an unknown age');
-    assert.equal(counts.github, 0);
-
-    const floored = await store.readResult(REF, clock.t, { minFetchedAt: 0 });
-    assert.equal(floored.via, PR_STATE_VIA.FRESH, 'even a floor of 0 forces a re-read of an unknown-age entry');
-    assert.equal(counts.github, 4);
-  });
-
-  test('a floor that cannot be met without budget reports the old entry as stale, with its age', async () => {
-    const clock = { t: 9_000_000 };
-    const counts = { github: 0 };
-    const bucket = [];
-    const store = makeStore({ clock, counts, bucket });
-    await store.readResult(REF, clock.t);
-    bucket.splice(0, bucket.length, ...Array(36).fill(clock.t));
-    const r = await store.readResult(REF, clock.t + 1000, { minFetchedAt: clock.t + 500 });
-    assert.equal(r.via, PR_STATE_VIA.STALE);
-    assert.equal(r.fetchedAt, 9_000_000);
     assert.equal(counts.github, 4);
   });
 });
