@@ -536,3 +536,81 @@ describe('owner create — run shares (LIN-3313)', () => {
     assert.equal(after.status, 410);
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIN-3315 (Phase 4 of LIN-2950): the owner-gated guest-preview route. It
+// builds a FRESH projection through the SAME run reader and renders it through
+// the SAME render-then-scan path `/s/:token` uses, so the two cannot drift.
+// ---------------------------------------------------------------------------
+describe('owner guest preview (LIN-3315)', () => {
+  function previewApp({ harness = createRunHarness(), workspaceOwnerCheck = OWNER_OK } = {}) {
+    const store = makeStore();
+    const app = buildApp({
+      store,
+      readOwnerIssues: async () => ({ reason: 'ok', issues: [] }),
+      readOwnerRun: harness.reader.readOwnerRun,
+      probeRun: harness.reader.probeRun,
+      workspaceOwnerCheck
+    });
+    return { app, store, harness };
+  }
+  const PREVIEW = `/workspace/${RUN_URL_KEY}/observation/session/${SID}/guest-preview`;
+
+  test('renders EXACTLY the /s/:token guest page for the same projection, with no-store and noindex', async () => {
+    const { app, harness } = previewApp();
+    const created = await request(app, `/workspace/${RUN_URL_KEY}/shares`, {
+      method: 'POST',
+      body: { subject: { kind: 'run', id: SID } }
+    });
+    assert.equal(created.status, 201);
+
+    const shared = await request(app, `/s/${created.json.token}`);
+    assert.equal(shared.status, 200);
+
+    const preview = await request(app, PREVIEW);
+    assert.equal(preview.status, 200);
+    assert.equal(preview.headers.get('cache-control'), 'private, no-store');
+    assert.equal(preview.headers.get('x-robots-tag'), 'noindex');
+    assert.equal(preview.body, shared.body, 'the preview HTML equals what the share serves');
+    assert.match(preview.body, /data-testid="session-page"/);
+    // The guest page carries no owner affordance, and the owner share control
+    // is not part of the guest render.
+    assert.ok(!preview.body.includes('sess-share-control'), 'no owner share control in the preview');
+    assert.ok(!preview.body.includes('data-url-key'), 'the guest page omits data-url-key');
+    void harness;
+  });
+
+  test('a non-owner is refused before any credential read; no preview is built', async () => {
+    const harness = createRunHarness();
+    const { app } = previewApp({ harness, workspaceOwnerCheck: async () => ({ status: 'not-owner' }) });
+    const res = await request(app, PREVIEW);
+    assert.equal(res.status, 403);
+    assert.equal(res.json.code, 'GRANT_OWNER_ONLY');
+    assert.equal(harness.counts.access, 0, 'no owner credential was resolved');
+  });
+
+  test('an unknown run → 404; a credential failure → 503; no reader wired → 503', async () => {
+    const missing = previewApp();
+    assert.equal((await request(missing.app, `/workspace/${RUN_URL_KEY}/observation/session/no-such-run/guest-preview`)).status, 404);
+
+    const credential = previewApp();
+    credential.harness.state.access = { token: null, reason: 'session_expired' };
+    const failed = await request(credential.app, PREVIEW);
+    assert.equal(failed.status, 503);
+    assert.equal(failed.json.reason, 'session_expired');
+
+    const store = makeStore();
+    const noReader = buildApp({ store, readOwnerIssues: async () => ({ reason: 'ok', issues: [] }) });
+    const unavailable = await request(noReader, PREVIEW);
+    assert.equal(unavailable.status, 503);
+    assert.equal(unavailable.json.code, 'RUN_SHARES_UNAVAILABLE');
+  });
+
+  test('a first-scan failure is not reachable: the preview refuses a secret-planted run with 503', async () => {
+    const { app, harness } = previewApp();
+    harness.state.session.loops[1].issueTitle = `deploy key ${PLANTED}`;
+    const res = await request(app, PREVIEW);
+    assert.equal(res.status, 503, 'a scan hit fails closed, never serving the page');
+    assert.ok(!res.body.includes(PLANTED), 'the refusal never echoes the finding');
+  });
+});

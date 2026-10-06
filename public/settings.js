@@ -232,7 +232,18 @@ const SHARE_REFUSAL_MESSAGES = {
   GRANT_OWNERLESS: 'This session has no account owner, so share links cannot be managed.',
   OWNER_CHECK_UNAVAILABLE: 'Owner verification is temporarily unavailable. Try again shortly.',
   PARENT_SHARES_UNSUPPORTED: 'This workspace’s provider has no subtasks, so a parent share would be empty. Share a label instead.',
-  SHARE_SNAPSHOT_UNAVAILABLE: 'Could not read the collection to share; nothing was created. Try again.'
+  SHARE_SNAPSHOT_UNAVAILABLE: 'Could not read the collection to share; nothing was created. Try again.',
+  SHARE_RUN_NOT_FOUND: 'No such run in this workspace; nothing was created.',
+  SHARE_SCAN_REFUSED: 'This run’s page did not pass the secret scan, so it cannot be shared.',
+  RUN_SHARES_UNAVAILABLE: 'Run share links are not available here.'
+}
+
+// Per-kind create-input hint (LIN-3315: the `run` kind was added): the error
+// shown when the field is empty and the input's placeholder.
+const SHARE_SUBJECT_HINTS = {
+  parent: { error: 'Enter the parent task’s id or identifier (e.g. LIN-3057).', placeholder: 'e.g. LIN-3057 or the task id' },
+  run: { error: 'Enter the run’s session id.', placeholder: 'run session id' },
+  label: { error: 'Enter a label name.', placeholder: 'label name' }
 }
 
 function showShareMessage(text) {
@@ -325,7 +336,7 @@ async function createShareLink(urlKey, root) {
 
   showShareMessage('')
   if (!value) {
-    showShareMessage(kind === 'parent' ? 'Enter the parent task’s id or identifier (e.g. LIN-3057).' : 'Enter a label name.')
+    showShareMessage((SHARE_SUBJECT_HINTS[kind] || SHARE_SUBJECT_HINTS.label).error)
     return
   }
 
@@ -384,7 +395,7 @@ function initShareLinks() {
   const input = root.querySelector('.share-subject-input')
   if (kindSelect && input) {
     const syncPlaceholder = () => {
-      input.placeholder = kindSelect.value === 'parent' ? 'e.g. LIN-3057 or the task id' : 'label name'
+      input.placeholder = (SHARE_SUBJECT_HINTS[kindSelect.value] || SHARE_SUBJECT_HINTS.label).placeholder
     }
     kindSelect.addEventListener('change', syncPlaceholder)
     syncPlaceholder()

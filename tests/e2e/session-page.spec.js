@@ -1460,3 +1460,28 @@ test.describe('Session credential state (LIN-1588)', () => {
 // PAT mode the server auto-recreates a session on the next visit, so "no
 // session" is not reproducible from an e2e. The 404 test above already exercises
 // this route's own missing-session handling behind a valid session.
+
+// ---------------------------------------------------------------------------
+// Run-page share control (LIN-3315, Phase 4 of LIN-2950). The control is
+// mounted on the authed run page (owner-side) with create/copy/revoke and a
+// "view as guest" link to the owner-gated preview route. Its placement is
+// pinned here; the full lifecycle runs in share-links.spec.js.
+// ---------------------------------------------------------------------------
+test.describe('Run-page share control (LIN-3315)', () => {
+  test('the authed run page carries the share control with a guest-preview link', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedSessionWithTranscript(page);
+    const sessionId = await discoverSessionId(page);
+
+    await page.goto(`/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}`);
+    await page.waitForLoadState('networkidle');
+
+    const control = page.locator('[data-testid="session-share-control"]');
+    await expect(control).toBeVisible();
+    await expect(control).toHaveAttribute('data-session-id', sessionId);
+    await expect(page.locator('[data-testid="session-share-create"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-share-preview"]'))
+      .toHaveAttribute('href', `/workspace/${URL_KEY}/observation/session/${encodeURIComponent(sessionId)}/guest-preview`);
+  });
+});
