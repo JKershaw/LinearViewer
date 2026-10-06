@@ -44,17 +44,26 @@ describe('buildWorkerLaneKickoff', () => {
       'a "file" option is limited to outside findings');
   });
 
-  // LIN-3033: Step 3 must require another fresh-context review for any edit
-  // made after the fresh-context review's Approve — unless it is the trivial,
-  // review-named edit review itself asked for. This covers a "do it here"
-  // ruling raised mid-lane too, without a dedicated clause of its own.
-  test('Step 3 requires another fresh-context review for any post-Approve edit that is not the named trivial edit (LIN-3033)', () => {
+  // LIN-3326 (replacing LIN-3033's bound): an edit made after the fresh-context
+  // review's Approve needs another fresh-context review before merge, unless it is
+  // a fix review asked for, or a merge conflict, kept to the size of a fix. A new
+  // design or new behaviour is a change no review covered. This covers a "do it
+  // here" ruling raised mid-lane too, without a dedicated clause of its own.
+  test('Step 3 requires another fresh-context review for a post-Approve edit that is more than a fix (LIN-3326)', () => {
     const text = buildWorkerLaneKickoff();
     assert.ok(/needs another fresh-context review before\s+merge/.test(text),
       'Step 3 must require a second fresh-context review for a post-Approve edit');
-    assert.ok(/unless it is the trivial, review-named edit review itself asked for/.test(text),
-      'the trivial, review-named edit is the sole exception');
-    assert.ok(/This\s+already covers a "do it here" ruling raised mid-lane/.test(text),
+    assert.ok(/unless it is a fix review asked for, or resolving a conflict while merging, kept to the\s+size of a fix/.test(text),
+      'a fix review asked for, or a merge conflict, the size of a fix, is the exception');
+    assert.ok(/A new design or new behaviour after the Approve is a change no review covered/.test(text),
+      'anything more than a fix needs another review, with its reason');
+    assert.ok(/This already covers a "do it here" ruling raised mid-lane/.test(text),
       'the same clause covers a mid-lane "do it here" ruling without a dedicated clause');
+  });
+
+  test('Step 3 drops an inside finding only for a change the team would hear about first (LIN-3291)', () => {
+    const text = buildWorkerLaneKickoff();
+    assert.ok(/A drop\s+is warranted only when finishing it is a change the team would need to hear about first/.test(text));
+    assert.ok(!/materially larger than this ticket's own change/.test(text), 'the size test for a drop is gone');
   });
 });

@@ -131,8 +131,9 @@ describe('one routing call, then code assembles the stage prompt', () => {
   // one scope line it does not state (LIN-3293 review S1).
   test('review keeps its safety floors', async () => {
     const floors = [/green CI never settles a ledger item/i, /never a bare Approve/i,
-      /name the specific monitor/i, /write one line naming why no check short of production could prove the claim/i,
-      /you name the rollback/i, /state the exact change/i, /You do NOT merge, mark the task Done, or file follow-ups/];
+      /\*\*A named monitor\*\*/, /one line on why no check short of production could prove it/i,
+      /An unnamed monitor or rollback settles nothing/, /name each precisely enough to make without guessing/i,
+      /You do NOT merge, mark the task Done, or file follow-ups/];
     transport(routing('review'));
     const rec = await getRecommendation(ISSUE, CONTEXT, { apiKey: 'k' });
     const rest = rec.prompt.slice(rec.prompt.indexOf('## Scope and Authority'));

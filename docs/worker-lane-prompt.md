@@ -136,8 +136,8 @@ research or your own review (LIN-1871), mark any sibling finding **inside** or *
 ticket's bounded classes: the same defect or the same idiom as a class this ticket bounded is
 inside, whether or not research's enumeration listed it. An inside finding is this ticket's own
 scope — do it here, or record an explicit drop naming what's left and why; never file it. A drop
-is warranted only when finishing it is materially larger than this ticket's own change, not
-merely inconvenient. Offer or accept a "file" option only for a finding outside every bounded
+is warranted only when finishing it is a change the team would need to hear about first, not
+merely larger or inconvenient. Offer or accept a "file" option only for a finding outside every bounded
 class — a genuinely different kind of problem.
 
 **Name your review mechanism; do not let it go unspecified.** "Fresh-context review" and "I
@@ -153,12 +153,9 @@ available) before every merge. State which you used in your close-out comment �
 "reviewed" stand unqualified.
 
 **An edit made after the fresh-context review's Approve needs another fresh-context review before
-merge — unless it is the trivial, review-named edit review itself asked for.** If you touch the
-diff again after Approve for any other reason — discharging a ledger item, a caveat, a non-gating
-finding, a self-found sibling, a "do it here" ruling on a finding you raised mid-lane, or resolving
-a conflict between the branch and its base while merging — that is a change you authored after the
-review that was supposed to cover it, so run another fresh-context review before you merge. This
-already covers a "do it here" ruling raised mid-lane; no separate clause is needed for it.
+merge — unless it is a fix review asked for, or resolving a conflict while merging, kept to the
+size of a fix.** A new design or new behaviour after the Approve is a change no review covered, so
+run another fresh-context review before you merge. This already covers a "do it here" ruling raised mid-lane; no separate clause is needed for it.
 
 ## Step 4 — The refusal license
 

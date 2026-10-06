@@ -61,7 +61,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 121192, // LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority. LIN-3300: +601, six stage rules moved in from the deleted meta-prompt; then -4404, each stage's route (when / when not / requires) replaces its aiHint
+  'lib/prompt-template-defs.js': 109927, // LIN-3326: -11265, close-out finishes the work and review stops turning claims into merge gates. LIN-3299: one lead per stage (STAGE_LEADS); -825 for leads that no longer repeat Scope and Authority. LIN-3300: +601, six stage rules moved in from the deleted meta-prompt; then -4404, each stage's route (when / when not / requires) replaces its aiHint
   'lib/prompt-templates.js': 19935, // LIN-3299: +13, re-exports STAGE_LEADS; +199, finishStagePrompt adds Scope and Authority. LIN-3300: -455, formatStageOptions and defer's entry replace the aiHint formatter
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3424,
@@ -92,8 +92,8 @@ export const TEMPLATES_RENDERED_CEILINGS = {
   context: 2021,
   'plan-review': 7955,
   implementation: 7937,
-  review: 18895,
-  'close-out': 18752,
+  review: 15598, // LIN-3326: -3297, the risk lanes and the authoring bound leave review
+  'close-out': 10859, // LIN-3326: -7893, close-out finishes the work: no authoring bound, no hard gate, one statement of each floor
   'retrospective-audit': 4427,
   retro: 4265,
 };
@@ -119,7 +119,7 @@ export const ROUTER_PROMPT_RENDERED_CEILING = 9555;
  * LIN-3300: the file was lib/prompts/brief-writer.js (ceiling 4779); the writer's prompt
  * left with the writer, and the ceiling moved with the lines that stayed.
  */
-export const STAGE_INTENT_SOURCE_CEILING = 2830;
+export const STAGE_INTENT_SOURCE_CEILING = 2912; // LIN-3326: +82, close-out's own line (engineering calls in finishing the work are its), paid from close-out's rendered ceiling
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
 export const RUNNER_PROMPT_SOURCE_CEILING = 17500;
@@ -141,8 +141,11 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * LIN-3300's stage selector lowered it again (437765 -> 364994): the selector's rules,
  * stage options and facts replace the decision tree and the aiHints, and the planner no
  * longer carries the loop bound. Every ceiling sits at its surface's size.
+ *
+ * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
+ * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 364994;
+export const FROZEN_TOTAL_BYTES = 342621;
 
 const BASE_URL = 'https://harbour.example';
 
