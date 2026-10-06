@@ -428,3 +428,114 @@ test.describe('Run share link — signed-out guest (LIN-3313)', () => {
     await guest.close();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Run-page share control + preview (LIN-3315, Phase 4 of LIN-2950). The owner
+// runs the whole lifecycle from the run page: create, copy, preview as guest,
+// revoke. The preview route is owner-gated and renders exactly the guest page.
+// ---------------------------------------------------------------------------
+test.describe('Run share link — owner UX (LIN-3315)', () => {
+  test.afterEach(async ({ page }) => {
+    await page.request.get('/test/clear-pr-status');
+  });
+
+  async function prepareOwnedRun(page, urlKey) {
+    await resetRunWorkspace(page, urlKey);
+    await seedRunWorkspace(page, urlKey);
+    await seedWorkspaceOwnership(page, urlKey, 'owner');
+    await seedFinishedRunFor(page, urlKey);
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: RUN_REPO, number: 12, readable: true, state: 'open', merged: false, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+    const sessionId = await discoverRunSessionId(page, urlKey);
+    await clearShares(page.request, urlKey);
+    return sessionId;
+  }
+
+  test('owner creates, previews as guest and revokes a run share from the run page', async ({ page, browser, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const sessionId = await prepareOwnedRun(page, urlKey);
+    const runPage = `/workspace/${urlKey}/observation/session/${encodeURIComponent(sessionId)}`;
+
+    await page.goto(runPage);
+    await page.waitForLoadState('networkidle');
+
+    const control = page.locator('[data-testid="session-share-control"]');
+    await expect(control).toBeVisible();
+    await expect(control).toHaveAttribute('data-session-id', sessionId);
+
+    // The "view as guest" link points at the owner-gated preview route.
+    await expect(page.locator('[data-testid="session-share-preview"]'))
+      .toHaveAttribute('href', `/workspace/${urlKey}/observation/session/${encodeURIComponent(sessionId)}/guest-preview`);
+
+    // Create from the run page; the URL is shown once with a copy button.
+    await page.locator('[data-testid="session-share-create"]').click();
+    const urlEl = page.locator('[data-testid="session-share-url"]');
+    await expect(urlEl).toContainText('/s/');
+    const shareUrl = (await urlEl.textContent()).trim();
+    const token = shareUrl.split('/s/')[1];
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+
+    // The list shows exactly the one active run row for this run (the token is
+    // never in it).
+    const activeRow = page.locator('[data-testid="session-share-list"] .sess-share-item[data-revoked="false"]');
+    await expect(activeRow).toHaveCount(1);
+    expect(await page.locator('[data-testid="session-share-list"]').textContent()).not.toContain(token);
+
+    // Preview as guest: the owner sees the guest page and no owner affordances.
+    const previewResponse = await page.goto(`/workspace/${urlKey}/observation/session/${encodeURIComponent(sessionId)}/guest-preview`);
+    expect(previewResponse.status()).toBe(200);
+    expect(previewResponse.headers()['cache-control']).toBe('private, no-store');
+    expect(previewResponse.headers()['x-robots-tag']).toBe('noindex');
+    await expect(page.locator('[data-testid="session-page"]')).toBeVisible();
+    await expect(page.locator('[data-testid="session-title"]')).toContainText('Shared run task');
+    await expect(page.locator('[data-testid="session-share-control"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="session-back"]')).toHaveCount(0);
+
+    // Revoke from the run page; the revoked /s/ URL is gone.
+    await page.goto(runPage);
+    await page.waitForLoadState('networkidle');
+    page.on('dialog', (dialog) => dialog.accept());
+    await page.locator('[data-testid="session-share-list"] .sess-share-revoke').first().click();
+    await expect(page.locator('[data-testid="session-share-list"] .sess-share-item[data-revoked="false"]')).toHaveCount(0);
+
+    const guest = await browser.newContext();
+    const guestPage = await guest.newPage();
+    expect((await guestPage.goto(`/s/${token}`)).status()).toBe(410);
+    await guest.close();
+  });
+
+  test('the preview route is never served to a signed-out viewer (owner-gated)', async ({ page, browser, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const sessionId = await prepareOwnedRun(page, urlKey);
+    const previewPath = `/workspace/${urlKey}/observation/session/${encodeURIComponent(sessionId)}/guest-preview`;
+
+    // A signed-out context holds no workspace session, so `workspaceFromUrl`
+    // bounces it off the preview route before the owner gate is even reached.
+    // (The owner gate itself is pinned by the unit test in
+    // share-owner-routes.test.js: a non-owner gets 403 GRANT_OWNER_ONLY.)
+    const signedOut = await browser.newContext();
+    const signedOutPage = await signedOut.newPage();
+    const res = await signedOutPage.goto(previewPath);
+    expect(new URL(signedOutPage.url()).pathname).not.toContain('guest-preview');
+    expect(await res.text()).not.toContain('Shared run task');
+    await signedOut.close();
+  });
+
+  test('the Settings create form offers the run kind and creates a run share', async ({ page, localWorkerUrlKey }) => {
+    const urlKey = localWorkerUrlKey;
+    const sessionId = await prepareOwnedRun(page, urlKey);
+
+    await page.goto(`/workspace/${urlKey}/settings`);
+    const section = page.locator('[data-testid="settings-section-share-links"]');
+    await expect(section).toBeVisible();
+    await expect(section.locator('[data-testid="share-kind-select"] option[value="run"]')).toHaveCount(1);
+
+    await section.locator('[data-testid="share-kind-select"]').selectOption('run');
+    await section.locator('[data-testid="share-subject-input"]').fill(sessionId);
+    await section.locator('[data-testid="share-create-btn"]').click();
+
+    await expect(section.locator('[data-testid="share-created-url"]')).toContainText('/s/');
+    await expect(section.locator('.share-item[data-revoked="false"]').filter({ hasText: sessionId })).toHaveCount(1);
+  });
+});

@@ -808,3 +808,79 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ── Run-page share control (LIN-3315, S8b of LIN-2950) ─────────────────────
+   Owner-only, mounted on the authed run page. A quiet utility row: the label,
+   a create button and the "view as guest" link; the created URL and the run's
+   share list appear below. Never rendered in guest mode (the guest branch does
+   not mount it), so these styles are inert on a share page. */
+.sess-share-section {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: var(--space-3);
+  background: var(--card);
+}
+.sess-share {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.sess-share-label {
+  font-family: var(--font-content);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.sess-share-preview {
+  font-family: var(--font-content);
+  font-size: 0.85rem;
+  color: var(--brand);
+  text-decoration: none;
+}
+.sess-share-preview:hover { text-decoration: underline; }
+.sess-share-created {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+/* Author `display` beats the UA `[hidden]` rule, so restore it explicitly. */
+.sess-share-created[hidden],
+.sess-share-message[hidden] { display: none; }
+.sess-share-url {
+  font-family: var(--font-structural);
+  overflow-wrap: anywhere;
+}
+.sess-share-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-family: var(--font-content);
+}
+.sess-share-message {
+  color: var(--amber);
+  font-size: 0.85rem;
+  margin-top: var(--space-2);
+  font-family: var(--font-content);
+}
+.sess-share-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+.sess-share-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-structural);
+  font-size: 0.85rem;
+}
+.sess-share-kind,
+.sess-share-meta { color: var(--muted); }
+.sess-share-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-family: var(--font-content);
+}

@@ -636,6 +636,47 @@ export function createShareRoutes({
       }
     });
 
+    // Preview (LIN-3315, S8b of LIN-2950): the owner sees EXACTLY the guest
+    // page a share link would serve, built from a FRESH projection each time.
+    // Owner-gated (a non-owner is refused before any credential read) and
+    // no-store/noindex: it is a private, always-current preview, not the
+    // cached `/s/:token` path. The HTML rides the SAME render-then-scan path
+    // (`renderScannedRun`) the share uses, so the two cannot drift.
+    router.get('/workspace/:urlKey/observation/session/:sessionId/guest-preview', workspaceFromUrl, async (req, res) => {
+      const { workspace } = req;
+      const refusal = await ownerRefusal(req);
+      if (refusal) return ownerRefusalResponse(res, refusal, workspace);
+
+      res.set('Referrer-Policy', 'no-referrer');
+      res.set('Cache-Control', 'private, no-store');
+      res.set('X-Robots-Tag', 'noindex');
+
+      const { sessionId } = req.params;
+      if (!sessionId) return res.status(404).end();
+      if (typeof readOwnerRun !== 'function') {
+        return jsonError(res, 503, 'Run share links are not available here.', { code: 'RUN_SHARES_UNAVAILABLE' });
+      }
+
+      let outcome;
+      try {
+        outcome = await readOwnerRun(workspace.urlKey, req.session.accountId, sessionId);
+      } catch {
+        outcome = { reason: 'refresh_error', run: null };
+      }
+      if (outcome == null || outcome.run == null || outcome.reason !== 'ok') {
+        const reason = outcome?.reason ?? 'refresh_error';
+        return jsonError(res, reason === 'run_not_found' ? 404 : 503,
+          reason === 'run_not_found' ? 'No such run in this workspace.' : 'Could not build the guest preview for this run.',
+          { code: 'RUN_PREVIEW_UNAVAILABLE', reason });
+      }
+      const page = renderScannedRun(outcome.run, outcome.run.capturedAt, false);
+      if (!page.ok) {
+        console.warn(`Run preview refused: ${page.reason} (urlKey=${workspace.urlKey}) — LIN-3315`);
+        return res.status(503).end();
+      }
+      return res.status(200).type('html').send(page.html);
+    });
+
     // Revoke: refusal gate → resolve the derived id WITHIN this workspace (a
     // share in another workspace is never even considered, so cross-workspace
     // revoke is refused) → revoke by record id.
