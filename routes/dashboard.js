@@ -262,38 +262,6 @@ export function sessionIsTerminal(session) {
 }
 
 /**
- * Per-loop terminal state plus the "settled" verdict (LIN-3311, S2a of
- * LIN-2950; plan-review R4). Stricter than `sessionIsTerminal`: an ANCHORED
- * session is terminal once its anchor is, even while a reply or proposal
- * Apply runs a follow-up loop; it is SETTLED only when the anchor rule holds
- * AND every loop is terminal.
- *
- *   settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(terminal)
- *
- * Each loop's `terminal` is the SAME private `loopIsTerminal` (`enrichLoop` →
- * `effectiveAgentState`, so a markerless `complete`/`error` loop counts) that
- * `sessionIsTerminal` uses — not the marker-only `gateFacts` view of the run
- * paragraph module, which is deliberately left alone (LIN-3253). The
- * returned `loops` array is the one the check counted, so a key built from it
- * (LIN-2950's `settledKey`) agrees with the verdict by construction. A loop
- * that never ends means "never settles", the safe direction.
- *
- * @param {Object} session - a reconstructed session (lean or non-lean)
- * @returns {{ settled: boolean, loops: Array<{ loopId: (string|null), terminal: boolean }> }}
- */
-export function sessionSettleState(session) {
-  const raw = Array.isArray(session?.loops) ? session.loops : [];
-  const loops = raw.map(loop => ({ loopId: loop.loopId ?? null, terminal: loopIsTerminal(loop) }));
-  const settled = sessionIsTerminal(session) && loops.length > 0 && loops.every(l => l.terminal);
-  return { settled, loops };
-}
-
-/** The settled verdict alone; defined from `sessionSettleState`, never beside it. */
-export function sessionIsSettled(session) {
-  return sessionSettleState(session).settled;
-}
-
-/**
  * Is this a STANDALONE session — a single user-dispatched cli/web prompt that
  * `_buildSessions` pass 3 synthesized into its own single-loop session (LIN-1194)?
  *
@@ -720,9 +688,9 @@ export function createDashboardRoutes({
   // store, which is process-wide in production (one router). Tests inject
   // `{ now, resolveProvider, loadRun, githubFetch, cache, allowlistCache, bucket }`.
   prState = null,
-  // LIN-3311 (S0 of LIN-2950): the ONE shared PR-state store server.js builds
-  // (`lib/pr-state-store.js`), so this router and later readers spend one 36/h
-  // budget and fill one cache. When given it wins over the store fields of the
+  // LIN-3311: the ONE shared PR-state store server.js builds
+  // (`lib/pr-state-store.js`), so this router spends one 36/h
+  // budget and fills one cache. When given it wins over the store fields of the
   // `prState` bag (`cache`/`allowlistCache`/`bucket`/`now`/`githubFetch`); the
   // bag's route seams (`loadRun`/`resolveProvider`) still apply.
   prStateStore: sharedPrStateStore = null
@@ -1645,12 +1613,11 @@ export function createDashboardRoutes({
   }
 
   /**
-   * The run page's LOCAL half (LIN-3311, S2a of LIN-2950): everything the page
+   * The run page's LOCAL half (LIN-3311): everything the page
    * model needs that is Mongo-only and request-free — the NON-lean session
    * (LIN-1021 point-read), the brief/recap cache-join, the anchor loop and its
    * title, the run view, and the stored run paragraph. No tracker or GitHub
-   * read, no `req`, no owner-only input, so a non-request caller (LIN-2950's
-   * share reader) can run it as its cheap local probe.
+   * read, no `req`, no owner-only input, so it also runs as a cheap local probe.
    *
    * @param {string} urlKey
    * @param {string} sessionId
@@ -1701,8 +1668,7 @@ export function createDashboardRoutes({
    * Owner-only inputs come in as arguments, never read here: `viewerIsOwner`
    * (default false), the dispatch-row `runFacts` and the `runnerReady` flag.
    * Omitted, they take the guest-safe defaults (`stopAt: null`,
-   * `variant: 'unknown'`, not ready). `allowlist`/`readPrStatus` are passed to
-   * the reader only when given (e.g. from the shared PR-state store).
+   * `variant: 'unknown'`, not ready).
    *
    * @param {Object} workspace
    * @param {Object} session
@@ -1711,17 +1677,13 @@ export function createDashboardRoutes({
    * @param {boolean} [opts.viewerIsOwner=false]
    * @param {{ stopAt?: ('pr'|null), variant?: string }|null} [opts.runFacts]
    * @param {boolean} [opts.runnerReady=false]
-   * @param {Set<string>} [opts.allowlist]
-   * @param {Function} [opts.readPrStatus]
    * @returns {Promise<Object|null>}
    */
   async function readRunExternal(workspace, session, {
     asked = null,
     viewerIsOwner = false,
     runFacts = null,
-    runnerReady = false,
-    allowlist = null,
-    readPrStatus = null
+    runnerReady = false
   } = {}) {
     if (!readRunEvidenceFn || !session || !session.seedIssue) return null;
     const facts = runFacts || {};
@@ -1739,8 +1701,6 @@ export function createDashboardRoutes({
         stopAt: facts.stopAt || null,
         variant: facts.variant || 'unknown',
         runnerReady: !!runnerReady,
-        ...(allowlist ? { allowlist } : {}),
-        ...(readPrStatus ? { readPrStatus } : {}),
       });
     } catch (err) {
       console.error('Session page run-evidence read failed:', err.message);
@@ -3158,12 +3118,6 @@ export function createDashboardRoutes({
       res.json({ hydrated: false, reason: /not found/i.test(error?.message) ? 'not_found' : 'unavailable' });
     }
   });
-
-  // The run page's two request-free halves (LIN-3311, S2a of LIN-2950), so a
-  // caller outside this router (LIN-2950 Phase 3's share reader, wired in
-  // server.js) builds a run model through the SAME code as the owner page
-  // instead of a fork. Neither carries an owner-only or request-coupled input.
-  router.runLoader = { loadRunLocal, readRunExternal };
 
   return router;
 }

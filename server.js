@@ -2310,10 +2310,9 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
-// The ONE PR-state store (LIN-3311, S0 of LIN-2950): the LIN-3251 cache,
-// sliding 36/h GitHub budget and repo-allowlist cache. Every reader of run PR
-// state (the dashboard router below; the share router from LIN-2950 Phase 3)
-// gets this instance, so the budget and the `repo#number` cache are shared.
+// The ONE PR-state store (LIN-3311): the LIN-3251 cache,
+// sliding 36/h GitHub budget and repo-allowlist cache. The dashboard router
+// below gets this instance, so the budget and the `repo#number` cache are shared.
 const prStateStore = createPrStateStore()
 
 // Mount proxy routes
@@ -2533,9 +2532,8 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options
   // cache, session scan, refresh-on-resolve, Connection-first arm) and they
   // previously each built their own answer; the Connection route's
   // `connectionResolveResult` (lib/connection-access.js) omitted the field, so
-  // consumers that gate on `reason === 'ok'` (the share readers) reported a
-  // valid owner login as `refresh_error`. Failures keep their own reason below
-  // (session_expired, owner_signed_out, binding_required, …).
+  // a valid owner login was reported as `refresh_error`. Failures keep their
+  // own reason below (session_expired, owner_signed_out, binding_required, …).
   const grant = (fields) => ({ ...fields, reason: 'ok' });
 
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {

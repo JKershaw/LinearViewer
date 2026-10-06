@@ -1,16 +1,12 @@
 /**
- * LIN-3311 (S2a of LIN-2950) — the run-evidence seams the share reader will use.
+ * LIN-3311 — the run-evidence seams.
  *
- *   - `readRunEvidence({ allowlist })`: a pre-resolved allowlist (the shared
- *     PR-state store's cached one) replaces the reader's own uncached
- *     `resolveRepoAllowlist` tracker read; omitted, the read happens as before.
- *   - `readRunEvidence` without `viewerIsOwner` now builds a NON-owner model
+ *   - `readRunEvidence` without `viewerIsOwner` builds a NON-owner model
  *     (`closeOut.owner === false`); both real callers pass the flag explicitly,
  *     and the `/api/run-evidence` route's own `() => true` default is unchanged.
- *   - The run page's loader split: `loadRunLocal` / `readRunExternal`
- *     (`router.runLoader`) take no request, default every owner-only input to
- *     the guest-safe value, and the owner page still calls the reader with
- *     exactly the arguments it did before the split.
+ *   - The owner run page still calls the reader with exactly the arguments it
+ *     did before the loader split (the split's request-free halves were removed
+ *     by LIN-3325; the owner page path is pinned here).
  */
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -37,34 +33,6 @@ function countingProvider({ repo = 'acme/widget', comments = [comment(`opened ${
 }
 
 const unreadable = async () => ({ readable: false, state: 'unknown', reason: 'stub' });
-
-describe('readRunEvidence: optional allowlist', () => {
-  test('a provided allowlist skips the tracker allowlist read and is the filter actually used', async () => {
-    const provider = countingProvider();
-    const kept = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, allowlist: new Set(['acme/widget']) });
-    assert.equal(provider.counts.fetchProjects, 0, 'no resolveRepoAllowlist read');
-    assert.equal(kept.state.prUrls.length, 1);
-
-    const filtered = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, allowlist: new Set(['other/repo']) });
-    assert.equal(provider.counts.fetchProjects, 0);
-    assert.equal(filtered.state.prUrls.length, 0, 'the provided set, not the tracker one, filtered the PR out');
-  });
-
-  test('omitted, the reader resolves the allowlist itself, as before', async () => {
-    const provider = countingProvider();
-    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable });
-    assert.equal(provider.counts.fetchProjects, 1);
-    assert.equal(model.state.prUrls.length, 1);
-  });
-
-  test('the provided allowlist reaches the PR reader too', async () => {
-    const provider = countingProvider();
-    const allowlist = new Set(['acme/widget']);
-    let seen = null;
-    await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', allowlist, readPrStatus: async (args) => { seen = args.allowlist; return { readable: false }; } });
-    assert.equal(seen, allowlist);
-  });
-});
 
 describe('readRunEvidence: viewerIsOwner defaults to false', () => {
   test('flag omitted → closeOut.owner === false', async () => {
@@ -94,7 +62,7 @@ describe('readRunEvidence: viewerIsOwner defaults to false', () => {
   });
 });
 
-describe('run page loader split (routes/dashboard.js runLoader)', () => {
+describe('run page owner path (routes/dashboard.js)', () => {
   const NOW_ISO = new Date().toISOString();
   const SID = 'sess-split';
 
@@ -139,79 +107,6 @@ describe('run page loader split (routes/dashboard.js runLoader)', () => {
     const reader = async (args) => { calls.push(args); return null; };
     return { calls, reader };
   }
-
-  test('the router exposes both halves, and neither takes a request', () => {
-    const { loadRunLocal, readRunExternal } = makeRouter().runLoader;
-    assert.equal(typeof loadRunLocal, 'function');
-    assert.equal(typeof readRunExternal, 'function');
-    assert.equal(loadRunLocal.length, 2, '(urlKey, sessionId[, opts])');
-    assert.equal(readRunExternal.length, 2, '(workspace, session[, opts])');
-  });
-
-  test('loadRunLocal returns the local model (session, anchor title, run view, stored paragraph); null when gone', async () => {
-    const paragraphs = new InMemoryRunParagraphStore();
-    await paragraphs.put('ws-a', SID, { paragraph: 'Stored words.', inputHash: 'h1', final: true });
-    const { loadRunLocal } = makeRouter({ runParagraphStore: paragraphs }).runLoader;
-
-    const local = await loadRunLocal('ws-a', SID, { now: NOW_ISO });
-    assert.equal(local.session.sessionId, SID);
-    assert.equal(local.anchorLoop.loopId, SID);
-    assert.equal(local.anchorIssueTitle, 'Anchor title');
-    assert.ok(local.runView && local.runView.progress, 'the run view is built');
-    assert.ok(Array.isArray(local.issueContext));
-    assert.equal(local.runParagraph, 'Stored words.');
-    assert.equal(local.paragraph.inputHash, 'h1', 'the stored record is kept whole for a later key match');
-    assert.equal(local.paragraph.final, true);
-
-    assert.equal(await loadRunLocal('ws-a', 'no-such-session'), null);
-  });
-
-  test('readRunExternal defaults every owner-only input to the guest-safe value', async () => {
-    const { calls, reader } = capturingReader();
-    const { loadRunLocal, readRunExternal } = makeRouter({ readRunEvidence: reader }).runLoader;
-    const { session } = await loadRunLocal('ws-a', SID);
-    await readRunExternal({ urlKey: 'ws-a' }, session);
-    assert.equal(calls.length, 1);
-    const args = calls[0];
-    assert.equal(args.viewerIsOwner, false);
-    assert.equal(args.stopAt, null);
-    assert.equal(args.variant, 'unknown');
-    assert.equal(args.runnerReady, false);
-    assert.equal(args.asked, session.seedIssue, 'no anchor title given → the seed');
-    assert.deepEqual(args.evidenceUrls, [PR_A], 'the [evidence] URLs still corroborate');
-    assert.ok(!('allowlist' in args) && !('readPrStatus' in args), 'reader defaults apply unless the caller supplies them');
-  });
-
-  test('readRunExternal passes a supplied allowlist and PR reader through', async () => {
-    const { calls, reader } = capturingReader();
-    const { loadRunLocal, readRunExternal } = makeRouter({ readRunEvidence: reader }).runLoader;
-    const { session } = await loadRunLocal('ws-a', SID);
-    const allowlist = new Set(['acme/widget']);
-    const readPrStatus = async () => null;
-    await readRunExternal({ urlKey: 'ws-a' }, session, { allowlist, readPrStatus });
-    assert.equal(calls[0].allowlist, allowlist);
-    assert.equal(calls[0].readPrStatus, readPrStatus);
-  });
-
-  test('readRunExternal is skipped (null) when the reader is unwired or there is no seed, and fails open', async () => {
-    const { loadRunLocal, readRunExternal } = makeRouter().runLoader;
-    const { session } = await loadRunLocal('ws-a', SID);
-    assert.equal(await readRunExternal({ urlKey: 'ws-a' }, session), null, 'unwired');
-
-    const { calls, reader } = capturingReader();
-    const wired = makeRouter({ readRunEvidence: reader }).runLoader;
-    assert.equal(await wired.readRunExternal({ urlKey: 'ws-a' }, { ...session, seedIssue: null }), null, 'no seed');
-    assert.equal(calls.length, 0);
-
-    const throwing = makeRouter({ readRunEvidence: async () => { throw new Error('tracker down'); } }).runLoader;
-    const origError = console.error;
-    console.error = () => {};
-    try {
-      assert.equal(await throwing.readRunExternal({ urlKey: 'ws-a' }, session), null, 'fail-open');
-    } finally {
-      console.error = origError;
-    }
-  });
 
   test('the owner page calls the reader with exactly the pre-split arguments', async () => {
     const { calls, reader } = capturingReader();
