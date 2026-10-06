@@ -9,6 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { SPINE, USUAL_STAGES, STAGE_LABELS } from '../../lib/run-view.js';
+import { STEP_KIND_WORDS } from '../../lib/render-run-steps.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 
 describe('run-view: stage vocabulary (LIN-3328)', () => {
@@ -31,6 +32,16 @@ describe('run-view: stage vocabulary (LIN-3328)', () => {
   test('the usual stages are all labelled', () => {
     for (const kind of USUAL_STAGES) {
       assert.ok(STAGE_LABELS[kind], `the usual stage "${kind}" needs a label`);
+    }
+  });
+
+  test('STEP_KIND_WORDS agrees with STAGE_LABELS', () => {
+    for (const kind of Object.keys(STEP_KIND_WORDS)) {
+      assert.equal(
+        STAGE_LABELS[kind],
+        STEP_KIND_WORDS[kind],
+        `"${kind}" drifted between STAGE_LABELS and STEP_KIND_WORDS`
+      );
     }
   });
 });
