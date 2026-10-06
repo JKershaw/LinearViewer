@@ -131,3 +131,30 @@ describe('run page owner path (routes/dashboard.js)', () => {
     assert.equal(args.variant, 'unknown');
   });
 });
+
+// LIN-3329: the task page's one tracker read already carries the issue's
+// comments, so it hands them in and the reader skips its own fetch. Omitted —
+// as the run page omits it (pinned by the key list above) — the fetch runs.
+describe('readRunEvidence: optional comments (LIN-3329)', () => {
+  test('comments supplied → no fetchIssueComments; the model is built from them', async () => {
+    const provider = countingProvider({ comments: [] });
+    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [comment(`opened ${PR_A}`)] });
+    assert.equal(provider.counts.comments, 0, 'the supplied comments were used');
+    assert.equal(model.state.pr.url, PR_A);
+    assert.equal(model.closeOut.owner, false, 'the viewerIsOwner default is untouched');
+  });
+
+  test('comments omitted → fetched exactly once, as before', async () => {
+    const provider = countingProvider();
+    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable });
+    assert.equal(provider.counts.comments, 1);
+    assert.equal(model.state.pr.url, PR_A);
+  });
+
+  test('an empty supplied list is respected (no fetch, no PR)', async () => {
+    const provider = countingProvider();
+    const model = await readRunEvidence({ issueIdentifier: 'LIN-1', provider, callScope: 's', readPrStatus: unreadable, comments: [] });
+    assert.equal(provider.counts.comments, 0);
+    assert.equal(model.state.status, 'no-pr');
+  });
+});
