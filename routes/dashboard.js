@@ -1713,14 +1713,6 @@ export function createDashboardRoutes({
    * @param {boolean} [opts.runnerReady=false]
    * @param {Set<string>} [opts.allowlist]
    * @param {Function} [opts.readPrStatus]
-   * @param {{ provider: Object, callScope: * }|null} [opts.binding] - an
-   *   already-resolved provider + call scope (LIN-3313: the share reader's
-   *   owner credential from `resolveWorkspaceAccess`). Omitted, the binding is
-   *   resolved from `workspace` as before; `workspace.urlKey` is still read.
-   * @param {boolean} [opts.failOpen=true] - false rethrows a read error
-   *   instead of returning null (LIN-3313: a share refresh must not mistake a
-   *   failed tracker read for "no evidence" and freeze that). The owner page
-   *   keeps the default.
    * @returns {Promise<Object|null>}
    */
   async function readRunExternal(workspace, session, {
@@ -1729,15 +1721,13 @@ export function createDashboardRoutes({
     runFacts = null,
     runnerReady = false,
     allowlist = null,
-    readPrStatus = null,
-    binding = null,
-    failOpen = true
+    readPrStatus = null
   } = {}) {
     if (!readRunEvidenceFn || !session || !session.seedIssue) return null;
     const facts = runFacts || {};
     try {
       const evidenceUrls = collectRunEvidenceUrls(session);
-      const { provider, callScope } = binding || resolveIssueBinding(workspace, null);
+      const { provider, callScope } = resolveIssueBinding(workspace, null);
       return await readRunEvidenceFn({
         issueIdentifier: session.seedIssue,
         provider,
@@ -1753,7 +1743,6 @@ export function createDashboardRoutes({
         ...(readPrStatus ? { readPrStatus } : {}),
       });
     } catch (err) {
-      if (!failOpen) throw err;
       console.error('Session page run-evidence read failed:', err.message);
       return null;
     }

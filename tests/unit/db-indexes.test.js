@@ -21,7 +21,6 @@ import { ProxyEventStore } from '../../lib/proxy-events.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
-import { ShareStore } from '../../lib/share-store.js';
 import { recordingCollection } from '../fixtures/mango-tmpdir.js';
 
 // Collections the audit deliberately left on the auto `_id` index.
@@ -487,8 +486,7 @@ describe('db-indexes', () => {
       { collection: 'proxy-events', make: c => new ProxyEventStore({ collection: c }), list: s => s.listSelfCredentialTrail('parity-ws', 'parity-token', { limit: 5 }), match: pagedListSpec('proxy-events') },
       { collection: 'prompt-traces', make: c => new PromptTraceStore({ collection: c }), list: s => s.listTraces('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('prompt-traces') },
       { collection: 'llm-call-log', make: c => new LlmCallLogStore({ collection: c }), list: s => s.listCalls('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('llm-call-log') },
-      { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('foreman-status') },
-      { collection: 'shares', make: c => new ShareStore({ collection: c }), list: s => s.listByUrlKey('parity-ws'), match: s => s.collection === 'shares' && s.keySpec.urlKey === 1 && s.keySpec.createdAt === -1 }
+      { collection: 'foreman-status', make: c => new AgentStatusStore({ collection: c }), list: s => s.listStatus('parity-ws', { limit: 5, offset: 0 }), match: pagedListSpec('foreman-status') }
     ];
     for (const { collection, make, list, match } of cases) {
       const recorded = recordingCollection(freshDb().collection(collection));
