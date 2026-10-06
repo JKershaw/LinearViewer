@@ -464,18 +464,25 @@ describe('resolveWorkspaceAccess wiring (LIN-1506, Block F — witness C, source
     const body = extractResolveWorkspaceAccessBody(SERVER_SRC);
     const lines = body.split('\n');
 
-    // The SUCCESS returns (cache-hit x2, selector x2, refresh-on-resolve) all
-    // carry the literal `reason: 'ok'` — unlike the failure-path return
-    // further down, which forwards a variable `reason` instead. That literal
-    // is what distinguishes them without hard-coding line numbers. Excludes
-    // the NODE_ENV=test shortcut's own `reason: 'ok'` return (`'test-token'`)
-    // — deliberately out of the plan's edits, a hard-coded Linear-shaped test
-    // fixture with no session/cache path to widen.
-    const successReturnLines = lines.filter(l => l.includes('return {') && l.includes("reason: 'ok'") && !l.includes("'test-token'"));
+    // LIN-3323: success construction moved to the single `grant` helper
+    // (`const grant = (fields) => ({ ...fields, reason: 'ok' })`), so the
+    // success returns are `return grant({...})`, not inline `reason: 'ok'`
+    // objects. The cache-hit x2, selector x2 and refresh-on-resolve sites each
+    // carry `scope:`. The NODE_ENV=test shortcut's `grant({... 'test-token'
+    // ...})` is excluded (`'test-token'`, a hard-coded Linear-shaped fixture
+    // with no session/cache path to widen). The Connection-first arm returns
+    // `arm.result.token ? grant(arm.result) : arm.result` — its `scope` rides
+    // on `arm.result` (connectionResolveResult) and is asserted by the LIN-3323
+    // witness, tests/unit/lin-3323-connection-owner-login.test.js.
+    const successReturnLines = lines.filter(l => l.includes('return grant(') && l.includes('scope:') && !l.includes("'test-token'"));
     assert.equal(successReturnLines.length, 5, `expected exactly 5 token-bearing success returns, found ${successReturnLines.length}`);
     for (const line of successReturnLines) {
       assert.match(line, /scope:/, `success return missing scope: ${line.trim()}`);
     }
+    assert.ok(
+      lines.some(l => l.includes('grant(arm.result)')),
+      'the Connection-first arm success return must pass through the shared `grant` constructor (reason: ok)'
+    );
 
     // All workspaceTokenCache.set(...) calls. LIN-3124 PR3 checkpoint C added a
     // fifth: the connection-first arm's own cache write (carries arm.result.scope).

@@ -2578,12 +2578,24 @@ const connectionAccess = createConnectionAccess({
 // → lib/audit.js) are untouched and out of this fix's remit — the cross-provider
 // credential disclosure there is LIN-1899's, not closed by anything here.
 async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options) {
+  // LIN-3323: the ONE success constructor for this resolver. Every route that
+  // successfully resolves an owner credential returns through `grant`, so
+  // `reason: 'ok'` is attached in exactly one place and a new success route
+  // cannot forget it. This resolver has several success routes (test token,
+  // cache, session scan, refresh-on-resolve, Connection-first arm) and they
+  // previously each built their own answer; the Connection route's
+  // `connectionResolveResult` (lib/connection-access.js) omitted the field, so
+  // consumers that gate on `reason === 'ok'` (the share readers) reported a
+  // valid owner login as `refresh_error`. Failures keep their own reason below
+  // (session_expired, owner_signed_out, binding_required, …).
+  const grant = (fields) => ({ ...fields, reason: 'ok' });
+
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     // LIN-1980: this is a credential-bearing return path like every other
     // below (plan-review round 2, F2) — stamped so a test exercising the
     // per-route fingerprint plumbing under NODE_ENV=test never sees
     // `credentialFingerprint: undefined` on this short-circuit.
-    return { token: 'test-token', reason: 'ok', provider: 'linear', credentialFingerprint: fingerprintCredential('test-token') };
+    return grant({ token: 'test-token', provider: 'linear', credentialFingerprint: fingerprintCredential('test-token') });
   }
 
   // LIN-3241 (B, parent LIN-3126 §3; ruling lin3126-plan-loop-f1-eviction (a),
@@ -2642,9 +2654,9 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options
     if (recovered) {
       if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
       rejectedCredentialRegistry.accept(cachedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
-      return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
+      return grant({ token: recovered.token, provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint });
     }
-    return { token: cached.token, reason: 'ok', provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt, credentialFingerprint: cachedFingerprint };
+    return grant({ token: cached.token, provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt, credentialFingerprint: cachedFingerprint });
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -2661,7 +2673,10 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options
       const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions, intent: options?.intent, selector: options?.selector });
       if (arm?.result) {
         if (!bypassTokenCache && arm.result.token) workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
-        return arm.result;
+        // LIN-3323: a token-bearing arm result is a success and goes through
+        // the one success constructor. A refusal (`token: null`, e.g.
+        // binding_required / unknown_binding) keeps its OWN reason untouched.
+        return arm.result.token ? grant(arm.result) : arm.result;
       }
       connectionSummary = arm?.connectionSummary || null;
     }
@@ -2682,10 +2697,10 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options
       if (recovered) {
         if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
         rejectedCredentialRegistry.accept(selectedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
-        return { token: recovered.token, reason: 'ok', provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint };
+        return grant({ token: recovered.token, provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint });
       }
       if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
-      return { token: selected.token, reason: 'ok', provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt, credentialFingerprint: selectedFingerprint };
+      return grant({ token: selected.token, provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt, credentialFingerprint: selectedFingerprint });
     }
 
     // LIN-1373 refresh-on-resolve, widened LIN-1524: the selector above only
@@ -2738,7 +2753,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, options
           });
           if (refreshed) {
             if (!bypassTokenCache) workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
-            return { token: refreshed.token, reason: 'ok', provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) };
+            return grant({ token: refreshed.token, provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) });
           }
         } catch (err) {
           console.error(`Token refresh-on-resolve failed for workspace ${urlKey}:`, err);
