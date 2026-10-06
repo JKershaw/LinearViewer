@@ -4,7 +4,8 @@
  * Byte-parity over fixed models built by the real `buildTaskPageModel` (so the
  * golden covers the model → HTML path, not a hand-written model): a running
  * task with a blocked row, a repeated review and a superseded run; a finished
- * task; a stored-only page; and a task with no sessions. Regenerate deliberately
+ * task; and a task with no sessions. There is no stored-only page (John's
+ * no-fallback decision): the loader refuses before anything renders. Regenerate deliberately
  * with `UPDATE_RENDER_TASK_PAGE_GOLDEN=1 node --test tests/unit/render-task-page-golden.test.js`
  * and say why in the commit — never by widening an assertion.
  *
@@ -12,7 +13,8 @@
  *   - the page order (answer → progress → brief/recap → details → share);
  *   - `renderOwnerControls` is the ONLY owner/guest difference: owner HTML with
  *     its two fragments removed is byte-identical to the guest HTML;
- *   - every in-Harbour href goes through `harbourHref` (carries the binding).
+ *   - every in-Harbour href goes through `harbourHref` (carries the binding),
+ *     the same for every viewer.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -105,23 +107,21 @@ function model(name) {
   const base = { identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, now: NOW };
   switch (name) {
     case 'running-blocked-repeat':
-      return buildTaskPageModel({ ...base, loops: RUNNING_LOOPS, ctx: ctx(), trackerMode: 'read', evidence: EVIDENCE,
+      return buildTaskPageModel({ ...base, loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE,
         brief: { brief: '## Brief\nBuild it.', model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
         recap: { recap: { done: [{ item: 'plan', evidence: 'comment' }], pending: [], deviations: [] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' } });
     case 'waiting':
-      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx(), trackerMode: 'read' });
+      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() });
     case 'done':
-      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), trackerMode: 'read', evidence: EVIDENCE });
-    case 'stored-only':
-      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1', issueTitle: 'Stored title' })], ctx: null, trackerMode: 'unavailable' });
+      return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE });
     case 'no-sessions':
-      return buildTaskPageModel({ ...base, loops: [], ctx: ctx({ stateType: 'unstarted', stateName: 'Todo' }), trackerMode: 'read' });
+      return buildTaskPageModel({ ...base, loops: [], ctx: ctx({ stateType: 'unstarted', stateName: 'Todo' }) });
     default:
       throw new Error(name);
   }
 }
 
-const CASES = ['running-blocked-repeat', 'waiting', 'done', 'stored-only', 'no-sessions'];
+const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions'];
 
 function render(name, viewer = 'owner') {
   return renderTaskPage(model(name), {
@@ -200,15 +200,11 @@ describe('task page structure', () => {
     assert.equal((none.match(/data-testid="task-page-guess"/g) || []).length, 5);
   });
 
-  test('header answers running / waiting / done; stored-only says the tracker is unavailable', () => {
+  test('header answers running / waiting / done', () => {
     assert.match(renderTaskStatus(model('running-blocked-repeat')), /data-status="running"[\s\S]*Review running since 6 Oct, 14:02 UTC\./);
     assert.match(renderTaskStatus(model('waiting')), /data-status="waiting"[\s\S]*task-page-sentence">which API key\?</, 'the [blocked] marker is not in the sentence');
     assert.match(renderTaskStatus(model('done')), /data-status="done"[\s\S]*Finished 6 Oct, 12:00 UTC\./);
-    assert.match(renderTaskStatus(model('stored-only')), /Tracker details unavailable\./);
-    const storedOnly = render('stored-only');
-    assert.doesNotMatch(storedOnly, /task-page-details/, 'no details without the tracker');
-    assert.doesNotMatch(storedOnly, /task-page-ask-update/, 'no ask-for-an-update without the tracker');
-    assert.match(storedOnly, /data-tracker="unavailable"/);
+    assert.doesNotMatch(render('running-blocked-repeat'), /Tracker details unavailable|data-tracker=/, 'no stored-only remnant');
   });
 });
 
@@ -234,11 +230,14 @@ describe('viewer isolation', () => {
     assert.match(context, new RegExp(`data-url="/workspace/acme/api/recap/${UUID}\\?source=linear&amp;bindingScope=team-a"`));
   });
 
-  test('in-Harbour links carry the binding through harbourHref', () => {
-    const html = render('running-blocked-repeat');
-    assert.ok(html.includes(`href="${harbourHref('owner', '/workspace/acme/task/LIN-40', BINDING).replace(/&/g, '&amp;')}"`), 'parent link');
-    assert.ok(html.includes('href="/workspace/acme/task/LIN-51?source=linear&amp;bindingScope=team-a"'), 'subtask link');
-    assert.ok(html.includes('href="/workspace/acme/"'), 'back link');
-    assert.throws(() => harbourHref('stranger', '/x'), /unknown viewer/);
+  test('in-Harbour links carry the binding through harbourHref, for every viewer', () => {
+    const links = (html) => [...html.matchAll(/<a [^>]*href="(\/workspace\/[^"]*)"/g)].map(m => m[1]);
+    const owner = render('running-blocked-repeat', 'owner');
+    assert.ok(owner.includes(`href="${harbourHref('/workspace/acme/task/LIN-40', BINDING).replace(/&/g, '&amp;')}"`), 'parent link');
+    assert.ok(owner.includes('href="/workspace/acme/task/LIN-51?source=linear&amp;bindingScope=team-a"'), 'subtask link');
+    assert.ok(owner.includes('href="/workspace/acme/"'), 'back link');
+    assert.deepEqual(links(render('running-blocked-repeat', 'guest')), links(owner), 'a guest keeps every Harbour link');
+    assert.equal(harbourHref('/x', { source: '', bindingScope: null }), '/x', 'empty provenance is dropped');
+    assert.throws(() => renderTaskPage(model('done'), { viewer: 'stranger' }), /unknown viewer/);
   });
 });

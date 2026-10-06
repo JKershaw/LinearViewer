@@ -10,6 +10,22 @@ import { localSeedId } from '../fixtures/local-harness.js';
 // way session-page.spec.js seeds the run page.
 
 const PHONE = { width: 360, height: 780 };
+
+// A review summary comment on the tracker, so the page's evidence read finds a
+// ledger (the same seed shape run-evidence.spec.js uses). No PR URL: nothing
+// here reaches GitHub.
+const REVIEW_BODY = [
+  '## Review — seeded',
+  '',
+  'CI on `abc1234` is green.',
+  '',
+  '### What CI Did Not Prove',
+  '| # | Claim | In/Out | Discharge |',
+  '|---|---|---|---|',
+  '| L1 | the task page keeps its evidence across a repaint | inside | this spec |',
+  '',
+  '**Verdict: Approve — conditional on close-out discharging the ledger.**',
+].join('\n');
 let URL_KEY;
 
 test.use({ viewport: PHONE });
@@ -25,7 +41,7 @@ test.beforeEach(async ({ page, localWorkerUrlKey }) => {
   await page.goto(`/test/clear-sessions-feed-cache?urlKey=${URL_KEY}`);
 });
 
-async function seedTasks(page, { omit = [] } = {}) {
+async function seedTasks(page, { omit = [], reviewed = false } = {}) {
   const id = (raw) => localSeedId(URL_KEY, raw);
   const issue = (raw, identifier, title, state, extra = {}) => ({
     id: id(raw), identifier, title, description: `Seeded ${title}`, projectId: id('tp-proj'), sortOrder: 1, state,
@@ -38,7 +54,8 @@ async function seedTasks(page, { omit = [] } = {}) {
       projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
       issues: [
         issue('tp-gone', 'LOCAL-TP5', 'A task the tracker later loses', { name: 'In Progress', type: 'started' }),
-        issue('tp-run', 'LOCAL-TP1', 'A task with a running build', { name: 'In Progress', type: 'started' }),
+        issue('tp-run', 'LOCAL-TP1', 'A task with a running build', { name: 'In Progress', type: 'started' },
+          reviewed ? { comments: [{ id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' }] } : {}),
         issue('tp-sub', 'LOCAL-TP4', 'A subtask of the running task', { name: 'Todo', type: 'unstarted' }, { parentId: id('tp-run') }),
         issue('tp-done', 'LOCAL-TP2', 'A finished task', { name: 'Done', type: 'completed' }),
         issue('tp-wait', 'LOCAL-TP3', 'A task waiting on an answer', { name: 'In Progress', type: 'started' }),
@@ -149,8 +166,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await noHorizontalScroll(page);
   });
 
-  test('it updates itself, and a repaint keeps the rows the reader opened', async ({ page }) => {
-    await seedTasks(page);
+  test('it updates itself, and a repaint keeps the rows the reader opened and the evidence', async ({ page }) => {
+    await seedTasks(page, { reviewed: true });
     const token = await runnerToken(page);
     await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'plan', feedback: ['[done] planned it'] });
     const buildId = await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
@@ -167,6 +184,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
     await step(page, 'plan').locator('[data-testid="session-run-toggle"]').click();
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/);
+    // The task's evidence (from the tracker's review comment) sits in the build row.
+    const evidence = step(page, 'implementation').locator('[data-testid="task-page-evidence"] [data-testid="run-evidence"]');
+    await expect(evidence).toHaveCount(1);
 
     // The build finishes; the next poll (forced as the tab-return catch-up)
     // repaints the header and the track from stored data.
@@ -176,23 +196,28 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(step(page, 'implementation').locator('[data-testid="task-page-step-summary"]')).toContainText('done');
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/, { timeout: 1000 });
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);
+    // The state endpoint can't read evidence (it needs the tracker); the client
+    // carried the page's evidence into the repainted row.
+    await expect(evidence).toHaveCount(1, { timeout: 1000 });
+    await expect(evidence.locator('[data-testid="run-evidence-checked-review-verdict"]')).toContainText('Approve');
 
     // The page only ever polled its stored-data state endpoint.
     expect(stateRequests.length).toBeGreaterThan(0);
     expect([...new Set(stateRequests)]).toEqual([`/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`]);
   });
 
-  test('stored-only, unknown and signed-out', async ({ page, browser }) => {
+  test('no stored-only page; unknown and signed-out', async ({ page, browser }) => {
     await seedTasks(page);
     const token = await runnerToken(page);
-    // A stored session for a task the tracker then loses: the page renders
-    // what is stored and says the tracker details are unavailable.
+    // A stored session for a task the tracker then loses: the tracker's answer
+    // wins — the not-found page, nothing stored rendered in its place.
     await seedSession(page, token, { identifier: 'LOCAL-TP5', title: 'A task the tracker later loses', kind: 'implementation', feedback: ['[done] built'] });
     await seedTasks(page, { omit: ['LOCAL-TP5'] });
-    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP5`);
-    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task the tracker later loses');
-    await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Tracker details unavailable.');
-    await expect(page.locator('[data-testid="task-page-details"]')).toHaveCount(0);
+    const lost = await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP5`);
+    expect(lost.status()).toBe(404);
+    await expect(page.locator('[data-testid="task-page-not-found"]')).toBeVisible();
+    await expect(page.locator('[data-testid="task-page-track"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('A task the tracker later loses');
 
     const missing = await page.goto(`/workspace/${URL_KEY}/task/LOCAL-NOPE`);
     expect(missing.status()).toBe(404);

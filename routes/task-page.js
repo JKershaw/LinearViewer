@@ -6,6 +6,10 @@
  *
  * A DRILL-DOWN page, like `/task/:issueId/edit` and the run page: no feature
  * flag, no view-tier entry, a back link, and a 404 body for an unknown id.
+ * Like task-edit, the page needs its tracker read: the tracker not knowing the
+ * task is the 404 page and any other tracker failure is a try-again page (503),
+ * whatever sessions are stored — there is no stored-only page (John's
+ * no-fallback decision, LIN-3329 close-out).
  *
  * MOUNT ORDER IS LOAD-BEARING. `ISSUE_ID_REGEX` accepts `new`, so this router
  * must mount AFTER `createTaskCreateRoutes` (server.js) or `/task/new` would
@@ -80,9 +84,11 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));
       }
       if (result.unavailable) {
+        // The tracker couldn't be read: an upstream outage, not a missing task,
+        // so try-again (503) rather than not-found.
         return res.status(503).send(renderErrorPage(
           'Task unavailable',
-          'The tracker could not be read and Harbour has nothing stored for this task yet. Please try again shortly.',
+          'Could not read this task from the tracker just now. Please try again shortly.',
           { action: 'Back to tasks', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/` }
         ));
       }

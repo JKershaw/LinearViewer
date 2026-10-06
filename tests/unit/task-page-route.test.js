@@ -1,8 +1,9 @@
 /**
  * LIN-3329 — routes/task-page.js.
  *
- *   - page: 404 for a malformed or unknown id (no 400 detail), 503 when nothing is
- *     stored and the tracker can't be read, 422 binding refusal, 200 with the
+ *   - page: 404 for a malformed id or one the tracker doesn't know (no 400
+ *     detail), 503 try-again when the tracker can't be read — stored sessions or
+ *     not, there is no stored-only page — 422 binding refusal, 200 with the
  *     owner page otherwise, reading through the issue's own binding;
  *   - `/task/new` and `/task/:id/edit` still resolve to their own pages with the
  *     real routers mounted in server.js order, and server.js mounts this router
@@ -142,18 +143,27 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     assert.match(res.body, /LIN-404/);
   });
 
-  test('nothing stored and a tracker error that is not not-found → 503', async () => {
+  test('nothing stored and a tracker error that is not not-found → 503 try-again', async () => {
     const { name } = spyProvider({ read: async () => { throw new Error('upstream 502'); } });
     const res = await call(makeRouter(makeLoader({ loops: [] })), PAGE, { provider: name, params: { identifier: 'LIN-50' } });
     assert.equal(res.statusCode, 503);
+    assert.match(res.body, /Please try again shortly\./);
   });
 
-  test('stored sessions and a tracker error → the stored-only page (200)', async () => {
+  test('stored sessions and a tracker error → still the 503 try-again page, no stored-only page', async () => {
     const { name } = spyProvider({ read: async () => { throw new Error('upstream 502'); } });
     const res = await call(makeRouter(makeLoader()), PAGE, { provider: name, params: { identifier: 'LIN-50' } });
-    assert.equal(res.statusCode, 200);
-    assert.match(res.body, /Tracker details unavailable\./);
-    assert.match(res.body, /data-testid="task-page-title">Stored title</);
+    assert.equal(res.statusCode, 503);
+    assert.match(res.body, /Please try again shortly\./);
+    assert.doesNotMatch(res.body, /data-testid="task-page-track"|Stored title|Tracker details unavailable/, 'nothing stored is rendered');
+  });
+
+  test('stored sessions but the tracker says not found → the 404 page', async () => {
+    const { name } = spyProvider({ read: async () => { throw new Error('Issue not found: LIN-50'); } });
+    const res = await call(makeRouter(makeLoader()), PAGE, { provider: name, params: { identifier: 'LIN-50' } });
+    assert.equal(res.statusCode, 404);
+    assert.match(res.body, /data-testid="task-page-not-found"/);
+    assert.doesNotMatch(res.body, /Stored title/);
   });
 
   test('a binding refusal answers with bindingRefusalResponse (422)', async () => {

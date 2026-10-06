@@ -8,7 +8,10 @@
  *   - exactly one task-scoped tracker read, `fetchRecommendationContext(...,
  *     {noDescend:true})`; evidence reuses its comments (no `fetchIssueComments`).
  *     The repo allowlist is a workspace-level `fetchProjects` read, named here;
- *   - the stored-only fallback, the stage-guess rule and the header sentence.
+ *   - sessions are read under the tracker's canonical identifier (a UUID open);
+ *   - no stored-only fallback: a tracker that can't be read is not-found or
+ *     unavailable, whatever is stored (John's no-fallback decision, LIN-3329);
+ *   - the stage-guess rule and the header sentence.
  *
  * Run with: node --test tests/unit/task-page-loader.test.js
  */
@@ -208,63 +211,71 @@ describe('task page loader: unbounded history through the real store', () => {
     const fresh = await dispatchStore.addItem('ws', { prompt: 'p', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-50', issueTitle: 'Stored title' });
 
     const loader = createTaskPageLoader({ dispatchStore, agentStatusStore, enrichLoop, deriveSessionWaiting, now: () => NOW });
-    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: null });
+    const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
+    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
     assert.deepEqual(model.sessions.map(s => s.loopId), [String(old._id), String(fresh._id)], 'oldest-first, the aged row included');
     assert.deepEqual(model.sessions.map(s => s.state), ['running', 'queued']);
   });
 });
 
-describe('task page loader: stored-only fallback', () => {
-  const stored = [done({ loopId: 'a', issueTitle: 'Older title' }), loop({ loopId: 'b', issueTitle: 'Newest stored title', terminalStatus: 'done', terminalCompletedAt: '2026-10-06T12:00:00.000Z' })];
+describe('task page loader: no stored-only fallback', () => {
+  // John's no-fallback decision (LIN-3329 close-out): if the tracker can't be
+  // read, the page is not-found or try-again, as the task-edit page is — stored
+  // sessions don't turn it into a partial page.
+  const stored = [done({ loopId: 'a' }), done({ loopId: 'b' })];
+  const access = (read) => ({ provider: spyProvider(read).provider, callScope: 'tok' });
 
-  for (const [name, access] of [
-    ['tracker read throws (not a not-found)', () => ({ provider: spyProvider({ throwOnRead: new Error('Linear API 500') }).provider, callScope: 'tok' })],
-    ['no tracker access at all (access: null)', () => null],
-  ]) {
-    test(name, async () => {
-      const { loader } = loaderWith({ loops: stored, brief: { brief: 'cached brief' } });
-      const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access() });
-      assert.equal(model.tracker.available, false);
-      assert.equal(model.title, 'Newest stored title', 'title from the newest loop');
-      assert.notEqual(model.status, 'done');
-      assert.match(model.sentence, /Tracker details unavailable\.$/);
-      assert.equal(model.details, null, 'task details omitted');
-      assert.equal(model.evidence, null, 'ledger/PR evidence omitted');
-      assert.equal(model.brief.body, 'cached brief', 'brief still read, keyed by the newest loop issueId');
-    });
-  }
-
-  test('stored-only never claims done, even when every session finished', async () => {
-    const { loader } = loaderWith({ loops: [done()] });
-    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: null });
-    assert.equal(model.status, 'idle');
+  test('stored sessions and a tracker error → unavailable, not a stored-only page', async () => {
+    const { loader, briefSpy } = loaderWith({ loops: stored, brief: { brief: 'cached brief' } });
+    const result = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access({ throwOnRead: new Error('Linear API 500') }) });
+    assert.deepEqual(result, { unavailable: true });
+    assert.equal(briefSpy.calls.get, 0, 'nothing else is read once the tracker failed');
   });
 
-  test('not found: no sessions and the tracker says not found → notFound', async () => {
-    const { provider } = spyProvider({ throwOnRead: new Error('Issue not found: LIN-404') });
+  test('no sessions and a tracker error → unavailable', async () => {
     const { loader } = loaderWith({ loops: [] });
-    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-404', access: { provider, callScope: 'tok' } }), { notFound: true });
+    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access({ throwOnRead: new Error('ECONNRESET') }) }), { unavailable: true });
   });
 
-  test('unavailable: no sessions and the tracker errored → unavailable (503)', async () => {
-    const { provider } = spyProvider({ throwOnRead: new Error('ECONNRESET') });
+  test('no tracker access at all → unavailable (the guest route\'s "owner login unusable")', async () => {
+    const { loader } = loaderWith({ loops: stored });
+    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: null }), { unavailable: true });
+  });
+
+  test('stored sessions but the tracker says not found → notFound, not a stored-only page', async () => {
+    const { loader } = loaderWith({ loops: stored });
+    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access({ throwOnRead: new Error('Issue not found: LIN-50') }) }), { notFound: true });
+  });
+
+  test('no sessions and the tracker says not found → notFound', async () => {
     const { loader } = loaderWith({ loops: [] });
-    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } }), { unavailable: true });
+    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-404', access: access({ throwOnRead: new Error('Issue not found: LIN-404') }) }), { notFound: true });
   });
 
-  test('stored sessions but the tracker says not found → stored-only page, not 404', async () => {
-    const { provider } = spyProvider({ throwOnRead: new Error('Issue not found: LIN-50') });
-    const { loader } = loaderWith({ loops: [done()] });
-    const result = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
-    assert.equal(result.model.tracker.available, false);
+  test('a tracker answer with no issue → notFound', async () => {
+    const { loader } = loaderWith({ loops: stored });
+    assert.deepEqual(await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: access({ ctx: null }) }), { notFound: true });
   });
 
   test('the state read never reaches a provider and never reports done', async () => {
     const { loader } = loaderWith({ loops: [done()] });
     const { model } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-50' });
-    assert.equal(model.tracker, null);
+    assert.equal(model.tracker, null, 'not read this time');
     assert.equal(model.status, 'idle');
-    assert.doesNotMatch(model.sentence, /Tracker details unavailable/, 'not-read-this-time is not the fallback');
+    assert.equal(model.sentence, 'No session running. Last: Build done 6 Oct, 11:00 UTC.');
+  });
+});
+
+describe('task page loader: the canonical identifier', () => {
+  test('a task opened by UUID reads its sessions under the tracker\'s identifier', async () => {
+    const seen = [];
+    const { provider, calls } = spyProvider({ ctx: ctxFor('LIN-9') });
+    const { loader } = loaderWith({ getLoops: async (urlKey, id) => { seen.push(id); return [done({ issueIdentifier: 'LIN-9' })]; } });
+    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: ISSUE_UUID, access: { provider, callScope: 'tok' } });
+    assert.equal(calls[0].id, ISSUE_UUID, 'the tracker is asked by what the URL carried');
+    assert.deepEqual(seen, ['LIN-9'], 'sessions are stored by identifier, so they are read by the canonical one');
+    assert.equal(model.identifier, 'LIN-9');
+    assert.equal(model.sessions.length, 1);
   });
 });
 
@@ -286,7 +297,7 @@ describe('guessStages: the usual stages after the FURTHEST one reached', () => {
 
 describe('deriveHeader: one row per branch, in order done → waiting → running → idle', () => {
   const s = (state, kind, over = {}) => ({ state, kind, loop: { takenAt: '2026-10-06T14:02:00.000Z', dispatchedAt: '2026-10-06T14:00:00.000Z' }, endedAt: '2026-10-06T13:30:00.000Z', ...over });
-  const tracker = (type) => ({ available: true, state: { name: type, type }, finishedAt: '2026-10-05T12:00:00.000Z' });
+  const tracker = (type) => ({ state: { name: type, type }, finishedAt: '2026-10-05T12:00:00.000Z' });
   const noWait = { waiting: false, message: null };
   const cases = [
     ['done (completed), even with a stale running row', { sessions: [s('running', 'review')], waiting: noWait, tracker: tracker('completed') }, 'done', 'Finished 5 Oct, 12:00 UTC.'],
@@ -296,7 +307,7 @@ describe('deriveHeader: one row per branch, in order done → waiting → runnin
     ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'running', 'Review queued, waiting for a worker.'],
     ['idle after a session', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'idle', 'No session running. Last: Review failed 6 Oct, 13:30 UTC.'],
     ['idle, nothing yet', { sessions: [], waiting: noWait, tracker: tracker('unstarted') }, 'idle', 'No sessions yet.'],
-    ['stored-only never done and says so', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: { available: false, state: null } }, 'idle', 'No session running. Last: Close-out done 6 Oct, 13:30 UTC. Tracker details unavailable.'],
+    ['tracker not read (the state endpoint): never done, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'idle', 'No session running. Last: Close-out done 6 Oct, 13:30 UTC.'],
     ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'running', 'Brand-new-kind running since 6 Oct, 14:02 UTC.'],
   ];
   for (const [name, input, status, sentence] of cases) {
@@ -309,7 +320,7 @@ describe('session rows', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50',
       loops: [loop({ loopId: 'c', historyStatus: 'cancelled', agentState: 'complete' }), loop({ loopId: 'a', agentState: 'complete' })],
-      trackerMode: 'skipped', enrichLoop, deriveSessionWaiting, now: NOW,
+      enrichLoop, deriveSessionWaiting, now: NOW,
     });
     assert.deepEqual(model.sessions.map(s => s.state), ['cancelled', 'done']);
     assert.deepEqual(model.sessions.map(s => s.loop.terminalStatus), ['cancelled', 'done'], 'the face gets the named end');
@@ -318,13 +329,13 @@ describe('session rows', () => {
 
   test('a blocked row is open and waiting until a follow-up supersedes it', () => {
     const blocked = loop({ loopId: 'b1', wakeMarker: 'blocked', waitingMessage: '[blocked] need a key', feedback: [{ message: '[blocked] need a key' }] });
-    const solo = buildTaskPageModel({ identifier: 'LIN-50', loops: [blocked], trackerMode: 'skipped', enrichLoop, deriveSessionWaiting, now: NOW });
+    const solo = buildTaskPageModel({ identifier: 'LIN-50', loops: [blocked], enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(solo.sessions[0].state, 'waiting');
     assert.equal(solo.sessions[0].open, true);
     assert.equal(solo.sessions[0].message, 'need a key', 'marker stripped');
     assert.equal(solo.status, 'waiting');
 
-    const followed = buildTaskPageModel({ identifier: 'LIN-50', loops: [blocked, done({ loopId: 'f1', followUpTo: 'b1' })], trackerMode: 'skipped', enrichLoop, deriveSessionWaiting, now: NOW });
+    const followed = buildTaskPageModel({ identifier: 'LIN-50', loops: [blocked, done({ loopId: 'f1', followUpTo: 'b1' })], enrichLoop, deriveSessionWaiting, now: NOW });
     assert.equal(followed.sessions[0].state, 'continued', 'superseded: ended when the follow-up took over, not waiting and not running');
     assert.equal(followed.sessions[0].loop.terminalStatus, 'continued', 'the face reads it too');
     assert.equal(followed.status, 'idle', 'a replied-to block never drives the header');
@@ -334,7 +345,7 @@ describe('session rows', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50',
       loops: [done({ loopId: 'p', kind: 'plan' }), done({ loopId: 'i', kind: 'implementation' }), done({ loopId: 'r', kind: 'review' }), done({ loopId: 'w', kind: 'wake' })],
-      trackerMode: 'skipped', enrichLoop, deriveSessionWaiting, now: NOW,
+      enrichLoop, deriveSessionWaiting, now: NOW,
     });
     assert.deepEqual(model.sessions.filter(s => s.evidenceHost).map(s => s.loopId), ['r']);
   });
@@ -343,7 +354,7 @@ describe('session rows', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50',
       loops: [done({ telemetry: { producedArtifacts: [{ url: 'https://example.com/pr/1', label: 'PR' }, { url: 'javascript:alert(1)', label: 'x' }] } })],
-      trackerMode: 'skipped', enrichLoop, deriveSessionWaiting, now: NOW,
+      enrichLoop, deriveSessionWaiting, now: NOW,
     });
     assert.deepEqual(model.sessions[0].links, [{ url: 'https://example.com/pr/1', label: 'PR' }]);
   });
