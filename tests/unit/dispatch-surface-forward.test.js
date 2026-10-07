@@ -69,22 +69,21 @@ describe('LIN-2944 P1 — dispatchPrompt forwards surface', () => {
   });
 });
 
-// LIN-3242 (LIN-3126 §4): the dispatch UI forwards the issue row's binding
-// selector stamps (`data-source` / `data-binding-scope`, threaded onto the issue
-// object as `source` / `bindingScope`) as `issueSource` / `issueBindingScope`.
-// Both are SPARSE: an unstamped row sends neither key.
-describe('LIN-3242 — dispatchPrompt forwards the issue row binding selector', () => {
-  const STAMPED = { id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', identifier: 'GB-1', source: 'github', bindingScope: 'octo/repoB' };
+// LIN-3242 (LIN-3126 §4): the dispatch UI forwards the issue row's provider
+// selector (`data-source`, threaded onto the issue object as `source`) as
+// `issueSource`. It is SPARSE: an unsourced row sends no key.
+describe('LIN-3242 — dispatchPrompt forwards the issue row source', () => {
+  const STAMPED = { id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee', identifier: 'GB-1', source: 'github' };
 
-  test('a stamped issue row sends issueSource + issueBindingScope in the request body', async () => {
+  test('a sourced issue row sends issueSource in the request body', async () => {
     const { dispatchPrompt, calls } = loadCommon();
     await dispatchPrompt({ urlKey: 'ws', prompt: 'p', issue: STAMPED });
     const body = JSON.parse(calls.api[0].opts.body);
     assert.equal(body.issueSource, 'github');
-    assert.equal(body.issueBindingScope, 'octo/repoB');
+    assert.equal('issueBindingScope' in body, false);
   });
 
-  test('an unstamped issue row sends neither key (byte-identical body)', async () => {
+  test('an unsourced issue row sends no key (byte-identical body)', async () => {
     const { dispatchPrompt, calls } = loadCommon();
     await dispatchPrompt({ urlKey: 'ws', prompt: 'p', issue: ISSUE });
     const body = JSON.parse(calls.api[0].opts.body);

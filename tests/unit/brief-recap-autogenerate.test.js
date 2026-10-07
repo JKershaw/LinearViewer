@@ -161,12 +161,10 @@ for (const S of SECTIONS) {
     assert.equal(container.getAttribute('data-state'), 'error', 'a manual click surfaces the reason, never the silent placeholder');
   });
 
-  // LIN-2944 P2 close-out ledger item 1 (review M3): P2 changed refresh()'s
-  // signature so `bindingScope` is positional (LIN-3240). A manual ✦ generate
-  // click must still forward the row's `source` + `bindingScope` to the POST, or
-  // per-row binding resolution silently breaks. No earlier case passed `source`,
+  // A manual ✦ generate click must forward the row's `source` to the POST, or
+  // per-row provider resolution silently breaks. No earlier case passed `source`,
   // so the vm context never needed URLSearchParams (added in loadSection above).
-  test(`${S.name}: manual ✦ generate forwards source + bindingScope on the POST (LIN-3240)`, async () => {
+  test(`${S.name}: manual ✦ generate forwards source on the POST (LIN-1910)`, async () => {
     const responder = (url, method) => (method === 'POST' ? S.fresh : { status: 'missing' });
     const { section, calls } = loadSection(S.file, S.global, responder);
 
@@ -175,7 +173,6 @@ for (const S of SECTIONS) {
       urlKey: 'ws',
       identifier: 'LIN-998',
       source: 'github',
-      bindingScope: 'octo/repoB',
     });
     assert.equal(container.getAttribute('data-state'), 'missing', 'opens on the manual placeholder');
 
@@ -184,6 +181,5 @@ for (const S of SECTIONS) {
     const posts = calls.filter(c => c.method === 'POST');
     assert.equal(posts.length, 1, 'exactly one POST from the click');
     assert.match(posts[0].url, /[?&]source=github(&|$)/, 'manual POST forwards source');
-    assert.match(posts[0].url, /[?&]bindingScope=octo%2FrepoB(&|$)/, 'manual POST forwards the row bindingScope');
   });
 }

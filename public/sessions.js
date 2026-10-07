@@ -93,12 +93,11 @@
   function header(count, opts) {
     const refresh = `<button type="button" class="sessions-refresh" data-sessions-refresh>↻ refresh</button>`;
     // LIN-3331: the one link through to this issue's task page, built by the
-    // shared client helper so the path/binding pair matches every other surface.
+    // shared client helper so the path/`?source=` matches every other surface.
     const taskHref = window.taskPageHref({
       urlKey: opts.urlKey,
       identifier: opts.identifier,
-      source: opts.source,
-      bindingScope: opts.bindingScope
+      source: opts.source
     });
     const taskLink = taskHref
       ? `<a class="sessions-task-page task-page-link" data-testid="sessions-task-page-link" href="${esc(taskHref)}">task page ↗</a>`

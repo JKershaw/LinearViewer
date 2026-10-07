@@ -83,10 +83,9 @@ function downloadMarkdown(text, filename) {
 // converges onto the superset (whole-string fence strip + marked-absent fallback);
 // relativeTime is the same "Behavior B" format this page's local copy seeded.
 
-// LIN-3240 / LIN-3126 residual: `sourceBindingQuery(source, bindingScope)` now
-// lives in common.js as `window.sourceBindingQuery` (the one shared builder
-// every page script uses). This page is always loaded after common.js, so the
-// call site below resolves to it.
+// The shared `?source=<kind>` builder lives in common.js as
+// `window.sourceQuery` (the one every page script uses). This page is always
+// loaded after common.js, so the call sites below resolve to it.
 
 /**
  * Load and render comments for an issue
@@ -98,10 +97,9 @@ async function loadComments(toggle, content) {
   const issueId = toggle.dataset.issueId
   const urlKey = toggle.dataset.urlKey
   // LIN-1904: forward the resolved provider (stamped server-side in
-  // lib/render.js) so the fetch resolves THIS issue's own binding instead of
-  // the workspace's active provider. LIN-3240: forward its binding stamp too.
+  // lib/render.js) so the fetch resolves THIS issue's own provider instead of
+  // the workspace's active provider.
   const source = toggle.dataset.source
-  const bindingScope = toggle.dataset.bindingScope
 
   if (!issueId || !urlKey) {
     console.error('Missing issueId or urlKey for comments')
@@ -117,8 +115,8 @@ async function loadComments(toggle, content) {
   errorEl?.classList.add('hidden')
 
   try {
-    const sourceQuery = sourceBindingQuery(source, bindingScope)
-    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}${sourceQuery}`)
+    const selectQuery = sourceQuery(source)
+    const data = await window.api(`/workspace/${encodeURIComponent(urlKey)}/api/comments/${encodeURIComponent(issueId)}${selectQuery}`)
     const comments = (data && data.comments) || []
 
     // Mark as loaded (don't re-fetch on toggle)
@@ -194,10 +192,9 @@ function loadLazySection(type, toggle, content) {
   const identifier = toggle.dataset.issueIdentifier
   const urlKey = toggle.dataset.urlKey
   // LIN-1910: forward the resolved provider (stamped server-side in
-  // lib/render.js) so Brief/Recap resolve THIS issue's own binding instead of
-  // the workspace's active provider. LIN-3240: forward its binding stamp too.
+  // lib/render.js) so Brief/Recap resolve THIS issue's own provider instead of
+  // the workspace's active provider.
   const source = toggle.dataset.source
-  const bindingScope = toggle.dataset.bindingScope
   if (!identifier || !urlKey) return
 
   // Guard against re-init on a later expand (init is idempotent but a re-fetch
@@ -208,33 +205,33 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-brief-placeholder="1"]')
     if (placeholder && window.BriefSection) {
       placeholder.removeAttribute('data-brief-placeholder')
-      window.BriefSection.init(placeholder, { urlKey, identifier, source, bindingScope })
+      window.BriefSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'recap') {
     const placeholder = content.querySelector('[data-recap-placeholder="1"]')
     if (placeholder && window.RecapSection) {
       placeholder.removeAttribute('data-recap-placeholder')
-      window.RecapSection.init(placeholder, { urlKey, identifier, source, bindingScope })
+      window.RecapSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'scan') {
     const placeholder = content.querySelector('[data-scan-placeholder="1"]')
     if (placeholder && window.ScanSection) {
       placeholder.removeAttribute('data-scan-placeholder')
-      window.ScanSection.init(placeholder, { urlKey, identifier, source, bindingScope })
+      window.ScanSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'sessions') {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
     if (placeholder && window.SessionsSection) {
       placeholder.removeAttribute('data-sessions-placeholder')
-      window.SessionsSection.init(placeholder, { urlKey, identifier, source, bindingScope })
+      window.SessionsSection.init(placeholder, { urlKey, identifier, source })
     }
   } else if (type === 'context') {
     const placeholder = content.querySelector('[data-context-placeholder="1"]')
     if (placeholder && window.ContextSection) {
       placeholder.removeAttribute('data-context-placeholder')
-      // LIN-3240 (review F3): forward the row's provider + binding stamp so the
-      // context read resolves THIS issue's own binding, not the active one.
-      window.ContextSection.init(placeholder, { urlKey, identifier, source, bindingScope })
+      // LIN-3240 (review F3): forward the row's provider so the context read
+      // resolves THIS issue's own provider, not the active one.
+      window.ContextSection.init(placeholder, { urlKey, identifier, source })
     }
   }
 }
@@ -260,15 +257,12 @@ async function loadDetails(details) {
   // appearance's "Dispatch ▾" resolves to the first's panel (LIN-732).
   const section = details.dataset.section || ''
   // Forward the issue's own provenance too (LIN-1903), so the server can
-  // resolve THIS issue's own binding in a merged multi-binding workspace
-  // instead of always resolving the workspace's active provider. LIN-3240 adds
-  // the binding stamp beside it (absent for an unstamped row).
+  // resolve THIS issue's own provider instead of always resolving the
+  // workspace's active provider.
   const source = details.dataset.source || ''
-  const bindingScope = details.dataset.bindingScope || ''
   const params = new URLSearchParams()
   if (section) params.set('section', section)
   if (source) params.set('source', source)
-  if (bindingScope) params.set('bindingScope', bindingScope)
   const query = params.toString()
   const detailQuery = query ? `?${query}` : ''
 
@@ -319,11 +313,8 @@ function mountHomePromptSections(root) {
       title: el.dataset.title || '',
       url: el.dataset.url || '',
       // LIN-1904/LIN-1910: thread the resolved provider so the template and
-      // Autopilot fetches resolve THIS issue's own binding, exactly as before.
-      source: el.dataset.source || undefined,
-      // LIN-3240: carry the row's binding stamp so the component's fetches and
-      // per-task memory resolve THIS issue's own binding in a multi-binding workspace.
-      bindingScope: el.dataset.bindingScope || undefined
+      // Autopilot fetches resolve THIS issue's own provider, exactly as before.
+      source: el.dataset.source || undefined
     }
     el.dataset.mounted = 'true'
     el._promptSectionHandle = window.PromptSection.init(el, {
@@ -1159,13 +1150,11 @@ function initPrompts() {
     const issueTitle = lineEl?.querySelector('.title, .title-dim')?.textContent || null
     const issueIdentifier = lineEl?.dataset.identifier || null
 
-    // LIN-3242 (LIN-3126 §4): read the row's own binding selector stamps so the
-    // dispatch is resolved against — and stamped with — the binding it came from.
-    // The lazy `.details` wrapper carries `data-source`/`data-binding-scope`
-    // unconditionally (render.js), present in the DOM even before expansion.
+    // LIN-3242 (LIN-3126 §4): read the row's own provider stamp so the dispatch
+    // is resolved against the provider it came from. The lazy `.details` wrapper
+    // carries `data-source` (render.js), present in the DOM even before expansion.
     const detailsEl = promptContainer.closest('.details')
     const issueSource = detailsEl?.dataset.source || undefined
-    const issueBindingScope = detailsEl?.dataset.bindingScope || undefined
 
     // Get repo from prompt/recommend container (set by prompt API response)
     const repo = promptContainer.dataset.repo || null
@@ -1205,7 +1194,7 @@ function initPrompts() {
         promptName,
         ...(issueless
           ? { issueless: true }
-          : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle, source: issueSource, bindingScope: issueBindingScope } }),
+          : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle, source: issueSource } }),
         target,
         repo: repo || undefined,
         kind,

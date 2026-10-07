@@ -4,9 +4,9 @@
  * Loads the REAL public/common.js (so `window.taskPageHref` is the shipped
  * builder) alongside the shipped browser scripts, then asserts each in-scope
  * client surface emits a `<surface>-task-page-link` whose href is built by the
- * helper and carries the issue's binding pair. These are the one-assertion-per-
- * surface checks the plan calls for; the server-rendered surfaces are covered
- * in render.test.js / render-session.test.js.
+ * helper and carries the issue's source kind (`?source=<kind>`). These are the
+ * one-assertion-per-surface checks the plan calls for; the server-rendered
+ * surfaces are covered in render.test.js / render-session.test.js.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -93,9 +93,10 @@ describe('Swipe card task-page link (LIN-3331)', () => {
     assert.match(html, /data-testid="swipe-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1"/);
   });
 
-  test('carries the issue binding pair', () => {
+  test('carries the issue source', () => {
     const html = renderCard({ id: 'issue-1', identifier: 'LIN-1', title: 'T', stateType: 'unstarted', source: 'linear', bindingScope: 'team-a' });
-    assert.match(html, /data-testid="swipe-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1\?source=linear&amp;bindingScope=team-a"/);
+    assert.match(html, /data-testid="swipe-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1\?source=linear"/);
+    assert.ok(!html.includes('bindingScope'), 'the pair-era scope is ignored');
   });
 
   test('no link on the landing card (no workspace)', () => {
@@ -107,9 +108,9 @@ describe('Swipe card task-page link (LIN-3331)', () => {
 describe('Queue row task-page link (LIN-3331)', () => {
   const { sandbox } = sandboxWithCommon();
 
-  test('builds the href with the shared helper, carrying the pair', () => {
+  test('builds the href with the shared helper, carrying the source', () => {
     const html = sandbox.renderQueueRow({ id: 'd1', promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z', issueIdentifier: 'LIN-7', issueSource: 'linear', issueBindingScope: 'team-a' }, 'ws');
-    assert.match(html, /data-testid="queue-item-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear&amp;bindingScope=team-a"/);
+    assert.match(html, /data-testid="queue-item-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear"/);
   });
 
   test('no identifier means no link', () => {
@@ -119,14 +120,14 @@ describe('Queue row task-page link (LIN-3331)', () => {
 });
 
 describe('Sessions section task-page link (LIN-3331)', () => {
-  test('the list header links to the task page, carrying the pair', async () => {
+  test('the list header links to the task page, carrying the source', async () => {
     const container = makeEl();
     const { sandbox } = sandboxWithCommon();
     sandbox.api = async () => ({ sessions: [] });
     vm.runInContext(read('public/sessions.js'), sandbox, { filename: 'sessions.js' });
     sandbox.SessionsSection.init(container, { urlKey: 'ws', identifier: 'LIN-7', source: 'linear', bindingScope: 'team-a' });
     await new Promise((r) => setImmediate(r));
-    assert.match(container.innerHTML, /data-testid="sessions-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear&amp;bindingScope=team-a"/);
+    assert.match(container.innerHTML, /data-testid="sessions-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear"/);
   });
 });
 
@@ -135,17 +136,18 @@ describe('Observation task-block task-page link (LIN-3331)', () => {
   vm.runInContext(read('public/observation.js'), sandbox, { filename: 'observation.js' });
   const { renderTaskBlock } = sandbox.module.exports;
 
-  test('carries the run binding pair on obs-task-page-link', () => {
+  test('carries the run source on obs-task-page-link', () => {
     const html = renderTaskBlock({ workspaceUrlKey: 'ws' }, 'LIN-1', null, [
       { loopId: 'l1', issueSource: 'linear', issueBindingScope: 'team-a' },
     ]);
-    assert.match(html, /data-testid="obs-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1\?source=linear&amp;bindingScope=team-a"/);
+    assert.match(html, /data-testid="obs-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1\?source=linear"/);
+    assert.ok(!html.includes('bindingScope'), 'the pair-era scope is ignored');
   });
 
-  test('falls back to a plain link when no run carries the pair', () => {
+  test('falls back to a plain link when no run carries the source', () => {
     const html = renderTaskBlock({ workspaceUrlKey: 'ws' }, 'LIN-1', null, [{ loopId: 'l1' }]);
     assert.match(html, /data-testid="obs-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1"/);
-    assert.ok(!/obs-task-page-link[^>]*\?/.test(html), 'no query string without the pair');
+    assert.ok(!/obs-task-page-link[^>]*\?/.test(html), 'no query string without a source');
   });
 });
 
@@ -159,12 +161,12 @@ describe('Dispatch history task-page link (LIN-3331)', () => {
     return container.innerHTML;
   }
 
-  test('carries the item binding pair on history-task-page-link', () => {
+  test('carries the item source on history-task-page-link', () => {
     const html = renderHistory([{
       status: 'done', issueIdentifier: 'LIN-7', issueSource: 'linear', issueBindingScope: 'team-a',
       promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z', resolvedAt: '2026-01-01T00:01:00Z',
     }]);
-    assert.match(html, /data-testid="history-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear&amp;bindingScope=team-a"/);
+    assert.match(html, /data-testid="history-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear"/);
   });
 
   test('no identifier means no link', () => {
@@ -189,12 +191,12 @@ describe('Live Console lane task-page link (LIN-3331)', () => {
     return { updateLaneNode, li, anchors };
   }
 
-  test('a lane with a task and the pair shows the link, carrying the pair', () => {
+  test('a lane with a task and a source shows the link, carrying the source', () => {
     const { updateLaneNode, li, anchors } = laneHarness();
     updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', issueSource: 'linear', issueBindingScope: 'team-a' });
     const link = anchors['.lc-lane-task-page'];
     assert.equal(link.hidden, false, 'link shown');
-    assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear&bindingScope=team-a');
+    assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear');
   });
 
   test('a repaint with the task gone hides the link and removes the href', () => {

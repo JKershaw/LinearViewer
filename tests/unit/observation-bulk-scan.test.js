@@ -148,7 +148,7 @@ test.describe('startBulkScan / stopBulkScan — no new issuance after abort (Wit
     // queue length, or any other pool-internal state, which could all agree
     // with each other while the underlying code is wrong.
     let calls = 0;
-    const postScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
+    const postScan = async (urlKey, id, source, { signal } = {}) => {
       calls++;
       return new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
@@ -232,7 +232,7 @@ test.describe('startBulkScan — client-side abort-signal propagation (Witness 3
     // one threaded into postScan's `init` — never that the in-flight HTTP
     // call was cancelled on the server. It must not be read as such.
     let capturedSignal = null;
-    const postScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
+    const postScan = async (urlKey, id, source, { signal } = {}) => {
       capturedSignal = signal;
       return new Promise(() => {}); // never resolves — only the signal identity/state matters
     };
@@ -266,7 +266,7 @@ test.describe('startBulkScan — stop-then-restart isolation (beat 4 fix, cross-
     // run's own runOne()/pump() closures can only ever touch THEIR OWN
     // inFlight/queue, never a newer run's.
     let run1Calls = 0;
-    const run1PostScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
+    const run1PostScan = async (urlKey, id, source, { signal } = {}) => {
       run1Calls++;
       return new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
@@ -327,7 +327,7 @@ test.describe('startBulkScan — two live runs are unreachable (Witness 6, LIN-2
     let inFlight = 0;
     let peak = 0;
     let capturedSignal = null;
-    const postScan = async (urlKey, id, source, bindingScope, { signal } = {}) => {
+    const postScan = async (urlKey, id, source, { signal } = {}) => {
       calls++;
       inFlight++;
       peak = Math.max(peak, inFlight);
@@ -609,20 +609,18 @@ test.describe('classifyBulkScanResult — decision / zero-finding / terminal-row
   });
 });
 
-// LIN-3126 residual, pre-PR due rows (review `5902c5c1` "What CI Did Not
-// Prove" item 3): a row scanned before this PR stored no pair, so
-// startDueBulkScan builds an unstamped item and its POST resolves strictly,
-// 422ing BINDING_REQUIRED. This is the pool `startDueBulkScan` drives; the
-// witness proves that failure is ONE item's error — the batch still completes
-// and every other row still scans. Needs no migration: once the task is
-// re-scanned from its row, the pair is stored and the next bulk scan carries it.
-test.describe('LIN-3126 residual — an unstamped (pre-PR) due row fails per row, not the batch', () => {
-  test('one 422 row is isolated; the stamped sibling still fulfils and the run tears down', async () => {
+// Bulk-scan batch isolation (review `5902c5c1` "What CI Did Not Prove" item 3):
+// one row's error is that row's alone — the batch still completes and every
+// other row still scans. The fixture simulates a per-row failure; with one
+// source per kind (LIN-3332) an unsourced row simply resolves to the active
+// provider, so the failure is an ordinary provider error, not a binding refusal.
+test.describe('bulk scan — a per-row error fails one row, not the batch', () => {
+  test('one failing row is isolated; the sourced sibling still fulfils and the run tears down', async () => {
     const calls = [];
-    const postScan = async (urlKey, identifier, source, bindingScope) => {
-      calls.push({ identifier, source, bindingScope });
-      if (identifier === 'pre-pr-row') {
-        throw Object.assign(new Error('BINDING_REQUIRED'), { status: 422 });
+    const postScan = async (urlKey, identifier, source, { signal } = {}) => {
+      calls.push({ identifier, source });
+      if (identifier === 'failing-row') {
+        throw Object.assign(new Error('provider unavailable'), { status: 503 });
       }
       return { ok: true };
     };
@@ -633,8 +631,8 @@ test.describe('LIN-3126 residual — an unstamped (pre-PR) due row fails per row
     let results = null;
     startBulkScan(
       [
-        { urlKey: 'acme', identifier: 'pre-pr-row' }, // no source/bindingScope — the pre-PR shape
-        { urlKey: 'acme', identifier: 're-scanned-row', source: 'github', bindingScope: 'octo/repoB' }
+        { urlKey: 'acme', identifier: 'failing-row' }, // no source — resolves to the active provider
+        { urlKey: 'acme', identifier: 're-scanned-row', source: 'github' }
       ],
       { onTeardown: (r) => { results = r; } }
     );
@@ -642,11 +640,11 @@ test.describe('LIN-3126 residual — an unstamped (pre-PR) due row fails per row
 
     assert.ok(results, 'the run tore down');
     assert.equal(results.length, 2, 'both rows settled — one failure did not abort the batch');
-    const failed = results.find((r) => r.item.identifier === 'pre-pr-row');
+    const failed = results.find((r) => r.item.identifier === 'failing-row');
     const ok = results.find((r) => r.item.identifier === 're-scanned-row');
-    assert.notEqual(failed.outcome, 'fulfilled', 'the unstamped row is that row\'s own error');
-    assert.equal(failed.error?.status, 422, 'the 422 is recorded against the row, not swallowed');
-    assert.equal(ok.outcome, 'fulfilled', 'the stamped sibling scanned successfully');
-    assert.deepEqual(calls.map((c) => c.identifier).sort(), ['pre-pr-row', 're-scanned-row'], 'both POSTs were issued');
+    assert.notEqual(failed.outcome, 'fulfilled', 'the failing row is that row\'s own error');
+    assert.equal(failed.error?.status, 503, 'the 503 is recorded against the row, not swallowed');
+    assert.equal(ok.outcome, 'fulfilled', 'the sourced sibling scanned successfully');
+    assert.deepEqual(calls.map((c) => c.identifier).sort(), ['failing-row', 're-scanned-row'], 'both POSTs were issued');
   });
 });

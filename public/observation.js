@@ -1076,17 +1076,15 @@ function renderTaskBlock(s, ident, node, runs) {
     : `<span class="obs-task-ident">${escapeHtml(ident)}</span>`;
 
   // LIN-3331: the task's own page, a separate in-Harbour link beside the
-  // tracker link above (never a retarget). The binding pair rides on the task's
-  // runs (routes/dashboard.js projects it, sparse); without it the link is
-  // plain — it resolves on a single-binding workspace and gets the binding
-  // refusal on a multi-binding one, exactly as the Edit link does.
-  const pairRun = runs.find(r => r && (r.issueSource || r.issueBindingScope)) || runs[0] || {};
+  // tracker link above (never a retarget). The source rides on the task's runs
+  // (routes/dashboard.js projects it, sparse); without it the link is plain —
+  // it resolves to the workspace's active provider, exactly as the Edit link does.
+  const sourceRun = runs.find(r => r && r.issueSource) || runs[0] || {};
   const taskHref = window.taskPageHref
     ? window.taskPageHref({
         urlKey: s.workspaceUrlKey,
         identifier: ident,
-        source: pairRun.issueSource,
-        bindingScope: pairRun.issueBindingScope
+        source: sourceRun.issueSource
       })
     : '';
   const taskPageLinkHtml = taskHref
@@ -1905,10 +1903,10 @@ function requestBasisCheck(anchor, noteEl) {
   basisCheckQueue.push(async () => {
     // `:urlKey` is the RULING's own workspace, not the page's — the rulings
     // feed is cross-workspace, the same reason dismiss/reply target the anchor.
-    // LIN-3126 residual: the anchor's binding pair rides the query so the scan
-    // read resolves the issue's binding on a two-binding workspace.
+    // LIN-3126 residual: the anchor's source rides the query so the scan
+    // read resolves the issue's provider on a multi-provider workspace.
     const url = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}`
-      + window.sourceBindingQuery(anchor.source, anchor.bindingScope);
+      + window.sourceQuery(anchor.source);
     try {
       const data = await window.api(url, { on401: false });
       const verdict = data && typeof data.basisChanged === 'boolean' ? data.basisChanged : null;
@@ -2346,10 +2344,10 @@ function rulingRowControls(li) {
 // request promise; the caller owns the pending-guard/restore/feedback wiring.
 function issueDismissRequest(anchor, decisionId, stampLoopId) {
   const isTaskBound = !anchor?.loopId && !!anchor?.taskDecisionId;
-  // LIN-3126 residual: the task-bound dismiss carries the anchor's binding pair
-  // so the scan dismiss route resolves the issue's binding, not the active one.
+  // LIN-3126 residual: the task-bound dismiss carries the anchor's source
+  // so the scan dismiss route resolves the issue's provider, not the active one.
   const dismissUrl = `/workspace/${encodeURIComponent(anchor.workspaceUrlKey)}/api/scan/${encodeURIComponent(anchor.issueId)}/dismiss`
-    + window.sourceBindingQuery(anchor.source, anchor.bindingScope);
+    + window.sourceQuery(anchor.source);
   return isTaskBound
     ? window.api(dismissUrl, {
         method: 'POST',
@@ -3292,11 +3290,10 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
         decisionLoopId,
         decisionId,
         optionId,
-        // LIN-3126 residual: the ruling anchor's own binding pair (beat 2) so
-        // the resume's comment write resolves the issue's binding, not the
-        // workspace's active one. Sparse — an unstamped anchor sends neither.
-        source: anchor.source,
-        bindingScope: anchor.bindingScope
+        // LIN-3126 residual: the ruling anchor's own source (beat 2) so the
+        // resume's comment write resolves the issue's provider, not the
+        // workspace's active one. Sparse — an unsourced anchor sends nothing.
+        source: anchor.source
       },
       prompt,
       {
@@ -3350,10 +3347,9 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       recordOn: decision?.on_answer?.record_on || null,
       prompt,
       downgradeNote,
-      // LIN-3126 residual: the anchor's binding pair rides both hops (the
-      // comment write and, when this downgrades to a dispatch, the run).
-      source: anchor.source,
-      bindingScope: anchor.bindingScope
+      // LIN-3126 residual: the anchor's source rides both hops (the comment
+      // write and, when this downgrades to a dispatch, the run).
+      source: anchor.source
     }, {
       onCommentFailed: (err) => { console.error('Ruling reply (record comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
       onNoTarget: () => { console.error('Ruling reply: no issue to record a comment against, cannot reply for an anchorless run'); restore(); setFeedback('cannot record a reply: no linked issue', true); },
@@ -3382,10 +3378,9 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
       prompt,
       dispatchPrompt: composeDispatchPrompt(row, prompt),
       recordOn: decision?.on_answer?.record_on || null,
-      // LIN-3126 residual: the anchor's binding pair, forwarded to BOTH the
-      // comment write and the fresh-run dispatch by deliverRulingDispatch.
-      source: anchor.source,
-      bindingScope: anchor.bindingScope
+      // LIN-3126 residual: the anchor's source, forwarded to BOTH the comment
+      // write and the fresh-run dispatch by deliverRulingDispatch.
+      source: anchor.source
     }, {
       onCommentFailed: (err) => { console.error('Ruling reply (comment) failed:', err); restore(); setFeedback(rulingReplyFailureMessage(err), true); },
       onPartialFailure: makePartialFailureHandler('start a run'),
@@ -3420,10 +3415,9 @@ function deliverRulingReply(row, prompt, li, optionId, { bulkAgree = false } = {
     return window.ReplyDelivery.postComment(targetUrlKey, anchor.issueId || anchor.issueIdentifier, prompt, {
       taskDecisionId: anchor.taskDecisionId,
       taskDecisionIssueId: anchor.issueId,
-      // LIN-3126 residual: the task-decision anchor's binding pair, so the
-      // comment write resolves the issue's binding on a two-binding workspace.
-      source: anchor.source,
-      bindingScope: anchor.bindingScope
+      // LIN-3126 residual: the task-decision anchor's source, so the comment
+      // write resolves the issue's provider on a multi-provider workspace.
+      source: anchor.source
     })
       .then((commentResult) => {
         if (!commentResult.ok) throw window.ReplyDelivery.errorFromResult(commentResult);
@@ -3701,16 +3695,14 @@ function syncDueBulkBar() {
  */
 function startDueBulkScan() {
   const urlKey = observationData?.urlKey;
-  // LIN-3126 residual (LIN-3256): carry each selected due row's own binding
-  // pair (emitted by the scan-due route from the row's recorded selector) so
-  // the per-item scan POST resolves the issue's binding, not the workspace's
-  // active one. Sparse — an unstamped row adds no keys, so the pool's
-  // postScan call stays byte-identical.
+  // LIN-3126 residual (LIN-3256): carry each selected due row's own source
+  // (emitted by the scan-due route from the row's recorded selector) so the
+  // per-item scan POST resolves the issue's provider, not the workspace's
+  // active one. Sparse — an unsourced row adds no keys.
   const items = [...dueSelectedIds].map((issueId) => {
     const row = dueLoadedItems.find((i) => String(i.issueId) === String(issueId));
     const item = { urlKey, identifier: issueId };
     if (row && row.source) item.source = row.source;
-    if (row && row.bindingScope) item.bindingScope = row.bindingScope;
     return item;
   });
   startBulkScan(items, {
@@ -3956,7 +3948,7 @@ function classifyBulkScanError(err) {
  * doubling global in-flight past BULK_SCAN_CONCURRENCY. See LIN-2700's
  * hand-off (ledger item 4) and LIN-2701 §B.7.
  *
- * @param {Array<{urlKey:string, identifier:string, source?:string, bindingScope?:string}>} items
+ * @param {Array<{urlKey:string, identifier:string, source?:string}>} items
  * @param {{onTeardown?: (results: Array) => void, onResult?: (entry: object) => void}} [opts]
  * @returns {{refused:true, reason:'run-in-progress'}
  *          |{refused:true, limit:number, requested:number, message:string}
@@ -4009,7 +4001,7 @@ function startBulkScan(items, { onTeardown, onResult } = {}) {
   async function runOne(item) {
     let entry;
     try {
-      const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, item.bindingScope, { signal: controller.signal });
+      const value = await window.ScanSection.postScan(item.urlKey, item.identifier, item.source, { signal: controller.signal });
       entry = { item, outcome: 'fulfilled', value };
     } catch (err) {
       entry = { item, outcome: classifyBulkScanError(err), error: err };

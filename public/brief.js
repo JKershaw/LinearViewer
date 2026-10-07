@@ -27,27 +27,24 @@
 
   // LIN-1910: `source` (the resolved provider, stamped server-side in
   // lib/render.js) forwards as `?source=` so the fetch resolves THIS issue's
-  // own binding instead of the workspace's active provider. Optional — a
-  // caller with no source (or a same-binding workspace) gets no query change.
-  // LIN-3240: `bindingScope` (the row's stamp) rides beside `source` when present,
-  // so an unstamped request is byte-identical.
-  function briefUrl(urlKey, identifier, source, bindingScope) {
+  // own provider instead of the workspace's active provider. Optional — a
+  // caller with no source gets a bare path.
+  function briefUrl(urlKey, identifier, source) {
     const base = `/workspace/${encodeURIComponent(urlKey)}/api/brief/${encodeURIComponent(identifier)}`;
-    if (!source && !bindingScope) return base;
+    if (!source) return base;
     const params = new URLSearchParams();
-    if (source) params.set('source', source);
-    if (bindingScope) params.set('bindingScope', bindingScope);
+    params.set('source', source);
     return `${base}?${params.toString()}`;
   }
 
   // on401:false — brief errors (incl. 401) throw with .status/.body so the
   // inline renderError path shows them, rather than redirecting to /logout.
-  async function fetchBriefStatus(urlKey, identifier, source, bindingScope) {
-    return window.api(briefUrl(urlKey, identifier, source, bindingScope), { on401: false });
+  async function fetchBriefStatus(urlKey, identifier, source) {
+    return window.api(briefUrl(urlKey, identifier, source), { on401: false });
   }
 
-  async function postBrief(urlKey, identifier, source, bindingScope) {
-    return window.api(briefUrl(urlKey, identifier, source, bindingScope), { method: 'POST', on401: false });
+  async function postBrief(urlKey, identifier, source) {
+    return window.api(briefUrl(urlKey, identifier, source), { method: 'POST', on401: false });
   }
 
   function header(label, meta, refreshLabel) {
@@ -108,26 +105,23 @@
     container.setAttribute('data-state', state);
   }
 
-  function wireRefresh(container, urlKey, identifier, source, bindingScope) {
+  function wireRefresh(container, urlKey, identifier, source) {
     const btn = container.querySelector('[data-brief-refresh]');
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      await refresh(container, urlKey, identifier, source, bindingScope);
+      await refresh(container, urlKey, identifier, source);
     });
   }
 
-  // LIN-3240: `bindingScope` (the row's binding stamp) forwards beside `source`
-  // so a manual regenerate resolves the row's own binding; `undefined` keeps the
-  // request byte-identical to an unstamped one.
-  async function refresh(container, urlKey, identifier, source, bindingScope) {
+  async function refresh(container, urlKey, identifier, source) {
     applyState(container, renderGenerating(), 'generating');
     try {
-      const data = await postBrief(urlKey, identifier, source, bindingScope);
+      const data = await postBrief(urlKey, identifier, source);
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');
     }
-    wireRefresh(container, urlKey, identifier, source, bindingScope);
+    wireRefresh(container, urlKey, identifier, source);
   }
 
   /**
@@ -138,16 +132,15 @@
    * @param {string} opts.urlKey - Workspace url key.
    * @param {string} opts.identifier - Linear issue id (UUID) or identifier (LIN-123).
    * @param {string} [opts.source] - Resolved provider name (LIN-1910), forwarded as `?source=`.
-   * @param {string} [opts.bindingScope] - Row binding stamp (LIN-3240), forwarded beside `source`.
    */
   async function init(container, opts) {
     if (!container || !opts || !opts.urlKey || !opts.identifier) return;
     container.classList.add('brief-section');
     applyState(container, renderGenerating(), 'loading');
-    const { urlKey, identifier, source, bindingScope } = opts;
+    const { urlKey, identifier, source } = opts;
 
     try {
-      const data = await fetchBriefStatus(urlKey, identifier, source, bindingScope);
+      const data = await fetchBriefStatus(urlKey, identifier, source);
       if (data.status === 'fresh') {
         applyState(container, renderFresh(data), 'fresh');
       } else if (data.status === 'stale') {
@@ -161,7 +154,7 @@
     } catch (err) {
       applyState(container, renderError(err && err.message), 'error');
     }
-    wireRefresh(container, urlKey, identifier, source, bindingScope);
+    wireRefresh(container, urlKey, identifier, source);
   }
 
   window.BriefSection = { init, refresh };

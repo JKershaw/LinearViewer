@@ -62,29 +62,26 @@
   // produce `...?source=local/dismiss`, silently routing to the base scan
   // endpoint rather than 404ing (an easy, undetectable mistake this shape
   // rules out by construction).
-  function scanUrl(urlKey, identifier, source, suffix, bindingScope) {
+  function scanUrl(urlKey, identifier, source, suffix) {
     const base = `/workspace/${encodeURIComponent(urlKey)}/api/scan/${encodeURIComponent(identifier)}${suffix || ''}`;
-    if (!source && !bindingScope) return base;
+    if (!source) return base;
     const params = new URLSearchParams();
-    if (source) params.set('source', source);
-    // LIN-3240: the row's binding stamp rides beside `source` when present, so
-    // an unstamped request is byte-identical.
-    if (bindingScope) params.set('bindingScope', bindingScope);
+    params.set('source', source);
     return `${base}?${params.toString()}`;
   }
 
   // on401:false — scan errors (incl. 401) throw with .status/.body so the
   // inline renderError path shows them, rather than redirecting to /logout.
-  async function fetchScanStatus(urlKey, identifier, source, bindingScope) {
-    return window.api(scanUrl(urlKey, identifier, source, undefined, bindingScope), { on401: false });
+  async function fetchScanStatus(urlKey, identifier, source) {
+    return window.api(scanUrl(urlKey, identifier, source, undefined), { on401: false });
   }
 
-  async function postScan(urlKey, identifier, source, bindingScope, { signal } = {}) {
-    return window.api(scanUrl(urlKey, identifier, source, undefined, bindingScope), { method: 'POST', on401: false, signal });
+  async function postScan(urlKey, identifier, source, { signal } = {}) {
+    return window.api(scanUrl(urlKey, identifier, source, undefined), { method: 'POST', on401: false, signal });
   }
 
-  async function postDismiss(urlKey, identifier, source, id, bindingScope) {
-    return window.api(scanUrl(urlKey, identifier, source, '/dismiss', bindingScope), {
+  async function postDismiss(urlKey, identifier, source, id) {
+    return window.api(scanUrl(urlKey, identifier, source, '/dismiss'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       on401: false,
@@ -96,8 +93,8 @@
   // self-resolved when that fresh check finds nothing pending; un-retire is
   // a pure store reversal. Both take only `{ id }` — never a client-supplied
   // verdict, matching the server's own contract.
-  async function postRetire(urlKey, identifier, source, id, bindingScope) {
-    return window.api(scanUrl(urlKey, identifier, source, '/retire', bindingScope), {
+  async function postRetire(urlKey, identifier, source, id) {
+    return window.api(scanUrl(urlKey, identifier, source, '/retire'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       on401: false,
@@ -105,8 +102,8 @@
     });
   }
 
-  async function postUnretire(urlKey, identifier, source, id, bindingScope) {
-    return window.api(scanUrl(urlKey, identifier, source, '/unretire', bindingScope), {
+  async function postUnretire(urlKey, identifier, source, id) {
+    return window.api(scanUrl(urlKey, identifier, source, '/unretire'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       on401: false,
@@ -353,7 +350,7 @@
   async function runScan(container, ctx) {
     applyState(container, renderGenerating('scan'), 'generating');
     try {
-      const data = await postScan(ctx.urlKey, ctx.identifier, ctx.source, ctx.bindingScope);
+      const data = await postScan(ctx.urlKey, ctx.identifier, ctx.source);
       ctx.lastData = data;
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
@@ -372,7 +369,7 @@
       // route skips its provider context fetch entirely for an
       // already-UUID-shaped id (LIN-2197 Phase 4 close-out ledger item L3).
       const dismissIdentifier = ctx.lastData.issueId || ctx.identifier;
-      const data = await postDismiss(ctx.urlKey, dismissIdentifier, ctx.source, id, ctx.bindingScope);
+      const data = await postDismiss(ctx.urlKey, dismissIdentifier, ctx.source, id);
       ctx.lastData = data;
       applyState(container, renderFresh(data), 'fresh');
     } catch (err) {
@@ -397,7 +394,7 @@
     applyState(container, renderGenerating('retire'), 'generating');
     try {
       const identifier = data.issueId || ctx.identifier;
-      const result = await postRetire(ctx.urlKey, identifier, ctx.source, data.id, ctx.bindingScope);
+      const result = await postRetire(ctx.urlKey, identifier, ctx.source, data.id);
       // LIN-2650 review F3: a keepalive-flushed error (lib/http-keepalive.js)
       // commits HTTP 200 before the real status is known, then carries the
       // failure as a `statusCode` field inside that 200 body — `window.api`
@@ -431,7 +428,7 @@
     applyState(container, renderGenerating('unretire'), 'generating');
     try {
       const identifier = (ctx.lastData && ctx.lastData.issueId) || ctx.identifier;
-      const data = await postUnretire(ctx.urlKey, identifier, ctx.source, id, ctx.bindingScope);
+      const data = await postUnretire(ctx.urlKey, identifier, ctx.source, id);
       // LIN-2650 review F3, for symmetry with runRetire above: un-retire has
       // no branch on the result shape at all today, so a flushed error body
       // would otherwise render straight through as if it were a real record.
@@ -473,7 +470,7 @@
       // `hashContext`), so the freshly-answered row routinely reports
       // 'stale' here — that is expected, not a failure, and NOT the same
       // rendering as 'missing' (this task plainly has been scanned).
-      const refreshed = await fetchScanStatus(ctx.urlKey, ctx.identifier, ctx.source, ctx.bindingScope);
+      const refreshed = await fetchScanStatus(ctx.urlKey, ctx.identifier, ctx.source);
       if (refreshed.status === 'fresh') {
         ctx.lastData = refreshed;
         applyState(container, renderFresh(refreshed), 'fresh');
@@ -497,16 +494,15 @@
    * @param {string} opts.urlKey - Workspace url key.
    * @param {string} opts.identifier - Linear issue id (UUID) or identifier (LIN-123).
    * @param {string} [opts.source] - Resolved provider name (LIN-1910), forwarded as `?source=`.
-   * @param {string} [opts.bindingScope] - Row binding stamp (LIN-3240), forwarded beside `source`.
    */
   async function init(container, opts) {
     if (!container || !opts || !opts.urlKey || !opts.identifier) return;
     container.classList.add('scan-section');
     applyState(container, renderGenerating('load'), 'loading');
-    const ctx = { urlKey: opts.urlKey, identifier: opts.identifier, source: opts.source, bindingScope: opts.bindingScope, lastData: null };
+    const ctx = { urlKey: opts.urlKey, identifier: opts.identifier, source: opts.source, lastData: null };
 
     try {
-      const data = await fetchScanStatus(ctx.urlKey, ctx.identifier, ctx.source, ctx.bindingScope);
+      const data = await fetchScanStatus(ctx.urlKey, ctx.identifier, ctx.source);
       if (data.status === 'fresh') {
         ctx.lastData = data;
         applyState(container, renderFresh(data), 'fresh');

@@ -25,31 +25,28 @@
   const MEMORY_PREFIX = 'harbour:prompt-memory:';
   const MEMORY_VERSION = 1;
 
-  // LIN-3240: an optional third argument — the row's binding stamp. Appended as
-  // `@<bindingScope>` ONLY when present, so every already-stored localStorage
-  // entry (single-binding / legacy) keeps its exact key and hydration.
-  function memoryKey(urlKey, issueId, bindingScope) {
-    return `${MEMORY_PREFIX}${urlKey || ''}:${issueId}${bindingScope ? '@' + bindingScope : ''}`;
+  // The durable prompt-memory key is `urlKey:issueId`. One ticket source per kind
+  // (LIN-3332) removed the binding stamp that once suffixed keys as
+  // `@<bindingScope>`; an old `...:<id>@<scope>` key is simply never read again.
+  function memoryKey(urlKey, issueId) {
+    return `${MEMORY_PREFIX}${urlKey || ''}:${issueId}`;
   }
 
-  // LIN-3240 (review F5): the in-session `promptCache` / `lastPromptLabel` maps
-  // use the SAME stamp shape as `memoryKey` — `issueId@<bindingScope>` only when
-  // the row carries a scope. Without the stamp, repoA#1 and repoB#1 (same iss
-  // NUMBER across bindings) shared one in-session slot, so repoB#1 could show
-  // repoA#1's "cached" hint. An unstamped key stays the bare issueId
-  // (byte-identical).
-  function sessionPromptKey(issueId, bindingScope) {
-    return `${issueId}${bindingScope ? '@' + bindingScope : ''}`;
+  // The in-session `promptCache` / `lastPromptLabel` maps key on the issueId.
+  // One ticket source per kind (LIN-3332) removed the `@<bindingScope>` suffix
+  // the pair-era stamp added.
+  function sessionPromptKey(issueId) {
+    return `${issueId}`;
   }
 
   // Read compatibility: an old-shape/foreign record that is malformed or lacks a
   // usable `raw` is treated as absent (no crash, no partial hydrate). A record
   // missing the newer fields (generatedAt/kind/proxyForce/warning) still
   // restores — those fields simply stay undefined.
-  function loadPromptMemory(urlKey, issueId, bindingScope) {
+  function loadPromptMemory(urlKey, issueId) {
     try {
       if (!window.localStorage) return null;
-      const stored = window.localStorage.getItem(memoryKey(urlKey, issueId, bindingScope));
+      const stored = window.localStorage.getItem(memoryKey(urlKey, issueId));
       if (!stored) return null;
       const parsed = JSON.parse(stored);
       if (!parsed || typeof parsed !== 'object' || typeof parsed.raw !== 'string') return null;
@@ -59,7 +56,7 @@
     }
   }
 
-  function savePromptMemory(urlKey, issueId, entry, bindingScope) {
+  function savePromptMemory(urlKey, issueId, entry) {
     if (!entry || typeof entry.raw !== 'string') return;
     try {
       if (!window.localStorage) return;
@@ -77,7 +74,7 @@
       for (const key of Object.keys(record)) {
         if (record[key] === undefined) delete record[key];
       }
-      window.localStorage.setItem(memoryKey(urlKey, issueId, bindingScope), JSON.stringify(record));
+      window.localStorage.setItem(memoryKey(urlKey, issueId), JSON.stringify(record));
     } catch {
       // Best-effort: memory is an optimisation, never load-bearing.
     }
@@ -543,7 +540,7 @@
     // replaced by the persisted record, so a mount hydrates from storage, not
     // from a process-global Map. Durable restore re-renders `html` from `raw`
     // (the record never carries markup) and re-seeds the in-session hint maps.
-    const memory = loadPromptMemory(opts.urlKey, issueId, issue.bindingScope);
+      const memory = loadPromptMemory(opts.urlKey, issueId);
     if (memory) {
       const hydrated = {
         label: memory.label,
@@ -560,8 +557,8 @@
       state.result = hydrated;
       state.activeLabel = hydrated.label;
       if (hydrated.label) {
-        promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${hydrated.label}`, hydrated);
-        lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), hydrated.label);
+        promptCache.set(`${sessionPromptKey(issueId)}:${hydrated.label}`, hydrated);
+        lastPromptLabel.set(sessionPromptKey(issueId), hydrated.label);
       }
     }
 
@@ -659,7 +656,6 @@
           // resolves recommend against its OWN binding, not the active one.
           const params = new URLSearchParams();
           if (issue.source) params.set('source', issue.source);
-          if (issue.bindingScope) params.set('bindingScope', issue.bindingScope);
           const query = params.toString() ? `?${params.toString()}` : '';
           const response = await fetch(`${apiPrefix}/api/recommend/${issueId}/stream${query}`, { signal: ac.signal });
           if (!response.ok) {
@@ -680,7 +676,6 @@
             issueId,
             variant,
             source: issue.source || undefined,
-            bindingScope: issue.bindingScope || undefined,
             // LIN-3246: the ladder's own autopilot run is bounded to the PR —
             // close-out is the person's to send. Every other launcher omits it.
             stopAt: 'pr',
@@ -694,27 +689,26 @@
           // this autopilot result forces proxy context (copy/download/dispatch) and
           // suppresses the now-inert +proxy toggle. Every other result stays unforced.
           const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, repo: result.repo || null, generatedAt: Date.now() };
-          promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);
-          lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), label);
-          savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
+          promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(issueId), label);
+          savePromptMemory(opts.urlKey, issueId, entry);
           enterPhase('fresh');
           state.result = entry;
           render();
         } else {
           // LIN-2944 addendum 1 (LIN-1916 row 1): thread `source` on the template
           // fetch too, via URLSearchParams (the LIN-2046 shape). The URL is
-          // unchanged when the issue has no source. LIN-3240 adds bindingScope.
+          // unchanged when the issue has no source.
           const params = new URLSearchParams();
           if (issue.source) params.set('source', issue.source);
-          if (issue.bindingScope) params.set('bindingScope', issue.bindingScope);
           const query = params.toString() ? `?${params.toString()}` : '';
           const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
           const entry = { label, name: result.promptName || '', raw: result.prompt, html, repo: result.repo || null, generatedAt: Date.now() };
-          promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);
-          lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), label);
-          savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
+          promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
+          lastPromptLabel.set(sessionPromptKey(issueId), label);
+          savePromptMemory(opts.urlKey, issueId, entry);
           enterPhase('fresh');
           state.result = entry;
           render();
@@ -840,9 +834,9 @@
         label, name: 'AI Recommendation', raw: displayText,
         html: finalHtml, reasoning: reasoningRaw, warning, repo, generatedAt: Date.now()
       };
-      promptCache.set(`${sessionPromptKey(issueId, issue.bindingScope)}:${label}`, entry);
-      lastPromptLabel.set(sessionPromptKey(issueId, issue.bindingScope), label);
-      savePromptMemory(opts.urlKey, issueId, entry, issue.bindingScope);
+      promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
+      lastPromptLabel.set(sessionPromptKey(issueId), label);
+      savePromptMemory(opts.urlKey, issueId, entry);
       enterPhase('fresh');
       state.result = entry;
       render();
@@ -1110,7 +1104,7 @@
         container.removeEventListener('click', handleClick);
       },
       getCachedLabel() {
-        const key = sessionPromptKey(issueId, issue.bindingScope);
+        const key = sessionPromptKey(issueId);
         const l = lastPromptLabel.get(key);
         const entry = l ? promptCache.get(`${key}:${l}`) : null;
         return entry ? { label: l, name: entry.name } : null;
@@ -1123,18 +1117,16 @@
    * Reads the in-session map first, then durable per-task memory (so the hint
    * survives a reload). `urlKey` is optional for backward compatibility; without
    * it only the in-session hint is available.
-   * @param {string} issueId
-   * @param {string} [urlKey]
-   * @param {string} [bindingScope] - Row binding stamp (LIN-3240); keeps the
-   *   durable-memory lookup per-binding.
-   * @returns {{label: string, name: string} | null}
-   */
-  function getCached(issueId, urlKey, bindingScope) {
-    const key = sessionPromptKey(issueId, bindingScope);
+    * @param {string} issueId
+    * @param {string} [urlKey]
+    * @returns {{label: string, name: string} | null}
+    */
+  function getCached(issueId, urlKey) {
+    const key = sessionPromptKey(issueId);
     const l = lastPromptLabel.get(key);
     const entry = l ? promptCache.get(`${key}:${l}`) : null;
     if (entry) return { label: l, name: entry.name };
-    const memory = urlKey ? loadPromptMemory(urlKey, issueId, bindingScope) : null;
+    const memory = urlKey ? loadPromptMemory(urlKey, issueId) : null;
     return memory ? { label: memory.label, name: memory.name } : null;
   }
 
