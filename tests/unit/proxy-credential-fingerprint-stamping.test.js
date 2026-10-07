@@ -130,9 +130,10 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // last direct site (group I recommend-and-dispatch) moved to
     // routes/proxy-dispatch.js, so routes/proxy.js now has 0.
     // LIN-3335: the pair-era `{ intent: BINDING_INTENT.* }` fourth argument (and
-    // the ISSUE-arm `selectedBinding` destructure) are gone; the call is the
-    // plain three-arg resolve.
-    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
+    // the ISSUE-arm `selectedBinding` destructure) are gone; an issue-addressed
+    // site now passes a kind-only `{ source: ... }` fourth argument, while a
+    // workspace-level site stays three-arg. The pattern accepts either shape.
+    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req(?:, \{[^}]*\})?\);/g;
     const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
     const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
     const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
@@ -185,8 +186,9 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
   function assertOrderingGuard(source, expectedCount, label) {
     const resolveIdx = [];
     // LIN-3335: the pair-era fourth `{ intent: BINDING_INTENT.* }` argument is
-    // gone, so the stable prefix is the plain three-arg resolve.
-    const prefix = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\)/g;
+    // gone; an issue-addressed site passes a kind-only `{ source: ... }` fourth
+    // argument (a workspace-level site stays three-arg), so accept both.
+    const prefix = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req(?:, \{[^}]*\})?\)/g;
     for (const m of source.matchAll(prefix)) {
       resolveIdx.push(m.index);
     }

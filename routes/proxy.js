@@ -703,7 +703,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    *
    * @returns {Promise<{provider: Object, token: (string|Object|null), reason: string}>}
    */
-  async function resolveProviderAccess(urlKey, ownerAccountId, req) {
+  async function resolveProviderAccess(urlKey, ownerAccountId, req, { source } = {}) {
     if (process.env.NODE_ENV === 'test' && urlKey === TEST_LOCAL_URL_KEY) {
       if (req) {
         req.resolvedCredentialFingerprint = null;
@@ -723,10 +723,15 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       }
       return { provider: localProvider, token: urlKey, reason: 'ok' };
     }
-    // LIN-3335: the pair-era intent/selector threading is gone. A proxy read
-    // resolves the workspace's active credential (row-level `source` routing
-    // stays on the session lane, not here).
-    const { token, scope, reason, provider: providerName, source, expiresAt, credentialFingerprint } = await resolveWorkspaceAccess(urlKey, ownerAccountId);
+    // LIN-3335 R1: the pair-era intent/selector threading is gone, but the
+    // kind-only `source` routing decision 6 kept stays. An issue-addressed
+    // caller passes the kind it is addressing (a body `issueSource` on the
+    // dispatch lanes, `req.query.source` on issue reads/writes); a
+    // workspace-level caller passes none. The source is threaded straight to
+    // `resolveWorkspaceAccess` -> the connection-first arm, which targets that
+    // kind's binding instead of the active one. `credentialSource` below is the
+    // unrelated provenance tag (cache | session-scan | connection | ...).
+    const { token, scope, reason, provider: providerName, source: credentialSource, expiresAt, credentialFingerprint } = await resolveWorkspaceAccess(urlKey, ownerAccountId, { source });
     if (req && token) {
       req.resolvedCredentialFingerprint = credentialFingerprint ?? null;
       // LIN-2216: stamped alongside the fingerprint, on THIS request object —
@@ -745,7 +750,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       // interleaving; the fingerprint comment above applies identically).
       // Persisted onto the proxy-event row so the live 401/200 toggle can be
       // attributed to a source from a proxy token via /credential-trail.
-      req.resolvedCredentialSource = source ?? null;
+      req.resolvedCredentialSource = credentialSource ?? null;
     }
     const activeProvider = injectedProvider || getProviderForWorkspace({ provider: providerName });
     if (req) {
@@ -796,7 +801,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       ownerAccountId,
       provider: providerName,
       credential: token ? (scope ?? token) : null,
-      source,
+      source: credentialSource,
       expiresAt,
     });
     // LIN-1891: substitute the structured call scope for the bare token ONLY

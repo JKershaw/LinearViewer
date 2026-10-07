@@ -2650,7 +2650,7 @@ ${goal}`
     // onto the durable scan row so a later rulings anchor
     // (lib/unanswered-decisions.js) and a scan-due item can hand the browser the
     // issue's own provider. Only a non-blank source is stored — a legacy scan
-    // adds no key (sparse, byte-identical). `issueBindingScope` is gone.
+    // adds no key (sparse, byte-identical).
     const scanBindingPair = (
       typeof req.query.source === 'string' && req.query.source.trim()
     )
@@ -3855,8 +3855,8 @@ ${goal}`
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
     const workspace = req.workspace;
     // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's
-    // default (active) binding. The pair-era `source`+`bindingScope` selector is
-    // gone; `resolveIssueBinding(workspace, null)` is the source-only default.
+    // default (active) binding. The pair-era selector is gone;
+    // `resolveIssueBinding(workspace, null)` is the source-only default.
     const issueBinding = resolveIssueBinding(workspace, null);
     const provider = issueBinding.provider;
     // LIN-3126 residual (producer sweep) / LIN-3335: the feedback triage/autopilot

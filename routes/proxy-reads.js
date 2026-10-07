@@ -298,7 +298,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get('/api/proxy/issues/:issueId', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/issues/:id', reason);
       }
@@ -512,7 +512,7 @@ export function createReadRoutes({ proxyLimiter, authenticateProxyToken, resolve
    */
   router.get(['/api/proxy/issues/:issueId/relations', '/api/proxy/relations/:issueId'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       if (!token) {
         return workspaceUnavailable(req, res, '/api/proxy/relations', reason);
       }

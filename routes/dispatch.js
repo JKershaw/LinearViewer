@@ -498,8 +498,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // LIN-3335 (reduced from LIN-3242): an issue-addressed dispatch may name
       // its provider-kind `issueSource` — a legitimate source-only routing hint
       // (every issue row carries a source), resolved by `resolveIssueBinding`'s
-      // source-only rule and persisted as a kind-only stamp. The pair-era
-      // `issueBindingScope` and its validation are gone.
+      // source-only rule and persisted as a kind-only stamp.
       const persistedBindingFields = issueIdentifier
         ? dispatchIssueSourceField(issueSource)
         : {};

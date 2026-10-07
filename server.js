@@ -2516,7 +2516,7 @@ const connectionAccess = createConnectionAccess({
 // paths that read it (lib/workspace.js's mirror writers, routes/workspace-api.js
 // → lib/audit.js) are untouched and out of this fix's remit — the cross-provider
 // credential disclosure there is LIN-1899's, not closed by anything here.
-async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
+async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED, { source } = {}) {
   // LIN-3323: the ONE success constructor for this resolver. Every route that
   // successfully resolves an owner credential returns through `grant`, so
   // `reason: 'ok'` is attached in exactly one place and a new success route
@@ -2525,8 +2525,18 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
   // previously each built their own answer; the Connection route's
   // `connectionResolveResult` (lib/connection-access.js) omitted the field, so
   // a valid owner login was reported as `refresh_error`. Failures keep their
-  // own reason below (session_expired, owner_signed_out, binding_required, …).
+  // own reason below (session_expired, owner_signed_out, …).
   const grant = (fields) => ({ ...fields, reason: 'ok' });
+
+  // LIN-3335 R1: a kind-only `source` routes a non-primary-kind task to that
+  // kind's binding (decision 6 / the P2 Keep list). The base cache key is
+  // per-(urlKey, owner), NOT per-kind, so a Jira-source resolution must never be
+  // read from or written to it — a Jira credential cached under the owner key
+  // would be served to the next no-source (active-kind) read within the 30s TTL.
+  // A source-bearing resolve therefore bypasses the cache entirely: nothing new
+  // to evict, so the LIN-1507 eviction pair stays exhaustive. The no-source path
+  // is byte-identical (still cached as before).
+  const sourceScoped = typeof source === 'string' && source.length > 0;
 
   if (process.env.NODE_ENV === 'test' && urlKey === 'test-workspace') {
     // LIN-1980: this is a credential-bearing return path like every other
@@ -2562,29 +2572,32 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
 
   // Check cache first — the factory already applies TTL internally and
   // returns undefined on a miss/expiry, so only the freshness-vs-expiry
-  // check (business logic, not cache mechanics) stays here.
-  const cached = workspaceTokenCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
-    const cachedFingerprint = fingerprintCredential(cached.scope ?? cached.token);
-    // LIN-1980: the cache-hit path needs the SAME suspect check the
-    // session-scan path gets below (plan-review round 2 flagged this as the
-    // easiest-to-miss edge — a suspect fingerprint can be sitting in the 30s
-    // cache). `attemptSuspectCredentialRefresh` checks `isSuspect` (a sync,
-    // no-IO lookup) before its caller-supplied `loadSessions` ever runs, so
-    // the ordinary (non-suspect) hot path still never touches Mongo here.
-    const recovered = await attemptSuspectCredentialRefresh({
-      fingerprint: cachedFingerprint,
-      urlKey,
-      ownerAccountId,
-      provider: cached.provider,
-      loadSessions: () => sessionsCollection.find({}).toArray(),
-    });
-    if (recovered) {
-      workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
-      rejectedCredentialRegistry.accept(cachedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
-      return grant({ token: recovered.token, provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint });
+  // check (business logic, not cache mechanics) stays here. A source-bearing
+  // resolve skips this entirely (LIN-3335 R1, see `sourceScoped` above).
+  if (!sourceScoped) {
+    const cached = workspaceTokenCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now() + TOKEN_REFRESH_BUFFER_MS) {
+      const cachedFingerprint = fingerprintCredential(cached.scope ?? cached.token);
+      // LIN-1980: the cache-hit path needs the SAME suspect check the
+      // session-scan path gets below (plan-review round 2 flagged this as the
+      // easiest-to-miss edge — a suspect fingerprint can be sitting in the 30s
+      // cache). `attemptSuspectCredentialRefresh` checks `isSuspect` (a sync,
+      // no-IO lookup) before its caller-supplied `loadSessions` ever runs, so
+      // the ordinary (non-suspect) hot path still never touches Mongo here.
+      const recovered = await attemptSuspectCredentialRefresh({
+        fingerprint: cachedFingerprint,
+        urlKey,
+        ownerAccountId,
+        provider: cached.provider,
+        loadSessions: () => sessionsCollection.find({}).toArray(),
+      });
+      if (recovered) {
+        workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
+        rejectedCredentialRegistry.accept(cachedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
+        return grant({ token: recovered.token, provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint });
+      }
+      return grant({ token: cached.token, provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt, credentialFingerprint: cachedFingerprint });
     }
-    return grant({ token: cached.token, provider: cached.provider, scope: cached.scope, source: CREDENTIAL_SOURCES.CACHE, expiresAt: cached.expiresAt, credentialFingerprint: cachedFingerprint });
   }
 
   // Look up the access token from the sessions collection, scoped to
@@ -2598,12 +2611,13 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
     // (D16/LIN-1448), and an arm result is never cached under the owner-blind
     // key. Falls through to the scan when no authorized Connection matches.
     if (ownerAccountId !== UNSCOPED) {
-      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions });
+      const arm = await connectionAccess.resolveConnectionBackedAccess({ urlKey, ownerAccountId, sessions, source });
       if (arm?.result) {
-        if (arm.result.token) workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
+        // LIN-3335 R1: `sourceScoped` resolutions are never cached (see above).
+        if (!sourceScoped && arm.result.token) workspaceTokenCache.set(cacheKey, { token: arm.result.token, expiresAt: arm.result.expiresAt, provider: arm.result.provider, scope: arm.result.scope });
         // LIN-3323: a token-bearing arm result is a success and goes through
-        // the one success constructor. A refusal (`token: null`, e.g.
-        // binding_required / unknown_binding) keeps its OWN reason untouched.
+        // the one success constructor. A token-less arm result keeps its OWN
+        // reason untouched.
         return arm.result.token ? grant(arm.result) : arm.result;
       }
       connectionSummary = arm?.connectionSummary || null;
@@ -2623,11 +2637,11 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
         loadSessions: () => Promise.resolve(sessions),
       });
       if (recovered) {
-        workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
+        if (!sourceScoped) workspaceTokenCache.set(cacheKey, { token: recovered.token, expiresAt: recovered.expiresAt, provider: recovered.provider, scope: recovered.scope });
         rejectedCredentialRegistry.accept(selectedFingerprint, { supersededBy: recovered.credentialFingerprint, source: recovered.adoptSource });
         return grant({ token: recovered.token, provider: recovered.provider, scope: recovered.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: recovered.expiresAt, credentialFingerprint: recovered.credentialFingerprint });
       }
-      workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
+      if (!sourceScoped) workspaceTokenCache.set(cacheKey, { token: selected.token, expiresAt: selected.expiresAt, provider: selected.provider, scope: selected.scope });
       return grant({ token: selected.token, provider: selected.provider, scope: selected.scope, source: CREDENTIAL_SOURCES.SESSION_SCAN, expiresAt: selected.expiresAt, credentialFingerprint: selectedFingerprint });
     }
 
@@ -2680,7 +2694,7 @@ async function resolveWorkspaceAccess(urlKey, ownerAccountId = UNSCOPED) {
             lifecycleEventStore: credentialLifecycleEventStore
           });
           if (refreshed) {
-            workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
+            if (!sourceScoped) workspaceTokenCache.set(cacheKey, { token: refreshed.token, expiresAt: refreshed.expiresAt, provider: refreshed.provider, scope: refreshed.scope });
             return grant({ token: refreshed.token, provider: refreshed.provider, scope: refreshed.scope, source: CREDENTIAL_SOURCES.REFRESH_ON_RESOLVE, expiresAt: refreshed.expiresAt, credentialFingerprint: fingerprintCredential(refreshed.scope ?? refreshed.token) });
           }
         } catch (err) {

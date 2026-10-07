@@ -281,7 +281,9 @@ export function createKickoffRoutes({
       // sparse write adds no key.
       let persistedBindingFields = {};
       if (issueIdentifier) {
-        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+        // LIN-3335 R1: forward the body's kind-only `issueSource` so a scoped
+        // run on a non-primary-kind task resolves against that kind's binding.
+        const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: issueSource });
         // LIN-1980: stamp before any other logic (incl. the !accessToken early
         // return below) so the fingerprint is present even when this request
         // later 401s from a shared credential another site marked suspect.

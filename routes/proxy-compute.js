@@ -278,7 +278,7 @@ export function createComputeRoutes({
    */
   router.get(['/api/proxy/issues/:identifier/prompt/:templateKey', '/api/proxy/prompt/:identifier/:templateKey'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -351,7 +351,7 @@ export function createComputeRoutes({
    */
   router.get(['/api/proxy/issues/:identifier/recommend', '/api/proxy/recommend/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -1040,7 +1040,7 @@ export function createComputeRoutes({
    */
   router.get(['/api/proxy/issues/:identifier/recap', '/api/proxy/recap/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -1187,7 +1187,7 @@ export function createComputeRoutes({
    */
   router.post('/api/proxy/recap/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -1323,7 +1323,7 @@ export function createComputeRoutes({
    */
   router.get(['/api/proxy/issues/:identifier/brief', '/api/proxy/brief/:identifier'], proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -1469,7 +1469,7 @@ export function createComputeRoutes({
    */
   router.post('/api/proxy/brief/:identifier', proxyLimiter, authenticateProxyToken, async (req, res) => {
     try {
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: req.query?.source });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.

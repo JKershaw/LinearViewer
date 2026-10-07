@@ -398,15 +398,17 @@ export function createDispatchRoutes({
       // blocked by either guard.
       let providerAccess = null;
       if (!isAbort && (issueIdentifier || repo)) {
-        // LIN-3335: the pair-era selector is gone; the referent resolves
-        // against the workspace's active binding.
-        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+        // LIN-3335 R1: the pair-era selector is gone, but an issue-addressed
+        // dispatch still forwards the body's kind-only `issueSource` so the
+        // referent resolves against that kind's binding, not the active one. A
+        // repo-only request passes no source and keeps the active binding.
+        providerAccess = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: issueIdentifier ? issueSource : undefined });
       }
 
       // LIN-3335 (reduced from LIN-3242): persist the kind-only `issueSource`
       // for a named-issue dispatch. A lone `source` is a routing hint; a
       // repo-only / issueless / abort request stamps nothing (the store's
-      // sparse write then adds no key). `issueBindingScope` is gone.
+      // sparse write then adds no key).
       const persistedBindingFields = (!isAbort && issueIdentifier)
         ? dispatchIssueSourceField(issueSource)
         : {};
@@ -906,9 +908,10 @@ export function createDispatchRoutes({
         : !explicitOptOut;
 
       // Recommendation preconditions — identical to GET /recommend.
-      // LIN-3335: the pair-era selector is gone; the referent resolves against
-      // the workspace's active binding.
-      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req);
+      // LIN-3335 R1: forward the body's kind-only `issueSource` so the referent
+      // and the recommendation read resolve against that kind's binding, not
+      // the active one (a non-primary-kind task on a mixed-kind workspace).
+      const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { source: issueSource });
       // LIN-1980: stamp before any other logic (incl. the !accessToken early
       // return below) so the fingerprint is present even when this request
       // later 401s from a shared credential another site marked suspect.
@@ -922,8 +925,7 @@ export function createDispatchRoutes({
       const isTestMode = process.env.NODE_ENV === 'test' && accessToken === 'test-token';
 
       // LIN-3335 (reduced from LIN-3242): persist the kind-only `issueSource`
-      // for a named-issue request; a lone `source` is a routing hint and
-      // `issueBindingScope` is gone.
+      // for a named-issue request; a lone `source` is a routing hint.
       const persistedBindingFields = issueIdentifier
         ? dispatchIssueSourceField(issueSource)
         : {};

@@ -2570,8 +2570,8 @@ export function createDashboardRoutes({
     // active binding. Each DISTINCT stamped source resolves ONCE via the
     // source-only `resolveIssueBinding`; the call scope/credential always comes
     // from the hydrated binding. An UNSTAMPED issue keeps today's behaviour: the
-    // null group resolves to the workspace's active pair. The pair-era
-    // `issueBindingScope` is gone.
+    // null group resolves to the workspace's active binding. The pair-era scope
+    // plumbing is gone.
     const stampByIdentifier = new Map();
     for (const row of [...liveRows, ...historyRows]) {
       const id = row.issueIdentifier;
