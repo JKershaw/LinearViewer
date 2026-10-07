@@ -224,8 +224,8 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
      * tests: a refused add-source grant is now rejected at the callback, before
      * the picker and before the staging write, for single- and multi-site alike.
      */
-    async function driveCallback(s, { mode = 'single', refresh = 'R1', site = SITE_B } = {}) {
-      stubAuthFetch(mode === 'single' ? [site] : [SITE_X, site], refresh);
+    async function driveCallback(s, { mode = 'single', refresh = 'R1', site = SITE_B, sites: siteList } = {}) {
+      stubAuthFetch(siteList || (mode === 'single' ? [site] : [SITE_X, site]), refresh);
       s.oauthState = 'nonce';
       s.oauthIntent = { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' };
       const res = makeRes();
@@ -650,6 +650,47 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     assert.deepEqual(await w.real.ownerStore.collection.findOne({ _id: `${w.account._id}::acme-jira::jira` }), legacyBefore, 'the legacy key is untouched');
     const grants = grantServer(['RA']);
     assert.equal((await refreshOwnerCredential({ ownerAccountId: w.account._id, urlKey: 'acme-jira', provider: 'jira', refreshAccessToken: grants.exchange, store: w.real.ownerStore })).refreshToken, 'RA+', 'the sibling still refreshes from its own grant');
+  });
+
+  test('T20(j)-multi (LIN-3334 F1): the new-login existing-container refusal drops the carried refresh token', async () => {
+    const w = await world();
+    const legacyA = structuredClone(LEGACY_OAUTH_A);
+    const container = { id: 'jira:atl-human', urlKey: 'acme-jira', provider: 'jira', accessToken: 'at-A', bindings: [legacyA] };
+    await w.real.accountStore.linkIdentity(w.account._id, 'jira', 'atl-human', {});
+    await w.real.ownerStore.put(w.account._id, 'acme-jira', { provider: 'jira', token: 'at-RA', refreshToken: 'RA', tokenExpiresAt: 1 });
+    const legacyBefore = await w.real.ownerStore.collection.findOne({ _id: `${w.account._id}::acme-jira::jira` });
+    const s = { accountId: w.account._id, workspaces: [container], activeWorkspaceId: container.id, oauthState: 'nonce', oauthIntent: { mode: 'new', provider: 'jira' }, save(cb) { cb(null); } };
+    // The distinguishing precondition (review F1): a MULTI-site `mode:'new'`
+    // grant, so the callback parks the rotating token in the session for the
+    // second-round pick. T20(j) only drives a single-site grant, where the
+    // token is a function argument and never touches `jiraPending`.
+    globalThis.fetch = async (url) => String(url).includes('accessible-resources')
+      ? { ok: true, status: 200, json: async () => [SITE_A, SITE_B] }
+      : { ok: true, status: 200, json: async () => ({ access_token: 'at-RB', refresh_token: 'RB', expires_in: 3600 }) };
+    const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
+    const first = makeRes();
+    await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, first);
+    assert.equal(first.statusCode, 200, 'the multi-site picker renders');
+    assert.equal(s.jiraPending.refreshToken, 'RB', 'precondition: the carried token is in the session');
+    const res = makeRes();
+    await getHandler(router, 'post', '/auth/jira/oauth/link')({ body: { cloudId: SITE_B.id }, session: s }, res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /already has a Jira source \(https:\/\/a\.atlassian\.net\)/);
+    assert.equal(s.jiraPending?.refreshToken, undefined, 'the carried token is dropped on the refusal exit');
+    assert.equal(container.bindings.length, 1, 'no second site bound');
+    assert.equal(container.bindings.find(x => x.scope === SITE_B.url), undefined);
+    assert.deepEqual(await w.real.ownerStore.collection.findOne({ _id: `${w.account._id}::acme-jira::jira` }), legacyBefore, 'the legacy key is untouched');
+  });
+
+  test('LIN-3334 F2: an add-source multi-site grant reaching [A, B] over a workspace holding A offers only A', async () => {
+    const w = await world();
+    const s = w.session([structuredClone(LEGACY_OAUTH_A)]);
+    const res = await w.driveCallback(s, { sites: [SITE_A, SITE_B], refresh: 'RB' });
+    assert.equal(res.thrown, undefined, 'no throw escapes the handler');
+    assert.equal(res.statusCode, 200, 'the picker renders (one allowed site)');
+    assert.match(res.body, /cid-a/, 'the already-bound site A is offered');
+    assert.doesNotMatch(res.body, /cid-b/, 'the refused site B is omitted from the picker');
+    assert.deepEqual(s.jiraPending.sites.map(x => x.cloudId), [SITE_A.id], 'only A survives in jiraPending.sites');
   });
 
   test('new-login fresh container: connection-backed, no legacy record; flag off writes the legacy record', async () => {

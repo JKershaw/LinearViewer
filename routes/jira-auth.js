@@ -78,34 +78,6 @@ const NO_WORKSPACE_MESSAGE = 'Jira can only be added as an additional source on 
 const INVALID_SITE_MESSAGE = 'Site must be a Jira Cloud URL like https://yourteam.atlassian.net — no path, port, or credentials.'
 
 /**
- * LIN-3334 (R1) — the plain-message one-source-per-kind refusal for the Jira
- * write arms (Basic link, OAuth add-source, and the new-login existing
- * container). They bypass `server.js /settings/providers/add`, so relying on
- * the `linkProvider` throw alone would surface a generic 500 — and the
- * connection-backed OAuth path can stage a durable write first. This runs
- * before `establishAccount` (and before any staged `put`), so a refused add
- * writes nothing. `scope` is the resolved site URL, so a same-site re-link
- * stays idempotent (`sameKindSourceBound` returns null). Returns true when it
- * responded.
- *
- * @param {import('express').Response} res
- * @param {Object} provider - the Jira provider instance (`ui.displayName`)
- * @param {Object} workspace - the container the binding would land on
- * @param {string} scope - the resolved site URL
- * @returns {boolean}
- */
-function refuseSecondJiraSource(res, provider, workspace, scope) {
-  const conflict = sameKindSourceBound(workspace, 'jira', scope)
-  if (!conflict) return false
-  res.status(409).send(renderErrorPage(
-    'One source per kind',
-    oneSourcePerKindMessage(provider?.ui?.displayName || 'Jira', conflict.scope),
-    { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
-  ))
-  return true
-}
-
-/**
  * The SSRF guard: `site` reaches `createJiraClient` as a literal fetch base
  * (`lib/providers/jira/client.js`), so an unvalidated value lets a caller make
  * the server issue arbitrary requests to arbitrary hosts (LIN-1885 re-review
@@ -226,6 +198,43 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
   }
 
   /**
+   * LIN-3334 (R1) — the plain-message one-source-per-kind refusal for the Jira
+   * write arms (Basic link, OAuth add-source, and the new-login existing
+   * container). They bypass `server.js /settings/providers/add`, so relying on
+   * the `linkProvider` throw alone would surface a generic 500 — and the
+   * connection-backed OAuth path can stage a durable write first. This runs
+   * before `establishAccount` (and before any staged `put`), so a refused add
+   * writes nothing. `scope` is the resolved site URL, so a same-site re-link
+   * stays idempotent (`sameKindSourceBound` returns null). Returns true when it
+   * responded.
+   *
+   * LIN-3334 close-out (review F1): a `mode: 'new'` multi-site grant parks the
+   * rotating refresh token in `jiraPending.refreshToken` for the pick, so a
+   * refusal on this exit must drop it exactly like the arm's other error exits
+   * (LIN-1890 F3 / LIN-2340) — otherwise a refused second-site pick leaves the
+   * token behind. The drop is unconditional and a no-op on the add-source
+   * callers, which carry no token (their carry is gated on `mode === 'new'`).
+   *
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   * @param {Object} provider - the Jira provider instance (`ui.displayName`)
+   * @param {Object} workspace - the container the binding would land on
+   * @param {string} scope - the resolved site URL
+   * @returns {boolean}
+   */
+  function refuseSecondJiraSource(req, res, provider, workspace, scope) {
+    const conflict = sameKindSourceBound(workspace, 'jira', scope)
+    if (!conflict) return false
+    dropCarriedRefreshToken(req)
+    res.status(409).send(renderErrorPage(
+      'One source per kind',
+      oneSourcePerKindMessage(provider?.ui?.displayName || 'Jira', conflict.scope),
+      { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
+    ))
+    return true
+  }
+
+  /**
    * Step 1: render the link form for the workspace the user is adding Jira
    * onto. `?workspace=<urlKey>` mirrors every other add-source entry point's
    * `workspace` query param (routes/github-auth.js).
@@ -280,7 +289,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // never passes through `/settings/providers/add`, so refuse a second Jira
     // source here — before establishAccount and any durable write. Same-site
     // re-link (a credential refresh) is idempotent.
-    if (refuseSecondJiraSource(res, provider, workspace, normalizedSite)) return
+    if (refuseSecondJiraSource(req, res, provider, workspace, normalizedSite)) return
 
     // LIN-3124 PR3 (D2a): refuse a Basic link onto a (jira, normalizedSite)
     // already held by a CONNECTION-BACKED OAuth binding. linkProvider merges
@@ -633,7 +642,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // pick can only name a `pending.sites` entry, but refuse here too, before
     // establishAccount and any durable write, so no path can link a second
     // same-kind site. A same-site re-link is allowed.
-    if (mode === 'add-source' && refuseSecondJiraSource(res, provider, workspace, site.url)) return
+    if (mode === 'add-source' && refuseSecondJiraSource(req, res, provider, workspace, site.url)) return
 
     let myself
     try {
@@ -836,7 +845,7 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       // existing `jira:<accountId>` container is refused with the plain message,
       // before establishAccount and before the durable refresh-token write
       // (`persistRefresh`/`convert`) below. Same-site re-link is allowed.
-      if (refuseSecondJiraSource(res, provider, existing, site.url)) return
+      if (refuseSecondJiraSource(req, res, provider, existing, site.url)) return
       const established = await establishAccount(
         req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
         { email: myself.emailAddress, displayName: myself.displayName }, existing.id
