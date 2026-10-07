@@ -27,12 +27,15 @@ function makeEl() {
     className: '',
     dataset: {},
     style: {},
+    _attrs: {},
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
-    setAttribute() {},
-    getAttribute() { return null; },
-    removeAttribute() {},
+    setAttribute(k, v) { this._attrs[k] = v; },
+    getAttribute(k) { return this._attrs[k] ?? null; },
+    removeAttribute(k) { delete this._attrs[k]; },
     addEventListener() {},
     remove() {},
+    appendChild() {},
+    insertAdjacentHTML() {},
     querySelector() { return null; },
     querySelectorAll() { return []; },
   };
@@ -44,11 +47,27 @@ function sandboxWithCommon(extra = {}) {
   const el = (key) => { if (!els.has(key)) els.set(key, makeEl()); return els.get(key); };
   const sandbox = {
     location: { search: '', href: '' },
-    document: { title: '', getElementById: (id) => el(`#${id}`), querySelector: (sel) => el(sel), addEventListener() {} },
+    document: {
+      title: '',
+      hidden: false,
+      getElementById: (id) => el(`#${id}`),
+      querySelector: (sel) => el(sel),
+      querySelectorAll: () => [],
+      createElement: () => makeEl(),
+      addEventListener() {},
+    },
     history: { replaceState() {} },
+    localStorage: { getItem: () => null, setItem() {} },
     setTimeout: () => 0,
     clearTimeout() {},
+    setInterval: () => 0,
+    clearInterval() {},
     requestAnimationFrame: () => 0,
+    cancelAnimationFrame() {},
+    matchMedia: () => ({ matches: false }),
+    addEventListener() {},
+    removeEventListener() {},
+    module: { exports: {} },
     console,
     ...extra,
   };
@@ -108,5 +127,84 @@ describe('Sessions section task-page link (LIN-3331)', () => {
     sandbox.SessionsSection.init(container, { urlKey: 'ws', identifier: 'LIN-7', source: 'linear', bindingScope: 'team-a' });
     await new Promise((r) => setImmediate(r));
     assert.match(container.innerHTML, /data-testid="sessions-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear&amp;bindingScope=team-a"/);
+  });
+});
+
+describe('Observation task-block task-page link (LIN-3331)', () => {
+  const { sandbox } = sandboxWithCommon();
+  vm.runInContext(read('public/observation.js'), sandbox, { filename: 'observation.js' });
+  const { renderTaskBlock } = sandbox.module.exports;
+
+  test('carries the run binding pair on obs-task-page-link', () => {
+    const html = renderTaskBlock({ workspaceUrlKey: 'ws' }, 'LIN-1', null, [
+      { loopId: 'l1', issueSource: 'linear', issueBindingScope: 'team-a' },
+    ]);
+    assert.match(html, /data-testid="obs-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1\?source=linear&amp;bindingScope=team-a"/);
+  });
+
+  test('falls back to a plain link when no run carries the pair', () => {
+    const html = renderTaskBlock({ workspaceUrlKey: 'ws' }, 'LIN-1', null, [{ loopId: 'l1' }]);
+    assert.match(html, /data-testid="obs-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-1"/);
+    assert.ok(!/obs-task-page-link[^>]*\?/.test(html), 'no query string without the pair');
+  });
+});
+
+describe('Dispatch history task-page link (LIN-3331)', () => {
+  const { sandbox } = sandboxWithCommon();
+  vm.runInContext(read('public/dispatch.js'), sandbox, { filename: 'dispatch.js' });
+
+  function renderHistory(items) {
+    const container = makeEl();
+    sandbox.renderDispatchHistoryList(container, items, items.length, 0, 'ws');
+    return container.innerHTML;
+  }
+
+  test('carries the item binding pair on history-task-page-link', () => {
+    const html = renderHistory([{
+      status: 'done', issueIdentifier: 'LIN-7', issueSource: 'linear', issueBindingScope: 'team-a',
+      promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z', resolvedAt: '2026-01-01T00:01:00Z',
+    }]);
+    assert.match(html, /data-testid="history-task-page-link"[^>]*href="\/workspace\/ws\/task\/LIN-7\?source=linear&amp;bindingScope=team-a"/);
+  });
+
+  test('no identifier means no link', () => {
+    const html = renderHistory([{
+      status: 'done', promptName: 'P', dispatchedAt: '2026-01-01T00:00:00Z', resolvedAt: '2026-01-01T00:01:00Z',
+    }]);
+    assert.ok(!html.includes('history-task-page-link'));
+  });
+});
+
+describe('Live Console lane task-page link (LIN-3331)', () => {
+  function laneHarness() {
+    const { sandbox } = sandboxWithCommon({
+      __LIVE_CONSOLE_DATA__: { urlKey: 'ws', workspaces: [] },
+      PULSE_SPAN_RUNGS_MS: [180000],
+      api: async () => new Promise(() => {}),
+    });
+    vm.runInContext(read('public/live-console.js'), sandbox, { filename: 'live-console.js' });
+    const { updateLaneNode } = sandbox.module.exports;
+    const anchors = {};
+    const li = { querySelector: (sel) => { if (!anchors[sel]) anchors[sel] = makeEl(); return anchors[sel]; } };
+    return { updateLaneNode, li, anchors };
+  }
+
+  test('a lane with a task and the pair shows the link, carrying the pair', () => {
+    const { updateLaneNode, li, anchors } = laneHarness();
+    updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws', workspaceName: 'WS', issueSource: 'linear', issueBindingScope: 'team-a' });
+    const link = anchors['.lc-lane-task-page'];
+    assert.equal(link.hidden, false, 'link shown');
+    assert.equal(link.getAttribute('href'), '/workspace/ws/task/LIN-5?source=linear&bindingScope=team-a');
+  });
+
+  test('a repaint with the task gone hides the link and removes the href', () => {
+    const { updateLaneNode, li, anchors } = laneHarness();
+    updateLaneNode(li, { task: 'LIN-5', workspaceUrlKey: 'ws' });
+    const link = anchors['.lc-lane-task-page'];
+    assert.equal(link.hidden, false, 'shown while the lane has a task');
+    // The same node is reused across polls; a repaint with no task must clear it.
+    updateLaneNode(li, { workspaceUrlKey: 'ws' });
+    assert.equal(link.hidden, true, 'hidden when the task is absent');
+    assert.equal(link.getAttribute('href'), null, 'href removed on hide');
   });
 });

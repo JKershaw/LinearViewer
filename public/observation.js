@@ -1077,8 +1077,9 @@ function renderTaskBlock(s, ident, node, runs) {
 
   // LIN-3331: the task's own page, a separate in-Harbour link beside the
   // tracker link above (never a retarget). The binding pair rides on the task's
-  // runs (routes/dashboard.js projects it, sparse); without it the helper drops
-  // the link on a multi-binding workspace rather than landing on a refusal.
+  // runs (routes/dashboard.js projects it, sparse); without it the link is
+  // plain — it resolves on a single-binding workspace and gets the binding
+  // refusal on a multi-binding one, exactly as the Edit link does.
   const pairRun = runs.find(r => r && (r.issueSource || r.issueBindingScope)) || runs[0] || {};
   const taskHref = window.taskPageHref
     ? window.taskPageHref({

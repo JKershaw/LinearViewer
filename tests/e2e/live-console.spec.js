@@ -338,6 +338,56 @@ test.describe('Live Console (experimental)', () => {
       await expect(evidence.locator('a.lc-event-summary-link')).toHaveAttribute('href', 'https://github.com/x/y/pull/9');
     });
 
+    // LIN-3331 F1 (review): the task-page link must NOT be its own grid cell in
+    // the `auto 1fr auto` lane — it shares `.lc-lane-head` with the identifier,
+    // so at desktop width the lane stays on ONE row (the workspace name keeps
+    // the right edge) and the link renders at the lane's structural size, never
+    // the body size. (The regression the review found by render is exactly the
+    // unwrapped `<a>` taking the `1fr` cell and wrapping `.lc-lane-ws`.)
+    test('the lane task-page link shares the identifier\'s grid cell (one-row layout, structural font size)', async ({ page }) => {
+      await page.goto(`/test/set-session?${featuresParam({ liveConsole: true })}&urlKey=${URL_KEY}`);
+      await clearFeed(page, URL_KEY);
+
+      const worker = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+        data: { prompt: 'implement', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-3331L', issueTitle: 'Layout worker', target: 'cli' },
+      });
+      expect(worker.status(), `worker seed failed: ${await worker.text()}`).toBe(201);
+      const workerId = (await worker.json()).item.id;
+      const { token } = await (await page.request.get(`/test/create-dispatch-token?label=runner-layout&urlKey=${URL_KEY}`)).json();
+      await page.request.post(`/api/dispatch/take/${workerId}`, { headers: { Authorization: `Bearer ${token}` } });
+      await page.request.post(`/api/dispatch/feedback/${workerId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        data: { message: '[working] 3 tools in 1m: Bash×3 · 3 total' },
+      });
+
+      await page.goto(PAGE_URL);
+      const lane = page.locator('[data-testid="live-console-lane"]', { hasText: 'LIN-3331L' }).first();
+      await expect(lane).toBeVisible();
+
+      const link = lane.locator('[data-testid="lc-lane-task-page-link"]');
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-3331L`);
+
+      const geometry = await lane.evaluate((li) => {
+        const top = (sel) => Math.round(li.querySelector(sel).getBoundingClientRect().top);
+        const linkEl = li.querySelector('.lc-lane-task-page');
+        const taskEl = li.querySelector('.lc-lane-task');
+        return {
+          linkTop: top('.lc-lane-task-page'),
+          taskTop: top('.lc-lane-task'),
+          wsTop: top('.lc-lane-ws'),
+          linkFont: parseFloat(getComputedStyle(linkEl).fontSize),
+          taskFont: parseFloat(getComputedStyle(taskEl).fontSize),
+        };
+      });
+      // One row: the workspace name sits on the same row as the task id.
+      expect(Math.abs(geometry.wsTop - geometry.taskTop)).toBeLessThanOrEqual(4);
+      // The link neighbours the identifier on that row.
+      expect(Math.abs(geometry.linkTop - geometry.taskTop)).toBeLessThanOrEqual(4);
+      // The link is lane-structural (0.72rem), not body-sized.
+      expect(geometry.linkFont).toBeLessThan(geometry.taskFont);
+    });
+
     // LIN-1929 (Phase C of LIN-1908): a beat with no tool calls parses to
     // heartbeat.state:'idle' (lib/session-telemetry.js's parseHeartbeat), which
     // the lane tick now surfaces as Observation's own idle chip instead of a
