@@ -17,8 +17,6 @@
   // holds the SAME identifier it was minted for — see send() below.
   var prefillTask = data.defaultTask || '';
   var prefillSource = data.defaultSource || '';
-  // LIN-3240: the issue's binding stamp beside the source hint.
-  var prefillBindingScope = data.defaultBindingScope || '';
   // LIN-3254: the run id this chat is scoped to (run-scoped chat proposes).
   var prefillRun = data.defaultRun || '';
 
@@ -332,16 +330,11 @@
     // it no longer describes the row the link was generated for, so it's
     // dropped rather than carried along.
     var sourceHint = (taskId === prefillTask) ? prefillSource : '';
-    // LIN-3240: bindingScope rides beside source, and is dropped under the same
-    // "still the prefilled task" rule. String concatenation (not URLSearchParams)
-    // keeps the unstamped `?source=` form byte-identical.
-    var bindingScopeHint = (taskId === prefillTask) ? prefillBindingScope : '';
     // LIN-3254: the run id rides the SAME "still the prefilled task" rule; it is
     // sent in the turn body so the server scopes the turn to the run.
     var runHint = (taskId === prefillTask) ? prefillRun : '';
     var sourceParts = [];
     if (sourceHint) sourceParts.push('source=' + encodeURIComponent(sourceHint));
-    if (bindingScopeHint) sourceParts.push('bindingScope=' + encodeURIComponent(bindingScopeHint));
     var sourceQuery = sourceParts.length ? ('?' + sourceParts.join('&')) : '';
 
     // Raw fetch carve-out: Server-Sent Events stream consumed via readSSEStream

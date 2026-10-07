@@ -4255,16 +4255,18 @@ describe('no rendered .obs-ruling-* control reads a bare "agree" (LIN-2757 accep
   });
 });
 
-// ─── LIN-3126 residual: the anchor pair must reach ReplyDelivery ────────────
+// ─── LIN-3126 residual: the anchor source must reach ReplyDelivery ───────────
 // Review `5902c5c1`'s mutation table found observation.js's three handoffs
-// (record, dispatch, task-bound) unpinned: deleting `source`/`bindingScope`
-// from any of them left the unit suite green. These witnesses pin all three,
-// each against a stamped anchor, so removing the handoff reddens exactly one.
+// (record, dispatch, task-bound) unpinned: deleting `source` from any of them
+// left the unit suite green. These witnesses pin all three, each against a
+// sourced anchor, so removing the handoff reddens exactly one. One source per
+// kind (LIN-3332) removed the pair-era `bindingScope`; the anchor still carries
+// one here only so the tests prove it is NOT forwarded.
 const STAMPED_ANCHOR = { ...ANCHOR, source: 'github', bindingScope: 'octo/repoB' };
 const pairFlush = async () => { for (let i = 0; i < 6; i++) await new Promise((r) => setImmediate(r)); };
 
-describe('LIN-3126 residual — the ruling anchors forward source/bindingScope to ReplyDelivery', () => {
-  test('gone/dispatch: the comment write AND the fresh run both carry the anchor pair', async () => {
+describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelivery', () => {
+  test('gone/dispatch: the comment write AND the fresh run both carry the anchor source', async () => {
     let capturedExtra = null;
     let capturedOpts = null;
     const { module } = makeSandbox({
@@ -4281,13 +4283,13 @@ describe('LIN-3126 residual — the ruling anchors forward source/bindingScope t
 
     assert.ok(capturedExtra, 'the comment write happened');
     assert.equal(capturedExtra.source, 'github', 'comment write forwards the anchor source');
-    assert.equal(capturedExtra.bindingScope, 'octo/repoB', 'comment write forwards the anchor scope');
+    assert.equal('bindingScope' in capturedExtra, false, 'the pair-era anchor scope is not forwarded');
     assert.ok(capturedOpts, 'the fresh run dispatched');
     assert.equal(capturedOpts.issue.source, 'github', 'fresh run issue.source');
-    assert.equal(capturedOpts.issue.bindingScope, 'octo/repoB', 'fresh run issue.bindingScope');
+    assert.equal('bindingScope' in capturedOpts.issue, false, 'fresh run issue carries no bindingScope');
   });
 
-  test('gone/record: the comment write carries the anchor pair (mutation: observation.js:3337-3338)', async () => {
+  test('gone/record: the comment write carries the anchor source (mutation: observation.js:3337-3338)', async () => {
     let capturedExtra = null;
     const { module } = makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
@@ -4303,10 +4305,10 @@ describe('LIN-3126 residual — the ruling anchors forward source/bindingScope t
 
     assert.ok(capturedExtra, 'the record comment write happened');
     assert.equal(capturedExtra.source, 'github');
-    assert.equal(capturedExtra.bindingScope, 'octo/repoB');
+    assert.equal('bindingScope' in capturedExtra, false);
   });
 
-  test('task-bound: the comment write carries the anchor pair (mutation: observation.js:3407-3408)', async () => {
+  test('task-bound: the comment write carries the anchor source (mutation: observation.js:3407-3408)', async () => {
     let capturedExtra = null;
     const { module } = makeSandbox({
       postComment: async (urlKey, issueId, body, extra) => { capturedExtra = extra; return { ok: true, status: 201, data: {} }; },
@@ -4325,6 +4327,6 @@ describe('LIN-3126 residual — the ruling anchors forward source/bindingScope t
 
     assert.ok(capturedExtra, 'the task-bound comment write happened');
     assert.equal(capturedExtra.source, 'github');
-    assert.equal(capturedExtra.bindingScope, 'octo/repoB');
+    assert.equal('bindingScope' in capturedExtra, false);
   });
 });

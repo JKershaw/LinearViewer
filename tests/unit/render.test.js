@@ -1179,12 +1179,13 @@ describe('task-page link (LIN-3331)', () => {
     assert.ok(!html.includes('issue-edit-link'), 'the edit link stays gated');
   });
 
-  test('carries the issue binding stamp beside source', () => {
+  test('never emits a bindingScope, even on a pairing-era row carrying one', () => {
     const provider = providerWith();
     const bound = { ...issue, bindingScope: 'team/a' };
     const html = renderDetailsContent(bound, { isLanding: false, urlKey: 'ws', provider });
-    assert.ok(html.includes(`href="/workspace/ws/task/STB-7?source=${encodeURIComponent(provider.name)}&amp;bindingScope=team%2Fa"`),
-      'the pair is forwarded, URL-encoded, in Edit/Chat order');
+    assert.ok(html.includes(`href="/workspace/ws/task/STB-7?source=${encodeURIComponent(provider.name)}"`),
+      'the link carries only ?source=<kind>');
+    assert.ok(!html.includes('bindingScope'), 'no bindingScope anywhere in the fragment');
   });
 
   test('the landing page and a missing urlKey omit the link', () => {

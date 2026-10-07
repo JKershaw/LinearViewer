@@ -32,7 +32,7 @@ function makeEl(over = {}) {
   }, over);
 }
 
-function makeCard({ effect, recordOn = '', question = 'Ship it?', chunks = [], typed = 'my answer', issueIdentifier = 'LIN-1', issueId = 'i1', disposition, source, bindingScope }) {
+function makeCard({ effect, recordOn = '', question = 'Ship it?', chunks = [], typed = 'my answer', issueIdentifier = 'LIN-1', issueId = 'i1', disposition, source }) {
   const btn = makeEl();
   const textarea = makeEl({ value: typed });
   const feedback = makeEl();
@@ -43,8 +43,7 @@ function makeCard({ effect, recordOn = '', question = 'Ship it?', chunks = [], t
       urlKey: 'w', loopId: 'lp', stampLoopId: 'sp', decisionId: 'd1', target: 'cli',
       issueId, issueIdentifier, disposition: disposition || (effect === 'resume' ? 'resumable' : 'gone'),
       effect, recordOn, sessionWaiting: 'false',
-      ...(source ? { source } : {}),
-      ...(bindingScope ? { bindingScope } : {})
+      ...(source ? { source } : {})
     },
     querySelector(sel) {
       if (sel.includes('answer')) return btn;
@@ -251,16 +250,15 @@ test('an empty reply is refused before any delivery is attempted', async () => {
   assert.equal(fixture.feedback.textContent, 'enter a reply');
 });
 
-// LIN-3126 residual (review `5902c5c1`): the card's own `data-source` /
-// `data-binding-scope` stamps (rendered by lib/render-session.js) must ride the
-// answer's opts, or the shared helper's strict comment/dispatch resolution 422s
-// on a two-binding workspace. Mutation: delete the two dataset reads in
-// public/session.js:475-476.
-test('the card answer forwards its data-source/data-binding-scope to the shared helper', async () => {
-  const fixture = makeCard({ effect: 'resume', source: 'github', bindingScope: 'octo/repoB' });
+// LIN-3126 residual (review `5902c5c1`): the card's own `data-source` stamp
+// (rendered by lib/render-session.js) must ride the answer's opts, or the shared
+// helper's strict comment/dispatch resolution 422s on a mixed-kind workspace.
+// One source per kind (LIN-3332) removed the `data-binding-scope` half.
+test('the card answer forwards its data-source to the shared helper', async () => {
+  const fixture = makeCard({ effect: 'resume', source: 'github' });
   const { opts } = await answer(fixture);
 
   assert.equal(opts.source, 'github', 'the card source rides the answer opts');
-  assert.equal(opts.bindingScope, 'octo/repoB', 'the card scope rides the answer opts');
+  assert.equal('bindingScope' in opts, false, 'no bindingScope on the answer opts');
 });
 

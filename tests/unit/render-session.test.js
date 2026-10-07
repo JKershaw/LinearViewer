@@ -146,14 +146,16 @@ describe('render-session: tasks + overview', () => {
     assert.match(html, /data-testid="session-task-page-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900"/);
   });
 
-  test('the seed row and chips carry the binding pair when a loop is stamped (LIN-3331)', () => {
+  test('the seed row and chips carry the source kind when a loop is stamped (LIN-3331)', () => {
     const session = fixtureSession();
     session.loops[0] = { ...session.loops[0], issueSource: 'linear', issueBindingScope: 'team-a' };
     const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
-    // The stamped task's seed link and chip carry `?source=&bindingScope=`.
-    assert.match(html, /data-testid="session-task-page-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900\?source=linear&amp;bindingScope=team-a"/);
-    assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900\?source=linear&amp;bindingScope=team-a"/);
-    // A task with no stamped loop keeps the plain link (single-binding fallback).
+    // The stamped task's seed link and chip carry `?source=<kind>`; the pair-era
+    // `issueBindingScope` on the loop is ignored.
+    assert.match(html, /data-testid="session-task-page-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900\?source=linear"/);
+    assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900\?source=linear"/);
+    assert.ok(!html.includes('bindingScope'), 'no bindingScope in the rendered page');
+    // A task with no stamped loop keeps the plain link (active-provider fallback).
     assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-901"/);
   });
 

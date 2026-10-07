@@ -985,12 +985,13 @@ test('deliverRulingAnswer effect=resume (and an absent effect): the ordinary com
 });
 
 
-// ── LIN-3126 residual: the issue's binding selector rides the comment URL ────
+// ── LIN-3126 residual: the issue's source rides the comment URL ──────────────
 // Review `5902c5c1`'s mutation table found the `deliverReply` → `postComment`
-// and `dismissRuling` resume hops unpinned: deleting `source`/`bindingScope`
-// from either call left the unit suite green. Both now assert the URL query the
-// comment route resolves the issue's binding from.
-test('deliverReply forwards opts.source/opts.bindingScope as the comment URL selector (mutation: common.js:1019/1047)', async () => {
+// and `dismissRuling` resume hops unpinned: deleting `source` from either call
+// left the unit suite green. Both now assert the URL query the comment route
+// resolves the issue's provider from. One source per kind (LIN-3332) removed the
+// pair-era `bindingScope`.
+test('deliverReply forwards opts.source as the comment URL selector (mutation: common.js:1019/1047)', async () => {
   const { window, calls } = makeSandbox((url) => {
     if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
     return jsonResponse(true, 200, { success: true });
@@ -1005,10 +1006,10 @@ test('deliverReply forwards opts.source/opts.bindingScope as the comment URL sel
 
   const comment = calls.find(c => String(c.url).includes('/api/comments/'));
   assert.ok(comment, 'a comment was written');
-  assert.match(String(comment.url), /\?source=github&bindingScope=octo%2FrepoB$/);
+  assert.match(String(comment.url), /\?source=github$/);
 });
 
-test('deliverReply without a pair leaves the comment URL byte-identical (no query)', async () => {
+test('deliverReply without a source leaves the comment URL byte-identical (no query)', async () => {
   const { window, calls } = makeSandbox((url) => {
     if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
     return jsonResponse(true, 200, { success: true });
@@ -1025,7 +1026,7 @@ test('deliverReply without a pair leaves the comment URL byte-identical (no quer
   assert.match(String(comment.url), /\/api\/comments\/i1$/);
 });
 
-test('dismissRuling resume forwards opts.source/opts.bindingScope to the follow-up comment (mutation: common.js:1109-1110)', async () => {
+test('dismissRuling resume forwards opts.source to the follow-up comment (mutation: common.js:1109-1110)', async () => {
   const { window, calls } = makeSandbox((url) => {
     if (String(url).includes('/api/dashboard/rulings/dismiss')) return jsonResponse(true, 200, { success: true });
     if (String(url).includes('/api/comments/')) return jsonResponse(true, 201, { success: true });
@@ -1041,5 +1042,5 @@ test('dismissRuling resume forwards opts.source/opts.bindingScope to the follow-
 
   const comment = calls.find(c => String(c.url).includes('/api/comments/'));
   assert.ok(comment, 'the resumable dismiss wrote its follow-up comment');
-  assert.match(String(comment.url), /\?source=github&bindingScope=octo%2FrepoB$/);
+  assert.match(String(comment.url), /\?source=github$/);
 });

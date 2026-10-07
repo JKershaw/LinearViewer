@@ -13,7 +13,7 @@
  *   - the page order (answer → progress → brief/recap → details → share);
  *   - `renderOwnerControls` is the ONLY owner/guest difference: owner HTML with
  *     its two fragments removed is byte-identical to the guest HTML;
- *   - every in-Harbour href goes through `harbourHref` (carries the binding),
+ *   - every in-Harbour href goes through `harbourHref` (carries the source kind),
  *     the same for every viewer.
  */
 import { test, describe } from 'node:test';
@@ -31,7 +31,7 @@ const UPDATE = process.env.UPDATE_RENDER_TASK_PAGE_GOLDEN === '1';
 
 const NOW = new Date('2026-10-06T15:00:00.000Z');
 const PAGE_OPTIONS = { deployInfo: { version: 'golden', commit: 'golden' }, featureFlags: {}, workspaces: [] };
-const BINDING = { source: 'linear', bindingScope: 'team-a' };
+const BINDING = { source: 'linear' };
 const UUID = '11111111-2222-3333-4444-555555555555';
 
 function loop(over = {}) {
@@ -224,20 +224,20 @@ describe('viewer isolation', () => {
     });
   }
 
-  test('the ask buttons POST the existing brief/recap endpoints with the binding', () => {
+  test('the ask buttons POST the existing brief/recap endpoints with the source', () => {
     const { context } = renderOwnerControls(model('running-blocked-repeat'), { urlKey: 'acme', binding: BINDING });
-    assert.match(context, new RegExp(`data-url="/workspace/acme/api/brief/${UUID}\\?source=linear&amp;bindingScope=team-a"`));
-    assert.match(context, new RegExp(`data-url="/workspace/acme/api/recap/${UUID}\\?source=linear&amp;bindingScope=team-a"`));
+    assert.match(context, new RegExp(`data-url="/workspace/acme/api/brief/${UUID}\\?source=linear"`));
+    assert.match(context, new RegExp(`data-url="/workspace/acme/api/recap/${UUID}\\?source=linear"`));
   });
 
-  test('in-Harbour links carry the binding through harbourHref, for every viewer', () => {
+  test('in-Harbour links carry the source through harbourHref, for every viewer', () => {
     const links = (html) => [...html.matchAll(/<a [^>]*href="(\/workspace\/[^"]*)"/g)].map(m => m[1]);
     const owner = render('running-blocked-repeat', 'owner');
     assert.ok(owner.includes(`href="${harbourHref('/workspace/acme/task/LIN-40', BINDING).replace(/&/g, '&amp;')}"`), 'parent link');
-    assert.ok(owner.includes('href="/workspace/acme/task/LIN-51?source=linear&amp;bindingScope=team-a"'), 'subtask link');
+    assert.ok(owner.includes('href="/workspace/acme/task/LIN-51?source=linear"'), 'subtask link');
     assert.ok(owner.includes('href="/workspace/acme/"'), 'back link');
     assert.deepEqual(links(render('running-blocked-repeat', 'guest')), links(owner), 'a guest keeps every Harbour link');
-    assert.equal(harbourHref('/x', { source: '', bindingScope: null }), '/x', 'empty provenance is dropped');
+    assert.equal(harbourHref('/x', { source: '' }), '/x', 'empty provenance is dropped');
     assert.throws(() => renderTaskPage(model('done'), { viewer: 'stranger' }), /unknown viewer/);
   });
 });

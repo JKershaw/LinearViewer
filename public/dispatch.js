@@ -1182,12 +1182,11 @@ function renderDispatchHistoryList(container, items, total, offset, urlKey) {
         : ` <span class="history-issue">${escapeHtml(item.issueIdentifier)}</span>`)
       : ''
     // LIN-3331: an adjacent in-Harbour link to the task page, with the issue's
-    // binding pair (projected by lib/dispatch-store.js `_formatHistoryItem`).
+    // source (projected by lib/dispatch-store.js `_formatHistoryItem`).
     const taskHref = window.taskPageHref({
       urlKey,
       identifier: item.issueIdentifier,
-      source: item.issueSource,
-      bindingScope: item.issueBindingScope
+      source: item.issueSource
     })
     const taskPageHtml = taskHref
       ? ` <a class="history-task-page task-page-link" data-testid="history-task-page-link" href="${escapeHtml(taskHref)}">task page ↗</a>`

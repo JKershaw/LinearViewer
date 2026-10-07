@@ -23,16 +23,13 @@
 
   const esc = window.escapeHtml;
 
-  function contextUrl(urlKey, identifier, source, bindingScope) {
-    const parts = [];
-    if (source) parts.push('source=' + encodeURIComponent(source));
-    if (bindingScope) parts.push('bindingScope=' + encodeURIComponent(bindingScope));
-    const qs = parts.length ? '?' + parts.join('&') : '';
+  function contextUrl(urlKey, identifier, source) {
+    const qs = source ? '?source=' + encodeURIComponent(source) : '';
     return `/workspace/${encodeURIComponent(urlKey)}/api/context/${encodeURIComponent(identifier)}${qs}`;
   }
 
-  async function fetchContext(urlKey, identifier, source, bindingScope) {
-    return window.api(contextUrl(urlKey, identifier, source, bindingScope), { on401: false });
+  async function fetchContext(urlKey, identifier, source) {
+    return window.api(contextUrl(urlKey, identifier, source), { on401: false });
   }
 
   // ✓ done · ◐ in-progress · ○ todo/backlog — the shared status vocabulary.
@@ -319,9 +316,7 @@
    * @param {string} opts.urlKey - Workspace url key.
    * @param {string} opts.identifier - Linear issue id (UUID) or identifier (LIN-123).
    * @param {string} [opts.source] - The issue's own provider (LIN-1910); forwarded
-   *   so the route resolves THIS issue's binding rather than the active one.
-   * @param {string} [opts.bindingScope] - The issue's binding stamp (LIN-3240);
-   *   forwarded beside `source`, present only when the row is stamped.
+   *   so the route resolves THIS issue's provider rather than the active one.
    * @param {Function} [opts.onNavigate] - (identifier, event) => boolean. Return
    *   true to handle navigation in-surface (suppresses the default link follow).
    */
@@ -332,7 +327,7 @@
     container.setAttribute('data-state', 'loading');
 
     try {
-      const graph = await fetchContext(opts.urlKey, opts.identifier, opts.source, opts.bindingScope);
+      const graph = await fetchContext(opts.urlKey, opts.identifier, opts.source);
       container.innerHTML = renderGraph(graph);
       container.setAttribute('data-state', 'loaded');
     } catch (err) {

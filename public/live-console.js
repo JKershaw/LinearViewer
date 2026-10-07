@@ -1153,15 +1153,14 @@
     task.setAttribute('href', obsHref(lane.workspaceUrlKey));
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
     // LIN-3331: the adjacent task-page link, repainted every update (a lane
-    // node is reused across polls). No identifier → hidden. Without the binding
-    // pair the link is plain: it resolves on a single-binding workspace and gets
-    // the binding refusal on a multi-binding one, exactly as the Edit link does.
+    // node is reused across polls). No identifier → hidden. Without a source the
+    // link is plain: it resolves to the workspace's active provider, exactly as
+    // the Edit link does.
     const taskPage = li.querySelector('.lc-lane-task-page');
     const taskPageHref = window.taskPageHref({
       urlKey: lane.workspaceUrlKey,
       identifier: lane.task,
       source: lane.issueSource,
-      bindingScope: lane.issueBindingScope,
     });
     if (taskPageHref) {
       taskPage.setAttribute('href', taskPageHref);

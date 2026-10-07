@@ -360,6 +360,27 @@ describe('expandToTreeContext', () => {
 });
 
 // =============================================================================
+// nodeKey (LIN-544 / LIN-3332)
+// =============================================================================
+// The node key is `<source>:<id>`. The pair-era `@<bindingScope>` segment was
+// removed with one-source-per-kind (LIN-3332); a pairing-era row still carrying
+// `bindingScope` keys exactly as if it did not.
+describe('nodeKey', () => {
+  test('is <source>:<id>', () => {
+    assert.equal(nodeKey({ id: '42', source: 'github' }), 'github:42');
+    assert.equal(nodeKey({ id: 'uuid-1', source: 'linear' }), 'linear:uuid-1');
+  });
+
+  test('defaults to linear for an unsourced issue', () => {
+    assert.equal(nodeKey({ id: 'uuid-1' }), 'linear:uuid-1');
+  });
+
+  test('ignores a pairing-era bindingScope stamp', () => {
+    assert.equal(nodeKey({ id: '42', source: 'github', bindingScope: 'octo/repoB' }), 'github:42');
+  });
+});
+
+// =============================================================================
 // buildInProgressForest Tests - Subtask Project Inheritance (LIN-53)
 // =============================================================================
 

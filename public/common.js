@@ -31,45 +31,37 @@ window.escapeHtml = function(str) {
 };
 
 /**
- * LIN-3240 / LIN-3126 residual: the shared `?source=...&bindingScope=...`
- * query for an issue-scoped request. Moved here (from app.js) so every page
- * script that loads common.js (observation, swipe, session, app) builds the
- * selector query the SAME way instead of hand-rolling it. `bindingScope` is
- * forwarded only when present, so an unstamped single-binding/legacy request
- * stays byte-identical to the pre-slice `?source=...` (or no query at all).
- * Both values are URL-encoded. `bindingScope` is selection-only, never a
- * credential (B1).
+ * The shared `?source=<kind>` query for an issue-scoped request. The client twin
+ * of `lib/task-page-href.js`'s `sourceQuery`, so every page script that loads
+ * common.js (observation, swipe, session, app) builds the selector query the SAME
+ * way instead of hand-rolling it. `source` is forwarded only when present, so a
+ * source-less request stays a bare path (or no query at all). URL-encoded.
  * @global
  * @param {string} [source] - resolved provider name
- * @param {string} [bindingScope] - binding selector stamp
  * @returns {string} a leading-`?` query string, or ''
  */
-window.sourceBindingQuery = function sourceBindingQuery(source, bindingScope) {
-  const parts = [];
-  if (source) parts.push(`source=${encodeURIComponent(source)}`);
-  if (bindingScope) parts.push(`bindingScope=${encodeURIComponent(bindingScope)}`);
-  return parts.length ? `?${parts.join('&')}` : '';
+window.sourceQuery = function sourceQuery(source) {
+  return source ? `?source=${encodeURIComponent(source)}` : '';
 };
 
 /**
  * LIN-3331: the client twin of the server `taskPageHref`
  * (`lib/task-page-href.js`). Builds the one task-page URL every client surface
- * links to, reusing `sourceBindingQuery` so the `?source=&bindingScope=` pair
- * matches the server helper and the Edit/Chat links byte-for-byte. Returns ''
- * when `urlKey` or `identifier` is missing so callers omit the link.
+ * links to, reusing `sourceQuery` so the `?source=<kind>` matches the server
+ * helper and the Edit/Chat links byte-for-byte. Returns '' when `urlKey` or
+ * `identifier` is missing so callers omit the link.
  * @global
  * @param {Object} opts
  * @param {string} opts.urlKey - workspace url key
  * @param {string} opts.identifier - issue identifier
  * @param {string} [opts.source] - resolved provider name
- * @param {string} [opts.bindingScope] - binding selector stamp
  * @returns {string} href (unescaped; escape at the attribute), or ''
  */
 window.taskPageHref = function taskPageHref(opts) {
   opts = opts || {};
   if (!opts.urlKey || !opts.identifier) return '';
   return `/workspace/${encodeURIComponent(opts.urlKey)}/task/${encodeURIComponent(opts.identifier)}`
-    + window.sourceBindingQuery(opts.source, opts.bindingScope);
+    + window.sourceQuery(opts.source);
 };
 
 /**
@@ -379,13 +371,12 @@ window.renderQueueRow = function renderQueueRow(item, urlKey, { card = false } =
         : `<span class="queue-item-issue">${esc(item.issueIdentifier)}</span>`)
     : '';
   // LIN-3331: an adjacent in-Harbour link to the task page. The list API projects
-  // the issue's binding pair (lib/dispatch-store.js `_formatItem`), so a
-  // multi-binding workspace resolves the right one; no identifier means no link.
+  // the issue's source (lib/dispatch-store.js `_formatItem`), so the link carries
+  // `?source=<kind>`; no identifier means no link.
   const taskHref = window.taskPageHref({
     urlKey,
     identifier: item.issueIdentifier,
-    source: item.issueSource,
-    bindingScope: item.issueBindingScope
+    source: item.issueSource
   });
   const taskPageHtml = taskHref
     ? `<a class="queue-item-task-page task-page-link" data-testid="queue-item-task-page-link" href="${esc(taskHref)}">task page ↗</a>`
@@ -739,7 +730,6 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {string} [opts.issue.title]
  * @param {string} [opts.issue.url]
  * @param {string} [opts.issue.source]       Issue row's provider/source stamp (LIN-3242); forwarded as `issueSource` when present
- * @param {string} [opts.issue.bindingScope] Issue row's binding-scope stamp (LIN-3242); forwarded as `issueBindingScope` when present
  * @param {boolean} [opts.issueless=false]   Opt-out for issue-less dispatches (custom prompt page)
  * @param {string} [opts.promptName='Prompt']
  * @param {string} [opts.target='cli']       'cli' | 'web' | 'dash' | 'local'
@@ -798,13 +788,11 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
     if (issue.identifier) payload.issueIdentifier = issue.identifier;
     if (issue.title) payload.issueTitle = issue.title;
     if (issue.url) payload.issueUrl = issue.url;
-    // LIN-3242 (LIN-3126 §4): forward the issue row's binding selector beside the
-    // identifier, so the dispatch is resolved against — and stamped with — the
-    // binding the row came from (data-source / data-binding-scope). Both keys are
-    // SPARSE: an unstamped row (or a legacy single-binding workspace) sends
-    // neither, keeping the request body byte-identical.
+    // LIN-3242 (LIN-3126 §4): forward the issue row's provider-kind source beside
+    // the identifier, so the dispatch is resolved against THAT provider. The key
+    // is SPARSE: an unsourced row (or a legacy workspace) sends nothing, keeping
+    // the request body byte-identical.
     if (issue.source) payload.issueSource = issue.source;
-    if (issue.bindingScope) payload.issueBindingScope = issue.bindingScope;
   }
   if (repo) payload.repo = repo;
   // Blank/omitted model+harness stay off the payload entirely (not sent as
@@ -904,9 +892,9 @@ window.ReplyDelivery = (function () {
   // object — forwarded alone whenever it's a non-blank string, regardless of
   // which (or neither) of the two pairs above is also present, so a
   // proposed-answer's durable option id can ride the ordinary comment write.
-  // LIN-3126 residual: `source`/`bindingScope` (the issue's own binding
-  // selector) are forwarded as URL query params, each only when present —
-  // selection-only provenance, never a credential (B1).
+  // LIN-3126 residual: `source` (the issue's own provider kind) is forwarded as
+  // a URL query param, only when present — selection-only provenance, never a
+  // credential (B1).
   function postComment(urlKey, issueId, prompt, decision) {
     var body = { body: prompt };
     if (decision && decision.decisionLoopId && decision.decisionId) {
@@ -920,14 +908,11 @@ window.ReplyDelivery = (function () {
     if (decision && typeof decision.optionId === 'string' && decision.optionId) {
       body.optionId = decision.optionId;
     }
-    // LIN-3126 residual: the issue's own binding selector rides the URL so the
-    // comment route (which resolves strictly) honours the issue's binding, not
-    // the workspace's active one. SPARSE — absent on an unstamped caller, so
+    // LIN-3126 residual: the issue's own provider-kind source rides the URL so the
+    // comment route (which resolves strictly) honours the issue's provider, not
+    // the workspace's active one. SPARSE — absent on an unsourced caller, so
     // the URL stays byte-identical. Shared builder, encoded.
-    var selectorQuery = window.sourceBindingQuery(
-      decision && decision.source,
-      decision && decision.bindingScope
-    );
+    var selectorQuery = window.sourceQuery(decision && decision.source);
     return fetch('/workspace/' + encodeURIComponent(urlKey) + '/api/comments/' + encodeURIComponent(issueId) + selectorQuery, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1049,7 +1034,7 @@ window.ReplyDelivery = (function () {
         onCommentFailed(new Error('cannot record an answer with no linked issue'));
         return Promise.resolve();
       }
-      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope }).then(
+      return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(
         function (commentResult) {
           if (!commentResult.ok) { onCommentFailed(errorFromResult(commentResult)); return; }
           onDispatchOk();
@@ -1077,7 +1062,7 @@ window.ReplyDelivery = (function () {
     // literal built here rather than the rest of `opts`, so this stays the
     // one place a caller's `opts.optionId` (when set) actually reaches
     // `postComment`'s own allowlist.
-    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope }).then(function (commentResult) {
+    return postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source }).then(function (commentResult) {
       if (!commentResult.ok) {
         onCommentFailed(errorFromResult(commentResult));
         return;
@@ -1140,7 +1125,6 @@ window.ReplyDelivery = (function () {
         followUpTo: opts.followUpTo || opts.stampLoopId,
         target: opts.target,
         source: opts.source,
-        bindingScope: opts.bindingScope,
         force: true
       }, opts.prompt, handlers);
     });
@@ -1248,7 +1232,7 @@ window.ReplyDelivery = (function () {
           if (typeof handlers.onNoTarget === 'function') handlers.onNoTarget();
           return;
         }
-        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope })
+        return window.ReplyDelivery.postComment(opts.urlKey, targetId, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             var recordOnNote = resolved.note
@@ -1300,7 +1284,7 @@ window.ReplyDelivery = (function () {
           return deliverRulingRecord(Object.assign({}, opts, { downgradeNote: PRESS_TIME_DOWNGRADE_NOTE }), handlers);
         }
 
-        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source, bindingScope: opts.bindingScope })
+        return window.ReplyDelivery.postComment(opts.urlKey, opts.issueId || opts.issueIdentifier, opts.prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, optionId: opts.optionId, source: opts.source })
           .then(function (commentResult) {
             if (!commentResult.ok) { handlers.onCommentFailed(errorFromResult(commentResult)); return; }
             function startRun() {
@@ -1312,11 +1296,10 @@ window.ReplyDelivery = (function () {
                 composedRunMarker: RULING_COMPOSED_RUN_MARKER,
                 issue: Object.assign(
                   { id: opts.issueId || opts.issueIdentifier, identifier: opts.issueIdentifier },
-                  // LIN-3126 residual: forward the anchor's binding pair only
-                  // when present, so an unstamped dispatch body stays
+                  // LIN-3126 residual: forward the anchor's provider-kind source
+                  // only when present, so an unsourced dispatch body stays
                   // byte-identical (no `source: undefined` keys).
-                  opts.source ? { source: opts.source } : {},
-                  opts.bindingScope ? { bindingScope: opts.bindingScope } : {}
+                  opts.source ? { source: opts.source } : {}
                 ),
                 target: opts.target || 'cli'
               });
@@ -1877,12 +1860,8 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {string} [opts.variant]               Optional `?variant=<variant>` query param
  * @param {string} [opts.source]                Optional `?source=<source>` query param (LIN-1904):
  *   the resolved provider's name, so the issue-scoped kickoff resolves THAT
- *   issue's own binding instead of the workspace's active provider. No-op
+ *   issue's own provider instead of the workspace's active provider. No-op
  *   (and unused) on the goal-scoped kickoff, which has no single issue to bind.
- * @param {string} [opts.bindingScope]          Optional `?bindingScope=<scope>` query param
- *   (LIN-3240): the issue row's binding stamp, forwarded beside `source` so the
- *   kickoff resolves THIS issue's own binding. Forwarded only when present, so an
- *   unstamped kickoff stays byte-identical.
  * @param {number} [opts.maxTasks]              Optional task-budget scope bound (LIN-1737/LIN-1751):
  *   `?maxTasks=<n>` query param on the general (goal-scoped) kickoff only — the
  *   issue-scoped kickoff has no budget concept, so this is a no-op there.
@@ -1896,7 +1875,7 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, bindingScope, maxTasks, maxSessionsPerTask, stopAt, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, maxSessionsPerTask, stopAt, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
@@ -1904,11 +1883,9 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
   if (issueId) {
     // LIN-1904: built via URLSearchParams (not string concatenation) so a
     // second param (`source`) alongside `variant` gets correct `?`/`&` joining.
-    // LIN-3240: `bindingScope` rides beside `source` when stamped.
     const params = new URLSearchParams();
     if (variant) params.set('variant', variant);
     if (source) params.set('source', source);
-    if (bindingScope) params.set('bindingScope', bindingScope);
     // LIN-3246: the run boundary, issue-scoped only. Blank/omitted sends nothing.
     if (stopAt) params.set('stopAt', stopAt);
     const issueQuery = params.toString() ? `?${params.toString()}` : '';

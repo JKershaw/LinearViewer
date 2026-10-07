@@ -452,7 +452,7 @@ function renderCard(direction) {
   // the anchor of the Work group. Only available when authenticated.
   if (urlKey) {
     const cached = window.PromptSection && window.PromptSection.getCached
-      ? window.PromptSection.getCached(issue.id, urlKey, issue.bindingScope)
+      ? window.PromptSection.getCached(issue.id, urlKey)
       : null;
     const hint = cached ? ` <span class="swipe-prompts-cache-hint">· ${_esc(cached.name || cached.label)} cached</span>` : '';
     groups.work.push(`
@@ -499,8 +499,7 @@ function renderCard(direction) {
     ? window.taskPageHref({
         urlKey,
         identifier: issue.identifier || issue.id,
-        source: issue.source,
-        bindingScope: issue.bindingScope
+        source: issue.source
       })
     : '';
   const taskPageLinkHtml = taskHref
@@ -776,8 +775,7 @@ function handleAccordionClick(e) {
         window.RecapSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          source: issue.source,
-          bindingScope: issue.bindingScope
+          source: issue.source
         });
       }
     }
@@ -792,8 +790,7 @@ function handleAccordionClick(e) {
         window.BriefSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          source: issue.source,
-          bindingScope: issue.bindingScope
+          source: issue.source
         });
       }
     }
@@ -808,8 +805,7 @@ function handleAccordionClick(e) {
         window.ScanSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          source: issue.source,
-          bindingScope: issue.bindingScope
+          source: issue.source
         });
       }
     }
@@ -824,10 +820,9 @@ function handleAccordionClick(e) {
         window.ContextSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
-          // LIN-3240 (review F3): forward the card's provider + binding stamp so
-          // the context read resolves THIS card's own binding, not the active one.
+          // LIN-3240 (review F3): forward the card's provider so the context read
+          // resolves THIS card's own provider, not the active one.
           source: issue.source,
-          bindingScope: issue.bindingScope,
           // Jump to the task within the deck when it's present; otherwise fall
           // through to the node's link (the task's provider URL).
           onNavigate: (identifier) => navigateToIdentifier(identifier)
@@ -846,7 +841,6 @@ function handleAccordionClick(e) {
           urlKey,
           identifier: issue.identifier || issue.id,
           source: issue.source,
-          bindingScope: issue.bindingScope,
           onCount: (n) => {
             // Reconcile the header [N] with the authoritative fetch.
             const countEl = header.querySelector('.swipe-sessions-count');
@@ -891,14 +885,13 @@ function handleAccordionClick(e) {
   }
 }
 
-// LIN-3126 residual: the swipe card's issue already carries its own
-// `source`/`bindingScope` (lib/render-swipe.js), so the comments read forwards
-// them via the one shared builder — the comment route resolves strictly, and a
-// two-binding workspace refuses a bare request. Sparse: an unstamped issue
+// LIN-3126 residual: the swipe card's issue already carries its own `source`
+// (lib/render-swipe.js), so the comments read forwards it via the one shared
+// builder — the comment route resolves strictly. Sparse: an unsourced issue
 // yields the byte-identical pre-residual URL.
 function swipeCommentsUrl(apiPrefix, issue) {
   return `${apiPrefix}/api/comments/${encodeURIComponent(issue.id)}`
-    + window.sourceBindingQuery(issue.source, issue.bindingScope);
+    + window.sourceQuery(issue.source);
 }
 
 async function loadComments(container) {

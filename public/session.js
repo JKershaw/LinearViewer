@@ -45,7 +45,7 @@
     feedback.textContent = '';
     feedback.className = 'sess-reply-feedback';
 
-    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, source: opts.source, bindingScope: opts.bindingScope })
+    window.ReplyDelivery.postComment(opts.urlKey, opts.issueId, prompt, { decisionLoopId: opts.decisionLoopId, decisionId: opts.decisionId, source: opts.source })
       .then(function (result) {
         if (!result.ok) throw window.ReplyDelivery.errorFromResult(result);
         appendYouBubble(thread, prompt);
@@ -349,11 +349,10 @@
           issueless: issueless,
           decisionLoopId: decisionId ? box.dataset.loopId : null,
           decisionId: decisionId,
-          // LIN-3126 residual: the run page's own binding stamps (LIN-3240),
-          // forwarded so the reply's comment write / resume resolves the issue's
-          // binding. Sparse — absent on an unstamped run.
-          source: box.dataset.source || undefined,
-          bindingScope: box.dataset.bindingScope || undefined
+          // LIN-3126 residual: the run page's own source stamp, forwarded so the
+          // reply's comment write / resume resolves the issue's provider.
+          // Sparse — absent on an unsourced run.
+          source: box.dataset.source || undefined
         };
 
         if (saveBtn) {
@@ -417,7 +416,6 @@
       issueId: card.dataset.issueId || card.dataset.issueIdentifier || '',
       disposition: card.dataset.disposition,
       source: card.dataset.source || undefined,
-      bindingScope: card.dataset.bindingScope || undefined,
       prompt: DISMISS_PROMPT
     }, DISMISS_NOOP_HANDLERS).then(function () {
       if (card.parentNode) card.parentNode.removeChild(card);
@@ -469,11 +467,10 @@
           issueless: !issueIdentifier,
           decisionLoopId: decisionId ? card.dataset.stampLoopId : null,
           decisionId: decisionId,
-          // LIN-3126 residual: the ruling anchor's binding pair (rendered onto
-          // the card by lib/render-session.js), forwarded to the shared answer
-          // helper so its comment write / dispatch resolves the issue's binding.
-          source: card.dataset.source || undefined,
-          bindingScope: card.dataset.bindingScope || undefined
+          // LIN-3126 residual: the ruling anchor's source (rendered onto the
+          // card by lib/render-session.js), forwarded to the shared answer
+          // helper so its comment write / dispatch resolves the issue's provider.
+          source: card.dataset.source || undefined
         };
 
         // The agent brief a `dispatch` answer needs is composed from what the
@@ -740,14 +737,13 @@
     var issueId = reply ? (reply.getAttribute('data-issue-id') || '') : '';
     var issueIdentifier = (reply && reply.getAttribute('data-issue-identifier'))
       || box.getAttribute('data-issue-identifier') || '';
-    // LIN-3126 residual: the issue's own binding pair, read off the run page's
-    // own stamps (lib/render-session.js's inline reply box, from the loop's
-    // dispatch row) so the close-out dispatch resolves the issue's binding, not
-    // the workspace's active one. Absent → undefined, so the dispatch body
-    // stays byte-identical (window.dispatchPrompt omits an absent pair).
+    // LIN-3126 residual: the issue's own source, read off the run page's own
+    // stamp (lib/render-session.js's inline reply box, from the loop's dispatch
+    // row) so the close-out dispatch resolves the issue's provider, not the
+    // workspace's active one. Absent → undefined, so the dispatch body stays
+    // byte-identical (window.dispatchPrompt omits an absent source).
     var source = (reply && reply.getAttribute('data-source')) || box.getAttribute('data-source') || '';
-    var bindingScope = (reply && reply.getAttribute('data-binding-scope')) || box.getAttribute('data-binding-scope') || '';
-    return { box: box, urlKey: urlKey, issueId: issueId, issueIdentifier: issueIdentifier, source: source, bindingScope: bindingScope };
+    return { box: box, urlKey: urlKey, issueId: issueId, issueIdentifier: issueIdentifier, source: source };
   }
 
   // Replace the box's dynamic content with a single line, built via textContent
@@ -827,7 +823,7 @@
           prompt: result.prompt,
           promptName: result.promptName || 'close-out',
           kind: 'close-out',
-          issue: { id: ctx.issueId, identifier: ctx.issueIdentifier, title: result.issueTitle || '', source: ctx.source, bindingScope: ctx.bindingScope },
+          issue: { id: ctx.issueId, identifier: ctx.issueIdentifier, title: result.issueTitle || '', source: ctx.source },
           entryRung: 'run-step'
         });
       })
