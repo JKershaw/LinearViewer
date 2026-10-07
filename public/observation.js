@@ -1075,6 +1075,24 @@ function renderTaskBlock(s, ident, node, runs) {
     ? `<a class="obs-task-ident" href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(ident)}</a>`
     : `<span class="obs-task-ident">${escapeHtml(ident)}</span>`;
 
+  // LIN-3331: the task's own page, a separate in-Harbour link beside the
+  // tracker link above (never a retarget). The binding pair rides on the task's
+  // runs (routes/dashboard.js projects it, sparse); without it the link is
+  // plain — it resolves on a single-binding workspace and gets the binding
+  // refusal on a multi-binding one, exactly as the Edit link does.
+  const pairRun = runs.find(r => r && (r.issueSource || r.issueBindingScope)) || runs[0] || {};
+  const taskHref = window.taskPageHref
+    ? window.taskPageHref({
+        urlKey: s.workspaceUrlKey,
+        identifier: ident,
+        source: pairRun.issueSource,
+        bindingScope: pairRun.issueBindingScope
+      })
+    : '';
+  const taskPageLinkHtml = taskHref
+    ? ` <a class="obs-task-page task-page-link" data-testid="obs-task-page-link" href="${escapeHtml(taskHref)}">task page ↗</a>`
+    : '';
+
   // Fold multi-wake lineages into one visual unit (LIN-1487) WITHIN this task
   // block — nesting the fold under `renderTaskBlock` keeps it scoped to a single
   // `issueIdentifier`, so a lineage that spans issues splits across task blocks
@@ -1097,7 +1115,7 @@ function renderTaskBlock(s, ident, node, runs) {
 
   return `<div class="obs-task">
       <div class="obs-task-head">
-        ${prov}${identHtml}
+        ${prov}${identHtml}${taskPageLinkHtml}
         <span class="obs-task-title">${escapeHtml(String(title))}</span>
         ${stateChip}${labelChips}
       </div>

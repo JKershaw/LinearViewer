@@ -226,7 +226,7 @@ function loadLazySection(type, toggle, content) {
     const placeholder = content.querySelector('[data-sessions-placeholder="1"]')
     if (placeholder && window.SessionsSection) {
       placeholder.removeAttribute('data-sessions-placeholder')
-      window.SessionsSection.init(placeholder, { urlKey, identifier })
+      window.SessionsSection.init(placeholder, { urlKey, identifier, source, bindingScope })
     }
   } else if (type === 'context') {
     const placeholder = content.querySelector('[data-context-placeholder="1"]')

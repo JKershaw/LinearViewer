@@ -1121,7 +1121,10 @@
     const shimmer = REDUCED_MOTION ? '' : ' lc-lane--pulse';
     const li = nodeFromHtml(`<li class="lc-lane${shimmer}" data-testid="live-console-lane">
         <span class="lc-lane-bar" aria-hidden="true"></span>
-        <a class="lc-lane-task" href="#"></a>
+        <span class="lc-lane-head">
+          <a class="lc-lane-task" href="#"></a>
+          <a class="lc-lane-task-page task-page-link" data-testid="lc-lane-task-page-link" href="#" hidden>task ↗</a>
+        </span>
         <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
         <span class="lc-lane-mid">
           <span class="lc-lane-action"></span>
@@ -1149,6 +1152,24 @@
     task.textContent = lane.task || '?';
     task.setAttribute('href', obsHref(lane.workspaceUrlKey));
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
+    // LIN-3331: the adjacent task-page link, repainted every update (a lane
+    // node is reused across polls). No identifier → hidden. Without the binding
+    // pair the link is plain: it resolves on a single-binding workspace and gets
+    // the binding refusal on a multi-binding one, exactly as the Edit link does.
+    const taskPage = li.querySelector('.lc-lane-task-page');
+    const taskPageHref = window.taskPageHref({
+      urlKey: lane.workspaceUrlKey,
+      identifier: lane.task,
+      source: lane.issueSource,
+      bindingScope: lane.issueBindingScope,
+    });
+    if (taskPageHref) {
+      taskPage.setAttribute('href', taskPageHref);
+      taskPage.hidden = false;
+    } else {
+      taskPage.removeAttribute('href');
+      taskPage.hidden = true;
+    }
     const tickets = li.querySelector('.lc-lane-tickets');
     tickets.textContent = ticketProgressText(lane.ticketWalk);
     // LIN-2244: a THIRD lane state, distinct from both actively working and
@@ -1176,6 +1197,15 @@
     sum.textContent = lane.summary || '';
     sum.setAttribute('title', lane.summary || '');
     li.querySelector('.lc-lane-ws').textContent = lane.workspaceName || lane.workspaceUrlKey || '';
+  }
+
+  // Test-only seam (public/session.js / public/flight-companion.js pattern);
+  // inert in the browser where `module` is undefined. Placed here, after the
+  // lane renderer's own consts (CRED_TEXT/CRED_TITLE) are initialised, so a
+  // node:vm-sandboxed test can drive `updateLaneNode` directly — including the
+  // LIN-3331 task-page link's show/hide-on-repaint path — without a full page.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { updateLaneNode };
   }
   function paintLanes(lanes) {
     if (!els.lanes) return;

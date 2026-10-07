@@ -52,6 +52,27 @@ window.sourceBindingQuery = function sourceBindingQuery(source, bindingScope) {
 };
 
 /**
+ * LIN-3331: the client twin of the server `taskPageHref`
+ * (`lib/task-page-href.js`). Builds the one task-page URL every client surface
+ * links to, reusing `sourceBindingQuery` so the `?source=&bindingScope=` pair
+ * matches the server helper and the Edit/Chat links byte-for-byte. Returns ''
+ * when `urlKey` or `identifier` is missing so callers omit the link.
+ * @global
+ * @param {Object} opts
+ * @param {string} opts.urlKey - workspace url key
+ * @param {string} opts.identifier - issue identifier
+ * @param {string} [opts.source] - resolved provider name
+ * @param {string} [opts.bindingScope] - binding selector stamp
+ * @returns {string} href (unescaped; escape at the attribute), or ''
+ */
+window.taskPageHref = function taskPageHref(opts) {
+  opts = opts || {};
+  if (!opts.urlKey || !opts.identifier) return '';
+  return `/workspace/${encodeURIComponent(opts.urlKey)}/task/${encodeURIComponent(opts.identifier)}`
+    + window.sourceBindingQuery(opts.source, opts.bindingScope);
+};
+
+/**
  * First-paint fit zoom (LIN-1221 F1). Mirror of lib/ship-layout.js
  * computeFitZoom — pick the largest scale at which the content box fits the
  * viewport (with padding), clamped to [minZoom, maxZoom]; never zoom IN on
@@ -357,7 +378,19 @@ window.renderQueueRow = function renderQueueRow(item, urlKey, { card = false } =
         ? `<a class="queue-item-issue" href="${esc(item.issueUrl)}" target="_blank" rel="noopener">${esc(item.issueIdentifier)}</a>`
         : `<span class="queue-item-issue">${esc(item.issueIdentifier)}</span>`)
     : '';
-  const metaHtml = [issueHtml, ...[item.repo, target, time].filter(Boolean).map(esc)]
+  // LIN-3331: an adjacent in-Harbour link to the task page. The list API projects
+  // the issue's binding pair (lib/dispatch-store.js `_formatItem`), so a
+  // multi-binding workspace resolves the right one; no identifier means no link.
+  const taskHref = window.taskPageHref({
+    urlKey,
+    identifier: item.issueIdentifier,
+    source: item.issueSource,
+    bindingScope: item.issueBindingScope
+  });
+  const taskPageHtml = taskHref
+    ? `<a class="queue-item-task-page task-page-link" data-testid="queue-item-task-page-link" href="${esc(taskHref)}">task page ↗</a>`
+    : '';
+  const metaHtml = [issueHtml, taskPageHtml, ...[item.repo, target, time].filter(Boolean).map(esc)]
     .filter(Boolean)
     .join(' · ');
 

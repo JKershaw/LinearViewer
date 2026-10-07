@@ -868,6 +868,12 @@ export function createDashboardRoutes({
         issueIdentifier: l.issueIdentifier || null,
         issueTitle: l.issueTitle || '',
         issueUrl: l.issueUrl || null,
+        // LIN-3331: the run's task binding pair, projected SPARSELY (an
+        // unstamped/legacy loop adds no key, keeping the feed row byte-
+        // identical) so the Observation task block's task-page link can carry
+        // it. Selection-only provenance, never a credential (B1).
+        ...(l.issueSource != null ? { issueSource: l.issueSource } : {}),
+        ...(l.issueBindingScope != null ? { issueBindingScope: l.issueBindingScope } : {}),
         agentState: l.agentState,
         stage: l.stage || null,
         promptName: l.promptName || null,

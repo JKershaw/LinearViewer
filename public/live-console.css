@@ -430,6 +430,20 @@
   text-decoration: none;
 }
 .lc-lane-task:hover { color: var(--brand-dim); text-decoration: underline; }
+/* LIN-3331 F1: the task identifier and its adjacent task-page link share ONE
+   grid cell, so the `auto 1fr auto` lane template is unchanged when the link is
+   visible (the lane stays on one row; `.lc-lane-ws` keeps the right edge). The
+   link carries the lane's structural font size, not the body size. */
+.lc-lane-head {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.lc-lane-task-page {
+  font-family: var(--font-structural);
+  font-size: 0.72rem;
+}
 /* LIN-2243: a worker-lane's touched-ticket count. Empty (no width) for a
    non-lane loop — never a fixed slot that leaves a visible gap. */
 .lc-lane-tickets {

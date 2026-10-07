@@ -136,9 +136,25 @@ describe('render-session: tasks + overview', () => {
   test('renders tasks-touched chips and the seed', () => {
     const html = renderSessionPage({ session: fixtureSession(), urlKey: 'ws-a', issueContext: [] });
     assert.match(html, /data-testid="session-tasks"/);
-    const tasks = html.match(/data-testid="session-task"/g) || [];
+    // LIN-3331: each chip is a link through to that task's page.
+    const tasks = html.match(/data-testid="session-task-link"/g) || [];
     assert.equal(tasks.length, 2);
+    assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900"/);
+    assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-901"/);
     assert.match(html, /data-testid="session-seed"[^>]*>LIN-900</);
+    // LIN-3331: the seed row's adjacent task-page link.
+    assert.match(html, /data-testid="session-task-page-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900"/);
+  });
+
+  test('the seed row and chips carry the binding pair when a loop is stamped (LIN-3331)', () => {
+    const session = fixtureSession();
+    session.loops[0] = { ...session.loops[0], issueSource: 'linear', issueBindingScope: 'team-a' };
+    const html = renderSessionPage({ session, urlKey: 'ws-a', issueContext: [] });
+    // The stamped task's seed link and chip carry `?source=&bindingScope=`.
+    assert.match(html, /data-testid="session-task-page-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900\?source=linear&amp;bindingScope=team-a"/);
+    assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-900\?source=linear&amp;bindingScope=team-a"/);
+    // A task with no stamped loop keeps the plain link (single-binding fallback).
+    assert.match(html, /data-testid="session-task-link"[^>]*href="\/workspace\/ws-a\/task\/LIN-901"/);
   });
 
   test('back-to-feed link targets the workspace observation feed', () => {

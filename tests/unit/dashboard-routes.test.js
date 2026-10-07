@@ -2402,6 +2402,33 @@ describe('GET /api/dashboard/sessions', () => {
     assert.equal(run.ticketWalk, null, 'run ticketWalk is null, not undefined');
   });
 
+  // ─── issue binding pair reaches the runs[] projection (LIN-3331) ────────────
+  test('runs[] carries issueSource/issueBindingScope when stamped, sparsely when not', async () => {
+    const stamped = { ...workerHistoryItem('w-bind', 'LIN-3331', 'sess-bind'), issueSource: 'linear', issueBindingScope: 'team-a' };
+    const plain = workerHistoryItem('w-plain', 'LIN-3332', 'sess-bind');
+    const perWorkspace = {
+      'ws-a': {
+        live: [],
+        history: [autopilotHistoryItem('sess-bind', 'LIN-3330'), stamped, plain],
+        agentStatus: [agentStatusDone('sess-bind', 'LIN-3330'), agentStatusDone('w-bind', 'LIN-3331'), agentStatusDone('w-plain', 'LIN-3332')]
+      }
+    };
+    const router = makeRouter(perWorkspace);
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
+    const { req, res } = makeReqRes({ session: { ...ENABLED, workspaces: [{ urlKey: 'ws-a', name: 'Alpha' }] } });
+    await handler(req, res);
+
+    assert.equal(res.statusCode, 200);
+    const sess = findSession(res.jsonBody, 'sess-bind');
+    const bound = sess.runs.find(r => r.loopId === 'w-bind');
+    assert.equal(bound.issueSource, 'linear');
+    assert.equal(bound.issueBindingScope, 'team-a');
+    // Sparse: an unstamped run adds NO key (byte-identical row shape).
+    const bare = sess.runs.find(r => r.loopId === 'w-plain');
+    assert.ok(!('issueSource' in bare), 'no issueSource key when unstamped');
+    assert.ok(!('issueBindingScope' in bare), 'no issueBindingScope key when unstamped');
+  });
+
   test('a live session carries a deterministic statusLine from its latest child (no per-poll summary fetch needed)', async () => {
     // A running worker decorated with an agent-status summary, under a live
     // (queued) autopilot anchor — i.e. a non-terminal session. The feed must

@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { defaultJiraSeed, JIRA_SITE } from '../fixtures/jira-harness.js';
 
 // LIN-3329: the task page, owner view
 // (GET /workspace/:urlKey/task/:identifier), at a 360px phone width.
@@ -289,5 +290,58 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     }
     await noHorizontalScroll(page);
     await page.screenshot({ path: test.info().outputPath('task-page-dark-360.png'), fullPage: true });
+  });
+
+  // LIN-3331: the task page is reachable from Home, not just by typing its URL.
+  test('the Home details task-page link navigates to the task page', async ({ page }) => {
+    await seedTasks(page);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.locator('.in-progress-items .line', { hasText: 'A task with a running build' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+
+    const link = page.locator('[data-testid="issue-task-page-link"]').first();
+    await expect(link).toBeVisible();
+    // The href is the task page's own path (the binding pair is optional).
+    await expect(link).toHaveAttribute('href', new RegExp(`^/workspace/${URL_KEY}/task/LOCAL-TP1(\\?|$)`));
+
+    await link.click();
+    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task with a running build');
+  });
+
+  // LIN-3331 (the plan's two-binding e2e): on a MERGED multi-binding workspace,
+  // a foreign-source issue's task-page link must carry the issue's OWN binding
+  // (`?source=&bindingScope=`) and land on the task page — never the route's
+  // BINDING_REQUIRED JSON refusal. Jira is a CONNECTION-BACKED secondary binding
+  // (so the fan-out stamps `bindingScope` on its rows); the Home link for its row
+  // must point through Jira's own scope, with the connection's call scope reaching
+  // the provider on the task page (the fixture's Jira client asserts that).
+  test('a foreign-source issue on a multi-binding workspace links with the pair and lands on its task page', async ({ page, seedLocal }) => {
+    const jiraResp = await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
+    expect(jiraResp.ok()).toBeTruthy();
+    const { dashboard } = await seedLocal(null, {
+      extraBindings: [{
+        provider: 'jira', scope: JIRA_SITE, connectionBacked: true, refreshToken: 'fake_extra_refresh',
+        credentials: { token: 'fake_extra_oauth_access', authType: 'oauth', cloudId: '11111111-2222-3333-4444-555555555555', tokenExpiresAt: Date.now() + 3600_000 },
+      }],
+    });
+
+    await page.goto(dashboard);
+    await page.waitForLoadState('networkidle');
+
+    const jiraNode = page.locator('.node').filter({ has: page.locator('.line:has-text("Jira task to do")') }).first();
+    await jiraNode.locator('.line').first().click();
+    await jiraNode.locator('.detail-toggle[data-toggle="details"]').first().click();
+
+    const link = jiraNode.locator('[data-testid="issue-task-page-link"]').first();
+    await expect(link).toBeVisible();
+    const href = await link.getAttribute('href');
+    expect(href).toContain('/task/ENG-1');
+    expect(href, 'the Jira issue carries source=jira').toContain('source=jira');
+    expect(href, 'the Jira issue carries its bindingScope').toContain(`bindingScope=${encodeURIComponent(JIRA_SITE)}`);
+
+    await link.click();
+    // Not the BINDING_REQUIRED JSON body: the real task page, resolved through
+    // the issue's own (Jira, connection-backed) binding.
+    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('Jira task to do');
   });
 });

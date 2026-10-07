@@ -847,6 +847,20 @@ a.wordmark:hover {
   text-decoration: underline;
 }
 
+/* The one shared affordance for a link through to a task's page (LIN-3331).
+   Every surface adds `task-page-link` alongside its own positioning class, so
+   the look is defined once here, not copied per surface. In-Harbour navigation,
+   so no target=_blank. */
+.task-page-link {
+  color: var(--blue);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.task-page-link:hover {
+  text-decoration: underline;
+}
+
 .queue-item-snippet {
   font-family: var(--font-content);
   font-size: 0.8em;
