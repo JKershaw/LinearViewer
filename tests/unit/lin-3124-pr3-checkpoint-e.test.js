@@ -419,9 +419,12 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
   // -------------------------------------------------------------------------
 
   test('T22: a legacy binding taking the scalar mirror clears a stale D2 marker (and the sanitizer then keeps its mirror)', () => {
+    // LIN-3334: `linkProvider` now refuses a second same-kind source, so the
+    // workspace starts with an empty binding set and only the stale marker; the
+    // branch this pins (a legacy active link deletes `activeBinding`) is unchanged.
     const ws = {
       id: 'ws', urlKey: 'u', provider: 'jira', activeBinding: { provider: 'jira', scope: 'https://b' },
-      bindings: [{ provider: 'jira', scope: 'https://b', connectionId: 'a::jira::https://b' }],
+      bindings: [],
     };
     linkProvider(ws, 'jira', 'https://c', { token: 'basic', email: 'e', tokenExpiresAt: Number.MAX_SAFE_INTEGER });
     assert.equal(ws.activeBinding, undefined);

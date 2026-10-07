@@ -104,7 +104,7 @@ import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable 
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
-import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, isActiveBinding, normalizeProvider, normalizeProviderName, matchTeamId, isPersistableTeamRef } from './lib/workspace.js'
+import { getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, removeWorkspace, saveSession, applyAccessTokenToWorkspace, getWorkspaceToken, getWorkspaceTokenExpiry, getBindingsForWorkspace, getBindingCallScope, getBindingCredentials, getWorkspaceCallScope, linkProvider, unlinkProvider, setActiveProvider, remintActiveCredential, isActiveBinding, normalizeProvider, normalizeProviderName, matchTeamId, isPersistableTeamRef, sameKindSourceBound, oneSourcePerKindMessage } from './lib/workspace.js'
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from './lib/refresh-strategy.js'
 import { refreshJiraAccessToken, isJiraOAuthConfigured } from './lib/providers/jira/oauth.js'
 import { createWorkspaceRoutes } from './routes/workspace.js'
@@ -4319,6 +4319,23 @@ app.post('/workspace/:urlKey/settings/providers/add', workspaceFromUrl, async (r
   const workspace = req.workspace;
   const settingsUrl = `/workspace/${encodeURIComponent(workspace.urlKey)}/settings`;
   const { provider } = req.body;
+
+  // LIN-3334: a workspace may have only one source of each kind. Refuse a
+  // second github / github-projects / jira source with a plain message BEFORE
+  // any OAuth/install redirect. The `linear` arm is deliberately EXEMPT: a
+  // second Linear org is its OWN workspace (LIN-1351), so "connect another
+  // Linear org" must keep working (it is not an add-onto-this-workspace).
+  if (provider === 'github' || provider === 'github-projects' || provider === 'jira') {
+    const conflict = sameKindSourceBound(workspace, provider);
+    if (conflict) {
+      const providerLabel = getProvider(provider)?.ui?.displayName || provider;
+      return res.status(409).send(renderErrorPage(
+        'One source per kind',
+        oneSourcePerKindMessage(providerLabel, conflict.scope),
+        { action: 'Back to settings', actionUrl: settingsUrl }
+      ));
+    }
+  }
 
   // GitHub OAuth begin in add-source mode. Carry the VIEWED workspace's urlKey
   // (this :urlKey route context) so the callback binds onto THIS workspace, not

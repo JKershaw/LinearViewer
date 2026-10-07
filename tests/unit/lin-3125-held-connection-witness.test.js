@@ -210,11 +210,11 @@ describe('LIN-3125 Phase 3 — acceptance witness: three repos, one connection',
     for (const k of ENV) { if (savedEnv[k] === undefined) delete process.env[k]; else process.env[k] = savedEnv[k]; }
   });
 
-  test('criterion (a)+(b): one connection, three repos, zero auth/install round trips on adds #2/#3', async () => {
+  test('criterion (a): a first connect completes, and a same-kind held add is refused with no auth/install round trip (LIN-3334)', async () => {
     const h = await harness(client);
     const session = makeSession();
 
-    // ---- add #1: the first-connect path (also the criterion (a) proof) ----
+    // ---- add #1: the first-connect path (the criterion (a) proof) ----
     await firstConnect(h, session, REPOS[0]);
     assert.equal(session.workspaces.length, 1);
     assert.equal(session.workspaces[0].urlKey, WORKSPACE);
@@ -227,53 +227,56 @@ describe('LIN-3125 Phase 3 — acceptance witness: three repos, one connection',
     // Counter liveness: every counter that can fire on the first connect did.
     for (const [name, v] of Object.entries(h.counters)) assert.ok(v >= 1, `counter ${name} is live (${v})`);
     const mark = snap(h.counters);
-    const markTokens = h.tokens.length;
 
-    // ---- adds #2 and #3: the held path, no marker on GitHub ----
+    // ---- add #2: a same-kind held add is now REFUSED (one ticket source per
+    // kind), and the refusal costs no network at all. ----
     h.setInstallationsVisible(true);
-    const redirects = [];
-    for (const repo of [REPOS[1], REPOS[2]]) {
-      const { g, b } = await heldAdd(h, session, repo);
-      redirects.push(g.redirectedTo, b.redirectedTo);
-    }
+    const g = makeRes();
+    await getHandler(h.flow, 'get', '/auth/github')({ query: { mode: 'add-source', workspace: WORKSPACE, heldConnection: '1' }, session }, g);
+    assert.equal(g.redirectedTo, '/connect/github/held', 'marked entry captured into the held picker');
+    assert.doesNotMatch(g.redirectedTo || '', /login\/oauth\/authorize|installations\/new/);
+
+    const p = makeRes();
+    await getHandler(h.picker, 'get', '/connect/:provider/held')({ params: { provider: 'github' }, session }, p);
+    assert.equal(p.statusCode, 409, 'the picker shows the plain refusal instead of a repo list');
+    assert.match(p.body, /already has a GitHub Issues source \(octo\/repo-a\)/);
+    assert.match(p.body, /one ticket source of each kind/);
 
     // (1) zero counter movement after the snapshot.
     assert.deepEqual(deltas(mark, h.counters), { oauthExchange: 0, mint: 0, installationRead: 0, listUserInstallations: 0, beginAuth: 0, beginInstall: 0 });
 
-    // (2) no held redirect ever matched an authorize/install URL.
-    for (const u of redirects) {
+    // (2) the held refusal never matched an authorize/install URL.
+    for (const u of [g.redirectedTo]) {
       assert.doesNotMatch(u || '', /github\.com\/login\/oauth\/authorize/);
       assert.doesNotMatch(u || '', /installations\/new/);
     }
 
-    // (3) exactly ONE Connection with three referents.
+    // (3) still exactly ONE Connection, with ONE referent.
     const rows = await h.connectionStore.readConnectionsByAccountPrefix(session.accountId);
     assert.equal(rows.length, 1, 'one Connection record');
-    assert.deepEqual(rows[0].referents.map(r => r.scope).sort(), [...REPOS].sort());
+    assert.deepEqual(rows[0].referents.map(r => r.scope), [REPOS[0]]);
     const connectionId = rows[0]._id;
 
-    // (4) three bindings, each {provider, scope, connectionId}, one connection, no credentials.
+    // (4) one binding, {provider, scope, connectionId}, one connection, no credentials.
     const ws = session.workspaces[0];
-    assert.equal(ws.bindings.length, 3);
-    for (const repo of REPOS) {
-      const b = ws.bindings.find(x => x.scope === repo);
-      assert.deepEqual(b, { provider: 'github', scope: repo, connectionId });
-      assert.ok(!('credentials' in b));
-    }
+    assert.equal(ws.bindings.length, 1);
+    assert.deepEqual(ws.bindings[0], { provider: 'github', scope: REPOS[0], connectionId });
+    assert.ok(!('credentials' in ws.bindings[0]));
 
-    // (5) the held adds used ONLY the installation token.
-    const heldTokens = h.tokens.slice(markTokens);
-    assert.ok(heldTokens.length >= 2, 'the held adds built at least one client per add');
-    assert.ok(heldTokens.every(t => t.startsWith('ghs_')), `held tokens are installation tokens, saw: ${JSON.stringify(heldTokens)}`);
-
-    // (6) no identity freshness stamp from the held adds (before/after #2/#3).
-    assert.equal(session.identityAuthenticatedAt, freshness, 'identityAuthenticatedAt unchanged by held adds');
+    // (5) no identity freshness stamp from the refused held add.
+    assert.equal(session.identityAuthenticatedAt, freshness, 'identityAuthenticatedAt unchanged by the held refusal');
   });
 
-  test('stale-token variant: exactly one refresh mint, zero oauth/installationRead/listUserInstallations', async () => {
+  test('stale-token variant: a held add onto a workspace without this kind refreshes exactly once', async () => {
     const h = await harness(client);
     const session = makeSession();
     await firstConnect(h, session, REPOS[0]);
+
+    // LIN-3334: a second GitHub source on the SAME workspace is refused, so the
+    // allowed held add targets a workspace with no GitHub source yet (a Linear
+    // workspace). This still exercises the pre-enumeration token refresh.
+    session.workspaces = [{ id: 'lin-1', urlKey: WORKSPACE, provider: 'linear', accessToken: 'lin', credentials: { token: 'lin' }, bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'lin' } }] }];
+    session.activeWorkspaceId = 'lin-1';
 
     // Expire the connection's installation token before add #2.
     await h.db.collection('connections').updateMany({}, { $set: { 'credentials.tokenExpiresAt': Date.now() - 60_000 } });
@@ -313,6 +316,11 @@ describe('LIN-3125 Phase 3 — acceptance witness: three repos, one connection',
     await firstConnect(h, session, REPOS[0]);
     assert.ok(h.counters.oauthExchange >= 1, 'completeAuth -> exchangeOAuthCode counted via fetchImpl');
     assert.ok(h.counters.mint >= 1, 'completeInstallation mint counted via fetchImpl');
+
+    // LIN-3334: target a workspace with no GitHub source yet so the held add is
+    // allowed and the refresh-fallback seam is exercised.
+    session.workspaces = [{ id: 'lin-1', urlKey: WORKSPACE, provider: 'linear', accessToken: 'lin', credentials: { token: 'lin' }, bindings: [{ provider: 'linear', scope: 'org-1', credentials: { token: 'lin' } }] }];
+    session.activeWorkspaceId = 'lin-1';
 
     // Stale token => the refresher's refreshCredential fallback also goes through the seam.
     await h.db.collection('connections').updateMany({}, { $set: { 'credentials.tokenExpiresAt': Date.now() - 60_000 } });

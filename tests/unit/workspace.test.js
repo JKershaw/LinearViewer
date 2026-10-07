@@ -30,6 +30,29 @@ import {
 } from '../../lib/workspace.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
+// LIN-3334: `linkProvider` now REFUSES a second source of the same kind, but a
+// pre-existing workspace may still hold two same-kind sources (the C8 scan
+// looks for them). The resolver/unlink/setActive/scope tests below characterize
+// that already-stored shape — deleted in P2 — so they seed it directly here,
+// mirroring the binding + scalar-mirror write `linkProvider` used to perform for
+// a same-provider second link. Never use this in a live-flow test.
+function appendSameKindBinding(ws, provider, scope, credentials = {}) {
+  ws.bindings = ws.bindings || [];
+  const index = ws.bindings.findIndex(b => b.provider === provider && b.scope === scope);
+  if (index >= 0) ws.bindings[index] = { provider, scope, credentials: { ...ws.bindings[index].credentials, ...credentials } };
+  else ws.bindings.push({ provider, scope, credentials: { ...credentials } });
+  const isActive = !ws.provider || ws.provider === provider;
+  ws.provider = ws.provider || provider;
+  if (isActive) {
+    delete ws.activeBinding;
+    ws.credentials = { ...ws.credentials, token: credentials.token };
+    ws.accessToken = credentials.token;
+    if (credentials.tokenExpiresAt !== undefined) ws.tokenExpiresAt = credentials.tokenExpiresAt;
+  }
+  return ws;
+}
+
+
 // LIN-1523: fake durable owner-credential store — records every `put` call so
 // tests can assert on write count/args without a real backing collection.
 function fakeCredentialStore() {
@@ -333,9 +356,12 @@ describe('linkProvider', () => {
     assert.strictEqual(ws.bindings[0].credentials.scope, 'read,write');
   });
 
-  test('same provider, different scope yields two distinct bindings', () => {
+  test('same provider, different scope is REFUSED (LIN-3334); the stored two-source shape is characterized separately', () => {
     const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/repo', { token: 'gh' });
-    linkProvider(ws, 'github', 'org/5', { token: 'gh' });
+    assert.throws(() => linkProvider(ws, 'github', 'org/5', { token: 'gh' }), /one ticket source of each kind/);
+    assert.strictEqual(ws.bindings.length, 1);
+    // A pre-existing two-source workspace (as the C8 scan finds) still resolves.
+    appendSameKindBinding(ws, 'github', 'org/5', { token: 'gh' });
     assert.strictEqual(ws.bindings.length, 2);
     assert.deepStrictEqual(ws.bindings.map(b => b.scope), ['owner/repo', 'org/5']);
   });
@@ -356,7 +382,7 @@ describe('unlinkProvider', () => {
 
   test('removes only the matching scope when a provider has two bindings', () => {
     const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/repo', { token: 'a' });
-    linkProvider(ws, 'github', 'org/5', { token: 'b' });
+    appendSameKindBinding(ws, 'github', 'org/5', { token: 'b' });
     unlinkProvider(ws, 'github', 'owner/repo');
     assert.deepStrictEqual(ws.bindings.map(b => b.scope), ['org/5']);
   });
@@ -571,7 +597,7 @@ describe('setActiveProvider', () => {
     // Two GitHub repos; linkProvider mirrors the last same-provider link, so repo-b
     // is active. Switching back to repo-a must re-point the mirror to repo-a's token.
     const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/a', { token: 'tok-a' });
-    linkProvider(ws, 'github', 'owner/b', { token: 'tok-b' });
+    appendSameKindBinding(ws, 'github', 'owner/b', { token: 'tok-b' });
     assert.strictEqual(ws.accessToken, 'tok-b');
 
     setActiveProvider(ws, 'github', 'owner/a');
@@ -636,7 +662,7 @@ describe('remintActiveCredential', () => {
     // reads via workspace.tokenExpiresAt) is octocat/b — the helper must refresh
     // exactly that one, leaving the other binding untouched.
     const ws = linkProvider({ id: 'gh-1' }, 'github', 'octocat/a', { installationId: '111', token: 'tok-a', tokenExpiresAt: 1 });
-    linkProvider(ws, 'github', 'octocat/b', { installationId: '222', token: 'tok-b', tokenExpiresAt: 1 });
+    appendSameKindBinding(ws, 'github', 'octocat/b', { installationId: '222', token: 'tok-b', tokenExpiresAt: 1 });
     assert.strictEqual(ws.accessToken, 'tok-b', 'precondition: scalar mirror points at the last-linked binding');
     const seen = [];
     const provider = fakeMintProvider({ token: 'tok-b2', tokenExpiresAt: 9, installationId: '222' }, seen);
@@ -838,7 +864,7 @@ describe('getWorkspaceCallScope', () => {
   test('returns { token, repo } for a GitHub workspace, pairing the active token with its binding repo', () => {
     // Two GitHub repo bindings on one account; the active one is the scalar mirror.
     let ws = linkProvider({ id: 'github:7' }, 'github', 'octocat/one', { token: 'tok-one', installationId: '1' });
-    ws = linkProvider(ws, 'github', 'octocat/two', { token: 'tok-two', installationId: '2' });
+    ws = appendSameKindBinding(ws, 'github', 'octocat/two', { token: 'tok-two', installationId: '2' });
     // The scalar mirror tracks the most-recently-linked binding (the active one).
     assert.strictEqual(getWorkspaceToken(ws), 'tok-two');
     assert.deepStrictEqual(getWorkspaceCallScope(ws), { token: 'tok-two', repo: 'octocat/two' });
@@ -875,7 +901,7 @@ describe('getWorkspaceCallScope', () => {
 
   test('the github/github-projects/linear/local branches are unchanged by the Jira branch (LIN-1885 research finding 2: no widened slice)', () => {
     let gh = linkProvider({ id: 'gh:1' }, 'github', 'octocat/one', { token: 'tok-one', installationId: '1' });
-    gh = linkProvider(gh, 'github', 'octocat/two', { token: 'tok-two', installationId: '2' });
+    gh = appendSameKindBinding(gh, 'github', 'octocat/two', { token: 'tok-two', installationId: '2' });
     assert.deepStrictEqual(getWorkspaceCallScope(gh), { token: 'tok-two', repo: 'octocat/two' });
 
     const proj = linkProvider({ id: 'proj:1' }, 'github-projects', 'octocat/5', { token: 'tok-proj' });
@@ -977,7 +1003,7 @@ describe('resolveIssueBinding', () => {
     // match it (not an arbitrary fake name) to exercise that branch honestly.
     const gh = registerProvider({ name: 'github', ui: {}, supports: () => true });
     const ws = linkProvider({ id: 'ws-1' }, gh.name, 'octocat/one', { token: 'tok-one' });
-    linkProvider(ws, gh.name, 'octocat/two', { token: 'tok-two' });
+    appendSameKindBinding(ws, gh.name, 'octocat/two', { token: 'tok-two' });
     // linkProvider mirrors the LAST same-provider link into the scalar fields.
     assert.strictEqual(getWorkspaceToken(ws), 'tok-two');
 
@@ -1132,7 +1158,7 @@ describe('getWorkspaceToken (provider/scope selection)', () => {
 
   test('selects a binding token by (provider, scope)', () => {
     const ws = linkProvider({ id: 'ws-1' }, 'github', 'owner/repo', { token: 'a' });
-    linkProvider(ws, 'github', 'org/5', { token: 'b' });
+    appendSameKindBinding(ws, 'github', 'org/5', { token: 'b' });
     assert.strictEqual(getWorkspaceToken(ws, 'github', 'owner/repo'), 'a');
     assert.strictEqual(getWorkspaceToken(ws, 'github', 'org/5'), 'b');
   });

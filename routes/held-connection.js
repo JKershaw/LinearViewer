@@ -36,7 +36,7 @@ import crypto from 'node:crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderWorkspaceLimitPage, renderGitHubRepoSelectPage, renderGitHubProjectSelectPage } from '../lib/render-pages.js'
 import { getProvider } from '../lib/providers/registry.js'
-import { getWorkspaceByUrlKey, upsertWorkspace } from '../lib/workspace.js'
+import { getWorkspaceByUrlKey, upsertWorkspace, sameKindSourceBound, oneSourcePerKindMessage } from '../lib/workspace.js'
 import { persistBinding } from '../lib/persist-binding.js'
 import { TOKEN_REFRESH_BUFFER_MS } from '../lib/workspace-token-resolver.js'
 import { deriveGithubFreshUrlKey } from '../lib/github-install-flow.js'
@@ -156,6 +156,23 @@ export function createHeldConnectionRoutes({
     // this GET. Falling through to a dead Session Expired page strands the user;
     // return to the bare begin flow (heldEntry.beginUrl) instead.
     if (!isNew && !workspace) return res.redirect(heldEntry.beginUrl || '/')
+
+    // LIN-3334: an add-source workspace that already holds this kind shows the
+    // plain one-source-per-kind message instead of a repo list. Held `mode=new`
+    // (no workspace) is never refused. The scope is not known yet here, so ANY
+    // binding of the provider refuses (the same-scope exemption lives on the
+    // POST/persist path); `renderHeldState` is not used because the action is
+    // "back to Settings", not "connect a different account".
+    if (!isNew && workspace) {
+      const conflict = sameKindSourceBound(workspace, provider.name)
+      if (conflict) {
+        return res.status(409).send(renderErrorPage(
+          'One source per kind',
+          oneSourcePerKindMessage(displayNameOf(provider), conflict.scope),
+          { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
+        ))
+      }
+    }
 
     let accountId
     try { accountId = await resolveCanonicalAccountId(req.session.accountId) } catch { accountId = null }
@@ -297,6 +314,12 @@ export function createHeldConnectionRoutes({
 
     let conversion
     try {
+      // LIN-3334 (plan-review E): held-new is the freshest container — it has
+      // NO bindings, so `persistBinding`'s one-source-per-kind refusal cannot
+      // fire here and no `sameKindRefusal` is passed. Unlike the add-source arm,
+      // `upsertWorkspace` above HAS already mutated `session.workspaces`, so a
+      // failure here restores the snapshot (there is something to restore, not
+      // "nothing written").
       conversion = await persistBinding({
         connectionStore, session: req.session, accountId, workspace: container,
         provider: provider.name, scope, heldConnectionId: connectionId,
@@ -366,15 +389,34 @@ export function createHeldConnectionRoutes({
     const snapshot = [...(req.session.workspaces || [])]
     let conversion
     try {
+      // LIN-3334 (plan-review E): bindAddSource is the only `persistBinding`
+      // caller that can receive `refused` — the workspace already holds a
+      // binding of this kind at a different scope (the same-scope case returned
+      // via `finishAdd` above, before this function). `persistBinding` checks
+      // before its held try/catch, its snapshot and `addReferent` and RETURNS
+      // the refusal, so nothing is written and the retry contract is untouched.
       conversion = await persistBinding({
         connectionStore, session: req.session, accountId, workspace,
         provider: provider.name, scope, heldConnectionId: connectionId,
         resolveCanonicalAccountId, writesEnabled: writesEnabled(), workspacesSnapshot: snapshot,
+        sameKindRefusal: (ws, p, s) => {
+          const conflict = sameKindSourceBound(ws, p, s)
+          return conflict ? oneSourcePerKindMessage(displayNameOf(provider), conflict.scope) : null
+        },
         convertToConnectionBacked,
       })
     } catch (err) {
       console.error('[held-connection] persist failed:', err)
       conversion = { connectionBacked: false, error: 'retryable' }
+    }
+    // LIN-3334: the returned refusal is a plain message page, never the retry
+    // page — it is not a transient failure and re-trying cannot succeed.
+    if (conversion?.error === 'refused') {
+      return res.status(409).send(renderErrorPage(
+        'One source per kind',
+        conversion.message,
+        { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
+      ))
     }
     // C3: a held failure is retryable and NEVER a legacy write (no credential copy).
     if (!conversion?.connectionBacked) return retryPage(res)

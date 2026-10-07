@@ -36,6 +36,12 @@ const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
 const SITE_A = { id: 'cid-a', url: 'https://a.atlassian.net', name: 'A' };
 const SITE_B = { id: 'cid-b', url: 'https://b.atlassian.net', name: 'B' };
 const SITE_X = { id: 'cid-x', url: 'https://x.atlassian.net', name: 'X' };
+
+// LIN-3334: the add arms now refuse a second same-kind source, so tests that
+// need a second co-resident Jira site seed it as a pre-existing legacy binding
+// and re-link it (idempotent). The converter/connection-backed path under test
+// is unchanged.
+const legacyOAuthAt = (site, token) => ({ provider: 'jira', scope: site.url, credentials: { token, authType: 'oauth', cloudId: site.id, tokenExpiresAt: Date.now() + 3600_000 } });
 const MODES = {
   single: { sites: [SITE_B] },
   multi: { sites: [SITE_X, SITE_B] },
@@ -301,9 +307,12 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         assert.equal(await liveCopies(retry, w.real.ownerStore, 'R1'), 1);
       });
 
-      test('T20(e) gate G: a co-resident legacy OAuth site A keeps B legacy — one record, no store call, both lanes rotate', async () => {
+      test('T20(e) gate G: a re-linked pre-existing legacy OAuth site keeps B legacy — one record, no store call, both lanes rotate', async () => {
         const w = await world();
-        const s = w.session([structuredClone(LEGACY_OAUTH_A)]);
+        // LIN-3334: a NEW second same-kind site is refused, so the co-resident
+        // shape is a pre-existing legacy B re-linked idempotently. The converter
+        // keeps B legacy (its `prior` is legacy) — no copy, no gate store call.
+        const s = w.session([structuredClone(LEGACY_OAUTH_A), legacyOAuthAt(SITE_B, 'at-B0')]);
         await w.addSource(s, { mode });
         for (const name of ['copyToConnection', 'conn.link', 'finalizePromotion', 'putByConnection', 'getByConnection', 'deleteByConnection', 'conn.readConnectionOutcome']) {
           assert.ok(!w.log.includes(name), `no ${name}`);
@@ -321,12 +330,15 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         assert.equal(await liveCopies(s, w.real.ownerStore, 'R1++'), 1);
       });
 
-      test('T20(e): a co-resident legacy BASIC site does not trigger the gate', async () => {
+      test('T20(e): adding a second Jira site is refused before any conversion (LIN-3334)', async () => {
         const w = await world();
         const s = w.session([structuredClone(LEGACY_BASIC_A)]);
-        await w.addSource(s, { mode });
-        assert.equal(w.bindingFor(s).connectionId, w.connectionIdFor());
-        assert.equal(await w.staged(), null);
+        const res = await w.addSource(s, { mode });
+        assert.ok(res.thrown, 'linkProvider refuses the second same-kind source');
+        assert.match(String(res.thrown.message), /one ticket source of each kind/);
+        assert.equal(w.bindingFor(s, SITE_B), undefined, 'no second site binding written');
+        assert.ok(w.bindingFor(s, SITE_A), 'the existing site is untouched');
+        assert.equal((await w.real.connectionStore.collection.find({}).toArray()).length, 0, 'no Connection written');
       });
 
       test('T20(f) row 6: finalize no-op (S re-staged by a later flow): S keeps its grant, B refreshes from C', async () => {
@@ -368,18 +380,15 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         assert.equal(await liveCopies(s2, w2.real.ownerStore, 'R1'), 1, 'S has no reader in this session');
       });
 
-      test('T20(g)(ii): two connection-backed sites from two authorizations — two records, rotating A leaves B refreshing, no S', async () => {
+      test('T20(g)(ii): a second Jira site on one workspace is refused (LIN-3334)', async () => {
         const w = await world();
-        const s = w.session();
-        await w.addSource(s, { mode, site: SITE_A, refresh: 'RA' });
-        await w.addSource(s, { mode, site: SITE_B, refresh: 'RB' });
-        assert.equal(w.bindingFor(s, SITE_A).connectionId, w.connectionIdFor(SITE_A));
-        assert.equal(w.bindingFor(s, SITE_B).connectionId, w.connectionIdFor(SITE_B));
-        assert.equal(await w.staged(), null);
-        const grants = grantServer(['RA', 'RB']);
-        const refresh = createConnectionRefresher({ connectionStore: w.real.connectionStore, ownerCredentialStore: w.real.ownerStore, resolveExchange: () => grants.exchange });
-        assert.equal((await refresh(w.connectionIdFor(SITE_A), w.account._id)).refreshToken, 'RA+');
-        assert.equal((await refresh(w.connectionIdFor(SITE_B), w.account._id)).refreshToken, 'RB+');
+        const s = w.session([structuredClone(LEGACY_OAUTH_A)]);
+        const res = await w.addSource(s, { mode, site: SITE_B, refresh: 'RB' });
+        assert.ok(res.thrown, 'linkProvider refuses the second same-kind source');
+        assert.match(String(res.thrown.message), /one ticket source of each kind/);
+        assert.equal(w.bindingFor(s, SITE_B), undefined, 'no second site binding written');
+        assert.ok(w.bindingFor(s, SITE_A), 'the existing site is untouched');
+        assert.equal((await w.staged())?.refreshToken, 'RB', 'the pre-link staging write is the only residue; no conversion, no second binding');
       });
 
       test('T20(h) row 3: link() false after a committed write: rolled forward, copy kept, finalize deletes S', async () => {
@@ -489,6 +498,9 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
         const w = await world();
         const s = w.session();
         await w.addSource(s, { mode });                       // B connection-backed (R1 in C)
+        // Seed A as a pre-existing legacy site so the (idempotent) re-link under
+        // the rollback flag is allowed (LIN-3334).
+        s.workspaces[0].bindings.push(legacyOAuthAt(SITE_A, 'at-A0'));
         process.env.CONNECTION_BACKED_WRITES = 'off';
         await w.addSource(s, { mode, site: SITE_A, refresh: 'RA' }); // rollback flag: A legacy
         delete process.env.CONNECTION_BACKED_WRITES;
@@ -587,7 +599,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     });
   }
 
-  test('T20(j): new-login existing container with a legacy sibling — direct putByConnection, legacy key byte-equal, sibling keeps its grant', async () => {
+  test('T20(j): new-login existing container refuses a second Jira site, leaving the sibling and the legacy key untouched (LIN-3334)', async () => {
     const w = await world();
     const legacyA = structuredClone(LEGACY_OAUTH_A);
     const container = { id: 'jira:atl-human', urlKey: 'acme-jira', provider: 'jira', accessToken: 'at-A', bindings: [legacyA] };
@@ -600,14 +612,15 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       : { ok: true, status: 200, json: async () => ({ access_token: 'at-RB', refresh_token: 'RB', expires_in: 3600 }) };
     const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
     const res = makeRes();
-    await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, res);
-    assert.equal(res.redirectedTo, '/workspace/acme-jira/');
-    const b = container.bindings.find(x => x.scope === SITE_B.url);
-    assert.equal(b.connectionId, `${w.account._id}::jira::${SITE_B.url}`);
-    assert.equal((await w.real.ownerStore.getByConnection(b.connectionId)).refreshToken, 'RB');
-    assert.deepEqual(await w.real.ownerStore.collection.findOne({ _id: `${w.account._id}::acme-jira::jira` }), legacyBefore, 'the legacy key is byte-equal');
-    const grants = grantServer(['RA', 'RB']);
-    assert.equal((await refreshOwnerCredential({ ownerAccountId: w.account._id, urlKey: 'acme-jira', provider: 'jira', refreshAccessToken: grants.exchange, store: w.real.ownerStore })).refreshToken, 'RA+', 'the sibling refreshes from its own grant');
+    await assert.rejects(
+      () => getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, res),
+      /one ticket source of each kind/
+    );
+    assert.equal(container.bindings.length, 1, 'no second site bound');
+    assert.equal(container.bindings.find(x => x.scope === SITE_B.url), undefined);
+    assert.deepEqual(await w.real.ownerStore.collection.findOne({ _id: `${w.account._id}::acme-jira::jira` }), legacyBefore, 'the legacy key is untouched');
+    const grants = grantServer(['RA']);
+    assert.equal((await refreshOwnerCredential({ ownerAccountId: w.account._id, urlKey: 'acme-jira', provider: 'jira', refreshAccessToken: grants.exchange, store: w.real.ownerStore })).refreshToken, 'RA+', 'the sibling still refreshes from its own grant');
   });
 
   test('new-login fresh container: connection-backed, no legacy record; flag off writes the legacy record', async () => {
