@@ -19,7 +19,11 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { fingerprintCredential, CREDENTIAL_SOURCES } from '../../lib/credential-diagnostics.js';
-import { BINDING_INTENT, selectIssueBinding } from '../../lib/workspace.js';
+
+// LIN-3335: the pair-era resolver intents/selectors are gone; `resolveConnectionBackedAccess`
+// now resolves the active connection-backed binding and falls back to the
+// Connection-gated resolver. The labels survive the case matrix.
+const BINDING_INTENT = { ISSUE: 'ISSUE', WORKSPACE: 'WORKSPACE', CREATE: 'CREATE' };
 
 const ACCT = 'acct-3282';
 const OTHER_ACCT = 'acct-other';
@@ -111,7 +115,7 @@ describe('LIN-3282: B1a/B1b — a legacy selected binding resolves to the owner 
     assert.equal(out.result.source, CREDENTIAL_SOURCES.CONNECTION);
   });
 
-  test('B1b multi-binding: the desired scope follows selectIssueBinding\'s legacy token-match rule (parity)', async () => {
+  test('B1b multi-binding: the desired scope follows the legacy token-match rule (parity)', async () => {
     // Two legacy bindings for the active provider; the workspace scalar matches
     // the org-2 binding, so the desired scope is org-2 (else-first is not used).
     const workspace = {
@@ -119,8 +123,6 @@ describe('LIN-3282: B1a/B1b — a legacy selected binding resolves to the owner 
       bindings: [legacyBinding('linear', 'org-1', 'TOK-1'), legacyBinding('linear', 'org-2', 'TOK-2')],
       accessToken: 'TOK-2',
     };
-    // Parity: the same rule selectIssueBinding already applies for `source`.
-    assert.equal(selectIssueBinding(workspace, { source: 'linear' }).binding.scope, 'org-2');
 
     const conn = connection({ id: `${ACCT}::linear::org-2`, scope: 'org-2', token: 'STALE-2' });
     const access = accessWith({

@@ -165,19 +165,6 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     assert.match(res.body, /data-testid="task-page-not-found"/);
     assert.doesNotMatch(res.body, /Stored title/);
   });
-
-  test('a binding refusal answers with bindingRefusalResponse (422)', async () => {
-    const { name, calls } = spyProvider();
-    const res = await call(makeRouter(makeLoader()), PAGE, {
-      provider: name,
-      params: { identifier: 'LIN-50' },
-      query: { source: name, bindingScope: 'no-such-scope' },
-      bindings: [{ provider: name, scope: 'ws-1', credentials: { token: 'tok' } }],
-    });
-    assert.equal(res.statusCode, 422);
-    assert.equal(res.jsonBody.code, 'UNKNOWN_BINDING');
-    assert.deepEqual(calls, [], 'no tracker read after a refusal');
-  });
 });
 
 describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {

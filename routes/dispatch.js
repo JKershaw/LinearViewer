@@ -32,7 +32,7 @@ import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dis
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
-import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE, resolveIssueBinding, findBindingBySelector, bindingRefusalResponse } from '../lib/workspace.js';
+import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE, resolveIssueBinding, dispatchIssueSourceField } from '../lib/workspace.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
@@ -244,7 +244,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, issueBindingScope, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -495,33 +495,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         return res.status(201).json({ success: true, cascade: true, ...result });
       }
 
-      // LIN-3242 (LIN-3126 §4): an issue-addressed dispatch may name its binding
-      // selector (`issueSource`/`issueBindingScope`). A COMPLETE pair is validated
-      // through slice-1's `findBindingBySelector` against THIS workspace's own
-      // bindings: an unknown pair refuses with the shared 422 shape BEFORE any row
-      // is written. A lone `issueSource` is a legitimate source-only hint (every
-      // issue row carries a source; only a stamped row carries a binding scope),
-      // resolved by `resolveIssueBinding`'s §1 source-only rule and NOT persisted
-      // as a pair. A lone `issueBindingScope` is never valid. Selection-only — the
-      // call scope always comes from `getBindingCallScope` of the hydrated binding,
-      // never from `bindingScope` (B1/LIN-2473). The validated pair persists (see
-      // `fields`).
-      let issueBindingSelector = null;
-      let issueBindingPair = null;
-      if (issueSource != null && issueBindingScope != null) {
-        const found = findBindingBySelector(workspace, { source: issueSource, bindingScope: issueBindingScope });
-        if (found.error) {
-          const refusal = bindingRefusalResponse(found);
-          return res.status(refusal.status).json(refusal.body);
-        }
-        issueBindingSelector = { source: found.binding.provider, bindingScope: found.binding.scope };
-        issueBindingPair = issueBindingSelector;
-      } else if (issueBindingScope != null) {
-        const refusal = bindingRefusalResponse(findBindingBySelector(workspace, { source: undefined, bindingScope: issueBindingScope }));
-        return res.status(refusal.status).json(refusal.body);
-      } else if (issueSource != null) {
-        issueBindingSelector = { source: issueSource };
-      }
+      // LIN-3335 (reduced from LIN-3242): an issue-addressed dispatch may name
+      // its provider-kind `issueSource` — a legitimate source-only routing hint
+      // (every issue row carries a source), resolved by `resolveIssueBinding`'s
+      // source-only rule and persisted as a kind-only stamp.
+      const persistedBindingFields = issueIdentifier
+        ? dispatchIssueSourceField(issueSource)
+        : {};
 
       // Dangling-referent guard (LIN-1948, surface 2d). The session-cookie twin
       // of the proxy-token check in routes/proxy.js — same hole, different auth
@@ -529,20 +509,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // unresolved. MUST run before createDispatchItem, whose finalizePrompt
       // mints a single-use bootstrap.
       //
-      // LIN-3242 (LIN-3126 §4): resolve the referent through the row's OWN binding
-      // selector, so a named issue is probed against the binding it came from
-      // rather than the workspace's active binding. On a multi-binding
-      // connection-backed workspace with no selector this fails closed
-      // (`BINDING_REQUIRED`) instead of guessing from `matches[0]`. A legacy
+      // LIN-3335: resolve the referent through the issue's own provider-kind
+      // `issueSource` when known, else the workspace's active binding. A legacy
       // workspace whose active binding is ambiguous still yields
       // AMBIGUOUS_CALL_SCOPE, treated as "no credential" and skipped — the same
       // fail-open as every other non-definitive outcome.
       if (!isAbort && issueIdentifier) {
-        const binding = resolveIssueBinding(workspace, issueBindingSelector);
-        if (binding.error) {
-          const refusal = bindingRefusalResponse(binding);
-          return res.status(refusal.status).json(refusal.body);
-        }
+        const binding = resolveIssueBinding(workspace, issueSource);
         const referentProvider = injectedProvider || binding.provider;
         const referentToken = binding.callScope === AMBIGUOUS_CALL_SCOPE ? null : binding.callScope;
         if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
@@ -776,12 +749,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           // Run variant (LIN-3248 N2): stamped when the validated
           // standard/stepper value was supplied; null otherwise.
           variant: variant ?? null,
-          // LIN-3242 (LIN-3126 §4): the validated binding selector pair. Written
-          // here as null when absent (the existing route `fields` style), but the
-          // STORE writes it SPARSELY — an unstamped persisted row adds no key.
-          // Selection-only provenance (never a credential).
-          issueSource: issueBindingPair?.source ?? null,
-          issueBindingScope: issueBindingPair?.bindingScope ?? null
+          // LIN-3335: the kind-only issue source. Written here as null when
+          // absent (the existing route `fields` style), but the STORE writes it
+          // SPARSELY — an unstamped persisted row adds no key. Selection-only
+          // provenance (never a credential).
+          issueSource: persistedBindingFields.issueSource ?? null
         }
       });
 

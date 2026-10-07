@@ -2403,8 +2403,8 @@ describe('GET /api/dashboard/sessions', () => {
   });
 
   // ─── issue binding pair reaches the runs[] projection (LIN-3331) ────────────
-  test('runs[] carries issueSource/issueBindingScope when stamped, sparsely when not', async () => {
-    const stamped = { ...workerHistoryItem('w-bind', 'LIN-3331', 'sess-bind'), issueSource: 'linear', issueBindingScope: 'team-a' };
+  test('runs[] carries issueSource when stamped, sparsely when not', async () => {
+    const stamped = { ...workerHistoryItem('w-bind', 'LIN-3331', 'sess-bind'), issueSource: 'linear' };
     const plain = workerHistoryItem('w-plain', 'LIN-3332', 'sess-bind');
     const perWorkspace = {
       'ws-a': {
@@ -2422,11 +2422,9 @@ describe('GET /api/dashboard/sessions', () => {
     const sess = findSession(res.jsonBody, 'sess-bind');
     const bound = sess.runs.find(r => r.loopId === 'w-bind');
     assert.equal(bound.issueSource, 'linear');
-    assert.equal(bound.issueBindingScope, 'team-a');
     // Sparse: an unstamped run adds NO key (byte-identical row shape).
     const bare = sess.runs.find(r => r.loopId === 'w-plain');
     assert.ok(!('issueSource' in bare), 'no issueSource key when unstamped');
-    assert.ok(!('issueBindingScope' in bare), 'no issueBindingScope key when unstamped');
   });
 
   test('a live session carries a deterministic statusLine from its latest child (no per-poll summary fetch needed)', async () => {

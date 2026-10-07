@@ -64,7 +64,7 @@ import { settleWithConcurrency } from './dashboard.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceMirrorToken, resolveIssueBinding, resolveDefaultBinding, resolveDefaultBindingSelection, bindingRefusalResponse, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceMirrorToken, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
 import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
 import { isConnectionBacked, setBindingCredential, setWorkspaceCredential } from '../lib/connection-binding.js';
 import { fingerprintCredential } from '../lib/credential-diagnostics.js';
@@ -325,27 +325,6 @@ function connectionBackedId(workspace) {
 }
 
 /**
- * LIN-3240 (LIN-3126 \u00a72): build an issue-binding selector from a request's
- * `source` + `bindingScope`. Absent/empty strings are treated as absent, so an
- * unstamped caller passes `null` — the exact pre-LIN-3240 call shape.
- * @param {*} source
- * @param {*} bindingScope
- * @returns {{source?: string, bindingScope?: string}|null}
- */
-function issueBindingSelector(source, bindingScope) {
-  const s = typeof source === 'string' && source ? source : undefined;
-  const bs = typeof bindingScope === 'string' && bindingScope ? bindingScope : undefined;
-  if (s === undefined && bs === undefined) return null;
-  return { source: s, bindingScope: bs };
-}
-
-/** LIN-3240: send a resolver refusal as the one 422 shape from lib/workspace.js. */
-function sendBindingRefusal(res, refusal) {
-  const { status, body } = bindingRefusalResponse(refusal);
-  return res.status(status).json(body);
-}
-
-/**
  * Create workspace API routes with required dependencies.
  * @param {Object} options
  * @param {Function} options.workspaceFromUrl - Middleware to extract workspace from URL
@@ -579,8 +558,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // stamp LIN-561 puts on every merged-tree row, LIN-544) rather than
       // always the workspace's active provider — same fix as /api/detail
       // (LIN-1903), same helper.
-      const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
-      if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+      const issueBinding = resolveIssueBinding(workspace, req.query.source)
       const { provider: issueProvider, callScope: issueCallScope } = issueBinding
       const { issue, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
 
@@ -718,8 +696,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
 
       // LIN-1904: resolve the issue's own binding via `source`, same as /api/prompt.
-      const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
-      if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+      const issueBinding = resolveIssueBinding(workspace, req.query.source)
       const { provider: issueProvider, callScope: issueCallScope } = issueBinding
       const { issue, project } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
       const prompt = buildAutopilotKickoff({
@@ -877,8 +854,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const workspace = req.workspace
 
     const { issueId } = req.params
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source)
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding
 
     if (!isValidIssueId(issueId)) {
@@ -1112,8 +1088,7 @@ ${goal}`
   router.get('/workspace/:urlKey/api/recommend/:issueId/stream', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     // --- Pre-flight validation (regular HTTP errors) ---
@@ -1491,8 +1466,7 @@ ${goal}`
       // test-token spec reaches this endpoint, so the old `testMockData` data-mock
       // branch was orphaned and removed (LIN-413). Linear + local both serve here.
       // LIN-1904: resolve the issue's own binding via `source`, same as /api/detail.
-      const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
-      if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+      const issueBinding = resolveIssueBinding(workspace, req.query.source)
       const { provider: issueProvider, callScope: issueCallScope } = issueBinding
       const comments = await issueProvider.fetchIssueComments(issueCallScope, issueId)
       res.json({ comments })
@@ -1558,10 +1532,9 @@ ${goal}`
    */
   router.post('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace
-    // LIN-3240: the issue's own binding, strict — `source`+`bindingScope` selector.
+    // LIN-3240 / LIN-3335: the issue's own provider-kind source, source-only.
     const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope))
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source)
     const { provider, callScope: token } = issueBinding
 
     if (!provider.supports('createComment')) {
@@ -1892,10 +1865,8 @@ ${goal}`
       // binding instead, via resolveIssueBinding — bounded to this workspace's
       // OWN bindings, so it can only select among credentials the caller
       // already has access to (LIN-1904).
-      const detailSelector = issueBindingSelector(req.query.source, req.query.bindingScope)
-      const issueBinding = resolveIssueBinding(workspace, detailSelector)
-      if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
-      const { provider, callScope } = issueBinding
+      const detailSelector = req.query.source
+      const { provider, callScope } = resolveIssueBinding(workspace, detailSelector)
 
       // Test mode (test-token + testMockData): the homepage renders from the mock
       // fixtures, not the provider API, so the lazy detail must too — fetching via
@@ -1909,18 +1880,6 @@ ${goal}`
         }
       } else {
         issue = await provider.fetchIssueFields(callScope, issueId)
-      }
-
-      // LIN-3240 (review F1): the fan-out stamp (`issue.bindingScope`) is applied
-      // at the source rows, but this provider re-fetch returns a fresh issue with
-      // none — so every `bindingScopeAttr(issue)` and the edit/chat hrefs in
-      // `renderDetailsContent` emitted nothing and downstream fetches re-resolved
-      // source-only (422 on a two-repo workspace). Once a `bindingScope` selector
-      // has validated, carry the validated scope onto the rendered issue so the
-      // whole fragment keeps THIS issue's binding. Only when a scope was
-      // validated: an unstamped/single-binding request stays byte-identical.
-      if (detailSelector?.bindingScope) {
-        issue = { ...issue, bindingScope: detailSelector.bindingScope.trim() }
       }
 
       // Custom prompts (non-blocking, fallback to empty) — matches the homepage.
@@ -2017,8 +1976,7 @@ ${goal}`
   router.get('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!isValidIssueId(issueId)) {
@@ -2087,8 +2045,7 @@ ${goal}`
   router.post('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!isValidIssueId(issueId)) {
@@ -2217,8 +2174,7 @@ ${goal}`
 
     // LIN-3240 (LIN-3126 \\u00a72): this is an ISSUE-neighbourhood read — fetch the
     // issue's OWN binding (strict), not the workspace's active one.
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding);
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
 
     try {
       const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
@@ -2265,8 +2221,7 @@ ${goal}`
   router.get('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!isValidIssueId(issueId)) {
@@ -2335,8 +2290,7 @@ ${goal}`
   router.post('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!isValidIssueId(issueId)) {
@@ -2570,8 +2524,7 @@ ${goal}`
   router.get('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!isValidIssueId(issueId)) {
@@ -2690,22 +2643,18 @@ ${goal}`
   router.post('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
-    // LIN-3126 residual: persist the validated selector pair onto the durable
-    // scan row so a later rulings anchor (lib/unanswered-decisions.js) and a
-    // scan-due item can hand the browser the issue's own binding. Only a
-    // COMPLETE, non-blank pair is stored — a source-only hint or a legacy /
-    // single-binding scan adds no key (sparse, byte-identical). The pair was
-    // already validated by `resolveIssueBinding` above; `issueBindingScope` is
-    // selection-only provenance, never a credential (B1).
+    // LIN-3126 residual / LIN-3335: persist the validated kind-only `issueSource`
+    // onto the durable scan row so a later rulings anchor
+    // (lib/unanswered-decisions.js) and a scan-due item can hand the browser the
+    // issue's own provider. Only a non-blank source is stored — a legacy scan
+    // adds no key (sparse, byte-identical).
     const scanBindingPair = (
-      typeof req.query.source === 'string' && req.query.source.trim() &&
-      typeof req.query.bindingScope === 'string' && req.query.bindingScope.trim()
+      typeof req.query.source === 'string' && req.query.source.trim()
     )
-      ? { issueSource: req.query.source.trim(), issueBindingScope: req.query.bindingScope.trim() }
+      ? { issueSource: req.query.source.trim() }
       : {};
 
     if (!isValidIssueId(issueId)) {
@@ -2925,8 +2874,7 @@ ${goal}`
       if (UUID_REGEX.test(issueId)) {
         canonicalId = issueId;
       } else {
-        const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-        if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+        const issueBinding = resolveIssueBinding(workspace, req.query.source);
         const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
         if (!issueProvider.supports('fetchRecommendationContext')) {
           return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
@@ -3029,8 +2977,7 @@ ${goal}`
     const workspace = req.workspace;
     const { issueId } = req.params;
     const recordId = req.body?.id;
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!isValidIssueId(issueId)) {
@@ -3219,8 +3166,7 @@ ${goal}`
       if (UUID_REGEX.test(issueId)) {
         canonicalId = issueId;
       } else {
-        const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-        if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+        const issueBinding = resolveIssueBinding(workspace, req.query.source);
         const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
         if (!issueProvider.supports('fetchRecommendationContext')) {
           return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
@@ -3335,12 +3281,9 @@ ${goal}`
    */
   router.get('/workspace/:urlKey/api/scan-due', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
-    // LIN-3240 (LIN-3126 \u00a72): scan-due is a WORKSPACE-LEVEL batch (no :issueId).
-    // It uses the explicit default binding (the LIN-3124 active marker) unless a
-    // validated `source`+`bindingScope` is supplied, so it never 422s for
-    // ambiguity on a two-repo workspace.
-    const issueBinding = resolveDefaultBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    // LIN-3240 / LIN-3335: scan-due is a WORKSPACE-LEVEL batch (no :issueId).
+    // It uses the source-only default binding, so it never 422s for ambiguity.
+    const issueBinding = resolveIssueBinding(workspace, null);
     const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
 
     if (!taskDecisionsStore) {
@@ -3401,12 +3344,11 @@ ${goal}`
             raisedDueBasisVersion: row.dueBasisVersion,
             currentDueBasisHash
           }),
-          // LIN-3126 residual: the row's own binding pair, recorded when it was
-          // scanned, rides the item so the client's bulk-scan POST can forward
-          // it (public/observation.js startDueBulkScan). SPARSE — a row with no
-          // pair emits no key. Selection-only (B1).
+          // LIN-3126 residual / LIN-3335: the row's own kind-only source,
+          // recorded when it was scanned, rides the item so the client's
+          // bulk-scan POST can forward it (public/observation.js
+          // startDueBulkScan). SPARSE — a row with no source emits no key.
           ...(row.issueSource != null ? { source: row.issueSource } : {}),
-          ...(row.issueBindingScope != null ? { bindingScope: row.issueBindingScope } : {})
         };
       });
 
@@ -3421,8 +3363,7 @@ ${goal}`
             issueIdentifier: page.items[i].issueIdentifier,
             dueStatus: null,
             error: true,
-            ...(page.items[i].issueSource != null ? { source: page.items[i].issueSource } : {}),
-            ...(page.items[i].issueBindingScope != null ? { bindingScope: page.items[i].issueBindingScope } : {})
+            ...(page.items[i].issueSource != null ? { source: page.items[i].issueSource } : {})
           });
 
       keepalive.send(200, {
@@ -3755,13 +3696,12 @@ ${goal}`
           issueUrl: issue.url || null,
           dispatchedBy: session?.accountId || null,
           target: 'cli',
-          // LIN-3126 residual (producer sweep): the created issue's own binding
-          // pair, so a reply/Close out on this run resolves the same binding.
-          // `?? null` (never a `fields` spread — the LIN-3138 census forbids one
-          // here); the store's `addItem` writes a null selector sparsely, so a
-          // legacy/marker-less workspace keeps the S0 key set.
-          issueSource: overrides.bindingPair?.issueSource ?? null,
-          issueBindingScope: overrides.bindingPair?.issueBindingScope ?? null
+          // LIN-3126 residual (producer sweep) / LIN-3335: the created issue's
+          // own kind-only source, so a reply/Close out on this run resolves the
+          // same provider. `?? null` (never a `fields` spread — the LIN-3138
+          // census forbids one here); the store's `addItem` writes a null source
+          // sparsely, so a legacy/marker-less workspace keeps the S0 key set.
+          issueSource: overrides.bindingPair?.issueSource ?? null
         }
       });
       return null;
@@ -3867,11 +3807,10 @@ ${goal}`
           issueUrl: issue.url || null,
           dispatchedBy: session?.accountId || null,
           target: 'cli',
-          // LIN-3126 residual (producer sweep): same created-issue binding pair
-          // as `enqueueFeedbackTriage` above (`?? null`; the store writes it
-          // sparsely).
-          issueSource: overrides.bindingPair?.issueSource ?? null,
-          issueBindingScope: overrides.bindingPair?.issueBindingScope ?? null
+          // LIN-3126 residual (producer sweep) / LIN-3335: same created-issue
+          // kind-only source as `enqueueFeedbackTriage` above (`?? null`; the
+          // store writes it sparsely).
+          issueSource: overrides.bindingPair?.issueSource ?? null
         }
       });
       return { launched: true };
@@ -3915,28 +3854,19 @@ ${goal}`
    */
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
     const workspace = req.workspace;
-    // LIN-3240 (LIN-3126 §2): creation targets the EXPLICIT default binding —
-    // the LIN-3124 active marker's binding. Targeting a non-default binding
-    // requires an explicit, validated `source`+`bindingScope`; absent means the
-    // default, never a silent pick. Call scope always comes from the binding
-    // (`getBindingCallScope`), never from `bindingScope`.
-    const feedbackBindingSelector = issueBindingSelector(req.body?.source ?? req.query.source, req.body?.bindingScope ?? req.query.bindingScope);
-    const issueBinding = resolveDefaultBindingSelection(workspace, feedbackBindingSelector);
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding);
+    // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's
+    // default (active) binding. The pair-era selector is gone;
+    // `resolveIssueBinding(workspace, null)` is the source-only default.
+    const issueBinding = resolveIssueBinding(workspace, null);
     const provider = issueBinding.provider;
-    // LIN-3126 residual (producer sweep): the feedback triage/autopilot rows are
-    // issue-addressed and never reach the factory's §5.5a pair inheritance (no
-    // `followUpTo`), so the row must carry the created issue's own binding pair
-    // or the run page's reply / Close out senders 422 BINDING_REQUIRED on a
-    // two-binding connection-backed workspace. The pair is taken from the SAME
-    // selected binding that produced `provider`/`callScope` — one selection, so
-    // the binding the issue is created in and the stamped pair cannot drift. A
-    // legacy/marker-less workspace selects no binding (`binding` absent) and adds
-    // no key, keeping the S0 sparse shape. Selection-only provenance, never a
+    // LIN-3126 residual (producer sweep) / LIN-3335: the feedback triage/autopilot
+    // rows are issue-addressed and never reach the factory's §5.5a source
+    // inheritance (no `followUpTo`), so the row carries the created issue's
+    // kind-only source. It is taken from the SAME resolved binding that produced
+    // `provider`/`callScope` — one resolution, so the source the issue is created
+    // in and the stamped source cannot drift. Selection-only provenance, never a
     // credential (B1).
-    const persistedBindingPair = issueBinding.binding
-      ? { issueSource: issueBinding.binding.provider, issueBindingScope: issueBinding.binding.scope }
-      : {};
+    const persistedBindingPair = provider?.name ? { issueSource: provider.name } : {};
     // Provider call scope: bare token for Linear/local (byte-identical), or a
     // { token, repo } GitHub App credential so createIssue builds a request-time
     // client from the installation token (LIN-713). uploadFile is capability-gated
@@ -4226,12 +4156,9 @@ ${goal}`
    */
   router.post('/workspace/:urlKey/api/issues', workspaceFromUrl, json(), async (req, res) => {
     const workspace = req.workspace;
-    // LIN-3240 (LIN-3126 §2): creation targets the EXPLICIT default binding —
-    // the LIN-3124 active marker's binding. A non-default target requires an
-    // explicit, validated `source`+`bindingScope`; absent means the default,
-    // never a silent pick. Call scope comes from the binding, never the selector.
-    const issueBinding = resolveDefaultBinding(workspace, issueBindingSelector(req.body?.source ?? req.query.source, req.body?.bindingScope ?? req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding);
+    // LIN-3240 / LIN-3335: creation targets the workspace's default (active)
+    // binding, source-only. The call scope comes from the resolved binding.
+    const issueBinding = resolveIssueBinding(workspace, null);
     const provider = issueBinding.provider;
     const token = issueBinding.callScope;
 
@@ -4341,8 +4268,7 @@ ${goal}`
     // routes. Guard-read and write both derive from this single pairing, so
     // they cannot land on different bindings (the invariant LIN-1903's review
     // mutation-tested).
-    const issueBinding = resolveIssueBinding(workspace, issueBindingSelector(req.query.source, req.query.bindingScope));
-    if (issueBinding.error) return sendBindingRefusal(res, issueBinding)
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
     const { provider, callScope: token } = issueBinding;
 
     if (!provider.supports('updateIssue')) {
@@ -4580,12 +4506,9 @@ ${goal}`
     const seam = closeOut || {};
     const resolveProvider = seam.resolveProvider || resolveIssueBinding;
     const requestedSource = typeof req.body?.source === 'string' ? req.body.source : (typeof req.query.source === 'string' ? req.query.source : null);
-    const requestedScope = req.body?.bindingScope ?? req.query.bindingScope;
 
     try {
-      const binding = resolveProvider(workspace, issueBindingSelector(requestedSource, requestedScope));
-      if (binding.error) return sendBindingRefusal(res, binding);
-      const { provider, callScope } = binding;
+      const { provider, callScope } = resolveProvider(workspace, requestedSource);
 
       const comments = await provider.fetchIssueComments(callScope, issueIdentifier);
       let allowlist = new Set();

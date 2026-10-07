@@ -34,11 +34,11 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { ConnectionStore } from '../../lib/connection-store.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { convertToConnectionBacked, createConnectionAccess } from '../../lib/connection-credential.js';
-import { linkProvider, normalizeProvider, BINDING_INTENT } from '../../lib/workspace.js';
+import { linkProvider, normalizeProvider } from '../../lib/workspace.js';
 import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, selectOwnerSessionRow, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
 import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
-import { workspaceTokenCacheKey, workspaceTokenCacheBypasses, createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
+import { workspaceTokenCacheKey, createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
 import { attemptSuspectCredentialRefresh as attemptImpl } from '../../lib/suspect-credential-refresh.js';
@@ -57,6 +57,9 @@ const HEALTHY = 'lin_HEALTHY_record';
 const DEAD = 'lin_DEAD_legacy_scalar';
 const CONNECTION_ID = `${ACCT}::linear::org-1`;
 const SEL = { source: 'linear', bindingScope: 'org-1' };
+// LIN-3335: the pair-era resolver intent/selector options are gone; these labels
+// survive the case matrix above but `resolveWorkspaceAccess` ignores them now.
+const BINDING_INTENT = { ISSUE: 'ISSUE', WORKSPACE: 'WORKSPACE', CREATE: 'CREATE' };
 
 /**
  * Assert the repeated-request sequence is stable: no adjacent 401<->200 switch
@@ -132,7 +135,7 @@ describe('LIN-3278 — stale Connection mirror vs authoritative owner record', (
     });
     const context = vm.createContext({
       UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution,
-      CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS, workspaceTokenCacheKey, workspaceTokenCacheBypasses,
+      CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS, workspaceTokenCacheKey,
       selectOwnerWorkspaceTokenExcludingSuperseded, rejectedCredentialRegistry: registry,
       accountStore: { resolveCanonicalAccountId: async (id) => id },
       sessionsCollection: { find: () => ({ toArray: async () => w.rows }) },
