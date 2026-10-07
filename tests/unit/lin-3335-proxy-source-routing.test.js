@@ -214,6 +214,37 @@ describe('LIN-3335 R1 — proxy dispatch/read routes a Jira task to Jira', () =>
     assert.equal(calls.linearDetail.length, 1, 'Linear served the read');
     assert.equal(calls.jiraDetail.length, 0, 'Jira was never queried');
   });
+
+  test('POST /api/proxy/autopilot/kickoff {issueSource:jira} resolves the scoped run against Jira', async () => {
+    const calls = installProviders();
+    const { fn } = makeMixedResolver();
+    const { seen, resolveWorkspaceAccess } = recordingResolver(fn);
+    const { app } = buildProxyApp({ resolveWorkspaceAccess, provider: null });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/autopilot/kickoff', {
+      issueIdentifier: 'ABC-12', issueSource: 'jira', goal: 'run the jira task',
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    assert.equal(seen.at(-1).provider, 'jira', 'the kickoff seam resolved the Jira provider');
+    assert.equal(seen.at(-1).token, JIRA_TOKEN, 'the kickoff seam served the Jira Connection credential');
+    assert.equal(calls.linearDetail.length, 0, 'Linear was never queried');
+  });
+
+  test('POST /api/proxy/recommend-and-dispatch {issueSource:jira} resolves the read against Jira', async () => {
+    const calls = installProviders();
+    const { fn } = makeMixedResolver();
+    const { seen, resolveWorkspaceAccess } = recordingResolver(fn);
+    const { app } = buildProxyApp({ resolveWorkspaceAccess, provider: null });
+
+    const res = await callProxy(app, 'POST', '/api/proxy/recommend-and-dispatch', {
+      issueIdentifier: 'ABC-12', issueSource: 'jira', kind: 'implementation',
+    });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    assert.equal(seen.at(-1).provider, 'jira', 'the recommend seam resolved the Jira provider');
+    assert.equal(seen.at(-1).token, JIRA_TOKEN, 'the recommend seam served the Jira Connection credential');
+  });
 });
 
 // ── The per-kind credential never contaminates the base token cache ───────────
