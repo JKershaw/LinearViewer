@@ -308,14 +308,13 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task with a running build');
   });
 
-  // LIN-3331 (the plan's two-binding e2e): on a MERGED multi-binding workspace,
-  // a foreign-source issue's task-page link must carry the issue's OWN binding
-  // (`?source=&bindingScope=`) and land on the task page — never the route's
-  // BINDING_REQUIRED JSON refusal. Jira is a CONNECTION-BACKED secondary binding
-  // (so the fan-out stamps `bindingScope` on its rows); the Home link for its row
-  // must point through Jira's own scope, with the connection's call scope reaching
-  // the provider on the task page (the fixture's Jira client asserts that).
-  test('a foreign-source issue on a multi-binding workspace links with the pair and lands on its task page', async ({ page, seedLocal }) => {
+  // LIN-3331 / LIN-3335 (the plan's two-binding e2e): on a MERGED multi-binding
+  // workspace, a foreign-source issue's task-page link must carry the issue's
+  // OWN provider kind (`?source=`) and land on the task page — never the route's
+  // (now-removed) BINDING_REQUIRED JSON refusal. The pair-era `bindingScope` is
+  // gone; the source-only resolver reaches Jira's own connection on the task
+  // page (the fixture's Jira client asserts that).
+  test('a foreign-source issue on a multi-binding workspace links with its source and lands on its task page', async ({ page, seedLocal }) => {
     const jiraResp = await page.request.post('/test/set-jira-session', { data: { seed: defaultJiraSeed } });
     expect(jiraResp.ok()).toBeTruthy();
     const { dashboard } = await seedLocal(null, {
@@ -337,7 +336,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     const href = await link.getAttribute('href');
     expect(href).toContain('/task/ENG-1');
     expect(href, 'the Jira issue carries source=jira').toContain('source=jira');
-    expect(href, 'the Jira issue carries its bindingScope').toContain(`bindingScope=${encodeURIComponent(JIRA_SITE)}`);
+    expect(href, 'the pair-era bindingScope is gone').not.toContain('bindingScope=');
 
     await link.click();
     // Not the BINDING_REQUIRED JSON body: the real task page, resolved through

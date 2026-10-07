@@ -28,7 +28,7 @@ import { Router } from 'express';
 import { renderTaskEditPage } from '../lib/render-task-edit.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { resolveIssueBinding, bindingRefusalResponse, isValidIssueId } from '../lib/workspace.js';
+import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 
 /**
  * Best-effort workflow states for the page's state `<select>`.
@@ -93,21 +93,11 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       ));
     }
 
-    // LIN-1904 / LIN-3240: resolve the issue's OWN binding via the
-    // `source`+`bindingScope` provenance the Edit link carries (lib/render.js),
-    // STRICT (issue-addressed). Single-binding workspaces are unaffected: an
-    // absent/unmatched `source` falls back to the active provider/scope.
-    const requestedBindingScope = typeof req.query.bindingScope === 'string' && req.query.bindingScope
-      ? req.query.bindingScope
-      : undefined;
-    const issueBinding = resolveIssueBinding(workspace, {
-      source: typeof req.query.source === 'string' && req.query.source ? req.query.source : undefined,
-      bindingScope: requestedBindingScope,
-    });
-    if (issueBinding.error) {
-      const { status, body } = bindingRefusalResponse(issueBinding);
-      return res.status(status).json(body);
-    }
+    // LIN-1904 / LIN-3335: resolve the issue's OWN provider-kind source from the
+    // `source` provenance the Edit link carries (lib/render.js), source-only.
+    // Single-binding workspaces are unaffected: an absent/unmatched `source`
+    // falls back to the active provider/scope.
+    const issueBinding = resolveIssueBinding(workspace, typeof req.query.source === 'string' && req.query.source ? req.query.source : undefined);
     const { provider, callScope: scope } = issueBinding;
 
     // LIN-1886: threads the provider's ui surface through so the renderer can
@@ -145,7 +135,7 @@ export function createTaskEditRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       // provenance through the write hop. For a single-binding workspace this
       // is the active provider's own name — a no-op in outcome, since the
       // sole binding still matches.
-      return res.send(renderTaskEditPage({ issue, states, urlKey: workspace.urlKey, issueId, source: provider.name, bindingScope: requestedBindingScope || '' }, pageOptions));
+      return res.send(renderTaskEditPage({ issue, states, urlKey: workspace.urlKey, issueId, source: provider.name }, pageOptions));
     } catch (error) {
       // Unknown / cross-workspace / deleted id — the provider read seam signals
       // this by throwing `Issue not found: <id>`. Same message match the lazy

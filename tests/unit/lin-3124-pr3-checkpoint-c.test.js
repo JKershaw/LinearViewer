@@ -99,7 +99,11 @@ describe('LIN-3124 PR3 checkpoint C — resolveConnectionBackedAccess', () => {
 
   test('a live owner connection is served, and the provider is the owner row provider', async () => {
     const owner = conn('acct::jira::s', 'jira', 'https://s', { token: 'jt', authType: 'oauth', cloudId: 'c', tokenExpiresAt: future() });
-    const ownerRow = { session: { workspaces: [{ provider: 'jira' }] }, workspaceIndex: 0 };
+    const ownerRow = { session: { workspaces: [{
+      provider: 'jira',
+      bindings: [{ provider: 'jira', scope: 'https://s', connectionId: owner._id }],
+      activeBinding: { provider: 'jira', scope: 'https://s' },
+    }] }, workspaceIndex: 0 };
     const { access, calls } = accessWith({ connections: [owner], ownerRow });
     const out = await access.resolveConnectionBackedAccess({ urlKey: 'u', ownerAccountId: 'acct', sessions: [] });
     assert.deepStrictEqual(calls.reads, [{ urlKey: 'u', provider: 'jira' }]);

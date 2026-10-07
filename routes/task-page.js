@@ -16,8 +16,9 @@
  * render as a task called "new". `/task/:issueId/edit` has one more segment and
  * can't collide. Both are pinned in tests/unit/task-page-route.test.js.
  *
- * The page reads with the session credential, through the issue's own binding
- * (`?source=&bindingScope=`, as the Edit link carries it). The state endpoint
+ * The page reads with the session credential, through the issue's own
+ * provider-kind source (`?source=`, as the Edit link carries it). The state
+ * endpoint
  * reads stored data only and never touches a provider: the client polls it, and
  * a poll must never spend a tracker read or an LLM call.
  */
@@ -25,7 +26,7 @@
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { resolveIssueBinding, bindingRefusalResponse, isValidIssueId } from '../lib/workspace.js';
+import { resolveIssueBinding, isValidIssueId } from '../lib/workspace.js';
 import { jsonError } from '../lib/errors.js';
 import {
   renderTaskPage,
@@ -68,14 +69,11 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));
     }
 
-    // The issue's OWN binding (LIN-1904 / LIN-3240), from the provenance the
-    // links carry. Single-binding workspaces fall back to the active one.
-    const binding = { source: queryValue(req.query.source), bindingScope: queryValue(req.query.bindingScope) };
-    const issueBinding = resolveIssueBinding(workspace, binding);
-    if (issueBinding.error) {
-      const { status, body } = bindingRefusalResponse(issueBinding);
-      return res.status(status).json(body);
-    }
+    // The issue's OWN provider-kind source (LIN-1904 / LIN-3335), from the
+    // provenance the links carry. Single-binding workspaces fall back to the
+    // active one. The pair-era `bindingScope` is gone.
+    const binding = { source: queryValue(req.query.source) };
+    const issueBinding = resolveIssueBinding(workspace, binding.source);
     const access = { provider: issueBinding.provider, callScope: issueBinding.callScope };
 
     try {
@@ -98,7 +96,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
       return res.send(renderTaskPage(model, {
         viewer: 'owner',
         urlKey: workspace.urlKey,
-        binding: { source: binding.source || null, bindingScope: binding.bindingScope || null },
+        binding: { source: binding.source || null },
         stateUrl,
         now: now(),
         pageOptions,

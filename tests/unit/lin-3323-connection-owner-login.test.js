@@ -38,7 +38,7 @@ import {
 } from '../../lib/workspace-token-resolver.js';
 import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
-import { workspaceTokenCacheKey, workspaceTokenCacheBypasses, createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
+import { workspaceTokenCacheKey, createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
 import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
 
@@ -109,7 +109,7 @@ function makeResolver(w, cache) {
   const lifecycle = { recordEvent: async () => {} };
   const context = vm.createContext({
     UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution,
-    CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS, workspaceTokenCacheKey, workspaceTokenCacheBypasses,
+    CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS, workspaceTokenCacheKey,
     selectOwnerWorkspaceTokenExcludingSuperseded, rejectedCredentialRegistry: registry,
     accountStore: { resolveCanonicalAccountId: async (id) => id },
     sessionsCollection: { find: () => ({ toArray: async () => w.rows }) },

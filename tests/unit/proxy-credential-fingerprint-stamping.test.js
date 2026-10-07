@@ -129,13 +129,10 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     // LIN-679 Stage 6 (LIN-2540) — three-way split, part 3 of 3, closing: the
     // last direct site (group I recommend-and-dispatch) moved to
     // routes/proxy-dispatch.js, so routes/proxy.js now has 0.
-    // LIN-3242: the intent argument may now carry a trailing `...(selector)`
-    // spread on the dispatch/kickoff sites, so the match spans to the statement
-    // terminator rather than a brace-excluding character class.
-    // LIN-3242 review R3: the ISSUE-arm enqueue sites (kickoff,
-    // recommend-and-dispatch) also destructure the seam's `selectedBinding`, so
-    // a trailing `, selectedBinding` is admitted; `provider` is still required.
-    const pattern = /const \{ token: accessToken, reason, provider(?:, selectedBinding)? \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req, \{ intent: [\s\S]*?\}\);/g;
+    // LIN-3335: the pair-era `{ intent: BINDING_INTENT.* }` fourth argument (and
+    // the ISSUE-arm `selectedBinding` destructure) are gone; the call is the
+    // plain three-arg resolve.
+    const pattern = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\);/g;
     const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
     const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
     const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
@@ -187,13 +184,9 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
   // routes/proxy.js (valid per the function's own loop-over-zero-matches shape).
   function assertOrderingGuard(source, expectedCount, label) {
     const resolveIdx = [];
-    // The call now carries a 4th `{ intent: BINDING_INTENT.* }` argument
-    // (LIN-3241 F); match the stable prefix up to that argument and locate the
-    // statement terminator, so the gap after the WHOLE resolve statement is
-    // still the thing asserted.
-    // LIN-3242 review R3: a trailing `, selectedBinding` in the destructure is
-    // admitted (the ISSUE-arm enqueue sites read the seam's selected binding).
-    const prefix = /const \{ token: accessToken, reason, provider(?:, selectedBinding)? \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req,/g;
+    // LIN-3335: the pair-era fourth `{ intent: BINDING_INTENT.* }` argument is
+    // gone, so the stable prefix is the plain three-arg resolve.
+    const prefix = /const \{ token: accessToken, reason, provider \} = await resolveProviderAccess\(req\.proxyUrlKey, req\.proxyCreatedBy, req\)/g;
     for (const m of source.matchAll(prefix)) {
       resolveIdx.push(m.index);
     }

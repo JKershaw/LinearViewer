@@ -42,7 +42,7 @@ import {
 } from '../../lib/workspace-token-resolver.js';
 import { CREDENTIAL_SOURCES, fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { CREDENTIAL_LIFECYCLE_EVENT_KINDS } from '../../lib/credential-lifecycle-events.js';
-import { workspaceTokenCacheKey, workspaceTokenCacheBypasses } from '../../lib/workspace-token-cache.js';
+import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
@@ -141,7 +141,6 @@ describe('LIN-3124 T18 — decoy-token across every lane', () => {
         CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS, workspaceTokenCacheKey,
         // LIN-3241 (B): the extracted body's cache-bypass decision; these probes
         // call the resolver with no options, so the real predicate returns false.
-        workspaceTokenCacheBypasses,
         accountStore: { resolveCanonicalAccountId: async (id) => id },
         sessionsCollection: { find: () => ({ toArray: async () => [{ _id: 'sid', session: w.session }] }) },
         workspaceTokenCache: { get: () => undefined, set: () => true },

@@ -868,12 +868,11 @@ export function createDashboardRoutes({
         issueIdentifier: l.issueIdentifier || null,
         issueTitle: l.issueTitle || '',
         issueUrl: l.issueUrl || null,
-        // LIN-3331: the run's task binding pair, projected SPARSELY (an
-        // unstamped/legacy loop adds no key, keeping the feed row byte-
-        // identical) so the Observation task block's task-page link can carry
-        // it. Selection-only provenance, never a credential (B1).
+        // LIN-3331 / LIN-3335: the run's task kind-only source, projected
+        // SPARSELY (an unstamped/legacy loop adds no key, keeping the feed row
+        // byte-identical) so the Observation task block's task-page link can
+        // carry it. Selection-only provenance, never a credential (B1).
         ...(l.issueSource != null ? { issueSource: l.issueSource } : {}),
-        ...(l.issueBindingScope != null ? { issueBindingScope: l.issueBindingScope } : {}),
         agentState: l.agentState,
         stage: l.stage || null,
         promptName: l.promptName || null,
@@ -2566,31 +2565,27 @@ export function createDashboardRoutes({
     // set scored cannot drift.
     const identifiers = eligibleIssueIdentifiers({ liveRows, historyRows });
 
-    // LIN-3242 (LIN-3126 §4): group the eligible population by the dispatch row's
-    // OWN binding selector (`issueSource`/`issueBindingScope`), not by the
-    // workspace's active binding. Each DISTINCT stamped key resolves ONCE via
-    // slice-1's `resolveIssueBinding`; the call scope/credential always comes from
-    // the hydrated binding, never from `bindingScope` itself (B1/LIN-2473), and
-    // this path adds no `workspaceTokenCache` usage. An UNSTAMPED issue on a
-    // multi-binding connection-backed workspace is NOT guessed from the active
-    // binding: it is counted as skipped and disclosed in `completeness`. So is a
-    // stamped key whose binding no longer resolves. A single-binding/legacy
-    // workspace keeps today's behaviour for unstamped rows exactly (the null
-    // group resolves to the workspace's active pair).
+    // LIN-3242 (LIN-3126 §4) / LIN-3335: group the eligible population by the
+    // dispatch row's OWN provider-kind `issueSource`, not by the workspace's
+    // active binding. Each DISTINCT stamped source resolves ONCE via the
+    // source-only `resolveIssueBinding`; the call scope/credential always comes
+    // from the hydrated binding. An UNSTAMPED issue keeps today's behaviour: the
+    // null group resolves to the workspace's active pair. The pair-era
+    // `issueBindingScope` is gone.
     const stampByIdentifier = new Map();
     for (const row of [...liveRows, ...historyRows]) {
       const id = row.issueIdentifier;
       if (!id) continue;
-      const stamped = row.issueSource != null && row.issueBindingScope != null;
+      const stamped = row.issueSource != null;
       const existing = stampByIdentifier.get(id);
       if (existing === undefined || (existing === null && stamped)) {
-        stampByIdentifier.set(id, stamped ? { source: row.issueSource, bindingScope: row.issueBindingScope } : null);
+        stampByIdentifier.set(id, stamped ? row.issueSource : null);
       }
     }
     const groups = new Map();
     for (const identifier of identifiers) {
       const selector = stampByIdentifier.get(identifier) ?? null;
-      const key = selector ? `${selector.source}\u0000${selector.bindingScope}` : '';
+      const key = selector ?? '';
       let group = groups.get(key);
       if (!group) {
         group = { selector, identifiers: [] };

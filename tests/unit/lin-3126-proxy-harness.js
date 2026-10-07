@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
-import { workspaceTokenCacheKey, workspaceTokenCacheBypasses, createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
+import { workspaceTokenCacheKey, createWorkspaceTokenCache } from '../../lib/workspace-token-cache.js';
 import { UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, classifyWorkspaceFailure, describeWorkspaceResolution } from '../../lib/workspace-token-resolver.js';
 import { selectOwnerWorkspaceTokenExcludingSuperseded } from '../../lib/superseded-selection.js';
 import { createRejectedCredentialRegistry } from '../../lib/rejected-credentials.js';
@@ -120,7 +120,6 @@ export function makeVmResolver({ sessions = [], connectionAccess = { resolveConn
     CREDENTIAL_SOURCES, fingerprintCredential, CREDENTIAL_LIFECYCLE_EVENT_KINDS,
     accountStore: { resolveCanonicalAccountId: async (id) => id },
     workspaceTokenCacheKey,
-    workspaceTokenCacheBypasses,
     sessionsCollection: { find: () => ({ toArray: async () => sessions }) },
     workspaceTokenCache: cache,
     ownerCredentialStore: { get: async () => null },

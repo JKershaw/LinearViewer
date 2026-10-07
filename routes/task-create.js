@@ -29,7 +29,7 @@ import { Router } from 'express';
 import { renderTaskCreatePage } from '../lib/render-task-create.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { resolveDefaultBinding } from '../lib/workspace.js';
+import { resolveIssueBinding } from '../lib/workspace.js';
 
 /**
  * Best-effort option list for a capability-gated read. Two independent guards,
@@ -82,11 +82,10 @@ export function createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, 
       featureFlags: getFeatureFlags(req.session)
     };
 
-    // LIN-3240 (LIN-3126 §2): creation is scoped to the EXPLICIT default binding
-    // (the LIN-3124 active marker's binding), never a silent pick on a
-    // multi-binding workspace. There is no issue yet to carry a `source` stamp;
+    // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's
+    // default (active) binding. There is no issue yet to carry a source stamp;
     // the form lists the default binding's teams/projects.
-    const defaultBinding = resolveDefaultBinding(workspace);
+    const defaultBinding = resolveIssueBinding(workspace, null);
     const provider = defaultBinding.provider;
     pageOptions.ui = provider?.ui || {};
 
