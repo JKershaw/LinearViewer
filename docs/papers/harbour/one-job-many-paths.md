@@ -22,8 +22,8 @@ cites:
 
 Harbour repeatedly makes one decision in several places because a new task adds a way
 through the system without retiring the old way. Compatibility, independently assembled
-results and context passed beside an identifier then become obligations for every later
-change. **The useful unit of consolidation is not the file or the endpoint, but the
+results and context passed beside an identifier then become obligations for later changes
+to that job. **The useful unit of consolidation is not the file or the endpoint, but the
 decision: one authority, reached by every caller.** The strongest remedy is already in
 Harbour's history: remove a competing implementation, preserve its necessary behaviour
 in the survivor, and test the real entry paths against that survivor. More permission to
@@ -134,7 +134,7 @@ residual remains today. [1]
 The causal sequence supported by these cases is:
 
 1. A task introduces a new representation or entrance while preserving the old one.
-2. Its tests establish the new path's local contract, often with the adjoining seam mocked.
+2. Its tests establish the new path's local contract but can stop at a mocked adjoining seam.
 3. A later fix follows one entrance and leaves another producer of the same answer intact.
 4. Compatibility and tests make each surviving branch look intentional; retiring it needs
    an explicit decision that no single patch requires.
@@ -232,6 +232,13 @@ These are proposals for John, not changes made by this paper:
   chosen authority, not create another version. Leave unrelated cosmetic similarities
   alone. This changes what work gets finished, not how many agents inspect it.
 
+For consolidation work, the existing close-out should consume the boundary-test result
+and deletion evidence through its run ledger and task dependencies. An unfinished
+retirement returns to the same effort instead of becoming a discharged filing. That
+requires making the completion check operative, not merely adding another prompt
+sentence; it needs no parallel debt database. Apply it to a chosen consolidation,
+not every task that happens to touch similar-looking code.
+
 The test of this proposal is fewer independent implementations of a *named decision*,
 with all bounded callers covered and old behaviour either preserved or explicitly
 withdrawn. Net lines help describe a change, but rewarding deletion alone would encourage
@@ -250,8 +257,8 @@ completion criterion. [12]
 trials themselves create second paths. The lesson here is to fund the cutover and
 deletion, not start another permanent two-arm experiment. Its September/October census
 is not a count of this checkout. *Paid Where Written* rightly locates cost in repeated
-work, but “put it in code” is insufficient: code with two authorities also charges every
-future change twice. [13]
+work, but “put it in code” is insufficient: two authorities can make a change to one
+decision require two repairs. [13]
 
 *Like a Skilled Developer* supplies the cause-level authority argument. Its claim that
 no stage grants that authority no longer describes this tree, and its proposed
