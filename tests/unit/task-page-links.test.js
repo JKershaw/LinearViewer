@@ -45,7 +45,8 @@ const HREF_ASSIGN_RE = /\.href\s*=\s*(.+)/;
 /** The exact parent-plan bounding grep, run against the working tree. */
 const CLASS1_GREP = "git grep -l -E 'identifier|issueIdentifier|seedIssue|issueTitle' -- 'lib/render-*.js' 'lib/components/*.js' 'public/*.js' lib/render.js";
 
-/** The value-level scan's file set (the parent plan's bounding grep). */
+/** `{file, snippet, reason}`. `snippet` is a stable substring of the flagged line;
+ * an entry covers every flagged line in its file that contains it. */
 const ALLOW_LIST = [
   {
     file: 'lib/render-session.js',
@@ -64,10 +65,16 @@ const ALLOW_LIST = [
   },
 ];
 
-// The template-literal scan's exempt homes and allow-list. The two helper homes
-// are exempt by path; every other `/task/${…}` literal needs a reasoned entry.
-const LITERAL_EXEMPT_FILES = ['lib/task-page-href.js', 'public/common.js'];
+// The template-literal scan's exempt home and allow-list. Only the shared helper
+// itself is exempt by path; its client twin in `public/common.js` is allow-listed
+// by the exact snippet so a hand-built path elsewhere in that file is still caught.
+const LITERAL_EXEMPT_FILES = ['lib/task-page-href.js'];
 const LITERAL_ALLOW_LIST = [
+  {
+    file: 'public/common.js',
+    snippet: 'encodeURIComponent(opts.urlKey)}/task/',
+    reason: 'window.taskPageHref — the client twin of the shared helper',
+  },
   {
     file: 'lib/render.js',
     snippet: '/edit',
