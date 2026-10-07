@@ -66,7 +66,12 @@ function twoRepoConnectionWorkspace({ activeScope = REPO_A } = {}) {
 function legacyTwoRepoWorkspace() {
   const gh = registerProvider({ name: 'github', ui: {}, supports: () => true });
   const ws = linkProvider({ id: 'ws-1', urlKey: 'acme' }, 'github', REPO_A, { token: 'tok-a' });
-  linkProvider(ws, 'github', REPO_B, { token: 'tok-b' });
+  // LIN-3334: `linkProvider` now refuses a second same-kind source. This helper
+  // characterizes a PRE-EXISTING legacy two-repo workspace (deleted in P2), so
+  // the second binding + scalar mirror are seeded directly, last-link-wins.
+  ws.bindings.push({ provider: 'github', scope: REPO_B, credentials: { token: 'tok-b' } });
+  ws.accessToken = 'tok-b';
+  ws.credentials = { ...ws.credentials, token: 'tok-b' };
   return { ws, gh };
 }
 

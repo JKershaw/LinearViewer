@@ -107,12 +107,12 @@ describe('workspace-store', () => {
   });
 
   // W3
-  test('bindings[] survive byte-intact, including a two-binding workspace (same provider, two scopes)', async () => {
+  test('bindings[] survive byte-intact, including a two-kind workspace (one binding per provider)', async () => {
     const store = freshStore();
     const ws = sampleWorkspace({
       bindings: [
         { provider: 'github', scope: 'owner/repo', credentials: { token: 'issues-tok' } },
-        { provider: 'github', scope: 'org/42', credentials: { token: 'projects-tok' } }
+        { provider: 'github-projects', scope: 'org/42', credentials: { token: 'projects-tok' } }
       ]
     });
 

@@ -161,12 +161,15 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.deepEqual(session.heldEntry.offered, { 'octo/5': `${ACCT}::github-projects::${INSTALL}` });
   });
 
-  test('GET excludes an already-bound scope', async () => {
+  test('GET refuses with the one-source-per-kind message when the workspace already has this kind (LIN-3334)', async () => {
     const { connectionStore } = await store();
     await seedConnection(connectionStore);
     const session = makeSession({ workspaces: [{ id: 'w1', urlKey: 'acme', bindings: [{ provider: 'github', scope: 'octo/a', connectionId: CONN_ID }] }] });
     const res = await get(buildRoute(connectionStore, { provider: githubProvider() }), session);
-    assert.deepEqual(session.heldEntry.offered, { 'octo/b': CONN_ID });
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /already has a GitHub Issues source \(octo\/a\)/);
+    assert.match(res.body, /one ticket source of each kind/);
+    assert.equal(session.heldEntry.offered, undefined, 'nothing is offered');
     assert.ok(!res.body.includes('value="octo/a"'));
   });
 
@@ -283,6 +286,30 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
     assert.deepEqual(session.workspaces[0].bindings, [existingBinding]);
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'no referent write on idempotent POST');
+  });
+
+  test('a held same-kind add at POST is refused with the plain message and writes nothing (LIN-3334)', async () => {
+    const { connectionStore } = await store();
+    await seedConnection(connectionStore);
+    const existingBinding = { provider: 'github', scope: 'octo/a', connectionId: CONN_ID };
+    const session = makeSession({
+      workspaces: [{ id: 'w1', urlKey: 'acme', bindings: [existingBinding] }],
+      // Offer map set directly (the GET would refuse; the POST is the second layer).
+      heldEntry: { provider: 'github', mode: 'add-source', workspaceUrlKey: 'acme', beginUrl: BEGIN, offered: { 'octo/b': CONN_ID } },
+    });
+    let addReferentCalls = 0;
+    const realAddReferent = connectionStore.addReferent?.bind(connectionStore);
+    connectionStore.addReferent = async (...args) => { addReferentCalls += 1; return realAddReferent ? realAddReferent(...args) : undefined; };
+    const before = await connectionStore.collection.findOne({ _id: CONN_ID });
+
+    const res = await post(buildRoute(connectionStore, { provider: githubProvider() }), session, { repo: 'octo/b' });
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /already has a GitHub Issues source \(octo\/a\)/);
+    assert.match(res.body, /one ticket source of each kind/);
+    assert.equal(addReferentCalls, 0, 'addReferent is never called');
+    assert.deepEqual(await connectionStore.collection.findOne({ _id: CONN_ID }), before, 'nothing is written to the store');
+    assert.deepEqual(session.workspaces[0].bindings, [existingBinding], 'no second binding');
   });
 
   // -------------------------------------------------------------------------

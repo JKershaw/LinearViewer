@@ -380,7 +380,10 @@ describe('LIN-1887 Step 5 — the OAuth binding carries a REAL expiry', () => {
     // is what makes both true — pinned here because Step 5 depends on it.
     const { setActiveProvider } = await import('../../lib/workspace.js');
     const expiry = Date.now() + 3_600_000;
-    const workspace = { urlKey: 'acme', provider: 'linear', accessToken: 'linear-tok', tokenExpiresAt: Number.MAX_SAFE_INTEGER, bindings: [] };
+    // LIN-3334: start from a truly fresh container (no scalar credential, no
+    // `bindings: []` hybrid) — otherwise the one-source-per-kind predicate
+    // reads the legacy scalar as an existing linear source and refuses the link.
+    const workspace = { urlKey: 'acme' };
     linkProvider(workspace, 'linear', 'org-1', { token: 'linear-tok', tokenExpiresAt: Number.MAX_SAFE_INTEGER });
     linkProvider(workspace, 'jira', 'https://acme.atlassian.net', { token: 'at-1', authType: 'oauth', cloudId: 'cid-1', tokenExpiresAt: expiry });
 

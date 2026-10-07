@@ -1,10 +1,14 @@
 /**
- * LIN-3125 Phase 3 — the offline e2e twin.
+ * LIN-3125 Phase 3 — the offline e2e twin (adapted for LIN-3334's one-source-
+ * per-kind rule).
  *
- * A signed-in user with ONE held (connection-backed) GitHub connection adds a
- * source via Settings and creates a fresh workspace via "as a new workspace" —
- * both entirely through the held picker. The browser never navigates to
- * github.com and the server-side auth/install counters stay at zero.
+ * A signed-in user with ONE held (connection-backed) GitHub connection:
+ *   - a same-kind add onto the workspace that already holds a GitHub source is
+ *     REFUSED with the plain message (LIN-3334) — no second source, no picker;
+ *   - a fresh workspace "as a new workspace" goes through the held picker and
+ *     binds another repo of the SAME connection, entirely offline.
+ * The browser never navigates to github.com and the server-side auth/install
+ * counters stay at zero.
  *
  * Runs against the dedicated, GitHub-configured test server on port 3002 (see
  * playwright.config.js): the default 3001 server deliberately runs with no
@@ -49,7 +53,7 @@ async function counters(page) {
 }
 
 test.describe('Held connection picker (LIN-3125 Phase 3)', () => {
-  test('settings add-source + fresh workspace go through the held picker with no GitHub navigation', async ({ page }) => {
+  test('a same-kind add is refused; a fresh workspace add goes through the held picker with no GitHub navigation', async ({ page }) => {
     const githubHits = [];
     await page.route('**github.com/**', route => { githubHits.push(route.request().url()); return route.abort(); });
 
@@ -59,28 +63,18 @@ test.describe('Held connection picker (LIN-3125 Phase 3)', () => {
 
     const settingsUrl = `/workspace/${urlKey}/settings`;
 
-    // ---- 1. add-source via the REAL Settings emitter (server.js add POST) ----
+    // ---- 1. a second GitHub source on the SAME workspace is refused (LIN-3334) ----
     await page.goto(settingsUrl);
     const addButton = page.locator('[data-testid="settings-provider-add-github"] button[type="submit"]');
     await expect(addButton).toBeVisible();
     await addButton.click();
-    await page.waitForURL('**/connect/github/held');
-    expect(page.url()).toContain('/connect/github/held');
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('body')).toContainText('already has a GitHub Issues source');
+    await expect(page.locator('body')).toContainText('one ticket source of each kind');
 
-    // The already-bound repo is excluded; the other two are offered.
-    await expect(page.locator(`input[name="repo"][value="${REPO_B}"]`)).toBeAttached();
-    await expect(page.locator(`input[name="repo"][value="${GITHUB_REPO}"]`)).toHaveCount(0);
-    await page.locator(`input[name="repo"][value="${REPO_B}"]`).check();
-    await page.locator('[data-testid="github-repo-submit"]').click();
-    await page.waitForURL(/\/settings\?provider_ok=github/);
-
-    // Settings now lists both bindings, sharing ONE connection.
-    await expect(page.locator(`[data-testid="settings-provider-binding"][data-scope="${GITHUB_REPO}"]`)).toHaveCount(1);
-    await expect(page.locator(`[data-testid="settings-provider-binding"][data-scope="${REPO_B}"]`)).toHaveCount(1);
     let ws = await bindingsOf(page);
     expect(ws.length).toBe(1);
-    expect(new Set(ws[0].bindings.map(b => b.connectionId)).size).toBe(1, 'both bindings share ONE connectionId');
-    expect(ws[0].bindings.every(b => b.hasCredentials === false)).toBe(true);
+    expect(ws[0].bindings.map(b => b.scope)).toEqual([GITHUB_REPO], 'no second source written');
 
     // ---- 2. fresh workspace via the REAL "as a new workspace" emitter ----
     await page.goto(settingsUrl);
@@ -97,7 +91,7 @@ test.describe('Held connection picker (LIN-3125 Phase 3)', () => {
     const all = ws.flatMap(w => w.bindings);
     expect(new Set(all.map(b => b.connectionId)).size).toBe(1);
     expect(all.every(b => b.hasCredentials === false)).toBe(true);
-    expect([...all.map(b => b.scope)].sort()).toEqual([GITHUB_REPO, REPO_B, REPO_C].sort());
+    expect([...all.map(b => b.scope)].sort()).toEqual([GITHUB_REPO, REPO_C].sort());
 
     // ---- 4. browser never reached github.com; SERVER did no auth/install round trip ----
     expect(githubHits).toEqual([]);

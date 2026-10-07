@@ -330,6 +330,9 @@ describe('getMissingGitHubConfig / getGitHubConfigProblems / isGitHubConfigured 
 function fakeProvider() {
   return {
     name: 'github',
+    // Mirrors the real provider's `ui.displayName` so the LIN-3334 refusal copy
+    // ("already has a GitHub Issues source …") is asserted as production renders it.
+    ui: { displayName: 'GitHub Issues' },
     // beginAuth is the authorize URL (LIN-735); beginInstall is the no-installation
     // fallback the callback redirects to.
     beginAuth: ({ state }) => `https://github.com/login/oauth/authorize?client_id=cid&state=${state}`,
@@ -910,8 +913,9 @@ describe('GitHub auth routes', () => {
     assert.equal(session.accountId, undefined);
   });
 
-  test('POST link (new) adds a second repo as a binding on the existing account container', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+  test('POST link (new) REFUSES a second repo on the existing account container with the plain message (LIN-3334 R1)', async () => {
+    const stores = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
@@ -925,8 +929,42 @@ describe('GitHub auth routes', () => {
     });
     await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
 
+    // LIN-3334 (R1): the returning-user login arm refuses with the plain
+    // message BEFORE establishAccount / linkProvider — no generic 500.
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /One source per kind/);
+    assert.match(res.body, /already has a GitHub Issues source \(octocat\/hello-world\)/);
+    assert.match(res.body, /one ticket source of each kind/);
     assert.equal(session.workspaces.length, 1, 'no duplicate workspace created');
-    assert.deepEqual(session.workspaces[0].bindings.map(b => b.scope), ['octocat/hello-world', 'octocat/another-repo']);
+    assert.deepEqual(session.workspaces[0].bindings.map(b => b.scope), ['octocat/hello-world'], 'no second source written');
+    // No durable account/binding edge was written for the refused add.
+    assert.deepEqual(await stores.accountWorkspaceStore.listAccountsForWorkspace('github:42'), []);
+  });
+
+  test('POST link (add-source) REFUSES a second repo on the viewed workspace with the plain message (LIN-3334 R1)', async () => {
+    const stores = freshAccountStores();
+    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const res = makeRes();
+    const viewed = {
+      id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok',
+      bindings: [
+        { provider: 'linear', scope: 'org-1', credentials: { token: 'lin_tok' } },
+        { provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } },
+      ],
+    };
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' },
+      workspaces: [viewed],
+      activeWorkspaceId: 'org-1',
+    });
+    await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
+
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /already has a GitHub Issues source \(octocat\/hello-world\)/);
+    assert.deepEqual(viewed.bindings.map(b => b.scope), ['org-1', 'octocat/hello-world'], 'no second source written');
+    assert.deepEqual(await stores.accountWorkspaceStore.listAccountsForWorkspace('org-1'), []);
   });
 
   // LIN-2300: the existing-container branch (re-adding a repo to an
@@ -951,7 +989,9 @@ describe('GitHub auth routes', () => {
       githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [existing],
     });
-    await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
+    // LIN-3334: re-link the SAME scope so the one-source-per-kind refusal does
+    // not pre-empt this branch's establishAccount path (the subject here).
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
     assert.equal(res.statusCode, 409);
     assert.match(res.body, /Account Conflict/);
@@ -984,7 +1024,9 @@ describe('GitHub auth routes', () => {
       githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: [existing],
     });
-    await handler({ body: { repo: 'octocat/another-repo' }, session }, res);
+    // LIN-3334: re-link the SAME scope, so this exercises the establishAccount
+    // conflict arm rather than the one-source-per-kind refusal.
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
     assert.equal(res.statusCode, 409);
     assert.match(res.body, /Account Conflict/);
@@ -1013,20 +1055,22 @@ describe('GitHub auth routes', () => {
     });
 
     const attempt1 = makeRes();
-    await handler({ body: { repo: 'octocat/another-repo' }, session }, attempt1);
+    // LIN-3334: re-link the SAME scope so attempt 1 reaches establishAccount (the
+    // unknown-account 409 subject) rather than the one-source-per-kind refusal.
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, attempt1);
     assert.equal(attempt1.statusCode, 409, 'attempt 1: the stale accountId fails as before');
     assert.equal(session.accountId, undefined, 'attempt 1: stale accountId cleared, opening the door to a retry');
 
     // Same session object, second attempt — the account is re-established fresh.
     session.githubPending = { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' };
     const attempt2 = makeRes();
-    await handler({ body: { repo: 'octocat/third-repo' }, session }, attempt2);
+    await handler({ body: { repo: 'octocat/hello-world' }, session }, attempt2);
 
     assert.equal(attempt2.redirectedTo, '/workspace/octocat/', 'attempt 2: succeeds and redirects');
     assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
     const account = await accountStore.getAccount(session.accountId);
     assert.ok(account, 'attempt 2: the newly established account is real and durable');
-    assert.equal(existing.bindings.length, 2, 'attempt 2: the retried binding is written');
+    assert.equal(existing.bindings.length, 1, 'attempt 2: the same source re-links idempotently, no duplicate');
   });
 
   // LIN-2267 (class fix of LIN-2233's L2.1, applied to the GitHub sibling):
@@ -1803,9 +1847,11 @@ describe('GitHub auth routes', () => {
   // LIN-3127 — the write-only Connection dual-write and its no-read-switch proof.
   // -------------------------------------------------------------------------
 
-  // Acceptance witness, literally as the ticket writes it: a fresh account
-  // completes ONE install and binds TWO repos on that installation.
-  test('LIN-3127 witness: one install + two repos writes exactly one Connection record; reads are store-independent', async () => {
+  // Acceptance witness, adapted for LIN-3334: a workspace may hold only one
+  // GitHub source, so the second beat is a same-source RE-LINK, not a second
+  // repo. One install still maps to exactly one Connection record, and the
+  // re-link refreshes that record's credentials.
+  test('LIN-3127 witness: one install + a same-source re-link writes exactly one Connection record; reads are store-independent', async () => {
     const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
@@ -1828,12 +1874,12 @@ describe('GitHub auth routes', () => {
     assert.equal(afterStep1.length, 1, 'new-container seam #6 wrote after step 1');
     assert.equal(afterStep1[0].credentials.token, 'gho_a', 'step-1 record carries the step-1 token');
 
-    // Step 2 — add-source bind of repo B on the SAME installation (99).
+    // Step 2 — re-link the SAME repo A on the SAME installation (99) with a fresh token.
     session.githubHumanId = 'human-42';
     session.githubPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
     session.activeWorkspaceId = 'github:42';
     const res2 = makeRes();
-    await handler({ body: { repo: 'octocat/repo-b' }, session }, res2);
+    await handler({ body: { repo: 'octocat/repo-a' }, session }, res2);
     assert.equal(res2.redirectedTo, '/workspace/octocat/settings?provider_ok=github');
 
     // Exactly ONE durable Connection record for (account, github, installationId),
@@ -1862,9 +1908,10 @@ describe('GitHub auth routes', () => {
     assert.equal(getWorkspaceCallScope(ws).token, 'gho_b', 'resolution is from the binding, not the store');
   });
 
-  // Existing-container arm: a second repo re-added to an already-connected
-  // container upserts the same single record (covers the third GitHub write seam).
-  test('LIN-3127: a second repo on an existing container upserts the same single Connection record', async () => {
+  // Existing-container arm: a same-source re-link on an already-connected
+  // container upserts the same single record (covers the third GitHub write
+  // seam). A second repo is refused (LIN-3334), so the re-link is same-scope.
+  test('LIN-3127: a same-source re-link on an existing container upserts the same single Connection record', async () => {
     const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
     const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
@@ -1879,7 +1926,7 @@ describe('GitHub auth routes', () => {
       workspaces: [existing],
     });
     const res = makeRes();
-    await handler({ body: { repo: 'octocat/repo-b' }, session }, res);
+    await handler({ body: { repo: 'octocat/repo-a' }, session }, res);
     assert.equal(res.redirectedTo, '/workspace/octocat/');
 
     const all = await connectionStore.collection.find({ accountId: session.accountId, provider: 'github', unitId: '99' }).toArray();

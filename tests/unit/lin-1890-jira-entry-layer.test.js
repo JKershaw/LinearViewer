@@ -356,17 +356,19 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
     assert.deepEqual(stores.bound, [['acct-new', `jira:${MYSELF.accountId}`]]);
   });
 
-  test('a returning human with the same accountId adds a BINDING, not a second workspace', async () => {
+  test('a returning human with the same accountId re-links the SAME site onto one container (LIN-3334)', async () => {
     const session = jiraOnlySession();
     await signInWithJira({ session });
     assert.equal(session.workspaces.length, 1);
 
-    // Sign in again, picking a different site for the same human.
-    const second = await signInWithJira({ session, sites: [{ id: 'cid-9', url: 'https://second.atlassian.net', name: 'Second' }] });
+    // Sign in again for the same human. LIN-3334: a second Jira SITE is now
+    // refused (one ticket source per kind), so the idempotent same-site re-link
+    // is what proves the single container is reused rather than duplicated.
+    const second = await signInWithJira({ session });
     assert.equal(second.callback.status, 302);
     assert.equal(session.workspaces.length, 1, 'one human, one Jira container');
-    const scopes = session.workspaces[0].bindings.filter(b => b.provider === 'jira').map(b => b.scope).sort();
-    assert.deepEqual(scopes, ['https://acme.atlassian.net', 'https://second.atlassian.net']);
+    const scopes = session.workspaces[0].bindings.filter(b => b.provider === 'jira').map(b => b.scope);
+    assert.deepEqual(scopes, ['https://acme.atlassian.net']);
   });
 
   test('the multi-site pick completes the same bootstrap, and clears the carried token', async () => {

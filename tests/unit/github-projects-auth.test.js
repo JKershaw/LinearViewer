@@ -1316,7 +1316,7 @@ describe('GitHub Projects auth routes', () => {
   // LIN-3127 — write-only Connection dual-write (github-projects arm).
   // -------------------------------------------------------------------------
 
-  test('LIN-3127 witness (github-projects): one install + two boards writes exactly one Connection record; reads are store-independent', async () => {
+  test('LIN-3127 witness (github-projects): one install + a same-board re-link writes exactly one Connection record; reads are store-independent', async () => {
     const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
     const router = createGitHubProjectsAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
@@ -1339,12 +1339,13 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(afterStep1.length, 1, 'new-container seam #6 wrote after step 1');
     assert.equal(afterStep1[0].credentials.token, 'gho_a', 'step-1 record carries the step-1 token');
 
-    // Step 2 — add-source bind of board 6 on the SAME installation (99).
+    // Step 2 — re-link the SAME board 5 on the SAME installation (99), fresh token.
+    // LIN-3334: a second board is refused, so the second beat is a same-source re-link.
     session.githubHumanId = 'human-42';
     session.githubProjectsPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
     session.activeWorkspaceId = 'github:42';
     const res2 = makeRes();
-    await handler({ body: { board: 'octocat/6' }, session }, res2);
+    await handler({ body: { board: 'octocat/5' }, session }, res2);
     assert.equal(res2.redirectedTo, '/workspace/octocat/settings?provider_ok=github-projects');
 
     const all = await connectionStore.collection.find({ accountId, provider: 'github-projects', unitId: '99' }).toArray();

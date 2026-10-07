@@ -138,6 +138,26 @@ describe('routes/jira-auth.js', () => {
       assert.equal(session.workspaces[0].provider, undefined, 'no binding written')
     })
 
+    test('refuses a second Jira site with the plain message, before any probe or write (LIN-3334 R1)', async () => {
+      // A provider whose probe throws on any call proves the refusal fires
+      // BEFORE validateCredential — no network, no durable write.
+      const spyProvider = { ui: { displayName: 'Jira' }, validateCredential: () => { throw new Error('must not probe a refused add') } }
+      const { accountStore, accountWorkspaceStore } = freshAccountStores()
+      const router = createJiraAuthRoutes({ provider: spyProvider, accountStore, accountWorkspaceStore })
+      const handler = getHandler(router, 'post', '/auth/jira/link')
+      const res = makeRes()
+      const session = makeSession({ workspaces: [{
+        id: 'ws-1', name: 'Acme', urlKey: 'acme', provider: 'jira', accessToken: 'api',
+        bindings: [{ provider: 'jira', scope: SITE, credentials: { token: 'api', email: 'a@b.c', tokenExpiresAt: Number.MAX_SAFE_INTEGER } }],
+      }] })
+      await handler({ body: { workspace: 'acme', email: 'a@b.com', apiToken: 't', site: 'https://other.atlassian.net' }, session }, res)
+      assert.equal(res.statusCode, 409)
+      assert.match(res.body, /already has a Jira source \(https:\/\/acme\.atlassian\.net\)/)
+      assert.match(res.body, /one ticket source of each kind/)
+      assert.equal(session.workspaces[0].bindings.length, 1, 'no second source written')
+      assert.equal(session.accountId, undefined, 'establishAccount never ran')
+    })
+
     test('400s when the target workspace is not in this session', async () => {
       const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'post', '/auth/jira/link')
