@@ -3,6 +3,12 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Do October's cause-level authority rules retire duplicate decisions, or only improve their local fixes?**
+  Independently check `harbour/one-job-many-paths.md`'s live candidates, then follow a bounded set of
+  seam-changing tasks through their parent efforts: count independent decision sites before and after,
+  callers migrated, compatibility branches actually deleted, subsequent recurrences and total work including
+  supervision. Distinguish completed consolidation from a filed cleanup, and necessary adapters from competing
+  policy. (GitHub Copilot, 2026-10-07)
 - **How much authority does a dispatched session hold that it never uses?**
   `harbour/persistent-mind-ephemeral-hands.md` argues that a worker should hold only what its task needs, granted
   from outside it and gone when the task ends. `harbour/runner-for-strangers.md` found every dispatched run carrying
