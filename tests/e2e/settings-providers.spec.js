@@ -157,6 +157,20 @@ test.describe('Settings — Providers section (LIN-634)', () => {
     expect(await res.text()).toContain('already has a Jira source')
   })
 
+  // R2 (review): the `github-projects` early-refusal arm had no direct test —
+  // dropping it from the `server.js` condition left every other test green.
+  // A workspace already holding a GitHub Projects board can add no second one.
+  test('refuses a second GitHub Projects source with the plain message (LIN-3334)', async ({ page, seedLocal }) => {
+    ;({ urlKey } = await seedLocal(null, {
+      extraBindings: [{ provider: 'github-projects', scope: 'octocat/5', credentials: { token: 'gh-install-tok', installationId: '99', tokenExpiresAt: Number.MAX_SAFE_INTEGER } }],
+    }))
+    const res = await page.request.post(`/workspace/${urlKey}/settings/providers/add`, { form: { provider: 'github-projects' }, maxRedirects: 0 })
+    expect(res.status()).toBe(409)
+    const body = await res.text()
+    expect(body).toContain('already has a GitHub Projects source (octocat/5)')
+    expect(body).toContain('one ticket source of each kind')
+  })
+
   test('the Linear add-source arm is exempt: a 2nd Linear org still redirects (LIN-3334)', async ({ page, seedLocal }) => {
     // The workspace already HOLDS a linear binding; the exemption is what keeps
     // "connect another Linear org" working (it creates its own workspace).

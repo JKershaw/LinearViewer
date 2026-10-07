@@ -189,14 +189,18 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       };
     }
 
-    /** Callback (+ pick): returns the final response; `beforePick` runs between the two. */
-    async function addSource(s, { mode = 'single', refresh = 'R1', site = SITE_B, beforePick, beforeFinalSave } = {}) {
-      const sites = mode === 'single' ? [site] : [SITE_X, site];
+    /** Stub the two OAuth network legs (accessible-resources + token exchange). */
+    function stubAuthFetch(sites, refresh) {
       globalThis.fetch = async (url) => {
         if (String(url).includes('accessible-resources')) return { ok: true, status: 200, json: async () => sites };
         if (String(url).includes('/oauth/token')) return { ok: true, status: 200, json: async () => ({ access_token: `at-${refresh}`, refresh_token: refresh, expires_in: 3600 }) };
         throw new Error(`unstubbed fetch ${url}`);
       };
+    }
+
+    /** Callback (+ pick): returns the final response; `beforePick` runs between the two. */
+    async function addSource(s, { mode = 'single', refresh = 'R1', site = SITE_B, beforePick, beforeFinalSave } = {}) {
+      stubAuthFetch(mode === 'single' ? [site] : [SITE_X, site], refresh);
       s.oauthState = 'nonce';
       s.oauthIntent = { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' };
       const run = async (handler, req) => {
@@ -215,10 +219,24 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       return run(pick, { body: { cloudId: site.id }, session: s });
     }
 
+    /**
+     * Drive ONLY the callback (no pick step). Used by the LIN-3334 refusal
+     * tests: a refused add-source grant is now rejected at the callback, before
+     * the picker and before the staging write, for single- and multi-site alike.
+     */
+    async function driveCallback(s, { mode = 'single', refresh = 'R1', site = SITE_B } = {}) {
+      stubAuthFetch(mode === 'single' ? [site] : [SITE_X, site], refresh);
+      s.oauthState = 'nonce';
+      s.oauthIntent = { mode: 'add-source', provider: 'jira', workspaceUrlKey: 'acme' };
+      const res = makeRes();
+      try { await callback({ query: { code: 'c', state: 'nonce' }, session: s }, res); } catch (err) { res.thrown = err; }
+      return res;
+    }
+
     const staged = () => real.ownerStore.collection.findOne({ _id: `${account._id}::acme::jira` });
     const connectionIdFor = (site = SITE_B) => `${account._id}::jira::${site.url}`;
     const bindingFor = (s, site = SITE_B) => s.workspaces[0].bindings.find(b => b.provider === 'jira' && b.scope === site.url);
-    return { real, account, log, faults, session, addSource, staged, connectionIdFor, bindingFor, db };
+    return { real, account, log, faults, session, addSource, driveCallback, staged, connectionIdFor, bindingFor, db };
   }
 
   const LEGACY_OAUTH_A = { provider: 'jira', scope: SITE_A.url, credentials: { token: 'at-A', authType: 'oauth', cloudId: SITE_A.id, tokenExpiresAt: Date.now() + 3600_000 } };
@@ -333,11 +351,16 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       test('T20(e): adding a second Jira site is refused before any conversion (LIN-3334)', async () => {
         const w = await world();
         const s = w.session([structuredClone(LEGACY_BASIC_A)]);
-        const res = await w.addSource(s, { mode });
-        assert.ok(res.thrown, 'linkProvider refuses the second same-kind source');
-        assert.match(String(res.thrown.message), /one ticket source of each kind/);
+        const res = await w.driveCallback(s, { mode });
+        // LIN-3334 R1: the plain-message refusal, not a linkProvider 500 and not
+        // an unhandled throw — and it fires BEFORE the staging write.
+        assert.equal(res.thrown, undefined, 'no throw escapes the handler');
+        assert.equal(res.statusCode, 409);
+        assert.match(res.body, /already has a Jira source \(https:\/\/a\.atlassian\.net\)/);
+        assert.match(res.body, /one ticket source of each kind/);
         assert.equal(w.bindingFor(s, SITE_B), undefined, 'no second site binding written');
         assert.ok(w.bindingFor(s, SITE_A), 'the existing site is untouched');
+        assert.equal(await w.staged(), null, 'no staging write happened before the refusal');
         assert.equal((await w.real.connectionStore.collection.find({}).toArray()).length, 0, 'no Connection written');
       });
 
@@ -382,13 +405,19 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
 
       test('T20(g)(ii): a second Jira site on one workspace is refused (LIN-3334)', async () => {
         const w = await world();
+        // Site A is a legacy OAuth binding whose refresh record lives at the
+        // `(accountId, urlKey)` staged key. The refused add must not overwrite it.
+        await w.real.ownerStore.put(w.account._id, 'acme', { provider: 'jira', token: 'at-A', refreshToken: 'RA', tokenExpiresAt: 1 });
         const s = w.session([structuredClone(LEGACY_OAUTH_A)]);
-        const res = await w.addSource(s, { mode, site: SITE_B, refresh: 'RB' });
-        assert.ok(res.thrown, 'linkProvider refuses the second same-kind source');
-        assert.match(String(res.thrown.message), /one ticket source of each kind/);
+        const res = await w.driveCallback(s, { mode, site: SITE_B, refresh: 'RB' });
+        assert.equal(res.thrown, undefined, 'no throw escapes the handler');
+        assert.equal(res.statusCode, 409);
+        assert.match(res.body, /already has a Jira source \(https:\/\/a\.atlassian\.net\)/);
         assert.equal(w.bindingFor(s, SITE_B), undefined, 'no second site binding written');
         assert.ok(w.bindingFor(s, SITE_A), 'the existing site is untouched');
-        assert.equal((await w.staged())?.refreshToken, 'RB', 'the pre-link staging write is the only residue; no conversion, no second binding');
+        // LIN-3334 R1: the refused grant's refresh token must NOT overwrite the
+        // legacy site A's refresh record — the pre-existing RA stays put, never RB.
+        assert.equal((await w.staged())?.refreshToken, 'RA', 'the legacy site A refresh record is untouched');
       });
 
       test('T20(h) row 3: link() false after a committed write: rolled forward, copy kept, finalize deletes S', async () => {
@@ -612,10 +641,10 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       : { ok: true, status: 200, json: async () => ({ access_token: 'at-RB', refresh_token: 'RB', expires_in: 3600 }) };
     const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
     const res = makeRes();
-    await assert.rejects(
-      () => getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, res),
-      /one ticket source of each kind/
-    );
+    await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body, /already has a Jira source \(https:\/\/a\.atlassian\.net\)/);
+    assert.match(res.body, /one ticket source of each kind/);
     assert.equal(container.bindings.length, 1, 'no second site bound');
     assert.equal(container.bindings.find(x => x.scope === SITE_B.url), undefined);
     assert.deepEqual(await w.real.ownerStore.collection.findOne({ _id: `${w.account._id}::acme-jira::jira` }), legacyBefore, 'the legacy key is untouched');

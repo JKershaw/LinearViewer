@@ -57,6 +57,8 @@ import {
   linkProvider,
   saveSession,
   upsertWorkspace,
+  sameKindSourceBound,
+  oneSourcePerKindMessage,
 } from '../lib/workspace.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-conflict.js'
@@ -74,6 +76,34 @@ import {
 
 const NO_WORKSPACE_MESSAGE = 'Jira can only be added as an additional source on an existing workspace — open Settings on the workspace you want to add it to, then try again.'
 const INVALID_SITE_MESSAGE = 'Site must be a Jira Cloud URL like https://yourteam.atlassian.net — no path, port, or credentials.'
+
+/**
+ * LIN-3334 (R1) — the plain-message one-source-per-kind refusal for the Jira
+ * write arms (Basic link, OAuth add-source, and the new-login existing
+ * container). They bypass `server.js /settings/providers/add`, so relying on
+ * the `linkProvider` throw alone would surface a generic 500 — and the
+ * connection-backed OAuth path can stage a durable write first. This runs
+ * before `establishAccount` (and before any staged `put`), so a refused add
+ * writes nothing. `scope` is the resolved site URL, so a same-site re-link
+ * stays idempotent (`sameKindSourceBound` returns null). Returns true when it
+ * responded.
+ *
+ * @param {import('express').Response} res
+ * @param {Object} provider - the Jira provider instance (`ui.displayName`)
+ * @param {Object} workspace - the container the binding would land on
+ * @param {string} scope - the resolved site URL
+ * @returns {boolean}
+ */
+function refuseSecondJiraSource(res, provider, workspace, scope) {
+  const conflict = sameKindSourceBound(workspace, 'jira', scope)
+  if (!conflict) return false
+  res.status(409).send(renderErrorPage(
+    'One source per kind',
+    oneSourcePerKindMessage(provider?.ui?.displayName || 'Jira', conflict.scope),
+    { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
+  ))
+  return true
+}
 
 /**
  * The SSRF guard: `site` reaches `createJiraClient` as a literal fetch base
@@ -245,6 +275,12 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         error: INVALID_SITE_MESSAGE,
       }))
     }
+
+    // LIN-3334 (R1): the Basic link arm has no OAuth redirect round-trip and
+    // never passes through `/settings/providers/add`, so refuse a second Jira
+    // source here — before establishAccount and any durable write. Same-site
+    // re-link (a credential refresh) is idempotent.
+    if (refuseSecondJiraSource(res, provider, workspace, normalizedSite)) return
 
     // LIN-3124 PR3 (D2a): refuse a Basic link onto a (jira, normalizedSite)
     // already held by a CONNECTION-BACKED OAuth binding. linkProvider merges
@@ -463,6 +499,26 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       }))
     }
 
+    // LIN-3334 (R1): an add-source workspace may hold only one Jira source.
+    // Refuse BEFORE the durable staging `put` below — for a legacy OAuth site
+    // that staged `(accountId, urlKey)` record is what the site refreshes from,
+    // so a refused add must not overwrite it. Same-site re-link stays allowed,
+    // so the accessible list keeps the already-bound scope (at most one of the
+    // offered scopes) and the picker below offers only it. A grant that reaches
+    // NO allowed scope is refused with the plain message and writes nothing.
+    const grantSiteCount = sites.length
+    if (mode === 'add-source') {
+      const allowed = sites.filter(s => !sameKindSourceBound(workspace, 'jira', s.url))
+      if (allowed.length === 0) {
+        return res.status(409).send(renderErrorPage(
+          'One source per kind',
+          oneSourcePerKindMessage(provider?.ui?.displayName || 'Jira', sameKindSourceBound(workspace, 'jira').scope),
+          { action: 'Back to settings', actionUrl: `/workspace/${encodeURIComponent(workspace.urlKey)}/settings` }
+        ))
+      }
+      sites = allowed
+    }
+
     // Durable-first: the rotating refresh token is persisted under the JIRA
     // partition (never Linear's — LIN-1887 F1) before anything else can fail.
     //
@@ -525,8 +581,10 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     }
 
     // One site is the common case: skip the picker entirely, which removes the
-    // pending state altogether.
-    if (sites.length === 1) {
+    // pending state altogether. Keyed on the GRANT's site count, not the
+    // (add-source-filtered) list, so a multi-site grant that keeps only the
+    // already-bound scope still renders the picker (LIN-3334 R1).
+    if (grantSiteCount === 1) {
       return completeJiraOAuthLink(req, res, sites[0], tokenBag.refresh_token)
     }
     return req.session.save(() => res.send(renderJiraSiteSelectPage(sites)))
@@ -570,6 +628,12 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
         action: 'Go to homepage', actionUrl: '/'
       }))
     }
+
+    // LIN-3334 (R1): defense in depth behind the callback's site filter — the
+    // pick can only name a `pending.sites` entry, but refuse here too, before
+    // establishAccount and any durable write, so no path can link a second
+    // same-kind site. A same-site re-link is allowed.
+    if (mode === 'add-source' && refuseSecondJiraSource(res, provider, workspace, site.url)) return
 
     let myself
     try {
@@ -768,6 +832,11 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // would drop the workspaces we are adding to).
     const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
     if (existing) {
+      // LIN-3334 (R1): a returning user picking a second Jira site on the
+      // existing `jira:<accountId>` container is refused with the plain message,
+      // before establishAccount and before the durable refresh-token write
+      // (`persistRefresh`/`convert`) below. Same-site re-link is allowed.
+      if (refuseSecondJiraSource(res, provider, existing, site.url)) return
       const established = await establishAccount(
         req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
         { email: myself.emailAddress, displayName: myself.displayName }, existing.id
