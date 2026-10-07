@@ -1,0 +1,198 @@
+Coherence under change: reproduction protocol
+============================================
+
+This is supporting research data, not an application script. Run the commands
+below from /home/runner/work/LinearViewer/LinearViewer with Python 3 and git.
+They inspect committed objects only: no application imports, credentials,
+network requests, model calls, production access, or dependency installation.
+A full history is required. The study fetched this repository's shallow
+history with `git fetch --unshallow origin` before measuring.
+
+Pinned objects
+--------------
+H = 170083222820915c06b221a7903436d544560b0d
+J = 462ecafd44a0e85482f3b566add883b42a316051
+S = 8b2be4242af92c3fde664da7bac8359854332b6d
+E = 3bc00a37a1a47e90933e1dfcffa306bb28e5f18e
+
+H is the research grounding. J and S are the last first-parent commits before
+July 1 and September 1, 2026, respectively, in UTC. E is the last before
+October 1 UTC. Use these object IDs, not a moving main or today's HEAD.
+
+git rev-list --count 170083222820915c06b221a7903436d544560b0d
+git rev-list --first-parent --count 170083222820915c06b221a7903436d544560b0d
+git log --first-parent -1 --before=2026-07-01T00:00:00Z --format='%H %cI' 170083222820915c06b221a7903436d544560b0d
+git log --first-parent -1 --before=2026-09-01T00:00:00Z --format='%H %cI' 170083222820915c06b221a7903436d544560b0d
+git log --first-parent -1 --before=2026-10-01T00:00:00Z --format='%H %cI' 170083222820915c06b221a7903436d544560b0d
+
+Expected history counts: 3818 ancestor commits, 1823 first-parent commits.
+
+1. Reconstruct the frame and outcome-blind sample
+------------------------------------------------
+python - <<'PY'
+import hashlib, re, subprocess
+H = '170083222820915c06b221a7903436d544560b0d'
+J = '462ecafd44a0e85482f3b566add883b42a316051'
+S = '8b2be4242af92c3fde664da7bac8359854332b6d'
+def git(*args):
+    return subprocess.check_output(['git', *args], text=True)
+def production(p):
+    return p.endswith('.js') and (
+        p.startswith(('lib/', 'routes/', 'public/')) or
+        p in ('server.js', 'render.js'))
+rx = re.compile(
+    r'^(?:export )?(?:async )?function '
+    r'((?:is|has|can|should|select|resolve|choose|classify|derive|determine)'
+    r'[A-Z]\w*)\s*\(', re.M)
+for sha in (J, S, H):
+    paths = [p for p in git('ls-tree', '-r', '--name-only', sha).splitlines()
+             if production(p)]
+    frame = []
+    for path in paths:
+        text = git('show', f'{sha}:{path}')
+        for match in rx.finditer(text):
+            key = path + '::' + match[1]
+            rank = hashlib.sha256(('harbour-coherence-v1:' + key).encode()).hexdigest()
+            frame.append((rank, key, text[:match.start()].count('\n') + 1))
+    print(sha, 'production_js', len(paths), 'frame', len(frame))
+    if sha == H:
+        for i, (_, key, line) in enumerate(sorted(frame)[:36], 1):
+            print(i, key, line)
+PY
+
+Expected (production JS files, candidate declarations):
+J (174, 66), S (294, 158), H (399, 269).
+These are syntactic counts, NOT counts of independent decisions or complexity.
+The prefix rule excludes arrow functions, methods, indented/nested functions,
+inline conditions, declarations with other names, other extensions, and scripts.
+No sample was redrawn after seeing its classifications.
+
+2. Re-read the semantic coding
+------------------------------
+The audit file records the interpretation, search terms, and source anchors.
+An authority independently determines the SAME answer under the SAME contract;
+agreement today is not delegation. An adapter with legitimately different
+semantics is not another authority. A wrapper delegating the choice is not one.
+Identical code alone is insufficient to establish a shared semantic obligation.
+"Single" means no second authority found in the recorded bounded search, not
+proof that no competing implementation exists. Counts of authorities are minima.
+
+For any source anchor, substitute its pinned object, file, and line range:
+git show 170083222820915c06b221a7903436d544560b0d:lib/prompts/stage-intent.js | nl -ba | sed -n '3,29p'
+git grep -n -E 'SEARCH_TERMS' 170083222820915c06b221a7903436d544560b0d -- lib routes public server.js render.js
+git log --format='%H %cI %s' -G 'SEARCH_TERMS' 170083222820915c06b221a7903436d544560b0d -- PATH
+
+Historical classifications follow the semantic decision into its older source,
+not just the current function name. Unresolved ancestry is uncertain, not absent.
+This is a panel of decisions surviving at H, not a historical probability sample:
+decisions deleted before H cannot enter it. Do not turn its trajectory into a
+claim about the whole historical codebase.
+
+3. Reproduce consolidation sizes and observation windows
+--------------------------------------------------------
+python - <<'PY'
+import datetime, subprocess
+H = '170083222820915c06b221a7903436d544560b0d'
+commits = [
+    ('one-path assembly', '845992420c76f07873459509ccaf6ef3d4c5a244'),
+    ('selector simplification', 'af3b207051151bd322f461601f38e059c7bfd7a1'),
+    ('share removal', 'dcfbf7fa5ac8a2d8b23a1023df2ba06e044c79c2'),
+    ('one-source admission', 'a052a5ddfa4122d415e8c79cd0b400b470c0afe3'),
+    ('server-side source cutover', 'bf58918b7e5f8c133275fdb188ce3d9636b90ba4'),
+]
+def git(*args):
+    return subprocess.check_output(['git', *args], text=True).strip()
+end = datetime.datetime.fromisoformat(git('show', '-s', '--format=%cI', H))
+for label, sha in commits:
+    lines = git('diff', '--numstat', sha + '^1', sha, '--',
+                'lib', 'routes', 'public', 'server.js').splitlines()
+    additions = sum(int(row.split('\t')[0]) for row in lines)
+    deletions = sum(int(row.split('\t')[1]) for row in lines)
+    start = datetime.datetime.fromisoformat(git('show', '-s', '--format=%cI', sha))
+    print(label, sha, start.astimezone(datetime.timezone.utc).isoformat(),
+          len(lines), additions, deletions, additions - deletions,
+          'hours_to_grounding', round((end-start).total_seconds()/3600, 3))
+PY
+
+This size measure intentionally matches one-job-many-paths' application
+directories, INCLUDING comments and non-JS assets under those directories.
+It differs from the JS-only sampling/outcome measure. It counts each landing
+against its first parent once, never both branch commits and their merge.
+Calendar exposure is not deployed time, active labour, or time spent by agents.
+
+git grep -l -E 'issueBindingScope|bindingScope' a052a5dd -- 'lib/*.js' 'routes/*.js' 'public/*.js' server.js | wc -l
+git grep -l -E 'issueBindingScope|bindingScope' 17008322 -- 'lib/*.js' 'routes/*.js' 'public/*.js' server.js | wc -l
+
+Expected propagation footprints: 44 and 30 files. These include comments and
+are NOT independent-authority counts. The older paper's baseline preceded the
+server cutover; its description of that PR as unmerged is historical.
+
+Reported evaluation and review evidence
+--------------------------------------
+The 92-case selector figures are the author's report in PR #1752's Evidence
+section, read 2026-10-07, not a new run or an independently verified raw dataset:
+https://github.com/JKershaw/LinearViewer/pull/1752
+No model evaluation was run for this paper.
+GitHub MCP pull_request_read(method="get_reviews", owner="JKershaw",
+repo="LinearViewer", pullNumber=1751/1752/1759/1764) returned empty arrays.
+This does not mean zero reviews: review discussion also lives in workspace
+comments and corrective commits. It supplies no defensible review-round count.
+
+The workspace proxy bootstrap request failed at DNS resolution. No exchange
+response, working token, workspace issues, or LIN-3339 comment was retrieved.
+The user-supplied hypothesis is the question, not independently read evidence.
+No credential belongs in these research artifacts.
+
+4. September file-touch comparison and its negative control
+----------------------------------------------------------
+The outcome window is the first-parent range S..E, not all branch commits whose
+timestamps happen to fall in September. The comparison unit is a landing change;
+application file breadth is a proxy for spread, NOT a measure of agent effort.
+For a decision, count a landing if it touches any of its September authority
+files. A landing can belong to more than one decision; do not pool these rows
+as independent observations. Unchanged decisions must not be called cheap
+completed tasks: no such tasks may have occurred.
+
+python - <<'PY'
+import re, statistics, subprocess
+S = '8b2be4242af92c3fde664da7bac8359854332b6d'
+E = '3bc00a37a1a47e90933e1dfcffa306bb28e5f18e'
+def git(*args):
+    return subprocess.check_output(['git', *args], text=True)
+def production(p):
+    return p.endswith('.js') and (
+        p.startswith(('lib/', 'routes/', 'public/')) or
+        p in ('server.js', 'render.js'))
+paths = {'routes/' + name + '.js' for name in (
+    'workspace-api', 'workspace-api-roadmap', 'next-run',
+    'task-chat', 'ship-biscuit')}
+body = re.compile(r'^(?:export )?function shouldMockAi\b[\s\S]*?^}', re.M)
+changes = []
+touches = []
+body_edits = []
+for sha in git('rev-list', '--first-parent', S + '..' + E).splitlines():
+    changed = {p for p in git('diff', '--no-renames', '--name-only',
+                             sha + '^1', sha).splitlines() if production(p)}
+    changes.append((sha, changed))
+    if not paths.intersection(changed):
+        continue
+    touches.append((sha, changed))
+    for path in sorted(paths.intersection(changed)):
+        before = body.search(git('show', sha + '^1:' + path))
+        after = body.search(git('show', sha + ':' + path))
+        assert before and after
+        if before[0] != after[0]:
+            body_edits.append((sha, path))
+print('all landings', len(changes))
+print('application JS landings', sum(bool(p) for _, p in changes))
+print('median application files', statistics.median(len(p) for _, p in changes if p))
+print('mock authority file touches', len(touches))
+print('mock authority function-text edits', body_edits)
+PY
+
+Expected: 337 landings; 212 with application JS; median 3 application files;
+26 landings touching mock-authority files; no mock-function text edits.
+The body extractor is deliberately specific to these five short top-level
+functions. It is not presented as a general JavaScript parser or semantic diff.
+Each intermediate landing is checked, so an edit followed by a revert would
+be counted rather than disappear in an endpoint comparison.
