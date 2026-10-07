@@ -1146,6 +1146,54 @@ describe('task-edit link (LIN-1565)', () => {
 });
 
 // =============================================================================
+// Task-page link on Home details (LIN-3331)
+// =============================================================================
+describe('task-page link (LIN-3331)', () => {
+  let seq = 0;
+  function providerWith(ui = {}) {
+    const name = `task-page-stub-${++seq}`;
+    const uiDefaults = { write: true, comments: true, displayName: 'Stub Tracker', ...ui };
+    registerProvider({ name, ui: uiDefaults });
+    return { name, ui: uiDefaults };
+  }
+  const issue = {
+    id: 'issue-uuid-1',
+    identifier: 'STB-7',
+    title: 'A task',
+    state: { type: 'started' },
+    labels: { nodes: [] },
+  };
+
+  test('renders a task-page link for a signed-in workspace, carrying the provider as ?source=', () => {
+    const provider = providerWith();
+    const html = renderDetailsContent(issue, { isLanding: false, urlKey: 'ws', provider });
+    assert.ok(html.includes('data-testid="issue-task-page-link"'), 'task-page link present');
+    assert.ok(html.includes(`href="/workspace/ws/task/STB-7?source=${encodeURIComponent(provider.name)}"`),
+      'href points at the task page, carrying the resolved provider');
+  });
+
+  test('is NOT gated on ui.inlineEdit (a read-only workspace still links)', () => {
+    const provider = providerWith({ inlineEdit: false });
+    const html = renderDetailsContent(issue, { isLanding: false, urlKey: 'ws', provider });
+    assert.ok(html.includes('data-testid="issue-task-page-link"'), 'task-page link present without inlineEdit');
+    assert.ok(!html.includes('issue-edit-link'), 'the edit link stays gated');
+  });
+
+  test('carries the issue binding stamp beside source', () => {
+    const provider = providerWith();
+    const bound = { ...issue, bindingScope: 'team/a' };
+    const html = renderDetailsContent(bound, { isLanding: false, urlKey: 'ws', provider });
+    assert.ok(html.includes(`href="/workspace/ws/task/STB-7?source=${encodeURIComponent(provider.name)}&amp;bindingScope=team%2Fa"`),
+      'the pair is forwarded, URL-encoded, in Edit/Chat order');
+  });
+
+  test('the landing page and a missing urlKey omit the link', () => {
+    assert.ok(!renderDetailsContent(issue, { isLanding: true, urlKey: 'ws', provider: providerWith() }).includes('issue-task-page-link'));
+    assert.ok(!renderDetailsContent(issue, { isLanding: false, urlKey: null, provider: providerWith() }).includes('issue-task-page-link'));
+  });
+});
+
+// =============================================================================
 // Home script list (LIN-2944 P1 addendum 9 / N1 M10)
 // =============================================================================
 // Home must load the shared opened-task component script. Dropping

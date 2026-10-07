@@ -343,6 +343,18 @@ test('deriveLoopLanes surfaces running loops with their latest heartbeat', () =>
   assert.deepEqual(l.heartbeat.breakdown, { Bash: 7, Read: 5 });
 });
 
+test('deriveLoopLanes (LIN-3331): projects the issue binding pair sparsely onto the lane', () => {
+  const [stamped] = deriveLoopLanes([loop({ issueSource: 'linear', issueBindingScope: 'team-a' })]);
+  assert.equal(stamped.issueSource, 'linear');
+  assert.equal(stamped.issueBindingScope, 'team-a');
+
+  // Sparse: an unstamped/legacy loop adds NO key, keeping the lane shape
+  // byte-identical to the pre-change read.
+  const [unstamped] = deriveLoopLanes([loop()]);
+  assert.ok(!('issueSource' in unstamped), 'no issueSource key when unstamped');
+  assert.ok(!('issueBindingScope' in unstamped), 'no issueBindingScope key when unstamped');
+});
+
 test('deriveLoopLanes (LIN-2243): a worker-lane loop carries its ticketWalk; a non-lane loop carries null', () => {
   const laneLoop = loop({
     telemetry: {

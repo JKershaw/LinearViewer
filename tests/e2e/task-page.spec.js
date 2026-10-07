@@ -290,4 +290,20 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await noHorizontalScroll(page);
     await page.screenshot({ path: test.info().outputPath('task-page-dark-360.png'), fullPage: true });
   });
+
+  // LIN-3331: the task page is reachable from Home, not just by typing its URL.
+  test('the Home details task-page link navigates to the task page', async ({ page }) => {
+    await seedTasks(page);
+    await page.goto(`/workspace/${URL_KEY}/`);
+    await page.locator('.in-progress-items .line', { hasText: 'A task with a running build' }).first().click();
+    await page.locator('.detail-toggle[data-toggle="details"]').first().click();
+
+    const link = page.locator('[data-testid="issue-task-page-link"]').first();
+    await expect(link).toBeVisible();
+    // The href is the task page's own path (the binding pair is optional).
+    await expect(link).toHaveAttribute('href', new RegExp(`^/workspace/${URL_KEY}/task/LOCAL-TP1(\\?|$)`));
+
+    await link.click();
+    await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('A task with a running build');
+  });
 });

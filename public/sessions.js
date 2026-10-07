@@ -90,28 +90,40 @@
       </div>`;
   }
 
-  function header(count) {
+  function header(count, opts) {
     const refresh = `<button type="button" class="sessions-refresh" data-sessions-refresh>↻ refresh</button>`;
+    // LIN-3331: the one link through to this issue's task page, built by the
+    // shared client helper so the path/binding pair matches every other surface.
+    const taskHref = window.taskPageHref({
+      urlKey: opts.urlKey,
+      identifier: opts.identifier,
+      source: opts.source,
+      bindingScope: opts.bindingScope
+    });
+    const taskLink = taskHref
+      ? `<a class="sessions-task-page task-page-link" data-testid="sessions-task-page-link" href="${esc(taskHref)}">task page ↗</a>`
+      : '';
     return `
       <div class="sessions-header">
         <span class="sessions-status-label">dispatched sessions</span>
         <span class="sessions-count-meta">${count}</span>
+        ${taskLink}
         ${refresh}
       </div>`;
   }
 
-  function renderList(sessions) {
+  function renderList(sessions, opts) {
     if (!sessions || sessions.length === 0) {
       return `
-        ${header(0)}
+        ${header(0, opts)}
         <div class="sessions-empty">No sessions yet. Dispatch a prompt to start one.</div>`;
     }
-    return `${header(sessions.length)}${sessions.map(renderSession).join('')}`;
+    return `${header(sessions.length, opts)}${sessions.map(renderSession).join('')}`;
   }
 
-  function renderLoading() {
+  function renderLoading(opts) {
     return `
-      ${header('…')}
+      ${header('…', opts)}
       <div class="sessions-empty sessions-loading">Loading sessions…</div>`;
   }
 
@@ -136,11 +148,11 @@
   }
 
   async function load(container, opts) {
-    applyState(container, renderLoading(), 'loading');
+    applyState(container, renderLoading(opts), 'loading');
     try {
       const data = await fetchSessions(opts.urlKey, opts.identifier);
       const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-      applyState(container, renderList(sessions), sessions.length ? 'list' : 'empty');
+      applyState(container, renderList(sessions, opts), sessions.length ? 'list' : 'empty');
       // Self-heal the accordion header count from the authoritative fetch.
       if (typeof opts.onCount === 'function') opts.onCount(sessions.length);
     } catch (err) {

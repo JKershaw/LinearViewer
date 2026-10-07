@@ -491,6 +491,22 @@ function renderCard(direction) {
     ? `<div class="swipe-card-runner">${window.PromptSection.runnerLinkHtml(urlKey)}</div>`
     : '';
 
+  // LIN-3331: the card's link through to the task page. `urlKey` gates the
+  // landing card out; the shared helper drops it when there's no identifier.
+  // An <a> is already excluded from the swipe/drag gesture (handleSwipeStart),
+  // so it cannot start a card transition.
+  const taskHref = window.taskPageHref
+    ? window.taskPageHref({
+        urlKey,
+        identifier: issue.identifier || issue.id,
+        source: issue.source,
+        bindingScope: issue.bindingScope
+      })
+    : '';
+  const taskPageLinkHtml = taskHref
+    ? `<a class="swipe-card-task-page task-page-link" data-testid="swipe-task-page-link" href="${_esc(taskHref)}">task page ↗</a>`
+    : '';
+
   const html = `
     <span class="accent-bar accent-bar--${state.cls}" aria-hidden="true"></span>
     <div class="swipe-card-inner">
@@ -501,6 +517,7 @@ function renderCard(direction) {
         </div>
         <span class="swipe-card-position">${currentIndex + 1} / ${total}</span>
       </div>
+      ${taskPageLinkHtml}
       <div class="${titleClass}">${_esc(issue.title)}</div>
       ${runnerLinkHtml}
       <div class="swipe-card-meta">${metaHtml}</div>
@@ -828,6 +845,8 @@ function handleAccordionClick(e) {
         window.SessionsSection.init(placeholder, {
           urlKey,
           identifier: issue.identifier || issue.id,
+          source: issue.source,
+          bindingScope: issue.bindingScope,
           onCount: (n) => {
             // Reconcile the header [N] with the authoritative fetch.
             const countEl = header.querySelector('.swipe-sessions-count');

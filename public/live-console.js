@@ -1122,6 +1122,7 @@
     const li = nodeFromHtml(`<li class="lc-lane${shimmer}" data-testid="live-console-lane">
         <span class="lc-lane-bar" aria-hidden="true"></span>
         <a class="lc-lane-task" href="#"></a>
+        <a class="lc-lane-task-page task-page-link" data-testid="lc-lane-task-page-link" href="#" hidden>task ↗</a>
         <span class="lc-lane-tickets" data-testid="live-console-lane-tickets"></span>
         <span class="lc-lane-mid">
           <span class="lc-lane-action"></span>
@@ -1149,6 +1150,23 @@
     task.textContent = lane.task || '?';
     task.setAttribute('href', obsHref(lane.workspaceUrlKey));
     task.setAttribute('title', `open ${lane.workspaceName || lane.workspaceUrlKey} in Observation`);
+    // LIN-3331: the adjacent task-page link, repainted every update (a lane
+    // node is reused across polls). No identifier → hidden; the shared helper
+    // drops it so the multi-binding refusal can't be landed on from here.
+    const taskPage = li.querySelector('.lc-lane-task-page');
+    const taskPageHref = window.taskPageHref({
+      urlKey: lane.workspaceUrlKey,
+      identifier: lane.task,
+      source: lane.issueSource,
+      bindingScope: lane.issueBindingScope,
+    });
+    if (taskPageHref) {
+      taskPage.setAttribute('href', taskPageHref);
+      taskPage.hidden = false;
+    } else {
+      taskPage.removeAttribute('href');
+      taskPage.hidden = true;
+    }
     const tickets = li.querySelector('.lc-lane-tickets');
     tickets.textContent = ticketProgressText(lane.ticketWalk);
     // LIN-2244: a THIRD lane state, distinct from both actively working and
