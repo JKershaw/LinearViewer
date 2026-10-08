@@ -15,7 +15,7 @@ import { join, relative } from 'node:path';
 import { loadLibrary, GITHUB_BASE, DEFAULT_DOCS_ROOT } from '../../lib/library.js';
 import { createLibraryRouter, escapeXml, sitemapEntries } from '../../routes/library.js';
 import { LISTED_DOCS, START_HERE } from '../../lib/library-metadata.js';
-import { themeSvg, THEME_MARKER, DARK_PALETTE } from '../../scripts/lib/figure-theme.mjs';
+import { themeSvg, THEME_MARKER, DARK_PALETTE, LIGHT_ONLY } from '../../scripts/lib/figure-theme.mjs';
 import { listFigures, FIGURES_DIR } from '../../scripts/figure-theme.mjs';
 
 const docsRoot = DEFAULT_DOCS_ROOT;
@@ -412,7 +412,7 @@ describe('figure dark-mode theme (LIN-3351)', () => {
   test('every figure is exactly what the transform produces (no stale palette)', () => {
     const stale = figureFiles.filter(f => {
       const text = readFileSync(f, 'utf8');
-      return themeSvg(text) !== text;
+      return themeSvg(text, relative(FIGURES_DIR, f)) !== text;
     }).map(f => relative(FIGURES_DIR, f));
     assert.deepEqual(stale, [], `stale figures — run \`npm run figures:theme\`: ${stale.join(', ')}`);
   });
@@ -447,10 +447,49 @@ describe('figure dark-mode theme (LIN-3351)', () => {
     assert.doesNotMatch(out, /fill-opacity="0.55"\]/);
   });
 
+  test('white non-rect shapes (hollow markers) get the dark canvas fill; coloured shapes do not', () => {
+    const out = themeSvg('<svg xmlns="http://www.w3.org/2000/svg"><circle fill="#fff" stroke="#1f2937"/><path fill="#ffffff" d="M0 0"/>'
+      + '<circle fill="#ffffff" fill-opacity="0.9"/><circle fill="#2a78d6"/></svg>');
+    assert.match(out, /circle\[fill="#fff"\]:not\(\[fill-opacity\]\)/);
+    assert.match(out, /path\[fill="#ffffff"\]:not\(\[fill-opacity\]\)/);
+    assert.match(out, /circle\[fill="#ffffff"\]\[fill-opacity="0.9"\]/);
+    assert.doesNotMatch(out, /circle\[fill="#2a78d6"\]/);
+  });
+
+  test('dark labels on light data fills are marked and left unremapped; others are not', () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="100" height="40" fill="#fff"/>'
+      + '<rect x="10" y="10" width="40" height="20" fill="#cbd5e1"/><text x="30" y="24" fill="#1f2937" text-anchor="middle">on</text>'
+      + '<rect x="60" y="10" width="30" height="20" fill="#1e40af"/><text x="75" y="24" fill="#1f2937">dark data</text>'
+      + '<text x="5" y="8" fill="#1f2937">canvas</text></svg>';
+    const out = themeSvg(svg);
+    assert.match(out, /<text data-on-fill="1" x="30"/, 'label over a pale data fill is marked');
+    assert.doesNotMatch(out, /<text data-on-fill="1" x="75"/, 'label over a saturated (dark) fill is not');
+    assert.doesNotMatch(out, /<text data-on-fill="1" x="5"/, 'label on the white canvas is not');
+    assert.match(out, /text\[fill="#1f2937"\]:not\(\[data-on-fill\]\)/);
+    assert.equal(themeSvg(out), out, 'marking is idempotent');
+  });
+
+  test('dark-neutral data fills are lifted off the canvas', () => {
+    const out = themeSvg('<svg xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="5" height="5" fill="#1f2937"/></svg>');
+    assert.match(out, /rect\[fill="#1f2937"\],circle\[fill="#1f2937"\],path\[fill="#1f2937"\]\{fill:#4b5563\}/);
+  });
+
+  test('LIGHT_ONLY figures get an empty dark block and stay light', () => {
+    assert.deepEqual([...LIGHT_ONLY], ['steady-base-menu/menu-size-vs-risk.svg']);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect fill="#fff"/></svg>';
+    const out = themeSvg(svg, LIGHT_ONLY[0]);
+    assert.ok(out.includes(`<style ${THEME_MARKER}="light-only">`));
+    assert.doesNotMatch(out, /prefers-color-scheme/);
+    assert.equal(themeSvg(out, LIGHT_ONLY[0]), out);
+  });
+
   test('library.css sets the figure color-scheme for both dark paths, scoped to Library figures', () => {
     const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'library.css'), 'utf8');
     assert.match(css, /\.library-doc__body img\s*\{\s*color-scheme:\s*light;/);
     assert.match(css, /\.theme-dark \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
     assert.match(css, /@media \(prefers-color-scheme: dark\)\s*\{\s*body\.is-landing \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
+    // The light-only figure is dimmed on both dark paths, by exact src.
+    assert.match(css, /\.theme-dark \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
+    assert.match(css, /body\.is-landing \.library-doc__body img\[src\$="\/steady-base-menu\/menu-size-vs-risk\.svg"\]\s*\{\s*filter:\s*brightness\(0\.85\)/);
   });
 });

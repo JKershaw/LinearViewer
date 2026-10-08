@@ -24,7 +24,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const stale = [];
   for (const file of listFigures()) {
     const before = readFileSync(file, 'utf8');
-    const after = themeSvg(before);
+    const after = themeSvg(before, relative(FIGURES_DIR, file));
     if (after === before) continue;
     stale.push(relative(FIGURES_DIR, file));
     if (!check) writeFileSync(file, after);

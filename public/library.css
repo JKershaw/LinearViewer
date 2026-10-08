@@ -277,6 +277,18 @@
   }
 }
 
+/* Light-only figures (LIGHT_ONLY in scripts/lib/figure-theme.mjs): a caption names a
+   colour the dark remap would falsify, so the SVG keeps its light rendering. Dim
+   it so the white block sits softer on the dark panel. Scoped to that one image. */
+.theme-dark .library-doc__body img[src$="/steady-base-menu/menu-size-vs-risk.svg"] {
+  filter: brightness(0.85);
+}
+@media (prefers-color-scheme: dark) {
+  body.is-landing .library-doc__body img[src$="/steady-base-menu/menu-size-vs-risk.svg"] {
+    filter: brightness(0.85);
+  }
+}
+
 /* A figure spans the full panel width and clears the floated aside, so a wide
    diagram drops below the further-reading panel instead of colliding with it. */
 .library-doc__body p:has(> img) {
