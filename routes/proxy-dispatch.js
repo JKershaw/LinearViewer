@@ -24,6 +24,7 @@ import { isValidIssueId, UUID_REGEX, dispatchIssueSourceField } from '../lib/wor
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { buildRunGate } from '../lib/chat-request.js';
+import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -1870,7 +1871,8 @@ export function createDispatchRoutes({
         id: item.id,
         promptName: item.promptName,
         kind: item.kind || 'custom',
-        prompt: item.prompt || null,
+        // LIN-3384: only the row's own dispatcher sees its prose unmasked.
+        prompt: redactSessionItem({ prompt: item.prompt, dispatchedBy: item.dispatchedBy }, req.proxyCreatedBy).prompt || null,
         issueIdentifier: item.issueIdentifier || null,
         issueUrl: item.issueUrl || null,
         target: item.target,
