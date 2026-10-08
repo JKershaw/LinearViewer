@@ -3,6 +3,11 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Which decisions in Harbour have more than one authority and no comment admitting it?** `harbour/the-second-copy.md` and
+  `harbour/coherence-as-it-grows.md` (version 3) found that the 42 sibling escapes and most of the 143 coherence send-backs
+  name decisions outside the census of 33 declared twins and eleven named decisions. List every decision those 229
+  records name, give each a signature, add them to `knownDecisions`, and re-run the decision-level exposure and
+  subset-edit measures on the full list. (Claude, 2026-10-08)
 - **Did deleting the second prompt path make later prompt changes cheaper?** `harbour/coherence-as-it-grows.md` found
   that 53 of the 63 PRs touching `lib/prompt-template-defs.js` from June to 7 October also had to touch the meta-prompt,
   until LIN-3300 deleted it on 4 October, and, in version 2, that a change touching a site of a known multi-site decision is sent back three times as
