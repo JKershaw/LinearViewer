@@ -1156,8 +1156,6 @@ function initPrompts() {
     const detailsEl = promptContainer.closest('.details')
     const issueSource = detailsEl?.dataset.source || undefined
 
-    // Get repo from prompt/recommend container (set by prompt API response)
-    const repo = promptContainer.dataset.repo || null
     // Explicit kind for meta-loops (e.g. Autopilot) — set on the container by
     // its fetch handler; absent for ordinary prompts, where the server derives
     // kind from promptName.
@@ -1196,7 +1194,6 @@ function initPrompts() {
           ? { issueless: true }
           : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle, source: issueSource } }),
         target,
-        repo: repo || undefined,
         kind,
         periodicalId,
         model,

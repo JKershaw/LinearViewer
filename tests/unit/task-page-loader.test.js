@@ -138,10 +138,8 @@ describe('task page loader: what it reads', () => {
     const { loader } = loaderWith({ loops: [done()], prStateStore });
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
 
-    const taskReads = calls.filter(c => c.method !== 'fetchProjects');
-    assert.deepEqual(taskReads.map(c => c.method), ['fetchRecommendationContext'], 'one task-scoped read, nothing else');
-    assert.deepEqual(taskReads[0].opts, { noDescend: true });
-    assert.equal(calls.filter(c => c.method === 'fetchProjects').length, 1, 'the workspace-level allowlist read (resolveRepoAllowlist) is the only other provider call');
+    assert.deepEqual(calls.map(c => c.method), ['fetchRecommendationContext'], 'one task-scoped read, nothing else (no allowlist read — LIN-3333)');
+    assert.deepEqual(calls[0].opts, { noDescend: true });
     assert.equal(calls.filter(c => c.method === 'fetchIssueComments').length, 0, 'readRunEvidence used the supplied comments');
     assert.deepEqual(prReads, [{ repo: 'acme/app', number: 41 }], 'PR state went through the shared prStateStore');
     assert.equal(model.evidence.state.pr.url, PR_URL);

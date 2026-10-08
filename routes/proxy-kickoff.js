@@ -10,7 +10,6 @@ import { MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../lib/issue-write-vali
 import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -307,7 +306,7 @@ export function createKickoffRoutes({
           return notFound.json(res, 'Issue not found');
         }
         issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
-        resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
+        resolvedRepo = repo || null;
         persistedBindingFields = dispatchIssueSourceField(issueSource);
       }
 

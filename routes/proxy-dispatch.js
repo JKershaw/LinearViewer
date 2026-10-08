@@ -17,12 +17,10 @@ import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, gr
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
-import { validateDispatchRepo, UNKNOWN_REPO_CODE } from '../lib/dispatch-repo-guard.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX, dispatchIssueSourceField } from '../lib/workspace.js';
-import { parseRepoFromDescription, resolveDispatchRepo } from '../lib/prompt-formatters.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { buildRunGate } from '../lib/chat-request.js';
@@ -424,43 +422,11 @@ export function createDispatchRoutes({
         }
       }
 
-      // Repo override validation at the Harbour seam (LIN-2886): resolve
-      // `repo` against the workspace's known repos (LIN-1935's
-      // `knownWorkspaceRepos` inventory seam) BEFORE enqueueing — a typo, a
-      // URL where a basename was meant, or an injected value should never
-      // reach the runner as a wasted dispatch + confusing terminal failure +
-      // five-minute duplicate-guard wait (LIN-2872). Fails OPEN when the
-      // capability isn't there to check with (see
-      // lib/dispatch-repo-guard.js). Passing this check is not a guarantee
-      // the runner can resolve the value (LIN-2974): this validates against
-      // the TRACKER's namespace (project `repo=` lines), while the runner
-      // (simple-dispatcher's admission.js) matches against its HOST's
-      // namespace (folder basenames in `workspaces.json`) — a separate
-      // check against a different list, not a narrower net behind this one.
-      // `resolvedRepo` (normalized to the basename on a URL/owner-name
-      // match) replaces the raw `repo` on the item; a validated repo is
-      // never stored in its unnormalized form.
-      let resolvedRepo = repo || null;
-      if (!isAbort && repo) {
-        // LIN-1880 hermetic guard: `test-token` is this codebase's established
-        // test-mode sentinel (see routes/proxy-dispatch.js's own `isTestMode`
-        // a few hundred lines below, and resolvePromptIssueContext's identical
-        // check) — a real `provider.fetchProjects` call under it would reach
-        // the live Linear API from a unit test. Passing `provider: null` rides
-        // validateDispatchRepo's own existing fail-open path (no extra branch
-        // needed there); a route-level test that wants to exercise validation
-        // for real supplies a non-'test-token' scope.
-        const isTestMode = process.env.NODE_ENV === 'test' && providerAccess?.token === 'test-token';
-        const repoResult = await validateDispatchRepo({ repo, provider: isTestMode ? null : providerAccess?.provider, scope: providerAccess?.token });
-        if (!repoResult.ok) {
-          logEvent(req, '/api/proxy/dispatch', 422, `UNKNOWN_REPO ${repo}`);
-          return jsonError(res, 422, `Unknown repo "${repo}"`, {
-            code: UNKNOWN_REPO_CODE,
-            knownRepos: repoResult.knownRepos
-          });
-        }
-        resolvedRepo = repoResult.repo;
-      }
+      // LIN-3333: an explicit `repo` is stored verbatim. The Harbour-side
+      // workspace-repo guard (LIN-2886/LIN-2974) was removed with the project
+      // `repo=` lines it validated against; the runner's own admission check
+      // (simple-dispatcher's admission.js) stays the authority on resolving it.
+      const resolvedRepo = repo || null;
 
       // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
@@ -749,7 +715,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { issueIdentifier, issueSource, target, repo, repoInherited, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
+      const { issueIdentifier, issueSource, target, repo, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
@@ -794,15 +760,6 @@ export function createDispatchRoutes({
       if (recommendRepoValidationError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, recommendRepoValidationError.error);
-      }
-      // Inherited-repo marker (LIN-1210): when true, `repo` was merely inherited
-      // (e.g. an autopilot orchestrator forwarding a parent project's repo onto a
-      // cross-project child fan-out), NOT deliberately chosen for THIS dispatch, so
-      // the server-derived child/node repo wins over it (see resolveDispatchRepo).
-      // Default false keeps the LIN-537 explicit-caller-repo precedence byte-for-byte.
-      if (repoInherited !== undefined && typeof repoInherited !== 'boolean') {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'repoInherited must be a boolean');
       }
       // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
       // via the shared helper (length + dangerous-chars). NOT a generation-model
@@ -991,25 +948,9 @@ export function createDispatchRoutes({
           // The body is server-generated/trusted, so it skips the dangerous-char /
           // length checks the caller-supplied POST /dispatch path runs, and is
           // never returned to the caller — same contract as the LLM-driven path.
-          // Repo override validation at the Harbour seam (LIN-2886): resolve
-          // the SAME repo value this branch is about to store — after LIN-537/
-          // LIN-1210 precedence, not the raw caller value — against the
-          // workspace's known repos. See the plain POST /dispatch guard above
-          // and lib/dispatch-repo-guard.js for the full rationale; fails OPEN
-          // when the capability isn't there to check with.
-          const overrideRepoCandidate = resolveDispatchRepo(repo, parseRepoFromDescription(project?.description), { inherited: repoInherited === true });
-          let overrideResolvedRepo = overrideRepoCandidate;
-          if (overrideRepoCandidate) {
-            // LIN-1880 hermetic guard: reuse this route's own `isTestMode`
-            // (computed above from the `test-token` sentinel) — see the
-            // matching comment on the plain POST /dispatch guard above.
-            const repoResult = await validateDispatchRepo({ repo: overrideRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
-            if (!repoResult.ok) {
-              logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 422, `UNKNOWN_REPO ${overrideRepoCandidate}`);
-              return keepalive.send(422, { error: `Unknown repo "${overrideRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
-            }
-            overrideResolvedRepo = repoResult.repo;
-          }
+          // LIN-3333: an explicit `repo` is stored verbatim (the workspace-repo
+          // guard was removed with the project `repo=` lines).
+          const overrideResolvedRepo = repo || null;
 
           // A caller that hung up before the enqueue gets nothing enqueued. Once
           // createDispatchItem starts it is never abandoned: no signal reaches it.
@@ -1108,12 +1049,8 @@ export function createDispatchRoutes({
               issueUrl: null,
               dispatchedBy: req.proxyCreatedBy || null,
               target: target || 'cli',
-              // Mirror /prompt's repo resolution: project `repo=` from the
-              // description, with an explicit caller repo winning (LIN-537). When
-              // the caller marks its repo as inherited (LIN-1210), the named node's
-              // own project repo wins over it instead (repoInherited: true).
-              // Validated + normalized against the workspace's known repos above
-              // (LIN-2886) — never the raw candidate.
+              // LIN-3333: the explicit caller `repo` is stored verbatim (the
+              // project `repo=` derivation and workspace-repo guard are gone).
               repo: overrideResolvedRepo,
               sessionId: sessionId || null,
               // LIN-2869: the fused verb's verb-override arm forwards a
@@ -1309,26 +1246,11 @@ export function createDispatchRoutes({
         // action can't be parsed.
         const effectiveKind = deriveDispatchKind(rec.recommendedAction);
 
-        // Repo override validation at the Harbour seam (LIN-2886): resolve the
-        // SAME repo value this branch is about to store — after LIN-537/
-        // LIN-1210 precedence, not the raw caller value — against the
-        // workspace's known repos. See the plain POST /dispatch guard and
-        // lib/dispatch-repo-guard.js for the full rationale; fails OPEN when
-        // the capability isn't there to check with. This branch is
-        // keepalive-armed, so a refusal rides `keepalive.send` like the
+        // LIN-3333: an explicit `repo` is stored verbatim (the workspace-repo
+        // guard was removed with the project `repo=` lines). This branch is
+        // keepalive-armed, so a hang-up rides `keepalive.send` like the
         // deferred-action check above, not a plain `res`.
-        const recommendRepoCandidate = resolveDispatchRepo(repo, rec.repo, { inherited: repoInherited === true });
-        let recommendResolvedRepo = recommendRepoCandidate;
-        if (recommendRepoCandidate) {
-          // LIN-1880 hermetic guard: same `isTestMode` reuse as the
-          // verb-override branch above.
-          const repoResult = await validateDispatchRepo({ repo: recommendRepoCandidate, provider: isTestMode ? null : provider, scope: accessToken });
-          if (!repoResult.ok) {
-            logEvent(req, '/api/proxy/recommend-and-dispatch', 422, `UNKNOWN_REPO ${recommendRepoCandidate}`);
-            return keepalive.send(422, { error: `Unknown repo "${recommendRepoCandidate}"`, code: UNKNOWN_REPO_CODE, knownRepos: repoResult.knownRepos });
-          }
-          recommendResolvedRepo = repoResult.repo;
-        }
+        const recommendResolvedRepo = repo || null;
 
         // A caller that hung up before the enqueue gets nothing enqueued. Once
         // createDispatchItem starts it is never abandoned: no signal reaches it.
@@ -1438,15 +1360,10 @@ export function createDispatchRoutes({
             issueUrl: null,
             dispatchedBy: req.proxyCreatedBy || null,
             target: target || 'cli',
-            // Inherit the server-resolved repo (terminal node's project `repo=`)
-            // when the caller omits one; an explicit caller repo still wins. repo
-            // is functional execution context (working directory), so this fused
-            // verb must propagate it, not just the display header fields (LIN-537).
-            // On a cross-project descent the terminal child's repo (rec.repo) also
-            // wins over a merely *inherited* caller repo (repoInherited: true), so
-            // the worker runs in the child project's repo, not the parent's (LIN-1210).
-            // Validated + normalized against the workspace's known repos above
-            // (LIN-2886) — never the raw candidate.
+            // LIN-3333: the explicit caller `repo` is stored verbatim. `repo` is
+            // still functional execution context (the runner's folder override),
+            // so an explicit caller value must propagate — but the project `repo=`
+            // derivation and the workspace-repo guard are gone.
             repo: recommendResolvedRepo,
             sessionId: sessionId || null,
             // LIN-2869: the fused verb's recommendation-derived arm (the one

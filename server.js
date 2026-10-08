@@ -98,7 +98,6 @@ import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
-import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
@@ -3723,18 +3722,6 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }
 
-  // Fetch project repos for the repo selector
-  let projectRepos = [];
-  try {
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-    const projects = isTestMode ? testMockData.projects : await getProviderForWorkspace(workspace).fetchProjectsList(getWorkspaceCallScope(workspace));
-    projectRepos = projects
-      .map(p => ({ name: p.name, repo: parseRepoFromDescription(p.content) }))
-      .filter(p => p.repo);
-  } catch (e) {
-    // Non-fatal: dispatch page works without repo selector
-  }
-
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
 
   // Workspace-wide dispatch defaults (LIN-1094), used only for the model/harness
@@ -3753,7 +3740,6 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     openRouterSource,
     workspaces: req.session.workspaces,
     featureFlags,
-    projectRepos,
     isLocalhost,
     dispatchDefaults,
     proxyDefault: req.session.proxyDefault

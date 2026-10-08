@@ -102,7 +102,7 @@ function runnerApp(overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// 77 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
+// 76 URL forms, in routes/proxy.js registration order. `group` is LIN-679's
 // own group letter. `run` builds the app + issues the one deterministic
 // offline request and returns { status }.
 // ---------------------------------------------------------------------------
@@ -177,17 +177,6 @@ const ROWS = [
     group: 'D', method: 'GET', url: '/api/proxy/projects', expect: 200,
     note: 'provider.projects() (:1981)',
     run: () => call(buildApp(), 'GET', '/api/proxy/projects'),
-  },
-  {
-    // LIN-2974: the shared fake provider's supports() always answers true,
-    // but it has no real fetchKnownRepos-reached fetchProjectsList() method, so
-    // the call throws synchronously and this route reports the inventory as
-    // unavailable rather than 200 — a deterministic, offline probe of the
-    // "can't determine" branch, not the happy path (that's pinned by
-    // tests/unit/proxy-known-repos.test.js instead).
-    group: 'D', method: 'GET', url: '/api/proxy/known-repos', expect: 503,
-    note: 'fetchKnownRepos() REPO_INVENTORY_UNAVAILABLE (routes/proxy-reads.js)',
-    run: () => call(buildApp(), 'GET', '/api/proxy/known-repos'),
   },
   {
     group: 'D', method: 'GET', url: '/api/proxy/issues', expect: 200,
@@ -590,8 +579,8 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
   // LIN-2634: group J adds a SECOND registration (GET .../transcripts) the
   // same way — still invisible to this regex, still no change to
   // routes/proxy.js's own count.
-  // LIN-2974: group D gains 1 more registration (GET /api/proxy/known-repos)
-  // directly in routes/proxy-reads.js — 13 - > 14, total 67 -> 68.
+  // LIN-3333: group D loses the retired repo-inventory route (deleted with the
+  // project repo= feature) — 14 -> 13.
   // LIN-3025: group K adds 3 registrations (GET/POST/DELETE
   // /api/proxy/dispatch/halt), landing directly in the new
   // routes/proxy-halt.js via router.use() (like every other group above it,
@@ -663,7 +652,7 @@ describe('LIN-679 PR-0: proxy.js registration count', () => {
 // The witness itself.
 // ---------------------------------------------------------------------------
 
-describe('LIN-679 PR-0: endpoint inventory witness (77 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
+describe('LIN-679 PR-0: endpoint inventory witness (76 covered URL forms resolve; 3 routes/proxy-rulings.js forms known-uncovered)', () => {
   for (const row of ROWS) {
     test(`[${row.group}] ${row.method} ${row.url} -> ${row.expect} (${row.note})`, async () => {
       const { status, body, contentType } = await row.run();

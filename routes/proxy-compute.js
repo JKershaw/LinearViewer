@@ -24,7 +24,7 @@ import { getPeriodicals } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
 import { READ_HORIZON_MS, READ_HORIZON_DAYS, readHorizonStart } from '../lib/read-horizon.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
-import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
+import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { badRequest, jsonError, notFound } from '../lib/errors.js';
@@ -326,8 +326,7 @@ export function createComputeRoutes({
         identifier: issue.identifier,
         templateKey,
         promptName: result.name,
-        prompt: result.prompt,
-        repo: parseRepoFromDescription(project?.description)
+        prompt: result.prompt
       });
     } catch (err) {
       if (err.message?.includes('not found')) {
@@ -480,7 +479,6 @@ export function createComputeRoutes({
             reasoning: null,
             prompt: generated.prompt,
             truncated: false,
-            repo: parseRepoFromDescription(project?.description) || null,
             recommendedAction: kind,
             override: true
           };
@@ -1011,9 +1009,8 @@ export function createComputeRoutes({
           // this route's existing top-level withholding above — not a new
           // precedent. `label` is computed here, not in the fold: the fold
           // stays network-free, and this route makes zero provider calls,
-          // so it cannot resolve a repo's display name via knownWorkspaceRepos
-          // — 'none' reuses that helper's own default-lane label string for
-          // vocabulary consistency without importing it.
+          // so it cannot resolve a repo's display name — 'none' is the
+          // default-lane label string for vocabulary consistency.
           repos: r.repos.map(lane => ({
             repo: lane.repo,
             label: lane.repo === null ? 'none' : lane.repo,

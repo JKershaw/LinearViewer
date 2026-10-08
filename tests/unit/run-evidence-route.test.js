@@ -4,8 +4,9 @@
 // Run with: node --test tests/unit/run-evidence-route.test.js
 //
 // Mounts the REAL router with an injected provider + fail-open PR reader, so
-// this exercises the actual handler: PR-URL extraction from tracker comments,
-// allowlist filtering, and the zero / one / many / unreadable derivation.
+// this exercises the actual handler: PR-URL extraction from tracker comments
+// (any repo — LIN-3333 retired the allowlist filter), and the zero / one /
+// many / unreadable derivation.
 
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,20 +23,17 @@ function getHandler(router, method, path) {
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
-function fakeProvider({ repo = 'acme/widget', comments = [] } = {}) {
+function fakeProvider({ comments = [] } = {}) {
   return {
     async fetchIssueComments() { return comments; },
-    async fetchProjects() {
-      return { projects: [{ id: 'p1', name: 'P', content: `repo=${repo}` }], issues: [] };
-    },
   };
 }
 
-function makeRouter({ repo = 'acme/widget', comments = [], readPrStatus = null, owner = true } = {}) {
+function makeRouter({ comments = [], readPrStatus = null, owner = true } = {}) {
   return createWorkspaceApiRoutes({
     workspaceFromUrl: (req, res, next) => next(),
     runEvidence: {
-      resolveProvider: () => ({ provider: fakeProvider({ repo, comments }), callScope: 'scope' }),
+      resolveProvider: () => ({ provider: fakeProvider({ comments }), callScope: 'scope' }),
       viewerIsOwner: () => owner,
       readPrStatus: readPrStatus || (async () => ({ readable: false, state: 'unknown', reason: 'stub' })),
     },
@@ -87,20 +85,21 @@ describe('GET /api/run-evidence/:issueIdentifier', () => {
   test('an unreadable PR read → unknown, never a 500', async () => {
     const res = await callRoute(makeRouter({
       comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      readPrStatus: async () => ({ readable: false, state: 'unknown', reason: 'not readable: private repository' }),
+      readPrStatus: async () => ({ readable: false, state: 'unknown', reason: 'not readable: private or unknown repository' }),
     }));
     assert.equal(res.statusCode, 200);
     assert.equal(res.jsonBody.state.status, 'unknown');
     assert.equal(res.jsonBody.evidence.checked.now.state, 'unknown');
   });
 
-  test('allowlist filtering: a PR for a repo the workspace does not name is dropped', async () => {
+  test('a PR for any repo is accepted — the workspace allowlist is gone (LIN-3333)', async () => {
+    const PR_FOREIGN = 'https://github.com/acme/other/pull/12';
     const res = await callRoute(makeRouter({
-      repo: 'acme/other',
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      readPrStatus: async () => { throw new Error('should not be called'); },
+      comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z')],
+      readPrStatus: async () => ({ readable: true, repo: 'acme/other', number: 12, state: 'open', merged: false, head: { ref: 'f', sha: 'abc1234' }, ref: 'abc1234', checks: [] }),
     }));
-    assert.equal(res.jsonBody.state.status, 'no-pr');
+    assert.equal(res.jsonBody.state.status, 'ready');
+    assert.equal(res.jsonBody.state.pr.repo, 'acme/other');
   });
 
   test('a non-owner viewer gets closeOut.owner=false (the box will be omitted)', async () => {

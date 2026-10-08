@@ -26,7 +26,7 @@ const ALL_TOOL_NAMES = ALL_SCHEMAS.map(s => s.function.name);
 describe('CHAT_TOOL_SCOPE_TIERS (LIN-2971)', () => {
   // The durable half of the ticket: a tool added to any of the three schema
   // collections without a tier entry fails this test, rather than silently
-  // going unscoped the way get_stack/resolveRepoAllowlist did before.
+  // going unscoped the way get_stack did before.
   test('every schema — including the two write schemas outside CHAT_TOOL_SCHEMAS — declares a tier', () => {
     for (const name of ALL_TOOL_NAMES) {
       assert.ok(
@@ -75,7 +75,7 @@ describe('CHAT_TOOL_SCOPE_TIERS (LIN-2971)', () => {
       get_session: 'fleet',
       list_active_sessions: 'fleet',
       list_pending_decisions: 'fleet',
-      get_pr_status: 'workspace',
+      get_pr_status: null,
       send_follow_up: 'fleet',
       remember: null,
     });

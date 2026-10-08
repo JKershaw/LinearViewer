@@ -18,7 +18,7 @@ let WS, DISPATCH_URL, API_PREFIX;
 
 const REPO_SEED = {
   projects: [
-    { id: 'local-proj-1', name: 'Project Alpha', content: 'repo=test-repo', sortOrder: 1 },
+    { id: 'local-proj-1', name: 'Project Alpha', content: 'Seeded project', sortOrder: 1 },
   ],
   issues: [],
 };
