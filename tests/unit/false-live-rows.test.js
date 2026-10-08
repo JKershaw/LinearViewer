@@ -140,7 +140,23 @@ describe('false-live-rows (LIN-3365)', () => {
   test('default ticket read: no base or a failing fetch yields null (unknown)', async () => {
     assert.equal(await defaultReadTicketState('acme', 'LIN-1', { base: '' }), null);
     assert.equal(await defaultReadTicketState('acme', 'LIN-1', { base: 'http://x', fetchImpl: async () => { throw new Error('down'); } }), null);
-    const ok = await defaultReadTicketState('acme', 'LIN-1', { base: 'http://x', fetchImpl: async () => ({ ok: true, json: async () => ({ state: { type: 'completed' }, completedAt: '2026-09-30T00:00:00Z' }) }) });
+    const fetchImpl = async () => ({ ok: true, json: async () => ({ state: { type: 'completed' }, completedAt: '2026-09-30T00:00:00Z' }) });
+    const ok = await defaultReadTicketState('acme', 'LIN-1', { base: 'http://x', fetchImpl, ticketUrlKey: 'acme' });
     assert.equal(ok.stateType, 'completed');
+  });
+
+  test('default ticket read is scoped to the passed workspace: any other urlKey (or none) reads unknown, never fetches', async () => {
+    let calls = 0;
+    const fetchImpl = async () => { calls += 1; return { ok: true, json: async () => ({ state: { type: 'completed' }, completedAt: '2026-09-30T00:00:00Z' }) }; };
+    assert.equal(await defaultReadTicketState('other', 'LIN-1', { base: 'http://x', fetchImpl, ticketUrlKey: 'acme' }), null);
+    assert.equal(await defaultReadTicketState('acme', 'LIN-1', { base: 'http://x', fetchImpl, ticketUrlKey: undefined }), null);
+    assert.equal(calls, 0);
+    assert.equal((await defaultReadTicketState('acme', 'LIN-1', { base: 'http://x', fetchImpl, ticketUrlKey: 'acme' })).stateType, 'completed');
+    assert.equal(calls, 1);
+  });
+
+  test('report says other-workspace and canceled/duplicate tickets read unknown', async () => {
+    const r = await run();
+    assert.match(r.report, /includes: tickets of any workspace other than --ticket-workspace; canceled\/duplicate tickets/);
   });
 });

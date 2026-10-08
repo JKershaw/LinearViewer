@@ -86,7 +86,9 @@ export async function selectForWorkspace({ dispatchStore, urlKey, now }) {
   for (const c of sel.closes) {
     if (c.ownTerminalNow) { ownTerminalNow += 1; continue; } // closeLineageRows would not write it either
     if (!bandIds.has(c.id)) { outsideHorizon += 1; continue; }
-    writable.push(c);
+    // closeLineageRows re-asserts rootItemId at write time, so the write key is the
+    // row's CURRENT root, not the event root the selector matched it under (N1).
+    writable.push({ ...c, currentRoot: byId.get(c.id)?.rootItemId ?? c.rootItemId });
   }
   const heldOpen = {};
   for (const b of SKIP_BUCKETS) heldOpen[b] = sel.skippedIds[b].filter(id => bandIds.has(id)).length;
@@ -97,7 +99,7 @@ export async function selectForWorkspace({ dispatchStore, urlKey, now }) {
 function groupWrites(writable) {
   const groups = new Map();
   for (const c of writable) {
-    const key = [c.rootItemId, c.reason, c.eventAtMs, c.beforeDispatchedMs].join('|');
+    const key = [c.currentRoot, c.reason, c.eventAtMs, c.beforeDispatchedMs].join('|');
     if (!groups.has(key)) groups.set(key, { ...c, ids: [] });
     groups.get(key).ids.push(c.id);
   }
@@ -140,7 +142,7 @@ export async function runLineageBackfill({
     if (!execute) continue;
 
     for (const g of groupWrites(result.writable)) {
-      const r = await dispatchStore.closeLineageRows(urlKey, g.rootItemId, {
+      const r = await dispatchStore.closeLineageRows(urlKey, g.currentRoot, {
         beforeDispatchedAt: new Date(g.beforeDispatchedMs),
         takenBefore: new Date(g.eventAtMs),
         kinds: g.reason === 'handed-on' ? ['wake'] : undefined,

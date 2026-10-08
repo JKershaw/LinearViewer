@@ -91,4 +91,24 @@ describe('lineage-close backfill (LIN-3365)', () => {
     } finally { store.historyCollection.find = real; }
     assert.equal(await stampOf('beat'), null);
   });
+
+  test('execute groups writes by the row\'s CURRENT root, not the event root (N1)', async () => {
+    // X: tagged A, then an untagged [done]. m: follow-up of X, joined A when taken, moved to B later.
+    await seed('X', { rootItemId: 'A', followUpTo: null, dispatchedAt: ago(2), resolvedAt: ago(2), feedback: [
+      { message: '[working] hi', timestamp: ago(2, 1), rootItemId: 'A' },
+      { message: '[done] ok', timestamp: ago(2, 5) }
+    ] });
+    await seed('m', { rootItemId: 'B', followUpTo: 'X', dispatchedAt: ago(2, 2), resolvedAt: ago(2, 3), feedback: [
+      { message: '[working] a', timestamp: ago(2, 3), rootItemId: 'A' },
+      { message: '[working] b', timestamp: ago(2, 8), rootItemId: 'B' }
+    ] });
+    const dry = await run();
+    const wouldStamp = dry.perWorkspace[0].writable.map(c => c.id).sort();
+    assert.deepEqual(wouldStamp, ['m']);
+    const ex = await run({ execute: true, by: 'tester' });
+    assert.deepEqual(ex.stamped.filter(s => s.ok).map(s => s.id).sort(), wouldStamp);
+    assert.equal((await stampOf('m')).reason, 'lineage-terminal');
+    assert.equal(ex.remaining, 0);
+    assert.match(ex.report, /Idempotence check: 0 remaining/);
+  });
 });

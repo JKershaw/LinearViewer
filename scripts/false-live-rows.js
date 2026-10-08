@@ -8,7 +8,16 @@
  * and after `scripts/lineage-close-backfill-lin3365.js`; both outputs go in the
  * PR. `find` only: there is no `--execute` and nothing here writes.
  *
- * Usage:  node scripts/false-live-rows.js          (same MONGODB_URI / HARBOUR_DATA_DIR as server.js)
+ * Usage:  node scripts/false-live-rows.js [--ticket-workspace <urlKey>]
+ *          (same MONGODB_URI / HARBOUR_DATA_DIR as server.js)
+ *
+ * Ticket reads (clauses 3, 4 and the ticket-closed false closes) go through
+ * HARBOUR_LOCAL_BASE, which is ONE workspace's proxy. They are only made for the
+ * workspace named by `--ticket-workspace` (or FALSE_LIVE_TICKET_URLKEY); every
+ * other workspace's tickets read `unknown`, never another workspace's
+ * same-identifier issue. Run once per workspace with that workspace's proxy base.
+ * Canceled and duplicate tickets also read `unknown` for clause 3: the proxy
+ * issue payload carries no `canceledAt`, so they have no terminal timestamp.
  *
  * Definition (the LIN-3358 plan, B section, revisions 2 and 3):
  *   1. a taken `kind:'wake'` row, unstamped, no own terminal, with a later
@@ -63,7 +72,14 @@ const toMs = (v) => (v == null ? NaN : (v instanceof Date ? v.getTime() : new Da
  *
  * @returns {Promise<{stateType: string|null, terminalAtMs: number|null}|null>}
  */
-export async function defaultReadTicketState(urlKey, issueIdentifier, { base = process.env.HARBOUR_LOCAL_BASE, fetchImpl = globalThis.fetch } = {}) {
+export async function defaultReadTicketState(urlKey, issueIdentifier, {
+  base = process.env.HARBOUR_LOCAL_BASE,
+  fetchImpl = globalThis.fetch,
+  ticketUrlKey = process.env.FALSE_LIVE_TICKET_URLKEY
+} = {}) {
+  // The base is one workspace's proxy: a read for any other workspace would
+  // return a same-identifier issue from the wrong one (team keys collide).
+  if (!ticketUrlKey || urlKey !== ticketUrlKey) return null;
   if (!base || !issueIdentifier || typeof fetchImpl !== 'function') return null;
   try {
     const res = await fetchImpl(`${base}/api/proxy/issues/${encodeURIComponent(issueIdentifier)}`);
@@ -240,6 +256,7 @@ export function buildReport({ perWorkspace, now, headSha }) {
   L.push(`Horizon: dispatchedAt >= ${new Date(now - READ_HORIZON_MS).toISOString()} (READ_HORIZON_MS); ticket grace ${TICKET_CLOSED_GRACE_MS / 60000}m (provisional)`);
   L.push('');
   L.push(`unknown (ticket unreadable; never counted as false-live): ${sum(w => w.unknown)}  [tickets checked: ${sum(w => w.ticketsChecked)}]`);
+  L.push('  includes: tickets of any workspace other than --ticket-workspace; canceled/duplicate tickets (clause 3: the proxy payload has no canceledAt)');
   L.push('');
   L.push('Clauses (target 0):');
   L.push(`  1 wake row, a later lineage row has posted (B(a))         ${String(sum(w => w.clause1)).padStart(5)}`);
@@ -267,7 +284,13 @@ export function readHeadSha() {
   }
 }
 
+export function parseTicketWorkspace(argv) {
+  const i = argv.indexOf('--ticket-workspace');
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
+}
+
 async function main() {
+  const ticketUrlKey = parseTicketWorkspace(process.argv) || process.env.FALSE_LIVE_TICKET_URLKEY || null;
   const dbClient = process.env.MONGODB_URI
     ? new MongoClient(process.env.MONGODB_URI)
     : new MangoClient(process.env.HARBOUR_DATA_DIR || './data');
@@ -279,7 +302,12 @@ async function main() {
       historyCollection: db.collection('dispatch-history')
     });
     const agentStatusStore = new AgentStatusStore({ collection: db.collection('foreman-status') });
-    const { report } = await runFalseLiveRows({ dispatchStore, agentStatusStore, headSha: readHeadSha(), log: (m) => console.error(m) });
+    const { report } = await runFalseLiveRows({
+      dispatchStore,
+      agentStatusStore,
+      headSha: readHeadSha(),
+      readTicketState: (k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey }),
+      log: (m) => console.error(m) });
     console.log(report);
   } finally {
     if (dbClient.close) await dbClient.close();
