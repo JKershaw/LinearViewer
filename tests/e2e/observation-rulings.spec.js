@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures/test-base.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 import { featuresParam } from '../helpers.js';
 
 // LIN-1728 Phase 3/4 — the escalation surface: the ambient "waiting on you"
@@ -601,6 +602,10 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
 
   test('LIN-1728 review F1: a ruling from a non-page workspace writes its comment/stamp/dispatch in the RULING\'s own workspace, and clears', async ({ page, secondWorkerUrlKey }) => {
     await page.goto(`/test/set-session?urlKey=${URL_KEY}&multiWorkspace=true`);
+    // LIN-3383: both seeds and the ruling's dispatch enqueue on a runner target
+    // (owner-only); the session must own both workspaces.
+    await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+    await seedWorkspaceOwnership(page, secondWorkerUrlKey, 'owner');
     await clearRuns(page);
     await clearRunsFor(page, secondWorkerUrlKey);
 

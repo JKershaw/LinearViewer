@@ -48,3 +48,26 @@ describe('server.js: LIN-3137 owner-check hoist + dispatch mint wiring', () => {
       'the dispatch router must receive the owner check, or the gate fails closed in production');
   });
 });
+
+// LIN-3383: the owner-only runner enqueue gate reads the SAME hoisted seam in the
+// five session routers that reach the queue. A mount missing it fails closed
+// (OWNER_CHECK_UNAVAILABLE) in production, which a unit harness injecting the dep
+// directly cannot see.
+describe('server.js: LIN-3383 owner-only enqueue wiring (the five new mounts)', () => {
+  for (const factory of [
+    'createWorkspaceApiRoutes',
+    'createCollectiveRoutes',
+    'createDashboardRoutes',
+    'createTaskChatRoutes',
+    'createFlightCompanionRoutes'
+  ]) {
+    test(`workspaceOwnerCheck is passed into ${factory}({ ... })`, () => {
+      const start = src.indexOf(`${factory}({`);
+      assert.notEqual(start, -1, `${factory} mount literal must exist`);
+      const end = src.indexOf('}))', start);
+      assert.notEqual(end, -1, 'the mount literal must close');
+      assert.match(src.slice(start, end), /\bworkspaceOwnerCheck\b/,
+        `${factory} must receive the hoisted owner check`);
+    });
+  }
+});

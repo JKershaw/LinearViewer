@@ -92,12 +92,14 @@ async function post(app, body) {
   }
 }
 
-function mountRoute(stores) {
+function mountRoute(stores, { ownerCheck } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createFlightCompanionRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: ownerCheck === undefined ? (async () => ({ status: 'owner' })) : ownerCheck,
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: URL_KEY };
+      req.workspace = { urlKey: URL_KEY, id: 'ws-1' };
       req.session = { accountId: 'u1', features: { flightCompanion: true } };
       next();
     },
@@ -126,6 +128,8 @@ function helperOptions(stores, overrides = {}) {
     prompt: 'next beat',
     baseUrl: 'http://127.0.0.1',
     dispatchedBy: 'u1',
+    ownerCheck: async () => ({ status: 'owner' }), // LIN-3383
+    workspaceId: 'ws-1',
     ...overrides,
   };
 }
@@ -286,4 +290,69 @@ describe('approve-follow-up behaves identically through the extraction', () => {
       assert.strictEqual(routeStores.addItemCalls.length, helperStores.addItemCalls.length);
     });
   }
+});
+
+// ── LIN-3383: the seam is owner-only and fails closed ────────────────────────
+
+describe('LIN-3383 — dispatchSessionFollowUp is owner-only', () => {
+  const anchorHistory = () => [historyItem({ id: 'sess-done', target: 'cli' })];
+
+  test('a non-owner is refused 422 RUNNER_ENQUEUE_OWNER_ONLY (never 403) and nothing is enqueued', async () => {
+    const stores = makeStores({ history: anchorHistory() });
+    const outcome = await dispatchSessionFollowUp(helperOptions(stores, { ownerCheck: async () => ({ status: 'not-owner' }) }));
+    assert.strictEqual(outcome.status, 422, '403 would read as flag-off to public/flight-companion.js');
+    assert.strictEqual(outcome.body.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    assert.strictEqual(outcome.body.retryable, false);
+    assert.strictEqual(stores.addItemCalls.length, 0);
+  });
+
+  test('missing ownerCheck → 503 OWNER_CHECK_UNAVAILABLE (fail closed)', async () => {
+    const stores = makeStores({ history: anchorHistory() });
+    const outcome = await dispatchSessionFollowUp(helperOptions(stores, { ownerCheck: undefined }));
+    assert.strictEqual(outcome.status, 503);
+    assert.strictEqual(outcome.body.code, 'OWNER_CHECK_UNAVAILABLE');
+    assert.strictEqual(stores.addItemCalls.length, 0);
+  });
+
+  test('missing dispatchedBy (no account) → 503 GRANT_OWNERLESS; missing workspaceId → 409 WORKSPACE_OWNER_UNSET', async () => {
+    const real = async ({ workspaceId }) => (workspaceId ? { status: 'owner' } : { status: 'no-owner' });
+    const a = makeStores({ history: anchorHistory() });
+    const noAccount = await dispatchSessionFollowUp(helperOptions(a, { ownerCheck: real, dispatchedBy: undefined }));
+    assert.strictEqual(noAccount.status, 503);
+    assert.strictEqual(noAccount.body.code, 'GRANT_OWNERLESS');
+    const b = makeStores({ history: anchorHistory() });
+    const noWorkspace = await dispatchSessionFollowUp(helperOptions(b, { ownerCheck: real, workspaceId: undefined }));
+    assert.strictEqual(noWorkspace.status, 409);
+    assert.strictEqual(noWorkspace.body.code, 'WORKSPACE_OWNER_UNSET');
+    assert.strictEqual(a.addItemCalls.length + b.addItemCalls.length, 0);
+  });
+
+  test('the seam is asked about the route workspace and the dispatching account', async () => {
+    const seen = [];
+    const stores = makeStores({ history: anchorHistory() });
+    const outcome = await dispatchSessionFollowUp(helperOptions(stores, { ownerCheck: async (a) => { seen.push(a); return { status: 'owner' }; } }));
+    assert.strictEqual(outcome.status, 200);
+    assert.deepEqual(seen, [{ workspaceId: 'ws-1', accountId: 'u1' }]);
+  });
+
+  test('a dash anchor is still the derivation 422 and never consults the seam first', async () => {
+    let calls = 0;
+    const stores = makeStores({ history: [historyItem({ id: 'sess-done', target: 'dash' })] });
+    const outcome = await dispatchSessionFollowUp(helperOptions(stores, { ownerCheck: async () => { calls++; return { status: 'not-owner' }; } }));
+    assert.strictEqual(outcome.status, 422);
+    assert.strictEqual(calls, 0);
+  });
+
+  test('FC approve-follow-up: a non-owner gets 422 (not the flag-off 403), nothing enqueued; the owner still enqueues', async () => {
+    const refused = makeStores({ history: anchorHistory() });
+    const r = await post(mountRoute(refused, { ownerCheck: async () => ({ status: 'not-owner' }) }), { sessionId: 'sess-done', prompt: 'next beat' });
+    assert.strictEqual(r.status, 422);
+    assert.strictEqual(r.body.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    assert.strictEqual(refused.addItemCalls.length, 0);
+
+    const allowed = makeStores({ history: anchorHistory() });
+    const o = await post(mountRoute(allowed), { sessionId: 'sess-done', prompt: 'next beat' });
+    assert.strictEqual(o.status, 200);
+    assert.strictEqual(allowed.addItemCalls.length, 1);
+  });
 });

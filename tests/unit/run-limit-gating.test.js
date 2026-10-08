@@ -32,6 +32,8 @@ function buildApp({ freeTierStore, accountStore = null, session = { accountId: '
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.item = item;

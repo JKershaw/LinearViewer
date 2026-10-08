@@ -1310,6 +1310,11 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
   // ---------------------------------------------------------------------------
   const LOCAL_WS_URL_KEY = LOCAL_WORKSPACE_URL_KEY;
   const LOCAL_WS_UUID = '33333333-3333-3333-3333-333333333333';
+  // A stable UUID-shaped id derived from a urlKey (sha1, version/variant bits set).
+  const uuidForUrlKey = (key) => {
+    const h = crypto.createHash('sha1').update(`local-workspace:${key}`).digest('hex');
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
+  };
 
   // Seed the local store and establish a `provider: 'local'` session.
   //
@@ -1350,7 +1355,16 @@ export function createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeT
       // fresh id (not the shared LOCAL_WS_UUID every single-workspace local
       // session reuses) avoids two simultaneous entries colliding on `id`.
       const append = body.append === true || req.query.append === 'true';
-      const wsId = append ? crypto.randomUUID() : LOCAL_WS_UUID;
+      //
+      // LIN-3383: the workspace id is also the owner edge's key, and the owner-only
+      // runner enqueue gate makes every enqueueing spec depend on it. A per-worker
+      // urlKey therefore gets its OWN deterministic id (same urlKey, same id, so a
+      // re-seed is stable): a single shared id let parallel workers, each a
+      // different account (identity scope = urlKey), flip each other's owner edge
+      // and 403 one another's dispatches. The fixed default key keeps the shared id.
+      const wsId = append
+        ? crypto.randomUUID()
+        : (urlKey === LOCAL_WS_URL_KEY ? LOCAL_WS_UUID : uuidForUrlKey(urlKey));
 
       // Token === urlKey: carries no auth, only selects the store partition.
       // No `accessToken: 'test-token'`, so the mock short-circuit never fires.

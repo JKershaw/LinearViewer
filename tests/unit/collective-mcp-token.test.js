@@ -64,6 +64,8 @@ function buildApp(captured, { workspacePreferencesStore, proxyTokenStore, accoun
   const app = express();
   app.use(express.json());
   app.use(createCollectiveRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.push({ urlKey, item });
@@ -78,9 +80,10 @@ function buildApp(captured, { workspacePreferencesStore, proxyTokenStore, accoun
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey };
       // `accountId` is what stamps a mint's `createdBy` (LIN-1376). Left unset by
-      // default, matching the historical fixture — the LIN-1582 tests below opt in
-      // to an owned session explicitly.
-      req.session = { linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
+      // default (an owned 'u1' since LIN-3383: a session with no account cannot
+      // enqueue to a runner at all) — the LIN-1582 tests below pass `accountId:
+      // null` for the ownerless case and a named account for the owned one.
+      req.session = { accountId: 'u1', linearUserId: 'u1', features: { collective: true }, workspaces: WORKSPACES };
       if (accountId !== undefined) req.session.accountId = accountId;
       next();
     },
@@ -273,54 +276,32 @@ describe('LIN-1582 — Collective prose branch under the ownerless switch', () =
     assert.strictEqual(item.bootstrapToken, null, 'prose path carries no structured field');
   });
 
-  test('compat ON + ownerless session: still mints and still embeds, but warns', async (t) => {
-    restore(t);
-    delete process.env[ENV];
-    const warnMock = t.mock.method(console, 'warn', () => {});
-    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
-    const minted = [];
-    const captured = [];
-    const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted) });
+  // LIN-3383: an ownerless session can no longer reach the prose mint at all.
+  // The route's owner-only runner enqueue gate refuses a seat for a session with
+  // no account BEFORE the factory and the mint (fail closed, GRANT_OWNERLESS),
+  // whatever the compat switch says — so neither compat mode mints, embeds or
+  // enqueues for it. (The mint-level compat lane stays covered where the mint is
+  // reachable: provisionBootstrapToken's own tests.)
+  for (const compat of ['unset', 'off']) {
+    test(`compat ${compat} + ownerless session: the seat is refused before any mint or enqueue`, async (t) => {
+      restore(t);
+      if (compat === 'off') process.env[ENV] = 'off'; else delete process.env[ENV];
+      const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
+      const minted = [];
+      const captured = [];
+      const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted), accountId: null });
 
-    const res = await call(app, 'post', START_PATH, {
-      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+      const res = await call(app, 'post', START_PATH, {
+        channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
+      });
+
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.equal(minted.length, 0, 'no bootstrap is minted for an ownerless session');
+      assert.equal(captured.length, 0, 'nothing is enqueued');
+      assert.equal(res.body.dispatched[0].ok, false);
+      assert.equal(res.body.dispatched[0].code, 'GRANT_OWNERLESS');
     });
-
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal(minted.length, 1, 'the compat population is still served');
-    assert.equal(minted[0].opts.createdBy, null);
-    assert.ok(captured[0].item.prompt.includes('boot_alpha'), 'prose block unchanged under compat');
-
-    const warned = warnMock.mock.calls.map(c => c.arguments.join(' ')).join('\n');
-    assert.match(warned, /LIN-1448/, 'the ownerless mint is countable, never silent');
-    assert.ok(!warned.includes('boot_alpha'), 'never logs token bytes');
-  });
-
-  test('compat OFF + ownerless session: no mint, no access block, participant still dispatched', async (t) => {
-    restore(t);
-    process.env[ENV] = 'off';
-    const workspacePreferencesStore = await prefsWith({ alpha: { harness: 'opencode' } });
-    const minted = [];
-    const captured = [];
-    const app = buildApp(captured, { workspacePreferencesStore, proxyTokenStore: mintingStore(minted) });
-
-    const res = await call(app, 'post', START_PATH, {
-      channel: '#room', characters: [{ workspaceUrlKey: 'alpha' }], target: 'cli',
-    });
-
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal(minted.length, 0, 'the ownerless bootstrap is never minted');
-    // Graceful, NOT fail-closed — contrast the claude-code case at :168.
-    assert.equal(captured.length, 1, 'the participant is still enqueued');
-    assert.equal(res.body.dispatched[0].ok, true, 'a token-less prose participant is not a failure');
-    const { item } = captured[0];
-    assert.ok(!item.prompt.includes('## Workspace API access (auto-appended)'),
-      'the token-dependent block is dropped rather than emitted token-less');
-    assert.ok(!item.prompt.includes('boot_alpha'));
-    assert.strictEqual(item.bootstrapToken, null);
-    // The discussion itself still works — the participant just lacks Linear access.
-    assert.ok(item.prompt.includes('#room'), 'the participant prompt is otherwise intact');
-  });
+  }
 
   test('compat OFF + owned session: the claude-code branch still gets its field token', async (t) => {
     restore(t);

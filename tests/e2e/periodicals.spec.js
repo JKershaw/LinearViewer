@@ -241,7 +241,9 @@ test.describe('Periodicals group', () => {
       await dispatchBtn.click();
 
       await expect(dispatchBtn).toHaveText('failed');
-      await expect(page.locator('.toast-error')).toContainText("Only this workspace's owner can mint an autopilot launch credential");
+      // LIN-3383: the owner-only runner enqueue gate runs ahead of M2's mint check,
+      // so a non-owner now meets its message first (M2 stays as the backstop).
+      await expect(page.locator('.toast-error')).toContainText("Only this workspace's owner can queue work for its runner");
       const { items } = await (await page.request.get(`/workspace/${localWorkerUrlKey}/api/dispatch`)).json();
       expect(items.filter(i => i.kind === 'periodical')).toHaveLength(0);
     } finally {

@@ -66,6 +66,11 @@ function world({ ownerCheck, session } = {}) {
   const app = express();
   app.use(express.json({ limit: '1mb' }));
   app.use(createDispatchRoutes({
+    // LIN-3383: the owner-only runner enqueue gate runs BEFORE M2. This stub is
+    // the owner so the M2 refusals below still reach M2's own mint-time check
+    // (its backstop role); the one exception, a session with no accountId, is
+    // refused by the gate first, with the same code plus its `category`.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         items.push(item);
@@ -153,7 +158,7 @@ describe('LIN-3136 M2 — refusals: nothing enqueued, no token, human text', () 
     ['owner-less workspace → 409 WORKSPACE_OWNER_UNSET', {}, (w) => { delete w.state.owners[WS]; }, 409,
       { error: 'This workspace has no recorded owner', code: 'WORKSPACE_OWNER_UNSET', retryable: false }],
     ['no accountId → 503 GRANT_OWNERLESS', { session: { linearUserId: 'u1' } }, () => {}, 503,
-      { error: 'This session has no account owner', code: 'GRANT_OWNERLESS', retryable: false }],
+      { error: 'This session has no account owner', code: 'GRANT_OWNERLESS', category: 'auth', retryable: false }],
     ['seam unwired → 503 OWNER_CHECK_UNAVAILABLE, retryable, owner-check text', { ownerCheck: null }, () => {}, 503,
       { error: 'Owner verification is temporarily unavailable', code: 'OWNER_CHECK_UNAVAILABLE', retryable: true }]
   ];

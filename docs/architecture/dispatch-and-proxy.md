@@ -12,6 +12,23 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
 - Token management at `/workspace/:urlKey/api/dispatch/tokens` — minting is **owner-only**
   (LIN-3137): a non-owner gets `403 GRANT_OWNER_ONLY`, an ownerless workspace
   `409 WORKSPACE_OWNER_UNSET`; listing/revoking are unchanged (a mint gate, not revocation)
+- **Queueing work for a runner is owner-only** (LIN-3383, `lib/runner-enqueue-gate.js`): for a
+  runner-consumed target (`cli`, `web`; an absent target is `cli`) only the workspace's owner can
+  enqueue from a session. A non-owner gets `403 RUNNER_ENQUEUE_OWNER_ONLY` ("Only this workspace's
+  owner can queue work for its runner."); an ownerless workspace `409 WORKSPACE_OWNER_UNSET`; a
+  session with no account `503 GRANT_OWNERLESS`; an absent/failing owner seam `503
+  OWNER_CHECK_UNAVAILABLE` (fail closed). `dash`/`local` are unchanged. The one hoisted
+  `workspaceOwnerCheck` is the only owner source (`role:'owner'` edge); the gate is a call at each
+  session-side entry, not inside `createDispatchItem` (which also serves token-scoped proxy and
+  orchestrator callers). Gated entries: `POST /api/dispatch` (fresh, follow-up, abort and cascade
+  abort), both feedback lanes (the issue still files; the lane returns `launched:false` + code),
+  run-proposal Apply (checked before the CAS claim), Flight Companion approve (a not-owner is `422`,
+  because the client reads a `403` there as flag-off) and reply, Task Chat's execute-mode
+  `send_follow_up`, and Collective (per participant workspace: an unowned seat is `ok:false`). The
+  proxy routes stay `requireGrant('dispatch')`-scoped. `tests/unit/lin-3383-runner-enqueue-census.test.js`
+  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink. Residual (filed to
+  LIN-3391): an invitee who owns a workspace with their own runner can still start a no-`stopAt`
+  run that merges without the press; halting the runner is not an enqueue.
 - `GET /workspace/:urlKey/api/dispatch/halt` - Read the workspace's halt request
 - `POST /workspace/:urlKey/api/dispatch/halt` - Request a pause or stop (LIN-2994)
 - `DELETE /workspace/:urlKey/api/dispatch/halt` - Clear the halt request

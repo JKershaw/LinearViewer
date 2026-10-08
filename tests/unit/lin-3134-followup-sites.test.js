@@ -250,6 +250,8 @@ function sessionApp(world) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: world.dispatchStore,
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
@@ -268,6 +270,8 @@ function fcApp(world) {
   const app = express();
   app.use(express.json());
   app.use(createFlightCompanionRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: URL_KEY }; req.session = { accountId: POSTER, features: { flightCompanion: true } }; next(); },
     getOpenRouterSource: () => null, getDeployInfo: () => ({}), observerStateStore: null, freeTierStore: null,
     workspacePreferencesStore: null, recapCacheStore: null, briefCacheStore: null,
@@ -291,6 +295,7 @@ function chatExecutor(world) {
     agentStatusStore: { listStatus: async () => ({ items: [], total: 0 }) },
     sessionIsTerminal: (session) => (session.loops || []).some((l) => l.terminalStatus === 'done'),
     followUpEnabled: true,
+    enqueueGuard: async () => null, // LIN-3383: the owner
     dispatchedBy: POSTER,
     proxyTokenStore: world.routeTokenStore,
     baseUrl: 'https://harbour.test'
