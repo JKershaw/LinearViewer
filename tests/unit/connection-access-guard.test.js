@@ -345,6 +345,8 @@ const METHOD_CLASSES = {
   readConnectionsByIds: 'READ',
   readConnectionsByReferent: 'READ',
   readReferencedConnections: 'READ',
+  // LIN-3381: the urlKey-holder projection (referents only, no credentials).
+  readConnectionReferents: 'READ',
   readConnectionsByAccountPrefix: 'READ',
   updateCredentials: 'WRITE',
   // LIN-3278: the CAS mirror repair (best-effort heal of a stale Connection
