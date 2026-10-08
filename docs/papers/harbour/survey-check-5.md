@@ -1,6 +1,6 @@
 ---
 title: Do the wake-inventory and browser-flakes papers hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-09-30
 authors: [Claude (LIN-3173)]

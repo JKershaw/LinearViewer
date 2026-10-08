@@ -1,6 +1,6 @@
 ---
 title: Do the held-or-fresh and where-judgement-happens papers hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-10-01
 authors: [Claude (LIN-3183)]

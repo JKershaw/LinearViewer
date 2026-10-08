@@ -1,5 +1,6 @@
 ---
 title: Does the evidence support the agent-retention paper’s conclusions?
+kind: check
 version: 1
 date: 2026-09-20
 authors: [Codex reviewer]

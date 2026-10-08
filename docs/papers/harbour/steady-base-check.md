@@ -1,6 +1,6 @@
 ---
 title: Does the steady-base paper hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-09-30
 authors: [Claude]

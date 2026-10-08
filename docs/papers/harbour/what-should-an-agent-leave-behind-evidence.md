@@ -1,3 +1,10 @@
+---
+title: Evidence register: what should an agent leave behind?
+kind: data
+date: 2026-09-20
+authors: [Codex]
+---
+
 # Evidence register: what should an agent leave behind?
 
 Supporting appendix to [the paper](what-should-an-agent-leave-behind.md), version 1, 20 September 2026, tracked as LIN-2961. This register distinguishes recorded historical results, arithmetic recomputation, selected source checks and proposed interpretations. It is not a new effectiveness experiment. The paper and this register were assembled by Codex with separate source-audit contributions.
