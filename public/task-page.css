@@ -142,7 +142,62 @@
 .task-ref-glyph, .task-ref-ident { font-family: var(--font-structural); }
 .task-ref-state { color: var(--muted); font-size: 0.8rem; }
 
-.task-share-slot:empty { display: none; }
+/* ── Share controls (LIN-3330, owner only) ───────────────────────────────── */
+.task-share { margin: var(--space-4, 1rem) 0; }
+.task-share-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.task-share-label { font-family: var(--font-content); color: var(--muted); }
+.task-share-create,
+.task-share-copy,
+.task-share-revoke {
+  font-family: var(--font-content);
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--brand-dim);
+  cursor: pointer;
+}
+.task-share-create[disabled], .task-share-revoke[disabled] { opacity: 0.6; cursor: progress; }
+.task-share-note { font-size: 0.8rem; color: var(--muted); }
+.task-share-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.task-share-new-label { font-size: 0.8rem; color: var(--muted); }
+.task-share-url {
+  font-family: var(--font-structural);
+  font-size: 0.8rem;
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+.task-share-list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.task-share-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  padding: 0.2rem 0;
+}
+.task-share-when { font-family: var(--font-structural); color: var(--muted); }
+.task-share-gone { color: var(--muted); }
+
+@media (max-width: 720px) {
+  .task-share-row { flex-wrap: wrap; }
+}
 
 /* ── Phone: the track stays calm ─────────────────────────────────────────────
    Counts and chips belong inside an opened session (John's check-in, 6 Oct):

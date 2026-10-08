@@ -174,8 +174,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     const buildId = await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
 
     // The page's own requests (the shared navbar's rulings badge poll is not
-    // the task page's): only the state endpoint, never a brief/recap read or
-    // generate.
+    // the task page's): the stored-data state endpoint it polls, plus the
+    // owner-only share list it loads once (LIN-3330) — never a brief/recap read
+    // or generate.
     const stateRequests = [];
     page.on('request', (req) => {
       const path = new URL(req.url()).pathname;
@@ -202,9 +203,15 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(evidence).toHaveCount(1, { timeout: 1000 });
     await expect(evidence.locator('[data-testid="run-evidence-checked-review-verdict"]')).toContainText('Approve');
 
-    // The page only ever polled its stored-data state endpoint.
+    // The page only ever polled its stored-data state endpoint, plus the
+    // one-time owner share list load — no AI read.
     expect(stateRequests.length).toBeGreaterThan(0);
-    expect([...new Set(stateRequests)]).toEqual([`/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`]);
+    const stateUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`;
+    const sharesUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/shares`;
+    expect(stateRequests).toContain(stateUrl);
+    for (const path of stateRequests) {
+      expect([stateUrl, sharesUrl], `unexpected task-page request: ${path}`).toContain(path);
+    }
   });
 
   test('no stored-only page; unknown and signed-out', async ({ page, browser }) => {

@@ -522,7 +522,7 @@ and is the recommended pattern for any consumer that posts foreman status.
 | `issueTitle` | string | Issue title (nullable) |
 | `issueUrl` | string | Full URL to the Linear issue (nullable) |
 | `target` | string | Dispatch target: `"cli"` (default), `"web"`, `"dash"`, or `"local"`. See [Target Routing](#target-routing) |
-| `repo` | string | Repository the consumer should operate in, or `null`. Always stored as the workspace-known **basename** — Harbour validates and normalizes a caller-supplied URL/`owner/name` form before enqueueing. See [Repo Override Validation](#repo-override-validation) (nullable) |
+| `repo` | string | The runner's folder override, or `null`. Stored verbatim (opaque); Harbour does not validate it — the consumer resolves it against its own folder namespaces. See [Repo Override](#repo-override-runner-folder-override) (nullable) |
 | `model` | string | **Execution** model the consumer should use to *run* this prompt (the value it passes to its own CLI, e.g. `claude --model`), or `null`. OpenRouter `provider/model` naming convention (e.g. `"anthropic/claude-opus-4.8"`). Opaque and forwarded blindly; `null` keeps the consumer's current default. See [Execution model](#execution-model-model) (nullable) |
 | `harness` | string | **Execution** harness the consumer should use to *run* this prompt (e.g. `"claude-code"`, `"opencode"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Harness](#harness-harness) (nullable) |
 | `terminal` | string | **Terminal-emulator driver** the consumer should launch this session in (e.g. `"terminal"`, `"iterm"`, `"kitty"`, `"tmux"`), or `null`. Opaque and forwarded blindly; `null` keeps the consumer's own default. See [Terminal](#terminal-terminal) (nullable) |
@@ -972,70 +972,20 @@ const myItems = items.filter(item => item.target === 'cli'); // or 'web', 'dash'
 
 Items without a `target` field default to `"cli"` for backward compatibility.
 
-## Repo Override Validation
+## Repo Override (runner folder override)
 
-The `repo` field on a dispatch overrides which checkout the consumer works in. Harbour
-validates and normalizes it at the two enqueue seams (`POST /api/proxy/dispatch`,
-`POST /api/proxy/recommend-and-dispatch`) **before** enqueueing (LIN-2886) — a typo, a
-URL where a basename was meant, or an injected value used to cost a wasted dispatch, a
-confusing terminal failure on the consumer, and a five-minute duplicate-dispatch wait
-before a retry.
+The `repo` field on a dispatch overrides which checkout the consumer works in. It is
+an opaque string, stored **verbatim** (max 1000 chars, no control characters), and
+forwarded blindly. `null` (or omitted) runs in the consumer's default folder.
 
-**This is not a clone-arbitrary-URL guard.** simple-dispatcher, the reference consumer,
-resolves `repo` only against the folder basenames of its own configured workspaces —
-it never clones a URL. The real gap this closes is Harbour forwarding an opaque `repo`
-value the consumer was always going to reject anyway, just later and less legibly.
-
-**Accepted forms**, all normalized to the matching workspace-known basename:
-
-| Form | Example | Stored as |
-|------|---------|-----------|
-| Basename | `"LinearViewer"` | `"LinearViewer"` (unchanged) |
-| Full URL | `"https://github.com/JKershaw/LinearViewer.git"` | `"LinearViewer"` |
-| SCP-like git remote | `"git@github.com:JKershaw/LinearViewer.git"` | `"LinearViewer"` |
-| `owner/name` | `"JKershaw/LinearViewer"` | `"LinearViewer"` |
-
-A workspace's known repos are its own known-repos inventory (`lib/workspace-repos.js`'s
-`knownWorkspaceRepos` — the `repo=` lines on the workspace's Linear projects, plus the
-default) — the same source the periodical target-repo picker uses. Matching is
-**case-sensitive**.
-
-An unrecognized value — one that matches no known basename in any accepted form — is
-refused with `422`:
-
-```json
-{
-  "error": "Unknown repo \"some-typo\"",
-  "code": "UNKNOWN_REPO",
-  "knownRepos": ["LinearViewer", "simple-dispatcher"]
-}
-```
-
-**Fails open, never closed, when the check itself can't run.** If the workspace's
-provider doesn't support listing projects, or the check times out or errors, the `repo`
-value is forwarded unvalidated rather than blocking the dispatch — a capability gap
-must never become a dispatch outage. In that case, and for any integration that
-bypasses this proxy seam (the autopilot kickoff and the session-authenticated UI
-dispatch do not run this check), simple-dispatcher's admission check still terminally
-rejects a `repo` it cannot resolve, with a `[failed]` marker naming it.
-
-**Accepted here does not mean resolvable by the consumer (LIN-2974).** Harbour and the
-consumer check `repo` against two *different* namespaces, and nothing keeps them in
-sync:
-
-| Layer | Namespace | Source of truth |
-|-------|-----------|-----------------|
-| Harbour (this check) | the tracker's `repo=` project lines | the workspace's project descriptions |
-| simple-dispatcher (admission) | folder basenames of configured workspaces | the runner host's `workspaces.json` |
-
-The consumer's reject is therefore a separate check against a different list, not a
-narrower net behind this one. A value can pass here, return `201 queued`, and still
-fail terminally at admission (`[failed] Unknown repo "…": no configured workspace has
-a matching folder basename`). Keeping the two in agreement is a host-configuration
-obligation: every name a project's `repo=` line can emit needs a matching
-`workspaces.json` entry on each runner host (see simple-dispatcher's
-`docs/dispatching-into-a-repo.md`). When in doubt, omit `repo`. `null` runs in the
-workspace's default folder.
+**Harbour no longer validates or normalizes it.** The project `repo=` feature (and the
+workspace repo inventory that fed its guard) was retired in LIN-3333; there is no
+workspace repo list on the Harbour side any more. The consumer is the authority on
+resolution: simple-dispatcher, the reference consumer, resolves `repo` only against the
+folder basenames of its own configured workspaces (never a URL), and terminally rejects
+a `repo` it cannot resolve with a `[failed]` marker naming it
+(`[failed] Unknown repo "…": no configured workspace has a matching folder basename`).
+When in doubt, omit `repo`.
 
 ## Task Kind
 

@@ -21,16 +21,24 @@ import { sweepFixedOverlaps, describeHits, expectSweepNotVacuous } from '../fixe
 // elsewhere mean something. If this file goes red, every other sweep result in
 // the suite is suspect regardless of what it says.
 test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () => {
-  // Inject a fixed overlay sitting exactly over the footer toggle's band, in
-  // the shape of the FAB this ticket deleted (83x32 at a 16px bottom-right
-  // inset — the geometry measured at main 54116d21).
-  async function injectFab(page) {
-    await page.evaluate(() => {
+  // Inject a fixed overlay sitting over the footer toggle's own band. The
+  // overlay mimics the FAB this ticket deleted (83x32 at a 16px bottom inset),
+  // but its horizontal position is taken from the target's measured rect rather
+  // than a hardcoded right edge: the footer's legal row reflows when a link is
+  // added (LIN-3345 added `library`), which moves the toggle and would leave a
+  // fixed right-inset overlay covering nothing. Deriving x from the target
+  // keeps this control measuring the sweep's geometry, not the footer's order.
+  async function injectOverlay(page, selector) {
+    await page.evaluate((selector) => {
+      const target = document.querySelector(selector)
+      const r = target.getBoundingClientRect()
+      const width = Math.max(83, r.width)
+      const left = Math.min(Math.max(0, r.left), Math.max(0, window.innerWidth - width - 16))
       const el = document.createElement('div')
       el.setAttribute('data-testid', 'sweep-control-overlay')
-      el.style.cssText = 'position:fixed;right:16px;bottom:16px;width:83px;height:32px;background:#2563eb;z-index:1000'
+      el.style.cssText = `position:fixed;left:${left}px;bottom:16px;width:${width}px;height:32px;background:#2563eb;z-index:1000`
       document.body.appendChild(el)
-    })
+    }, selector)
   }
 
   // Run at every width the real sweeps use. Detection capability is not
@@ -48,7 +56,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     // synthetic page the other specs never touch.
     const target = '[data-testid="footer-feedback-toggle"]'
 
-    await injectFab(page)
+    await injectOverlay(page, target)
     const withOverlay = await sweepFixedOverlaps(page, target)
     expect(
       withOverlay.candidates,
@@ -56,7 +64,7 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     ).toContain('sweep-control-overlay')
     expect(
       withOverlay.hits.length,
-      `an overlay in the bottom-right band MUST be reported over the footer toggle — ${describeHits(withOverlay)}`
+      `a fixed overlay in the target's band MUST be reported over the footer toggle — ${describeHits(withOverlay)}`
     ).toBeGreaterThan(0)
     expect(withOverlay.hits.every(h => h.overlay === 'sweep-control-overlay')).toBe(true)
 
@@ -89,11 +97,15 @@ test.describe('LIN-2298: the overlay sweep can actually detect an overlay', () =
     await page.waitForLoadState('networkidle')
 
     await page.evaluate(() => {
+      const target = document.querySelector('[data-testid="footer-feedback-toggle"]')
+      const r = target.getBoundingClientRect()
+      const width = Math.max(120, r.width)
+      const left = Math.min(Math.max(0, r.left), Math.max(0, window.innerWidth - width - 16))
       for (const id of ['overlay-one', 'overlay-two']) {
         const el = document.createElement('div')
         el.setAttribute('data-testid', id)
         // Same band, so both cover the target at the same scroll offsets.
-        el.style.cssText = 'position:fixed;right:16px;bottom:16px;width:120px;height:40px;background:#2563eb;z-index:1000'
+        el.style.cssText = `position:fixed;left:${left}px;bottom:16px;width:${width}px;height:40px;background:#2563eb;z-index:1000`
         document.body.appendChild(el)
       }
     })

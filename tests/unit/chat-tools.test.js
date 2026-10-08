@@ -1705,8 +1705,8 @@ describe('invariant 2 exception (LIN-2624)', () => {
 // ─── get_pr_status (LIN-2624) ────────────────────────────────────────────────
 
 describe('get_pr_status', () => {
-  // A fake provider whose fetchProjects reports one project bound to the
-  // public LinearViewer repo via the `repo=` convention (lib/workspace-repos.js).
+  // A fake provider. `get_pr_status` no longer reads the tracker at all
+  // (LIN-3333 retired the repo allowlist), but the catalog still takes one.
   function makeRepoProvider({ repo = 'JKershaw/LinearViewer' } = {}) {
     return makeFakeProvider({
       async fetchProjects(scope) {
@@ -1738,14 +1738,27 @@ describe('get_pr_status', () => {
     return createChatToolCatalog({ provider, scope: SCOPE, urlKey: URL_KEY, githubFetch });
   }
 
-  test('rejects a repo this workspace has not named, before ever calling fetch (mutation-check: removing the allowlist check would make this pass)', async () => {
+  test('refuses a non-slug repo before ever calling fetch (it would steer the api.github.com path)', async () => {
     const githubFetch = makeFakeGithubFetch();
     const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
-    await assert.rejects(
-      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'someone-else/not-named', number: 42 } }),
-      /not in this workspace's allowed repo list/,
-    );
-    assert.strictEqual(githubFetch.calls.length, 0, 'an unlisted repo must never reach a GitHub fetch');
+    for (const repo of ['../x/y', 'a/..', 'a/b/c', 'owner/', '/name', 'owner /name']) {
+      await assert.rejects(
+        () => executeTool({ name: 'get_pr_status', arguments: { repo, number: 42 } }),
+        /Invalid GitHub repo/,
+      );
+    }
+    assert.strictEqual(githubFetch.calls.length, 0, 'a non-slug repo must never reach a GitHub fetch');
+  });
+
+  test('reads any public owner/name slug — the workspace repo allowlist is gone (LIN-3333)', async () => {
+    const githubFetch = makeFakeGithubFetch({
+      '/repos/someone-else/not-named': { status: 200, body: { private: false } },
+      '/repos/someone-else/not-named/commits/abc1234/check-runs': { status: 200, body: { check_runs: [] } },
+      '/repos/someone-else/not-named/commits/abc1234/status': { status: 200, body: { statuses: [] } },
+    });
+    const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
+    const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'someone-else/not-named', sha: 'abc1234' } });
+    assert.strictEqual(result.readable, true);
   });
 
   test('rejects a malformed PR number before any fetch, including the allowlist read', async () => {
@@ -1778,12 +1791,12 @@ describe('get_pr_status', () => {
     );
   });
 
-  test('a private allow-listed repo answers not-readable rather than a bare 404 (repo-visibility probe fails)', async () => {
+  test('a repo an unauthenticated read cannot see answers not-readable rather than a bare 404 (repo-visibility probe fails)', async () => {
     // No `/repos/JKershaw/LinearViewer` entry in the script → the fake 404s it.
     const githubFetch = makeFakeGithubFetch({});
     const { executeTool } = catalogWithGithubFetch({ repo: 'JKershaw/LinearViewer', githubFetch });
     const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
-    assert.deepStrictEqual(result, { repo: 'JKershaw/LinearViewer', readable: false, reason: 'not readable: private repository' });
+    assert.deepStrictEqual(result, { repo: 'JKershaw/LinearViewer', readable: false, reason: 'not readable: private or unknown repository' });
     assert.strictEqual(githubFetch.calls.length, 1, 'a failed visibility probe must short-circuit before the PR/check calls');
   });
 
@@ -3488,19 +3501,9 @@ describe('LIN-2967: createChatToolCatalog accepts a scope per tier (scopeByTier)
     assert.strictEqual(workspaceProvider.calls.length, 0, 'lookup_task must never touch the workspace-tier override');
   });
 
-  test('get_pr_status\'s allowlist is the WORKSPACE\'s repo set, never the row\'s, on a foreign-source row (LIN-2967 acceptance)', async () => {
-    // The row's own binding names a DIFFERENT repo than the workspace's.
-    const rowProvider = makeFakeProvider({
-      async fetchProjects() {
-        return { projects: [{ id: 'p', name: 'P', content: 'repo=someoneelse/not-this-workspace' }], issues: [] };
-      },
-    });
-    const workspaceProvider = makeFakeProvider({
-      async fetchProjects(scope, teamId, opts) {
-        workspaceProvider.calls.push({ method: 'fetchProjects', scope, teamId, opts });
-        return { projects: [{ id: 'p', name: 'P', content: 'repo=JKershaw/LinearViewer' }], issues: [] };
-      },
-    });
+  test('get_pr_status reads any public owner/name and consults no provider binding (LIN-3333)', async () => {
+    const rowProvider = makeFakeProvider();
+    const workspaceProvider = makeFakeProvider();
     const githubCalls = [];
     const githubFetch = async (url) => {
       githubCalls.push(url);
@@ -3524,19 +3527,11 @@ describe('LIN-2967: createChatToolCatalog accepts a scope per tier (scopeByTier)
       urlKey: URL_KEY, githubFetch,
     });
 
-    // The WORKSPACE's own repo is accepted...
+    // Any public slug is read — the workspace repo allowlist is gone (LIN-3333).
     const result = await executeTool({ name: 'get_pr_status', arguments: { repo: 'JKershaw/LinearViewer', number: 42 } });
     assert.strictEqual(result.readable, true);
-    // ...but the ROW's own repo is REJECTED — proving the allowlist never
-    // consulted the row's binding at all, not merely that it also has the
-    // workspace's.
-    await assert.rejects(
-      () => executeTool({ name: 'get_pr_status', arguments: { repo: 'someoneelse/not-this-workspace', number: 1 } }),
-      /not in this workspace's allowed repo list/,
-    );
-    const wsCall = workspaceProvider.calls.find(c => c.method === 'fetchProjects');
-    assert.ok(wsCall && wsCall.scope === 'workspace-scope');
-    assert.strictEqual(rowProvider.calls.length, 0, 'the allowlist read must never touch the row-tier provider');
+    assert.strictEqual(rowProvider.calls.length, 0, 'get_pr_status must not touch the row-tier provider');
+    assert.strictEqual(workspaceProvider.calls.length, 0, 'get_pr_status must not touch the workspace-tier provider');
   });
 });
 

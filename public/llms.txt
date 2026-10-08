@@ -2,6 +2,17 @@
 
 > A minimal web app that displays your task tracker's projects and issues as a collapsible tree with a CLI aesthetic. Backed by Linear, GitHub, GitHub Projects, Jira, or a local store.
 
+## Library
+
+The papers and essays behind Harbour are published unauthenticated at `/library` — a searchable index of every document, no session required.
+
+- **Index**: `/library` lists the six "Start here" items, the papers and essays, and the Archive editions
+- **Search**: `/library?q=<terms>` — server-rendered, works without JavaScript; always `X-Robots-Tag: noindex`
+- **A document**: `/library/<slug>` (a paper) or `/library/doc/<slug>` (a listed document); the wrong form 404s
+- **Plain markdown**: append `.md` to any document URL — `/library/<slug>.md` or `/library/doc/<slug>.md`
+- **Start here**: `/archive/2`; `/library/doc/the-folded-loop`; `/library/doc/ladder`; `/library/writing-length`; `/library/review-loops`; `/library/learning-while-the-tools-change`
+- **Crawler files**: `/sitemap.xml` (canonical, query-free URLs) and `/robots.txt`
+
 ## Overview
 
 - Syncs with your workspace's provider (Linear, GitHub, GitHub Projects, Jira, or a local store) via OAuth or token auth
@@ -254,6 +265,10 @@ Every surface that shows a task links there through the shared helper (`lib/task
 - `[data-testid="obs-task-page-link"]` - Observation per-task block
 - `[data-testid="lc-lane-task-page-link"]` - Live Console lane (adjacent to the Observation link, which is unchanged)
 - `[data-testid="queue-item-task-page-link"]` / `[data-testid="history-task-page-link"]` - dispatch queue / history rows
+
+### Task Share (LIN-3330)
+
+A task share link is the SAME task page seen by a signed-out guest, at an unguessable key: `GET /t/{token}` (and its stored-data repaint `GET /t/{token}/state`, the same JSON as the owner state route). The token is 43 base64url chars; only its SHA-256 is stored in the `task_share_links` collection (never `shares`). A guest sees the page with only the owner controls hidden (the "ask for an update" and share/revoke controls); links back into Harbour stay. Owner controls on the task page are `[data-testid="task-share-create"]` (mint — the one-time URL shows in `[data-testid="task-share-new"]`), `[data-testid="task-share-list"]` (one `[data-testid="task-share-row"]` per link, each with `[data-testid="task-share-revoke"]`). Owner routes (session auth): `POST /workspace/{urlKey}/api/task/{identifier}/share` (201 `{id, path, createdAt}`), `GET .../shares`, `POST .../shares/{id}/revoke`. A revoked or unknown link is a plain 404 for the guest; `/s/<anything>` stays 404 (the retired run-share surface). No rate limit; public-page secret scanning is LIN-3261.
 
 ## Collective (experimental)
 

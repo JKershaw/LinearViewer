@@ -72,7 +72,7 @@ describe('createPoller', () => {
   const { createPoller } = load();
   const STATE_URL = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
 
-  function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true } }) {
+  function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true }, onGone = null }) {
     const timers = makeTimers();
     const urls = [];
     const applied = [];
@@ -88,6 +88,7 @@ describe('createPoller', () => {
       apply: (s) => applied.push(s),
       isVisible: () => visible.value,
       initial,
+      onGone,
       setTimer: timers.setTimer,
       clearTimer: timers.clearTimer,
     });
@@ -164,6 +165,49 @@ describe('createPoller', () => {
     const { poller, timers } = makePoller({ responses: [Object.assign(new Error('Unauthorized'), { status: 401 })] });
     await poller.poll();
     assert.equal(timers.pending.size, 0);
+  });
+
+  // LIN-3330: a guest page whose link was revoked (or never issued) gets a 404
+  // from its state endpoint — the loop stops and reports "gone".
+  test('a 404 stops the loop and reports gone', async () => {
+    let gone = 0;
+    const { poller, timers } = makePoller({
+      responses: [Object.assign(new Error('Not found'), { status: 404 })],
+      onGone: () => { gone++; },
+    });
+    await poller.poll();
+    assert.equal(gone, 1);
+    assert.equal(timers.pending.size, 0, 'no further poll is scheduled');
+  });
+
+  // LIN-3330 review, ledger 2: an owner page passes no `onGone`, so a 404 is an
+  // ordinary poll failure — it must not stop the loop or touch the page.
+  test('a 404 without onGone (an owner page) is an ordinary failure; the loop keeps polling', async () => {
+    let gone = 0;
+    const { poller, timers, urls } = makePoller({
+      responses: [Object.assign(new Error('Not found'), { status: 404 }), { status: 'running', live: true }],
+      onGone: null,
+    });
+    poller.start();
+    await timers.fireAll();
+    assert.equal(gone, 0, 'no gone handler ran');
+    assert.equal(urls.length, 1);
+    assert.ok(timers.pending.size > 0, 'the loop keeps polling on failure, as before this feature');
+  });
+});
+
+// LIN-3330 review, ledger 2: only a guest share URL may report "gone".
+describe('isGuestStateUrl (the onGone gate)', () => {
+  const { isGuestStateUrl } = load();
+
+  test('a guest share state URL reports gone', () => {
+    assert.equal(isGuestStateUrl('/t/' + 'A'.repeat(43) + '/state'), true);
+  });
+
+  test('an owner state URL never reports gone', () => {
+    assert.equal(isGuestStateUrl('/workspace/acme/api/task/LIN-50/state?issueId=abc'), false);
+    assert.equal(isGuestStateUrl(''), false);
+    assert.equal(isGuestStateUrl(null), false);
   });
 });
 

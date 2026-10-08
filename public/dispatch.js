@@ -155,7 +155,7 @@ async function refreshDispatchPromptLists(favoritesContainer, recentsContainer, 
 /**
  * Dispatch a custom prompt and update UI feedback
  */
-async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope, presetScope }) {
+async function dispatchPageCustomPrompt({ urlKey, prompt, target, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope, presetScope }) {
   const originalText = btn.textContent
   btn.textContent = 'sending...'
   btn.disabled = true
@@ -180,7 +180,6 @@ async function dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, pr
       promptName: promptName || 'Custom',
       kind: kind || undefined,
       target,
-      repo: repo || undefined,
       issueless: true,
       model,
       harness,
@@ -359,7 +358,6 @@ function initDispatchPagePrompt() {
   const recentsContainer = section.querySelector('.dispatch-recents-container')
   const favoritesContainer = section.querySelector('.dispatch-favorites-container')
   const feedbackEl = section.querySelector('.dispatch-prompt-feedback')
-  const repoSelect = section.querySelector('.dispatch-repo-select')
   const goalInput = section.querySelector('.dispatch-autopilot-goal')
 
   // Inject the shared model/harness exec controls (LIN-1096) into the
@@ -524,11 +522,10 @@ function initDispatchPagePrompt() {
       }
 
       const target = btn.dataset.target || 'cli'
-      const repo = repoSelect ? repoSelect.value : ''
       // A loaded Autopilot kickoff sets these; hand-typed prompts leave them undefined.
       const kind = textarea.dataset.kind || undefined
       const promptName = textarea.dataset.promptName || undefined
-      await dispatchPageCustomPrompt({ urlKey, prompt, target, repo, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope: execContainer, presetScope: presetContainer })
+      await dispatchPageCustomPrompt({ urlKey, prompt, target, kind, promptName, btn, textarea, feedbackEl, recentsContainer, execScope: execContainer, presetScope: presetContainer })
       return
     }
 

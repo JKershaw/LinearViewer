@@ -686,12 +686,12 @@ export function createDashboardRoutes({
   readRunEvidence: readRunEvidenceFn = null,
   // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
   // store, which is process-wide in production (one router). Tests inject
-  // `{ now, resolveProvider, loadRun, githubFetch, cache, allowlistCache, bucket }`.
+  // `{ now, resolveProvider, loadRun, githubFetch, cache, bucket }`.
   prState = null,
   // LIN-3311: the ONE shared PR-state store server.js builds
   // (`lib/pr-state-store.js`), so this router spends one 36/h
   // budget and fills one cache. When given it wins over the store fields of the
-  // `prState` bag (`cache`/`allowlistCache`/`bucket`/`now`/`githubFetch`); the
+  // `prState` bag (`cache`/`bucket`/`now`/`githubFetch`); the
   // bag's route seams (`loadRun`/`resolveProvider`) still apply.
   prStateStore: sharedPrStateStore = null
 }) {
@@ -705,12 +705,12 @@ export function createDashboardRoutes({
   // NOTE: there is deliberately NO run->PR pointer cache. Every GET re-reads the
   // run's tracker comments and re-extracts the PR URL, so a PR posted after the
   // first poll is picked up on the next one. The only thing cached across polls
-  // is the per-workspace repo allowlist (a tracker `fetchProjects` read, not a
-  // GitHub read), so a PR-state cache hit still runs no `fetchProjects`.
+  // is the PR-state result per `owner/repo#number` (LIN-3333 removed the
+  // per-workspace repo-allowlist cache that used to sit alongside it).
   //
   // Without an injected store the router builds its own from the `prState`
-  // bag: the shared process-wide cache, a fresh budget log and allowlist cache
-  // (the pre-LIN-3311 defaults, unchanged).
+  // bag: the shared process-wide cache and a fresh budget log (the pre-LIN-3311
+  // defaults, unchanged).
   const prStateStore = sharedPrStateStore || createPrStateStore(prState || {});
   const prStateSeams = {
     resolveProvider: (prState && prState.resolveProvider) || ((workspace, selector) => resolveIssueBinding(workspace, selector)),
@@ -1436,18 +1436,18 @@ export function createDashboardRoutes({
   // ─── Live PR state (LIN-3251, S1b of LIN-2948, condition C1) ────────────────
   //
   // GET /workspace/:urlKey/api/run/:runId/pr-state. Resolves the run's PR URL
-  // through LIN-2949's run-evidence model (tracker comments, allowlist-filtered,
+  // through LIN-2949's run-evidence model (the run's own tracker comments,
   // `[evidence]` corroborating only), then reads the live PR state through the
   // shared `lib/github-pr-status.js` reader. It never calls LIN-2949's
   // side-effecting POST `.../check`. The whole reader result is cached per
   // `owner/repo#number`; run pages share the process-wide 36-calls/hour budget.
-  // Unreadable cases (private, off-allowlist, rate-limited, budget spent with no
+  // Unreadable cases (private/unknown, rate-limited, budget spent with no
   // stale value) resolve to the "state not reported" (`unknown`) state — never a
   // 403, never a thrown read.
 
-  // The allowlist cache, sliding budget, counting fetch, TTL rule and payload
-  // shapes are `lib/pr-state-store.js`'s (LIN-3311); this route only resolves
-  // the run's PR and asks the store.
+  // The sliding budget, counting fetch, TTL rule and payload shapes are
+  // `lib/pr-state-store.js`'s (LIN-3311); this route only resolves the run's PR
+  // and asks the store.
 
   router.get('/workspace/:urlKey/api/run/:runId/pr-state', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
@@ -1458,20 +1458,17 @@ export function createDashboardRoutes({
     const nowMs = prStateStore.now();
     try {
       // Re-resolve the run's PR URL on EVERY request (no run->PR pointer cache),
-      // so a PR posted after the first poll is seen on the next one. Only the
-      // repo allowlist (a tracker read) is cached, not the PR URL or its state.
+      // so a PR posted after the first poll is seen on the next one.
       const run = await prStateSeams.loadRun(workspace.urlKey, runId);
       if (!run || !run.issueIdentifier) {
         return res.json({ state: 'none', number: null, checks: null, url: null, message: prStateCopy({ state: 'none' }) });
       }
       const { provider, callScope } = prStateSeams.resolveProvider(workspace, null);
       const comments = await provider.fetchIssueComments(callScope, run.issueIdentifier);
-      const allowlist = await prStateStore.allowlist(workspace.urlKey, provider, callScope, nowMs);
       // Through LIN-2949's run-evidence model, not a new parser.
       const model = buildRunEvidence({
         issueIdentifier: run.issueIdentifier,
         comments,
-        allowlist,
         evidenceUrls: run.evidenceUrls || [],
         prStatus: null
       });

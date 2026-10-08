@@ -80,7 +80,6 @@ import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, get
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { foldPeriodicalRuns, DEFAULT_HORIZON_MS } from '../lib/periodical-runs.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dispatch-store.js';
-import { parseRepoFromDescription, resolveDispatchRepo, buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionBootstrapToken } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -1576,7 +1575,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           reasoning: `${issueIdentifier} is a container; the actionable work lives in ${focusChild.identifier}.`,
           prompt: null,
           truncated: false,
-          repo: parseRepoFromDescription(mockData.projects.find(p => p.id === mockIssue.project?.id)?.content),
           recommendedAction: 'defer',
           deferTo: focusChild.identifier
         };
@@ -1586,14 +1584,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
         recommendedAction = 'implement';
       }
 
-      const mockProject = mockData.projects.find(p => p.id === mockIssue.project?.id);
-
       return {
         identifier: issueIdentifier,
         reasoning,
         prompt: `Help me with task ${issueIdentifier}\n\n## Context\n\n**Status:** ${mockIssue.state?.name || 'Unknown'}\n${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}\n\n## Goal\n\n${goal}`,
         truncated: false,
-        repo: parseRepoFromDescription(mockProject?.content),
         recommendedAction,
         deferTo: null,
         // LIN-2575: derive the periodical join key from the issue's gate marker
@@ -1655,7 +1650,6 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       reasoning: recommendation.reasoning,
       prompt: recommendation.prompt,
       truncated: recommendation.truncated,
-      repo: parseRepoFromDescription(project?.description),
       recommendedAction: recommendation.recommendedAction,
       // deferTo (LIN-327) drives the recommend recursion (resolveRecommendation).
       deferTo: recommendation.deferTo || null,

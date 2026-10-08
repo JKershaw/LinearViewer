@@ -98,7 +98,6 @@ import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
-import { parseRepoFromDescription } from './lib/prompt-formatters.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
 import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
@@ -153,6 +152,11 @@ import { createTaskEditRoutes } from './routes/task-edit.js'
 import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
 import { createTaskPageLoader } from './lib/task-page-loader.js'
+import { createTaskShareRoutes } from './routes/task-share.js'
+import { createLibraryRouter } from './routes/library.js'
+import { TaskShareStore } from './lib/task-share-store.js'
+import { createGuestTaskAccess } from './lib/task-share-access.js'
+import { isTokenRefreshExempt } from './lib/guest-task-path.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
@@ -988,7 +992,7 @@ if (process.env.NODE_ENV === 'test') {
   // additive, test-only seam so a spec can inject a rejecting aggregate() on
   // the exact two collections /kpis' loaders read, without touching /kpis'
   // own route logic. See routes/test.js's kpis-fail-next-aggregate handler.
-  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore }))
+  app.use(createTestRoutes({ dispatchQueueStore, dispatchTokenStore, freeTierStore, userPreferencesStore, workspacePreferencesStore, customPromptsStore, collectiveCharactersStore, collectivePresetsStore, dispatchPresetsStore, proxyTokenStore, proxyEventStore, agentStatusStore, observationSessionsStore, sessionsFeedCache, recapCacheStore, briefCacheStore, runSummaryCacheStore, sessionSummaryCacheStore, reportHistoryStore, shipBiscuitHistoryStore, taskSnapshotStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, savedChatStore, localStore, getWorkspaceAccessToken, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore, clearWorkspaceIssuesMemo, observerStateStore, dispatchHistoryCollection, proxyEventsCollection, resetKpiCache: (mode) => { kpiCache = mode === 'stale' ? { at: 0, stats: kpiCache.stats } : { at: 0, stats: null } }, workspaceHaltStore, emailTransport: emailTransport?.kind === 'capture' ? emailTransport : null, commentDedupe, decisionStampDedupe, taskModeStore, taskShareCollection: db.collection('task_share_links') }))
 }
 
 // =============================================================================
@@ -1345,7 +1349,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis' || req.path === '/templates') {
+  if (isTokenRefreshExempt(req.path)) {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -2156,6 +2160,16 @@ app.get('/templates', (req, res) => {
 })
 
 // =============================================================================
+// Harbour Library (public, no auth required; LIN-3344, Part A of LIN-3342)
+// =============================================================================
+// Read-only papers/essays at /library/…, searchable without JS and rendered
+// script-safe (see routes/library.js). Mounted at the root because the router
+// owns full `/library…` paths; its header middleware is scoped to those paths
+// so it cannot touch the rest of the app. `isPublicLibraryPath` (via
+// isTokenRefreshExempt and lib/pat-session.js) exempts these paths from auth.
+app.use(createLibraryRouter())
+
+// =============================================================================
 // KPIs Page (public, no auth required, intentionally unlinked)
 // =============================================================================
 // Instance-wide aggregate stats. collectKpiStats() is the privacy boundary —
@@ -2303,7 +2317,7 @@ app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
-// sliding 36/h GitHub budget and repo-allowlist cache. The dashboard router
+// sliding 36/h GitHub budget and PR-state cache. The dashboard router
 // below gets this instance, so the budget and the `repo#number` cache are shared.
 const prStateStore = createPrStateStore()
 
@@ -2957,11 +2971,29 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
 // `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
 // `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
   getDeployInfo,
-  loader: createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting })
+  loader: taskPageLoader
+}))
+
+// Mount the task share routes (LIN-3330) — the owner mint/list/revoke controls
+// and the PUBLIC guest page at `/t/:token` (+ its stored-data `/t/:token/state`).
+// The guest route reads the owner's task through the EXISTING owner-away
+// credential path (`createGuestTaskAccess` → `resolveWorkspaceAccess`); `/t/` is
+// exempt from PAT auto-login and token refresh via the shared guest-path predicate
+// (`isGuestTaskPath` / `isTokenRefreshExempt` in `lib/guest-task-path.js`).
+// Mounted right after the task page, before the proxy default/legacy catch-alls.
+const taskShareStore = new TaskShareStore({ collection: db.collection('task_share_links') })
+app.use(createTaskShareRoutes({
+  taskShareStore,
+  loader: taskPageLoader,
+  workspaceFromUrl,
+  workspaceOwnerCheck,
+  guestAccess: createGuestTaskAccess({ resolveWorkspaceAccess, getProviderForWorkspace }),
+  getDeployInfo,
 }))
 
 // Mount next-run routes (experimental "suggest the next autopilot run" — LIN-603).
@@ -3723,18 +3755,6 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/settings`);
   }
 
-  // Fetch project repos for the repo selector
-  let projectRepos = [];
-  try {
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-    const projects = isTestMode ? testMockData.projects : await getProviderForWorkspace(workspace).fetchProjectsList(getWorkspaceCallScope(workspace));
-    projectRepos = projects
-      .map(p => ({ name: p.name, repo: parseRepoFromDescription(p.content) }))
-      .filter(p => p.repo);
-  } catch (e) {
-    // Non-fatal: dispatch page works without repo selector
-  }
-
   const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
 
   // Workspace-wide dispatch defaults (LIN-1094), used only for the model/harness
@@ -3753,7 +3773,6 @@ app.get('/workspace/:urlKey/dispatch', workspaceFromUrl, async (req, res) => {
     openRouterSource,
     workspaces: req.session.workspaces,
     featureFlags,
-    projectRepos,
     isLocalhost,
     dispatchDefaults,
     proxyDefault: req.session.proxyDefault

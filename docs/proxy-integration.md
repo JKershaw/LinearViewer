@@ -620,49 +620,6 @@ Response:
 }
 ```
 
-#### List Known Repos (LIN-2974)
-
-Read-only exposure of this workspace's own known-repos inventory — the exact
-`repo=` project-line computation the dispatch-time [Repo Override
-Validation](dispatch-integration.md#repo-override-validation) check runs
-before enqueueing, reachable directly instead of only via that check's `422`
-body. Takes no `repo` input, creates no dispatch item, and has no
-interaction with the duplicate-dispatch guard. A plain read-scoped token is
-sufficient — this route requires no write scope.
-
-```
-GET /api/proxy/known-repos
-```
-
-Response (`200`):
-```json
-{ "knownRepos": ["LinearViewer", "simple-dispatcher"] }
-```
-
-Unavailable inventory (the provider can't answer — no provider, unsupported,
-or a throwing/timing-out fetch) is a distinct non-`200` `503`, **never** a
-fail-open `{ "knownRepos": [] }` — a silent empty list here would read as
-"this workspace has no repos" rather than "could not check", which is
-exactly the false signal an operator-run drift check must not see:
-
-```json
-{
-  "error": "Could not determine this workspace's known-repos inventory",
-  "code": "REPO_INVENTORY_UNAVAILABLE",
-  "reason": "no-provider" | "unsupported" | "fetch-failed"
-}
-```
-
-**Accepted here ≠ resolvable by the consumer (LIN-2974).** `knownRepos` is
-the TRACKER's namespace — the same one [Repo Override
-Validation](dispatch-integration.md#repo-override-validation) validates
-against. The consumer (e.g. simple-dispatcher) resolves a dispatch's `repo`
-against its own, separate namespace (its host's `workspaces.json` folder
-basenames), and nothing keeps the two in sync automatically — a value listed
-here can still be refused by the consumer's own admission check. See
-[dispatch-integration.md](dispatch-integration.md#repo-override-validation)
-for the full namespace-mismatch note.
-
 #### List Issues
 
 ```
@@ -1824,9 +1781,9 @@ Requires a `readWrite` scoped token. Builds the kickoff **and dispatches it** in
 | `goal` | _(none)_ | Free-text. For a **general** run it focuses the stack walk; for a **scoped** run (`issueIdentifier` set) it is appended as additional human context on the pinned-task line, not discarded (LIN-2818). Opaque, multi-line accepted: max **100000 chars** (UTF-16 code units; no control characters) — a violation is a 400 naming the constraint, and the received length when the length cap is the cause (a huge multibyte body can instead 413 at the JSON body-size limit first). Distinct from the GET preview's 1000-char cap. `null`/omitted are both accepted as absent. See LIN-2075/LIN-2818. |
 | `mode` | `write` | `write` (implementation/review + evidence-gated merge) or `readonly` (investigation only). |
 | `variant` | `standard` | `standard` (normal orchestrator) or `stepper` (warm beat-stepping disposition — see [Stepper variant](./autopilot-kickoff.md#stepper-variant)). Orthogonal to `mode`. An unknown value is a 400. |
-| `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line and the project `repo=` is inherited. Absent ⇒ general stack-walk run. |
+| `issueIdentifier` | _(none)_ | Present ⇒ **scoped** run ("autopilot until THIS task is done"); the issue title is named in the goal line. Absent ⇒ general stack-walk run. |
 | `target` | `cli` | Dispatch target (`cli`/`web`/`dash`; `local`/Harbour OS is not available to proxy consumers). |
-| `repo` | _(resolved)_ | Target repo. For a scoped run, defaults to the project's `repo=`; an explicit value wins. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint, and the received length when the length cap is the cause. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. |
+| `repo` | _(none)_ | The runner's folder override for a scoped run, stored verbatim. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — a violation is a 400 naming the constraint. `null`/omitted both mean the consumer's default folder. Harbour no longer derives or validates it (the project `repo=` feature was retired, LIN-3333). See LIN-2075. |
 | `appendProxyContext` | `true` | Append the Linear-access + token + reporting block so the run inherits proxy access. |
 | `maxTasks` | _(none)_ | Optional integer ≥ 1 — a **scope** bound, not a cost control: this run covers up to that many **distinct** tasks, enforced server-side (see below). Omit for an unbounded run (today's behavior, byte-identical). See LIN-1751. |
 | `maxSessionsPerTask` | _(none)_ | Optional integer ≥ 1 (LIN-2934) — a **sibling** scope bound: caps fresh **worker-session** dispatches to a single task, independent of `maxTasks`. This is the bound a *scoped one-task run* actually needs, since `maxTasks` cannot bind a run whose whole job is one task. Either, both, or neither bound may be declared. Omit for a run unbounded per-task (today's behavior, byte-identical). |
@@ -2294,7 +2251,7 @@ Content-Type: application/json
 | `kind` | string | No | Stable task classification — one of the `DISPATCH_KINDS` (the prompt-template keys, plus `custom`; see `lib/prompt-templates.js`). When omitted it is derived from `promptName`, falling back to `custom`. Read it instead of inferring the task type from `promptName` or the prompt body |
 | `issueId` / `issueIdentifier` / `issueTitle` / `issueUrl` | string | No | Optional linkage to an issue |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
-| `repo` | string | No | Repository override, validated against the workspace's known repos before enqueueing (LIN-2886) — see [Repo Override Validation](dispatch-integration.md#repo-override-validation) |
+| `repo` | string | No | Repository override — the runner's folder override, stored verbatim. Harbour does not validate it against any workspace repo list; the project `repo=` feature and its guard were retired (LIN-3333). The consumer's own admission check resolves it against its folder namespaces |
 | `followUpTo` | string (UUID) | No | Resume an existing session: pass the `id` of an earlier dispatch and `prompt` becomes a follow-up instruction to that same session. `cli`/`web` only, same workspace. The runner owns session liveness — if the session is gone it posts a terminal `[failed] no live session to resume`. Use sparingly (see the dispatch guide's [Follow-ups](dispatch-integration.md#follow-ups) section); any wobble → dispatch a fresh session instead |
 | `force` | bool | No | Default `false`. **Overrides a guard**, so it is meaningful only alongside a verb that has one — with `followUpTo` it lets a resume bypass the active-session liveness gate (a session wedged/sleeping in an active phase; asserts the prior process is dead, see LIN-546), with a single `abort` it force-closes even a human-continued session the runner would otherwise skip, and on an **issue-scoped fresh dispatch** it is the **operator rescue hatch** past the duplicate guard below (LIN-1656) — for a human recovering a wedged task who has confirmed the colliding dispatch is not doing the work, *not* the reply to a 409 you were just handed. A bare `force: true` with no `followUpTo`, no `abort` and no `issueIdentifier` is rejected (`400 "force requires followUpTo, abort, or an issueIdentifier"`) — there is no guard for it to override; `force` + `cascade` is rejected (`400`). The runner reads it as `item.force`. See LIN-559/LIN-946/LIN-1656 |
 | `abort` / `abortTo` | bool / string (UUID) | No | Cancel/close an existing session instead of running a prompt: `abort: true` + `abortTo` = the `id` of the session to cancel (no `prompt` needed). See the dispatch guide's [Aborting a session](dispatch-integration.md#aborting-a-session) |
@@ -2317,14 +2274,6 @@ Returns `201`:
 ```
 
 **This does not refuse the dispatch — it still enqueues.** A runner may come up later; the warning is read-only telemetry so you can tell "queued, nothing polling yet" apart from "queued, a runner will pick this up any second." The same `consumerLastSeenAt` stamp (and a derived `consumerPollWarning`, re-evaluated against the current time) is also readable later via `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/dispatch` — see below.
-
-Returns `422` — **unknown repo** (LIN-2886). Unlike the poll-recency warning above, this ONE DOES refuse: a `repo` that matches no form of any of the workspace's known repos (see [Repo Override Validation](dispatch-integration.md#repo-override-validation)) is never enqueued:
-
-```json
-{ "error": "Unknown repo \"some-typo\"", "code": "UNKNOWN_REPO", "knownRepos": ["LinearViewer", "simple-dispatcher"] }
-```
-
-A URL or `owner/name` form of a *known* repo is accepted and silently normalized — the item is stored with the basename, never the raw value. This check fails **open** (skips validation, forwards `repo` unchanged) when the workspace's provider can't answer at all, so it is never a reason to retry. **Passing this check does not guarantee the runner can resolve the value** (LIN-2974). `knownRepos` is the tracker's namespace, but the runner matches `repo` against the folder basenames in its host's `workspaces.json`. A value accepted here can still return `201` and then fail terminally with `[failed] Unknown repo "…"`. See [Repo Override Validation](dispatch-integration.md#repo-override-validation).
 
 Returns `409` — **duplicate dispatch** (LIN-1656). A *fresh* dispatch for an `issueIdentifier` + `kind` this workspace already dispatched within the last **5 minutes** is refused, because two independent orchestrators (an autopilot run and a human on the board) can otherwise start the same step minutes apart and duplicate the work:
 
@@ -2395,8 +2344,7 @@ Runs `/recommend` and forwards the recommended prompt straight into a dispatch �
 |-------|------|----------|-------------|
 | `issueIdentifier` | string | Yes | The issue to recommend a next step for (UUID or `LIN-123`) |
 | `target` | string | No | `cli` \| `web` \| `dash` (default `cli`). `local`/Harbour OS is **not** available to proxy consumers |
-| `repo` | string | No | Repository override. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — violating either is a 400 naming the constraint, and the received length when the length cap is the cause. `null`/omitted are both accepted as absent, falling back to the project-derived `repo=`. See LIN-2075. The value that ends up stored (whichever of `repo`/the project-derived repo wins, see `repoInherited` below) is then validated against the workspace's known repos before enqueueing — see [Repo Override Validation](dispatch-integration.md#repo-override-validation) and LIN-2886. |
-| `repoInherited` | bool | No | Default `false`. Marks `repo` as **inherited** (forwarded from a parent context) rather than user-explicit. When `true`, a cross-project descent's child repo — or the named node's own project `repo=` on a `kind` override — wins over the inherited `repo`; a repo-less child still falls back to it. Leave it off (or `false`) for a deliberately chosen repo, which keeps winning (see below) |
+| `repo` | string | No | Repository override — the runner's folder override, stored verbatim. Opaque string (max 1000 chars, UTF-16 code units; no control characters) — a violation is a 400 naming the constraint. `null`/omitted both mean the consumer's default folder. Harbour no longer derives or validates it (the project `repo=` feature was retired, LIN-3333). See LIN-2075. |
 | `appendProxyContext` | bool | No | Default `true`: append a proxy-context block so the worker inherits workspace access via this proxy |
 | `noDescend` | bool | No | Default `false`. When `true`, recommend and dispatch the **named issue's own** next step and never descend into an open child (see below) |
 | `kind` | string | No | **Verb override.** A prompt template key (e.g. `review`, `plan`, `implementation`). When supplied, the LLM recommendation + descent is bypassed and the body is generated for the **named issue** with that template (see below) |
@@ -2426,18 +2374,6 @@ scope or separately tracked — the lever is deterministic (the child is never f
 or dispatched), so it is the reliable way to make a parent's own work reachable
 through the verb.
 
-**`repoInherited` — switch repo context on a cross-project descent.** A `repo` you
-pass is treated as a **deliberate, user-explicit** choice and always wins over the
-server-resolved repo (the LIN-537 rule). But an orchestrator that fans work out often
-forwards a `repo` it merely **inherited** from the parent context — and when this verb
-then descends into a child in a *different* project with its own `repo=`, that inherited
-repo would wrongly mask the child's, dispatching the worker against the parent's
-codebase. Set `repoInherited: true` to mark the forwarded repo as inherited: the
-descended child's repo (or, on a `kind` override, the named node's own project `repo=`)
-then wins, while a repo-less child still falls back to the inherited value. Same-project
-descents, repo-less children, and dispatches that pass no `repo` are unaffected. Omit it
-(or send `false`) whenever the caller genuinely means to force a specific repo through.
-
 Returns `201`:
 ```json
 { "id": "uuid", "status": "queued", "kind": "plan", "promptName": "plan", "issueIdentifier": "LIN-42", "target": "cli", "sessionId": null, "dispatchedAt": "2026-06-06T11:32:25.111Z", "consumerLastSeenAt": "2026-06-06T09:10:00.000Z" }
@@ -2451,12 +2387,6 @@ With a `kind` override the response also carries `"override": true` and omits th
 ```
 
 `/recommend` can be slow (provider fetch + OpenRouter); the same whitespace-keepalive behaviour as `GET /recommend` applies, so don't set a client timeout below ~60s. Watch the returned `id` with `GET /api/proxy/dispatch/{id}` exactly as for a plain dispatch.
-
-Returns `422` — **unknown repo** (LIN-2886), same shape and same fail-open-on-capability-gap behavior as `POST /api/proxy/dispatch` above. Validated against whichever repo value this call resolves to after `repoInherited` precedence (a purely project-derived repo always passes, because it comes from the same inventory; this guard's practical bite is on a caller-supplied `repo`). Passing still does not guarantee the runner can resolve it (LIN-2974, see above):
-
-```json
-{ "error": "Unknown repo \"some-typo\"", "code": "UNKNOWN_REPO", "knownRepos": ["LinearViewer", "simple-dispatcher"] }
-```
 
 #### Watch a Dispatch
 

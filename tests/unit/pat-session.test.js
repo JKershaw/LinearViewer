@@ -172,6 +172,74 @@ describe('createEnsurePATSession', () => {
     }
   });
 
+  // LIN-3330: a public guest task page under /t/ carries no session, so PAT
+  // auto-login must skip it with ZERO provider reads — the predicate is
+  // trailing-slash so /test/, /terms and /templates stay unaffected.
+  test('skips guest /t/ paths with zero provider reads (LIN-3330)', async () => {
+    class CountingPATProvider extends ProviderInterface {
+      constructor() { super(); this.name = 'linear'; this.calls = 0; }
+      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
+      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
+    }
+    const counting = new CountingPATProvider();
+    registerProvider(counting);
+    try {
+      const middleware = createEnsurePATSession(freshStores());
+      const token = 'A'.repeat(43);
+      for (const path of ['/t/abc', `/t/${token}`, '/t/', `/t/${token}/state`]) {
+        const { req, res } = makeReqRes({ path });
+        let nextCalled = false;
+        await middleware(req, res, () => { nextCalled = true; });
+        assert.strictEqual(nextCalled, true, `next() called for ${path}`);
+        assert.strictEqual(req.session.workspaces, undefined, `no PAT session for ${path}`);
+      }
+      assert.strictEqual(counting.calls, 0, 'PAT never read the provider for a guest path');
+      // Negative cases: the trailing slash must not sweep these in.
+      for (const path of ['/test/x', '/terms', '/templates', '/t']) {
+        const { req, res } = makeReqRes({ path });
+        await middleware(req, res, () => {});
+      }
+      assert.ok(counting.calls > 0, 'a non-guest path still runs PAT auto-login');
+    } finally {
+      registerProvider(new FakeLinearProvider());
+    }
+  });
+
+  // LIN-3344: the Library is a public, session-less surface. PAT auto-login
+  // must skip it with ZERO provider reads — proven per path, because a defeated
+  // shared counter (`calls > 0` after all negatives) would let an inline
+  // `startsWith('/library')` clause sweeping in `/libraryfoo` pass unnoticed.
+  test('skips public library paths with zero provider reads (LIN-3344)', async () => {
+    class CountingLibraryProvider extends ProviderInterface {
+      constructor() { super(); this.name = 'linear'; this.calls = 0; }
+      async fetchOrganization() { this.calls++; return { id: 'org-1', name: 'Acme', urlKey: 'acme' }; }
+      async fetchViewer() { this.calls++; return { id: 'viewer-1' }; }
+    }
+    const counting = new CountingLibraryProvider();
+    registerProvider(counting);
+    try {
+      const middleware = createEnsurePATSession(freshStores());
+      for (const path of ['/library', '/library/ladder', '/Library/x', '/sitemap.xml']) {
+        const { req, res } = makeReqRes({ path });
+        let nextCalled = false;
+        await middleware(req, res, () => { nextCalled = true; });
+        assert.strictEqual(nextCalled, true, `next() called for ${path}`);
+        assert.strictEqual(req.session.workspaces, undefined, `no PAT session for ${path}`);
+      }
+      assert.strictEqual(counting.calls, 0, 'PAT never read the provider for a library path');
+
+      // Negatives, asserted PER PATH: a lookalike must still run auto-login.
+      for (const path of ['/libraryfoo', '/librarian']) {
+        const before = counting.calls;
+        const { req, res } = makeReqRes({ path });
+        await middleware(req, res, () => {});
+        assert.ok(counting.calls > before, `${path} still runs PAT auto-login`);
+      }
+    } finally {
+      registerProvider(new FakeLinearProvider());
+    }
+  });
+
   // LIN-1892 (N1): an email-only signed-in session (accountId, zero
   // workspaces) is not a signed-out visitor. Keep the guard if S2 is reverted.
   describe('N1: a signed-in account with zero workspaces is never auto-logged-in (LIN-1892)', () => {
