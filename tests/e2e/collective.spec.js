@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test-base.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-450: the experimental Collective page. Seeds via /test/set-session (the
 // page needs only a session with workspaces + the per-user `collective` flag;
@@ -139,6 +140,10 @@ test.describe('Collective Page (experimental)', () => {
 
     test('dispatches a participant prompt for each selected character', async ({ page, secondWorkerUrlKey }) => {
       await page.goto(`/test/set-session?multiWorkspace=true&urlKey=${URL_KEY}&${featuresParam({ collective: true })}`);
+      // LIN-3383: each seat enqueues on its own workspace's runner, so the session
+      // must own both; state it rather than inherit first-binder order.
+      await seedWorkspaceOwnership(page, URL_KEY, 'owner');
+      await seedWorkspaceOwnership(page, secondWorkerUrlKey, 'owner');
 
       const res = await page.request.post(`${API_PREFIX}/collective/start`, {
         data: {

@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-2830: regression witness for the clipped bake-off rows — the RENDERED
 // GEOMETRY of `.effort-group-rows`, not the HTML string.
@@ -65,6 +66,8 @@ test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {
   // Seeded LOCAL provider workspace, so the read-out route's per-issue
   // provider reads (comments/description per GEOM-n) genuinely resolve.
   await seedLocal(geometrySeed(URL_KEY));
+  // LIN-3383: seedWorkerLineage dispatches to a runner target (owner-only); state the owner.
+  await seedWorkspaceOwnership(page, URL_KEY, 'owner');
   await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
   await page.goto(`/test/clear-dispatch-history?urlKey=${URL_KEY}`);
 
