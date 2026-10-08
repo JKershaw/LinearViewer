@@ -77,6 +77,20 @@ describe('LIN-3364 helpers', () => {
     assert.equal(recentRuns([{ ...rows[0], bookkeeping: null }])[0].outcome, 'running');
   });
 
+  test('recentRuns: a closed row carries its stamp time and sorts by it, not last (review F1)', () => {
+    const closedOld = { id: 'old', kind: 'plan', status: 'taken', dispatchedAt: '2026-01-01T00:00:00.000Z', feedback: fb('[pending] x'), bookkeeping: { ...STAMP, at: new Date('2026-01-02T00:00:00.000Z') } };
+    const done = Array.from({ length: 5 }, (_, i) => ({
+      id: `d${i}`, kind: 'implementation', status: 'taken', dispatchedAt: `2026-09-0${i + 1}T00:00:00.000Z`,
+      feedback: [{ message: '[done] ok', timestamp: `2026-09-0${i + 1}T01:00:00.000Z` }], bookkeeping: null
+    }));
+    const runs = recentRuns([closedOld, ...done]);
+    assert.equal(runs.length, 5);
+    assert.ok(runs.every(r => r.outcome === 'done'), 'the January closed row falls out of the newest five');
+    assert.equal(runs[0].at, '2026-09-01T01:00:00.000Z', 'the oldest September run is kept');
+    const alone = recentRuns([closedOld]);
+    assert.deepEqual(alone, [{ stage: 'plan', at: '2026-01-02T00:00:00.000Z', outcome: 'closed' }]);
+  });
+
   test('effort-readout: a closed row is lifecycleStatus closed and a no-attempt status', () => {
     const row = { id: 'r1', kind: 'implementation', status: 'taken', dispatchedAt: '2026-08-01T00:00:00.000Z', feedback: fb('[pending] x'), bookkeeping: STAMP };
     const n = normalizeDispatchRow(row, { isLive: false });

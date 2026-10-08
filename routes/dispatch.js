@@ -1839,6 +1839,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         if (row.status !== 'taken' || !req.dispatchTokenLabel || row.takenByTokenLabel !== req.dispatchTokenLabel) {
           return refuse('not-taker');
         }
+        // LIN-3364: deliberately `deriveTerminalStatus`, not `deriveWireTerminal` — a closed stamp is a liveness fact for readers, not a revocation; a still-alive runner keeps its re-mint.
         if (deriveTerminalStatus(row.feedback) !== null) return refuse('terminal');
 
         // Both hold: re-mint through the T2 helper, which re-reads the record

@@ -108,6 +108,14 @@ describe('resolveDisposition (LIN-1728 Revision 3, F8: total mapping)', () => {
     assert.strictEqual(resolveDisposition(l, { now: NOW }), 'resumable');
   });
 
+  test('stamped (closed) running loop ages from the stamp, not mid-turn (LIN-3364 F3)', () => {
+    const fresh = loop({ terminalStatus: null, agentState: 'running', bookkeeping: { at: new Date(NOW.getTime() - 1000 * 60 * 5), by: 'a', reason: 'handed-on' } });
+    assert.strictEqual(resolveDisposition(fresh, { now: NOW }), 'resumable');
+    const old = loop({ terminalStatus: null, agentState: 'running', bookkeeping: { at: new Date(NOW.getTime() - REAP_INACTIVITY_MS - 1), by: 'a', reason: 'handed-on' } });
+    assert.strictEqual(resolveDisposition(old, { now: NOW }), 'gone');
+    assert.strictEqual(resolveDisposition(loop({ terminalStatus: null, agentState: 'running' }), { now: NOW }), 'mid-turn');
+  });
+
   test('terminal, exactly at the reap-window boundary → resumable (inclusive)', () => {
     const completedAt = new Date(NOW.getTime() - REAP_INACTIVITY_MS);
     const l = loop({ terminalStatus: 'done', terminalCompletedAt: completedAt.toISOString() });

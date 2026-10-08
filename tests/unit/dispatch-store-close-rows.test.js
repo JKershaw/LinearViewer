@@ -115,6 +115,20 @@ describe('bulk close (real MangoDB tmpdir, LIN-3364)', () => {
       assert.equal(await stamped('resumed') ?? null, null);
     });
 
+    test('a row that resumes between the select and the write is NOT closed (guarded updateMany, review F2)', async () => {
+      await seed('resumes');
+      await seed('quiet');
+      const real = history.updateMany.bind(history);
+      history.updateMany = async (...args) => {
+        await history.updateOne({ _id: 'resumes' }, { $push: { feedback: { message: '[working] Session resumed.', timestamp: T(15) } } });
+        return real(...args);
+      };
+      const r = await store.closeIssueRows(URL_KEY, 'LIN-1', { ids: ['resumes', 'quiet'], quietSince: T(10), reason: 'ticket-closed' });
+      assert.deepEqual(r.closedIds, ['quiet']);
+      assert.equal(await stamped('resumes') ?? null, null);
+      assert.notEqual(await stamped('quiet'), null);
+    });
+
     test('a row with its own terminal marker is skipped; wrong issue is not reached', async () => {
       await seed('done', { feedback: [{ message: '[done] ok', timestamp: T(2) }] });
       await seed('other-issue', { issueIdentifier: 'LIN-2' });
