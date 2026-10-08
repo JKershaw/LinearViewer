@@ -3,6 +3,39 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Which decisions in Harbour have more than one authority and no comment admitting it?** `harbour/the-second-copy.md` and
+  `harbour/coherence-as-it-grows.md` (version 3) found that the 42 sibling escapes and most of the 143 coherence send-backs
+  name decisions outside the census of 33 declared twins and eleven named decisions. List every decision those 229
+  records name, give each a signature, add them to `knownDecisions`, and re-run the decision-level exposure and
+  subset-edit measures on the full list. (Claude, 2026-10-08)
+- **Did deleting the second prompt path make later prompt changes cheaper?** `harbour/coherence-as-it-grows.md` found
+  that 53 of the 63 PRs touching `lib/prompt-template-defs.js` from June to 7 October also had to touch the meta-prompt,
+  until LIN-3300 deleted it on 4 October, and, in version 2, that a change touching a site of a known multi-site decision is sent back three times as
+  often within every size band. Set the eight weeks of prompt-rule changes after 4 October against the
+  eight before on production files touched, review send-backs, worker sessions and working hours, within size band;
+  this is the one consolidation old enough to measure by December, and the free half of that paper's two-arm trial.
+  (Claude, 2026-10-08)
+- **Does a retirement-inclusive definition of done retire sites, and at what cost now and later?** The same paper's
+  "How to test it": for six weeks, assign tickets that touch a listed seam by ticket-number parity to today's
+  definition of done or to one that also requires the touched decision to have one authority at close-out, and measure
+  sites per decision before and after (the census script), N-place edits and sibling escapes over the following eight
+  weeks, and sessions, send-backs and hours for the change and for later changes to the same seam. (Claude, 2026-10-08)
+- **How many of Harbour's decisions have more than one authority?** The same paper could count only floors: 33
+  declared twins, 27 decision-bearing clone pairs and eleven named decisions in 103 of 398 production files. Draw fifty
+  production functions at random, trace each to every other site that makes the same decision, with two blind readers,
+  and report the decision-level share with an interval and the readers' agreement. (Claude, 2026-10-08)
+- **How much of the June-to-July halving was the code, and how much the process?** `harbour/coherence-as-it-grows.md`
+  (version 2) found 45% of escaped defects and 36% of review send-backs since June to be an unreconciled decision, and
+  the steady-base papers put the halving on supervision, wakes and gates; neither apportioned it. Put the runner's
+  per-ticket working hours (`scripts/survey-effort-runner.mjs` on the host's state directory, June on) on a branch,
+  join them to `coherence-as-it-grows-exposure.json`, and set hours per same-sized change by month against
+  decision-level exposure. The one measure the paper's strong form still lacks. (Claude, 2026-10-08)
+- **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
+  subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
+  question is now about the unnamed ones. For each of the 33 twins in `coherence-as-it-grows-codes.json`, read
+  every PR that touched either side and say whether the other side moved with it, lagged it, or was missed and fixed
+  later; that measures the obligation directly, and says whether the eleven server-and-browser twins would be worth a
+  shared pure module loaded by the browser. (Claude, 2026-10-08)
 - **Do October's cause-level authority rules retire duplicate decisions, or only improve their local fixes?**
   Independently check `harbour/one-job-many-paths.md`'s live candidates, then follow a bounded set of
   seam-changing tasks through their parent efforts: count independent decision sites before and after,

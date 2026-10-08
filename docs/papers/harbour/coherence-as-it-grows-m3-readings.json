@@ -1,0 +1,1714 @@
+{
+"337|store clear(urlKey) boilerplate|499": {
+"reading": "unrelated",
+"note": "foreman-store rename; unrelated"
+},
+"346|segment rank|774": {
+"reading": "unrelated",
+"note": "UI audit of swim.js; 'mirrors' refers to public/kpis.js colour tokens"
+},
+"351|twin: TERMINAL_STATES lib/tree.js \u2194 ship.js, swim.js, swipe.js|774": {
+"reading": "unrelated",
+"note": "UI audit of swim.js; 'mirrors' refers to public/kpis.js colour tokens"
+},
+"394|page-shell option bag|792": {
+"reading": "unrelated",
+"note": "new per-session Observation page route; unrelated"
+},
+"394|page-shell option bag|797": {
+"reading": "unrelated",
+"note": "task-chat route change; unrelated"
+},
+"394|page-shell option bag|799": {
+"reading": "unrelated",
+"note": "H12 timeout fix on the Observation route: a same-day fix of #792's own page (which touched the same site)"
+},
+"394|page-shell option bag|817": {
+"reading": "unrelated",
+"note": "collective characters; unrelated"
+},
+"394|page-shell option bag|827": {
+"reading": "unrelated",
+"note": "collective presets; unrelated"
+},
+"449|page-shell option bag|792": {
+"reading": "unrelated",
+"note": "new per-session Observation page route; unrelated"
+},
+"449|page-shell option bag|797": {
+"reading": "unrelated",
+"note": "task-chat route change; unrelated"
+},
+"449|page-shell option bag|799": {
+"reading": "unrelated",
+"note": "H12 timeout fix on the Observation route: a same-day fix of #792's own page (which touched the same site)"
+},
+"449|page-shell option bag|817": {
+"reading": "unrelated",
+"note": "collective characters; unrelated"
+},
+"449|page-shell option bag|827": {
+"reading": "unrelated",
+"note": "collective presets; unrelated"
+},
+"449|page-shell option bag|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"449|page-shell option bag|901": {
+"reading": "unrelated",
+"note": "feed hydration extension (LIN-1258/1259 pair); unrelated"
+},
+"449|page-shell option bag|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"499|store clear(urlKey) boilerplate|872": {
+"reading": "unrelated",
+"note": "task-snapshot store added; unrelated"
+},
+"499|store clear(urlKey) boilerplate|908": {
+"reading": "unrelated",
+"note": "report-history read (Bug); unrelated"
+},
+"503|twin: TERMINAL_STATES lib/tree.js \u2194 ship.js, swim.js, swipe.js|774": {
+"reading": "unrelated",
+"note": "UI audit of swim.js; 'mirrors' refers to public/kpis.js colour tokens"
+},
+"573|page-shell option bag|792": {
+"reading": "unrelated",
+"note": "new per-session Observation page route; unrelated"
+},
+"573|page-shell option bag|797": {
+"reading": "unrelated",
+"note": "task-chat route change; unrelated"
+},
+"573|page-shell option bag|799": {
+"reading": "unrelated",
+"note": "H12 timeout fix on the Observation route: a same-day fix of #792's own page (which touched the same site)"
+},
+"573|page-shell option bag|817": {
+"reading": "unrelated",
+"note": "collective characters; unrelated"
+},
+"573|page-shell option bag|827": {
+"reading": "unrelated",
+"note": "collective presets; unrelated"
+},
+"573|page-shell option bag|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"573|page-shell option bag|901": {
+"reading": "unrelated",
+"note": "feed hydration extension (LIN-1258/1259 pair); unrelated"
+},
+"573|page-shell option bag|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"573|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"728|review ledger heading|732": {
+"reading": "unrelated",
+"note": "ledger-proportionality rule edit in completion-signals; no relation to #728's attachment-perception rule"
+},
+"728|review ledger heading|740": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy (LIN-915/1071/1206): each a new policy, not a missed sibling"
+},
+"728|review ledger heading|742": {
+"reading": "unrelated",
+"note": "meta-prompt design-routing edit; unrelated"
+},
+"728|review ledger heading|825": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy: new policy, not a missed sibling"
+},
+"728|review ledger heading|883": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy: new policy, not a missed sibling"
+},
+"728|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"728|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"728|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"728|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"728|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"732|review ledger heading|740": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy (LIN-915/1071/1206): each a new policy, not a missed sibling"
+},
+"732|review ledger heading|742": {
+"reading": "unrelated",
+"note": "meta-prompt design-routing edit; unrelated"
+},
+"732|review ledger heading|825": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy: new policy, not a missed sibling"
+},
+"732|review ledger heading|883": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy: new policy, not a missed sibling"
+},
+"732|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"732|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"732|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"740|review ledger heading|742": {
+"reading": "unrelated",
+"note": "meta-prompt design-routing edit; unrelated"
+},
+"740|review ledger heading|888": {
+"reading": "unrelated",
+"note": "triage scope guard (Bug); unrelated to the first PR's edit"
+},
+"740|review ledger heading|928": {
+"reading": "unrelated",
+"note": "auth vs authz wording; unrelated"
+},
+"740|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"740|review ledger heading|1019": {
+"reading": "unrelated",
+"note": "plan-review template added (a new site), LIN-1602/1603 pair; not a sibling of the earlier edits"
+},
+"740|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"740|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"740|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"740|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"742|review ledger heading|825": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy: new policy, not a missed sibling"
+},
+"742|review ledger heading|883": {
+"reading": "unrelated",
+"note": "successive changes to the kickoff's close-on-done policy: new policy, not a missed sibling"
+},
+"742|review ledger heading|888": {
+"reading": "unrelated",
+"note": "triage scope guard (Bug); unrelated to the first PR's edit"
+},
+"742|review ledger heading|928": {
+"reading": "unrelated",
+"note": "auth vs authz wording; unrelated"
+},
+"742|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"742|review ledger heading|1019": {
+"reading": "unrelated",
+"note": "plan-review template added (a new site), LIN-1602/1603 pair; not a sibling of the earlier edits"
+},
+"742|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"742|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"742|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"742|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"792|page-shell option bag|797": {
+"reading": "unrelated",
+"note": "task-chat route change; unrelated"
+},
+"792|page-shell option bag|817": {
+"reading": "unrelated",
+"note": "collective characters; unrelated"
+},
+"792|page-shell option bag|827": {
+"reading": "unrelated",
+"note": "collective presets; unrelated"
+},
+"792|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"792|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"797|page-shell option bag|799": {
+"reading": "unrelated",
+"note": "H12 timeout fix on the Observation route: a same-day fix of #792's own page (which touched the same site)"
+},
+"797|page-shell option bag|817": {
+"reading": "unrelated",
+"note": "collective characters; unrelated"
+},
+"797|page-shell option bag|827": {
+"reading": "unrelated",
+"note": "collective presets; unrelated"
+},
+"797|page-shell option bag|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"797|page-shell option bag|901": {
+"reading": "unrelated",
+"note": "feed hydration extension (LIN-1258/1259 pair); unrelated"
+},
+"797|page-shell option bag|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"797|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"799|page-shell option bag|817": {
+"reading": "unrelated",
+"note": "collective characters; unrelated"
+},
+"799|page-shell option bag|827": {
+"reading": "unrelated",
+"note": "collective presets; unrelated"
+},
+"799|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"799|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"800|session classification|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"800|session classification|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"802|session classification|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"802|session classification|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"817|page-shell option bag|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"817|page-shell option bag|901": {
+"reading": "unrelated",
+"note": "feed hydration extension (LIN-1258/1259 pair); unrelated"
+},
+"817|page-shell option bag|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"817|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"817|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"825|review ledger heading|888": {
+"reading": "unrelated",
+"note": "triage scope guard (Bug); unrelated to the first PR's edit"
+},
+"825|review ledger heading|928": {
+"reading": "unrelated",
+"note": "auth vs authz wording; unrelated"
+},
+"825|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"825|review ledger heading|1019": {
+"reading": "unrelated",
+"note": "plan-review template added (a new site), LIN-1602/1603 pair; not a sibling of the earlier edits"
+},
+"825|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"825|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"825|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"825|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"825|review ledger heading|1069": {
+"reading": "unrelated",
+"note": "7th plan-review check; unrelated"
+},
+"827|page-shell option bag|899": {
+"reading": "unrelated",
+"note": "feed hydration in dashboard.js; unrelated"
+},
+"827|page-shell option bag|901": {
+"reading": "unrelated",
+"note": "feed hydration extension (LIN-1258/1259 pair); unrelated"
+},
+"827|page-shell option bag|913": {
+"reading": "unrelated",
+"note": "recency rollup in dashboard.js; unrelated"
+},
+"827|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"827|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"872|store clear(urlKey) boilerplate|908": {
+"reading": "unrelated",
+"note": "report-history read (Bug); unrelated"
+},
+"872|store clear(urlKey) boilerplate|1030": {
+"reading": "unrelated",
+"note": "report-history listFull; unrelated"
+},
+"883|review ledger heading|888": {
+"reading": "unrelated",
+"note": "triage scope guard (Bug); unrelated to the first PR's edit"
+},
+"883|review ledger heading|928": {
+"reading": "unrelated",
+"note": "auth vs authz wording; unrelated"
+},
+"883|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"883|review ledger heading|1019": {
+"reading": "unrelated",
+"note": "plan-review template added (a new site), LIN-1602/1603 pair; not a sibling of the earlier edits"
+},
+"883|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"883|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"883|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"883|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"883|review ledger heading|1069": {
+"reading": "unrelated",
+"note": "7th plan-review check; unrelated"
+},
+"883|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"888|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"888|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"888|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"888|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"888|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"888|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"899|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"899|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"899|page-shell option bag|1082": {
+"reading": "unrelated",
+"note": "LIN-1904 applies the 'same fix as /api/detail (LIN-1903)' to sibling id-scoped routes: a sibling fix of an untracked decision (per-binding provider resolution), not of the option bag"
+},
+"899|page-shell option bag|1091": {
+"reading": "unrelated",
+"note": "adds planFeeConfig to the /kpis option bag: its own change"
+},
+"901|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"901|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"901|page-shell option bag|1082": {
+"reading": "unrelated",
+"note": "LIN-1904 applies the 'same fix as /api/detail (LIN-1903)' to sibling id-scoped routes: a sibling fix of an untracked decision (per-binding provider resolution), not of the option bag"
+},
+"901|page-shell option bag|1091": {
+"reading": "unrelated",
+"note": "adds planFeeConfig to the /kpis option bag: its own change"
+},
+"913|page-shell option bag|926": {
+"reading": "unrelated",
+"note": "task-chat re-key; unrelated"
+},
+"913|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"913|page-shell option bag|1082": {
+"reading": "unrelated",
+"note": "LIN-1904 applies the 'same fix as /api/detail (LIN-1903)' to sibling id-scoped routes: a sibling fix of an untracked decision (per-binding provider resolution), not of the option bag"
+},
+"913|page-shell option bag|1091": {
+"reading": "unrelated",
+"note": "adds planFeeConfig to the /kpis option bag: its own change"
+},
+"926|page-shell option bag|1027": {
+"reading": "unrelated",
+"note": "archive pages added to server.js; unrelated"
+},
+"926|page-shell option bag|1082": {
+"reading": "unrelated",
+"note": "LIN-1904 applies the 'same fix as /api/detail (LIN-1903)' to sibling id-scoped routes: a sibling fix of an untracked decision (per-binding provider resolution), not of the option bag"
+},
+"926|page-shell option bag|1091": {
+"reading": "unrelated",
+"note": "adds planFeeConfig to the /kpis option bag: its own change"
+},
+"928|review ledger heading|1012": {
+"reading": "unrelated",
+"note": "widens the proportional lane in completion-signals; unrelated"
+},
+"928|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"928|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"928|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"928|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"928|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"981|twin: binding credentials \u2194 legacy scalar mirror|985": {
+"reading": "unrelated",
+"note": "owner-credential store docstring (LIN-1523); unrelated"
+},
+"981|twin: binding credentials \u2194 legacy scalar mirror|986": {
+"reading": "unrelated",
+"note": "LIN-1524 regression pin; unrelated"
+},
+"981|twin: binding credentials \u2194 legacy scalar mirror|995": {
+"reading": "unrelated",
+"note": "race-safe refresh rotation (LIN-1546); unrelated"
+},
+"981|twin: binding credentials \u2194 legacy scalar mirror|997": {
+"reading": "unrelated",
+"note": "removes dead seam; unrelated"
+},
+"981|twin: binding credentials \u2194 legacy scalar mirror|1088": {
+"reading": "unrelated",
+"note": "Jira OAuth refresh strategy; unrelated"
+},
+"985|twin: binding credentials \u2194 legacy scalar mirror|986": {
+"reading": "unrelated",
+"note": "LIN-1524 regression pin; unrelated"
+},
+"985|twin: binding credentials \u2194 legacy scalar mirror|995": {
+"reading": "unrelated",
+"note": "race-safe refresh rotation (LIN-1546); unrelated"
+},
+"995|twin: binding credentials \u2194 legacy scalar mirror|997": {
+"reading": "unrelated",
+"note": "removes dead seam; unrelated"
+},
+"995|twin: binding credentials \u2194 legacy scalar mirror|1088": {
+"reading": "unrelated",
+"note": "Jira OAuth refresh strategy; unrelated"
+},
+"1012|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"1012|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"1012|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"1012|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1012|review ledger heading|1164": {
+"reading": "unrelated",
+"note": "Principle 0 gate in kickoff and manual"
+},
+"1012|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1019|review ledger heading|1024": {
+"reading": "unrelated",
+"note": "plan-review gate wired into the meta-prompt (LIN-1602/1603 pair); not a sibling of the earlier edits"
+},
+"1019|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"1019|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"1019|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"1019|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1019|review ledger heading|1164": {
+"reading": "unrelated",
+"note": "Principle 0 gate in kickoff and manual"
+},
+"1019|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1024|review ledger heading|1048": {
+"reading": "unrelated",
+"note": "close-out archive & prune: a new rule"
+},
+"1024|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "same-day follow-up adds a branch LIN-1770 missed, at the completion-signals site"
+},
+"1024|review ledger heading|1051": {
+"reading": "unrelated",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"1024|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1024|review ledger heading|1164": {
+"reading": "unrelated",
+"note": "Principle 0 gate in kickoff and manual"
+},
+"1024|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1027|page-shell option bag|1082": {
+"reading": "unrelated",
+"note": "LIN-1904 applies the 'same fix as /api/detail (LIN-1903)' to sibling id-scoped routes: a sibling fix of an untracked decision (per-binding provider resolution), not of the option bag"
+},
+"1027|page-shell option bag|1091": {
+"reading": "unrelated",
+"note": "adds planFeeConfig to the /kpis option bag: its own change"
+},
+"1027|page-shell option bag|1118": {
+"reading": "unrelated",
+"note": "task-chat source hint; unrelated"
+},
+"1048|review ledger heading|1051": {
+"reading": "sibling-fix",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"1048|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1048|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1050|review ledger heading|1051": {
+"reading": "sibling-fix",
+"note": "aligns the close-out catalog description/workflow and the meta-prompt text with the archive & prune rule LIN-1770 landed in the template and kickoff"
+},
+"1050|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1050|review ledger heading|1164": {
+"reading": "unrelated",
+"note": "Principle 0 gate in kickoff and manual"
+},
+"1050|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1051|review ledger heading|1069": {
+"reading": "unrelated",
+"note": "7th plan-review check; unrelated"
+},
+"1051|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1051|review ledger heading|1164": {
+"reading": "unrelated",
+"note": "Principle 0 gate in kickoff and manual"
+},
+"1051|review ledger heading|1176": {
+"reading": "unrelated",
+"note": "same-day follow-up ticket carries the Principle 0 gate + ruling format from the kickoff/manual into the worker task templates"
+},
+"1051|review ledger heading|1181": {
+"reading": "unrelated",
+"note": "acceptance-witness bullet; unrelated"
+},
+"1051|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1051|review ledger heading|1253": {
+"reading": "unrelated",
+"note": "mutation-check wording; unrelated"
+},
+"1051|review ledger heading|1255": {
+"reading": "unrelated",
+"note": "follow-up labels; unrelated"
+},
+"1051|review ledger heading|1256": {
+"reading": "unrelated",
+"note": "priority field wording; unrelated"
+},
+"1051|review ledger heading|1259": {
+"reading": "unrelated",
+"note": "priorityLevel wording; unrelated"
+},
+"1069|review ledger heading|1092": {
+"reading": "unrelated",
+"note": "CI/checks precondition capability-gated at six sites in one change: an N-place edit, not a sibling fix of an earlier one"
+},
+"1069|review ledger heading|1164": {
+"reading": "unrelated",
+"note": "Principle 0 gate in kickoff and manual"
+},
+"1069|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1082|page-shell option bag|1091": {
+"reading": "unrelated",
+"note": "adds planFeeConfig to the /kpis option bag: its own change"
+},
+"1082|page-shell option bag|1118": {
+"reading": "unrelated",
+"note": "task-chat source hint; unrelated"
+},
+"1082|page-shell option bag|1299": {
+"reading": "unrelated",
+"note": "Flight Companion route created; unrelated"
+},
+"1082|page-shell option bag|1300": {
+"reading": "unrelated",
+"note": "degrade on failing read (fix of #1299, same site); unrelated"
+},
+"1082|page-shell option bag|1420": {
+"reading": "unrelated",
+"note": "Flight Companion strip data; unrelated"
+},
+"1082|page-shell option bag|1424": {
+"reading": "unrelated",
+"note": "scan-due surface in dashboard.js; unrelated"
+},
+"1085|twin: timeline zoom/pan/overlap/fit server \u2194 client|1086": {
+"reading": "unrelated",
+"note": "Phase B of LIN-1908 adds computeTimelineFit to both lib and public in one change: a planned phase, not a missed sibling"
+},
+"1086|twin: timeline zoom/pan/overlap/fit server \u2194 client|1125": {
+"reading": "unrelated",
+"note": "pulse-strip zoom; unrelated"
+},
+"1091|page-shell option bag|1118": {
+"reading": "unrelated",
+"note": "task-chat source hint; unrelated"
+},
+"1091|page-shell option bag|1299": {
+"reading": "unrelated",
+"note": "Flight Companion route created; unrelated"
+},
+"1091|page-shell option bag|1300": {
+"reading": "unrelated",
+"note": "degrade on failing read (fix of #1299, same site); unrelated"
+},
+"1091|page-shell option bag|1420": {
+"reading": "unrelated",
+"note": "Flight Companion strip data; unrelated"
+},
+"1091|page-shell option bag|1424": {
+"reading": "unrelated",
+"note": "scan-due surface in dashboard.js; unrelated"
+},
+"1118|page-shell option bag|1299": {
+"reading": "unrelated",
+"note": "Flight Companion route created; unrelated"
+},
+"1118|page-shell option bag|1300": {
+"reading": "unrelated",
+"note": "degrade on failing read (fix of #1299, same site); unrelated"
+},
+"1118|page-shell option bag|1420": {
+"reading": "unrelated",
+"note": "Flight Companion strip data; unrelated"
+},
+"1118|page-shell option bag|1424": {
+"reading": "unrelated",
+"note": "scan-due surface in dashboard.js; unrelated"
+},
+"1118|page-shell option bag|1442": {
+"reading": "unrelated",
+"note": "Flight Companion model choice; unrelated"
+},
+"1156|twin: autopilot kickoff text \u2194 docs/autopilot-kickoff.md|1499": {
+"reading": "unrelated",
+"note": "kickoff header comment; unrelated"
+},
+"1162|session classification|1387": {
+"reading": "unrelated",
+"note": "rulings read in dashboard.js; unrelated"
+},
+"1162|session classification|1414": {
+"reading": "unrelated",
+"note": "PR-status chat tool; 'drift' is about a repo allowlist"
+},
+"1162|session classification|1441": {
+"reading": "unrelated",
+"note": "on_answer wiring; unrelated"
+},
+"1164|review ledger heading|1176": {
+"reading": "sibling-fix",
+"note": "same-day follow-up ticket carries the Principle 0 gate + ruling format from the kickoff/manual into the worker task templates"
+},
+"1164|review ledger heading|1181": {
+"reading": "unrelated",
+"note": "acceptance-witness bullet; unrelated"
+},
+"1164|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1164|review ledger heading|1253": {
+"reading": "unrelated",
+"note": "mutation-check wording; unrelated"
+},
+"1164|review ledger heading|1255": {
+"reading": "unrelated",
+"note": "follow-up labels; unrelated"
+},
+"1164|review ledger heading|1256": {
+"reading": "unrelated",
+"note": "priority field wording; unrelated"
+},
+"1164|review ledger heading|1259": {
+"reading": "unrelated",
+"note": "priorityLevel wording; unrelated"
+},
+"1164|review ledger heading|1374": {
+"reading": "unrelated",
+"note": "generalises the cited-sweep rule into plan and plan-review: a rule carried to sibling templates, but its origin PR is not among the subset edits here; unrelated to #1164"
+},
+"1164|review ledger heading|1459": {
+"reading": "unrelated",
+"note": "plan-enumeration wording; the matched keywords are inside the prompt text itself"
+},
+"1164|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1164|review ledger heading|1533": {
+"reading": "unclear",
+"note": "a month-later fix making the Principle 0 gate self-sufficient in the meta-prompt and manual: a follow-up to LIN-1732's rule rather than a missed site"
+},
+"1164|twin: autopilot kickoff text \u2194 docs/autopilot-kickoff.md|1499": {
+"reading": "unrelated",
+"note": "kickoff header comment; unrelated"
+},
+"1176|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1176|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1181|review ledger heading|1252": {
+"reading": "unrelated",
+"note": "retrospective-audit template; unrelated"
+},
+"1181|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1252|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1253|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1255|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1255|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1256|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1256|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1259|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1259|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1287|twin: autopilot kickoff text \u2194 docs/autopilot-kickoff.md|1499": {
+"reading": "unrelated",
+"note": "kickoff header comment; unrelated"
+},
+"1287|twin: autopilot kickoff text \u2194 docs/autopilot-kickoff.md|1585": {
+"reading": "unrelated",
+"note": "scoped kickoff carries the caller goal; not a doc-to-code sync"
+},
+"1299|page-shell option bag|1424": {
+"reading": "unrelated",
+"note": "scan-due surface in dashboard.js; unrelated"
+},
+"1299|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1300|page-shell option bag|1424": {
+"reading": "unrelated",
+"note": "scan-due surface in dashboard.js; unrelated"
+},
+"1300|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1328|twin: LANE_KEYS restated (flight-companion-gate \u2194 observer-sweep)|1400": {
+"reading": "unrelated",
+"note": "census attention ranking; unrelated"
+},
+"1328|twin: LANE_KEYS restated (flight-companion-gate \u2194 observer-sweep)|1570": {
+"reading": "unrelated",
+"note": "answered-decision lineage; unrelated"
+},
+"1328|twin: LANE_KEYS restated (flight-companion-gate \u2194 observer-sweep)|1581": {
+"reading": "unrelated",
+"note": "withdrawn resolution in /rulings (LIN-3038): 'parity' is about the /rulings contract"
+},
+"1374|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1374|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1374|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1374|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1374|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1374|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1374|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1374|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1384|tolerant timestamp parse|1437": {
+"reading": "unrelated",
+"note": "shelved-rulings store added (a new site); unrelated"
+},
+"1384|tolerant timestamp parse|1581": {
+"reading": "unrelated",
+"note": "withdrawn resolution in /rulings (LIN-3038): 'parity' is about the /rulings contract"
+},
+"1387|session classification|1414": {
+"reading": "unrelated",
+"note": "PR-status chat tool; 'drift' is about a repo allowlist"
+},
+"1387|session classification|1441": {
+"reading": "unrelated",
+"note": "on_answer wiring; unrelated"
+},
+"1387|session classification|1642": {
+"reading": "unrelated",
+"note": "history-read bound; unrelated"
+},
+"1387|session classification|1723": {
+"reading": "unrelated",
+"note": "close-out title exclusion; unrelated"
+},
+"1387|session classification|1743": {
+"reading": "unrelated",
+"note": "keepalive stop (LIN-3293/3294); unrelated"
+},
+"1414|session classification|1441": {
+"reading": "unrelated",
+"note": "on_answer wiring; unrelated"
+},
+"1414|session classification|1642": {
+"reading": "unrelated",
+"note": "history-read bound; unrelated"
+},
+"1414|session classification|1743": {
+"reading": "unrelated",
+"note": "keepalive stop (LIN-3293/3294); unrelated"
+},
+"1414|twin: chat-tools isTerminalLoop \u2194 routes/dashboard.js|1441": {
+"reading": "unrelated",
+"note": "on_answer wiring; unrelated"
+},
+"1412|tolerant timestamp parse|1437": {
+"reading": "unrelated",
+"note": "shelved-rulings store added (a new site); unrelated"
+},
+"1412|tolerant timestamp parse|1581": {
+"reading": "unrelated",
+"note": "withdrawn resolution in /rulings (LIN-3038): 'parity' is about the /rulings contract"
+},
+"1420|page-shell option bag|1424": {
+"reading": "unrelated",
+"note": "scan-due surface in dashboard.js; unrelated"
+},
+"1420|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1420|page-shell option bag|1718": {
+"reading": "unrelated",
+"note": "LIN-3240 review round 2 threads the binding stamp through three task routes: its own review fix, not a sibling of the listed first PRs"
+},
+"1420|page-shell option bag|1721": {
+"reading": "unrelated",
+"note": "run-scoped chat; unrelated"
+},
+"1424|page-shell option bag|1442": {
+"reading": "unrelated",
+"note": "Flight Companion model choice; unrelated"
+},
+"1424|page-shell option bag|1491": {
+"reading": "unrelated",
+"note": "Flight Companion ai-configured attribute; unrelated"
+},
+"1424|page-shell option bag|1535": {
+"reading": "unrelated",
+"note": "chat-request preamble; unrelated"
+},
+"1424|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1424|page-shell option bag|1718": {
+"reading": "unrelated",
+"note": "LIN-3240 review round 2 threads the binding stamp through three task routes: its own review fix, not a sibling of the listed first PRs"
+},
+"1424|page-shell option bag|1721": {
+"reading": "unrelated",
+"note": "run-scoped chat; unrelated"
+},
+"1424|page-shell option bag|1736": {
+"reading": "unrelated",
+"note": "proxy default copy; unrelated"
+},
+"1428|tolerant timestamp parse|1437": {
+"reading": "unrelated",
+"note": "shelved-rulings store added (a new site); unrelated"
+},
+"1428|tolerant timestamp parse|1581": {
+"reading": "unrelated",
+"note": "withdrawn resolution in /rulings (LIN-3038): 'parity' is about the /rulings contract"
+},
+"1428|store clear(urlKey) boilerplate|1653": {
+"reading": "unrelated",
+"note": "index/sort comments in four stores (LIN-3163); unrelated"
+},
+"1428|store clear(urlKey) boilerplate|1741": {
+"reading": "unrelated",
+"note": "LIN-3282 mirror readers serve the authoritative owner record: a stale-mirror fix for the connection-record twin (declared that day), unrelated to clear(urlKey)"
+},
+"1437|tolerant timestamp parse|1581": {
+"reading": "unrelated",
+"note": "withdrawn resolution in /rulings (LIN-3038): 'parity' is about the /rulings contract"
+},
+"1441|session classification|1642": {
+"reading": "unrelated",
+"note": "history-read bound; unrelated"
+},
+"1441|session classification|1723": {
+"reading": "unrelated",
+"note": "close-out title exclusion; unrelated"
+},
+"1441|session classification|1743": {
+"reading": "unrelated",
+"note": "keepalive stop (LIN-3293/3294); unrelated"
+},
+"1441|twin: chat-tools isTerminalLoop \u2194 routes/dashboard.js|1723": {
+"reading": "unrelated",
+"note": "close-out title exclusion; unrelated"
+},
+"1442|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1442|page-shell option bag|1718": {
+"reading": "unrelated",
+"note": "LIN-3240 review round 2 threads the binding stamp through three task routes: its own review fix, not a sibling of the listed first PRs"
+},
+"1442|page-shell option bag|1721": {
+"reading": "unrelated",
+"note": "run-scoped chat; unrelated"
+},
+"1442|page-shell option bag|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1459|review ledger heading|1506": {
+"reading": "unrelated",
+"note": "misfire-guard wording at three sites in one change; unrelated"
+},
+"1459|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1459|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1459|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1459|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1459|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1459|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1459|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1459|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1459|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1491|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1491|page-shell option bag|1718": {
+"reading": "unrelated",
+"note": "LIN-3240 review round 2 threads the binding stamp through three task routes: its own review fix, not a sibling of the listed first PRs"
+},
+"1491|page-shell option bag|1721": {
+"reading": "unrelated",
+"note": "run-scoped chat; unrelated"
+},
+"1491|page-shell option bag|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1499|terminal states literal|1725": {
+"reading": "unrelated",
+"note": "reply delivery in observation.js; unrelated"
+},
+"1506|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1506|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1506|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1506|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1506|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1506|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1506|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1506|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1533|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1533|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1533|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1533|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1533|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1533|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1533|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1533|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1533|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1535|page-shell option bag|1603": {
+"reading": "unrelated",
+"note": "home redirect in server.js; unrelated"
+},
+"1535|page-shell option bag|1718": {
+"reading": "unrelated",
+"note": "LIN-3240 review round 2 threads the binding stamp through three task routes: its own review fix, not a sibling of the listed first PRs"
+},
+"1535|page-shell option bag|1721": {
+"reading": "unrelated",
+"note": "run-scoped chat; unrelated"
+},
+"1535|page-shell option bag|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1545|review ledger heading|1554": {
+"reading": "unrelated",
+"note": "inside/outside-scope wording at three sites in one change; unrelated"
+},
+"1545|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1545|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1545|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1545|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1545|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1545|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1545|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1545|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1554|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1554|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1554|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1554|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1554|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1554|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1554|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1566|store clear(urlKey) boilerplate|1653": {
+"reading": "unrelated",
+"note": "index/sort comments in four stores (LIN-3163); unrelated"
+},
+"1566|store clear(urlKey) boilerplate|1741": {
+"reading": "unrelated",
+"note": "LIN-3282 mirror readers serve the authoritative owner record: a stale-mirror fix for the connection-record twin (declared that day), unrelated to clear(urlKey)"
+},
+"1570|review ledger heading|1578": {
+"reading": "unrelated",
+"note": "close-out wording; unrelated"
+},
+"1570|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1570|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1570|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1570|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1570|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1570|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1570|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1569|twin: autopilot kickoff text \u2194 docs/autopilot-kickoff.md|1585": {
+"reading": "unrelated",
+"note": "scoped kickoff carries the caller goal; not a doc-to-code sync"
+},
+"1569|twin: autopilot kickoff text \u2194 docs/autopilot-kickoff.md|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1578|review ledger heading|1579": {
+"reading": "unrelated",
+"note": "breakdown-child routing; unrelated"
+},
+"1578|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1578|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1578|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1578|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1578|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1579|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1579|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1579|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1579|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1579|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1579|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1581|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1581|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1581|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1581|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1581|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1581|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1584|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1584|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1584|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1584|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1584|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1603|page-shell option bag|1718": {
+"reading": "unrelated",
+"note": "LIN-3240 review round 2 threads the binding stamp through three task routes: its own review fix, not a sibling of the listed first PRs"
+},
+"1603|page-shell option bag|1721": {
+"reading": "unrelated",
+"note": "run-scoped chat; unrelated"
+},
+"1603|page-shell option bag|1736": {
+"reading": "unrelated",
+"note": "proxy default copy; unrelated"
+},
+"1603|page-shell option bag|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1642|session classification|1723": {
+"reading": "unrelated",
+"note": "close-out title exclusion; unrelated"
+},
+"1642|session classification|1743": {
+"reading": "unrelated",
+"note": "keepalive stop (LIN-3293/3294); unrelated"
+},
+"1695|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1695|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1695|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1695|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1695|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1711|twin: dispatch scope bound routes/dispatch \u2194 proxy-dispatch|1734": {
+"reading": "unrelated",
+"note": "LIN-3242 binding-selector fields at the proxy entrance; unrelated to LIN-2942/3245/3248"
+},
+"1711|twin: dispatch scope bound routes/dispatch \u2194 proxy-dispatch|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1716|twin: dispatch scope bound routes/dispatch \u2194 proxy-dispatch|1734": {
+"reading": "unrelated",
+"note": "LIN-3242 binding-selector fields at the proxy entrance; unrelated to LIN-2942/3245/3248"
+},
+"1716|twin: dispatch scope bound routes/dispatch \u2194 proxy-dispatch|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1718|page-shell option bag|1736": {
+"reading": "unrelated",
+"note": "proxy default copy; unrelated"
+},
+"1724|review ledger heading|1742": {
+"reading": "unrelated",
+"note": "size-freeze and wording (LIN-3293); unrelated"
+},
+"1724|review ledger heading|1745": {
+"reading": "unrelated",
+"note": "one-path consolidation (LIN-3299); unrelated"
+},
+"1724|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1724|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1724|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1721|page-shell option bag|1736": {
+"reading": "unrelated",
+"note": "proxy default copy; unrelated"
+},
+"1721|page-shell option bag|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1723|session classification|1743": {
+"reading": "unrelated",
+"note": "keepalive stop (LIN-3293/3294); unrelated"
+},
+"1731|twin: dispatch scope bound routes/dispatch \u2194 proxy-dispatch|1734": {
+"reading": "unrelated",
+"note": "LIN-3242 binding-selector fields at the proxy entrance; unrelated to LIN-2942/3245/3248"
+},
+"1731|twin: dispatch scope bound routes/dispatch \u2194 proxy-dispatch|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"1742|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1745|review ledger heading|1747": {
+"reading": "unrelated",
+"note": "router seam (LIN-3304); unrelated"
+},
+"1745|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1745|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1747|review ledger heading|1751": {
+"reading": "unrelated",
+"note": "one-path consolidation wording and stale comments (LIN-3300); unrelated"
+},
+"1747|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1751|review ledger heading|1760": {
+"reading": "unrelated",
+"note": "close-out finishes the work (LIN-3326); unrelated"
+},
+"1736|page-shell option bag|1765": {
+"reading": "unrelated",
+"note": "LIN-3335 removes that hop from the same three routes; unrelated"
+},
+"346|terminal states literal|774": {
+"reading": "unrelated",
+"note": "UI audit of swim.js; 'mirrors' refers to public/kpis.js colour tokens"
+},
+"346|twin: TERMINAL_STATES lib/tree.js \u2194 ship.js, swim.js, swipe.js|774": {
+"reading": "unrelated",
+"note": "UI audit of swim.js; 'mirrors' refers to public/kpis.js colour tokens"
+},
+"346|twin: swim lane assignment server \u2194 client|774": {
+"reading": "unrelated",
+"note": "UI audit of swim.js; 'mirrors' refers to public/kpis.js colour tokens"
+},
+"732|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "LIN-1772 adds a branch LIN-1770 (#1048) missed; unrelated to this first PR"
+},
+"1012|review ledger heading|1050": {
+"reading": "unrelated",
+"note": "LIN-1772 adds a branch LIN-1770 (#1048) missed; unrelated to this first PR"
+},
+"1024|review ledger heading|1069": {
+"reading": "unrelated",
+"note": "7th plan-review check; unrelated"
+},
+"1024|review ledger heading|1176": {
+"reading": "unrelated",
+"note": "Principle 0 gate carried into worker templates (sibling of #1164, not of this first PR)"
+},
+"1024|review ledger heading|1181": {
+"reading": "unrelated",
+"note": "acceptance-witness bullet; unrelated"
+},
+"1024|review ledger heading|1253": {
+"reading": "unrelated",
+"note": "mutation-check wording; unrelated"
+},
+"1024|review ledger heading|1255": {
+"reading": "unrelated",
+"note": "follow-up labels; unrelated"
+},
+"1024|review ledger heading|1256": {
+"reading": "unrelated",
+"note": "priority field wording; unrelated"
+},
+"1506|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+},
+"1554|review ledger heading|1724": {
+"reading": "unrelated",
+"note": "finish-line stop block; unrelated"
+},
+"1578|review ledger heading|1584": {
+"reading": "unrelated",
+"note": "review verdict routing; unrelated"
+}
+}

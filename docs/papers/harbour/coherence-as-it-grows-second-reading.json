@@ -1,0 +1,902 @@
+{
+"about": "Blind second reading of the 126 admission lines and 33 twin candidates in coherence-as-it-grows-codes.json by an in-session reader given the classes but not the first reader's codes, at d61903f3, 2026-10-08.",
+"commit": "d61903f3",
+"hits": [
+{
+"i": 0,
+"class": "S",
+"note": "chat-request.js is the extracted shared preamble; the line lists adopters, no second copy of the rule"
+},
+{
+"i": 1,
+"class": "O",
+"note": "'not copied from a proposal' = provenance claim; tiers verified against executors, no second site"
+},
+{
+"i": 2,
+"class": "S",
+"note": "declares classifyLoop is imported, never re-implemented; one classifier"
+},
+{
+"i": 3,
+"class": "T",
+"note": "routes/dashboard.js:90 TERMINAL_AGENT_STATES + :237 isTerminalLoop; replicated because lib must not import routes/"
+},
+{
+"i": 4,
+"class": "S",
+"note": "one allowedToolNames set computed once, consumed in two places; no second copy of the rule"
+},
+{
+"i": 5,
+"class": "S",
+"note": "navbar consumes getViewNavLinks; declares it the single source"
+},
+{
+"i": 6,
+"class": "S",
+"note": "view-nav.js header declares itself the one list; footer copy removed"
+},
+{
+"i": 7,
+"class": "S",
+"note": "same header: drift guard because list lives in exactly one place"
+},
+{
+"i": 8,
+"class": "O",
+"note": "owner Connection record vs row.credentials: runtime data mirror of a token, not a code twin"
+},
+{
+"i": 9,
+"class": "O",
+"note": "'Same shape as lib/observer-sweep.js' is a structural analogy"
+},
+{
+"i": 10,
+"class": "S",
+"note": "explains why a shared module exists so there are not two copies"
+},
+{
+"i": 11,
+"class": "T",
+"note": "db-indexes.js:265-289 keySpecs vs .sort() in proxy-events.js:556, llm-call-log.js:109, prompt-trace-store.js:227, agent-status-store.js:191"
+},
+{
+"i": 12,
+"class": "P",
+"note": "non-lean _buildLoops output must stay byte-identical; shared helper, not a second site"
+},
+{
+"i": 13,
+"class": "S",
+"note": "dispatch-feedback-validation.js declares itself the single source; runner route reuses it"
+},
+{
+"i": 14,
+"class": "O",
+"note": "tracker repo= namespace vs runner workspaces.json basenames: two different lists by design, cross-repo; not a twin"
+},
+{
+"i": 15,
+"class": "T",
+"note": "addItem explicit document dispatch-store.js:546-552 vs archive allow-list :1195-1202; same sparse-key list hand-kept"
+},
+{
+"i": 16,
+"class": "T",
+"note": "countDistinctTasksForSession rowsById Map :1646-1650 vs countPilotEligible ids Set :1712; copied idiom, no sync mandate"
+},
+{
+"i": 17,
+"class": "H",
+"note": "feedbackTimestampMs copy in dispatch-store.js removed by LIN-1480; this is now the single definition"
+},
+{
+"i": 18,
+"class": "S",
+"note": "declares dispatch-validation.js the single source; both routers import it"
+},
+{
+"i": 19,
+"class": "S",
+"note": "SUBSCRIPTION_LEVELS declared the single source, imported by validation sites"
+},
+{
+"i": 20,
+"class": "T",
+"note": "lib/observer-sweep.js:33 LANE_KEYS identical 7-key list; restated by house convention"
+},
+{
+"i": 21,
+"class": "P",
+"note": "renderPicker call must stay byte-identical for the Projects renderer; not a second site"
+},
+{
+"i": 22,
+"class": "P",
+"note": "same byte-identical guard at the call site; passLoginOnRebind gate"
+},
+{
+"i": 23,
+"class": "S",
+"note": "buildBlockingGraph declared the single source of the edge set"
+},
+{
+"i": 24,
+"class": "S",
+"note": "resolveCommentId imported from scan-fingerprint.js, never re-implemented"
+},
+{
+"i": 25,
+"class": "O",
+"note": "lane counts copied verbatim from census at runtime (data), never from the model"
+},
+{
+"i": 26,
+"class": "T",
+"note": "lib/live-console.js:125 _epoch byte-identical 4-line function; 'Copied verbatim'"
+},
+{
+"i": 27,
+"class": "S",
+"note": "EMPTY_PROVIDER_CONTEXT declared the one constant both store and route return"
+},
+{
+"i": 28,
+"class": "T",
+"note": "docs/autopilot-kickoff.md exists at d61903f3; 'keep in sync ... must not drift'. Partner is a doc, not code (flag)"
+},
+{
+"i": 29,
+"class": "S",
+"note": "manual read from docs/autopilot-operating-manual.md at runtime; declared single source"
+},
+{
+"i": 30,
+"class": "T",
+"note": "docs/autopilot-operating-manual.md:434 has the exact heading; code constant must match by hand"
+},
+{
+"i": 31,
+"class": "S",
+"note": "restates that the manual is the rubric's single source (LIN-1732)"
+},
+{
+"i": 32,
+"class": "O",
+"note": "'SAME snapshot' = same runtime variable passed to three consumers"
+},
+{
+"i": 33,
+"class": "T",
+"note": "interface.js:475-501 method stubs mirror PROVIDER_SURFACE lists in the same file; hand-kept"
+},
+{
+"i": 34,
+"class": "S",
+"note": "displayName deliberately not duplicated; ui.displayName is the one source"
+},
+{
+"i": 35,
+"class": "T",
+"note": "WRITER_REBUILDABLE_NODE_TYPES vs types emitted by parseBlock/parseInline/parseParagraphContent in adf.js (21 emit sites)"
+},
+{
+"i": 36,
+"class": "H",
+"note": "queries were copied from inline GraphQL in routes/proxy.js; routes/ has no gql at d61903f3, source copy gone"
+},
+{
+"i": 37,
+"class": "S",
+"note": "API_ISSUE_FIELDS fragment declared the single source for read/echo shape"
+},
+{
+"i": 38,
+"class": "S",
+"note": "one self-inverse formula, two named exports; explicitly not two implementations"
+},
+{
+"i": 39,
+"class": "O",
+"note": "advice not to copy a bound from another cache; no second site"
+},
+{
+"i": 40,
+"class": "S",
+"note": "shouldUseMcpTokenField declared the single source of the branch"
+},
+{
+"i": 41,
+"class": "S",
+"note": "consolidation residue: six inline sequences now one function"
+},
+{
+"i": 42,
+"class": "O",
+"note": "grants copied verbatim at runtime between token documents (data)"
+},
+{
+"i": 43,
+"class": "O",
+"note": "runtime grant copy rule (data)"
+},
+{
+"i": 44,
+"class": "O",
+"note": "runtime lineage/workspaceId copy (data)"
+},
+{
+"i": 45,
+"class": "O",
+"note": "runtime grant copy (data)"
+},
+{
+"i": 46,
+"class": "O",
+"note": "runtime grant copy in exchange (data)"
+},
+{
+"i": 47,
+"class": "O",
+"note": "write site and read site share one in-memory map; same-object state, not a code copy"
+},
+{
+"i": 48,
+"class": "O",
+"note": "same paragraph; shared-variable argument about one map"
+},
+{
+"i": 49,
+"class": "S",
+"note": "ONE limit page shared by two call sites"
+},
+{
+"i": 50,
+"class": "O",
+"note": "'exact copy' = text wording from prStateCopy, not a code copy"
+},
+{
+"i": 51,
+"class": "S",
+"note": "exported constant shared with render-pages.js instead of a forked restatement"
+},
+{
+"i": 52,
+"class": "T",
+"note": "simple-dispatcher/executors.js:379 CLAUDE_MAPPABLE_MODEL_FAMILIES; cross-repo hand-mirrored list"
+},
+{
+"i": 53,
+"class": "T",
+"note": "public/common.js:1436 DISPATCH_MODEL_OTHER_VALUE = '__other__'"
+},
+{
+"i": 54,
+"class": "T",
+"note": "public/ship-biscuit.js:24 COLUMN_WEIGHT_FLOOR = 3"
+},
+{
+"i": 55,
+"class": "T",
+"note": "public/ship-biscuit.js:24-25 COLUMN_WEIGHT_FLOOR / DESK_ORDER identical"
+},
+{
+"i": 56,
+"class": "T",
+"note": "public/ship-biscuit.js:65 layoutIndex mirrors the server function"
+},
+{
+"i": 57,
+"class": "T",
+"note": "routes/workspace-api.js:3418 allowedHosts same 3-host set as LINEAR_IMAGE_HOSTS; both server-side"
+},
+{
+"i": 58,
+"class": "O",
+"note": "aria-expanded owned by one DOM writer; same-object state"
+},
+{
+"i": 59,
+"class": "T",
+"note": "routes/dashboard.js:281 isStandaloneSession same rule; inlined to avoid lib->routes import"
+},
+{
+"i": 60,
+"class": "S",
+"note": "parseDecision imported, not reimplemented"
+},
+{
+"i": 61,
+"class": "H",
+"note": "'there is no server-side twin ... any more' - the twin was removed"
+},
+{
+"i": 62,
+"class": "H",
+"note": "same sentence; former twin gone"
+},
+{
+"i": 63,
+"class": "T",
+"note": "public/common.js:74 window.computeFitZoom same algorithm"
+},
+{
+"i": 64,
+"class": "S",
+"note": "sse.js is the one frame writer; three copies consolidated (residue)"
+},
+{
+"i": 65,
+"class": "T",
+"note": "lib/wall-clock-summary.js:58 CI_TEST_SIGNATURE exists but regex differs; no test asserts equality (partly)"
+},
+{
+"i": 66,
+"class": "P",
+"note": "OAuth > env > free chain must stay byte-identical; not a second site"
+},
+{
+"i": 67,
+"class": "S",
+"note": "durable store declared single source; session field is a request-scoped data mirror"
+},
+{
+"i": 68,
+"class": "O",
+"note": "favourite/recent kept in sync by string value at runtime (data)"
+},
+{
+"i": 69,
+"class": "S",
+"note": "VALID_THEMES declared the single source for route + writers"
+},
+{
+"i": 70,
+"class": "S",
+"note": "workflow-config declared the single source of label names"
+},
+{
+"i": 71,
+"class": "S",
+"note": "resolveWorkspaceModel declared the single source for model selection"
+},
+{
+"i": 72,
+"class": "S",
+"note": "credentials inside each binding declared the single source"
+},
+{
+"i": 73,
+"class": "S",
+"note": "typedef restates binding credentials as single source"
+},
+{
+"i": 74,
+"class": "O",
+"note": "active binding credentials rotated in lockstep with scalar mirror on the same object (data)"
+},
+{
+"i": 75,
+"class": "S",
+"note": "binding credentials single source; scalar mirror is same-object back-compat data"
+},
+{
+"i": 76,
+"class": "S",
+"note": "getBindingsForWorkspace declared the single source"
+},
+{
+"i": 77,
+"class": "S",
+"note": "binding.credentials stays the single source; scope functions are projections"
+},
+{
+"i": 78,
+"class": "T",
+"note": "lib/components/status-pill.js:63-69 STATE_GLYPHS identical map; browser cannot import server ESM"
+},
+{
+"i": 79,
+"class": "T",
+"note": "same block: keep in sync with lib/components/*; verified status-pill.js"
+},
+{
+"i": 80,
+"class": "O",
+"note": "'copied from the pipeline poll pattern' is an idiom analogy; no shared constant/rule"
+},
+{
+"i": 81,
+"class": "T",
+"note": "lib/ship-layout.js:891 computeFitZoom same algorithm"
+},
+{
+"i": 82,
+"class": "T",
+"note": "same block; keep in sync with the pure version"
+},
+{
+"i": 83,
+"class": "T",
+"note": "lib/timeline-zoom.js:66 computeTimelineZoom"
+},
+{
+"i": 84,
+"class": "T",
+"note": "same block; lib/timeline-zoom.js:66"
+},
+{
+"i": 85,
+"class": "T",
+"note": "lib/timeline-zoom.js:101 computeTimelinePan"
+},
+{
+"i": 86,
+"class": "T",
+"note": "same block; lib/timeline-zoom.js:101"
+},
+{
+"i": 87,
+"class": "T",
+"note": "lib/timeline-zoom.js:133 timelineRunOverlapsWindow"
+},
+{
+"i": 88,
+"class": "T",
+"note": "lib/timeline-zoom.js:161 computeTimelineFit"
+},
+{
+"i": 89,
+"class": "T",
+"note": "same block; lib/timeline-zoom.js:161"
+},
+{
+"i": 90,
+"class": "T",
+"note": "lib/components/status-pill.js:71, surface.js:26, tag.js:29,48 replicated as window.* in common.js"
+},
+{
+"i": 91,
+"class": "O",
+"note": "'exact copy' = user-facing wording map, not a code copy"
+},
+{
+"i": 92,
+"class": "S",
+"note": "both surfaces call one window.renderQueueRow; 'twins' share one renderer"
+},
+{
+"i": 93,
+"class": "O",
+"note": "two Maps populated in lockstep in one function; same-object state"
+},
+{
+"i": 94,
+"class": "S",
+"note": "server value declared the single source; client set is a fallback"
+},
+{
+"i": 95,
+"class": "S",
+"note": "SESSION_PILL map declared the single source for pill/bar/dot"
+},
+{
+"i": 96,
+"class": "S",
+"note": "eyebrow count reuses the same SESSION_PILL map"
+},
+{
+"i": 97,
+"class": "T",
+"note": "lib/render-observation.js:255 'Apply 0 as proposed' SSR label vs client template"
+},
+{
+"i": 98,
+"class": "S",
+"note": "dueSelectedIds Set declared the single source over checkbox DOM"
+},
+{
+"i": 99,
+"class": "T",
+"note": "lib/render-ship-biscuit.js:34,41 COLUMN_WEIGHT_FLOOR / DESK_ORDER identical"
+},
+{
+"i": 100,
+"class": "O",
+"note": "'same pattern as public/ship.js:1493' is an analogy; cited line is seamAngles code (stale ref)"
+},
+{
+"i": 101,
+"class": "T",
+"note": "public/swim.js:2429 popover; ship.js:1692 'adapted from swim.js' - copied then diverged, no sync mandate"
+},
+{
+"i": 102,
+"class": "T",
+"note": "lib/tree.js:179 re-exports isTerminalState from providers/state-map.js:17; list lives there, partner live"
+},
+{
+"i": 103,
+"class": "T",
+"note": "lib/ship-layout.js primitives (SECTORS, rings, hash) mirrored; no build step"
+},
+{
+"i": 104,
+"class": "T",
+"note": "lib/ship-layout.js:80 computeShipReachableIds"
+},
+{
+"i": 105,
+"class": "T",
+"note": "lib/ship-layout.js:591 orderByDependency"
+},
+{
+"i": 106,
+"class": "T",
+"note": "lib/ship-layout.js:708 resolveCollisions"
+},
+{
+"i": 107,
+"class": "T",
+"note": "lib/ship-layout.js:147 computeProximityRings"
+},
+{
+"i": 108,
+"class": "T",
+"note": "lib/ship-layout.js:952 BEARING_TO_ANGLE / :1025 orientationLayout"
+},
+{
+"i": 109,
+"class": "O",
+"note": "negation: measured DOM height means there is NO constant to keep in sync"
+},
+{
+"i": 110,
+"class": "T",
+"note": "lib/swim-lanes.js:33 assignLanes; client copy because no build step"
+},
+{
+"i": 111,
+"class": "T",
+"note": "lib/providers/state-map.js:17 via lib/tree.js:179 re-export; TERMINAL_STATES list restated"
+},
+{
+"i": 112,
+"class": "T",
+"note": "lib/swim-lanes.js:260 SEGMENT_RANK same ranks; CLAUDE.md no-build-step rule cited"
+},
+{
+"i": 113,
+"class": "T",
+"note": "lib/providers/state-map.js:17 via lib/tree.js:179; third browser copy of TERMINAL_STATES"
+},
+{
+"i": 114,
+"class": "O",
+"note": "favourite/recent in sync by value at runtime (data identity)"
+},
+{
+"i": 115,
+"class": "T",
+"note": "routes/dispatch.js:1080-1090 recents POST has the identical three checks"
+},
+{
+"i": 116,
+"class": "T",
+"note": "same JSDoc; recents POST :1080-1090 verified"
+},
+{
+"i": 117,
+"class": "O",
+"note": "'same shape as' routes/proxy.js:278 proxyTokenCreationLimiter: analogy of a rate-limit config"
+},
+{
+"i": 118,
+"class": "O",
+"note": "census numbers copied verbatim from the snapshot at runtime (data)"
+},
+{
+"i": 119,
+"class": "P",
+"note": "Projects picker must stay byte-identical; opt-in flag, not a second site"
+},
+{
+"i": 120,
+"class": "T",
+"note": "routes/dispatch.js:742 `maxTasks: maxTasks ?? null` same field handling; weak single-line parity"
+},
+{
+"i": 121,
+"class": "H",
+"note": "'no longer kept in sync by inspection' - former hand-synced cap replaced by shared constant"
+},
+{
+"i": 122,
+"class": "T",
+"note": "lib/proxy-wire.js:106,137 UPLOAD_HOSTS; GitHub hosts shared by import, Linear hosts restated (partly)"
+},
+{
+"i": 123,
+"class": "P",
+"note": "non-bootstrap createToken branch must stay byte-identical; not a second site"
+},
+{
+"i": 124,
+"class": "S",
+"note": "confirm step deliberately not reimplemented; spec uses the real route"
+},
+{
+"i": 125,
+"class": "O",
+"note": "two intervalMs params both fed by one OBSERVER_SWEEP_INTERVAL_MS since b0a98664; no hand sync"
+}
+],
+"twins": [
+{
+"index": 0,
+"live": "yes",
+"partner": "routes/dashboard.js:90,237",
+"reason": "rule",
+"reasonNote": "'this module must not import from routes/ (the ticket's binding constraint against touching routes/dashboard.js)'",
+"firstSeen": "2026-07-20"
+},
+{
+"index": 1,
+"live": "no",
+"partner": "lib/connection-credential.js:613-640 (owner record vs connection.credentials row) - runtime data mirror, not a code twin",
+"reason": "compat",
+"reasonNote": "'the row's `credentials` is a mirror that \"may be stale\" (D9)'",
+"firstSeen": "2026-10-03"
+},
+{
+"index": 2,
+"live": "yes",
+"partner": "lib/proxy-events.js:556, lib/llm-call-log.js:109, lib/prompt-trace-store.js:227, lib/agent-status-store.js:191 (.sort) vs lib/db-indexes.js:265-289",
+"reason": "convenience",
+"reasonNote": "'each paged list's index key must match that list's sort key EXACTLY ... keep the two in lockstep' - no reason given for not deriving one from the other",
+"firstSeen": "2026-09-30"
+},
+{
+"index": 3,
+"live": "no",
+"partner": "simple-dispatcher admission.js (host namespace) vs lib/workspace-repos.js knownWorkspaceRepos (tracker namespace) - different lists by design",
+"reason": "semantics",
+"reasonNote": "'This checks the TRACKER's namespace ... The runner resolves against its HOST's namespace ... and nothing keeps the two in sync'",
+"firstSeen": "2026-09-22"
+},
+{
+"index": 4,
+"live": "yes",
+"partner": "lib/dispatch-store.js:546-552 (addItem explicit document)",
+"reason": "convenience",
+"reasonNote": "'the archive allow-list must stay in step with `addItem`'s explicit document' - no reason given for two literal key lists",
+"firstSeen": "2026-09-29"
+},
+{
+"index": 5,
+"live": "partly",
+"partner": "lib/dispatch-store.js:1646-1650 (rowsById Map) vs :1712 (ids Set) - same de-dupe idiom, 3 lines",
+"reason": "convenience",
+"reasonNote": "'The `_id` de-dupe (copied from `countDistinctTasksForSession`)'",
+"firstSeen": "2026-10-01"
+},
+{
+"index": 6,
+"live": "yes",
+"partner": "lib/observer-sweep.js:33 LANE_KEYS",
+"reason": "rule",
+"reasonNote": "'consumed as plain data (never imported), same discipline as the rest of this module' / 'Duplicated rather than imported - see the file header'",
+"firstSeen": "2026-08-31"
+},
+{
+"index": 7,
+"live": "yes",
+"partner": "lib/live-console.js:125 _epoch",
+"reason": "convenience",
+"reasonNote": "'Copied verbatim from lib/live-console.js's `_epoch` - the same tolerant-timestamp idiom'",
+"firstSeen": "2026-08-03"
+},
+{
+"index": 8,
+"live": "yes",
+"partner": "docs/autopilot-kickoff.md (exists at d61903f3) - partner is a doc, not code",
+"reason": "semantics",
+"reasonNote": "'That doc is the human-readable design artifact (rationale + worked snapshot example); the guide text below is the canonical runtime form. They must not drift.'",
+"firstSeen": "2026-06-06"
+},
+{
+"index": 9,
+"live": "yes",
+"partner": "docs/autopilot-operating-manual.md:434 '## The human's edge, and how to hand back'",
+"reason": "boundary",
+"reasonNote": "'must stay byte-identical to the manual' - a code anchor into a markdown file read at runtime; no reason stated",
+"firstSeen": "2026-08-22"
+},
+{
+"index": 10,
+"live": "yes",
+"partner": "lib/providers/interface.js:475-501 method stubs",
+"reason": "convenience",
+"reasonNote": "'Keep this in sync with the method declarations below' - no reason given for not deriving the list from the class",
+"firstSeen": "2026-06-07"
+},
+{
+"index": 11,
+"live": "yes",
+"partner": "lib/providers/jira/adf.js parseBlock/parseInline/parseParagraphContent emit sites (same file)",
+"reason": "convenience",
+"reasonNote": "'keep this list in lockstep with those three functions, never with `renderAdfNode`'s switch' - set hand-derived from the writer",
+"firstSeen": "2026-09-02"
+},
+{
+"index": 12,
+"live": "yes",
+"partner": "/home/user/simple-dispatcher/executors.js:379 CLAUDE_MAPPABLE_MODEL_FAMILIES (cross-repo)",
+"reason": "boundary",
+"reasonNote": "'Nothing automated catches this; the two lists are hand-mirrored across repositories'",
+"firstSeen": "2026-08-07"
+},
+{
+"index": 13,
+"live": "yes",
+"partner": "public/common.js:1436-1437",
+"reason": "boundary",
+"reasonNote": "'the two runtimes can't share a module, so the literal string is the contract'",
+"firstSeen": "2026-09-11"
+},
+{
+"index": 14,
+"live": "yes",
+"partner": "public/ship-biscuit.js:24-25",
+"reason": "boundary",
+"reasonNote": "'Kept in lockstep with the client mirror in public/ship-biscuit.js' - server/browser split, no stated rule",
+"firstSeen": "2026-07-10"
+},
+{
+"index": 15,
+"live": "yes",
+"partner": "public/ship-biscuit.js:65 layoutIndex",
+"reason": "boundary",
+"reasonNote": "'this exact logic is mirrored in public/ship-biscuit.js so the server first-paint and the client post-generate render produce the same shape'",
+"firstSeen": "2026-07-10"
+},
+{
+"index": 16,
+"live": "yes",
+"partner": "routes/workspace-api.js:3418 allowedHosts",
+"reason": "convenience",
+"reasonNote": "'Kept in sync with that endpoint's `allowedHosts`' - both server-side, no reason given for not importing",
+"firstSeen": "2026-06-25"
+},
+{
+"index": 17,
+"live": "yes",
+"partner": "routes/dashboard.js:281 isStandaloneSession",
+"reason": "rule",
+"reasonNote": "'Inlined here (rather than importing the route) to keep this module pure and dependency-light'",
+"firstSeen": "2026-10-02"
+},
+{
+"index": 18,
+"live": "yes",
+"partner": "public/common.js:74 window.computeFitZoom",
+"reason": "boundary",
+"reasonNote": "'Pure: no DOM. Mirrored in public/common.js' / 'Keep in sync with the pure version' - server/browser, no stated rule",
+"firstSeen": "2026-07-29"
+},
+{
+"index": 19,
+"live": "partly",
+"partner": "lib/wall-clock-summary.js:58 CI_TEST_SIGNATURE - different regex; no test references VERIFY_BASH",
+"reason": "rule",
+"reasonNote": "'Re-declared here rather than imported so this module stays a leaf with no coupling to the wall-clock analysis; the pattern is asserted equal in tests' (no such test found)",
+"firstSeen": "2026-07-11"
+},
+{
+"index": 20,
+"live": "no",
+"partner": "lib/workspace.js:380-405 scalar fields vs bindings[].credentials on the same object - runtime data mirror",
+"reason": "compat",
+"reasonNote": "'writes the legacy scalar mirror ... so the ~26 `accessToken` + ~31 single-arg `getWorkspaceToken` readers stay green untouched'",
+"firstSeen": "2026-06-24"
+},
+{
+"index": 21,
+"live": "yes",
+"partner": "lib/components/status-pill.js:63-69 STATE_GLYPHS, :71 renderStatusPill",
+"reason": "boundary",
+"reasonNote": "'server-only ES modules and can't be imported into the browser'",
+"firstSeen": "2026-07-01"
+},
+{
+"index": 22,
+"live": "yes",
+"partner": "lib/timeline-zoom.js:66,101,133,161",
+"reason": "boundary",
+"reasonNote": "'Mirror of lib/timeline-zoom.js ... Keep in sync with the pure version' - server/browser, no stated rule",
+"firstSeen": "2026-07-31"
+},
+{
+"index": 23,
+"live": "yes",
+"partner": "lib/components/status-pill.js:71, surface.js:26, tag.js:29,48",
+"reason": "boundary",
+"reasonNote": "'build their live content in the browser and can't import server modules'",
+"firstSeen": "2026-07-01"
+},
+{
+"index": 24,
+"live": "yes",
+"partner": "lib/render-observation.js:255",
+"reason": "boundary",
+"reasonNote": "'Must stay byte-identical to lib/render-observation.js's SSR button label template' - SSR vs client, no stated rule",
+"firstSeen": "2026-09-12"
+},
+{
+"index": 25,
+"live": "partly",
+"partner": "public/swim.js:2429-2440 showPopover vs public/ship.js:1692-1704 openPopover ('adapted from swim.js') - diverged, no sync mandate",
+"reason": "convenience",
+"reasonNote": "'Popover behaviour copied from swim.js; card markup matches swim's .swim-box'",
+"firstSeen": "2026-05-16"
+},
+{
+"index": 26,
+"live": "yes",
+"partner": "lib/providers/state-map.js:17 isTerminalState (re-exported by lib/tree.js:179); list restated in ship.js:13, swim.js:21, swipe.js:10",
+"reason": "rule",
+"reasonNote": "'mirrored from lib/tree.js (no shared import in public/)'",
+"firstSeen": "2026-05-20"
+},
+{
+"index": 27,
+"live": "yes",
+"partner": "lib/ship-layout.js:80,147,591,708,952,1025",
+"reason": "rule",
+"reasonNote": "'inlined here so the page has no build step'",
+"firstSeen": "2026-05-16"
+},
+{
+"index": 28,
+"live": "yes",
+"partner": "lib/swim-lanes.js:33 assignLanes, :260 SEGMENT_RANK",
+"reason": "rule",
+"reasonNote": "'duplicated because the `no build step` constraint (CLAUDE.md) prevents importing from lib/'",
+"firstSeen": "2026-03-16"
+},
+{
+"index": 29,
+"live": "yes",
+"partner": "routes/dispatch.js:1080-1090 (recents POST)",
+"reason": "convenience",
+"reasonNote": "'Validation is copied verbatim from the recents POST so a favourite and its recent counterpart accept/reject the same strings'",
+"firstSeen": "2026-07-04"
+},
+{
+"index": 30,
+"live": "yes",
+"partner": "routes/dispatch.js:742 `maxTasks: maxTasks ?? null` (single-line field parity)",
+"reason": "convenience",
+"reasonNote": "'parity with routes/dispatch.js - absent/null stores as unbounded' - no reason given",
+"firstSeen": "2026-09-22"
+},
+{
+"index": 31,
+"live": "partly",
+"partner": "lib/proxy-wire.js:106 LINEAR_UPLOAD_HOSTS / :137 UPLOAD_HOSTS - GitHub hosts shared by import, Linear hosts restated",
+"reason": "semantics",
+"reasonNote": "'The GitHub asset hosts are sourced from the SAME exported set ... `linear.app` stays relay-only (it is an SSRF allow, not a discovery upload host)'",
+"firstSeen": "2026-09-04"
+},
+{
+"index": 32,
+"live": "no",
+"partner": "server.js:742 single OBSERVER_SWEEP_INTERVAL_MS feeds both intervalMs params (:751, :759) since b0a98664",
+"reason": "unclear",
+"reasonNote": "'Both `intervalMs` constants below MUST stay the same value' - but there is one constant, not two",
+"firstSeen": "2026-08-16"
+}
+]
+}

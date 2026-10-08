@@ -1,0 +1,2319 @@
+{
+ "about": "Hand classifications behind docs/papers/harbour/coherence-as-it-grows.md, at d61903f3 (2026-10-07). One reader (the author), classes fixed before reading.",
+ "admissions": {
+  "classes": {
+   "T": "live twin: a second site holding the same rule, list, constant or algorithm that the comment says must be kept in sync by hand",
+   "S": "single-source claim: the comment declares this site the one authority (often the residue of a consolidation)",
+   "H": "historical: refers to a duplicate that no longer exists",
+   "P": "preservation: must stay byte-identical across a change; not a second site",
+   "O": "other: runtime data copying, an analogy (same shape as), or same-object state"
+  },
+  "hits": [
+   {
+    "i": 0,
+    "file": "lib/chat-request.js",
+    "line": 8,
+    "area": "chat + LLM calls",
+    "text": "* `routes/flight-companion.js` (all three sites), `routes/next-run.js`,",
+    "class": "S",
+    "introduced": "d3d89f36 2026-09-22 LIN-2978: rewrite lib/chat-request.js's header comment for the post-sweep tree (step 5/6)"
+   },
+   {
+    "i": 1,
+    "file": "lib/chat-tools.js",
+    "line": 679,
+    "area": "chat + LLM calls",
+    "text": "* (not copied from a proposal):",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 2,
+    "file": "lib/chat-tools.js",
+    "line": 1051,
+    "area": "chat + LLM calls",
+    "text": "* breaks the tie. `classifyLoop` itself is never re-implemented here \u2014 this",
+    "class": "S",
+    "introduced": "66149ded 2026-09-05 LIN-2617: fleet-wide in-flight read, pending-decisions read, attention rows in the census seed (#139"
+   },
+   {
+    "i": 3,
+    "file": "lib/chat-tools.js",
+    "line": 1165,
+    "area": "chat + LLM calls",
+    "text": "// LIN-1486: loop-local mirror of routes/dashboard.js's `isTerminalLoop`",
+    "class": "T",
+    "introduced": "49e1825e 2026-07-20 LIN-1486: cover anchorless multi-loop sessions, correct isLoopTerminal comment"
+   },
+   {
+    "i": 4,
+    "file": "lib/chat-tools.js",
+    "line": 1410,
+    "area": "chat + LLM calls",
+    "text": "// in two places below: the final `tools` list, and `executeTool`'s own",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 5,
+    "file": "lib/components/navbar.js",
+    "line": 174,
+    "area": "UI (public, components)",
+    "text": "// `getViewNavLinks` single source of truth (drift guard), NOT re-implemented.",
+    "class": "S",
+    "introduced": "bdff8ebb 2026-07-04 LIN-978: shared header view switcher + footer-link hoist (#772)"
+   },
+   {
+    "i": 6,
+    "file": "lib/components/view-nav.js",
+    "line": 4,
+    "area": "UI (public, components)",
+    "text": "* The single source of truth for the cross-view navigation list \u2014 the tier/flag",
+    "class": "S",
+    "introduced": "bdff8ebb 2026-07-04 LIN-978: shared header view switcher + footer-link hoist (#772)"
+   },
+   {
+    "i": 7,
+    "file": "lib/components/view-nav.js",
+    "line": 6,
+    "area": "UI (public, components)",
+    "text": "* Extracting it here is the #1 drift guard for the header/footer split: the",
+    "class": "S",
+    "introduced": "bdff8ebb 2026-07-04 LIN-978: shared header view switcher + footer-link hoist (#772)"
+   },
+   {
+    "i": 8,
+    "file": "lib/connection-credential.js",
+    "line": 599,
+    "area": "accounts + credentials",
+    "text": "* the single source of truth: `runConnectionRefresh` CASes it first and only",
+    "class": "T",
+    "introduced": "1290ef75 2026-10-03 LIN-3278: serve the connection owner record, not the stale row mirror"
+   },
+   {
+    "i": 9,
+    "file": "lib/credential-invariant-sweep.js",
+    "line": 5,
+    "area": "accounts + credentials",
+    "text": "* Same shape as lib/observer-sweep.js (already in the codebase for a related",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 10,
+    "file": "lib/credential-state.js",
+    "line": 14,
+    "area": "accounts + credentials",
+    "text": "* resolution, and two copies of \"what does a missing token mean\" is precisely",
+    "class": "S",
+    "introduced": "96eac2b7 2026-07-26 LIN-1588: per-session credential state in Live Console and the session page (C0-C3) (#1021)"
+   },
+   {
+    "i": 11,
+    "file": "lib/db-indexes.js",
+    "line": 34,
+    "area": "other lib",
+    "text": "*   blocking sort, so keep the two in lockstep. No TTL index and no",
+    "class": "T",
+    "introduced": "5bcd09be 2026-09-30 LIN-3163: match paged-list index keys to their sort keys (post-deploy fix)"
+   },
+   {
+    "i": 12,
+    "file": "lib/digest-feedback.js",
+    "line": 21,
+    "area": "dispatch + fleet",
+    "text": "*    non-lean `_buildLoops` output must stay byte-identical whichever module",
+    "class": "S",
+    "introduced": "92ef6706 2026-09-24 LIN-3008: implement digestFeedback(doc, { now }) Phase 0 extraction (TDD green)"
+   },
+   {
+    "i": 13,
+    "file": "lib/dispatch-feedback-validation.js",
+    "line": 5,
+    "area": "dispatch + fleet",
+    "text": "* This is the single source of truth for the `message`/`url`/`urlLabel`/`kind`/",
+    "class": "S",
+    "introduced": "29ec5612 2026-09-28 LIN-3130 S2a.0 (refactor-only): extract three shared dispatch helpers"
+   },
+   {
+    "i": 14,
+    "file": "lib/dispatch-repo-guard.js",
+    "line": 21,
+    "area": "dispatch + fleet",
+    "text": "* keeps the two in sync. So the runner's own reject (admission.js) is a",
+    "class": "T",
+    "introduced": "d668a584 2026-09-22 LIN-2974: name the two repo namespaces in the dispatch contract"
+   },
+   {
+    "i": 15,
+    "file": "lib/dispatch-store.js",
+    "line": 1189,
+    "area": "dispatch + fleet",
+    "text": "// silent-drop class. Both new fields are SPARSE: copied from the source",
+    "class": "T",
+    "introduced": "581dc1bd 2026-09-29 LIN-3138 S1: store declared-record persistence, archive allow-list, secrecy, three-state lookup"
+   },
+   {
+    "i": 16,
+    "file": "lib/dispatch-store.js",
+    "line": 1688,
+    "area": "dispatch + fleet",
+    "text": "* `_id` de-dupe (copied from `countDistinctTasksForSession`) covers the other",
+    "class": "T",
+    "introduced": "2b8975c1 2026-10-01 LIN-3200: code-built file pointer at the top of the implementation prompt"
+   },
+   {
+    "i": 17,
+    "file": "lib/dispatch-terminal.js",
+    "line": 269,
+    "area": "dispatch + fleet",
+    "text": "// Formerly duplicated in lib/dispatch-store.js as `feedbackTimestampMs`",
+    "class": "H",
+    "introduced": "6b9e7f47 2026-07-20 LIN-1480: forward-only guard on the :id watch seam's lineage merge"
+   },
+   {
+    "i": 18,
+    "file": "lib/dispatch-validation.js",
+    "line": 8,
+    "area": "dispatch + fleet",
+    "text": "* accepted it as absent. This helper is the single source of truth going",
+    "class": "S",
+    "introduced": "0c4eb0a4 2026-07-06 LIN-1084: Bring harness + per-task model dispatch to Harbour (#828)"
+   },
+   {
+    "i": 19,
+    "file": "lib/dispatch-wake.js",
+    "line": 50,
+    "area": "dispatch + fleet",
+    "text": "* `terminal-only`. Single source of truth, imported by every validation/coercion",
+    "class": "S",
+    "introduced": "4d45e0ec 2026-07-02 LIN-901: subscription enum + \u00a75 bubbling matrix + kind:'wake' loop guard"
+   },
+   {
+    "i": 20,
+    "file": "lib/flight-companion-gate.js",
+    "line": 64,
+    "area": "chat + LLM calls",
+    "text": "// The 7 census lanes, restated from lib/observer-sweep.js:32's LANE_KEYS \u2014",
+    "class": "T",
+    "introduced": "884d2154 2026-08-31 LIN-2431: companion memory key + deterministic pre-call gate (#1314)"
+   },
+   {
+    "i": 21,
+    "file": "lib/github-install-flow.js",
+    "line": 197,
+    "area": "tracker providers",
+    "text": "*   (which already reads `login` too, but must stay byte-identical) \u2014 unlike",
+    "class": "P",
+    "introduced": null
+   },
+   {
+    "i": 22,
+    "file": "lib/github-install-flow.js",
+    "line": 616,
+    "area": "tracker providers",
+    "text": "// `login` too and must stay byte-identical (see the descriptor JSDoc",
+    "class": "P",
+    "introduced": null
+   },
+   {
+    "i": 23,
+    "file": "lib/graph-features.js",
+    "line": 23,
+    "area": "other lib",
+    "text": "* resolved. This is the single source of truth for the edge set, shared by",
+    "class": "S",
+    "introduced": "fb52b1ab 2026-06-12 LIN-433: frontier ranking + fact-surfacing (low-hanging fruit) (#432)"
+   },
+   {
+    "i": 24,
+    "file": "lib/harbour-comments-store.js",
+    "line": 35,
+    "area": "other lib",
+    "text": "* \u2014 imported, never re-implemented here), so \"is this comment in the ledger\"",
+    "class": "S",
+    "introduced": "550a7b45 2026-09-05 LIN-2648: comment-id projection under commentId, basis fallback, Harbour-comment ledger (#1404)"
+   },
+   {
+    "i": 25,
+    "file": "lib/observer-pass.js",
+    "line": 8,
+    "area": "dispatch + fleet",
+    "text": "* only (never numbers \u2014 lane counts are always copied verbatim from the",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 26,
+    "file": "lib/periodical-runs.js",
+    "line": 100,
+    "area": "dispatch + fleet",
+    "text": "* epoch ms number, or null when unparseable. Copied verbatim from",
+    "class": "T",
+    "introduced": "fc319a32 2026-08-03 LIN-1827: add periodical-runs fold + PERIODICAL_PROJECTION (#1061)"
+   },
+   {
+    "i": 27,
+    "file": "lib/prompt-trace-store.js",
+    "line": 60,
+    "area": "other lib",
+    "text": "* Single source of truth for \"no provider-context data\" (LIN-2357). Both this",
+    "class": "S",
+    "introduced": "bfab2f58 2026-08-29 LIN-2357: surface provider-context disclosure for prompt traces (#1288)"
+   },
+   {
+    "i": 28,
+    "file": "lib/prompts/autopilot-kickoff.js",
+    "line": 20,
+    "area": "prompt text",
+    "text": "* IMPORTANT \u2014 keep in sync with docs/autopilot-kickoff.md. That doc is the",
+    "class": "T",
+    "introduced": "1af84fd1 2026-06-06 Add Autopilot as a first-class prompt alongside foreman/mini-foreman"
+   },
+   {
+    "i": 29,
+    "file": "lib/prompts/autopilot-manual.js",
+    "line": 9,
+    "area": "prompt text",
+    "text": "* Single source of truth: docs/autopilot-operating-manual.md. This module reads",
+    "class": "S",
+    "introduced": "37e6b197 2026-06-07 Claude/project autopilot overview nop nt (#345)"
+   },
+   {
+    "i": 30,
+    "file": "lib/prompts/autopilot-manual.js",
+    "line": 56,
+    "area": "prompt text",
+    "text": "/** The anchor heading for the Principle 0 gate \u2014 must stay byte-identical to the manual. */",
+    "class": "T",
+    "introduced": "ed48f23c 2026-08-22 LIN-2197 (Phase 1): pure Principle 0 section extractor (#1171)"
+   },
+   {
+    "i": 31,
+    "file": "lib/prompts/autopilot-manual.js",
+    "line": 63,
+    "area": "prompt text",
+    "text": "* pinned the manual as the rubric's single source of truth).",
+    "class": "S",
+    "introduced": "ed48f23c 2026-08-22 LIN-2197 (Phase 1): pure Principle 0 section extractor (#1171)"
+   },
+   {
+    "i": 32,
+    "file": "lib/prompts/roadmap-orientation-template.js",
+    "line": 120,
+    "area": "prompt text",
+    "text": "*   Must be the SAME snapshot the north-star-reading layer and saveReport use",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 33,
+    "file": "lib/providers/interface.js",
+    "line": 69,
+    "area": "tracker providers",
+    "text": "* Keep this in sync with the method declarations below.",
+    "class": "T",
+    "introduced": "42b6724a 2026-06-07 LIN-330: provider interface + registry + Linear provider + lib/linear.js shim (#351)"
+   },
+   {
+    "i": 34,
+    "file": "lib/providers/interface.js",
+    "line": 274,
+    "area": "tracker providers",
+    "text": "// duplicated here \u2014 `ui.displayName` stays the single source of truth.",
+    "class": "S",
+    "introduced": "0c0f5fc8 2026-08-20 LIN-2010 Phase 1: provider identity registry \u2014 render surfaces converge on the registry (#1153)"
+   },
+   {
+    "i": 35,
+    "file": "lib/providers/jira/adf.js",
+    "line": 420,
+    "area": "tracker providers",
+    "text": "// actually EMIT; keep this list in lockstep with those three functions, never",
+    "class": "T",
+    "introduced": "33b83d5b 2026-09-02 LIN-2399: extract the Jira ADF\u2194Markdown codec into lib/providers/jira/adf.js (pure move) (#1324)"
+   },
+   {
+    "i": 36,
+    "file": "lib/providers/linear/index.js",
+    "line": 1232,
+    "area": "tracker providers",
+    "text": "// Each query/mutation below is MOVED, not invented \u2014 copied from the inline",
+    "class": "H",
+    "introduced": "9f67b1ed 2026-06-21 LIN-307: wire the Linear provider's full API surface (capability-gated)"
+   },
+   {
+    "i": 37,
+    "file": "lib/providers/linear/index.js",
+    "line": 1416,
+    "area": "tracker providers",
+    "text": "* The single source of truth for the flat issue shape the consumer proxy returns",
+    "class": "S",
+    "introduced": "99586aac 2026-06-25 LIN-589: proxy responses carry team/teamId, priorityLabel, self-verifying write echoes"
+   },
+   {
+    "i": 38,
+    "file": "lib/providers/models.js",
+    "line": 137,
+    "area": "tracker providers",
+    "text": "* exports below for read-site clarity, not two implementations. Out-of-range",
+    "class": "S",
+    "introduced": "8659f2eb 2026-08-23 LIN-2239: canonical ascending priority scale (priorityLevel), abstracted at the provider boundary (#"
+   },
+   {
+    "i": 39,
+    "file": "lib/proxy-dedupe.js",
+    "line": 115,
+    "area": "proxy",
+    "text": "* key cardinality (effectively unreachable), not copied from a smaller,",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 40,
+    "file": "lib/proxy-preamble.js",
+    "line": 16,
+    "area": "prompt text",
+    "text": "* Single source of truth for the claude-code MCP-token branch (LIN-1155).",
+    "class": "S",
+    "introduced": "71296984 2026-07-09 LIN-1155: thread the bootstrap token as a structured dispatch-item field for claude-code (#856)"
+   },
+   {
+    "i": 41,
+    "file": "lib/proxy-preamble.js",
+    "line": 589,
+    "area": "prompt text",
+    "text": "* append preamble\" sequences that previously lived at four sites in",
+    "class": "S",
+    "introduced": "c7454341 2026-07-09 LIN-1157: consolidate bootstrap-mint + proxy-context append into one function (#855)"
+   },
+   {
+    "i": 42,
+    "file": "lib/proxy-tokens.js",
+    "line": 266,
+    "area": "proxy",
+    "text": "* (owner-checked) and, from beat 3, `exchangeBootstrapToken` (verbatim copy).",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 43,
+    "file": "lib/proxy-tokens.js",
+    "line": 433,
+    "area": "proxy",
+    "text": "*  - grants are copied VERBATIM from the bootstrap and never added; any",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 44,
+    "file": "lib/proxy-tokens.js",
+    "line": 446,
+    "area": "proxy",
+    "text": "*  - lineage (`parentTokenId` = the bootstrap's id, `workspaceId` copied from",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 45,
+    "file": "lib/proxy-tokens.js",
+    "line": 463,
+    "area": "proxy",
+    "text": "* @param {Array} [options.grants] - IGNORED; grants are copied from the bootstrap only",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 46,
+    "file": "lib/proxy-tokens.js",
+    "line": 534,
+    "area": "proxy",
+    "text": "// Grants are copied verbatim; lineage is recorded uniformly. A grant-bearing",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 47,
+    "file": "lib/rejected-credentials.js",
+    "line": 88,
+    "area": "other lib",
+    "text": "* scope-keyed counter between the two sites. Fingerprint alone removes the",
+    "class": "S",
+    "introduced": "5cdf6f6b 2026-08-27 LIN-2327: escalate byte-identical Linear refresh to terminal instead of looping (#1264)"
+   },
+   {
+    "i": 48,
+    "file": "lib/rejected-credentials.js",
+    "line": 89,
+    "area": "other lib",
+    "text": "* shared variable those two sites could ever disagree about. Retention is",
+    "class": "S",
+    "introduced": "5cdf6f6b 2026-08-27 LIN-2327: escalate byte-identical Linear refresh to terminal instead of looping (#1264)"
+   },
+   {
+    "i": 49,
+    "file": "lib/render-pages.js",
+    "line": 626,
+    "area": "views + rendering",
+    "text": "* the held `mode=new` picker arm (`routes/held-connection.js`) so the two sites",
+    "class": "S",
+    "introduced": "5ddff1aa 2026-10-01 LIN-3125 Phase 3: held-connection picker, entry wiring, held new workspace, acceptance witness + e2e"
+   },
+   {
+    "i": 50,
+    "file": "lib/render-session.js",
+    "line": 661,
+    "area": "views + rendering",
+    "text": "// With a known `prState` it renders the exact copy; otherwise it renders the",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 51,
+    "file": "lib/render-settings.js",
+    "line": 36,
+    "area": "views + rendering",
+    "text": "// interstitial (lib/render-pages.js) shares this exact copy rather than a",
+    "class": "S",
+    "introduced": "2392a537 2026-08-30 LIN-2412: consent-gated, env-free unattended OpenRouter key resolution (#1307)"
+   },
+   {
+    "i": 52,
+    "file": "lib/render-settings.js",
+    "line": 119,
+    "area": "views + rendering",
+    "text": "* repositories. Update both, or the select is offering a model that cannot run. (The",
+    "class": "T",
+    "introduced": "c037859c 2026-09-11 LIN-2719: replace the datalist model picker with a real <select> on Dispatch and Settings (#1435)"
+   },
+   {
+    "i": 53,
+    "file": "lib/render-settings.js",
+    "line": 132,
+    "area": "views + rendering",
+    "text": "* requirement, not a convenience. Mirrored in public/common.js",
+    "class": "T",
+    "introduced": "c037859c 2026-09-11 LIN-2719: replace the datalist model picker with a real <select> on Dispatch and Settings (#1435)"
+   },
+   {
+    "i": 54,
+    "file": "lib/render-ship-biscuit.js",
+    "line": 31,
+    "area": "views + rendering",
+    "text": "* below it a stub drops to the lower-prominence \"In brief\" list. Kept in lockstep with",
+    "class": "T",
+    "introduced": "04dae1c7 2026-07-10 LIN-1198: Theme B \u2014 newspaper-style front page for The Ship's Biscuit"
+   },
+   {
+    "i": 55,
+    "file": "lib/render-ship-biscuit.js",
+    "line": 32,
+    "area": "views + rendering",
+    "text": "* the client mirror in public/ship-biscuit.js (COLUMN_WEIGHT_FLOOR).",
+    "class": "T",
+    "introduced": "04dae1c7 2026-07-10 LIN-1198: Theme B \u2014 newspaper-style front page for The Ship's Biscuit"
+   },
+   {
+    "i": 56,
+    "file": "lib/render-ship-biscuit.js",
+    "line": 53,
+    "area": "views + rendering",
+    "text": "* PURE and deterministic; this exact logic is mirrored in public/ship-biscuit.js so the",
+    "class": "T",
+    "introduced": "04dae1c7 2026-07-10 LIN-1198: Theme B \u2014 newspaper-style front page for The Ship's Biscuit"
+   },
+   {
+    "i": 57,
+    "file": "lib/render.js",
+    "line": 80,
+    "area": "views + rendering",
+    "text": "// Kept in sync with that endpoint's `allowedHosts` so we only route URLs the",
+    "class": "T",
+    "introduced": "3b7a805b 2026-06-25 LIN-652: capability-gated attachments gallery on task detail (issue + comment images)"
+   },
+   {
+    "i": 58,
+    "file": "lib/render.js",
+    "line": 709,
+    "area": "views + rendering",
+    "text": "// is owned by toggleItem (and applyState on load) so all input modalities stay in sync.",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 59,
+    "file": "lib/run-view.js",
+    "line": 269,
+    "area": "other lib",
+    "text": "* synthesized on its own (LIN-1194). Same rule as `routes/dashboard.js`'s",
+    "class": "T",
+    "introduced": "3a714571 2026-10-02 LIN-3250: add pure buildRunView core (steps, progress, next, tier)"
+   },
+   {
+    "i": 60,
+    "file": "lib/scan.js",
+    "line": 152,
+    "area": "other lib",
+    "text": "* `parseDecision` (the landed shape/allow-list gate, not reimplemented here)",
+    "class": "S",
+    "introduced": "e968cf3a 2026-08-22 LIN-2197 (Phase 4): scan prompt/response module + GET/POST scan + dismiss routes (#1175)"
+   },
+   {
+    "i": 61,
+    "file": "lib/ship-journey.js",
+    "line": 254,
+    "area": "views + rendering",
+    "text": "* `completedAt` directly (there is no server-side twin of that computation",
+    "class": "H",
+    "introduced": "03608ef9 2026-09-20 LIN-2956: continue the ship's walk across a north-star change instead of resetting to the berth orig"
+   },
+   {
+    "i": 62,
+    "file": "lib/ship-journey.js",
+    "line": 255,
+    "area": "views + rendering",
+    "text": "* to keep in sync with any more).",
+    "class": "H",
+    "introduced": "03608ef9 2026-09-20 LIN-2956: continue the ship's walk across a north-star change instead of resetting to the berth orig"
+   },
+   {
+    "i": 63,
+    "file": "lib/ship-layout.js",
+    "line": 879,
+    "area": "views + rendering",
+    "text": "* `minZoom`. Pure: no DOM. Mirrored in public/common.js (window.computeFitZoom).",
+    "class": "T",
+    "introduced": "d2942dbe 2026-07-29 LIN-1682: extract computeFitZoom into public/common.js (#1031)"
+   },
+   {
+    "i": 64,
+    "file": "lib/sse.js",
+    "line": 7,
+    "area": "other lib",
+    "text": "* about to add a fourth. Four copies of a wire format is how one of them",
+    "class": "S",
+    "introduced": "64433a6d 2026-09-05 LIN-2631: extract the Flight Companion turn core (#1405)"
+   },
+   {
+    "i": 65,
+    "file": "lib/transcript-spend.js",
+    "line": 38,
+    "area": "dispatch + fleet",
+    "text": "// \u2500\u2500\u2500 the CI/verify signature (kept in lockstep with wall-clock-summary.js) \u2500\u2500\u2500\u2500",
+    "class": "T",
+    "introduced": "82ae505a 2026-07-11 LIN-1235: Track B / D3 \u2014 inside-view session-spend analysis (#885)"
+   },
+   {
+    "i": 66,
+    "file": "lib/user-preferences.js",
+    "line": 44,
+    "area": "accounts + credentials",
+    "text": "*   `OAuth > env > free` chain must stay byte-identical for non-opt-in users).",
+    "class": "P",
+    "introduced": null
+   },
+   {
+    "i": 67,
+    "file": "lib/user-preferences.js",
+    "line": 151,
+    "area": "accounts + credentials",
+    "text": "* This is the single source of truth for a user's OpenRouter connection",
+    "class": "S",
+    "introduced": "8bc48b81 2026-06-15 LIN-498: make OpenRouter connection survive Linear re-auth (durable per-user key) (#473)"
+   },
+   {
+    "i": 68,
+    "file": "lib/user-preferences.js",
+    "line": 281,
+    "area": "accounts + credentials",
+    "text": "* favourite stays in sync by value with its recent counterpart.",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 69,
+    "file": "lib/user-preferences.js",
+    "line": 434,
+    "area": "accounts + credentials",
+    "text": "* The accepted theme values. The single source of truth shared by the route",
+    "class": "S",
+    "introduced": "88c278ee 2026-06-30 LIN-785: Theme S1 \u2014 token layer, theming mechanism, typography, a11y/motion, global toggle"
+   },
+   {
+    "i": 70,
+    "file": "lib/workflow-config.js",
+    "line": 5,
+    "area": "other lib",
+    "text": "* This module serves as the single source of truth for all label names",
+    "class": "S",
+    "introduced": "6124be26 2026-01-19 Implement configurable in-X workflow labels (LIN-67)"
+   },
+   {
+    "i": 71,
+    "file": "lib/workspace-preferences.js",
+    "line": 152,
+    "area": "accounts + credentials",
+    "text": "* Resolves the AI model for a workspace. This is the single source of truth",
+    "class": "S",
+    "introduced": "c9519c06 2026-05-26 LIN-283: add WorkspacePreferencesStore + resolveWorkspaceModel helper"
+   },
+   {
+    "i": 72,
+    "file": "lib/workspace.js",
+    "line": 49,
+    "area": "accounts + credentials",
+    "text": "* Credentials live INSIDE each binding so there is a single source of truth.",
+    "class": "S",
+    "introduced": "5ca84975 2026-06-24 LIN-562: provider-binding model + generic provider linking (keystone)"
+   },
+   {
+    "i": 73,
+    "file": "lib/workspace.js",
+    "line": 55,
+    "area": "accounts + credentials",
+    "text": "* @property {WorkspaceCredentials} credentials - The binding's own credentials (single source of truth).",
+    "class": "S",
+    "introduced": "5ca84975 2026-06-24 LIN-562: provider-binding model + generic provider linking (keystone)"
+   },
+   {
+    "i": 74,
+    "file": "lib/workspace.js",
+    "line": 391,
+    "area": "accounts + credentials",
+    "text": "// LIN-562: rotate the matching binding's credentials in lockstep with the",
+    "class": "T",
+    "introduced": "5ca84975 2026-06-24 LIN-562: provider-binding model + generic provider linking (keystone)"
+   },
+   {
+    "i": 75,
+    "file": "lib/workspace.js",
+    "line": 470,
+    "area": "accounts + credentials",
+    "text": "* single source of truth), defaults the workspace's active `provider` when",
+    "class": "T",
+    "introduced": "5ca84975 2026-06-24 LIN-562: provider-binding model + generic provider linking (keystone)"
+   },
+   {
+    "i": 76,
+    "file": "lib/workspace.js",
+    "line": 661,
+    "area": "accounts + credentials",
+    "text": "// getBindingsForWorkspace is the single source of truth the rest of the code",
+    "class": "S",
+    "introduced": "a0a16dc5 2026-06-25 LIN-634: settings provider-management section"
+   },
+   {
+    "i": 77,
+    "file": "lib/workspace.js",
+    "line": 900,
+    "area": "accounts + credentials",
+    "text": "* carry. `binding.credentials` stays the single source of truth (email/token",
+    "class": "S",
+    "introduced": "ba3bccd8 2026-08-06 LIN-1885: Jira Provider Phase 1 \u2014 read path, API-token Basic auth, settings wiring (#1076)"
+   },
+   {
+    "i": 78,
+    "file": "public/audit.js",
+    "line": 58,
+    "area": "UI (public, components)",
+    "text": "// Theme primitives (client-side mirrors of lib/components/*.js)",
+    "class": "T",
+    "introduced": "225ecc00 2026-07-01 LIN-858: Theme-migrate the audit report onto shared primitives"
+   },
+   {
+    "i": 79,
+    "file": "public/audit.js",
+    "line": 65,
+    "area": "UI (public, components)",
+    "text": "// run-status pill (LIN-786). Keep in sync with lib/components/*; /styleguide is",
+    "class": "T",
+    "introduced": "225ecc00 2026-07-01 LIN-858: Theme-migrate the audit report onto shared primitives"
+   },
+   {
+    "i": 80,
+    "file": "public/collective.js",
+    "line": 14,
+    "area": "UI (public, components)",
+    "text": "*   incrementally by Yap cursor (copied from the pipeline poll pattern)",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 81,
+    "file": "public/common.js",
+    "line": 68,
+    "area": "UI (public, components)",
+    "text": "* First-paint fit zoom (LIN-1221 F1). Mirror of lib/ship-layout.js",
+    "class": "T",
+    "introduced": "d2942dbe 2026-07-29 LIN-1682: extract computeFitZoom into public/common.js (#1031)"
+   },
+   {
+    "i": 82,
+    "file": "public/common.js",
+    "line": 71,
+    "area": "UI (public, components)",
+    "text": "* fit (maxZoom default 1). Keep in sync with the pure version.",
+    "class": "T",
+    "introduced": "d2942dbe 2026-07-29 LIN-1682: extract computeFitZoom into public/common.js (#1031)"
+   },
+   {
+    "i": 83,
+    "file": "public/common.js",
+    "line": 131,
+    "area": "UI (public, components)",
+    "text": "* Live Console timeline zoom (LIN-1743). Mirror of lib/timeline-zoom.js",
+    "class": "T",
+    "introduced": "d50839b7 2026-07-31 LIN-1743: Live Console timeline \u2014 Phase 2: zoom, pan, and gesture (#1040)"
+   },
+   {
+    "i": 84,
+    "file": "public/common.js",
+    "line": 133,
+    "area": "UI (public, components)",
+    "text": "* instant at `focalX` stationary. Keep in sync with the pure version.",
+    "class": "T",
+    "introduced": "d50839b7 2026-07-31 LIN-1743: Live Console timeline \u2014 Phase 2: zoom, pan, and gesture (#1040)"
+   },
+   {
+    "i": 85,
+    "file": "public/common.js",
+    "line": 154,
+    "area": "UI (public, components)",
+    "text": "* Live Console timeline pan (LIN-1743). Mirror of lib/timeline-zoom.js",
+    "class": "T",
+    "introduced": "d50839b7 2026-07-31 LIN-1743: Live Console timeline \u2014 Phase 2: zoom, pan, and gesture (#1040)"
+   },
+   {
+    "i": 86,
+    "file": "public/common.js",
+    "line": 156,
+    "area": "UI (public, components)",
+    "text": "* clamped to the same axis bounds computeTimelineZoom uses. Keep in sync",
+    "class": "T",
+    "introduced": "d50839b7 2026-07-31 LIN-1743: Live Console timeline \u2014 Phase 2: zoom, pan, and gesture (#1040)"
+   },
+   {
+    "i": 87,
+    "file": "public/common.js",
+    "line": 174,
+    "area": "UI (public, components)",
+    "text": "* lib/timeline-zoom.js timelineRunOverlapsWindow \u2014 keep in sync with the pure",
+    "class": "T",
+    "introduced": "d50839b7 2026-07-31 LIN-1743: Live Console timeline \u2014 Phase 2: zoom, pan, and gesture (#1040)"
+   },
+   {
+    "i": 88,
+    "file": "public/common.js",
+    "line": 186,
+    "area": "UI (public, components)",
+    "text": "* Mirror of lib/timeline-zoom.js computeTimelineFit \u2014 a one-shot computation",
+    "class": "T",
+    "introduced": "03757f9e 2026-08-08 LIN-1928: Live Console timeline readability \u2014 fit default window + lowered zoom floor (#1086)"
+   },
+   {
+    "i": 89,
+    "file": "public/common.js",
+    "line": 187,
+    "area": "UI (public, components)",
+    "text": "* the caller latches at first paint, not re-run on every poll. Keep in sync",
+    "class": "T",
+    "introduced": "03757f9e 2026-08-08 LIN-1928: Live Console timeline readability \u2014 fit default window + lowered zoom floor (#1086)"
+   },
+   {
+    "i": 90,
+    "file": "public/common.js",
+    "line": 214,
+    "area": "UI (public, components)",
+    "text": "// them in lock-step with lib/components/*: ONE replica, many consumers, no drift.",
+    "class": "T",
+    "introduced": "1001b9d3 2026-07-01 LIN-861: Theme-migrate experimental views onto shared primitives"
+   },
+   {
+    "i": 91,
+    "file": "public/common.js",
+    "line": 2117,
+    "area": "UI (public, components)",
+    "text": "* so the caller (the runner prompt, LIN-3098) can render the exact copy from",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 92,
+    "file": "public/dispatch.js",
+    "line": 701,
+    "area": "UI (public, components)",
+    "text": "// popover (app.js) via window.renderQueueRow, so the twins stay in lockstep.",
+    "class": "S",
+    "introduced": "993f8d6a 2026-07-11 LIN-1244: richer default content in dispatch queue rows (#891)"
+   },
+   {
+    "i": 93,
+    "file": "public/observation.js",
+    "line": 242,
+    "area": "UI (public, components)",
+    "text": "// Populated/pruned in lockstep with `renderedRulingRows` (same `seen`",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 94,
+    "file": "public/observation.js",
+    "line": 311,
+    "area": "UI (public, components)",
+    "text": "// two paths can't double-apply \u2014 the server value is the single source of truth.",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 95,
+    "file": "public/observation.js",
+    "line": 324,
+    "area": "UI (public, components)",
+    "text": "// SINGLE source of truth reused by the pill, the progress bar, and the workspace",
+    "class": "S",
+    "introduced": "3750fbe2 2026-07-01 LIN-783: migrate the Observation page onto the LIN-782 theme"
+   },
+   {
+    "i": 96,
+    "file": "public/observation.js",
+    "line": 886,
+    "area": "UI (public, components)",
+    "text": "// dot use (single source of truth), so the eyebrow can never disagree with the",
+    "class": "S",
+    "introduced": "e4577fa3 2026-07-03 LIN-929: Observation Active eyebrow shows live \"\u00b7 N running\" count (design \u00a73.4/\u00a78) (#747)"
+   },
+   {
+    "i": 97,
+    "file": "public/observation.js",
+    "line": 2755,
+    "area": "UI (public, components)",
+    "text": "// Must stay byte-identical to lib/render-observation.js's SSR button",
+    "class": "T",
+    "introduced": "ffc45017 2026-09-12 LIN-2757 beats 2-5: rename Rulings tab controls to name their outcome"
+   },
+   {
+    "i": 98,
+    "file": "public/observation.js",
+    "line": 3475,
+    "area": "UI (public, components)",
+    "text": "// single source of truth, never the checkbox DOM), so a repaint restores",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 99,
+    "file": "public/ship-biscuit.js",
+    "line": 23,
+    "area": "UI (public, components)",
+    "text": "// Kept in lockstep with lib/render-ship-biscuit.js (COLUMN_WEIGHT_FLOOR / DESK_ORDER).",
+    "class": "T",
+    "introduced": "04dae1c7 2026-07-10 LIN-1198: Theme B \u2014 newspaper-style front page for The Ship's Biscuit"
+   },
+   {
+    "i": 100,
+    "file": "public/ship-journey.js",
+    "line": 377,
+    "area": "UI (public, components)",
+    "text": "// \u2014 same pattern as public/ship.js:1493's translate(...) scale(...), just",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 101,
+    "file": "public/ship.js",
+    "line": 8,
+    "area": "UI (public, components)",
+    "text": "* Popover behaviour copied from swim.js; card markup matches swim's .swim-box.",
+    "class": "T",
+    "introduced": "87c8741a 2026-05-16 Add radial Ship view prototype"
+   },
+   {
+    "i": 102,
+    "file": "public/ship.js",
+    "line": 12,
+    "area": "UI (public, components)",
+    "text": "// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).",
+    "class": "T",
+    "introduced": "769e0e05 2026-05-20 LIN-276: Treat duplicate state as canceled"
+   },
+   {
+    "i": 103,
+    "file": "public/ship.js",
+    "line": 19,
+    "area": "UI (public, components)",
+    "text": "// Layout primitives (mirror of lib/ship-layout.js)",
+    "class": "T",
+    "introduced": "87c8741a 2026-05-16 Add radial Ship view prototype"
+   },
+   {
+    "i": 104,
+    "file": "public/ship.js",
+    "line": 94,
+    "area": "UI (public, components)",
+    "text": "// the orbit at all). Mirror of lib/ship-layout.js computeShipReachableIds.",
+    "class": "T",
+    "introduced": "6d52d986 2026-08-13 LIN-1208: Hide backlog tasks in radial view (#1124)"
+   },
+   {
+    "i": 105,
+    "file": "public/ship.js",
+    "line": 331,
+    "area": "UI (public, components)",
+    "text": "// Topological order within a bucket. Mirror of lib/ship-layout.js",
+    "class": "T",
+    "introduced": "87c8741a 2026-05-16 Add radial Ship view prototype"
+   },
+   {
+    "i": 106,
+    "file": "public/ship.js",
+    "line": 468,
+    "area": "UI (public, components)",
+    "text": "// Iterative anti-collision pass. Mirror of lib/ship-layout.js",
+    "class": "T",
+    "introduced": "87c8741a 2026-05-16 Add radial Ship view prototype"
+   },
+   {
+    "i": 107,
+    "file": "public/ship.js",
+    "line": 534,
+    "area": "UI (public, components)",
+    "text": "// Mirror of lib/ship-layout.js computeProximityRings. Pipeline:",
+    "class": "T",
+    "introduced": "87c8741a 2026-05-16 Add radial Ship view prototype"
+   },
+   {
+    "i": 108,
+    "file": "public/ship.js",
+    "line": 625,
+    "area": "UI (public, components)",
+    "text": "// Orientation mode (LIN-301) \u2014 mirror of lib/ship-layout.js orientation path.",
+    "class": "T",
+    "introduced": "26201816 2026-06-07 LIN-301: Ship view orientation mode \u2014 parallel layout + angular toggle (#337)"
+   },
+   {
+    "i": 109,
+    "file": "public/ship.js",
+    "line": 919,
+    "area": "UI (public, components)",
+    "text": "// fragile CARD_SIZE.height constant to keep in sync.",
+    "class": "H",
+    "introduced": "87c8741a 2026-05-16 Add radial Ship view prototype"
+   },
+   {
+    "i": 110,
+    "file": "public/swim.js",
+    "line": 9,
+    "area": "UI (public, components)",
+    "text": "// Lane Assignment (client-side copy of lib/swim-lanes.js algorithm)",
+    "class": "T",
+    "introduced": "0a6f6cec 2026-03-16 Add swim lanes view prototype for task sequencing and parallelism"
+   },
+   {
+    "i": 111,
+    "file": "public/swim.js",
+    "line": 20,
+    "area": "UI (public, components)",
+    "text": "// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).",
+    "class": "T",
+    "introduced": "769e0e05 2026-05-20 LIN-276: Treat duplicate state as canceled"
+   },
+   {
+    "i": 112,
+    "file": "public/swim.js",
+    "line": 29,
+    "area": "UI (public, components)",
+    "text": "// (CLAUDE.md) prevents importing from lib/. Keep in sync; unifying client+server",
+    "class": "T",
+    "introduced": "5c6c2201 2026-06-07 LIN-175: extract canonical state model + state-map (Phase 1 of LIN-174) (#346)"
+   },
+   {
+    "i": 113,
+    "file": "public/swipe.js",
+    "line": 9,
+    "area": "UI (public, components)",
+    "text": "// Terminal states are non-actionable; mirrored from lib/tree.js (no shared import in public/).",
+    "class": "T",
+    "introduced": "769e0e05 2026-05-20 LIN-276: Treat duplicate state as canceled"
+   },
+   {
+    "i": 114,
+    "file": "routes/dispatch.js",
+    "line": 1126,
+    "area": "routes + server",
+    "text": "// a favourite and its recent counterpart stay in sync by value.",
+    "class": "T",
+    "introduced": "9338c323 2026-07-04 LIN-1011: favourite/save recent dispatch prompts"
+   },
+   {
+    "i": 115,
+    "file": "routes/dispatch.js",
+    "line": 1154,
+    "area": "routes + server",
+    "text": "* Validation is copied verbatim from the recents POST so a favourite and its",
+    "class": "T",
+    "introduced": "9338c323 2026-07-04 LIN-1011: favourite/save recent dispatch prompts"
+   },
+   {
+    "i": 116,
+    "file": "routes/dispatch.js",
+    "line": 1155,
+    "area": "routes + server",
+    "text": "* recent counterpart accept/reject the same strings (and stay in sync by value).",
+    "class": "T",
+    "introduced": "9338c323 2026-07-04 LIN-1011: favourite/save recent dispatch prompts"
+   },
+   {
+    "i": 117,
+    "file": "routes/email-auth.js",
+    "line": 78,
+    "area": "routes + server",
+    "text": "// Per-IP send limit, the same shape as routes/proxy.js's",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 118,
+    "file": "routes/flight-companion.js",
+    "line": 131,
+    "area": "routes + server",
+    "text": "* snapshot with no rounding/reformatting/recomputation \u2014 copied verbatim, so",
+    "class": "O",
+    "introduced": null
+   },
+   {
+    "i": 119,
+    "file": "routes/github-auth.js",
+    "line": 61,
+    "area": "routes + server",
+    "text": "// shared descriptor, since the Projects picker must stay byte-identical.",
+    "class": "P",
+    "introduced": null
+   },
+   {
+    "i": 120,
+    "file": "routes/proxy-dispatch.js",
+    "line": 645,
+    "area": "routes + server",
+    "text": "// LIN-2975: scope bound (LIN-1751), parity with routes/dispatch.js \u2014",
+    "class": "T",
+    "introduced": "061108b6 2026-09-22 LIN-2975: stop hiding sessionId/maxTasks/repo on proxy dispatch reads, accept maxTasks on proxy POST"
+   },
+   {
+    "i": 121,
+    "file": "routes/proxy-flight-companion.js",
+    "line": 44,
+    "area": "routes + server",
+    "text": "// browser's, via the shared chat-lane constant \u2014 no longer kept in sync by",
+    "class": "H",
+    "introduced": "ede3a6d4 2026-09-21 LIN-2970: one chat-request preamble \u2014 credential resolution, free-tier gate, shared caps"
+   },
+   {
+    "i": 122,
+    "file": "routes/proxy-reads.js",
+    "line": 592,
+    "area": "routes + server",
+    "text": "// capability. Kept in lockstep with discovery's UPLOAD_HOSTS (lib/proxy-",
+    "class": "T",
+    "introduced": "22f1162a 2026-09-04 LIN-2536: LIN-679 Stage 3a (PR-3a) \u2014 move group D reads to a router.use() sub-router (#1370)"
+   },
+   {
+    "i": 123,
+    "file": "routes/proxy-tokens-admin.js",
+    "line": 259,
+    "area": "routes + server",
+    "text": "// spread and must stay byte-identical, ownerless session or not.",
+    "class": "P",
+    "introduced": null
+   },
+   {
+    "i": 124,
+    "file": "routes/test.js",
+    "line": 358,
+    "area": "routes + server",
+    "text": "// confirm step itself is deliberately NOT reimplemented here \u2014 the spec",
+    "class": "S",
+    "introduced": "14281a47 2026-08-28 LIN-2285: canonicalize the merged side of an account-merge offer (#1271)"
+   },
+   {
+    "i": 125,
+    "file": "server.js",
+    "line": 738,
+    "area": "routes + server",
+    "text": "// Both `intervalMs` constants below MUST stay the same value: the round-robin",
+    "class": "T",
+    "introduced": "b0a98664 2026-08-16 LIN-2131: deterministic observer sweep \u2014 7-lane census + diagnosis (no LLM) (#1150)"
+   }
+  ],
+  "twins": [
+   {
+    "decision": "chat-tools isTerminalLoop \u2194 routes/dashboard.js",
+    "hits": [
+     3
+    ],
+    "files": [
+     "lib/chat-tools.js"
+    ],
+    "serverClient": false,
+    "reason": "layering rule",
+    "reasonNote": "a lib module must not import a route module, so the predicate is re-declared (\"loop-local mirror\")",
+    "firstDeclared": "2026-07-20",
+    "sites": 1
+   },
+   {
+    "decision": "connection record \u2194 row credentials mirror",
+    "hits": [
+     8
+    ],
+    "files": [
+     "lib/connection-credential.js"
+    ],
+    "serverClient": false,
+    "reason": "data mirror kept for compatibility",
+    "reasonNote": "the row keeps a copy of the owner record for older readers; the mirror \"may be stale\" (the LIN-3275 incident)",
+    "firstDeclared": "2026-10-03",
+    "sites": 1
+   },
+   {
+    "decision": "db index key \u2194 list sort",
+    "hits": [
+     11
+    ],
+    "files": [
+     "lib/db-indexes.js"
+    ],
+    "serverClient": false,
+    "reason": "two artefacts of one fact",
+    "reasonNote": "an index declaration and a query sort must agree; no shared representation exists",
+    "firstDeclared": "2026-09-30",
+    "sites": 1
+   },
+   {
+    "decision": "tracker repo namespace \u2194 runner host namespace",
+    "hits": [
+     14
+    ],
+    "files": [
+     "lib/dispatch-repo-guard.js"
+    ],
+    "serverClient": false,
+    "reason": "cross-system",
+    "reasonNote": "the tracker and the runner each hold a repo list; \"nothing keeps the two in sync\"",
+    "firstDeclared": "2026-09-22",
+    "sites": 1
+   },
+   {
+    "decision": "dispatch archive allow-list \u2194 addItem document",
+    "hits": [
+     15
+    ],
+    "files": [
+     "lib/dispatch-store.js"
+    ],
+    "serverClient": false,
+    "reason": "two lists in one module",
+    "reasonNote": "the archive allow-list restates the document shape addItem writes",
+    "firstDeclared": "2026-09-29",
+    "sites": 1
+   },
+   {
+    "decision": "dispatch-store _id de-dupe copied",
+    "hits": [
+     16
+    ],
+    "files": [
+     "lib/dispatch-store.js"
+    ],
+    "serverClient": false,
+    "reason": "convenience copy",
+    "reasonNote": "copied from a sibling function in the same module",
+    "firstDeclared": "2026-10-01",
+    "sites": 1
+   },
+   {
+    "decision": "LANE_KEYS restated (flight-companion-gate \u2194 observer-sweep)",
+    "hits": [
+     20
+    ],
+    "files": [
+     "lib/flight-companion-gate.js"
+    ],
+    "serverClient": false,
+    "reason": "layering rule",
+    "reasonNote": "\"consumed as plain data (never imported), same discipline as the rest of this module\"",
+    "firstDeclared": "2026-08-31",
+    "sites": 1
+   },
+   {
+    "decision": "_epoch copied (periodical-runs \u2194 live-console)",
+    "hits": [
+     26
+    ],
+    "files": [
+     "lib/periodical-runs.js"
+    ],
+    "serverClient": false,
+    "reason": "convenience copy",
+    "reasonNote": "\"Copied verbatim from lib/live-console.js\"",
+    "firstDeclared": "2026-08-03",
+    "sites": 1
+   },
+   {
+    "decision": "autopilot kickoff text \u2194 docs/autopilot-kickoff.md",
+    "hits": [
+     28
+    ],
+    "files": [
+     "lib/prompts/autopilot-kickoff.js"
+    ],
+    "serverClient": false,
+    "reason": "code and document",
+    "reasonNote": "the runtime prompt and a design document must not drift",
+    "firstDeclared": "2026-06-06",
+    "sites": 1
+   },
+   {
+    "decision": "PRINCIPLE_ZERO_HEADING \u2194 manual heading",
+    "hits": [
+     30
+    ],
+    "files": [
+     "lib/prompts/autopilot-manual.js"
+    ],
+    "serverClient": false,
+    "reason": "code and document",
+    "reasonNote": "a heading string in code must match a markdown anchor",
+    "firstDeclared": "2026-08-22",
+    "sites": 1
+   },
+   {
+    "decision": "PROVIDER_SURFACE \u2194 method declarations",
+    "hits": [
+     33
+    ],
+    "files": [
+     "lib/providers/interface.js"
+    ],
+    "serverClient": false,
+    "reason": "declared list beside the implementation",
+    "reasonNote": "a hand-kept list of methods beside the methods themselves",
+    "firstDeclared": "2026-06-07",
+    "sites": 1
+   },
+   {
+    "decision": "ADF emit list \u2194 parse functions",
+    "hits": [
+     35
+    ],
+    "files": [
+     "lib/providers/jira/adf.js"
+    ],
+    "serverClient": false,
+    "reason": "declared list beside the implementation",
+    "reasonNote": "a hand-kept list of node types beside the functions that emit them",
+    "firstDeclared": "2026-09-02",
+    "sites": 1
+   },
+   {
+    "decision": "model preset list \u2194 simple-dispatcher list",
+    "hits": [
+     52
+    ],
+    "files": [
+     "lib/render-settings.js"
+    ],
+    "serverClient": false,
+    "reason": "cross-repo",
+    "reasonNote": "\"the two lists are hand-mirrored across repositories. Update both\"",
+    "firstDeclared": "2026-09-11",
+    "sites": 1
+   },
+   {
+    "decision": "DISPATCH_MODEL_OTHER_VALUE server \u2194 client",
+    "hits": [
+     53
+    ],
+    "files": [
+     "lib/render-settings.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "\"the two runtimes can't share a module\"",
+    "firstDeclared": "2026-09-11",
+    "sites": 1
+   },
+   {
+    "decision": "ship-biscuit COLUMN_WEIGHT_FLOOR/DESK_ORDER server \u2194 client",
+    "hits": [
+     54,
+     55,
+     99
+    ],
+    "files": [
+     "lib/render-ship-biscuit.js",
+     "public/ship-biscuit.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "constants kept in lockstep with the client mirror",
+    "firstDeclared": "2026-07-10",
+    "sites": 2
+   },
+   {
+    "decision": "ship-biscuit layoutIndex server \u2194 client",
+    "hits": [
+     56
+    ],
+    "files": [
+     "lib/render-ship-biscuit.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "\"this exact logic is mirrored in public/ship-biscuit.js\"",
+    "firstDeclared": "2026-07-10",
+    "sites": 1
+   },
+   {
+    "decision": "LINEAR_IMAGE_HOSTS \u2194 relay allowedHosts",
+    "hits": [
+     57
+    ],
+    "files": [
+     "lib/render.js"
+    ],
+    "serverClient": false,
+    "reason": "convenience copy",
+    "reasonNote": "a host list kept in sync with the relay route's list by hand",
+    "firstDeclared": "2026-06-25",
+    "sites": 1
+   },
+   {
+    "decision": "isStandaloneSession run-view \u2194 dashboard",
+    "hits": [
+     59
+    ],
+    "files": [
+     "lib/run-view.js"
+    ],
+    "serverClient": false,
+    "reason": "layering rule",
+    "reasonNote": "\"Inlined here (rather than importing the route) to keep this module pure\" (2 October)",
+    "firstDeclared": "2026-10-02",
+    "sites": 1
+   },
+   {
+    "decision": "computeFitZoom server \u2194 client",
+    "hits": [
+     63,
+     81,
+     82
+    ],
+    "files": [
+     "lib/ship-layout.js",
+     "public/common.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "\"Mirrored in public/common.js\"",
+    "firstDeclared": "2026-07-29",
+    "sites": 2
+   },
+   {
+    "decision": "CI/verify signature transcript-spend \u2194 wall-clock-summary",
+    "hits": [
+     65
+    ],
+    "files": [
+     "lib/transcript-spend.js"
+    ],
+    "serverClient": false,
+    "reason": "layering rule",
+    "reasonNote": "\"Re-declared here rather than imported so this module stays a leaf\"",
+    "firstDeclared": "2026-07-11",
+    "sites": 1
+   },
+   {
+    "decision": "binding credentials \u2194 legacy scalar mirror",
+    "hits": [
+     74,
+     75
+    ],
+    "files": [
+     "lib/workspace.js"
+    ],
+    "serverClient": false,
+    "reason": "data mirror kept for compatibility",
+    "reasonNote": "the legacy scalar fields are written beside the binding for older readers (LIN-562)",
+    "firstDeclared": "2026-06-24",
+    "sites": 1
+   },
+   {
+    "decision": "theme primitives lib/components \u2194 public/audit.js",
+    "hits": [
+     78,
+     79
+    ],
+    "files": [
+     "public/audit.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "client-side mirrors of lib/components",
+    "firstDeclared": "2026-07-01",
+    "sites": 1
+   },
+   {
+    "decision": "timeline zoom/pan/overlap/fit server \u2194 client",
+    "hits": [
+     83,
+     84,
+     85,
+     86,
+     87,
+     88,
+     89
+    ],
+    "files": [
+     "public/common.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "four pure functions mirrored into public/common.js",
+    "firstDeclared": "2026-07-31",
+    "sites": 1
+   },
+   {
+    "decision": "component replicas lib/components \u2194 public/common.js",
+    "hits": [
+     90
+    ],
+    "files": [
+     "public/common.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "\"ONE replica, many consumers, no drift\"",
+    "firstDeclared": "2026-07-01",
+    "sites": 1
+   },
+   {
+    "decision": "bulk-agree button label SSR \u2194 client",
+    "hits": [
+     97
+    ],
+    "files": [
+     "public/observation.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "a label template that must match the server-rendered button",
+    "firstDeclared": "2026-09-12",
+    "sites": 1
+   },
+   {
+    "decision": "popover behaviour swim.js \u2194 ship.js",
+    "hits": [
+     101
+    ],
+    "files": [
+     "public/ship.js"
+    ],
+    "serverClient": true,
+    "reason": "convenience copy",
+    "reasonNote": "copied between two browser pages (May prototype)",
+    "firstDeclared": "2026-05-16",
+    "sites": 1
+   },
+   {
+    "decision": "TERMINAL_STATES lib/tree.js \u2194 ship.js, swim.js, swipe.js",
+    "hits": [
+     102,
+     111,
+     113
+    ],
+    "files": [
+     "public/ship.js",
+     "public/swim.js",
+     "public/swipe.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "\"mirrored from lib/tree.js (no shared import in public/)\"; four sites",
+    "firstDeclared": "2026-05-20",
+    "sites": 4
+   },
+   {
+    "decision": "ship layout primitives server \u2194 client (6 functions)",
+    "hits": [
+     103,
+     104,
+     105,
+     106,
+     107,
+     108
+    ],
+    "files": [
+     "public/ship.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "six layout functions mirrored into public/ship.js (May prototype)",
+    "firstDeclared": "2026-05-16",
+    "sites": 1
+   },
+   {
+    "decision": "swim lane assignment server \u2194 client",
+    "hits": [
+     110,
+     112
+    ],
+    "files": [
+     "public/swim.js"
+    ],
+    "serverClient": true,
+    "reason": "server and browser runtimes",
+    "reasonNote": "\"the no build step constraint (CLAUDE.md) prevents importing from lib/\"; a follow-up under LIN-174 was named and never filed",
+    "firstDeclared": "2026-03-16",
+    "sites": 1
+   },
+   {
+    "decision": "favourites validation copied from recents",
+    "hits": [
+     114,
+     115,
+     116
+    ],
+    "files": [
+     "routes/dispatch.js"
+    ],
+    "serverClient": false,
+    "reason": "convenience copy",
+    "reasonNote": "\"Validation is copied verbatim from the recents POST\"",
+    "firstDeclared": "2026-07-04",
+    "sites": 1
+   },
+   {
+    "decision": "dispatch scope bound routes/dispatch \u2194 proxy-dispatch",
+    "hits": [
+     120
+    ],
+    "files": [
+     "routes/proxy-dispatch.js"
+    ],
+    "serverClient": false,
+    "reason": "convenience copy",
+    "reasonNote": "two entrances each apply the same bound",
+    "firstDeclared": "2026-09-22",
+    "sites": 1
+   },
+   {
+    "decision": "UPLOAD_HOSTS discovery \u2194 relay guard",
+    "hits": [
+     122
+    ],
+    "files": [
+     "routes/proxy-reads.js"
+    ],
+    "serverClient": false,
+    "reason": "convenience copy",
+    "reasonNote": "\"Kept in lockstep with discovery's UPLOAD_HOSTS\"",
+    "firstDeclared": "2026-09-04",
+    "sites": 1
+   },
+   {
+    "decision": "OBSERVER_SWEEP_INTERVAL_MS constants",
+    "hits": [
+     125
+    ],
+    "files": [
+     "server.js"
+    ],
+    "serverClient": false,
+    "reason": "two lists in one module",
+    "reasonNote": "two constants that \"MUST stay the same value\"",
+    "firstDeclared": "2026-08-16",
+    "sites": 1
+   }
+  ]
+ },
+ "clonePairs": {
+  "classes": {
+   "D": "the fragment encodes a rule that could need to change (parsing, formatting, selection, validation, a page contract): a second authority for one decision",
+   "M": "mechanism scaffolding copied per module (store CRUD, token-store housekeeping, prompt-file reader): duplicated code, but no decision a later change would have to find twice",
+   "F": "a whole feature cloned from a sibling (brief/recap; create/edit forms; ship/swipe render): a second authority for the flow"
+  },
+  "minTokens": 50,
+  "pairs": [
+   {
+    "i": 0,
+    "a": "lib/brief-cache.js",
+    "aLine": 27,
+    "b": "lib/recap-cache.js",
+    "bLine": 102,
+    "lines": 18,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 1,
+    "a": "lib/brief-cache.js",
+    "aLine": 44,
+    "b": "lib/recap-cache.js",
+    "bLine": 119,
+    "lines": 11,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 2,
+    "a": "lib/brief-cache.js",
+    "aLine": 71,
+    "b": "lib/recap-cache.js",
+    "bLine": 146,
+    "lines": 9,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 3,
+    "a": "lib/brief.js",
+    "aLine": 115,
+    "b": "lib/recap.js",
+    "bLine": 123,
+    "lines": 8,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 4,
+    "a": "lib/close-out-events-store.js",
+    "aLine": 51,
+    "b": "lib/funnel-event-store.js",
+    "bLine": 49,
+    "lines": 13,
+    "tokens": 0,
+    "class": "D",
+    "note": "id validation rule (MAX_ID_LENGTH, control-char regex) restated per store"
+   },
+   {
+    "i": 5,
+    "a": "lib/close-out-events-store.js",
+    "aLine": 295,
+    "b": "lib/task-mode-store.js",
+    "bLine": 344,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 6,
+    "a": "lib/collective-characters-store.js",
+    "aLine": 108,
+    "b": "lib/dispatch-presets-store.js",
+    "bLine": 119,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 7,
+    "a": "lib/collective-characters-store.js",
+    "aLine": 125,
+    "b": "lib/dispatch-presets-store.js",
+    "bLine": 136,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 8,
+    "a": "lib/collective-characters-store.js",
+    "aLine": 248,
+    "b": "lib/dispatch-presets-store.js",
+    "bLine": 216,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 9,
+    "a": "lib/collective-presets-store.js",
+    "aLine": 129,
+    "b": "lib/dispatch-presets-store.js",
+    "bLine": 159,
+    "lines": 13,
+    "tokens": 0,
+    "class": "D",
+    "note": "maxCustom overflow rule copied between preset stores"
+   },
+   {
+    "i": 10,
+    "a": "lib/custom-prompts-store.js",
+    "aLine": 134,
+    "b": "lib/dispatch-presets-store.js",
+    "bLine": 216,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 11,
+    "a": "lib/dismissal-suggestions-store.js",
+    "aLine": 273,
+    "b": "lib/shelved-rulings-store.js",
+    "bLine": 153,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 12,
+    "a": "lib/dismissal-suggestions-store.js",
+    "aLine": 290,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 309,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 13,
+    "a": "lib/dispatch-tokens.js",
+    "aLine": 181,
+    "b": "lib/proxy-tokens.js",
+    "bLine": 855,
+    "lines": 21,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 14,
+    "a": "lib/dispatch-tokens.js",
+    "aLine": 201,
+    "b": "lib/proxy-tokens.js",
+    "bLine": 875,
+    "lines": 17,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 15,
+    "a": "lib/escalation-kpis.js",
+    "aLine": 47,
+    "b": "lib/observer-efficacy-signal.js",
+    "bLine": 162,
+    "lines": 35,
+    "tokens": 0,
+    "class": "D",
+    "note": "tolerant timestamp parse (toMs) + more, 35 lines"
+   },
+   {
+    "i": 16,
+    "a": "lib/live-console.js",
+    "aLine": 125,
+    "b": "lib/periodical-runs.js",
+    "bLine": 106,
+    "lines": 13,
+    "tokens": 0,
+    "class": "D",
+    "note": "tolerant timestamp parse (_epoch) \u2014 admitted copy"
+   },
+   {
+    "i": 17,
+    "a": "lib/llm-call-log.js",
+    "aLine": 325,
+    "b": "lib/prompt-trace-store.js",
+    "bLine": 300,
+    "lines": 16,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 18,
+    "a": "lib/llm-call-log.js",
+    "aLine": 101,
+    "b": "lib/proxy-events.js",
+    "bLine": 548,
+    "lines": 17,
+    "tokens": 0,
+    "class": "D",
+    "note": "index-backed sort contract restated"
+   },
+   {
+    "i": 19,
+    "a": "lib/milestone-funnel.js",
+    "aLine": 61,
+    "b": "lib/task-mode-store.js",
+    "bLine": 126,
+    "lines": 10,
+    "tokens": 0,
+    "class": "D",
+    "note": "tolerant timestamp parse (toMillis)"
+   },
+   {
+    "i": 20,
+    "a": "lib/observer-pass.js",
+    "aLine": 530,
+    "b": "lib/observer-sweep.js",
+    "bLine": 642,
+    "lines": 8,
+    "tokens": 0,
+    "class": "D",
+    "note": "fleet census read copied between observer pass and sweep"
+   },
+   {
+    "i": 21,
+    "a": "lib/observer-pass.js",
+    "aLine": 236,
+    "b": "lib/prompts/flight-companion-brief.js",
+    "bLine": 236,
+    "lines": 6,
+    "tokens": 0,
+    "class": "D",
+    "note": "staleness-threshold wording rule"
+   },
+   {
+    "i": 22,
+    "a": "lib/observer-pass.js",
+    "aLine": 99,
+    "b": "lib/prompts/ship-biscuit-editor.js",
+    "bLine": 101,
+    "lines": 36,
+    "tokens": 0,
+    "class": "D",
+    "note": "model JSON reply parse with fence stripping, 36 lines"
+   },
+   {
+    "i": 23,
+    "a": "lib/prompts/passage-planner-kickoff.js",
+    "aLine": 42,
+    "b": "lib/prompts/worker-lane-kickoff.js",
+    "bLine": 46,
+    "lines": 11,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 24,
+    "a": "lib/prompts/passage-runner-kickoff.js",
+    "aLine": 40,
+    "b": "lib/prompts/worker-lane-kickoff.js",
+    "bLine": 46,
+    "lines": 11,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 25,
+    "a": "lib/prompts/roadmap-digest-template.js",
+    "aLine": 135,
+    "b": "lib/prompts/roadmap-narrative-template.js",
+    "bLine": 150,
+    "lines": 8,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 26,
+    "a": "lib/proxy-events.js",
+    "aLine": 107,
+    "b": "lib/task-mode-store.js",
+    "bLine": 129,
+    "lines": 38,
+    "tokens": 0,
+    "class": "D",
+    "note": "tolerant timestamp parse (toMillis), 38 lines"
+   },
+   {
+    "i": 27,
+    "a": "lib/recap-cache.js",
+    "aLine": 21,
+    "b": "lib/run-summary-cache.js",
+    "bLine": 26,
+    "lines": 23,
+    "tokens": 0,
+    "class": "D",
+    "note": "stable JSON hashing rule for cache keys"
+   },
+   {
+    "i": 28,
+    "a": "lib/recap.js",
+    "aLine": 55,
+    "b": "lib/session-summary.js",
+    "bLine": 141,
+    "lines": 13,
+    "tokens": 0,
+    "class": "D",
+    "note": "model JSON reply parse with fence stripping"
+   },
+   {
+    "i": 29,
+    "a": "lib/render-effort-readout.js",
+    "aLine": 24,
+    "b": "lib/render-escalation-kpis.js",
+    "bLine": 21,
+    "lines": 10,
+    "tokens": 0,
+    "class": "D",
+    "note": "duration formatting rule"
+   },
+   {
+    "i": 30,
+    "a": "lib/render-ship-biscuit.js",
+    "aLine": 93,
+    "b": "public/ship-biscuit.js",
+    "bLine": 87,
+    "lines": 6,
+    "tokens": 0,
+    "class": "D",
+    "note": "ship-biscuit desk ordering server/client (admitted twin)"
+   },
+   {
+    "i": 31,
+    "a": "lib/render-ship.js",
+    "aLine": 29,
+    "b": "lib/render-swipe.js",
+    "bLine": 615,
+    "lines": 10,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 32,
+    "a": "lib/render-swim.js",
+    "aLine": 54,
+    "b": "lib/task-stack.js",
+    "bLine": 111,
+    "lines": 13,
+    "tokens": 0,
+    "class": "D",
+    "note": "in-progress issue de-dupe rule"
+   },
+   {
+    "i": 33,
+    "a": "lib/report-history-store.js",
+    "aLine": 178,
+    "b": "lib/ship-biscuit-history-store.js",
+    "bLine": 182,
+    "lines": 10,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 34,
+    "a": "lib/report-history-store.js",
+    "aLine": 196,
+    "b": "lib/ship-biscuit-history-store.js",
+    "bLine": 199,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 35,
+    "a": "lib/report-history-store.js",
+    "aLine": 217,
+    "b": "lib/ship-biscuit-history-store.js",
+    "bLine": 214,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 36,
+    "a": "lib/report-history-store.js",
+    "aLine": 276,
+    "b": "lib/ship-biscuit-history-store.js",
+    "bLine": 221,
+    "lines": 12,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 37,
+    "a": "lib/report-history-store.js",
+    "aLine": 287,
+    "b": "lib/ship-biscuit-history-store.js",
+    "bLine": 232,
+    "lines": 13,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 38,
+    "a": "lib/run-proposals-store.js",
+    "aLine": 198,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 309,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 39,
+    "a": "lib/run-summary.js",
+    "aLine": 106,
+    "b": "lib/session-summary.js",
+    "bLine": 139,
+    "lines": 29,
+    "tokens": 0,
+    "class": "D",
+    "note": "model JSON reply parse"
+   },
+   {
+    "i": 40,
+    "a": "lib/run-summary.js",
+    "aLine": 137,
+    "b": "lib/session-summary.js",
+    "bLine": 169,
+    "lines": 11,
+    "tokens": 0,
+    "class": "D",
+    "note": "string list sanitising rule"
+   },
+   {
+    "i": 41,
+    "a": "lib/saved-chat-store.js",
+    "aLine": 235,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 309,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 42,
+    "a": "lib/scan.js",
+    "aLine": 112,
+    "b": "lib/session-summary.js",
+    "bLine": 144,
+    "lines": 9,
+    "tokens": 0,
+    "class": "D",
+    "note": "model JSON reply parse"
+   },
+   {
+    "i": 43,
+    "a": "lib/shelved-rulings-store.js",
+    "aLine": 165,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 309,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 44,
+    "a": "lib/ship-biscuit-history-store.js",
+    "aLine": 226,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 309,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 45,
+    "a": "lib/task-decisions-store.js",
+    "aLine": 124,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 145,
+    "lines": 10,
+    "tokens": 0,
+    "class": "D",
+    "note": "timestamp conversion"
+   },
+   {
+    "i": 46,
+    "a": "lib/task-decisions-store.js",
+    "aLine": 489,
+    "b": "lib/task-snapshot-store.js",
+    "bLine": 309,
+    "lines": 7,
+    "tokens": 0,
+    "class": "M",
+    "note": ""
+   },
+   {
+    "i": 47,
+    "a": "public/brief.js",
+    "aLine": 100,
+    "b": "public/recap.js",
+    "bLine": 133,
+    "lines": 10,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 48,
+    "a": "public/brief.js",
+    "aLine": 109,
+    "b": "public/recap.js",
+    "bLine": 142,
+    "lines": 11,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 49,
+    "a": "public/brief.js",
+    "aLine": 119,
+    "b": "public/recap.js",
+    "bLine": 152,
+    "lines": 17,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 50,
+    "a": "public/brief.js",
+    "aLine": 143,
+    "b": "public/recap.js",
+    "bLine": 176,
+    "lines": 7,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 51,
+    "a": "public/brief.js",
+    "aLine": 150,
+    "b": "public/recap.js",
+    "bLine": 183,
+    "lines": 11,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 52,
+    "a": "public/session.js",
+    "aLine": 544,
+    "b": "public/task-page.js",
+    "bLine": 168,
+    "lines": 13,
+    "tokens": 0,
+    "class": "D",
+    "note": "elapsed-time formatting rule (client)"
+   },
+   {
+    "i": 53,
+    "a": "public/task-create.js",
+    "aLine": 37,
+    "b": "public/task-edit.js",
+    "bLine": 64,
+    "lines": 14,
+    "tokens": 0,
+    "class": "F",
+    "note": ""
+   },
+   {
+    "i": 54,
+    "a": "routes/collective.js",
+    "aLine": 126,
+    "b": "routes/task-chat.js",
+    "bLine": 276,
+    "lines": 12,
+    "tokens": 0,
+    "class": "D",
+    "note": "page-shell option contract restated per route"
+   },
+   {
+    "i": 55,
+    "a": "routes/milestone-funnel.js",
+    "aLine": 49,
+    "b": "routes/task-mode.js",
+    "bLine": 83,
+    "lines": 9,
+    "tokens": 0,
+    "class": "D",
+    "note": "auth gate + account lookup restated per route"
+   },
+   {
+    "i": 56,
+    "a": "routes/next-run.js",
+    "aLine": 185,
+    "b": "routes/task-chat.js",
+    "bLine": 446,
+    "lines": 9,
+    "tokens": 0,
+    "class": "D",
+    "note": "chat credential / test-mode resolution scaffold restated"
+   },
+   {
+    "i": 57,
+    "a": "routes/passage-planner.js",
+    "aLine": 47,
+    "b": "routes/task-chat.js",
+    "bLine": 276,
+    "lines": 12,
+    "tokens": 0,
+    "class": "D",
+    "note": "page-shell option contract restated per route"
+   },
+   {
+    "i": 58,
+    "a": "routes/ship-biscuit.js",
+    "aLine": 107,
+    "b": "routes/task-chat.js",
+    "bLine": 276,
+    "lines": 12,
+    "tokens": 0,
+    "class": "D",
+    "note": "page-shell option contract restated per route"
+   },
+   {
+    "i": 59,
+    "a": "routes/ship-biscuit.js",
+    "aLine": 137,
+    "b": "routes/task-chat.js",
+    "bLine": 447,
+    "lines": 8,
+    "tokens": 0,
+    "class": "D",
+    "note": "chat credential resolution scaffold restated"
+   },
+   {
+    "i": 60,
+    "a": "routes/task-create.js",
+    "aLine": 74,
+    "b": "routes/task-edit.js",
+    "bLine": 77,
+    "lines": 12,
+    "tokens": 0,
+    "class": "D",
+    "note": "page-shell option contract restated per route"
+   }
+  ]
+ }
+}
