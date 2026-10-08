@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isGuestTaskPath, isTokenRefreshExempt } from '../../lib/guest-task-path.js';
+import { isGuestTaskPath, isTokenRefreshExempt, isPublicLibraryPath } from '../../lib/guest-task-path.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TOKEN = 'A'.repeat(43);
@@ -37,8 +37,9 @@ describe('isTokenRefreshExempt (server.js token-refresh skip list)', () => {
     '/auth/login', '/auth/callback',
     '/logout', '/privacy', '/terms', '/styleguide', '/kpis', '/templates',
     '/t/x', `/t/${TOKEN}`, `/t/${TOKEN}/state`,
+    '/library', '/library/', '/library/ladder', '/Library/x', '/sitemap.xml', '/robots.txt',
   ];
-  const no = ['/t', '/test/x', '/s/x', '/workspace/a/', '/workspace/a/api/task/LIN-1/state', '/', ''];
+  const no = ['/t', '/test/x', '/s/x', '/workspace/a/', '/workspace/a/api/task/LIN-1/state', '/', '', '/libraryfoo', '/librarian', '/api/library'];
 
   for (const path of yes) {
     test(`exempts ${JSON.stringify(path)}`, () => assert.equal(isTokenRefreshExempt(path), true));
@@ -48,13 +49,29 @@ describe('isTokenRefreshExempt (server.js token-refresh skip list)', () => {
   }
 });
 
+// LIN-3344: the Library exemption needs its own behaviour table with
+// negatives, so a lookalike clause (`startsWith('/library')`) cannot sweep in
+// `/libraryfoo` and `/Librarian` un-noticed.
+describe('isPublicLibraryPath (Library auth exemption)', () => {
+  const yes = ['/library', '/library/', '/library/ladder', '/library/doc/ladder', '/library/a/b', '/Library/x', '/LIBRARY', '/sitemap.xml', '/robots.txt', '/Sitemap.xml'];
+  const no = ['/libraryfoo', '/librarian', '/api/library', '/library.md', '/t/x', '/templates', '/terms', '/', '', null, undefined, 42];
+
+  for (const path of yes) {
+    test(`exempts ${JSON.stringify(path)}`, () => assert.equal(isPublicLibraryPath(path), true));
+  }
+  for (const path of no) {
+    test(`does NOT exempt ${JSON.stringify(path)}`, () => assert.equal(isPublicLibraryPath(path), false));
+  }
+});
+
 describe('the two exemptions use the shared predicate (drift guard)', () => {
   test('server.js and lib/pat-session.js both call the shared predicate', () => {
     const server = readFileSync(join(__dirname, '../../server.js'), 'utf8');
     const pat = readFileSync(join(__dirname, '../../lib/pat-session.js'), 'utf8');
     assert.match(server, /isTokenRefreshExempt\(req\.path\)/, 'server.js token-refresh exemption uses the helper');
     assert.match(server, /import \{ isTokenRefreshExempt \} from '\.\/lib\/guest-task-path\.js'/, 'server imports the helper');
-    assert.match(pat, /isGuestTaskPath\(req\.path\)/, 'pat-session exemption uses the predicate');
-    assert.match(pat, /import \{ isGuestTaskPath \} from '\.\/guest-task-path\.js'/, 'pat-session imports the predicate');
+    assert.match(pat, /isGuestTaskPath\(req\.path\)/, 'pat-session exemption uses the guest predicate');
+    assert.match(pat, /isPublicLibraryPath\(req\.path\)/, 'pat-session exemption uses the library predicate');
+    assert.match(pat, /import \{ isGuestTaskPath, isPublicLibraryPath \} from '\.\/guest-task-path\.js'/, 'pat-session imports both predicates');
   });
 });

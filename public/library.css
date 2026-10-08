@@ -1,0 +1,257 @@
+/*
+ * Harbour Library (LIN-3344, Part A of LIN-3342).
+ *
+ * One calm reading column, built on the existing Phase-0 tokens so it inherits
+ * the light theme and the landing's dark remap with no new colour. No cards, no
+ * counts, no interface chrome beyond the search field. Loaded after
+ * `/style.css`; scoped under `.library` and `.library-doc` so it cannot leak
+ * into the authenticated app.
+ */
+
+.library {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-3) 0;
+  color: var(--text);
+  font-family: var(--font-content);
+  line-height: 1.65;
+}
+
+.library-intro {
+  color: var(--muted);
+  margin: 0 0 var(--space-4);
+}
+
+/* Search ------------------------------------------------------------------ */
+
+.library-search {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+}
+
+.library-search input[type='search'] {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-content);
+  font-size: 1em;
+}
+
+.library-search input[type='search']:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.library-search button {
+  padding: var(--space-2) var(--space-4);
+  color: var(--bg);
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-content);
+  font-size: 1em;
+  cursor: pointer;
+}
+
+/* Index sections ---------------------------------------------------------- */
+
+.library-section {
+  margin: 0 0 var(--space-5);
+}
+
+.library-section h2 {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.library-start,
+.library-list,
+.library-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.library-start__item,
+.library-item,
+.library-result {
+  margin: 0 0 var(--space-3);
+}
+
+.library-start__item a,
+.library-item__link,
+.library-result__link {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.library-start__item a:hover,
+.library-item__link:hover,
+.library-result__link:hover {
+  color: var(--brand-dim);
+  text-decoration: underline;
+}
+
+.library-start__note {
+  display: block;
+  color: var(--muted);
+  font-size: 0.95em;
+}
+
+.library-item__summary,
+.library-result__snippet {
+  color: var(--muted);
+  font-size: 0.95em;
+  margin: var(--space-1) 0 0;
+}
+
+.library-count,
+.library-empty {
+  color: var(--muted);
+}
+
+.library-results mark {
+  background: var(--amber);
+  color: var(--bg);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* Document page ----------------------------------------------------------- */
+
+.library-doc__header {
+  text-align: left;
+  margin: 0 0 var(--space-5);
+}
+
+.library-doc__header h1 {
+  font-family: var(--font-content);
+  font-size: 2em;
+  line-height: 1.25;
+  margin: 0 0 var(--space-2);
+}
+
+.library-doc__byline {
+  color: var(--muted);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+  margin: 0;
+}
+
+.library-doc__body {
+  font-size: 1.05em;
+}
+
+.library-doc__body h2,
+.library-doc__body h3,
+.library-doc__body h4 {
+  font-family: var(--font-content);
+  line-height: 1.3;
+  margin: var(--space-5) 0 var(--space-2);
+}
+
+.library-doc__body h2 {
+  font-size: 1.4em;
+}
+
+.library-doc__body h3 {
+  font-size: 1.2em;
+}
+
+.library-doc__body p {
+  margin: 0 0 var(--space-3);
+}
+
+.library-doc__body a {
+  color: var(--brand-dim);
+}
+
+.library-doc__body img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: var(--space-4) auto;
+}
+
+.library-doc__body code {
+  font-family: var(--font-structural);
+  font-size: 0.9em;
+  background: var(--card);
+  padding: 0.1em 0.3em;
+  border-radius: var(--radius-sm);
+}
+
+.library-doc__body pre {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  overflow-x: auto;
+}
+
+.library-doc__body pre code {
+  background: none;
+  padding: 0;
+}
+
+.library-doc__body blockquote {
+  margin: var(--space-4) 0;
+  padding: 0 var(--space-3);
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+
+.library-doc__body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-4) 0;
+  font-size: 0.95em;
+}
+
+.library-doc__body th,
+.library-doc__body td {
+  border: 1px solid var(--line);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+
+.library-doc__body hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: var(--space-5) 0;
+}
+
+.library-doc__footer {
+  margin-top: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 0.95em;
+}
+
+.library-doc__footer p {
+  margin: 0 0 var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .library {
+    padding: var(--space-3) var(--space-2) 0;
+  }
+
+  .library-doc__header h1 {
+    font-size: 1.6em;
+  }
+}
