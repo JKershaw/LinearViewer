@@ -10,6 +10,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
+import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildQueuedPollWarning } from '../../lib/consumer-poll-warning.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
@@ -114,5 +115,46 @@ describe('GET /api/proxy/dispatch — queued-only warning from live recency (LIN
     await dispatchQueueStore.takeItem(t._id, 'acme');
     assert.match((await get(app, `/api/proxy/dispatch/${q._id}`)).body.consumerPollWarning, /ever polled/);
     assert.equal((await get(app, `/api/proxy/dispatch/${t._id}`)).body.consumerPollWarning, null);
+  });
+});
+
+describe('GET /workspace/:urlKey/api/dispatch — dispatch-page queue list (LIN-3367)', () => {
+  function buildPageApp({ dispatchQueueStore, dispatchTokenStore }) {
+    const app = express();
+    app.use(express.json());
+    app.use(createDispatchRoutes({
+      dispatchQueueStore,
+      dispatchTokenStore,
+      workspaceFromUrl: (req, res, next) => {
+        req.workspace = { urlKey: req.params.urlKey };
+        req.session = { linearUserId: 'u1' };
+        next();
+      },
+      userPreferencesStore: {},
+      harbourFeedbackTokenStore: null
+    }));
+    return app;
+  }
+  const getPage = (app) => get(app, '/workspace/acme/api/dispatch');
+
+  test('a queued row stamped null is silent once a consumer has polled (live recency, not the stamp)', async () => {
+    const dispatchQueueStore = newStore();
+    const tokens = tokenStore(new Date().toISOString());
+    const app = buildPageApp({ dispatchQueueStore, dispatchTokenStore: tokens });
+    const a = await dispatchQueueStore.addItem('acme', {
+      prompt: 'p', kind: 'implementation', issueIdentifier: 'LIN-1', consumerLastSeenAt: null
+    });
+    const res = await getPage(app);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.items.find(i => i._id === a._id || i.id === a._id).consumerPollWarning, null);
+    assert.equal(tokens.calls.n, 1, 'live recency must be read once per list request, not per row');
+  });
+
+  test('a queued row warns when no consumer has ever polled', async () => {
+    const dispatchQueueStore = newStore();
+    const app = buildPageApp({ dispatchQueueStore, dispatchTokenStore: tokenStore(null) });
+    const a = await dispatchQueueStore.addItem('acme', { prompt: 'p', kind: 'implementation', issueIdentifier: 'LIN-1' });
+    const res = await getPage(app);
+    assert.match(res.body.items.find(i => i._id === a._id || i.id === a._id).consumerPollWarning, /ever polled/);
   });
 });

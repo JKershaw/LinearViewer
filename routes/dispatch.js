@@ -957,15 +957,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     try {
       const items = await dispatchQueueStore.listItems(workspace.urlKey);
       // Consumer poll-recency warning (LIN-2885), derived fresh against the
-      // current clock from each item's own enqueue-time stamp — same pure
-      // function the proxy watch/list endpoints use — so the dispatch page's
-      // queue list and the nav-badge popover (both rendered off this response
-      // via window.renderQueueRow) can show "no runner has polled..." on a
-      // stale queued row without duplicating the threshold logic client-side.
-      // LIN-3367: warning from the LIVE poll recency (read once per request, not
-      // per row), queued rows only. This collection is the queue itself, so
-      // every row here is queued — the status gate is a no-op; it is routed
-      // through the shared helper so the rule lives in one place.
+      // current clock from the LIVE poll recency (LIN-3367: read once per
+      // request, not per row; queued rows only) — same helper the proxy
+      // watch/list endpoints use — so the dispatch page's queue list and the
+      // nav-badge popover (both rendered off this response via
+      // window.renderQueueRow) can show "no runner has polled..." on a stale
+      // queued row without duplicating the threshold logic client-side. This
+      // collection is the queue itself, so every row here is queued and the
+      // status gate is a no-op; it is routed through the shared helper so the
+      // rule lives in one place.
       const liveLastSeenAt = items.length
         ? await getConsumerLastSeenAt(dispatchTokenStore, workspace.urlKey, proxyTokenStore)
         : null;

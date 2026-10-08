@@ -2273,7 +2273,7 @@ Returns `201`:
 { "id": "uuid", "status": "queued", "...": "...", "consumerLastSeenAt": null, "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts." }
 ```
 
-**This does not refuse the dispatch — it still enqueues.** A runner may come up later; the warning is read-only telemetry so you can tell "queued, nothing polling yet" apart from "queued, a runner will pick this up any second." The same `consumerLastSeenAt` stamp (and a derived `consumerPollWarning`, re-evaluated against the current time) is also readable later via `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/dispatch` — see below.
+**This does not refuse the dispatch — it still enqueues.** A runner may come up later; the warning is read-only telemetry so you can tell "queued, nothing polling yet" apart from "queued, a runner will pick this up any second." The same `consumerLastSeenAt` stamp is also readable later, alongside a `consumerPollWarning` derived from live poll recency while the row is queued (LIN-3367), via `GET /api/proxy/dispatch/{id}` and `GET /api/proxy/dispatch` — see below.
 
 Returns `409` — **duplicate dispatch** (LIN-1656). A *fresh* dispatch for an `issueIdentifier` + `kind` this workspace already dispatched within the last **5 minutes** is refused, because two independent orchestrators (an autopilot run and a human on the board) can otherwise start the same step minutes apart and duplicate the work:
 
