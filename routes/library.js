@@ -56,9 +56,13 @@ export function escapeXml(value) {
 /**
  * Every canonical, query-free URL the sitemap lists. The set is derived from
  * the catalog by construction (never hand-written), so it cannot drift from the
- * routes: the two top-level public pages, every paper and listed document at
- * its one canonical path, and every Archive edition. No `?q=` URL can appear —
- * the loop never builds one.
+ * routes: the two top-level public pages, every served document at its one
+ * canonical path, and every Archive edition. No `?q=` URL can appear — the loop
+ * never builds one.
+ *
+ * The loop walks the *served* set (`catalog.docs`), not the shelves: a document
+ * unshelved by its `kind` is still reachable and stays in the sitemap, so no
+ * published URL drops out (LIN-3350).
  *
  * @param {ReturnType<import('../lib/library.js').loadLibrary>} catalog
  * @returns {{path: string, lastmod: string|null}[]}
@@ -68,7 +72,7 @@ export function sitemapEntries(catalog) {
     { path: '/', lastmod: null },
     { path: '/library', lastmod: null },
   ];
-  for (const doc of [...catalog.papers, ...catalog.listed]) {
+  for (const doc of catalog.docs) {
     // `lastmod` only when the date is a real `YYYY-MM-DD`; omit rather than invent.
     const lastmod = /^\d{4}-\d{2}-\d{2}$/.test(doc.date || '') ? doc.date : null;
     entries.push({ path: `/library/${doc.slug}`, lastmod });

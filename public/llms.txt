@@ -6,7 +6,7 @@
 
 The papers and essays behind Harbour are published unauthenticated at `/library` — a searchable index of every document, no session required.
 
-- **Index**: `/library` lists the six "Start here" items, the papers and essays, and the Archive editions
+- **Index**: `/library` lists the six "Start here" items, then the essays, the papers, and the Archive editions; a document whose kind is not `essay` or `paper` (a check, data or pre-registration) is served at its URL but not shelved
 - **Search**: `/library?q=<terms>` — server-rendered, works without JavaScript; always `X-Robots-Tag: noindex`
 - **A document**: `/library/<slug>` (a paper) or `/library/doc/<slug>` (a listed document); the wrong form 404s
 - **Plain markdown**: append `.md` to any document URL — `/library/<slug>.md` or `/library/doc/<slug>.md`

@@ -17,6 +17,11 @@
   line-height: 1.65;
 }
 
+/* A document page gets a wider frame; the text column stays 68ch below. */
+.library--doc {
+  max-width: 64rem;
+}
+
 .library-intro {
   color: var(--muted);
   margin: 0 0 var(--space-4);
@@ -118,6 +123,14 @@
   margin: var(--space-1) 0 0;
 }
 
+/* Derived per-entry cues: date · reading time · figure count (LIN-3350). */
+.library-item__meta {
+  color: var(--muted);
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  margin: var(--space-1) 0 0;
+}
+
 .library-count,
 .library-empty {
   color: var(--muted);
@@ -131,6 +144,62 @@
 }
 
 /* Document page ----------------------------------------------------------- */
+
+/* A plain panel over the landing grid, so the grid stays in the gutters and
+   never sits behind the text. `flow-root` contains the floated aside. */
+.library-doc {
+  background: var(--bg);
+  display: flow-root;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.library-doc__back {
+  max-width: 68ch;
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-structural);
+  font-size: 0.85em;
+}
+
+.library-doc__back a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.library-doc__back a:hover {
+  color: var(--brand-dim);
+  text-decoration: underline;
+}
+
+/* Further reading, floated right at desktop width; below 960px it falls back
+   under the text (see the media query at the end of the file). */
+.library-doc__aside {
+  float: right;
+  width: 15rem;
+  margin: 0 0 var(--space-4) var(--space-4);
+  padding: var(--space-3);
+  background: var(--card);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.library-doc__aside p {
+  margin: 0 0 var(--space-2);
+}
+
+.library-doc__aside p:last-child {
+  margin-bottom: 0;
+}
+
+/* The reading column stays 68ch inside the wider panel. The cap is on the
+   body's children, not the body itself, so a figure (below) can span the full
+   panel width. */
+.library-doc__header,
+.library-doc__body > * {
+  max-width: 68ch;
+}
 
 .library-doc__header {
   text-align: left;
@@ -186,6 +255,13 @@
   margin: var(--space-4) auto;
 }
 
+/* A figure spans the full panel width and clears the floated aside, so a wide
+   diagram drops below the further-reading panel instead of colliding with it. */
+.library-doc__body p:has(> img) {
+  max-width: none;
+  clear: right;
+}
+
 .library-doc__body code {
   font-family: var(--font-structural);
   font-size: 0.9em;
@@ -234,16 +310,20 @@
   margin: var(--space-5) 0;
 }
 
-.library-doc__footer {
-  margin-top: var(--space-5);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line-soft);
-  color: var(--muted);
-  font-size: 0.95em;
-}
+/* Below 960px the aside falls back under the text as a normal block. */
+@media (max-width: 960px) {
+  .library-doc {
+    display: flex;
+    flex-direction: column;
+    padding: var(--space-4) var(--space-3);
+  }
 
-.library-doc__footer p {
-  margin: 0 0 var(--space-2);
+  .library-doc__aside {
+    float: none;
+    width: auto;
+    order: 3;
+    margin: var(--space-4) 0 0;
+  }
 }
 
 @media (max-width: 640px) {
