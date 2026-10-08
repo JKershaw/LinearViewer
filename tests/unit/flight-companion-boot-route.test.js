@@ -17,8 +17,8 @@
  *   - `turnKind: 'boot'` and `followUpMode: 'propose'` are hardcoded at the
  *     call site — a body claiming otherwise is simply never read for this
  *     purpose (LIN-2432's rule, extended to a third endpoint).
- *   - The boot's own budget (`maxIterations: 5`, `maxTokens: 2500`) reaches
- *     the model call — NOT the turn route's default 1500/4.
+ *   - The boot's own budget (`maxIterations: 5`, `maxTokens: FC_MAX_TOKENS`) reaches
+ *     the model call — NOT Task Chat's default.
  *   - Free-tier `tryUse` is charged exactly like a typed turn: the SAME 429
  *     shape as `/turn`'s user-initiated branch (never auto-wake's silent 200).
  *   - The SSE frame set (`token`/`tool`/`done`/`error`) is byte-identical to
@@ -31,6 +31,7 @@ import assert from 'node:assert/strict';
 import express from 'express';
 import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';
 import { COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
+import { FC_MAX_TOKENS } from '../../lib/agent-turn.js';
 
 // Deterministic, key-sorted stringify — internal consistency only, mirrors
 // flight-companion-turn-route.test.js's own fake.
@@ -209,7 +210,7 @@ describe('Flight Companion boot endpoint (LIN-2622) — turn kind and follow-up 
 });
 
 describe('Flight Companion boot endpoint (LIN-2622) — own budget reaches the model call', () => {
-  test('maxTokens is 2500 and maxIterations is 5 — not the turn route\'s 1500/4 default', async () => {
+  test('maxTokens is FC_MAX_TOKENS and maxIterations is 5 — not the 1500 default', async () => {
     let capturedOptions = null;
     const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
     const freeTierStore = fakeFreeTierStore({ allowed: true });
@@ -222,7 +223,7 @@ describe('Flight Companion boot endpoint (LIN-2622) — own budget reaches the m
     const { status } = await post(app, '/workspace/acme/api/flight-companion/boot', {});
     assert.strictEqual(status, 200);
     assert.ok(capturedOptions, 'expected the model to have been called');
-    assert.strictEqual(capturedOptions.maxTokens, 2500);
+    assert.strictEqual(capturedOptions.maxTokens, FC_MAX_TOKENS);
     if ('maxIterations' in capturedOptions) {
       assert.strictEqual(capturedOptions.maxIterations, 5);
     }

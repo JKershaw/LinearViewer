@@ -98,7 +98,7 @@ import { sendSSE } from '../lib/sse.js';
 // LIN-2631: the turn itself lives in lib/ now, so the proxy endpoint, the boot
 // turn, the playbook memory and the scheduler tick can each run one without
 // pretending to be an Express handler. This route is the browser's adapter.
-import { runAgentTurn } from '../lib/agent-turn.js';
+import { runAgentTurn, FC_MAX_TOKENS } from '../lib/agent-turn.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 
 const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
@@ -668,6 +668,7 @@ export function createFlightCompanionRoutes({
         },
         signal: clientAbort.signal,
         isClientGone: () => clientGone,
+        budget: { maxTokens: FC_MAX_TOKENS },
         // The free-tier quota sits HERE — after the gate, before the
         // reservation write — which is the ordering LIN-2432 §A.2 makes an
         // acceptance criterion. The core owns the ordering; this route owns
@@ -762,7 +763,7 @@ export function createFlightCompanionRoutes({
   // route calls. `turnKind: 'boot'` and `followUpMode: 'propose'` are
   // HARDCODED at this call site, never read from the request body — LIN-2432's
   // "never client-asserted" rule, extended to a third endpoint. A boot's own
-  // budget (5 iterations / 2500 tokens, bigger than a typed turn's 4/1500 —
+  // budget (5 iterations / FC_MAX_TOKENS, bigger than a typed turn's 4 iterations —
   // the reference boot readout runs roughly 900 tokens) drives its own lease
   // via the same `deriveReservationLeaseMs` derivation the core's auto-wake
   // branch already uses. Free-tier `tryUse` is charged exactly like a typed
@@ -818,7 +819,7 @@ export function createFlightCompanionRoutes({
         apiKey: apiKeyToUse,
         isFreeTier,
         followUpMode: 'propose',
-        budget: { maxIterations: 5, maxTokens: 2500 },
+        budget: { maxIterations: 5, maxTokens: FC_MAX_TOKENS },
         onStreamStart: startStream,
         onEvent: (type, data) => {
           sendSSE(res, type, data);

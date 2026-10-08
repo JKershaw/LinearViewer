@@ -81,6 +81,15 @@ describe('LlmCallLogStore.record', () => {
     assert.ok(typeof doc._id === 'string' && doc._id.length > 0);
   });
 
+  test('stores maxTokens and reasoningTokens when present, null when absent (LIN-3359)', async () => {
+    await store.record({ feature: 'flight-companion', finishReason: 'length', maxTokens: 4000, reasoningTokens: 3900 });
+    await store.record({ feature: 'flight-companion' });
+    assert.strictEqual(collection._docs[0].maxTokens, 4000);
+    assert.strictEqual(collection._docs[0].reasoningTokens, 3900);
+    assert.strictEqual(collection._docs[1].maxTokens, null);
+    assert.strictEqual(collection._docs[1].reasoningTokens, null);
+  });
+
   test('coerces missing/non-numeric fields to null', async () => {
     await store.record({ feature: 'recap' });
     const doc = collection._docs[0];

@@ -30,7 +30,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { sendSSE } from '../lib/sse.js';
-import { runAgentTurn } from '../lib/agent-turn.js';
+import { runAgentTurn, FC_MAX_TOKENS } from '../lib/agent-turn.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog } from '../lib/chat-tools.js';
@@ -259,6 +259,7 @@ export function createProxyFlightCompanionRoutes({
           },
           signal: clientAbort.signal,
           isClientGone: () => clientGone,
+          budget: { maxTokens: FC_MAX_TOKENS },
           onBeforeSpend: async () => {
             if (!isFreeTier) return null;
             const check = await chargeFreeTierOrReject(req, ENDPOINT);

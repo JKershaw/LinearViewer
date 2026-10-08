@@ -78,6 +78,7 @@ import {
   buildFlightCompanionMessages, renderStaleAttentionLine, formatFossilThreshold,
 } from '../../lib/prompts/flight-companion-brief.js';
 import { COMPANION_SEED_STATE, buildCompanionSnapshot, RESERVATION_LEASE_MS, DEFAULT_COMPANION_FLOOR_MS, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../../lib/flight-companion-gate.js';
+import { FC_MAX_TOKENS } from '../../lib/agent-turn.js';
 import { ObserverStateStore } from '../../lib/observer-state-store.js';
 import { DEFAULT_MODEL, AVAILABLE_MODELS } from '../../lib/openrouter.js';
 
@@ -545,6 +546,23 @@ describe('Flight Companion turn endpoint (LIN-2435 Commit 1) — advance() tri-s
     const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
     assert.strictEqual(status, 200);
     assert.strictEqual(calls.length, 1, 'the model call must have been reached when advance() clears');
+  });
+});
+
+describe('Flight Companion turn endpoint (LIN-3359) — the sized bare cap reaches the model call', () => {
+  test('a typed turn requests maxTokens FC_MAX_TOKENS and no reasoning field', async () => {
+    let capturedOptions = null;
+    const observerStateStore = fakeObserverStateStore({ censusDoc: realCensusDoc() });
+    const freeTierStore = { async tryUse() { throw new Error('unused'); } };
+    const chatClient = {
+      async streamChat(messages, opts, onEvent) { capturedOptions = opts; onEvent('done', {}); },
+      async streamChatWithTools(messages, opts, onEvent) { capturedOptions = opts; onEvent('done', {}); },
+    };
+    const app = buildApp({ observerStateStore, freeTierStore, chatClient, session: { openRouterApiKey: 'sk-test-paid-key' } });
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {});
+    assert.strictEqual(status, 200);
+    assert.strictEqual(capturedOptions.maxTokens, FC_MAX_TOKENS);
+    assert.ok(!('reasoning' in capturedOptions), 'bare cap only — no reasoning field');
   });
 });
 
