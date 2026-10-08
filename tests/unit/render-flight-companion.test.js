@@ -125,7 +125,7 @@ describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse
   const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
 
   test('section order is Chat -> How to use -> Kickoff prompt -> observer report', () => {
-    const chatIdx = html.indexOf('>Chat<');
+    const chatIdx = html.indexOf('flight-companion-chat-section');
     const howToIdx = html.indexOf('>How to use<');
     const promptHeadingIdx = html.indexOf('>Kickoff prompt<');
     const observerIdx = html.indexOf('>Latest observer report (read-only)<');
@@ -136,9 +136,10 @@ describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse
   });
 
   test('the kickoff prompt <pre> is wrapped in a <details> disclosure rendered without `open`', () => {
-    const detailsOpenIdx = html.indexOf('<details class="disclosure"');
+    const preIdx0 = html.indexOf('id="flight-companion-prompt"');
+    const detailsOpenIdx = html.lastIndexOf('<details class="disclosure"', preIdx0);
     const detailsTagEnd = html.indexOf('>', detailsOpenIdx);
-    const detailsCloseIdx = html.indexOf('</details>');
+    const detailsCloseIdx = html.indexOf('</details>', preIdx0);
     const preIdx = html.indexOf('id="flight-companion-prompt"');
     assert.ok(detailsOpenIdx > -1 && detailsCloseIdx > -1, 'expected a <details class="disclosure"> wrapper');
     assert.ok(preIdx > detailsOpenIdx && preIdx < detailsCloseIdx, 'the prompt <pre> must render inside the <details>');
@@ -146,7 +147,7 @@ describe('renderFlightCompanionPage — LIN-2443: section order, prompt collapse
   });
 
   test('#flight-companion-copy / #flight-companion-copy-feedback render outside the <details> (LIN-3079: toggle gone)', () => {
-    const detailsOpenIdx = html.indexOf('<details class="disclosure"');
+    const detailsOpenIdx = html.lastIndexOf('<details class="disclosure"', html.indexOf('id="flight-companion-prompt"'));
     const copyIdx = html.indexOf('id="flight-companion-copy"');
     const feedbackIdx = html.indexOf('id="flight-companion-copy-feedback"');
     assert.ok(copyIdx > -1 && copyIdx < detailsOpenIdx, '#flight-companion-copy must render before the <details>');
@@ -241,7 +242,7 @@ describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
     const html = renderFlightCompanionPage({ prompt: 'kickoff', strip }, { urlKey: 'ws' });
     assert.match(html, /fc-strip-model">model: <code>openai\/gpt-5\.4-mini<\/code>/);
     assert.match(html, /fc-strip-tools">tools: on</);
-    assert.match(html, /fc-strip-checkin">last check-in: <time datetime="2026-09-05T12:00:00\.000Z">/);
+    assert.match(html, /fc-strip-checkin">last check-in: <time datetime="2026-09-05T12:00:00\.000Z" data-local-time>/);
     assert.match(html, /fc-strip-mode">mode: read-only · proposes, never acts · rung 1 of 3</);
     assert.match(html, /sweep alive · last seen/);
   });
@@ -274,7 +275,7 @@ describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
   // LIN-2621 beat 3
   test('the running "this tab so far" total mount is present, server-rendered with its TRUE initial value (a fresh tab has spent nothing)', () => {
     const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
-    assert.match(html, /<span class="fc-strip-tab-total" id="flight-companion-strip-tab-total">0 check-ins · \$0\.00 this tab<\/span>/);
+    assert.match(html, /<span class="fc-strip-tab-total" id="flight-companion-strip-tab-total" hidden>0 check-ins · \$0\.00 this tab<\/span>/);
   });
 });
 
@@ -451,5 +452,75 @@ describe('renderFlightCompanionPage — LIN-2771 beat 3: data-fc-ai-configured a
   test('omitted aiConfigured defaults to "false" — the client treats absent/anything-but-false as re-arm', () => {
     const html = renderFlightCompanionPage({}, { urlKey: 'ws' });
     assert.match(html, /<main class="flight-companion-page"[^>]*data-fc-ai-configured="false"/);
+  });
+});
+
+// LIN-3360: a calmer page shell.
+describe('renderFlightCompanionPage — LIN-3360: calmer shell', () => {
+  const strip = {
+    model: 'openai/gpt-5.4-mini', toolsOn: false, isFreeTier: true,
+    lastCheckInAt: '2026-09-05T12:00:00.000Z', sweepStatus: 'alive', sweepLastSeenAt: '2026-09-05T11:59:00.000Z',
+    mode: 'read-only · proposes, never acts · rung 1 of 3',
+  };
+  const html = renderFlightCompanionPage({ prompt: 'kickoff', strip }, { urlKey: 'ws' });
+
+  test('Settings is a closed native <details> holding the strip, picker and next check-in', () => {
+    const open = html.indexOf('<details class="disclosure fc-settings"');
+    assert.ok(open > -1);
+    assert.doesNotMatch(html.slice(open, html.indexOf('>', open) + 1), /\bopen\b/);
+    assert.match(html.slice(open), /^[^]*?<span class="disclosure__label">settings<\/span>/);
+    const close = html.indexOf('</details>', open);
+    for (const id of ['flight-companion-strip"', 'flight-companion-strip-next', 'flight-companion-model-select', 'flight-companion-model-price']) {
+      const i = html.indexOf(`id="${id}`);
+      assert.ok(i > open && i < close, `${id} must be inside the Settings fold`);
+    }
+  });
+
+  test('the tools-off warning and free-tier note sit in the notices slot, outside the fold', () => {
+    const slot = html.indexOf('id="flight-companion-strip-notices"');
+    const open = html.indexOf('<details class="disclosure fc-settings"');
+    const close = html.indexOf('</details>', open);
+    for (const id of ['flight-companion-tools-warning', 'flight-companion-freetier-note']) {
+      const i = html.indexOf(`id="${id}"`);
+      assert.ok(i > slot && i < open, `${id} must be in the notices slot above the fold`);
+      assert.ok(!(i > open && i < close));
+    }
+    const clean = renderFlightCompanionPage({ prompt: 'k', strip: { ...strip, toolsOn: true, isFreeTier: false } }, { urlKey: 'ws' });
+    assert.match(clean, /id="flight-companion-strip-notices"><\/div>/, 'slot is always emitted');
+  });
+
+  test('the tab total is a hidden sibling of the check-in line in #flight-companion-checkin-row, not nested in it', () => {
+    const row = html.indexOf('id="flight-companion-checkin-row"');
+    const checkin = html.indexOf('id="flight-companion-checkin"');
+    const total = html.indexOf('id="flight-companion-strip-tab-total"');
+    assert.ok(row > -1 && row < checkin && checkin < total);
+    assert.match(html, /id="flight-companion-checkin" aria-live="polite" hidden><\/p>\s*<span class="fc-strip-tab-total" id="flight-companion-strip-tab-total" hidden>/);
+    const settingsOpen = html.indexOf('<details class="disclosure fc-settings"');
+    assert.ok(total > html.indexOf('</details>', settingsOpen), 'total is no longer in the Settings fold');
+  });
+
+  test('no visible Chat heading, but the landmark keeps an accessible name', () => {
+    assert.doesNotMatch(html, />Chat</);
+    assert.match(html, /<section class="section section--boxed flight-companion-section flight-companion-chat-section" aria-label="Flight Companion chat">/);
+  });
+
+  test('How to use and the observer report keep their headings with closed bodies', () => {
+    for (const [heading, label] of [['How to use', 'show how to use'], ['Latest observer report (read-only)', 'show latest observer report']]) {
+      const h = html.indexOf(`>${heading}<`);
+      assert.ok(h > -1, `${heading} heading`);
+      const d = html.indexOf('<details class="disclosure">', h);
+      assert.ok(d > h && html.indexOf(`>${label}<`, d) > d);
+      assert.doesNotMatch(html.slice(d, html.indexOf('>', d) + 1), /\bopen\b/);
+    }
+  });
+
+  test('data-local-time marks exactly the four timestamps; missing values render plain unknown', () => {
+    const doc = { updatedAt: '2026-09-05T10:00:00.000Z', state: { report: { narrative: 'n', lanes: {}, censusGroundedAt: '2026-09-05T09:00:00.000Z' } } };
+    const full = renderFlightCompanionPage({ prompt: 'k', strip, observerReportDoc: doc }, { urlKey: 'ws' });
+    assert.equal((full.match(/data-local-time/g) || []).length, 4);
+    const bare = renderFlightCompanionPage({ prompt: 'k', strip: { ...strip, lastCheckInAt: null, sweepLastSeenAt: null } }, { urlKey: 'ws' });
+    assert.equal((bare.match(/data-local-time/g) || []).length, 0);
+    assert.doesNotMatch(bare, /datetime=""/);
+    assert.match(bare, /last seen unknown/);
   });
 });

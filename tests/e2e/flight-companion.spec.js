@@ -140,12 +140,11 @@ test.describe('Flight Companion Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
     });
 
-    test('section order: Chat -> How to use -> Kickoff prompt -> Latest observer report', async ({ page }) => {
+    test('section order: (untitled chat) -> How to use -> Kickoff prompt -> Latest observer report', async ({ page }) => {
       // Scoped to .flight-companion-page so this can't pick up an unrelated
       // .section-header from the nav or footer.
       const titles = await page.locator('.flight-companion-page .section-header').allTextContents();
       expect(titles.map((t) => t.trim())).toEqual([
-        'Chat',
         'How to use',
         'Kickoff prompt',
         'Latest observer report (read-only)',
@@ -160,9 +159,12 @@ test.describe('Flight Companion Page (experimental)', () => {
       await page.goto(PAGE_URL);
       await page.waitForLoadState('networkidle');
 
-      const details = page.locator('details.disclosure');
+      // LIN-3360: scoped to the kickoff section — Settings, How to use and
+      // the observer report are closed disclosures too.
+      const details = page.locator('details.disclosure', { has: page.locator('#flight-companion-prompt') });
       await expect(details).toHaveCount(1);
       expect(await details.getAttribute('open')).toBeNull();
+      await expect(page.locator('details.disclosure[open]')).toHaveCount(0);
 
       // .flight-companion-actions sits outside the <details> — a native
       // closed <details> hides its descendants, so this genuinely fails if
@@ -614,10 +616,12 @@ test.describe('Flight Companion Page (experimental)', () => {
       await page.waitForLoadState('networkidle');
 
       const tabTotal = page.locator('#flight-companion-strip-tab-total');
-      await expect(tabTotal).toHaveText('0 check-ins · $0.00 this tab');
+      // LIN-3360: hidden until the first check-in is counted.
+      await expect(tabTotal).toBeHidden();
 
       await page.clock.fastForward(30000);
 
+      await expect(tabTotal).toBeVisible();
       await expect(tabTotal).toHaveText('1 check-in · $0.0009 this tab');
       await expect(page.locator('.fc-msg-who')).toHaveCount(0);
       await expect(page.locator('.fc-msg-meta')).toHaveCount(0);
@@ -1412,6 +1416,9 @@ test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () 
     });
 
     const select = page.locator('#flight-companion-model-select');
+    // LIN-3360: the picker lives in the closed Settings fold.
+    await expect(select).toBeHidden();
+    await page.locator('details.fc-settings > summary').click();
     await expect(select).toBeVisible();
     await select.selectOption('anthropic/claude-opus-5');
 
@@ -1440,6 +1447,7 @@ test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () 
   test('choosing a model live-updates the rate card from the selected option\'s own data-pricing attribute', async ({ page }) => {
     const select = page.locator('#flight-companion-model-select');
     const priceEl = page.locator('#flight-companion-model-price');
+    await page.locator('details.fc-settings > summary').click();
 
     const selectedOption = select.locator('option[value="anthropic/claude-opus-5"]');
     const expectedPrice = await selectedOption.getAttribute('data-pricing');
@@ -1447,5 +1455,20 @@ test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () 
 
     await select.selectOption('anthropic/claude-opus-5');
     await expect(priceEl).toHaveText(expectedPrice);
+  });
+
+  test('LIN-3360: the picked model persists across a reload, and the fold is closed again afterwards', async ({ page }) => {
+    const select = page.locator('#flight-companion-model-select');
+    const fold = page.locator('details.fc-settings');
+    await expect(fold).not.toHaveAttribute('open', '');
+    await fold.locator('> summary').click();
+    await select.selectOption('anthropic/claude-opus-5');
+    await fold.locator('> summary').click();
+    await expect(fold).not.toHaveAttribute('open', '');
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(fold).not.toHaveAttribute('open', '');
+    await fold.locator('> summary').click();
+    await expect(select).toHaveValue('anthropic/claude-opus-5');
   });
 });

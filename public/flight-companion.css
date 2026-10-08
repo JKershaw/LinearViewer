@@ -422,9 +422,9 @@
  * "in viewport" underneath an opaque overlay.
  *
  * Its direct children are already in exactly the right DOM order for this
- * (lib/render-flight-companion.js's `chatBody`: the section-header, the
- * thread, the empty-state placeholder, the start button (LIN-2622), the
- * check-in status line, the re-orient button (LIN-2622), then the composer)
+ * (lib/render-flight-companion.js's `chatBody`: [LIN-3360: no visible
+ * section-header any more] the notices slot, the Settings fold, the thread, the empty-state placeholder, the start button (LIN-2622), the
+ * check-in row, the re-orient button (LIN-2622), then the composer)
  * — the thread/empty-state pair (only one is ever visible; both carry
  * `[hidden]` toggled by flight-companion.js) gets `flex: 1`, so whichever is
  * showing fills the remaining space, while chat.css's own `overflow-y: auto`
@@ -469,6 +469,13 @@
   .flight-companion-chat-section > .section-header {
     flex: 0 0 auto;
   }
+  /* LIN-3360: an open Settings fold scrolls inside a cap instead of growing
+     the column past 100dvh and pushing Start/composer out (the LIN-2715
+     failure mode). */
+  .fc-settings[open] {
+    max-height: 40dvh;
+    overflow-y: auto;
+  }
   #flight-companion-thread,
   .flight-companion-chat-empty {
     flex: 1 1 auto;
@@ -492,11 +499,46 @@
      thread — it takes its natural (wrapped) height like the section-header
      above it, never growing to fill remaining space, so it joins THIS fixed-
      height group rather than the thread's flex:1 group. */
-  #flight-companion-strip,
+  #flight-companion-strip-notices,
+  .fc-settings,
+  #flight-companion-checkin-row,
   #flight-companion-checkin,
   #flight-companion-start,
   #flight-companion-reorient,
   .fc-chat-composer {
     flex: 0 0 auto;
   }
+}
+
+/* LIN-3360: calmer shell. Notices slot (collapses when empty), the Settings
+   fold, and the check-in row that carries the tab total beside the check-in
+   line. Token-only colours; no margin on the row so it takes no height while
+   both children are hidden. */
+.fc-strip-notices:empty {
+  display: none;
+}
+.fc-strip-notices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+.fc-settings {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.fc-settings > .disclosure__summary {
+  color: var(--muted);
+}
+.fc-checkin-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+}
+.fc-checkin-row > * {
+  margin: 0;
+}
+.fc-checkin-row [hidden] {
+  display: none;
 }

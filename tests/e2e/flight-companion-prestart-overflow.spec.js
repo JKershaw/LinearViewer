@@ -266,3 +266,29 @@ test.describe('Flight Companion — pre-start mobile overflow (LIN-2715)', () =>
     });
   });
 });
+
+// LIN-3360: the Settings fold must not push Start/the composer out of the
+// viewport, closed or open (an open fold is capped and scrolls internally).
+for (const viewport of [{ width: 375, height: 812 }, { width: 1024, height: 812 }]) {
+  test.describe(`Flight Companion — Settings fold at ${viewport.width}x${viewport.height} (LIN-3360)`, () => {
+    test.use({ viewport });
+
+    for (const openFold of [false, true]) {
+      test(`Start and composer stay in the viewport and clickable with the fold ${openFold ? 'open' : 'closed'}`, async ({ page }) => {
+        await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+        await seedPlaybook(page, URL_KEY);
+        await page.goto(PAGE_URL);
+        await waitForPlaybookPainted(page);
+        if (openFold) await page.locator('details.fc-settings > summary').click();
+        await expect(page.locator('details.fc-settings')).toHaveJSProperty('open', openFold);
+
+        await page.locator('.fc-chat-composer').scrollIntoViewIfNeeded();
+        await assertControlsStayInSection(page);
+        await expect(page.locator('#flight-companion-start')).toBeInViewport();
+        await expect(page.locator('#flight-companion-send')).toBeInViewport();
+        await page.locator('#flight-companion-start').click({ trial: true, timeout: 2000 });
+        await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
+      });
+    }
+  });
+}
