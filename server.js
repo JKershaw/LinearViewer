@@ -2302,7 +2302,7 @@ app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
 app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
-// sliding 36/h GitHub budget and repo-allowlist cache. The dashboard router
+// sliding 36/h GitHub budget and PR-state cache. The dashboard router
 // below gets this instance, so the budget and the `repo#number` cache are shared.
 const prStateStore = createPrStateStore()
 

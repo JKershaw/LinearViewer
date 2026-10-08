@@ -1254,6 +1254,9 @@ export function createDispatchRoutes({
 
         // A caller that hung up before the enqueue gets nothing enqueued. Once
         // createDispatchItem starts it is never abandoned: no signal reaches it.
+        // Defensive backstop: nothing is awaited between the recommendation and
+        // here today, so a real hang-up ends in the routing catch above; kept so
+        // a future await cannot silently reopen the window (LIN-3333).
         gone.release();
         if (gone.gone) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 499, 'client closed before enqueue');

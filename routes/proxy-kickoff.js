@@ -110,10 +110,9 @@ export function createKickoffRoutes({
    *
    * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext?, sessionId?, subscription? }
    *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
-   *     done"): the issue's title is resolved for the goal line, a non-empty
-   *     `goal` is appended as additional human context (LIN-2818), and its
-   *     project `repo=` is inherited (an explicit caller `repo` wins, mirroring
-   *     /prompt).
+   *     done"): the issue's title is resolved for the goal line, and a non-empty
+   *     `goal` is appended as additional human context (LIN-2818). `repo` is the
+   *     caller's runner-folder override, stored verbatim.
    *   - issueIdentifier absent  → GENERAL run; `goal` focuses the stack walk.
    *   - mode: 'write' (default) | 'readonly'.
    *   - variant: 'standard' (default) | 'stepper' (warm beat-stepping disposition,

@@ -521,7 +521,7 @@ export function createComputeRoutes({
         }
         // recommendedAction + kind are additive (LIN-321); deferredVia + the terminal
         // identifier are additive (LIN-327): existing clients that read
-        // identifier/reasoning/prompt/truncated/repo are unaffected. `override` is
+        // identifier/reasoning/prompt/truncated are unaffected. `override` is
         // additive too and present only on the kind-override path (LIN-839), so the
         // default no-kind response stays byte-identical.
         keepalive.send(200, {
@@ -529,7 +529,6 @@ export function createComputeRoutes({
           reasoning: rec.reasoning,
           prompt: rec.prompt,
           truncated: rec.truncated,
-          repo: rec.repo,
           recommendedAction: rec.recommendedAction,
           kind: deriveDispatchKind(rec.recommendedAction),
           deferredVia,
