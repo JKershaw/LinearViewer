@@ -1105,6 +1105,8 @@ test.describe('Decisions as option buttons (LIN-2621 beat 4)', () => {
     await page.waitForLoadState('networkidle');
     await page.clock.fastForward(30000);
 
+    // LIN-3361: the decisions start folded; open the fold to reach the cards.
+    await page.locator('.fc-decisions-fold > summary').click();
     const card = page.locator('.fc-decision');
     await expect(card).toHaveCount(1);
     await expect(card.locator('.fc-decision-question')).toHaveText('Ship the fix now?');
@@ -1504,5 +1506,187 @@ test.describe('LIN-3360: server-rendered page times are rewritten to local time 
     await expect(page.locator('#lt-probe')).toHaveText('6 Oct, 10:05');
     await expect(page.locator('#lt-probe')).toHaveAttribute('title', ISO);
     await expect(page.locator('#lt-empty')).toHaveText('unknown');
+  });
+});
+
+// LIN-3361: a thread you can scan. Real DOM and real client; the turn is
+// mocked so no model is called (same discipline as the rest of this file).
+test.describe('LIN-3361: expandable grouped tool rows, folded decisions and readout, task links', () => {
+  const toolCall = (id, name, args) => ['tool', { phase: 'call', id, name, arguments: args }];
+  const toolResult = (id, name, result) => ['tool', { phase: 'result', id, name, result: JSON.stringify(result) }];
+  const bootReadout = (extra = '') => [
+    'All green: 3 lanes live. See LIN-3361 and GPT-5, UTF-8.',
+    '',
+    '---',
+    '',
+    '## The big thread',
+    '',
+    `${'The fleet is mostly about the scannable thread work. '.repeat(8)} Tracked in LIN-3361 and \`LIN-3361\` as code.`,
+    extra,
+  ].join('\n');
+
+  async function openPage(page) {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.clock.install();
+  }
+  async function tick(page) {
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.clock.fastForward(30000);
+  }
+
+  test('a tool row is closed, expands on click, and shows its arguments and result', async ({ page }) => {
+    await openPage(page);
+    await mockTurn(page, {
+      toolFrames: [
+        toolCall('a', 'list_task_sessions', { issueId: 'LIN-9' }),
+        toolResult('a', 'list_task_sessions', { sessions: [{ issueIdentifier: 'LIN-9' }] }),
+      ],
+    });
+    await tick(page);
+    const row = page.locator('.chat-tool-row');
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('summary')).toHaveText('↳ checked sessions for LIN-9');
+    await expect(row.locator('.chat-tool-args')).toBeHidden();
+    await row.locator('summary').click();
+    await expect(row.locator('.chat-tool-args')).toContainText('"issueId": "LIN-9"');
+    await expect(row.locator('.chat-tool-result')).toContainText('"issueIdentifier": "LIN-9"');
+    await expect(page.locator('.chat-tool-row .status-pill, .chat-tool-row .chat-msg__who')).toHaveCount(0);
+  });
+
+  test('a run of tool calls compacts into "checked N things"; a proposal card between them splits the run', async ({ page }) => {
+    await openPage(page);
+    await mockTurn(page, {
+      toolFrames: [
+        toolCall('a', 'get_stack', {}), toolCall('b', 'list_active_sessions', {}), toolCall('c', 'get_session', { sessionId: 's1' }),
+        toolResult('a', 'get_stack', {}), toolResult('b', 'list_active_sessions', []), toolResult('c', 'get_session', {}),
+        ['tool', { phase: 'proposed', id: 'p', name: 'send_follow_up', result: JSON.stringify({ proposed: true, sessionId: 'sess-1', prompt: 'go' }) }],
+        toolCall('d', 'get_stack', {}), toolResult('d', 'get_stack', {}),
+      ],
+    });
+    await tick(page);
+    const group = page.locator('.chat-tool-group');
+    await expect(group).toHaveCount(1);
+    await expect(group.locator('> details > summary')).toHaveText('checked 3 things');
+    await expect(group.locator('.chat-tool-row')).toHaveCount(3);
+    await expect(page.locator('.fc-proposal')).toHaveCount(1);
+    await expect(group.locator('.fc-proposal')).toHaveCount(0);
+    // The call after the proposal is a bare row — the run was broken.
+    await expect(page.locator('#flight-companion-thread > li.chat-tool-row')).toHaveCount(1);
+  });
+
+  test('decisions fold under "N decisions waiting"; opening it and tapping an option still replies and resolves', async ({ page }) => {
+    const decision = (n) => ({
+      decisionId: `dec-${n}`, issueIdentifier: `LIN-${n}`, loopId: `loop-${n}`, sessionId: `sess-${n}`,
+      question: `Q${n}?`, options: [{ id: 'yes', label: 'Ship it' }], optionsTotal: 1, recommended: 'yes',
+      since: null, disposition: 'resumable', canReply: true, shelvedLapseCount: 0,
+    });
+    await openPage(page);
+    await mockTurn(page, {
+      toolFrames: [['tool', { phase: 'result', id: 't1', name: 'list_pending_decisions', result: JSON.stringify({ count: 2, truncated: false, decisions: [decision(42), decision(43)] }) }]],
+    });
+    let posted = null;
+    await page.route('**/api/comments/**', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'c1' }) });
+    });
+    await tick(page);
+
+    const fold = page.locator('.fc-decisions-fold');
+    await expect(fold).toHaveCount(1);
+    await expect(fold.locator('> summary')).toHaveText('2 decisions waiting');
+    await expect(fold).not.toHaveAttribute('open', '');
+    await expect(fold.locator('.fc-decision')).toHaveCount(2);
+    await expect(fold.locator('.fc-decision').first()).toBeHidden();
+    await expect(page.getByTestId('fc-decisions-rulings-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/observation?view=rulings`);
+
+    await fold.locator('> summary').click();
+    const card = fold.locator('.fc-decision').first();
+    await expect(card).toBeVisible();
+    await expect(card.getByTestId('fc-decision-task-link')).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-42`);
+    await card.locator('.chat-option-btn').click();
+    await expect.poll(() => posted).not.toBeNull();
+    await expect(card).toHaveClass(/fc-decision--resolved/);
+    await expect(card.locator('.fc-decision-feedback')).toContainText('Replied');
+  });
+
+  test('a readout with a rule folds under "full readout"; the headline stays, the transcript stays intact', async ({ page }) => {
+    await openPage(page);
+    const readout = bootReadout();
+    // A typed turn rather than boot: the boot exchange is deliberately not
+    // stored until a later turn carries it (see finishTurn), and the stored
+    // transcript is half of what this test asserts.
+    await mockTurn(page, { token: readout });
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('#flight-companion-question').fill('where are we?');
+    await page.locator('#flight-companion-send').click();
+
+    const bubble = page.locator('.fc-msg-body').last();
+    const fold = bubble.locator('details.chat-fold');
+    await expect(fold).toHaveCount(1);
+    await expect(fold.locator('> summary')).toHaveText('full readout');
+    await expect(bubble.locator('> p').first()).toContainText('All green');
+    await expect(fold.locator('h2')).toBeHidden();
+    await fold.locator('> summary').click();
+    await expect(fold.locator('h2')).toBeVisible();
+
+    const stored = await page.evaluate((k) => sessionStorage.getItem(`flight-companion-session:${k}`), URL_KEY);
+    expect(JSON.parse(stored).history.some((t) => t.role === 'assistant' && t.content === readout)).toBe(true);
+
+    // A reload restores the same fold from the stored raw text.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.fc-msg-body details.chat-fold')).toHaveCount(1);
+  });
+
+  test('an answer with no anchor, or a short tail, is not folded', async ({ page }) => {
+    await openPage(page);
+    await mockTurn(page, { token: `Just prose. ${'More prose. '.repeat(60)}` });
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('#flight-companion-question').fill('hello');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who')).toHaveClass(/status-pill--done/);
+    await expect(page.locator('.chat-fold')).toHaveCount(0);
+
+    await mockTurn(page, { token: 'Headline.\n\n---\n\nshort tail' });
+    await page.locator('#flight-companion-question').fill('again');
+    await page.locator('#flight-companion-send').click();
+    await expect(page.locator('.fc-msg-who.status-pill--done')).toHaveCount(2);
+    await expect(page.locator('.chat-fold')).toHaveCount(0);
+  });
+
+  test('a seen identifier links to its task page — inside the fold too — but GPT-5, UTF-8, code and unseen ids do not; links survive a reload', async ({ page }) => {
+    await openPage(page);
+    await mockTurn(page, {
+      toolFrames: [
+        toolCall('a', 'list_task_sessions', { issueId: 'LIN-3361' }),
+        toolResult('a', 'list_task_sessions', { sessions: [{ issueIdentifier: 'LIN-3361' }] }),
+      ],
+      token: bootReadout('And LIN-9999 which no tool ever returned.'),
+    });
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('#flight-companion-question').fill('where are we?');
+    await page.locator('#flight-companion-send').click();
+
+    const bubble = page.locator('.fc-msg-body').last();
+    const links = bubble.getByTestId('chat-task-link');
+    await expect(links.first()).toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-3361`);
+    // Headline link + one in the fold prose; the inline-code one stays code.
+    await expect(links).toHaveCount(2);
+    await expect(bubble.locator('code', { hasText: 'LIN-3361' }).locator('a')).toHaveCount(0);
+    await expect(bubble.locator('a', { hasText: 'GPT-5' })).toHaveCount(0);
+    await expect(bubble.locator('a', { hasText: 'UTF-8' })).toHaveCount(0);
+    await expect(bubble.locator('a', { hasText: 'LIN-9999' })).toHaveCount(0);
+
+    // Tool rows are gone after a reload, but the persisted seen set keeps the link.
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.chat-tool-row')).toHaveCount(0);
+    await expect(page.locator('.fc-msg-body').last().getByTestId('chat-task-link').first())
+      .toHaveAttribute('href', `/workspace/${URL_KEY}/task/LIN-3361`);
   });
 });

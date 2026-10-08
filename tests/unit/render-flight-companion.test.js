@@ -12,6 +12,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderFlightCompanionPage } from '../../lib/render-flight-companion.js';
+import { COMPANION_READOUT_HEADINGS } from '../../lib/prompts/flight-companion-brief.js';
+import { taskPageHref } from '../../lib/task-page-href.js';
 
 describe('renderFlightCompanionPage — proxy feature gate', () => {
   test('emits data-proxy-feature but NO +proxy toggle when featureFlags.proxy === true (LIN-3079: forced, toggle removed)', () => {
@@ -522,5 +524,52 @@ describe('renderFlightCompanionPage — LIN-3360: calmer shell', () => {
     assert.equal((bare.match(/data-local-time/g) || []).length, 0);
     assert.doesNotMatch(bare, /datetime=""/);
     assert.match(bare, /last seen unknown/);
+  });
+});
+
+// LIN-3361: the observer row's issue links to its task page; a loopId does not.
+describe('renderFlightCompanionPage — scannable thread (LIN-3361)', () => {
+  const docWith = (attention) => ({
+    updatedAt: '2026-09-05T10:00:00.000Z',
+    state: { report: { narrative: 'n', lanes: {}, attention, attentionCount: attention.length } },
+  });
+  const render = (attention, urlKey = 'ws') => renderFlightCompanionPage({ prompt: 'k', observerReportDoc: docWith(attention) }, { urlKey });
+
+  test('row.issue is a task-page link built by the shared helper', () => {
+    const html = render([{ lane: 'a', issue: 'LIN-42', stage: 's', since: 'x' }]);
+    const href = taskPageHref({ urlKey: 'ws', identifier: 'LIN-42' });
+    assert.ok(html.includes(`<a class="fc-obs-attention-issue-link" data-testid="fc-obs-attention-issue-link" href="${href}">LIN-42</a>`));
+  });
+
+  test('a row with only a loopId stays plain escaped text — it is not a task identifier', () => {
+    const html = render([{ lane: 'a', loopId: 'loop-7', stage: 's', since: 'x' }]);
+    assert.ok(html.includes('<span class="fc-obs-attention-issue">loop-7</span>'));
+    assert.ok(!html.includes('fc-obs-attention-issue-link'));
+  });
+
+  test('when both are present only the issue is linked and the loopId is not shown', () => {
+    const html = render([{ lane: 'a', issue: 'LIN-1', loopId: 'loop-7', stage: 's', since: 'x' }]);
+    assert.ok(html.includes('>LIN-1</a>'));
+    assert.ok(!html.includes('loop-7'));
+  });
+
+  test('the href and text are escaped at the attribute', () => {
+    const html = render([{ lane: 'a', issue: 'X"><script>-1', stage: 's', since: 'x' }], 'w"s');
+    assert.ok(!html.includes('<script>-1') && !html.includes('"><script'));
+    assert.ok(!html.includes('href="/workspace/w"s'));
+  });
+
+  test('no urlKey: the issue is plain text, never a hand-built or empty href', () => {
+    const html = renderFlightCompanionPage({ prompt: 'k', observerReportDoc: docWith([{ lane: 'a', issue: 'LIN-5', stage: 's', since: 'x' }]) }, {});
+    assert.ok(!html.includes('fc-obs-attention-issue-link'));
+    assert.ok(html.includes('<span class="fc-obs-attention-issue">LIN-5</span>'));
+  });
+
+  test('data-fc-readout-headings on the page element equals the exported constant', () => {
+    const html = renderFlightCompanionPage({ prompt: 'k' }, { urlKey: 'ws' });
+    const m = html.match(/<main class="flight-companion-page"[^>]*data-fc-readout-headings="([^"]*)"/);
+    assert.ok(m, 'attribute present on main.flight-companion-page');
+    const decoded = m[1].replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    assert.deepStrictEqual(JSON.parse(decoded), COMPANION_READOUT_HEADINGS);
   });
 });
