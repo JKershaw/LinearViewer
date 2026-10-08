@@ -358,3 +358,64 @@ describe('F2 (7) read-path sinks', () => {
     assertClean('stampBookkeeping', await world.store.stampBookkeeping(URL_KEY, world.factoryId, { by: 'op', reason: 'r' }));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LIN-3384 (S1.5): the live bootstrap token, by value, on the session-readable
+// sinks. The marker is the `bootstrapToken` FIELD only (this harness runs as the
+// poster/owner, so prose masking is covered in lin-3384-bootstrap-token-redaction).
+// Poll/take are deliberately NOT asserted clean: the runner must receive it.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('LIN-3384 — bootstrapToken field on session-readable sinks', () => {
+  const TOKEN_MARKER = 'tok3384-field-marker-aaaaaaaaaaaaaaaaaaaaaaaa';
+  let rowId;
+
+  function assertNoToken(label, value) {
+    const s = JSON.stringify(value);
+    assert.ok(s !== undefined, `${label}: sink produced a value`);
+    assert.ok(!s.includes(TOKEN_MARKER), `${label} leaks the bootstrap token: ${s.slice(Math.max(0, s.indexOf(TOKEN_MARKER) - 80), s.indexOf(TOKEN_MARKER) + 60)}`);
+  }
+
+  before(async () => {
+    const row = await world.store.addItem(URL_KEY, {
+      prompt: 'token beat', promptName: 'Tok', kind: 'implementation', issueIdentifier: 'TEST-7',
+      harness: 'claude-code', target: 'cli', dispatchedBy: POSTER, bootstrapToken: TOKEN_MARKER
+    });
+    rowId = row._id;
+  });
+
+  test('precondition: the store formatter and the runner poll DO carry the token', async () => {
+    const item = await world.store.getItemStatus(URL_KEY, rowId);
+    assert.equal(item.bootstrapToken, TOKEN_MARKER);
+    const runnerPoll = await callApp(runnerApp(), 'get', '/api/proxy/runner/poll', undefined, 'x');
+    assert.ok(runnerPoll.body.items.some(i => i.bootstrapToken === TOKEN_MARKER), 'the runner still receives the live token');
+  });
+
+  test('session queue list and trim carry no token', async () => {
+    const list = await callApp(sessionApp(), 'get', '/workspace/acme/api/dispatch');
+    assert.equal(list.status, 200, JSON.stringify(list.body));
+    assert.ok(list.body.items.some(i => i.id === rowId), 'the row is listed');
+    assertNoToken('session queue list', list.body);
+    const trim = await callApp(sessionApp(), 'patch', `/workspace/acme/api/dispatch/${rowId}/trim`, { maxTasks: 1 });
+    assert.equal(trim.status, 200, JSON.stringify(trim.body));
+    assertNoToken('trim (queued row)', trim.body);
+  });
+
+  test('GET /:id/prompt and watch carry no token', async () => {
+    const prompt = await callApp(proxyApp(), 'get', `/api/proxy/dispatch/${rowId}/prompt`, undefined, world.posterToken);
+    assert.equal(prompt.status, 200, JSON.stringify(prompt.body));
+    assertNoToken('GET /:id/prompt', prompt.body);
+    const watch = await callApp(proxyApp(), 'get', `/api/proxy/dispatch/${rowId}`, undefined, world.posterToken);
+    assertNoToken('watch', watch.body);
+    const list = await callApp(proxyApp(), 'get', '/api/proxy/dispatch', undefined, world.posterToken);
+    assertNoToken('proxy list', list.body);
+  });
+
+  test('history route (after the runner takes it) carries no token', async () => {
+    const taken = await world.store.takeItem(rowId, URL_KEY, 'runner');
+    assert.ok(taken, 'taken');
+    const route = await callApp(sessionApp(), 'get', '/workspace/acme/api/dispatch/history');
+    assert.equal(route.status, 200, JSON.stringify(route.body));
+    assertNoToken('history route', route.body);
+  });
+});

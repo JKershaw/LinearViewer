@@ -1,17 +1,20 @@
 /**
  * LIN-3384 (LIN-2954 S1.5) — no live bootstrap token in any response a session
- * can read. Helper semantics, the four redacted routes, the runner paths that
- * must STAY token-bearing, and a census of formatter/reader callers.
+ * can read. Helper semantics, the four redacted routes (incl. the proxy
+ * `/:id/prompt` read for two different proxy creators), both real prose
+ * embeddings, and every runner path that must STAY token-bearing.
+ * The call-site census lives in lin-3384-redaction-census.test.js.
  */
 process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { readFileSync, readdirSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
+import { createProxyRoutes } from '../../routes/proxy.js';
+import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
+import { buildProxyContextPreamble } from '../../lib/proxy-preamble.js';
+import { buildCollectiveParticipantPrompt } from '../../lib/prompts/collective-participant.js';
 import {
   isItemOwner, maskBootstrapTokens, redactSessionItem, REDACTED_TOKEN_PLACEHOLDER
 } from '../../lib/dispatch-session-redaction.js';
@@ -136,68 +139,174 @@ describe('session-readable routes', () => {
   });
 });
 
-describe('runner paths stay token-bearing', () => {
-  test('poll still returns the live bootstrapToken', async () => {
+describe('trim: both row shapes', () => {
+  test('an archived (history-shape) row gains no bootstrapToken key', async () => {
+    const archived = { id: 'h1', prompt: PROSE, dispatchedBy: 'owner-1' }; // _formatHistoryItem shape: no key
+    const hstore = { ...store, trimSessionBudget: async () => ({ ok: true, item: archived }) };
+    const res = await get(buildApp(hstore, 'someone-else'), 'PATCH', `/workspace/acme/api/dispatch/${SESSION_ID}/trim`, { maxTasks: 1 });
+    assert.equal(res.status, 200);
+    assert.ok(!('bootstrapToken' in res.body.item), 'no bootstrapToken key added to a history row');
+    assert.ok(!JSON.stringify(res.body).includes(TOKEN), 'prose still masked for a non-owner');
+  });
+});
+
+describe('both real prose embeddings are masked', () => {
+  // The two production sites that write `Authorization: Bearer <bootstrap>`:
+  // lib/proxy-preamble.js (buildProxyContextPreamble) and
+  // lib/prompts/collective-participant.js (buildLinearAccessBlock).
+  const preamble = `do the task${buildProxyContextPreamble({ baseUrl: 'https://h.test', token: TOKEN, issueIdentifier: 'LIN-1', tokenDelivery: 'prose' })}`;
+  const collective = buildCollectiveParticipantPrompt({
+    channel: '#Collective', nick: 'P1', yapBaseUrl: 'https://yap.test', yapPassword: 'pw',
+    proxyBaseUrl: 'https://h.test', proxyToken: TOKEN
+  });
+
+  for (const [name, prompt] of [['proxy-preamble', preamble], ['collective-participant', collective]]) {
+    test(`${name}: the generated prompt carries the token, the mask removes only it`, () => {
+      assert.ok(prompt.includes(`Bearer ${TOKEN}`), 'precondition: the real generator embeds the token');
+      const masked = maskBootstrapTokens(prompt);
+      assert.ok(!masked.includes(TOKEN));
+      assert.equal(masked, prompt.replace(TOKEN, REDACTED_TOKEN_PLACEHOLDER), 'the rest of the prompt is byte-identical');
+      assert.ok(masked.includes('<WORKING_TOKEN>'), 'the placeholder survives');
+    });
+
+    test(`${name}: through the session list, non-owner masked / owner unchanged`, async () => {
+      const pstore = { ...store, listItems: async () => [row({ prompt, bootstrapToken: null })] };
+      const other = await get(buildApp(pstore, 'someone-else'), 'GET', '/workspace/acme/api/dispatch');
+      assert.ok(!JSON.stringify(other.body).includes(TOKEN));
+      const owner = await get(buildApp(pstore, 'owner-1'), 'GET', '/workspace/acme/api/dispatch');
+      assert.equal(owner.body.items[0].prompt, prompt);
+    });
+  }
+});
+
+describe('GET /api/proxy/dispatch/:id/prompt — masked by proxy creator', () => {
+  const ITEM_ID = '11111111-2222-3333-4444-555555555555';
+  function proxyApp(createdBy, dispatchedBy) {
     const app = express();
-    app.use(createDispatchRoutes({
-      dispatchQueueStore: store,
-      dispatchTokenStore: {
-        validateToken: async () => ({ urlKey: 'acme', label: 'r', tokenId: 't', createdBy: 'u' })
+    app.use(express.json());
+    app.use(createProxyRoutes({
+      proxyTokenStore: {
+        validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'read', createdBy })
       },
+      proxyEventStore: { recordEvent: async () => {} },
+      resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
+      getWorkspaceAccessToken: async () => 'test-token',
+      getWorkspaceOpenRouterKey: async () => null,
+      agentStatusStore: {},
+      recapCacheStore: { get: async () => null, set: async () => {} },
+      briefCacheStore: { get: async () => null, set: async () => {} },
+      dispatchQueueStore: {
+        getItemStatus: async (urlKey, id) => ({
+          id, prompt: PROSE, promptName: 'implementation', kind: 'implementation', target: 'cli',
+          followUpTo: null, sessionId: null, dispatchedBy, bootstrapToken: TOKEN
+        })
+      },
+      workspaceFromUrl: (req, res, next) => next(),
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+      freeTierStore: { tryUse: async () => ({ allowed: true }) }
+    }));
+    return app;
+  }
+  async function readPrompt(app) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}/api/proxy/dispatch/${ITEM_ID}/prompt`, {
+        headers: { Authorization: 'Bearer anything' }
+      });
+      return { status: res.status, text: await res.text() };
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }
+
+  test("another account's proxy token: the bearer token is masked", async () => {
+    const res = await readPrompt(proxyApp('someone-else', 'owner-1'));
+    assert.equal(res.status, 200);
+    assert.ok(!res.text.includes(TOKEN));
+    assert.ok(res.text.includes(REDACTED_TOKEN_PLACEHOLDER));
+  });
+
+  test("the dispatcher's own proxy token: the prompt is returned byte for byte", async () => {
+    const res = await readPrompt(proxyApp('owner-1', 'owner-1'));
+    assert.equal(res.status, 200);
+    assert.equal(JSON.parse(res.text).prompt, PROSE);
+  });
+
+  test('ownerless row read by an ownerless token (null/null): masked, not revealed', async () => {
+    const res = await readPrompt(proxyApp(null, null));
+    assert.equal(res.status, 200);
+    assert.ok(!res.text.includes(TOKEN));
+  });
+});
+
+describe('runner paths stay token-bearing (route level)', () => {
+  const ITEM_ID = '22222222-2222-4222-8222-222222222222';
+  const runnerStore = {
+    pollAvailable: async () => [row()],
+    takeItem: async () => row(),
+    listItems: async () => [row()]
+  };
+  async function call(app, method, path, bearer) {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    try {
+      const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, {
+        method, headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, body: method === 'POST' ? '{}' : undefined
+      });
+      return { status: res.status, body: await res.json() };
+    } finally {
+      await new Promise(r => server.close(r));
+    }
+  }
+  function legacyApp() {
+    const app = express();
+    app.use(express.json());
+    app.use(createDispatchRoutes({
+      dispatchQueueStore: runnerStore,
+      dispatchTokenStore: { validateToken: async () => ({ urlKey: 'acme', label: 'r', tokenId: 't', createdBy: 'u' }) },
       workspaceFromUrl: (req, res, next) => next(),
       userPreferencesStore: {},
       harbourFeedbackTokenStore: null
     }));
-    const server = app.listen(0, '127.0.0.1');
-    await new Promise(r => server.once('listening', r));
-    try {
-      const res = await fetch(`http://127.0.0.1:${server.address().port}/api/dispatch/poll`, { headers: { Authorization: 'Bearer x' } });
-      const body = await res.json();
-      if (res.status === 200) assert.equal(body.items[0].bootstrapToken, TOKEN);
-      else assert.fail(`poll auth fake rejected: ${res.status}`);
-    } finally {
-      await new Promise(r => server.close(r));
-    }
+    return app;
+  }
+  function proxyRunnerApp() {
+    const app = express();
+    app.use(express.json());
+    app.use(createProxyRunnerRoutes({
+      proxyLimiter: (req, res, next) => next(),
+      authenticateProxyToken: (req, res, next) => {
+        req.proxyUrlKey = 'acme'; req.proxyTokenLabel = 'runner'; req.proxyTokenId = 'runner-1'; req.proxyCreatedBy = 'someone-else'; next();
+      },
+      requireGrant: () => (req, res, next) => next(),
+      logEvent: () => {},
+      dispatchQueueStore: runnerStore,
+      dispatchTokenStore: {},
+      proxyTokenStore: {},
+      workspaceHaltStore: { getWorkspaceHalt: async () => null, getLastKnownHalt: () => null }
+    }));
+    return app;
+  }
+
+  test('legacy GET /api/dispatch/poll', async () => {
+    const res = await call(legacyApp(), 'GET', '/api/dispatch/poll', 'x');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.items[0].bootstrapToken, TOKEN);
   });
-});
-
-describe('census: session-reachable readers go through the redactor', () => {
-  const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
-  const read = (rel) => readFileSync(join(REPO, rel), 'utf8');
-
-  test('routes/dispatch.js: every non-runner reader response is redacted', () => {
-    const src = read('routes/dispatch.js');
-    for (const call of ['listItems(', 'listHistory(', 'trimSessionBudget(']) {
-      assert.ok(src.includes(`dispatchQueueStore.${call}`), `${call} caller expected`);
-    }
-    assert.equal((src.match(/redactSessionItems?\(/g) || []).length >= 3, true);
-    // poll/take responses must not be redacted
-    for (const marker of ["router.get('/api/dispatch/poll'", "router.post('/api/dispatch/take/:itemId'"]) {
-      const start = src.indexOf(marker);
-      assert.ok(start > 0, marker);
-      const body = src.slice(start, src.indexOf('\n  });', start));
-      assert.ok(!body.includes('redactSession'), `${marker} must stay token-bearing`);
-    }
+  test('legacy POST /api/dispatch/take/:itemId', async () => {
+    const res = await call(legacyApp(), 'POST', `/api/dispatch/take/${ITEM_ID}`, 'x');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.item.bootstrapToken, TOKEN);
   });
-
-  test('proxy prompt route is redacted', () => {
-    const src = read('routes/proxy-dispatch.js');
-    const start = src.indexOf("router.get('/api/proxy/dispatch/:id/prompt'");
-    const body = src.slice(start, src.indexOf('\n  });', start));
-    assert.ok(body.includes('redactSessionItem('));
+  test('proxy runner GET /api/proxy/runner/poll', async () => {
+    const res = await call(proxyRunnerApp(), 'GET', '/api/proxy/runner/poll', 'x');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.items[0].bootstrapToken, TOKEN);
   });
-
-  test('no other route file echoes a raw store item (formatter/reader census)', () => {
-    // Every file calling a token-bearing reader must be classified. A new caller
-    // fails here until someone decides redact / runner / projects-an-allowlist.
-    const CLASSIFIED = new Set([
-      'dispatch.js', 'proxy-dispatch.js',            // redacted (above)
-      'proxy-runner.js',                              // runner: token-bearing by design
-      'proxy-compute.js', 'dashboard.js', 'proxy-kickoff.js', 'test.js' // read fields into allowlisted projections
-    ]);
-    const READER = /\.(listItems|listHistory|getItemStatus|trimSessionBudget|pollAvailable|takeItem)\(/;
-    const offenders = readdirSync(join(REPO, 'routes'))
-      .filter(f => f.endsWith('.js') && READER.test(read(`routes/${f}`)) && !CLASSIFIED.has(f));
-    assert.deepEqual(offenders, []);
+  test('proxy runner POST /api/proxy/runner/take/:id', async () => {
+    const res = await call(proxyRunnerApp(), 'POST', `/api/proxy/runner/take/${ITEM_ID}`, 'x');
+    assert.equal(res.status, 200);
+    assert.equal(res.body.item.bootstrapToken, TOKEN);
   });
 });
