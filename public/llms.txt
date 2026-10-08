@@ -391,7 +391,7 @@ main.task-chat-page[data-url-key]      - page container
 
 The Flight Companion page (`/workspace/{urlKey}/flight-companion`) is a live, in-page chat for LIN-751 ("realtime chat with work in flight"): a companion that watches the workspace's dispatch feed and checks in with you on its own client-driven cadence (visible-tab only, 30s base, doubling to a 180s cap on nothing-to-report ticks; the server's own pre-call gate is always the real spend authority), or answers directly when you send it a message. It renders through the shared chat UI (`chat.css`/`window.ChatUI`) and streams turns over SSE, including tool-use breadcrumbs (LIN-2632) via the SAME shared `window.ChatUI.toolBreadcrumbLabel` Task Chat uses — never a page-local label fork. On an auto-wake turn, a proposed follow-up renders an inline Approve/Dismiss control and only an Approve click can enqueue it — the model can never dispatch one unapproved there. On a turn you start yourself, though, the model's `send_follow_up` executes directly (no proposal card, no approval needed) — the approval gate is auto-wake-only, not a blanket guarantee. Requires the per-user `flightCompanion` feature flag; reached only via a link in Settings.
 
-Chat is the FIRST section on the page (LIN-2443; it has no visible title since LIN-3360, only `aria-label="Flight Companion chat"`) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last; `How to use` and the observer report keep their headings but their bodies start in closed disclosures (LIN-3360). Above the thread sits a closed `settings` disclosure (`details.fc-settings`, LIN-3360) holding the status strip (LIN-2621; the tools-off warning and free-tier note stay outside it in `#flight-companion-strip-notices` so they show with the fold closed). Page timestamps (`time[data-local-time]`: last check-in, sweep last seen, observer generated/grounded) are rewritten to local time by the shared `window.initLocalTimes` (public/common.js). The strip: model id, tools on/off (both resolved server-side ONCE per page load via `resolveAiOperationModel({opKind:'flight-companion'})`/`isToolCapableModel` — since LIN-2623 the SAME single-resolver call the turn core itself uses, lib/agent-turn.js, so the strip can never describe a different model than the one the turn will actually use), last check-in, next check-in due, sweep liveness/no-census, a mode line (`mode: read-only · proposes, never acts · rung 1 of 3`, byte-pinned; LIN-2626 turns it into a real control later), and — since LIN-2623 beat 3 — the per-turn model picker, its rate card, and (when the resolved default is not tool-capable) a visible tools-off warning. A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: instead the single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reads `checking in…` for the duration of the tick, then settles to e.g. `checked in 22:03 · nothing new` on `done` — consecutive silent ticks overwrite that one node rather than appending rows, and a non-spend `gate-silent` tick refreshes the same line the same way (LIN-2632 beat 3). A turn YOU start instead gets the thinking state: an assistant row appears IMMEDIATELY, before any token or tool event, in the in-progress pill state with a quiet `thinking…` placeholder — the placeholder is display-only and never enters the client-held history, so an empty turn still ends with an honest `no reply — nothing to add` on that SAME row rather than a second one. Either way the speaker pill leaves the in-progress state on `done`/`error`.
+Chat is the FIRST section on the page (LIN-2443; it has no visible title since LIN-3360, only `aria-label="Flight Companion chat"`) — `How to use` and the kickoff prompt follow it, and the read-only observer report stays last; `How to use` and the observer report keep their headings but their bodies start in closed disclosures (LIN-3360). Above the thread sits a closed `settings` disclosure (`details.fc-settings`, LIN-3360) holding the status strip (LIN-2621; the tools-off warning and free-tier note stay outside it in `#flight-companion-strip-notices` so they show with the fold closed). Page timestamps (`time[data-local-time]`: last check-in, sweep last seen, observer generated/grounded) are rewritten to local time by the shared `window.initLocalTimes` (public/common.js). The strip: model id, tools on/off (both resolved server-side ONCE per page load via `resolveAiOperationModel({opKind:'flight-companion'})`/`isToolCapableModel` — since LIN-2623 the SAME single-resolver call the turn core itself uses, lib/agent-turn.js, so the strip can never describe a different model than the one the turn will actually use), last check-in, next check-in due, sweep liveness/no-census, a mode line (`mode: read-only · proposes, never acts · rung 1 of 3`, byte-pinned; LIN-2626 turns it into a real control later), and — since LIN-2623 beat 3 — the per-turn model picker, its rate card, and an always-emitted tools-off warning (`hidden` while the model that will run is tools-on; visible when the resolved default is not tool-capable, and toggled by the picker on a pick, LIN-3363). A silent auto-wake tick (one that completes with no text, the designed common outcome) paints NO chat bubble at all: instead the single, non-stacking status line (`#flight-companion-checkin`, `aria-live="polite"`, hidden until first use) reads `checking in…` for the duration of the tick, then settles to e.g. `checked in 22:03 · nothing new` on `done` — consecutive silent ticks overwrite that one node rather than appending rows, and a non-spend `gate-silent` tick refreshes the same line the same way (LIN-2632 beat 3). A turn YOU start instead gets the thinking state: an assistant row appears IMMEDIATELY, before any token or tool event, in the in-progress pill state with a quiet `thinking…` placeholder — the placeholder is display-only and never enters the client-held history, so an empty turn still ends with an honest `no reply — nothing to add` on that SAME row rather than a second one. Either way the speaker pill leaves the in-progress state on `done`/`error`.
 
 Every `done` frame carries the turn's own summed usage (LIN-2631 sums hop usage server-side onto the FINAL `done` only). A visible turn's own bubble grows a trailing meta line (`.fc-msg-meta`, "N tokens · $x") reading exactly what that frame carried, no caveat text; the strip's running total and check-in count (LIN-2621 beat 3) accumulate on EVERY `done` this tab observes — visible or silent, any turn kind — since a silent tick's cost otherwise has nowhere to appear. `lib/openrouter.js` does not yet attach per-hop usage to a tool-using turn's intermediate frames, so a multi-hop turn's displayed cost under-reports today until that lands as its own follow-up — a known, out-of-scope gap, not a defect of this page.
 
@@ -414,8 +414,10 @@ main.flight-companion-page[data-url-key]  - page container
                                               an earlier position:sticky, which pinned
                                               it over the sections below instead)
     #flight-companion-strip-notices         - (LIN-3360) always-emitted notices slot
-                                              (tools-off warning, free-tier note), above
-                                              the Settings fold; empty = display:none
+                                              (tools-off warning — always present, `hidden`
+                                              when tools are on — and free-tier note), above
+                                              the Settings fold; takes no height while
+                                              both children are hidden
     details.fc-settings                     - (LIN-3360) closed native disclosure,
                                               summary "settings", wrapping the strip
     #flight-companion-strip                 - the status strip (LIN-2621), inside the
@@ -433,15 +435,17 @@ main.flight-companion-page[data-url-key]  - page container
       .fc-strip-tools                         - "tools: on|off" — isToolCapableModel on
                                               that SAME resolved model id. Byte-identical,
                                               untouched by LIN-2623 beat 3's additions below
-      .fc-strip-tools-warning                 - (LIN-2623) "⚠ tools are off for this
-                                              model — …", rendered ONLY when
-                                              .fc-strip-tools reads "off" — visible on the
-                                              strip before you send anything. Exactly one
-                                              trigger: the resolved DEFAULT is not tool-
-                                              capable — never re-derived from the picker's
-                                              own selection below (every option the picker
-                                              currently offers is curated, so always tool-
-                                              capable)
+      .fc-strip-tools-warning                 - (LIN-2623, LIN-3363) "⚠ tools are off for
+                                              this model — …", ALWAYS emitted (so the
+                                              picker has something to reveal), carrying
+                                              data-default-tools-on. `hidden` iff the
+                                              model that will run is tools-on: on load,
+                                              the resolved DEFAULT; after a pick, the
+                                              pick's own data-tools (a catalog-only
+                                              model is tools-off, so picking one shows
+                                              the warning; picking a curated model hides
+                                              it). A free-tier page ignores any pick
+                                              (the clamp runs the default)
       .fc-strip-checkin                       - "last check-in: <time>|never" — the
                                               companion doc's own lastTurnAt
       #flight-companion-strip-next            - "next check-in: —" server-rendered
@@ -463,38 +467,46 @@ main.flight-companion-page[data-url-key]  - page container
       .fc-strip-mode                          - "mode: read-only · proposes, never acts
                                               · rung 1 of 3" — byte-pinned text; LIN-2626
                                               turns this into a real control later
-      .fc-strip-model-picker                  - (LIN-2623) the per-turn model override,
-                                              beside the rate card. Options are EXACTLY
-                                              the curated AVAILABLE_MODELS ids for now (a
-                                              subset of what the turn endpoint's
-                                              resolveTurnModelOverride accepts: curated OR
-                                              a model-catalog id — LIN-3363 widens the
-                                              picker to the catalog); every offered choice
-                                              is one the endpoint accepts, never a choice
-                                              it would reject with 400
-        #flight-companion-model-select           - the <select> itself, aria-label
-                                              "Per-turn model override" (a visible
-                                              "override:" label sits beside it too). The
-                                              leading option carries value="" ("— current
-                                              default —" — the id itself is NOT repeated
-                                              in the option text, deliberately: it's
-                                              already shown plainly in .fc-strip-model
-                                              above, and embedding it here once measurably
-                                              widened the <select> enough to overflow a
-                                              1024px viewport, LIN-2623 beat 4 finding):
-                                              an untouched picker sends NO `model` field
-                                              on the turn request at all,
-                                              so beat 1's resolveAiOperationModel decides
-                                              exactly as it did before this picker
-                                              existed — it can never silently swap a
+      .fc-strip-model-picker                  - (LIN-2623, LIN-3363) the per-turn model
+                                              override combobox, beside the rate card.
+                                              Offers the Settings dispatch-row list:
+                                              curated AVAILABLE_MODELS ids plus the live
+                                              catalog (searchable by id or name), which
+                                              is exactly what resolveTurnModelOverride
+                                              accepts, so no offered choice 400s. A
+                                              catalog-only option is tools-off (tagged
+                                              "tools off"; free ones tagged "free")
+        #flight-companion-model-search           - the visible <input type="search"
+                                              role="combobox">, aria-label "Per-turn
+                                              model override", aria-controls the list.
+                                              Typing filters (case-insensitive
+                                              substring of id or name); Down/Up/Enter/
+                                              Escape work; typed text that matches
+                                              nothing commits nothing. Disabled
+                                              outright on a free-tier request
+        #flight-companion-model                  - the COMMITTED choice (hidden input).
+                                              value="" ("— current default —") means an
+                                              untouched picker sends NO `model` field on
+                                              the turn request at all, so beat 1's
+                                              resolveAiOperationModel decides exactly as
+                                              before — it can never silently swap a
                                               possibly-uncurated workspace default for
-                                              some other offered id. Disabled outright on
-                                              a free-tier request (see .fc-strip-freetier)
+                                              some other offered id. Only a list pick
+                                              writes it; a stored id no longer offered
+                                              is reset to "" on restore and re-saved
+        #flight-companion-model-list             - ul[role=listbox], IN FLOW (not an
+                                              absolute popup, which the Settings fold's
+                                              overflow would clip), max-height ~9rem
+                                              with its own scroll so it fits the fold's
+                                              40dvh cap. Rows: li[role=option] with
+                                              data-id, data-name, data-pricing,
+                                              data-tools="off", data-free; the first
+                                              row (data-id="") is "— current default —"
         #flight-companion-model-price            - the rate card, next to the picker —
                                               the selected option's own data-pricing
                                               attribute (getModelPricingHint), "—" for an
                                               id with no known rate (never a fabricated
-                                              or zero price); updates live on `change`
+                                              or zero price); updates live on each pick
       .fc-strip-freetier                      - (LIN-2623) "free tier: model selection
                                               is not honored — …", rendered only on a
                                               free-tier page load, alongside a disabled

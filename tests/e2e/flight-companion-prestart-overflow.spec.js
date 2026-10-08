@@ -318,3 +318,33 @@ test.describe('Flight Companion — open Settings fold is capped on a short phon
     await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
   });
 });
+
+// LIN-3363 S2: the model combobox's results list is in flow and self-scrolls,
+// so with it OPEN the fold still holds to its 40dvh cap and Start/composer stay
+// in the viewport and clickable (an absolutely-positioned popup would instead
+// be clipped by the fold's overflow).
+test.describe('Flight Companion — open model list inside the capped fold on a short phone (LIN-3363)', () => {
+  test.use({ viewport: { width: 375, height: 500 } });
+
+  test('the fold stays at most 40dvh tall with the list open, the list scrolls itself, and Start/composer stay clickable', async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await seedPlaybook(page, URL_KEY);
+    await page.goto(PAGE_URL);
+    await waitForPlaybookPainted(page);
+    await page.locator('details.fc-settings > summary').click();
+    await page.locator('#flight-companion-model-search').click();
+    await expect(page.locator('#flight-companion-model-list')).toBeVisible();
+
+    const box = await page.locator('details.fc-settings').boundingBox();
+    expect(box.height).toBeLessThanOrEqual(0.4 * 500 + 1);
+    const list = await page.locator('#flight-companion-model-list').evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight }));
+    expect(list.client).toBeLessThanOrEqual(0.4 * 500);
+
+    await page.locator('.fc-chat-composer').scrollIntoViewIfNeeded();
+    await assertControlsStayInSection(page);
+    await expect(page.locator('#flight-companion-start')).toBeInViewport();
+    await expect(page.locator('#flight-companion-send')).toBeInViewport();
+    await page.locator('#flight-companion-start').click({ trial: true, timeout: 2000 });
+    await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
+  });
+});

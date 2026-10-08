@@ -333,8 +333,8 @@ export function buildCensusSeedText(currentCensusDoc) {
  * `resolveTurnModelOverride`, routes/flight-companion.js, accepts, so no
  * option can 400. Built via the shared `buildModelOptions` merge (lib/
  * openrouter-catalog.js), reused rather than forked. Each option carries
- * `curated`; the renderer currently offers curated options only, LIN-3363 S2
- * widens the picker. Curated display name/pricing come straight from
+ * `curated`; the renderer offers every option (LIN-3363 S2: a searchable
+ * combobox, catalog-only entries tagged tools-off). Curated display name/pricing come straight from
  * `AVAILABLE_MODELS`; a catalog-only id uses its catalog label and a null
  * pricing hint) and `currentPricing` (the resolved default's
  * own rate-card hint, `null` when unpriced — never fabricated, matching
@@ -359,8 +359,8 @@ export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, 
   // LIN-3363: the option set is curated ids plus the cached catalog, deduped
   // by `buildModelOptions` (curated first). Curated entries keep their
   // AVAILABLE_MODELS name/pricing; a catalog-only id uses its catalog label and
-  // `getModelPricingHint` (null for it). `curated` lets the renderer (curated
-  // only in S1) tell the two apart; `toolsOn`/`free` are per-option facts.
+  // `getModelPricingHint` (null for it). `curated` marks the two
+  // apart (the renderer offers both); `toolsOn`/`free` are per-option facts.
   const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id), catalog }).map((d) => {
     const curated = AVAILABLE_MODELS.find((m) => m.id === d.id);
     return {
