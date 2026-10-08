@@ -1,5 +1,5 @@
 {
-"about": "Blind coding of every review comment in the first 400 characters of which \"Request Changes\" or \"Needs Discussion\" appears, on the 176 tickets with send-backs and 136 with plan send-backs, by two in-session readers (before and from 2026-09-01), against coherence-as-it-grows-codebook-sendbacks.md, 2026-10-08. Bodies were capped at 5,000 characters. Neither reader saw version 1 of the paper.",
+"about": "Blind coding of every review comment in the first 400 characters of which \"Request Changes\" or \"Needs Discussion\" appears, on the 176 tickets with send-backs and 136 with plan send-backs, by two in-session readers (before and from 2026-09-01), against coherence-as-it-grows-sources/codebook-sendbacks.md, 2026-10-08. Bodies were capped at 5,000 characters. Neither reader saw version 1 of the paper.",
 "rows": [
 {
 "ticket": "LIN-510",
