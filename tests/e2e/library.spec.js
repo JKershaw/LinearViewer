@@ -12,11 +12,11 @@ test.describe('Library — server-rendered, no JavaScript', () => {
 
   test('index renders Start here, the shelves and Archive editions', async ({ page }) => {
     await page.goto('/library');
-    await expect(page.locator('h2', { hasText: 'Start here' })).toBeVisible();
-    await expect(page.locator('h2', { hasText: 'Essays' })).toBeVisible();
-    await expect(page.locator('h2', { hasText: 'Papers' })).toBeVisible();
-    await expect(page.locator('h2', { hasText: 'Other documents' })).toBeVisible();
-    await expect(page.locator('h2', { hasText: 'Archive editions' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Start here', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Essays', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Papers', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Other documents', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Archive editions', exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="library-item-link"]').first()).toBeVisible();
   });
 

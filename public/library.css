@@ -193,6 +193,10 @@
   margin-bottom: 0;
 }
 
+.library-doc__aside a {
+  color: var(--brand-dim);
+}
+
 /* The reading column stays 68ch inside the wider panel. The cap is on the
    body's children, not the body itself, so a figure (below) can span the full
    panel width. */
