@@ -79,6 +79,8 @@ function buildApp(captured) {
   const app = express();
   app.use(express.json());
   app.use(createCollectiveRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.push({ urlKey, item });
@@ -95,7 +97,7 @@ function buildApp(captured) {
     getDeployInfo: () => ({}),
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey };
-      req.session = {
+      req.session = { accountId: 'u1',
         accountId: 'u1',
         features: { collective: true },
         workspaces: WORKSPACES,
@@ -278,6 +280,8 @@ describe('POST /collective/start — persona threading + recent recording (LIN-1
     const app = express();
     app.use(express.json());
     app.use(createCollectiveRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       dispatchQueueStore: {
         addItem: async (urlKey, item) => {
           captured.push({ urlKey, item });
@@ -369,6 +373,8 @@ describe('POST /collective/start — persona threading + recent recording (LIN-1
     const app = express();
     app.use(express.json());
     app.use(createCollectiveRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       dispatchQueueStore: {
         addItem: async (urlKey, item) => { captured.push({ urlKey, item }); return { _id: `disp-${captured.length}`, ...item }; },
       },

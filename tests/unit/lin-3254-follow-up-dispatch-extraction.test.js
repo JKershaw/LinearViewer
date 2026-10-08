@@ -96,6 +96,8 @@ function mountRoute(stores) {
   const app = express();
   app.use(express.json());
   app.use(createFlightCompanionRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: URL_KEY };
       req.session = { accountId: 'u1', features: { flightCompanion: true } };
@@ -126,6 +128,8 @@ function helperOptions(stores, overrides = {}) {
     prompt: 'next beat',
     baseUrl: 'http://127.0.0.1',
     dispatchedBy: 'u1',
+    ownerCheck: async () => ({ status: 'owner' }), // LIN-3383
+    workspaceId: 'ws-1',
     ...overrides,
   };
 }

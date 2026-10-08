@@ -53,6 +53,8 @@ function buildDispatchApp({ taskModeStore = null, session = { accountId: 'acct-1
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
       addItem: async (urlKey, item) => {
         captured.items = [...(captured.items || []), item];
@@ -278,10 +280,13 @@ describe('LIN-2942 — session dispatch route, entryRung', () => {
     }
   });
 
-  test('no session account: the dispatch proceeds and nothing is recorded', async () => {
+  // LIN-3383: a session with no account can no longer dispatch to a runner
+  // target at all (owner-only enqueue, fail closed), so nothing is recorded
+  // because nothing is dispatched.
+  test('no session account: the dispatch is refused (GRANT_OWNERLESS) and nothing is recorded', async () => {
     const store = recordingTaskModeStore();
     const res = await call(buildDispatchApp({ taskModeStore: store, session: { linearUserId: 'u1' } }), 'post', DISPATCH_PATH, { ...TASK_BODY, entryRung: 'run-step' });
-    assert.equal(res.status, 201, res.text);
+    assert.equal(res.status, 503, res.text);
     assert.equal(store.calls.length, 0);
   });
 
@@ -290,6 +295,8 @@ describe('LIN-2942 — session dispatch route, entryRung', () => {
     const app = express();
     app.use(express.json());
     app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       dispatchQueueStore: { addItem: async () => { throw new Error('queue down'); } },
       dispatchTokenStore: {},
       provider: { name: 'unit-test' },

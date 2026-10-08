@@ -97,6 +97,7 @@ function turnDeps(stores, extra = {}) {
     proxyTokenStore: { async createToken() { return { token: 'minted' }; } },
     baseUrl: 'http://127.0.0.1',
     dispatchedBy: 'user-1',
+    enqueueGuard: async () => null, // LIN-3383: the owner
   };
 }
 

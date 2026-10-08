@@ -115,6 +115,8 @@ function buildSessionApp(workspace, store) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: store,
     dispatchTokenStore: {},
     workspaceFromUrl: (req, _res, next) => {

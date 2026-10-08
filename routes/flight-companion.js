@@ -73,6 +73,7 @@
  * returns that shape.
  */
 
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { Router } from 'express';
 import { renderFlightCompanionPage } from '../lib/render-flight-companion.js';
 import { renderErrorPage } from '../lib/render.js';
@@ -495,6 +496,9 @@ export function createFlightCompanionRoutes({
   workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore,
   freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore,
   dispatchQueueStore, agentStatusStore, proxyTokenStore,
+  // LIN-3383: the hoisted workspace-owner seam (server.js). Approve and reply
+  // (send_follow_up) are owner-only.
+  workspaceOwnerCheck = null,
   // LIN-2617: the two extra inputs `list_pending_decisions` needs to return the
   // same rows the rulings feed returns. Optional, like every other store here —
   // absent, that ONE tool reports "not configured" and the rest of the catalog
@@ -732,6 +736,13 @@ export function createFlightCompanionRoutes({
           buildCensusSeedText,
           baseUrl: `${req.protocol}://${req.get('host')}`,
           dispatchedBy: req.session?.accountId || null,
+          // LIN-3383: the reply's send_follow_up (execute mode) is owner-only.
+          enqueueGuard: ({ target }) => resolveRunnerEnqueueRefusal({
+            ownerCheck: workspaceOwnerCheck,
+            workspaceId: workspace.id,
+            accountId: req.session?.accountId,
+            target
+          }),
         },
       });
 
@@ -961,6 +972,8 @@ export function createFlightCompanionRoutes({
         prompt,
         baseUrl,
         dispatchedBy,
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: workspace.id,
       });
       res.status(outcome.status).json(outcome.body);
     } catch (error) {

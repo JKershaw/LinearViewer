@@ -77,9 +77,11 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
   // the route's own permissive parser is what handles our text/plain bodies.
   app.use(express.json({ limit: '250kb' }));
   const router = createWorkspaceApiRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: token };
-      req.session = { linearUserId: 'user-1', features };
+      req.session = { accountId: 'u1', linearUserId: 'user-1', features };
       // fixture:LIN-3136: the owner session and workspace id a declared mint needs
       req.workspace.id = 'ws-acme';
       req.session.accountId = 'acct-owner';

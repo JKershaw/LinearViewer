@@ -164,9 +164,11 @@ function buildFeedbackApp({ provider, dispatchQueueStore }) {
   const app = express();
   app.use(express.json({ limit: '250kb' }));
   const router = createWorkspaceApiRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: provider.name, accessToken: 'ws-token' };
-      req.session = { linearUserId: 'user-1', features: { feedbackTriage: true } };
+      req.session = { accountId: 'u1', linearUserId: 'user-1', features: { feedbackTriage: true } };
       next();
     },
     dispatchQueueStore,

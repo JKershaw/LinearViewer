@@ -44,6 +44,7 @@ import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { DISPATCH_RUNGS, SURFACES } from '../lib/task-mode-store.js';
 import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
@@ -265,6 +266,28 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
         return badRequest.json(res, `target must be one of: ${VALID_TARGETS.join(', ')}`);
+      }
+
+      // LIN-3383 owner-only runner enqueue. Every write below (fresh, followUpTo,
+      // abort and the cascade expansion) is consumed by the owner's runner when
+      // target is cli/web (absent = cli), so only the workspace owner may reach
+      // them. Ahead of every write, provider call and run gate: a refusal spends
+      // nothing. dash/local pass untouched; an abort to dash stays ungated.
+      const enqueueRefusal = await resolveRunnerEnqueueRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: workspace.id,
+        accountId: req.session?.accountId,
+        target: target ?? 'cli'
+      });
+      if (enqueueRefusal) {
+        console.warn(
+          `Dispatch enqueue refused: ${enqueueRefusal.code} (urlKey=${workspace.urlKey}) — LIN-3383`
+        );
+        return jsonError(res, enqueueRefusal.status, enqueueRefusal.error, {
+          code: enqueueRefusal.code,
+          category: enqueueRefusal.category,
+          retryable: enqueueRefusal.retryable
+        });
       }
 
       // Abort eligibility (LIN-743): the abort item's OWN target must be

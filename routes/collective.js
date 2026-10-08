@@ -23,6 +23,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { jsonError, notFound } from '../lib/errors.js';
@@ -86,6 +87,9 @@ export function createCollectiveRoutes({
   getOpenRouterSource,
   getDeployInfo,
   workspacePreferencesStore,
+  // LIN-3383: the hoisted workspace-owner seam (server.js). Each participant
+  // seat enqueues on its workspace's runner, so the session must own it.
+  workspaceOwnerCheck = null,
 }) {
   const router = Router();
 
@@ -276,6 +280,22 @@ export function createCollectiveRoutes({
       // buildCollectiveParticipantPrompt/buildCollectiveFacilitatorPrompt don't
       // gate any endpoint hint on it, out of scope per this ticket's class sweep).
       const providerUi = getProvider(ws.provider)?.ui ?? null;
+
+      // LIN-3383 owner-only runner enqueue, per participant workspace (never the
+      // anchor): a seat in a workspace this session does not own is marked
+      // ok:false and nothing is enqueued for it; the owned seats still launch.
+      // Ahead of the factory, the token mint and the character bookkeeping.
+      const seatRefusal = await resolveRunnerEnqueueRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: ws.id,
+        accountId: req.session?.accountId,
+        target
+      });
+      if (seatRefusal) {
+        console.warn(`Collective: enqueue refused for ${ws.urlKey}: ${seatRefusal.code} — LIN-3383`);
+        dispatched.push({ urlKey: ws.urlKey, name: ws.name, nick, ok: false, error: seatRefusal.error, code: seatRefusal.code });
+        continue;
+      }
 
       // Build the participant/facilitator prompt for a given proxy token pair.
       // Hoisted so finalizePrompt can build it either WITHOUT a token (claude-code,
