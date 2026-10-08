@@ -210,15 +210,21 @@ export function createTaskShareRoutes({
         issueId: record.issueId,
       });
       res.set('Cache-Control', 'no-store');
-      const contextHtml = renderTaskContext(model, { urlKey: record.urlKey });
-      return res.json({
+      // The state read has no tracker, so it holds no verified brief/recap:
+      // send no context at all and the client keeps the page-load panels
+      // (LIN-3373). Only a model that carries a doc repaints them.
+      const body = {
         status: model.status,
         live: model.live,
         headerHtml: renderTaskStatus(model),
         trackHtml: renderTaskTrack(model, { now: now() }),
-        contextHtml,
-        contextSig: contextSignature(contextHtml),
-      });
+      };
+      if (model.brief || model.recap) {
+        const contextHtml = renderTaskContext(model, { urlKey: record.urlKey });
+        body.contextHtml = contextHtml;
+        body.contextSig = contextSignature(contextHtml);
+      }
+      return res.json(body);
     } catch (error) {
       console.error('Task share state error:', error.message);
       return jsonError(res, 503, UNAVAILABLE_MESSAGE);

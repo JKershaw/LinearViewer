@@ -472,6 +472,21 @@
     return stateSig == null || stateSig !== mountSig;
   }
 
+  /**
+   * Repaint the answer header from the state endpoint (LIN-3373). That read has
+   * no tracker, so it can't verify a summary and its header carries none: the
+   * load-time summary paragraph is carried across rather than deleted by the
+   * repaint. A header that does carry one replaces it.
+   */
+  function repaintHeader(answer, html) {
+    var summaryNode = answer.querySelector('[data-testid="task-page-summary"]');
+    answer.innerHTML = html;
+    if (summaryNode && !answer.querySelector('[data-testid="task-page-summary"]')) {
+      var status = answer.querySelector('[data-testid="task-page-status"]');
+      (status || answer).appendChild(summaryNode);
+    }
+  }
+
   function init(doc) {
     var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
     if (!main) return null;
@@ -519,7 +534,7 @@
       // status is idle and the box is still ready; a polled running/waiting (a
       // close-out session started) overrides it.
       var keepReady = shouldKeepReady(main.getAttribute('data-merge-ready'), state.status);
-      if (answer && typeof state.headerHtml === 'string' && !keepReady) answer.innerHTML = state.headerHtml;
+      if (answer && typeof state.headerHtml === 'string' && !keepReady) repaintHeader(answer, state.headerHtml);
       if (trackMount && typeof state.trackHtml === 'string') {
         var checkIns = openCheckIns(trackMount);
         trackMount.innerHTML = state.trackHtml;
@@ -578,6 +593,7 @@
       tickClocks: tickClocks,
       openCheckIns: openCheckIns,
       restoreCheckIns: restoreCheckIns,
+      repaintHeader: repaintHeader,
       isGuestStateUrl: isGuestStateUrl,
       shouldKeepReady: shouldKeepReady,
       contextNeedsRepaint: contextNeedsRepaint,

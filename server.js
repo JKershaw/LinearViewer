@@ -2971,7 +2971,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
 // `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
 // `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, closeOutEventsStore, enrichLoop, deriveSessionWaiting })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,

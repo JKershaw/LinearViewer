@@ -227,7 +227,7 @@ describe('GET /t/:token/state', () => {
       const res = await get(base, `/t/${TOKEN}/state`);
       assert.equal(res.status, 200);
       const body = JSON.parse(res.text);
-      assert.deepEqual(Object.keys(body).sort(), ['contextHtml', 'contextSig', 'headerHtml', 'live', 'status', 'trackHtml']);
+      assert.deepEqual(Object.keys(body).sort(), ['headerHtml', 'live', 'status', 'trackHtml'], 'no verified brief/recap on a state read: no context sent (LIN-3373)');
       assert.equal(accessCalls, 0, 'the state endpoint resolves no credential');
       assert.equal(loader.calls.loadTaskState.length, 1);
       assert.equal(loader.calls.loadTaskPage.length, 0);
