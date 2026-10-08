@@ -34,6 +34,7 @@ import {
   renderTaskStatus,
   renderTaskTrack,
   renderTaskContext,
+  contextSignature,
 } from '../lib/render-task-page.js';
 
 /** A non-empty query string value, else undefined. */
@@ -77,7 +78,13 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
     const access = { provider: issueBinding.provider, callScope: issueBinding.callScope };
 
     try {
-      const result = await loader.loadTaskPage({ urlKey: workspace.urlKey, identifier, access });
+      const result = await loader.loadTaskPage({
+        urlKey: workspace.urlKey,
+        identifier,
+        access,
+        viewerIsOwner: true,
+        runnerReady: getFeatureFlags(req.session).dispatch === true,
+      });
       if (result.notFound) {
         return res.status(404).send(renderTaskNotFoundPage({ identifier, urlKey: workspace.urlKey }, pageOptions));
       }
@@ -128,12 +135,14 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         issueId: issueId && isValidIssueId(issueId) ? issueId : null,
       });
       res.set('Cache-Control', 'no-store');
+      const contextHtml = renderTaskContext(model, { urlKey: workspace.urlKey });
       return res.json({
         status: model.status,
         live: model.live,
         headerHtml: renderTaskStatus(model),
         trackHtml: renderTaskTrack(model, { now: now() }),
-        contextHtml: renderTaskContext(model, { urlKey: workspace.urlKey }),
+        contextHtml,
+        contextSig: contextSignature(contextHtml),
       });
     } catch (error) {
       console.error('Task page state error:', error.message);

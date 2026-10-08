@@ -36,6 +36,7 @@ import {
   renderTaskStatus,
   renderTaskTrack,
   renderTaskContext,
+  contextSignature,
 } from '../lib/render-task-page.js';
 
 /** The loader-result cache window. A revoke/owner change still lands next request. */
@@ -209,12 +210,14 @@ export function createTaskShareRoutes({
         issueId: record.issueId,
       });
       res.set('Cache-Control', 'no-store');
+      const contextHtml = renderTaskContext(model, { urlKey: record.urlKey });
       return res.json({
         status: model.status,
         live: model.live,
         headerHtml: renderTaskStatus(model),
         trackHtml: renderTaskTrack(model, { now: now() }),
-        contextHtml: renderTaskContext(model, { urlKey: record.urlKey }),
+        contextHtml,
+        contextSig: contextSignature(contextHtml),
       });
     } catch (error) {
       console.error('Task share state error:', error.message);

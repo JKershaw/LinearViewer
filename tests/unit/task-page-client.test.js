@@ -23,9 +23,9 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/task-page.js'), 'utf8');
 
-function load() {
+function load({ window = {} } = {}) {
   const module = { exports: {} };
-  vm.runInNewContext(SRC, { module, Set, Math, Promise, Date, String, isNaN, Array });
+  vm.runInNewContext(SRC, { module, window, Set, Math, Promise, Date, String, isNaN, Array });
   return module.exports;
 }
 
@@ -196,7 +196,47 @@ describe('createPoller', () => {
   });
 });
 
-// LIN-3330 review, ledger 2: only a guest share URL may report "gone".
+// LIN-3340: the poll must not wipe the load-time ready header, and a guest's
+// client-side markdown must survive an unchanged brief.
+describe('poll safety (LIN-3340)', () => {
+  const { shouldKeepReady, contextNeedsRepaint } = load();
+
+  test('the ready-to-merge header is kept only across an idle poll', () => {
+    assert.equal(shouldKeepReady('true', 'idle'), true);
+    assert.equal(shouldKeepReady('true', 'running'), false, 'a started close-out overrides');
+    assert.equal(shouldKeepReady('true', 'waiting'), false);
+    assert.equal(shouldKeepReady('false', 'idle'), false);
+    assert.equal(shouldKeepReady(null, 'idle'), false);
+  });
+
+  test('the context mount repaints only on a changed signature, and never once widgets mount', () => {
+    assert.equal(contextNeedsRepaint(undefined, 'abc', false), true, 'no sig: repaint');
+    assert.equal(contextNeedsRepaint('abc', 'abc', false), false, 'unchanged brief is not repainted');
+    assert.equal(contextNeedsRepaint('def', 'abc', false), true, 'changed brief is repainted');
+    assert.equal(contextNeedsRepaint('def', 'abc', true), false, 'the owner widgets own their refresh');
+  });
+
+  test('a guest brief `<pre>` is upgraded to markdown and the upgrade is idempotent', () => {
+    const module = { exports: {} };
+    const document = { createElement: () => ({ className: '', innerHTML: '' }) };
+    const window = { renderMarkdown: (t) => `<p>${t}</p>` };
+    vm.runInNewContext(SRC, { module, window, document, Set, Math, Promise, Date, String, isNaN, Array });
+    const { enhanceContextMarkdown } = module.exports;
+
+    const pre = { textContent: 'A **brief**', parentNode: null, replacedWith: null };
+    const parent = { replaceChild(div, old) { this.child = div; this.replaced = old; } };
+    pre.parentNode = parent;
+    let present = [pre];
+    const mount = { querySelectorAll: (sel) => (sel === 'pre.sess-ctx-body' ? (present = present.filter(p => p !== parent.replaced && p)) : []) };
+    parent.replaceChild = function (div, old) { this.child = div; this.replaced = old; present = []; };
+
+    enhanceContextMarkdown(mount);
+    assert.equal(parent.child.innerHTML, '<p>A **brief**</p>', 'markdown rendered');
+    assert.equal(parent.replaced, pre, 'the <pre> was replaced');
+    enhanceContextMarkdown(mount); // no pre left — a no-op
+    assert.equal(parent.child.innerHTML, '<p>A **brief**</p>');
+  });
+});
 describe('isGuestStateUrl (the onGone gate)', () => {
   const { isGuestStateUrl } = load();
 
@@ -208,6 +248,52 @@ describe('isGuestStateUrl (the onGone gate)', () => {
     assert.equal(isGuestStateUrl('/workspace/acme/api/task/LIN-50/state?issueId=abc'), false);
     assert.equal(isGuestStateUrl(''), false);
     assert.equal(isGuestStateUrl(null), false);
+  });
+});
+
+// LIN-3340 G1/F2 (review `388f4246`): the owner's brief/recap widgets must be
+// mounted WITH the task's provider kind, or their GET/POST resolve the wrong
+// provider. A mutation dropping `source: source` left the suite green, because
+// the e2e compares pathnames only.
+describe('owner widget mount threads source (LIN-3340)', () => {
+  /** A doc with the owner marker and one brief + one recap panel. */
+  function makeDoc({ source, marker = true } = {}) {
+    const calls = [];
+    const init = (lib) => (el, opts) => calls.push({ lib, el, opts });
+    const window = { BriefSection: { init: init('brief') }, RecapSection: { init: init('recap') } };
+    const briefEl = { dataset: { urlKey: 'dk-brief', identifier: 'LIN-50' } };
+    const recapEl = { dataset: { urlKey: 'dk-recap', identifier: 'LIN-50' } };
+    const doc = {
+      querySelector: (sel) => (marker && sel === '[data-testid="task-page-owner-widgets"]' ? {} : null),
+      querySelectorAll: (sel) => (sel === '.sess-ctx-panel.brief-section' ? [briefEl]
+        : sel === '.sess-ctx-panel.recap-section' ? [recapEl] : []),
+    };
+    const attrs = { 'data-source': source, 'data-url-key': 'fbk', 'data-identifier': 'LIN-50' };
+    const main = { getAttribute: (k) => (k in attrs ? attrs[k] : null) };
+    return { doc, main, calls, window };
+  }
+
+  test('the task source reaches both widget inits (and both refresh POSTs)', () => {
+    const { doc, main, calls, window } = makeDoc({ source: 'linear' });
+    const { mountWidgets } = load({ window });
+    assert.equal(mountWidgets(doc, main), true);
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls.map(c => c.lib).sort(), ['brief', 'recap']);
+    for (const c of calls) assert.equal(c.opts.source, 'linear', `${c.lib} got the task source`);
+  });
+
+  test('a task with no data-source mounts the widgets with no source', () => {
+    const { doc, main, calls, window } = makeDoc({ source: undefined });
+    const { mountWidgets } = load({ window });
+    mountWidgets(doc, main);
+    for (const c of calls) assert.equal(c.opts.source, undefined, 'no source stays off the request');
+  });
+
+  test('a guest (no owner marker) mounts nothing', () => {
+    const { doc, main, calls, window } = makeDoc({ source: 'linear', marker: false });
+    const { mountWidgets } = load({ window });
+    assert.equal(mountWidgets(doc, main), false);
+    assert.equal(calls.length, 0);
   });
 });
 

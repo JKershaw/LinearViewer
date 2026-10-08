@@ -12,9 +12,17 @@
  * polling — the state endpoint can't see the tracker, so it could never repaint
  * a done header truthfully (LIN-3324 Decisions: poll rule).
  *
- * The poll only ever requests the state URL. The one other request this page
- * makes is "ask for an update" (owner only), which POSTs the existing
- * session-only `/api/brief|recap/:issueId` and then polls once.
+ * The poll only ever requests the state URL. Owner-only behaviour starts from
+ * owner-only DOM hooks: the brief/recap widgets mount from the
+ * `task-page-owner-widgets` marker, and the close-out box (public/close-out.js)
+ * is its own owner fragment. A guest loads the same scripts and they no-op.
+ *
+ * Evidence and the description/comments block sit OUTSIDE every poll-repainted
+ * mount, so a repaint can never lose or move them. The brief/recap panels are
+ * sig-gated: the context mount repaints only when `contextSig` changed, and a
+ * guest's client-side markdown is re-applied after any repaint (LIN-3340 F2).
+ * Once the owner's widgets mount, the context mount is never repainted (the
+ * widgets own their refresh).
  *
  * A repaint never collapses a row the reader opened: an open-set keyed by
  * `data-loop-id` is seeded from the rows rendered open and re-applied after
@@ -334,6 +342,70 @@
   // ── Page wiring ────────────────────────────────────────────────────────────
 
   /**
+   * Upgrade `[data-md]` bodies (description, comments) to sanitized markdown,
+   * from the escaped text the server rendered. Idempotent enough for our use
+   * (the block is never repainted, so it runs once). A missing renderMarkdown
+   * leaves the escaped text.
+   */
+  function enhanceMarkdown(root) {
+    if (!root || !root.querySelectorAll || typeof window.renderMarkdown !== 'function') return;
+    var nodes = root.querySelectorAll('[data-md]');
+    for (var i = 0; i < nodes.length; i++) {
+      var text = nodes[i].textContent;
+      if (text) nodes[i].innerHTML = window.renderMarkdown(text);
+    }
+  }
+
+  /**
+   * Upgrade the brief's server-rendered `<pre class="sess-ctx-body">` to
+   * markdown (a guest, or an owner whose widget libs failed to load). Replaces
+   * the `<pre>` with a div, so a second call is a no-op.
+   */
+  function enhanceContextMarkdown(mount) {
+    if (!mount || !mount.querySelectorAll || typeof window.renderMarkdown !== 'function') return;
+    var pres = mount.querySelectorAll('pre.sess-ctx-body');
+    for (var i = 0; i < pres.length; i++) {
+      var pre = pres[i];
+      if (!pre.parentNode) continue;
+      var div = document.createElement('div');
+      div.className = 'sess-ctx-body sess-ctx-md';
+      div.innerHTML = window.renderMarkdown(pre.textContent);
+      pre.parentNode.replaceChild(div, pre);
+    }
+  }
+
+  /**
+   * Mount the owner's live brief/recap widgets from the owner marker, threading
+   * the task's `source` (from `<main data-source>`) so their GET/POST resolve
+   * THIS issue's provider (G1). Returns whether anything mounted — the caller
+   * then never repaints the context mount.
+   */
+  function mountWidgets(doc, main) {
+    var marker = doc.querySelector('[data-testid="task-page-owner-widgets"]');
+    if (!marker) return false;
+    var source = main.getAttribute('data-source') || undefined;
+    var fallbackUrlKey = main.getAttribute('data-url-key') || '';
+    var fallbackIdentifier = main.getAttribute('data-identifier') || '';
+    var mounted = false;
+    function mount(selector, lib) {
+      if (!lib || typeof lib.init !== 'function') return;
+      var panels = doc.querySelectorAll(selector);
+      for (var i = 0; i < panels.length; i++) {
+        var el = panels[i];
+        lib.init(el, {
+          urlKey: (el.dataset && el.dataset.urlKey) || fallbackUrlKey,
+          identifier: (el.dataset && el.dataset.identifier) || fallbackIdentifier,
+          source: source,
+        });
+        mounted = true;
+      }
+    }
+    mount('.sess-ctx-panel.brief-section', window.BriefSection);
+    mount('.sess-ctx-panel.recap-section', window.RecapSection);
+    return mounted;
+  }
+
+  /**
    * Whether a state URL belongs to a guest share page (LIN-3330 review, ledger 2).
    * Only a guest page's state endpoint can 404 because the link was revoked or
    * never issued; an owner page's 404 (e.g. the workspace left the session in
@@ -342,6 +414,26 @@
    */
   function isGuestStateUrl(stateUrl) {
     return typeof stateUrl === 'string' && /^\/t\//.test(stateUrl);
+  }
+
+  /**
+   * Keep the load-time "approved, ready to merge" answer while the stored-data
+   * poll reports `idle` (it can't see the ready state) and the box is still
+   * ready. A polled running/waiting — a close-out session started — overrides.
+   * Pure.
+   */
+  function shouldKeepReady(mergeReadyAttr, stateStatus) {
+    return mergeReadyAttr === 'true' && stateStatus === 'idle';
+  }
+
+  /**
+   * Whether the context mount must be repainted: never once the owner's widgets
+   * mounted (they own their refresh), and otherwise only when `contextSig`
+   * changed (an unchanged brief keeps its client-side markdown). Pure.
+   */
+  function contextNeedsRepaint(stateSig, mountSig, widgetsMounted) {
+    if (widgetsMounted) return false;
+    return stateSig == null || stateSig !== mountSig;
   }
 
   function init(doc) {
@@ -353,6 +445,12 @@
     var contextMount = doc.querySelector('[data-testid="task-page-context-mount"]');
     var rows = function () { return trackMount ? trackMount.querySelectorAll('.task-step') : []; };
     var memory = createOpenMemory(rows());
+
+    // Owner's live widgets (if the libs loaded). Once mounted, the context
+    // mount is never repainted; the widgets own their refresh.
+    var widgetsMounted = mountWidgets(doc, main);
+    if (!widgetsMounted && contextMount) enhanceContextMarkdown(contextMount);
+    enhanceMarkdown(doc);
 
     function toggle(row) {
       var open = !row.classList.contains(OPEN_CLASS);
@@ -376,20 +474,30 @@
       });
     }
 
+    // The close-out box lives outside every repainted mount, so only the
+    // merge-ready attribute needs to track it: a check (or a poll) that moves
+    // the box off `ready` clears the load-time answer's retention.
+    function syncMergeReady() {
+      var box = doc.querySelector('[data-testid="run-evidence-closeout"]');
+      if (box && box.getAttribute('data-state') !== 'ready') main.setAttribute('data-merge-ready', 'false');
+    }
+
     function apply(state) {
-      // The evidence needs the tracker, which the state endpoint never reads:
-      // carry the page's evidence into whichever row hosts the slot now.
-      var oldSlot = trackMount && trackMount.querySelector('[data-evidence-slot]');
-      var evidence = oldSlot ? Array.prototype.slice.call(oldSlot.childNodes) : [];
-      if (answer && typeof state.headerHtml === 'string') answer.innerHTML = state.headerHtml;
+      // The state endpoint can't see the tracker, so it never reports ready.
+      // Keep the load-time "approved, ready to merge" answer while the polled
+      // status is idle and the box is still ready; a polled running/waiting (a
+      // close-out session started) overrides it.
+      var keepReady = shouldKeepReady(main.getAttribute('data-merge-ready'), state.status);
+      if (answer && typeof state.headerHtml === 'string' && !keepReady) answer.innerHTML = state.headerHtml;
       if (trackMount && typeof state.trackHtml === 'string') trackMount.innerHTML = state.trackHtml;
-      if (contextMount && typeof state.contextHtml === 'string') contextMount.innerHTML = state.contextHtml;
-      var newSlot = trackMount && trackMount.querySelector('[data-evidence-slot]');
-      if (newSlot && !newSlot.childNodes.length) {
-        for (var i = 0; i < evidence.length; i++) newSlot.appendChild(evidence[i]);
+      if (contextMount && typeof state.contextHtml === 'string' && contextNeedsRepaint(state.contextSig, contextMount.getAttribute('data-context-sig'), widgetsMounted)) {
+        contextMount.innerHTML = state.contextHtml;
+        if (state.contextSig != null) contextMount.setAttribute('data-context-sig', state.contextSig);
+        enhanceContextMarkdown(contextMount);
       }
       applyOpenMemory(rows(), memory);
-      main.setAttribute('data-status', state.status);
+      syncMergeReady();
+      main.setAttribute('data-status', keepReady ? 'waiting' : state.status);
       main.setAttribute('data-live', state.live ? 'true' : 'false');
       tickClocks(main);
     }
@@ -412,27 +520,6 @@
       doc.addEventListener('visibilitychange', function () { poller.onVisibilityChange(doc.hidden); });
     }
 
-    // "Ask for an update" (owner only): the existing session-only POST, then
-    // one poll so the new brief/recap shows. Opening the page never asks.
-    doc.addEventListener('click', function (e) {
-      var btn = e.target && e.target.closest ? e.target.closest('[data-action="task-ask-update"]') : null;
-      if (!btn) return;
-      e.preventDefault();
-      var note = doc.querySelector('[data-testid="task-page-ask-note"]');
-      var kind = btn.getAttribute('data-kind') || 'brief';
-      btn.disabled = true;
-      if (note) note.textContent = 'asking for an updated ' + kind + '…';
-      window.api(btn.getAttribute('data-url'), { method: 'POST', on401: false })
-        .then(function () {
-          if (note) note.textContent = 'updated ' + kind;
-          if (poller) return poller.poll();
-          return window.api(main.getAttribute('data-state-url'), { on401: '/logout' }).then(apply);
-        }, function (err) {
-          if (note) note.textContent = 'could not update the ' + kind + ': ' + ((err && err.message) || 'error');
-        })
-        .then(function () { btn.disabled = false; });
-    });
-
     tickClocks(main);
     setInterval(function () { tickClocks(main); }, TICK_MS);
     return { poller: poller, memory: memory, apply: apply };
@@ -454,6 +541,11 @@
       applyOpenMemory: applyOpenMemory,
       formatElapsed: formatElapsed,
       isGuestStateUrl: isGuestStateUrl,
+      shouldKeepReady: shouldKeepReady,
+      contextNeedsRepaint: contextNeedsRepaint,
+      enhanceMarkdown: enhanceMarkdown,
+      enhanceContextMarkdown: enhanceContextMarkdown,
+      mountWidgets: mountWidgets,
       FAST_MS: FAST_MS,
       SLOW_MS: SLOW_MS,
       MAX_BACKOFF_MS: MAX_BACKOFF_MS

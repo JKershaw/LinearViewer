@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus, harbourHref } from '../../lib/render-task-page.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { CLOSE_OUT_STATUS } from '../../lib/run-closeout-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(__dirname, '../fixtures/render-task-page-golden.json');
@@ -75,13 +76,17 @@ function ctx({ stateType = 'started', stateName = 'In Progress' } = {}) {
       url: 'https://linear.app/x/issue/LIN-50',
       state: { name: stateName, type: stateType },
       labels: ['frontend'],
+      description: 'A **markdown** description with a list:\n\n- one\n- two',
       blockedBy: [{ identifier: 'LIN-49', title: 'Lift helpers', state: { name: 'Done', type: 'completed' } }],
       createdAt: '2026-10-01T09:00:00.000Z',
       updatedAt: '2026-10-06T10:00:00.000Z',
     },
     parent: { id: 'p', identifier: 'LIN-40', title: 'A page for each task', state: { name: 'In Progress', type: 'started' } },
     children: [{ id: 'c', identifier: 'LIN-51', title: 'Share link', state: { name: 'Todo', type: 'unstarted' } }],
-    comments: [],
+    comments: [
+      { body: 'First comment', user: { name: 'Ada' }, createdAt: '2026-10-05T09:00:00.000Z' },
+      { body: 'Second comment', user: 'Bob', createdAt: '2026-10-06T09:00:00.000Z' },
+    ],
     stateTransitions: [{ createdAt: '2026-10-06T12:00:00.000Z', fromState: 'In Review', toState: stateName }],
   };
 }
@@ -90,7 +95,7 @@ const EVIDENCE = {
   state: { status: 'ready', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' } },
   evidence: { asked: 'Build the task page', done: 'PR #41', checked: { review: null, now: { state: 'passing', checks: [], headSha: 'abc1234', prUrl: 'https://github.com/acme/app/pull/41', checksUrl: 'https://github.com/acme/app/pull/41/checks', headMoved: false } } },
   ledger: null,
-  closeOut: { owner: false, status: 'ready' },
+  closeOut: { owner: true, status: 'ready', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' }, stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50' },
 };
 
 const RUNNING_LOOPS = [
@@ -152,10 +157,10 @@ describe('task page owner golden (LIN-3329)', () => {
 });
 
 describe('task page structure', () => {
-  test('page order: answer → progress → brief/recap → details → share', () => {
+  test('page order: answer → pull request → progress → brief/recap → docs → details → share', () => {
     const html = render('running-blocked-repeat');
     const at = (testid) => html.indexOf(`data-testid="${testid}"`);
-    const order = ['task-page-answer', 'task-page-track', 'task-page-context', 'task-page-details', 'task-page-share-slot'].map(at);
+    const order = ['task-page-answer', 'task-page-pr-mount', 'task-page-track', 'task-page-context', 'task-page-docs', 'task-page-details', 'task-page-share-slot'].map(at);
     assert.ok(order.every(i => i > 0), JSON.stringify(order));
     assert.deepEqual([...order].sort((a, b) => a - b), order);
   });
@@ -178,19 +183,59 @@ describe('task page structure', () => {
     assert.doesNotMatch(row, /status-pill--running/);
   });
 
-  test('the task evidence renders once, inside the newest review/build row', () => {
-    const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
-    assert.equal((html.match(/data-evidence-slot="true"/g) || []).length, 1);
-    const slotRow = html.slice(html.lastIndexOf('data-loop-id=', html.indexOf('data-evidence-slot')), html.indexOf('data-evidence-slot'));
-    assert.match(slotRow, /data-loop-id="rev-2"/);
+  test('the task evidence renders once, in the Pull request section; the track has no slot', () => {
+    const html = render('running-blocked-repeat');
+    assert.equal((html.match(/data-testid="run-evidence"/g) || []).length, 1, 'evidence once');
+    assert.equal((html.match(/data-evidence-slot/g) || []).length, 0, 'no evidence slot in any row');
+    assert.equal((html.match(/data-testid="task-page-pr-mount"/g) || []).length, 1, 'one PR section');
+    // The section sits before Progress, so it is outside every repainted mount.
+    assert.ok(html.indexOf('data-testid="task-page-pr-mount"') < html.indexOf('data-testid="task-page-track-mount"'));
   });
 
-  test('an evidence model with no PR and no ledger renders nothing (no "not recorded" rows)', () => {
+  test('an evidence model with no PR and no ledger renders no Pull request section', () => {
     const m = model('running-blocked-repeat');
-    const bare = { ...m, evidence: { state: { status: 'no-pr', pr: null }, evidence: { asked: 'x', done: null, checked: { review: null, now: { state: 'unknown' } } }, ledger: null } };
-    const html = renderTaskTrack(bare, { now: NOW });
-    assert.match(html, /data-evidence-slot="true"><\/div>/, 'the slot stays, empty');
+    const bare = { ...m, evidence: { state: { status: 'no-pr', pr: null }, evidence: { asked: 'x', done: null, checked: { review: null, now: { state: 'unknown' } } }, ledger: null, closeOut: { owner: true, status: 'no-pr' } } };
+    const html = renderTaskPage(bare, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+    assert.doesNotMatch(html, /task-page-pr-mount/, 'no section');
     assert.doesNotMatch(html, /run-evidence/);
+  });
+
+  test('description and comments render as closed disclosures, outside the repainted mounts', () => {
+    const html = render('running-blocked-repeat');
+    assert.match(html, /data-testid="task-page-description"/);
+    assert.match(html, /data-testid="task-page-comments"/);
+    assert.match(html, /Comments \(2\)/);
+    assert.match(html, /data-testid="task-page-comment-author">Ada</);
+    assert.match(html, /data-testid="task-page-comment-author">Bob</);
+    // After the context mount, before Task details.
+    const docs = html.indexOf('data-testid="task-page-docs"');
+    assert.ok(docs > html.indexOf('data-testid="task-page-context-mount"'));
+    assert.ok(docs < html.indexOf('data-testid="task-page-details"'));
+  });
+
+  // LIN-3340 F3 (review `388f4246`): every close-out status must render a
+  // sensible line on the task page, as it does on the run page. This iterates
+  // the enum, so a status that renders nothing fails here.
+  test('every close-out status renders a line on the task page (C5)', () => {
+    const statuses = Object.values(CLOSE_OUT_STATUS);
+    assert.equal(statuses.length, 8, 'the enum has all eight statuses');
+    for (const status of statuses) {
+      const m = model('running-blocked-repeat');
+      const withBox = {
+        ...m,
+        evidence: {
+          ...m.evidence,
+          closeOut: {
+            owner: true, status, variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
+            pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' },
+          },
+        },
+      };
+      const html = renderTaskPage(withBox, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+      assert.match(html, /data-testid="run-evidence-closeout"/, `${status}: the box is present`);
+      assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"/, `${status}: the box renders a line`);
+      assert.match(html, new RegExp(`data-state="${status}"`), `${status}: the box carries the status`);
+    }
   });
 
   test('guesses: after the furthest stage reached; none once done', () => {
@@ -215,7 +260,7 @@ describe('viewer isolation', () => {
       const guest = render(name, 'guest');
       const fragments = renderOwnerControls(model(name), { urlKey: 'acme', binding: BINDING });
       let stripped = owner;
-      for (const f of [fragments.context, fragments.share]) {
+      for (const f of [fragments.context, fragments.pullRequest, fragments.share]) {
         if (!f) continue;
         assert.ok(stripped.includes(f), 'the owner page carries the fragment verbatim');
         stripped = stripped.replace(f, '');
@@ -224,10 +269,16 @@ describe('viewer isolation', () => {
     });
   }
 
-  test('the ask buttons POST the existing brief/recap endpoints with the source', () => {
-    const { context } = renderOwnerControls(model('running-blocked-repeat'), { urlKey: 'acme', binding: BINDING });
-    assert.match(context, new RegExp(`data-url="/workspace/acme/api/brief/${UUID}\\?source=linear"`));
-    assert.match(context, new RegExp(`data-url="/workspace/acme/api/recap/${UUID}\\?source=linear"`));
+  test('the owner widget marker and the close-out box are owner-only', () => {
+    const owner = render('running-blocked-repeat', 'owner');
+    const guest = render('running-blocked-repeat', 'guest');
+    assert.match(owner, /data-testid="task-page-owner-widgets"/);
+    assert.doesNotMatch(guest, /task-page-owner-widgets/);
+    assert.match(owner, /data-testid="run-evidence-closeout"/);
+    assert.match(owner, /data-issue-id="11111111-2222-3333-4444-555555555555"/);
+    assert.match(owner, /data-source="linear"/);
+    assert.doesNotMatch(guest, /run-evidence-closeout/, 'a guest gets the evidence but no box');
+    assert.match(guest, /data-testid="run-evidence"/);
   });
 
   test('in-Harbour links carry the source through harbourHref, for every viewer', () => {

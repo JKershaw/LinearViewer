@@ -190,10 +190,10 @@ describe('GET /t/:token — guest page matrix', () => {
       assert.match(res.text, /data-testid="task-page"/);
       assert.match(res.text, /data-testid="task-page-title">Build the task page</);
       assert.match(res.text, /data-state-url="\/t\/AAAA/);
-      assert.doesNotMatch(res.text, /data-testid="task-page-ask-update"/, 'no owner ask controls');
+      assert.doesNotMatch(res.text, /data-testid="task-page-owner-widgets"/, 'a guest gets no owner widgets');
       assert.doesNotMatch(res.text, /data-testid="task-share-create"/, 'no owner share controls');
+      assert.doesNotMatch(res.text, /data-testid="run-evidence-closeout"/, 'a guest gets no close-out box');
       assert.match(res.text, /data-testid="task-page-back"/, 'the back link stays for a guest');
-      assert.doesNotMatch(res.text, /data-testid="task-page-ask-brief"/);
       assert.equal(loader.calls.loadTaskPage.length, 1);
       const args = loader.calls.loadTaskPage[0];
       assert.equal(args.urlKey, 'acme');
@@ -227,7 +227,7 @@ describe('GET /t/:token/state', () => {
       const res = await get(base, `/t/${TOKEN}/state`);
       assert.equal(res.status, 200);
       const body = JSON.parse(res.text);
-      assert.deepEqual(Object.keys(body).sort(), ['contextHtml', 'headerHtml', 'live', 'status', 'trackHtml']);
+      assert.deepEqual(Object.keys(body).sort(), ['contextHtml', 'contextSig', 'headerHtml', 'live', 'status', 'trackHtml']);
       assert.equal(accessCalls, 0, 'the state endpoint resolves no credential');
       assert.equal(loader.calls.loadTaskState.length, 1);
       assert.equal(loader.calls.loadTaskPage.length, 0);
