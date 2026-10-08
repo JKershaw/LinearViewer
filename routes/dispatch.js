@@ -40,7 +40,7 @@ import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
-import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
@@ -958,15 +958,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     try {
       const items = await dispatchQueueStore.listItems(workspace.urlKey);
       // Consumer poll-recency warning (LIN-2885), derived fresh against the
-      // current clock from each item's own enqueue-time stamp — same pure
-      // function the proxy watch/list endpoints use — so the dispatch page's
-      // queue list and the nav-badge popover (both rendered off this response
-      // via window.renderQueueRow) can show "no runner has polled..." on a
-      // stale queued row without duplicating the threshold logic client-side.
+      // current clock from the LIVE poll recency (LIN-3367: read once per
+      // request, not per row; queued rows only) — same helper the proxy
+      // watch/list endpoints use — so the dispatch page's queue list and the
+      // nav-badge popover (both rendered off this response via
+      // window.renderQueueRow) can show "no runner has polled..." on a stale
+      // queued row without duplicating the threshold logic client-side. This
+      // collection is the queue itself, so every row here is queued and the
+      // status gate is a no-op; it is routed through the shared helper so the
+      // rule lives in one place.
+      const liveLastSeenAt = items.length
+        ? await getConsumerLastSeenAt(dispatchTokenStore, workspace.urlKey, proxyTokenStore)
+        : null;
       // LIN-3384: session-readable — the live bootstrap token never leaves on this route
       // (runner poll/take is the only token-bearing path).
       const callerId = req.session?.accountId || null;
-      res.json({ items: items.map(item => ({ ...redactSessionItem(item, callerId), consumerPollWarning: buildConsumerPollWarning(item.consumerLastSeenAt) })) });
+      res.json({ items: items.map(item => ({ ...redactSessionItem(item, callerId), consumerPollWarning: buildQueuedPollWarning('queued', liveLastSeenAt) })) });
     } catch (err) {
       console.error('List dispatch items error:', err.message);
       jsonError(res, 500, 'Failed to list dispatch items');

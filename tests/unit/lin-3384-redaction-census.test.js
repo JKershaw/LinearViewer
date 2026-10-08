@@ -123,7 +123,8 @@ const TABLE = {
   'routes/dashboard.js :: readRunFacts': [SRV, 2],
   // routes — explicit allow-list / projection
   'routes/proxy-dispatch.js :: /api/proxy/dispatch': [PRJ, 3],
-  'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 2],
+  'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id': [PRJ, 1],
+  'routes/proxy-dispatch.js :: liveSeen': [PRJ, 1], // the :id watch long-poll re-read, keyed lexically after LIN-3367's const liveSeen arrow
   'routes/proxy-compute.js :: /api/proxy/issues/:identifier/snapshots/diff': [PRJ, 3],
   'routes/proxy-compute.js :: /api/proxy/periodicals': [PRJ, 2],
   // routes — test only
