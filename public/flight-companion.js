@@ -1621,7 +1621,14 @@
       // element (ensureAssistantBubble is idempotent, so it never creates a
       // second row).
       ensureAssistantBubble();
-      answerEl.textContent = 'thinking…';
+      // LIN-3362: a boot (the Start press) paints a static hello in the SAME
+      // row, so the first second is not a bare placeholder while the first tool
+      // hop runs. Display-only like the placeholder itself: the first token (or
+      // any settle path) overwrites this element's text, and `answerText` — the
+      // only thing chatHistory is built from — is untouched.
+      answerEl.textContent = turnKind === 'boot'
+        ? 'Hello! Just having a look at the board… thinking…'
+        : 'thinking…';
     } else if (checkInEl) {
       // LIN-2632: "checking in…" — the auto-wake sibling of the thinking
       // row above, shown for the duration of the tick. Snapshotted so
@@ -1656,6 +1663,16 @@
     // kind is endpoint-selected, not body-selected, so the client's choice
     // of URL is the ONLY thing that distinguishes a boot from here on.
     var endpoint = turnKind === 'boot' ? 'boot' : 'turn';
+    // LIN-3362: the browser's zone so the model's clock reads in the person's own
+    // time. Only a hint — the server validates it and falls back to UK — so a
+    // runtime without Intl just omits it. Both endpoints; auto-wake is silent
+    // and has no reply to localise.
+    if (turnKind === 'user-initiated' || turnKind === 'boot') {
+      try {
+        var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (typeof zone === 'string' && zone) body.timeZone = zone;
+      } catch (e) { /* omit */ }
+    }
 
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
     // consumed via readSSEStream (public/common.js); window.api() parses the
@@ -1680,6 +1697,17 @@
             // append at thread level in that case, so the Approve/Dismiss
             // card renders identically — just appended rather than inserted.
             handleToolEvent(eventData, answerLi, toolBreadcrumbLis);
+          } else if (type === 'hop-text') {
+            // LIN-3362: a tool hop's interim prose, as a completed frame. A
+            // muted inline note before the answer row — NEVER a bubble and
+            // never in chatHistory (it is narration of a hop, not the answer, so
+            // replaying it to the model would double-count). Only a turn with
+            // an answer row can show one; the server never sends it on auto-wake.
+            var hopText = eventData && typeof eventData.text === 'string' ? eventData.text.trim() : '';
+            if (hopText && answerLi) {
+              showInlineNote(hopText, answerLi);
+              thread.scrollTop = thread.scrollHeight;
+            }
           } else if (type === 'token' || type === 'message') {
             var chunk = typeof eventData === 'object' ? (eventData.token || eventData.text || '') : eventData;
             // First NON-EMPTY chunk creates the bubble — text is the only
