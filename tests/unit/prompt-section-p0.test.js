@@ -321,6 +321,43 @@ describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not res
     assert.equal(ls.getItem('harbour:prompt-memory:ws:issue-7'), null, 'the stale autopilot record is removed on load');
   });
 
+  test('a stored stepper autopilot record is dropped on mount and never cached (the stepper arm)', () => {
+    const ls = makeLocalStorage();
+    const issue = { id: 'issue-stepper', identifier: 'LIN-ST' };
+
+    // A legacy-style record under the OTHER autopilot label, keyed on `kind`.
+    ls.setItem('harbour:prompt-memory:ws:issue-stepper', JSON.stringify({
+      v: 1, label: '__autopilot_stepper__', name: 'Autopilot · stepped', raw: 'STEPPER PROMPT', kind: 'autopilot',
+    }));
+
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(issue, { proxyEnabled: true, dispatchEnabled: true }));
+
+    assert.equal(container.getAttribute('data-phase'), 'idle', 'the stepper autopilot prompt is NOT hydrated');
+    assert.doesNotMatch(container.innerHTML, /STEPPER PROMPT/, 'no remembered stepper prompt reappears');
+    assert.equal(ls.getItem('harbour:prompt-memory:ws:issue-stepper'), null, 'the stale stepper record is removed on load');
+    assert.equal(PromptSection.getCached('issue-stepper', 'ws'), null, 'getCached does not surface a dropped autopilot record');
+  });
+
+  test('a stored __ai__ record still hydrates fresh (the filter is autopilot-only)', () => {
+    const ls = makeLocalStorage();
+    const issue = { id: 'issue-ai', identifier: 'LIN-AI' };
+    ls.setItem('harbour:prompt-memory:ws:issue-ai', JSON.stringify({
+      v: 1, label: '__ai__', name: 'AI Recommendation', raw: 'AI PROMPT', generatedAt: Date.now(),
+    }));
+
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(issue, { aiState: 'off' }));
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh', 'a non-autopilot prompt still hydrates');
+    assert.match(container.innerHTML, /AI PROMPT/);
+    const cached = PromptSection.getCached('issue-ai', 'ws');
+    assert.equal(cached && cached.label, '__ai__');
+    assert.equal(cached && cached.name, 'AI Recommendation');
+  });
+
   test('the appended proxy block is never persisted', async () => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-8', identifier: 'LIN-8' };

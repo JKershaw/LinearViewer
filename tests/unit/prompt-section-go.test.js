@@ -63,6 +63,12 @@ function makeContainer() {
           get innerHTML() { return ''; },
         };
       }
+      if (sel === '[data-setup-notice-slot]') {
+        return {
+          set innerHTML(v) { self._html = self._html.replace(/(data-setup-notice-slot[^>]*>)[\s\S]*?(<\/div>)/, `$1${v}$2`); },
+          get innerHTML() { return ''; },
+        };
+      }
       if (sel === '.swipe-prompt-options') return null;
       return null;
     },
@@ -320,6 +326,8 @@ describe('LIN-3341 — Go is one press', () => {
     assert.match(m.container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'Go shows ○ set up');
     await m.container.click({ action: 'setup', setupNeeds: 'dispatch', rung: 'run-task' });
     await m.flush();
+    assert.match(m.container.innerHTML, /Go needs the dispatch runner set up/, 'the notice names Go, not the run-step rung');
+    assert.doesNotMatch(m.container.innerHTML, /running this step needs the dispatch runner set up/);
     assert.equal(m.calls.dispatch.length, 0, 'nothing dispatched');
     assert.equal(m.calls.kickoff.length, 0, 'no kickoff');
     assert.equal(m.calls.records.length, 1, 'the press is recorded');

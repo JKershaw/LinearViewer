@@ -1143,11 +1143,14 @@
         // it cannot rebuild the prompt body — above all the streamed text while
         // the ✦ stream is in flight (the stream paints the body directly).
         const needs = btn.dataset.setupNeeds;
+        // LIN-3341: Go is its own control now, so its not-set-up notice names
+        // Go, not the run-step rung. The run-step and prompt wording is unchanged.
+        const isGo = btn.dataset.rung === 'run-task';
         const notice = needs === 'dispatch'
-          ? 'running this step needs the dispatch runner set up'
+          ? (isGo ? 'Go needs the dispatch runner set up' : 'running this step needs the dispatch runner set up')
           : needs === 'prompt'
             ? 'generate a prompt first'
-            : 'running the whole task needs the proxy set up';
+            : (isGo ? 'Go needs the proxy set up' : 'running the whole task needs the proxy set up');
         state.setupNotice = notice;
         state.setupNoticeLink = needs === 'dispatch' || needs === 'proxy' ? runnerSetupHref(opts) : null;
         const slot = container.querySelector('[data-setup-notice-slot]');
