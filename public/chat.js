@@ -119,6 +119,336 @@
     return li;
   }
 
+  // ─── Scannable-thread helpers (LIN-3361) ───────────────────────────────────
+  // Additive: appendNote / renderMarkdownText are untouched, and Task Chat
+  // (which calls them) keeps its bare note rendering until it opts in here.
+  // Nothing below names a Flight-Companion-only class — surfaces pass their
+  // own wording in via opts.
+
+  var TOOL_RESULT_CLIP = 1500;
+  var FOLD_MIN_TAIL_CHARS = 280;
+  var IDENTIFIER_SHAPE = /^[A-Z][A-Z0-9]*-\d+$/;
+  var IDENTIFIER_KEYS = { issueIdentifier: true, identifier: true, issueId: true };
+  var LINK_SKIP_TAGS = { A: true, CODE: true, PRE: true, SUMMARY: true, BUTTON: true };
+
+  function childList(el) {
+    return Array.prototype.slice.call(el.children || []);
+  }
+
+  function hasClass(el, cls) {
+    return !!(el && el.classList && el.classList.contains(cls));
+  }
+
+  function clipText(text, max) {
+    return text.length > max ? text.slice(0, max) + '…' : text;
+  }
+
+  function prettyResult(text) {
+    // Pretty-print only a complete JSON result; a server-clipped one (it ends
+    // in `… [truncated N chars]`) does not parse and is shown as sent.
+    try {
+      return JSON.stringify(JSON.parse(text), null, 2);
+    } catch (e) {
+      return text;
+    }
+  }
+
+  function toolGroupOf(li) {
+    var ul = li.parentNode;
+    if (!ul || !hasClass(ul, 'chat-tool-group-list')) return null;
+    var details = ul.parentNode;
+    return details ? details.parentNode : null;
+  }
+
+  function refreshToolGroup(groupLi) {
+    if (!groupLi) return;
+    var details = groupLi.children[0];
+    var summary = details.children[0];
+    var rows = childList(details.children[1]);
+    var pending = rows.some(function (r) { return r.dataset.pending === '1'; });
+    var failed = rows.some(function (r) { return r.dataset.error === '1'; });
+    summary.textContent = 'checked ' + rows.length + ' things' + (pending ? ' …' : '');
+    if (failed) groupLi.dataset.hasError = '1'; else delete groupLi.dataset.hasError;
+  }
+
+  /**
+   * Append an expandable tool row: a closed `<details>` whose summary is the
+   * label and whose body is the call arguments + the (clipped) result. Never a
+   * bubble — no speaker chrome. A row inserted directly after another tool row
+   * or group joins it in one `checked N things` group; grouping is DOM
+   * adjacency only, so any other `li` between two rows breaks the run.
+   * @param {Element} thread
+   * @param {Object} opts
+   * @param {string} opts.label
+   * @param {*} [opts.args] - rendered as indented JSON in the body.
+   * @param {Element} [opts.before] - insert before this element if still attached to `thread`; else append.
+   * @param {boolean} [opts.reveal] - default true.
+   * @returns {{li: Element, settle: function(string): void, fail: function(string): void}}
+   */
+  function appendToolRow(thread, opts) {
+    opts = opts || {};
+    var label = opts.label || '';
+    var li = document.createElement('li');
+    li.className = 'chat-tool-row';
+    li.dataset.pending = '1';
+    var details = document.createElement('details');
+    var summary = document.createElement('summary');
+    summary.textContent = '↳ ' + label + ' …';
+    details.appendChild(summary);
+    var body = document.createElement('div');
+    body.className = 'chat-tool-body';
+    if (opts.args !== undefined && opts.args !== null) {
+      var argsPre = document.createElement('pre');
+      argsPre.className = 'chat-tool-args';
+      argsPre.textContent = typeof opts.args === 'string' ? opts.args : JSON.stringify(opts.args, null, 2);
+      body.appendChild(argsPre);
+    }
+    var resultPre = document.createElement('pre');
+    resultPre.className = 'chat-tool-result';
+    resultPre.hidden = true;
+    body.appendChild(resultPre);
+    details.appendChild(body);
+    li.appendChild(details);
+
+    var doReveal = opts.reveal !== false;
+    var wasPinned = doReveal ? window.isPinnedToBottom(thread) : false;
+    var attachedBefore = opts.before && opts.before.parentNode === thread ? opts.before : null;
+    var siblings = childList(thread);
+    var prev = attachedBefore
+      ? siblings[siblings.indexOf(attachedBefore) - 1]
+      : siblings[siblings.length - 1];
+    if (hasClass(prev, 'chat-tool-group')) {
+      prev.children[0].children[1].appendChild(li);
+      refreshToolGroup(prev);
+    } else if (hasClass(prev, 'chat-tool-row')) {
+      var group = document.createElement('li');
+      group.className = 'chat-tool-group';
+      var gDetails = document.createElement('details');
+      var gSummary = document.createElement('summary');
+      var list = document.createElement('ul');
+      list.className = 'chat-tool-group-list';
+      gDetails.appendChild(gSummary);
+      gDetails.appendChild(list);
+      group.appendChild(gDetails);
+      thread.insertBefore(group, prev);
+      list.appendChild(prev);
+      list.appendChild(li);
+      refreshToolGroup(group);
+    } else if (attachedBefore) {
+      thread.insertBefore(li, attachedBefore);
+    } else {
+      thread.appendChild(li);
+    }
+    if (doReveal) reveal(thread, { wasPinned: wasPinned });
+
+    function settleWith(fn) {
+      var pinned = doReveal ? window.isPinnedToBottom(thread) : false;
+      fn();
+      delete li.dataset.pending;
+      refreshToolGroup(toolGroupOf(li));
+      if (doReveal) reveal(thread, { wasPinned: pinned });
+    }
+    return {
+      li: li,
+      settle: function (resultText) {
+        settleWith(function () {
+          summary.textContent = '↳ ' + label;
+          if (typeof resultText === 'string' && resultText) {
+            resultPre.textContent = clipText(prettyResult(resultText), TOOL_RESULT_CLIP);
+            resultPre.hidden = false;
+          }
+        });
+      },
+      fail: function (failLabel) {
+        settleWith(function () {
+          summary.textContent = '↳ ' + (failLabel || label);
+          li.dataset.error = '1';
+        });
+      }
+    };
+  }
+
+  /**
+   * Pure: pick the fold anchor from plain node descriptions
+   * (`{ tag, strongOnly }` — `strongOnly` is the text of a `<p>` whose only
+   * content is one `<strong>`, or of the leading `<strong>` of a list's first
+   * item, else null). The first `h1-h6`/`hr` wins; only
+   * with none of those does the bold-label fallback apply, matched exactly
+   * against `headings`. -1 when there is no anchor.
+   */
+  // "1. The big thread:" and "the big thread" are the same label.
+  function normalizeLabel(text) {
+    return String(text).trim().replace(/^\d+[.)]\s*/, '').replace(/[\s:.\u2014-]+$/, '').toLowerCase();
+  }
+
+  function chooseFoldAnchor(descs, headings) {
+    var i;
+    for (i = 0; i < descs.length; i++) {
+      if (/^(H[1-6]|HR)$/.test(descs[i].tag)) return i;
+    }
+    var known = (headings || []).map(normalizeLabel);
+    for (i = 0; i < descs.length; i++) {
+      var s = descs[i].strongOnly;
+      if (s && known.indexOf(normalizeLabel(s)) !== -1) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Move the anchor and everything after it into a closed
+   * `<details class="chat-fold">` appended to `el`, keeping the opening block
+   * visible. Moves the existing nodes (no innerHTML, no re-sanitising).
+   * Returns false and does nothing when there is no anchor, nothing before it,
+   * or the tail is short (< ~280 chars) — a short answer must not hide behind a
+   * click.
+   * @param {Element} el
+   * @param {Object} [opts]
+   * @param {string} [opts.summary] - summary text, default 'more'.
+   * @param {string[]} [opts.headings] - bold-label fallback anchors.
+   * @returns {boolean}
+   */
+  function foldAfterAnchor(el, opts) {
+    opts = opts || {};
+    var kids = childList(el);
+    var descs = kids.map(function (k) {
+      var strongOnly = null;
+      if (k.tagName === 'P' && k.children && k.children.length === 1 && k.children[0].tagName === 'STRONG'
+        && (k.textContent || '').trim() === (k.children[0].textContent || '').trim()) {
+        strongOnly = k.children[0].textContent || '';
+      } else if ((k.tagName === 'OL' || k.tagName === 'UL') && k.children && k.children[0]
+        && k.children[0].children && k.children[0].children[0]
+        && k.children[0].children[0].tagName === 'STRONG'
+        && (k.children[0].textContent || '').indexOf(k.children[0].children[0].textContent || '') === 0) {
+        // The brief asks for the body as a numbered list of bold labels
+        // ("1. **The big thread** — …"), which markdown renders as <ol><li>
+        // <strong>…; the label leads the first item.
+        strongOnly = k.children[0].children[0].textContent || '';
+      }
+      return { tag: k.tagName, strongOnly: strongOnly };
+    });
+    var at = chooseFoldAnchor(descs, opts.headings);
+    if (at <= 0) return false;
+    var tail = kids.slice(at);
+    var tailChars = tail.reduce(function (n, k) { return n + (k.textContent || '').length; }, 0);
+    if (tailChars < FOLD_MIN_TAIL_CHARS) return false;
+    var details = document.createElement('details');
+    details.className = 'chat-fold';
+    var summary = document.createElement('summary');
+    summary.textContent = opts.summary || 'more';
+    details.appendChild(summary);
+    tail.forEach(function (k) { details.appendChild(k); });
+    el.appendChild(details);
+    return true;
+  }
+
+  /**
+   * Pure: split `text` on whole-token occurrences of the KNOWN identifiers in
+   * `known` (a Set or array) — it searches for those strings, never for a
+   * pattern. Longest first, with a boundary check so `LIN-33` never matches
+   * inside `LIN-3361`. Returns `[{ text, id? }]`; `id` is set on link segments.
+   */
+  function splitByKnownIdentifiers(text, known) {
+    var ids = Array.from(known || []).filter(function (s) { return typeof s === 'string' && s; });
+    if (!ids.length || !text) return [{ text: text }];
+    ids.sort(function (a, b) { return b.length - a.length; });
+    var re = new RegExp('(' + ids.map(function (s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'g');
+    var word = /[A-Za-z0-9_-]/;
+    var out = [];
+    var last = 0;
+    var m;
+    while ((m = re.exec(text)) !== null) {
+      var start = m.index;
+      var end = start + m[0].length;
+      if ((start > 0 && word.test(text.charAt(start - 1))) || (end < text.length && word.test(text.charAt(end)))) {
+        re.lastIndex = start + 1;
+        continue;
+      }
+      if (start > last) out.push({ text: text.slice(last, start) });
+      out.push({ text: m[0], id: m[0] });
+      last = end;
+    }
+    if (last < text.length) out.push({ text: text.slice(last) });
+    return out;
+  }
+
+  /**
+   * Replace known identifiers in the text nodes under `root` with task links.
+   * Skips text already inside a / code / pre / summary / button, so a re-run
+   * is idempotent. DOM construction only — never innerHTML.
+   * @returns {number} links made
+   */
+  function linkifyIdentifiers(root, seen, hrefFor) {
+    if (!root || !seen || !(seen.size || seen.length) || typeof hrefFor !== 'function') return 0;
+    var walker = document.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+    var nodes = [];
+    var n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    var made = 0;
+    nodes.forEach(function (node) {
+      for (var p = node.parentNode; p && p !== root.parentNode; p = p.parentNode) {
+        if (LINK_SKIP_TAGS[p.tagName]) return;
+      }
+      var segs = splitByKnownIdentifiers(node.nodeValue, seen);
+      if (!segs.some(function (s) { return s.id; })) return;
+      var frag = document.createDocumentFragment();
+      segs.forEach(function (s) {
+        var href = s.id ? hrefFor(s.id) : '';
+        if (!href) {
+          frag.appendChild(document.createTextNode(s.text));
+          return;
+        }
+        var a = document.createElement('a');
+        a.className = 'chat-task-link';
+        a.setAttribute('href', href);
+        a.setAttribute('data-testid', 'chat-task-link');
+        a.textContent = s.text;
+        frag.appendChild(a);
+        made++;
+      });
+      node.parentNode.replaceChild(frag, node);
+    });
+    return made;
+  }
+
+  /**
+   * Pure: add the identifiers found in already-structured values to `into`.
+   * Only the values of the keys issueIdentifier / identifier / issueId that
+   * match the identifier shape — a filter on structured fields, not a finder.
+   * @returns {Set|Array} `into`
+   */
+  function collectIdentifiers(value, into) {
+    function add(id) {
+      if (Array.isArray(into)) { if (into.indexOf(id) === -1) into.push(id); } else into.add(id);
+    }
+    (function walk(v, depth) {
+      if (!v || typeof v !== 'object' || depth > 8) return;
+      if (Array.isArray(v)) { v.forEach(function (x) { walk(x, depth + 1); }); return; }
+      Object.keys(v).forEach(function (k) {
+        var x = v[k];
+        if (IDENTIFIER_KEYS[k] && typeof x === 'string' && IDENTIFIER_SHAPE.test(x)) add(x);
+        else walk(x, depth + 1);
+      });
+    })(value, 0);
+    return into;
+  }
+
+  /**
+   * Like collectIdentifiers over a JSON string. A result the server clipped
+   * does not parse; fall back to a scan anchored on the same structured keys
+   * (`"identifier": "…"`), still never a bare pattern over prose.
+   */
+  function collectIdentifiersFromText(raw, into) {
+    if (typeof raw !== 'string' || !raw) return into;
+    try {
+      return collectIdentifiers(JSON.parse(raw), into);
+    } catch (e) {
+      var re = /"(issueIdentifier|identifier)"\s*:\s*"([^"]+)"/g;
+      var m;
+      while ((m = re.exec(raw)) !== null) collectIdentifiers({ identifier: m[2] }, into);
+      return into;
+    }
+  }
+
   // Disposition → caption text (LIN-1728 Phase 4, decision 4/F8). The SAME
   // button-press means two different things depending on the anchor's
   // press-time liveness (`lib/unanswered-decisions.js`'s `resolveDisposition`,
@@ -387,6 +717,13 @@
     appendMessage: appendMessage,
     appendNote: appendNote,
     appendOptions: appendOptions,
+    appendToolRow: appendToolRow,
+    foldAfterAnchor: foldAfterAnchor,
+    chooseFoldAnchor: chooseFoldAnchor,
+    linkifyIdentifiers: linkifyIdentifiers,
+    splitByKnownIdentifiers: splitByKnownIdentifiers,
+    collectIdentifiers: collectIdentifiers,
+    collectIdentifiersFromText: collectIdentifiersFromText,
     isPinnedToBottom: window.isPinnedToBottom,
     resolveCaption: resolveCaption,
     renderMarkdownText: renderMarkdownText,

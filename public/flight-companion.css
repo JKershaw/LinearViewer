@@ -551,3 +551,19 @@
 .fc-checkin-row [hidden] {
   display: none;
 }
+
+/* LIN-3361: a result's decisions sit in one closed fold; quiet summary, the
+   rows inside keep their normal look. */
+.fc-decisions-fold > summary {
+  cursor: pointer;
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+}
+.fc-decisions-rulings-link {
+  display: inline-block;
+  margin: 0.25rem 0 0.25rem var(--space-2);
+  font-size: var(--font-size-sm);
+}
+.fc-decisions-list { list-style: none; margin: 0; padding: 0; }
+.fc-decision-ref { margin: 0 0 0.25rem; font-family: var(--font-structural); font-size: var(--font-size-sm); }

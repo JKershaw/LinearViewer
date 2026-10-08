@@ -335,3 +335,40 @@
   flex-direction: row;
   align-items: center;
 }
+
+/* ── Expandable tool rows, groups and folds (LIN-3361) ───────────────────── */
+
+/* Quiet like .chat-note: no bubble chrome, no speaker pill. */
+.chat-tool-row,
+.chat-tool-group,
+.chat-fold {
+  font-family: var(--font-structural);
+  font-size: var(--font-size-sm);
+  color: var(--fg-dim);
+  padding-left: var(--space-2);
+}
+.chat-tool-row summary,
+.chat-tool-group > details > summary,
+.chat-fold > summary {
+  cursor: pointer;
+  word-break: break-word;
+}
+.chat-tool-group-list {
+  list-style: none;
+  margin: 0;
+  padding-left: var(--space-2);
+}
+.chat-tool-group[data-has-error] > details > summary,
+.chat-tool-row[data-error] > details > summary {
+  color: var(--red, var(--fg-dim));
+}
+.chat-tool-body pre {
+  margin: 0.25rem 0;
+  max-height: 14rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-fold { padding-left: 0; font-family: inherit; font-size: inherit; color: inherit; }
+.chat-fold > summary { color: var(--fg-dim); font-size: var(--font-size-sm); margin: 0.25rem 0; }
+.chat-task-link { text-decoration: underline; }
