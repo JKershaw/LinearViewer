@@ -107,11 +107,13 @@ describe('LIN-2354 F1 — dispatch lane (routes/dispatch.js)', () => {
     const app = express();
     app.use(express.json());
     app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       dispatchQueueStore: {
         addItem: async (urlKey, item) => { captured.item = item; return { _id: 'd1', dispatchedAt: '2026-08-29T00:00:00.000Z', ...item }; }
       },
       dispatchTokenStore: {},
-      workspaceFromUrl: (req, res, next) => { req.workspace = workspace; req.session = { linearUserId: 'u1' }; next(); },
+      workspaceFromUrl: (req, res, next) => { req.workspace = workspace; req.session = { accountId: 'u1', linearUserId: 'u1' }; next(); },
       userPreferencesStore: {},
       harbourFeedbackTokenStore: null,
       proxyTokenStore: fakeProxyTokenStore()
@@ -149,9 +151,11 @@ describe('LIN-2354 F1 — feedback-triage/autopilot lane (routes/workspace-api.j
     const app = express();
     app.use(express.json({ limit: '250kb' }));
     const router = createWorkspaceApiRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       workspaceFromUrl: (req, res, next) => {
         req.workspace = workspace;
-        req.session = { linearUserId: 'user-1', features: { feedbackTriage: true } };
+        req.session = { accountId: 'u1', linearUserId: 'user-1', features: { feedbackTriage: true } };
         // fixture:LIN-3136: the owner session and workspace id a declared mint needs
         req.workspace = { ...workspace, id: 'ws-acme' };
         req.session.accountId = 'acct-owner';
@@ -223,6 +227,8 @@ describe('LIN-2354 F1 — collective lane (routes/collective.js)', () => {
     const app = express();
     app.use(express.json());
     app.use(createCollectiveRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       dispatchQueueStore: {
         addItem: async (urlKey, item) => { captured.push({ urlKey, item }); return { _id: `disp-${captured.length}`, ...item }; }
       },

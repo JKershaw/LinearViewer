@@ -9,12 +9,16 @@
  * `dispatchDefaults` storage shape).
  */
 import { test, expect } from '../fixtures/test-base.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 test.describe('Dispatch defaults settings', () => {
-  test.beforeEach(async ({ request, seedLocal, localWorkerUrlKey }) => {
+  test.beforeEach(async ({ page, request, seedLocal, localWorkerUrlKey }) => {
     // Clean slate: delete the whole workspace-prefs doc (no modelId = delete).
     await request.get(`/test/set-workspace-model?urlKey=${localWorkerUrlKey}`);
     await seedLocal();
+    // LIN-3383: the G2 resolution witness dispatches to a runner target, which is
+    // owner-only; state the owner rather than inheriting first-binder order.
+    await seedWorkspaceOwnership(page, localWorkerUrlKey, 'owner');
   });
 
   test.afterEach(async ({ request, localWorkerUrlKey }) => {

@@ -760,6 +760,8 @@ function sessionApp({ anchor = null, proxyTokenStore } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: {
       getGrantDeclaration: async () => ({ state: 'none' }),
       addItem: async (urlKey, item) => { captured.items.push(item); return { _id: 'disp-1', dispatchedAt: '2026-07-09T00:00:00.000Z', ...item }; },
@@ -858,6 +860,8 @@ function fcApp({ anchorStatus = null } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createFlightCompanionRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: 'acme' }; req.session = { accountId: 'u1', features: { flightCompanion: true } }; next(); },
     getOpenRouterSource: () => null, getDeployInfo: () => ({}), observerStateStore: null, freeTierStore: null,
     workspacePreferencesStore: null, recapCacheStore: null, briefCacheStore: null,
@@ -928,6 +932,7 @@ function chatCatalog({ anchorHarness, proxyTokenStore } = {}) {
     agentStatusStore: { listStatus: async () => ({ items: [], total: 0 }) },
     sessionIsTerminal: (session) => (session.loops || []).some((l) => l.terminalStatus === 'done'),
     followUpEnabled: true,
+    enqueueGuard: async () => null, // LIN-3383: the owner
     dispatchedBy: 'user-42',
     proxyTokenStore,
     baseUrl: 'https://harbour.test'

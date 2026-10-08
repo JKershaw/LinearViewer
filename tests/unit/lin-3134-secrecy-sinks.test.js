@@ -135,6 +135,8 @@ function sessionApp() {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     dispatchQueueStore: world.store,
     dispatchTokenStore: world.dispatchTokenStore,
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: req.params.urlKey }; req.session = { accountId: POSTER }; next(); },
@@ -167,6 +169,8 @@ function fcApp() {
   const app = express();
   app.use(express.json());
   app.use(createFlightCompanionRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: URL_KEY }; req.session = { accountId: POSTER, features: { flightCompanion: true } }; next(); },
     getOpenRouterSource: () => null, getDeployInfo: () => ({}), observerStateStore: null, freeTierStore: null,
     workspacePreferencesStore: null, recapCacheStore: null, briefCacheStore: null,
@@ -272,7 +276,7 @@ describe('F2 (7) create-path sinks — follow-ups to a declared parent', () => {
       dispatchQueueStore: world.sessionStore,
       agentStatusStore: { listStatus: async () => ({ items: [], total: 0 }) },
       sessionIsTerminal: (session) => (session.loops || []).some((l) => l.terminalStatus === 'done'),
-      followUpEnabled: true, dispatchedBy: POSTER, proxyTokenStore: world.tokenStore, baseUrl: 'https://harbour.test'
+      followUpEnabled: true, enqueueGuard: async () => null, dispatchedBy: POSTER, proxyTokenStore: world.tokenStore, baseUrl: 'https://harbour.test'
     });
     const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: world.parentId, prompt: 'next beat' } });
     assert.equal(result.queued, true);

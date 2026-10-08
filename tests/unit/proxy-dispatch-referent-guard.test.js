@@ -231,6 +231,8 @@ describe('LIN-1948 surface 2d — POST /workspace/:urlKey/api/dispatch (session-
     app.use(express.json());
     app.use((req, _res, next) => { req.session = { accountId: 'acct-1' }; next(); });
     app.use(createDispatchRoutes({
+    // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
       provider,
       dispatchQueueStore: {
         addItem: async (urlKey, item) => {

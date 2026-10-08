@@ -40,6 +40,7 @@
 
 import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
 import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
@@ -635,6 +636,8 @@ export function createDashboardRoutes({
   getOpenRouterSource,
   getDeployInfo,
   workspacePreferencesStore = null,
+  // LIN-3383: the hoisted workspace-owner seam (server.js). Apply is owner-only.
+  workspaceOwnerCheck = null,
   recentLimit = 120,
   sessionsFeedCache = createSessionsFeedCache(),
   // Touched-task done-state TTL cache (LIN-1258): 60s, keyed `${wsUrlKey}::${identifier}`.
@@ -1523,6 +1526,26 @@ export function createDashboardRoutes({
       const session = await loadSessionWithTranscript(workspace.urlKey, runId);
       if (!session) return jsonError(res, 404, `Run ${runId} not found`);
 
+      // LIN-3383 / LIN-3254: a refusal decidable without dispatching happens
+      // BEFORE the claim, so a non-owner never flips the row to `applied` (an
+      // owner's concurrent Apply/Decline would 409 in that window). The seam
+      // inside dispatchSessionFollowUp stays as the fail-closed backstop. The
+      // anchor's target is cli or web (dash/local cannot follow up), so the
+      // owner verdict is the same for either.
+      const refusal = await resolveRunnerEnqueueRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: workspace.id,
+        accountId: dispatchedBy,
+        target: 'cli'
+      });
+      if (refusal) {
+        return jsonError(res, refusal.status, refusal.error, {
+          code: refusal.code,
+          category: refusal.category,
+          retryable: refusal.retryable
+        });
+      }
+
       const claimed = await runProposalsStore.apply(workspace.urlKey, runId, id);
       if (!claimed) return jsonError(res, 409, 'Proposal already decided');
 
@@ -1537,6 +1560,8 @@ export function createDashboardRoutes({
           prompt: proposal.prompt,
           baseUrl: `${req.protocol}://${req.get('host')}`,
           dispatchedBy,
+          ownerCheck: workspaceOwnerCheck,
+          workspaceId: workspace.id,
         });
         if (outcome.status !== 200) {
           await runProposalsStore.revert(workspace.urlKey, runId, id);

@@ -2436,3 +2436,96 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
   });
 });
+
+// LIN-3383 (review): the route-level `enqueueGuard` closure for a user-initiated
+// reply. The tool's handling of an injected guard is pinned in chat-tools.test.js
+// and the census only sees the `enqueueGuard` token; neither shows that the
+// closure THIS route builds consults the owner seam with the route's workspace
+// id and the session's account id. A guard that is present but always allows
+// left the whole unit suite green. This drives the real handler → real
+// agent-turn core → real tool catalog, faking only the LLM transport
+// (`chatClient`) and the stores.
+describe('LIN-3383: the Flight Companion turn route enqueueGuard consults the owner seam (execute-mode send_follow_up)', () => {
+  const WORKSPACE_ID = 'ws-3383';
+  const ACCOUNT_ID = 'acct-member-1';
+  const T_DISPATCHED = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const T_DONE = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  const terminalCliSession = () => [{
+    id: 'sess-done', promptName: 'implementation', kind: 'autopilot', prompt: 'prompt body',
+    issueId: 'uuid-500', issueIdentifier: 'LIN-500', issueTitle: 'A task',
+    issueUrl: 'https://linear.app/x/issue/LIN-500', workspace: { urlKey: 'acme' },
+    dispatchedAt: T_DISPATCHED, dispatchedBy: 'user-1', target: 'cli', repo: null, status: 'taken',
+    resolvedAt: T_DONE, feedback: [{ message: '[done] Task completed in 8s', timestamp: T_DONE }],
+  }];
+
+  async function runReply(verdict) {
+    const history = terminalCliSession();
+    const addItemCalls = [];
+    const ownerCalls = [];
+    const outcome = {};
+    const dispatchQueueStore = {
+      getGrantDeclaration: async () => ({ state: 'none' }),
+      async listItems() { return []; },
+      async listHistory() { return { items: history, total: history.length }; },
+      async getItemStatus() { return null; },
+      async addItem(urlKey, item) {
+        addItemCalls.push({ urlKey, item });
+        return { _id: 'disp-new-1', dispatchedAt: new Date().toISOString(), ...item };
+      },
+    };
+    const chatClient = {
+      async streamChat() { throw new Error('streamChat must not be used: the default model is tool-capable'); },
+      async streamChatWithTools(messages, opts, onEvent) {
+        try {
+          outcome.result = await opts.executeTool({ id: 'call-1', name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+        } catch (err) {
+          outcome.error = err;
+        }
+        onEvent('done', {});
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    app.use((req, res, next) => {
+      req.session = { features: { flightCompanion: true }, workspaces: [{ urlKey: 'acme' }], accountId: ACCOUNT_ID, openRouterApiKey: 'sk-test-paid-key' };
+      next();
+    });
+    app.use(createFlightCompanionRoutes({
+      workspaceFromUrl: (req, res, next) => { req.workspace = { id: WORKSPACE_ID, urlKey: 'acme' }; next(); },
+      getOpenRouterSource: () => null,
+      getDeployInfo: () => ({}),
+      getModelCatalog: async () => [],
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      dispatchQueueStore,
+      agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
+      chatClient,
+      workspaceOwnerCheck: async (args) => { ownerCalls.push(args); return { status: verdict }; },
+    }));
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'please follow up on the run' });
+    assert.strictEqual(status, 200);
+    return { addItemCalls, ownerCalls, outcome };
+  }
+
+  test('a non-owner: the tool refuses with RUNNER_ENQUEUE_OWNER_ONLY, nothing is enqueued, and the seam saw the route workspace id and session account', async () => {
+    const { addItemCalls, ownerCalls, outcome } = await runReply('not-owner');
+
+    assert.strictEqual(addItemCalls.length, 0, 'a refused follow-up must not enqueue anything');
+    assert.ok(outcome.error, 'the tool call must throw for a non-owner');
+    assert.match(outcome.error.message, /send_follow_up refused \(RUNNER_ENQUEUE_OWNER_ONLY\)/);
+    assert.strictEqual(ownerCalls.length, 1);
+    assert.deepStrictEqual(ownerCalls[0], { workspaceId: WORKSPACE_ID, accountId: ACCOUNT_ID },
+      'the closure must pass the route\'s workspace.id and req.session.accountId to the owner seam');
+  });
+
+  test('the owner: exactly one item is enqueued for the anchor\'s cli target', async () => {
+    const { addItemCalls, ownerCalls, outcome } = await runReply('owner');
+
+    assert.strictEqual(outcome.error, undefined);
+    assert.strictEqual(addItemCalls.length, 1);
+    assert.strictEqual(addItemCalls[0].item.target, 'cli');
+    assert.strictEqual(addItemCalls[0].item.followUpTo, 'sess-done');
+    assert.strictEqual(ownerCalls.length, 1);
+  });
+});
