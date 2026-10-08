@@ -1,0 +1,134 @@
+[
+ {
+  "id": "P11",
+  "k": 0,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, with four ledger items left for close-out to discharge before merging.",
+  "cost": 0.002683,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 1,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and its four remaining ledger items are explicitly left for close-out to discharge.",
+  "cost": 0.003353,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 2,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and its four remaining ledger items are explicitly for close-out to discharge.",
+  "cost": 0.003093,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 3,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, and no later work, close-out, or merge is recorded.",
+  "cost": 0.002623,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 4,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and four ledger items remain for close-out to discharge.",
+  "cost": 0.003123,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 5,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, with four ledger items explicitly left for close-out to discharge.",
+  "cost": 0.002423,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 6,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and its four remaining ledger items are explicitly left for close-out to discharge.",
+  "cost": 0.002623,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 7,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and its four close-out ledger items remain to be discharged before merging.",
+  "cost": 0.0176885,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 8,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and its four remaining ledger items now need to be discharged before landing.",
+  "cost": 0.001853,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 9,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and its four remaining ledger items are explicitly left for close-out to discharge.",
+  "cost": 0.003423,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 10,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, with four close-out items still to discharge and no subsequent implementation or blocker reported.",
+  "cost": 0.001833,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P11",
+  "k": 11,
+  "chars": 27734,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The latest code review conditionally approved PR #1781, CI is green, and no close-out or merge has occurred since.",
+  "cost": 0.002773,
+  "promptTokens": 6888,
+  "provider": "OpenAI"
+ }
+]

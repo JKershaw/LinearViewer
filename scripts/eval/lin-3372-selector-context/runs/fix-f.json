@@ -1,0 +1,200 @@
+[
+ {
+  "id": "P12",
+  "k": 0,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John discharged the final post-deploy check and explicitly said close-out can set the merged ticket to Done.",
+  "cost": 0.0039118,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 1,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John's post-deploy owner check discharged the remaining hold and explicitly says close-out can set the merged ticket Done.",
+  "cost": 0.0043418,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 2,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John approved the post-deploy owner check and explicitly said close-out can set the merged ticket to Done.",
+  "cost": 0.0031718,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 3,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John completed the final post-deploy owner check and explicitly said close-out can set the merged ticket to Done.",
+  "cost": 0.0190035,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 4,
+  "chars": 27841,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "The reviewed work has merged and deployed, and John’s post-deploy owner check discharged the remaining checks, so the ticket can now be marked Done.",
+  "cost": 0.0019018,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 5,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John’s latest comment confirms the post-deploy checks passed and explicitly says close-out can set the ticket Done.",
+  "cost": 0.0028918,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 6,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John’s post-deploy check approved the result and explicitly said close-out can set the still-open ticket to Done.",
+  "cost": 0.0031518,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 7,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John completed the post-deploy owner check and explicitly said close-out can set the ticket Done.",
+  "cost": 0.0033118,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 8,
+  "chars": 27841,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John’s latest comment says the post-deploy checks passed and close-out can set the still-open ticket to Done.",
+  "cost": 0.0028418,
+  "promptTokens": 6982,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 0,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "The reviewed work has merged and deployed, and John’s post-deploy owner check discharged the remaining checks, but the ticket is not yet Done.",
+  "cost": 0.0179485,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 1,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "PR #1781 is merged and deployed with code review on record, and John’s post-deploy owner check confirmed the task page is excellent and that close-out can set the ticket Done.",
+  "cost": 0.0019822,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 2,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "The reviewed work has merged and deployed, and John’s post-deploy owner check confirmed it is excellent, leaving only the merged ticket to audit and mark Done.",
+  "cost": 0.0019222,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 3,
+  "chars": 27853,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The work is merged and deployed, and John’s post-deploy approval discharged the final checks so close-out can mark the ticket Done.",
+  "cost": 0.0052122,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 4,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "PR #1781 is merged and deployed, John completed the outstanding post-deploy check, and the ticket can now be marked Done.",
+  "cost": 0.0018722,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 5,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "PR #1781 has merged and deployed, code review is on record, and John’s post-deploy owner check confirmed the task page is excellent, so the remaining step is to audit and mark the ticket Done.",
+  "cost": 0.0020322,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 6,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "PR #1781 is merged and deployed, code review is on record, and John’s post-deploy owner check confirms the work can be marked Done.",
+  "cost": 0.0019122,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 7,
+  "chars": 27853,
+  "action": "retrospective-audit",
+  "deferTo": null,
+  "whyNow": "PR #1781 is merged and deployed, John’s post-deploy owner check approved the result, and the remaining step is to mark the ticket Done.",
+  "cost": 0.0019122,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 8,
+  "chars": 27853,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The work is merged and deployed, John completed the post-deploy check and explicitly said close-out can set the still-open task to Done.",
+  "cost": 0.0042622,
+  "promptTokens": 6984,
+  "provider": "OpenAI"
+ }
+]

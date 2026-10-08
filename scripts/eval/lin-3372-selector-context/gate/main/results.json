@@ -1,0 +1,6420 @@
+{
+  "task": "LIN-3107",
+  "ranAt": "2026-10-08T20:53:53.104Z",
+  "dryRun": false,
+  "models": {
+    "jev": "typesafe/jev-1.13",
+    "incumbent": "openai/gpt-5.6-sol"
+  },
+  "k": 3,
+  "arms": {
+    "arm3": {
+      "hits": 243,
+      "n": 276,
+      "rate": 0.8804347826086957,
+      "wilson": {
+        "lo": 0.8368405536425614,
+        "hi": 0.9135839722320763
+      },
+      "avoids": 0,
+      "loopRepeat": 0
+    }
+  },
+  "fixtureCount": 92,
+  "sourceCounts": {
+    "A": 7,
+    "B": 56,
+    "C": 24,
+    "D": 5
+  },
+  "goldOverrides": [
+    {
+      "id": "LIN-571",
+      "expect": [
+        "plan-review"
+      ],
+      "reason": "LIN-1603 (2026-07-26) added the plan-review gate after this fixture was last touched (LIN-588, 2026-06-23). The fixture's own description states \"Session fit: Needs multiple sessions\" for its own zero-children, undecomposed scope, with no plan-review verdict on trail → criterion (a) fires under today's contract. Original gold (breakdown/implementation/implement, avoid plan) graded a pre-LIN-1603 contract and is superseded. `avoid: plan` / `loop: true` are RETAINED: under today's contract, re-emitting `plan` is still the trap."
+    },
+    {
+      "id": "FIX-830-pos",
+      "expect": [
+        "breakdown",
+        "plan-review"
+      ],
+      "reason": "Binding review correction 2. Frozen 2026-06-30, before LIN-1603. A 0-child leaf with no plan-review verdict; its gold rests only on the implicit multi-phase signal. The live template says multi-phase structure \"is itself a needs-multiple-sessions answer\", but whether that implicit answer also trips gate criterion (a) is the implicit/explicit ambiguity. Accepting BOTH `breakdown` and `plan-review` grades it fairly under either reading; its per-arm distribution is reported separately."
+    },
+    {
+      "id": "LIN-385@breakdown",
+      "expect": [
+        "plan-review"
+      ],
+      "reason": "Third real criterion-(a) violation (binding review correction 1). Class B (fixtures/recommend/linearviewer.json), last touched 2026-06-22, before LIN-1603. A leaf with 0 children, 1 comment, no plan-review verdict; its plan says \"Session-fit: does NOT fit one session. 4 sessions\". The phrase grep in the plan missed it because it does not use the words \"multiple session\". Same LIN-1603 criterion-(a) provenance as LIN-571."
+    },
+    {
+      "id": "SYN-12",
+      "expect": [
+        "plan-review"
+      ],
+      "reason": "Same LIN-1603 criterion-(a) trap as LIN-571: an explicit \"Needs multiple sessions\" scope answer with no plan-review verdict on trail. Original gold (breakdown) predates the gate's existence in this suite."
+    }
+  ],
+  "deferRule": "defer eligible only on a node with a real non-terminal child; leaf defer is a miss in every arm; node defer scored on action only; arms 1/2 filter at prompt time, arm 3 at grading time",
+  "corpusQuery": {
+    "query": "GET https://harbour.cat/api/proxy/search?q=verb%20override",
+    "runAt": "2026-09-26T21:16:42Z",
+    "groundedAt": "b5c528c4",
+    "hitCount": 50,
+    "cap": 50,
+    "included": 1,
+    "excluded": 49
+  },
+  "paired": {},
+  "calibration": null,
+  "resources": {
+    "arm3": {
+      "calls": 276,
+      "latencyMs": {
+        "min": 0,
+        "median": 2076,
+        "max": 10678,
+        "mean": 2475.210144927536
+      },
+      "totalCostUsd": 0.48229360000000004,
+      "meanCostUsd": 0.0017474405797101452,
+      "inputTokens": 1023705,
+      "outputTokens": 24803
+    }
+  },
+  "deferByArm": {
+    "arm3": {
+      "leaf": {
+        "defer": 3,
+        "n": 261
+      },
+      "node": {
+        "defer": 15,
+        "n": 15
+      }
+    }
+  },
+  "arm3DeferToAgreement": {
+    "agree": 15,
+    "n": 15
+  },
+  "fix830PosDistribution": {
+    "expect": [
+      "breakdown",
+      "plan-review"
+    ],
+    "distribution": {
+      "arm3": {
+        "plan": 3
+      }
+    }
+  },
+  "normalizationRewrites": 60,
+  "goNoGo": {
+    "decided": false,
+    "note": "both arm 1 and arm 3 required"
+  },
+  "cases": [
+    {
+      "id": "HAR-697",
+      "source": "A",
+      "provenance": "fixtures/HAR-697-red.json",
+      "expect": [
+        "bug",
+        "research"
+      ],
+      "avoid": "implement",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL full-scale HAR-697 frozen after HAR-705 refuted the module-load-stall cause and before the review filed HAR-707. The refutation is buried after a multi-thousand-char investigation that ends \"ready to hand to an implementation task\", so the trail is dense with fix-oriented prose around a refuted, unvalidated cause whose decisive live experiment never passed. Correct: re-investigate / run the decisive experiment; advancing to implement is the fix-before-validate trap. Real-scale counterpart to the forgiving synthetic SYN-21.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6696,
+            "cost": 0.0131385,
+            "inputTokens": 4096,
+            "outputTokens": 290,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3703,
+            "cost": 0.0029446,
+            "inputTokens": 4096,
+            "outputTokens": 212,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6527,
+            "cost": 0.0041146,
+            "inputTokens": 4096,
+            "outputTokens": 329,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-420",
+      "source": "A",
+      "provenance": "fixtures/LIN-420-landed-review.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL LIN-420 landed-awaiting-review (real counterpart to synthetic SYN-16). The single kept comment is the completion recap (envelope helpers adopted across the three route files, PR open, CI green). Work has demonstrably landed but is not yet reviewed → confirm-and-close (review), not re-implement. Frozen before the approve + merge comments.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1028,
+            "cost": 0.007461,
+            "inputTokens": 2841,
+            "outputTokens": 36,
+            "promptChars": 11838,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2365,
+            "cost": 0.0009336,
+            "inputTokens": 2841,
+            "outputTokens": 36,
+            "promptChars": 11838,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1134,
+            "cost": 0.0009336,
+            "inputTokens": 2841,
+            "outputTokens": 36,
+            "promptChars": 11838,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-510",
+      "source": "A",
+      "provenance": "fixtures/LIN-510-review-loop.json",
+      "expect": [
+        "implement",
+        "blocked",
+        "plan",
+        "bug"
+      ],
+      "avoid": "review",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL LIN-510 stuck-review loop (real counterpart to synthetic SYN-17). The trail runs research → implement → Review #1/#2/#3, all Request-Changes on the SAME unaddressed blocker (dishonest visual-regression baselines on an unchanged commit). A 4th review repeats the loop; the correct break is to route to the blocker fix (regenerate the baselines), not another review. Frozen before the close-out comment. Real scale + real distractors vs the forgiving synthetic.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1861,
+            "cost": 0.0137235,
+            "inputTokens": 5274,
+            "outputTokens": 54,
+            "promptChars": 19285,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1961,
+            "cost": 0.0015902,
+            "inputTokens": 5274,
+            "outputTokens": 53,
+            "promptChars": 19285,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2218,
+            "cost": 0.0015702,
+            "inputTokens": 5274,
+            "outputTokens": 51,
+            "promptChars": 19285,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-537",
+      "source": "A",
+      "provenance": "fixtures/LIN-537-bug-investigated.json",
+      "expect": [
+        "implement",
+        "plan"
+      ],
+      "avoid": "bug",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL LIN-537 bug-already-investigated (real counterpart to synthetic SYN-18). The single kept comment is a code-grounded investigation naming the root cause AND a minimal fix (isolated, not a class). The honest next action is to advance to the fix, NOT to re-investigate. Frozen before the fix/review/close comments. NOTE: the real task carries no `bug` label (its title/description are the bug signal), so this measures the investigation-done advance; SYN-18 retains the bug-LABEL test.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1624,
+            "cost": 0.001015,
+            "inputTokens": 2848,
+            "outputTokens": 44,
+            "promptChars": 12139,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1525,
+            "cost": 0.001015,
+            "inputTokens": 2848,
+            "outputTokens": 44,
+            "promptChars": 12139,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1722,
+            "cost": 0.000935,
+            "inputTokens": 2848,
+            "outputTokens": 36,
+            "promptChars": 12139,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-571",
+      "source": "A",
+      "provenance": "fixtures/LIN-571-replan-trap.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": "plan",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": true,
+      "overrideReason": "LIN-1603 (2026-07-26) added the plan-review gate after this fixture was last touched (LIN-588, 2026-06-23). The fixture's own description states \"Session fit: Needs multiple sessions\" for its own zero-children, undecomposed scope, with no plan-review verdict on trail → criterion (a) fires under today's contract. Original gold (breakdown/implementation/implement, avoid plan) graded a pre-LIN-1603 contract and is superseded. `avoid: plan` / `loop: true` are RETAINED: under today's contract, re-emitting `plan` is still the trap.",
+      "goldSourceComment": "REAL LIN-588 trap — the settled-prep mirror of the LIN-586 settled-vs-refuted pole. On autopilot, recommend-and-dispatch{LIN-571} emitted kind=plan, then emitted kind=plan AGAIN against a ticket whose description already carries a complete, settled, dependency-ordered plan with an explicit 'Session fit: Needs multiple sessions' answer and a breakdown-shaped plan comment, and which has ZERO children. The correct verb is `breakdown` (decompose the multi-session plan into subtasks — exactly what the human `breakdown` override then produced: LIN-582/583/584 with the B1-blocks-B2 arrow). The engine re-emitted `plan` because, reading the node in isolation, it latched onto the plan's own self-referential prose ('Recommended next step: a PLAN ticket', 'file the Phase A subtask', 'Recommended next action: create the Phase A subtask') and treated a settled prep deliverable as 'planning still owed' rather than 'plan done -> decompose'. avoid:'plan' -> loop-repeat measures the trap rate. Acceptance: moves OFF plan -> breakdown/implementation >=8/10 at K=10.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2435,
+            "cost": 0.0026892,
+            "inputTokens": 6069,
+            "outputTokens": 147,
+            "promptChars": 25012,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2916,
+            "cost": 0.0025992,
+            "inputTokens": 6069,
+            "outputTokens": 138,
+            "promptChars": 25012,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2727,
+            "cost": 0.0025492,
+            "inputTokens": 6069,
+            "outputTokens": 133,
+            "promptChars": 25012,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-748",
+      "source": "A",
+      "provenance": "fixtures/LIN-748-design-theme.json",
+      "expect": [
+        "design"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL LIN-748 \"Theme and Observation page design\" (LIN-878). Frozen at keep=2 (bookkeeping + the research/exploration comment), before comment [2] \"Breakdown — direction locked with John\" decided the shape inline. The attachments (theme-design.md, observation-page-design.md, AgentRuns.jsx mockup) are read but the SHAPE of reconciling mockup-vs-existing is contested (light/dark default, retire theme-amber, relax the CLI-mono principle) — the deliberate `design` step this task never got, whose absence let the delivery drift from the intended design (→ rebuild LIN-873 + fidelity follow-ups). HARDER than LIN-813: the description embeds research findings and a two-track (Task 1/Task 2) framing, so it can also attract `research`/`breakdown` — a realistic, less-forgiving design fixture on purpose.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3460,
+            "cost": 0.0012652,
+            "inputTokens": 3949,
+            "outputTokens": 47,
+            "promptChars": 15588,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3042,
+            "cost": 0.0017752,
+            "inputTokens": 3949,
+            "outputTokens": 98,
+            "promptChars": 15588,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4046,
+            "cost": 0.0018352,
+            "inputTokens": 3949,
+            "outputTokens": 104,
+            "promptChars": 15588,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-813",
+      "source": "A",
+      "provenance": "fixtures/LIN-813-design-shape-fork.json",
+      "expect": [
+        "design"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL LIN-813 shape-fork — THE gold design case (LIN-878). Frozen at keep=2 (the dogfooding proof + John's scope-narrowing comment) — the pre-plan red moment. Knowledge is gathered and scope is pinned to the first slice (one head AP + one child AP per task), but the SOLUTION SHAPE is still contested: the next comment (dropped here) is the plan, which silently picked a launch-time coordinator VARIANT — a choice John reversed twice (PR #718 built→reviewed→CHANGES-REQUESTED→closed unmerged, rebuilt guide-driven as #719). A deliberate `design` pass weighing coordinator-variant vs guide-driven would have surfaced that fork before implementation. The honest next action is `design`, not straight to `plan`. Frozen before the plan/implement/review/close-out trail.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "scoping",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3397,
+            "cost": 0.0018716,
+            "inputTokens": 3181,
+            "outputTokens": 123,
+            "promptChars": 13559,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "scoping",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2218,
+            "cost": 0.0016516,
+            "inputTokens": 3181,
+            "outputTokens": 101,
+            "promptChars": 13559,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "scoping",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1967,
+            "cost": 0.0017416,
+            "inputTokens": 3181,
+            "outputTokens": 110,
+            "promptChars": 13559,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-APB-pos",
+      "source": "B",
+      "provenance": "fixtures/recommend/approved-parent-breakdown.json",
+      "expect": [
+        "implement",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "no-regression pin: a breakdown child carrying its own copied plan slice + session-fit + plan-review-due:no citing the parent's approving verdict routes to implement/implementation — AND already does so on unmodified main (6/6); this case does NOT isolate the meta guards' effect",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1643,
+            "cost": 0.0009508,
+            "inputTokens": 2627,
+            "outputTokens": 42,
+            "promptChars": 11201,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1635,
+            "cost": 0.0009408,
+            "inputTokens": 2627,
+            "outputTokens": 41,
+            "promptChars": 11201,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1924,
+            "cost": 0.0009108,
+            "inputTokens": 2627,
+            "outputTokens": 38,
+            "promptChars": 11201,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-APB-neg",
+      "source": "B",
+      "provenance": "fixtures/recommend/approved-parent-breakdown.json",
+      "expect": [
+        "plan",
+        "implement",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "non-discriminating control: a breakdown child with a plain acceptance-criteria description and NO recorded Approve (its expect accepts every label seen on both main and the PR, so it cannot fail; a thin dispatch-contract child staying in prep is still unmeasured)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1556,
+            "cost": 0.0009476,
+            "inputTokens": 2311,
+            "outputTokens": 48,
+            "promptChars": 9921,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2630,
+            "cost": 0.0009376,
+            "inputTokens": 2311,
+            "outputTokens": 47,
+            "promptChars": 9921,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1676,
+            "cost": 0.0008676,
+            "inputTokens": 2311,
+            "outputTokens": 40,
+            "promptChars": 9921,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-APB-diverged",
+      "source": "B",
+      "provenance": "fixtures/recommend/approved-parent-breakdown.json",
+      "expect": [
+        "plan",
+        "plan-review",
+        "research"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "acceptance case: a breakdown child whose copied slice cites the parent's approving verdict, but a later comment shows the parent plan revised past that slice — the gate (and the Step-1/completed-prep guards) must re-derive on visible divergence; acceptance criterion is ZERO implement-family (research is accepted: reviewed baseline 5/6 research on main)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6401,
+            "cost": 0.003362,
+            "inputTokens": 2633,
+            "outputTokens": 283,
+            "promptChars": 11186,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4765,
+            "cost": 0.002882,
+            "inputTokens": 2633,
+            "outputTokens": 235,
+            "promptChars": 11186,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5445,
+            "cost": 0.003582,
+            "inputTokens": 2633,
+            "outputTokens": 305,
+            "promptChars": 11186,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-830-pos",
+      "source": "B",
+      "provenance": "fixtures/recommend/breakdown-fork.json",
+      "expect": [
+        "breakdown",
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": true,
+      "overrideReason": "Binding review correction 2. Frozen 2026-06-30, before LIN-1603. A 0-child leaf with no plan-review verdict; its gold rests only on the implicit multi-phase signal. The live template says multi-phase structure \"is itself a needs-multiple-sessions answer\", but whether that implicit answer also trips gate criterion (a) is the implicit/explicit ambiguity. Accepting BOTH `breakdown` and `plan-review` grades it fairly under either reading; its per-arm distribution is reported separately.",
+      "goldSourceComment": "real LIN-826 two-phase task (phases with own separate acceptances, no formal arrows, no explicit multi-session verdict) -> expect breakdown (the under-fire dogfood shape)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5116,
+            "cost": 0.0036044,
+            "inputTokens": 4945,
+            "outputTokens": 261,
+            "promptChars": 20571,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4401,
+            "cost": 0.0029544,
+            "inputTokens": 4945,
+            "outputTokens": 196,
+            "promptChars": 20571,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3129,
+            "cost": 0.0027044,
+            "inputTokens": 4945,
+            "outputTokens": 171,
+            "promptChars": 20571,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-830-neg",
+      "source": "B",
+      "provenance": "fixtures/recommend/breakdown-fork.json",
+      "expect": [
+        "implement",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "genuinely single-session task whose plan merely lists two sequential steps that land together as one PR/close-out (overfit trap: step-listing != phases) -> must stay implement, NOT breakdown",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1377,
+            "cost": 0.0008704,
+            "inputTokens": 2425,
+            "outputTokens": 38,
+            "promptChars": 10432,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2526,
+            "cost": 0.0009104,
+            "inputTokens": 2425,
+            "outputTokens": 42,
+            "promptChars": 10432,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1294,
+            "cost": 0.0008604,
+            "inputTokens": 2425,
+            "outputTokens": 37,
+            "promptChars": 10432,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-812-approve-ledger",
+      "source": "B",
+      "provenance": "fixtures/recommend/closeout-review.json",
+      "expect": [
+        "close-out"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "landed leaf, review recorded Approve — conditional + non-empty ledger, still unmerged/In Progress (expect -> close-out; the LIN-804 under-fire headline shape)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "close-out",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1364,
+            "cost": 0.0009354,
+            "inputTokens": 2650,
+            "outputTokens": 40,
+            "promptChars": 11239,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "close-out",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1495,
+            "cost": 0.0009354,
+            "inputTokens": 2650,
+            "outputTokens": 40,
+            "promptChars": 11239,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "close-out",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1509,
+            "cost": 0.0009354,
+            "inputTokens": 2650,
+            "outputTokens": 40,
+            "promptChars": 11239,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-812-approve-empty",
+      "source": "B",
+      "provenance": "fixtures/recommend/closeout-review.json",
+      "expect": [
+        "close-out"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "landed leaf, review recorded a plain Approve + empty ledger, still unmerged/In Progress (LIN-810 — gate on verdict, not heading; expect -> close-out as a cheap pass-through)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "close-out",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1483,
+            "cost": 0.0008726,
+            "inputTokens": 2536,
+            "outputTokens": 36,
+            "promptChars": 10778,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "close-out",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1548,
+            "cost": 0.0009026,
+            "inputTokens": 2536,
+            "outputTokens": 39,
+            "promptChars": 10778,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "close-out",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1734,
+            "cost": 0.0009026,
+            "inputTokens": 2536,
+            "outputTokens": 39,
+            "promptChars": 10778,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-812-noreview",
+      "source": "B",
+      "provenance": "fixtures/recommend/closeout-review.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "landed leaf that LOOKS done (PR merged comment) but has NO review-verdict comment on the trail (LIN-811 — positive review evidence required before close-out; expect -> review, NOT close-out)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2778,
+            "cost": 0.0020756,
+            "inputTokens": 2451,
+            "outputTokens": 158,
+            "promptChars": 10431,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5210,
+            "cost": 0.0018656,
+            "inputTokens": 2451,
+            "outputTokens": 137,
+            "promptChars": 10431,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3523,
+            "cost": 0.0019756,
+            "inputTokens": 2451,
+            "outputTokens": 148,
+            "promptChars": 10431,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-823-bug-noreview",
+      "source": "B",
+      "provenance": "fixtures/recommend/closeout-review.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "landed `bug`-labelled leaf, fix landed (PR open, CI green) with a rich investigation trail (Root-cause-CONFIRMED + decisive experiment + class-check + stepper run-summary) but NO review verdict — modeled on the real LIN-799 misroute (LIN-823 — a bug's own analysis is not a review verdict; expect -> review, NOT close-out)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1691,
+            "cost": 0.0009836,
+            "inputTokens": 2941,
+            "outputTokens": 39,
+            "promptChars": 12309,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2022,
+            "cost": 0.0009836,
+            "inputTokens": 2941,
+            "outputTokens": 39,
+            "promptChars": 12309,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2576,
+            "cost": 0.0013936,
+            "inputTokens": 2941,
+            "outputTokens": 80,
+            "promptChars": 12309,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "HAR-149",
+      "source": "B",
+      "provenance": "fixtures/recommend/harbour.json",
+      "expect": [
+        "defer"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": true,
+      "deferTarget": "HAR-545",
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "epic (descent → HAR-616)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-545",
+            "codeRoute": null,
+            "latencyMs": 1930,
+            "cost": 0.0019242,
+            "inputTokens": 7194,
+            "outputTokens": 48,
+            "promptChars": 28792,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-545",
+            "codeRoute": null,
+            "latencyMs": 1287,
+            "cost": 0.0019242,
+            "inputTokens": 7194,
+            "outputTokens": 48,
+            "promptChars": 28792,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-545",
+            "codeRoute": null,
+            "latencyMs": 1543,
+            "cost": 0.0019042,
+            "inputTokens": 7194,
+            "outputTokens": 46,
+            "promptChars": 28792,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "HAR-545",
+      "source": "B",
+      "provenance": "fixtures/recommend/harbour.json",
+      "expect": [
+        "defer"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": true,
+      "deferTarget": "HAR-616",
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "mid (descent → HAR-616)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-616",
+            "codeRoute": null,
+            "latencyMs": 1338,
+            "cost": 0.0012402,
+            "inputTokens": 3924,
+            "outputTokens": 45,
+            "promptChars": 15889,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-616",
+            "codeRoute": null,
+            "latencyMs": 1674,
+            "cost": 0.0012402,
+            "inputTokens": 3924,
+            "outputTokens": 45,
+            "promptChars": 15889,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-616",
+            "codeRoute": null,
+            "latencyMs": 1822,
+            "cost": 0.0012402,
+            "inputTokens": 3924,
+            "outputTokens": 45,
+            "promptChars": 15889,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "HAR-616",
+      "source": "B",
+      "provenance": "fixtures/recommend/harbour.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "leaf (descent → HAR-616)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-623",
+            "codeRoute": null,
+            "latencyMs": 3089,
+            "cost": 0.0023582,
+            "inputTokens": 5464,
+            "outputTokens": 126,
+            "promptChars": 21313,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "ineligible-defer"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-623",
+            "codeRoute": null,
+            "latencyMs": 2346,
+            "cost": 0.0022282,
+            "inputTokens": 5464,
+            "outputTokens": 113,
+            "promptChars": 21313,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "ineligible-defer"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "HAR-623",
+            "codeRoute": null,
+            "latencyMs": 4696,
+            "cost": 0.0024382,
+            "inputTokens": 5464,
+            "outputTokens": 134,
+            "promptChars": 21313,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "ineligible-defer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-2149",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "defer"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": true,
+      "deferTarget": "LIN-3125",
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "node (defer → LIN-3125)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-3125",
+            "codeRoute": null,
+            "latencyMs": 1293,
+            "cost": 0.0019718,
+            "inputTokens": 7132,
+            "outputTokens": 54,
+            "promptChars": 28532,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-3125",
+            "codeRoute": null,
+            "latencyMs": 2459,
+            "cost": 0.0019818,
+            "inputTokens": 7132,
+            "outputTokens": 55,
+            "promptChars": 28532,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-3125",
+            "codeRoute": null,
+            "latencyMs": 2506,
+            "cost": 0.0019818,
+            "inputTokens": 7132,
+            "outputTokens": 55,
+            "promptChars": 28532,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-1892",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "implement",
+        "implement",
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4663,
+            "cost": 0.0047746,
+            "inputTokens": 6996,
+            "outputTokens": 337,
+            "promptChars": 28281,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6028,
+            "cost": 0.0041846,
+            "inputTokens": 6996,
+            "outputTokens": 278,
+            "promptChars": 28281,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5656,
+            "cost": 0.0046946,
+            "inputTokens": 6996,
+            "outputTokens": 329,
+            "promptChars": 28281,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-2944",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "implement",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2443,
+            "cost": 0.002246,
+            "inputTokens": 6103,
+            "outputTokens": 102,
+            "promptChars": 23608,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2114,
+            "cost": 0.002296,
+            "inputTokens": 6103,
+            "outputTokens": 107,
+            "promptChars": 23608,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2893,
+            "cost": 0.002416,
+            "inputTokens": 6103,
+            "outputTokens": 119,
+            "promptChars": 23608,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-3059",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2120,
+            "cost": 0.0034608,
+            "inputTokens": 12527,
+            "outputTokens": 95,
+            "promptChars": 47703,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3629,
+            "cost": 0.0034808,
+            "inputTokens": 12527,
+            "outputTokens": 97,
+            "promptChars": 47703,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3209,
+            "cost": 0.0034808,
+            "inputTokens": 12527,
+            "outputTokens": 97,
+            "promptChars": 47703,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-3098",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "implement",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5358,
+            "cost": 0.0042586,
+            "inputTokens": 6266,
+            "outputTokens": 300,
+            "promptChars": 23971,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2837,
+            "cost": 0.0029586,
+            "inputTokens": 6266,
+            "outputTokens": 170,
+            "promptChars": 23971,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4017,
+            "cost": 0.0025986,
+            "inputTokens": 6266,
+            "outputTokens": 134,
+            "promptChars": 23971,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-3107",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "retrospective-audit"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1289,
+            "cost": 0.0015414,
+            "inputTokens": 5530,
+            "outputTokens": 43,
+            "promptChars": 21985,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1419,
+            "cost": 0.0015414,
+            "inputTokens": 5530,
+            "outputTokens": 43,
+            "promptChars": 21985,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1410,
+            "cost": 0.0015514,
+            "inputTokens": 5530,
+            "outputTokens": 44,
+            "promptChars": 21985,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-3124",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "retrospective-audit"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1315,
+            "cost": 0.0018004,
+            "inputTokens": 6875,
+            "outputTokens": 42,
+            "promptChars": 27275,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2672,
+            "cost": 0.0018104,
+            "inputTokens": 6875,
+            "outputTokens": 43,
+            "promptChars": 27275,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1260,
+            "cost": 0.0018304,
+            "inputTokens": 6875,
+            "outputTokens": 45,
+            "promptChars": 27275,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-3135",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "implement",
+        "implement",
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5634,
+            "cost": 0.0045154,
+            "inputTokens": 7850,
+            "outputTokens": 294,
+            "promptChars": 29342,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5145,
+            "cost": 0.0042954,
+            "inputTokens": 7850,
+            "outputTokens": 272,
+            "promptChars": 29342,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3747,
+            "cost": 0.0037654,
+            "inputTokens": 7850,
+            "outputTokens": 219,
+            "promptChars": 29342,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-2403",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "retrospective-audit"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1341,
+            "cost": 0.0016092,
+            "inputTokens": 5819,
+            "outputTokens": 44,
+            "promptChars": 22341,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1327,
+            "cost": 0.0016092,
+            "inputTokens": 5819,
+            "outputTokens": 44,
+            "promptChars": 22341,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2357,
+            "cost": 0.0016092,
+            "inputTokens": 5819,
+            "outputTokens": 44,
+            "promptChars": 22341,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-2882",
+      "source": "B",
+      "provenance": "fixtures/recommend/large-dense.json",
+      "expect": [
+        "retrospective-audit"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "dense leaf",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1936,
+            "cost": 0.0016146,
+            "inputTokens": 5896,
+            "outputTokens": 43,
+            "promptChars": 22528,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1450,
+            "cost": 0.0016846,
+            "inputTokens": 5896,
+            "outputTokens": 50,
+            "promptChars": 22528,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "retrospective-audit",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1550,
+            "cost": 0.0016146,
+            "inputTokens": 5896,
+            "outputTokens": 43,
+            "promptChars": 22528,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-215@plan",
+      "source": "B",
+      "provenance": "fixtures/recommend/lin597-hardcases.json",
+      "expect": [
+        "plan",
+        "research",
+        "breakdown"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "OVER-advance probe — broad multi-surface E2E maintainability, nothing done, 'Proposed Changes' list reads plan-ish but NO committed scope/session-fit, no plan, no code -> expect plan/research/breakdown; a miss to implement is the over-keen direction",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2908,
+            "cost": 0.00155,
+            "inputTokens": 2773,
+            "outputTokens": 99,
+            "promptChars": 11890,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3294,
+            "cost": 0.00147,
+            "inputTokens": 2773,
+            "outputTokens": 91,
+            "promptChars": 11890,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5246,
+            "cost": 0.00174,
+            "inputTokens": 2773,
+            "outputTokens": 118,
+            "promptChars": 11890,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-202@research",
+      "source": "B",
+      "provenance": "fixtures/recommend/lin597-hardcases.json",
+      "expect": [
+        "research",
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "OVER-advance probe (extreme) — broad migration, empty/unscoped description, nothing to act on -> expect research/plan; anything downstream (implement/breakdown) is the over-keen miss",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2638,
+            "cost": 0.0015454,
+            "inputTokens": 2250,
+            "outputTokens": 109,
+            "promptChars": 9623,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4061,
+            "cost": 0.0013554,
+            "inputTokens": 2250,
+            "outputTokens": 90,
+            "promptChars": 9623,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2582,
+            "cost": 0.0015454,
+            "inputTokens": 2250,
+            "outputTokens": 109,
+            "promptChars": 9623,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-489@implement",
+      "source": "B",
+      "provenance": "fixtures/recommend/lin597-hardcases.json",
+      "expect": [
+        "implement",
+        "breakdown"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "UNDER-advance / plan-detection probe — research done (codebase Findings) + committed phasing plan + comment 'Planning complete, fits one focused session, ready for implementation', no code -> expect implement (breakdown defensible); a miss to plan/research is the re-deliberate / doesn't-detect-planning-is-done direction (fresh non-LIN-596 task for hypothesis 2)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2254,
+            "cost": 0.0010416,
+            "inputTokens": 3181,
+            "outputTokens": 40,
+            "promptChars": 13659,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2462,
+            "cost": 0.0010516,
+            "inputTokens": 3181,
+            "outputTokens": 41,
+            "promptChars": 13659,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1446,
+            "cost": 0.0010316,
+            "inputTokens": 3181,
+            "outputTokens": 39,
+            "promptChars": 13659,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-385",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "defer"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": true,
+      "deferTarget": "LIN-389",
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "epic (descent → LIN-428)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-389",
+            "codeRoute": null,
+            "latencyMs": 1296,
+            "cost": 0.0011972,
+            "inputTokens": 3659,
+            "outputTokens": 46,
+            "promptChars": 15310,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-389",
+            "codeRoute": null,
+            "latencyMs": 1320,
+            "cost": 0.0011872,
+            "inputTokens": 3659,
+            "outputTokens": 45,
+            "promptChars": 15310,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-389",
+            "codeRoute": null,
+            "latencyMs": 1122,
+            "cost": 0.0011572,
+            "inputTokens": 3659,
+            "outputTokens": 42,
+            "promptChars": 15310,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-389",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "defer"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": true,
+      "deferTarget": "LIN-428",
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "mid (descent → LIN-428)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-428",
+            "codeRoute": null,
+            "latencyMs": 1527,
+            "cost": 0.0017672,
+            "inputTokens": 6509,
+            "outputTokens": 46,
+            "promptChars": 26085,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-428",
+            "codeRoute": null,
+            "latencyMs": 1970,
+            "cost": 0.0017672,
+            "inputTokens": 6509,
+            "outputTokens": 46,
+            "promptChars": 26085,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "defer",
+            "deferTo": "LIN-428",
+            "codeRoute": null,
+            "latencyMs": 1468,
+            "cost": 0.0017372,
+            "inputTokens": 6509,
+            "outputTokens": 43,
+            "promptChars": 26085,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": true,
+            "hit": true,
+            "gradeKind": "node-defer"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-428",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "leaf (descent → LIN-428)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4023,
+            "cost": 0.0025232,
+            "inputTokens": 3939,
+            "outputTokens": 173,
+            "promptChars": 16363,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3759,
+            "cost": 0.0025332,
+            "inputTokens": 3939,
+            "outputTokens": 174,
+            "promptChars": 16363,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3232,
+            "cost": 0.0025732,
+            "inputTokens": 3939,
+            "outputTokens": 178,
+            "promptChars": 16363,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-385@plan",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "plan",
+        "research"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "leaf @ nothing-done — broad multi-spec migration epic, scope checklist, no plan → plan/research",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3880,
+            "cost": 0.0019748,
+            "inputTokens": 2897,
+            "outputTokens": 139,
+            "promptChars": 12419,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3720,
+            "cost": 0.0017648,
+            "inputTokens": 2897,
+            "outputTokens": 118,
+            "promptChars": 12419,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3189,
+            "cost": 0.0019548,
+            "inputTokens": 2897,
+            "outputTokens": 137,
+            "promptChars": 12419,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-385@breakdown",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": true,
+      "overrideReason": "Third real criterion-(a) violation (binding review correction 1). Class B (fixtures/recommend/linearviewer.json), last touched 2026-06-22, before LIN-1603. A leaf with 0 children, 1 comment, no plan-review verdict; its plan says \"Session-fit: does NOT fit one session. 4 sessions\". The phrase grep in the plan missed it because it does not use the words \"multiple session\". Same LIN-1603 criterion-(a) provenance as LIN-571.",
+      "goldSourceComment": "leaf @ plan-committed (comment[0]), multi-session migration across files → breakdown",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3530,
+            "cost": 0.0025188,
+            "inputTokens": 3517,
+            "outputTokens": 181,
+            "promptChars": 14788,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5873,
+            "cost": 0.0044988,
+            "inputTokens": 3517,
+            "outputTokens": 379,
+            "promptChars": 14788,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3295,
+            "cost": 0.0025188,
+            "inputTokens": 3517,
+            "outputTokens": 181,
+            "promptChars": 14788,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-428@implement",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "leaf @ plan-ready — one-session impl plan in desc + comment[0] \"Plan ready\", before code → implement",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2860,
+            "cost": 0.0023272,
+            "inputTokens": 3759,
+            "outputTokens": 157,
+            "promptChars": 15714,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3724,
+            "cost": 0.0031472,
+            "inputTokens": 3759,
+            "outputTokens": 239,
+            "promptChars": 15714,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3624,
+            "cost": 0.0026272,
+            "inputTokens": 3759,
+            "outputTokens": 187,
+            "promptChars": 15714,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-428@review",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "leaf @ landed — comment[1] implemented + PR open + CI green, before approve/merge → review",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2191,
+            "cost": 0.0012232,
+            "inputTokens": 4189,
+            "outputTokens": 38,
+            "promptChars": 17365,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2952,
+            "cost": 0.0019632,
+            "inputTokens": 4189,
+            "outputTokens": 112,
+            "promptChars": 17365,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2620,
+            "cost": 0.0016932,
+            "inputTokens": 4189,
+            "outputTokens": 85,
+            "promptChars": 17365,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-596@implement",
+      "source": "B",
+      "provenance": "fixtures/recommend/linearviewer.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "leaf @ plan-committed — full plan in desc (open questions deferred to impl) + comment[2] \"Planning complete — ready for implementation\", no code → implement; reproduces the live re-plan miss (LIN-597)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1443,
+            "cost": 0.0016478,
+            "inputTokens": 5812,
+            "outputTokens": 48,
+            "promptChars": 24505,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1755,
+            "cost": 0.0016578,
+            "inputTokens": 5812,
+            "outputTokens": 49,
+            "promptChars": 24505,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2546,
+            "cost": 0.0016678,
+            "inputTokens": 5812,
+            "outputTokens": 50,
+            "promptChars": 24505,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-R2",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real trail through plan-review round 2 (two Request Changes, no revision label) — expect plan (a revision), never blocked or build",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1108,
+            "cost": 0.002171,
+            "inputTokens": 8828,
+            "outputTokens": 40,
+            "promptChars": 33249,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2836,
+            "cost": 0.002181,
+            "inputTokens": 8828,
+            "outputTokens": 41,
+            "promptChars": 33249,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2903,
+            "cost": 0.002171,
+            "inputTokens": 8828,
+            "outputTokens": 40,
+            "promptChars": 33249,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2954",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real trail: blocked by open tickets — expect blocked",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2630,
+            "cost": 0.0020616,
+            "inputTokens": 3731,
+            "outputTokens": 131,
+            "promptChars": 15664,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2809,
+            "cost": 0.0018816,
+            "inputTokens": 3731,
+            "outputTokens": 113,
+            "promptChars": 15664,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2477,
+            "cost": 0.0018216,
+            "inputTokens": 3731,
+            "outputTokens": 107,
+            "promptChars": 15664,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-GO",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then a person's go-ahead — expect plan",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2519,
+            "cost": 0.0019718,
+            "inputTokens": 7982,
+            "outputTokens": 37,
+            "promptChars": 30207,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1896,
+            "cost": 0.0019718,
+            "inputTokens": 7982,
+            "outputTokens": 37,
+            "promptChars": 30207,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3061,
+            "cost": 0.0019818,
+            "inputTokens": 7982,
+            "outputTokens": 38,
+            "promptChars": 30207,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-HOLD",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then a person's hold — expect blocked (a hold wins at any count)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2530,
+            "cost": 0.0020324,
+            "inputTokens": 7985,
+            "outputTokens": 43,
+            "promptChars": 30217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1978,
+            "cost": 0.0020324,
+            "inputTokens": 7985,
+            "outputTokens": 43,
+            "promptChars": 30217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1263,
+            "cost": 0.0020224,
+            "inputTokens": 7985,
+            "outputTokens": 42,
+            "promptChars": 30217,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-NOTE",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then an agent's plan-posted note — expect blocked (a note is not a reply)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": "blocked",
+            "latencyMs": 0,
+            "cost": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "promptChars": 31056,
+            "servedModel": "code-route",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": "blocked",
+            "latencyMs": 0,
+            "cost": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "promptChars": 31056,
+            "servedModel": "code-route",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": "blocked",
+            "latencyMs": 0,
+            "cost": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "promptChars": 31056,
+            "servedModel": "code-route",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-LATEST-REPLY",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, then a hold, then a go-ahead — expect plan (the newest reply wins, F3a)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1815,
+            "cost": 0.0019764,
+            "inputTokens": 7955,
+            "outputTokens": 38,
+            "promptChars": 30118,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1717,
+            "cost": 0.0019664,
+            "inputTokens": 7955,
+            "outputTokens": 37,
+            "promptChars": 30118,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1287,
+            "cost": 0.0019764,
+            "inputTokens": 7955,
+            "outputTokens": 38,
+            "promptChars": 30118,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-REVISED",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: one Request Changes, then Revision 2 — expect plan-review, never plan",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2606,
+            "cost": 0.0018632,
+            "inputTokens": 3589,
+            "outputTokens": 114,
+            "promptChars": 14712,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3110,
+            "cost": 0.0022832,
+            "inputTokens": 3589,
+            "outputTokens": 156,
+            "promptChars": 14712,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3718,
+            "cost": 0.0019232,
+            "inputTokens": 3589,
+            "outputTokens": 120,
+            "promptChars": 14712,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-NOW",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: two Request Changes, no revision label — expect plan (control)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2451,
+            "cost": 0.0010492,
+            "inputTokens": 3569,
+            "outputTokens": 33,
+            "promptChars": 14673,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1064,
+            "cost": 0.0010492,
+            "inputTokens": 3569,
+            "outputTokens": 33,
+            "promptChars": 14673,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1808,
+            "cost": 0.0010492,
+            "inputTokens": 3569,
+            "outputTokens": 33,
+            "promptChars": 14673,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-R2-REV",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: count 2 plus a landed Revision 3 (this ticket's own state) — expect plan-review",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1326,
+            "cost": 0.0012726,
+            "inputTokens": 4186,
+            "outputTokens": 43,
+            "promptChars": 16747,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1731,
+            "cost": 0.0012626,
+            "inputTokens": 4186,
+            "outputTokens": 42,
+            "promptChars": 16747,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2126,
+            "cost": 0.0012626,
+            "inputTokens": 4186,
+            "outputTokens": 42,
+            "promptChars": 16747,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-RC1-REV",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "PR-1603 trail: count 1, revised to Revision 2 — expect plan-review, never plan",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1429,
+            "cost": 0.0010746,
+            "inputTokens": 2596,
+            "outputTokens": 55,
+            "promptChars": 11086,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1535,
+            "cost": 0.0010246,
+            "inputTokens": 2596,
+            "outputTokens": 50,
+            "promptChars": 11086,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1859,
+            "cost": 0.0010146,
+            "inputTokens": 2596,
+            "outputTokens": 49,
+            "promptChars": 11086,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-RC1-HOLD",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "PR-1603 trail: count 1, then a person's hold — expect blocked at any count",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1582,
+            "cost": 0.0009198,
+            "inputTokens": 2672,
+            "outputTokens": 38,
+            "promptChars": 11322,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1738,
+            "cost": 0.0009198,
+            "inputTokens": 2672,
+            "outputTokens": 38,
+            "promptChars": 11322,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1581,
+            "cost": 0.0009698,
+            "inputTokens": 2672,
+            "outputTokens": 43,
+            "promptChars": 11322,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-RC1-FC-RULING",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "PR-1603 trail: count 1, then an FC ruling posted as a comment — expect plan (F3d)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3078,
+            "cost": 0.0017904,
+            "inputTokens": 2675,
+            "outputTokens": 125,
+            "promptChars": 11327,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2525,
+            "cost": 0.0013604,
+            "inputTokens": 2675,
+            "outputTokens": 82,
+            "promptChars": 11327,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2099,
+            "cost": 0.0009604,
+            "inputTokens": 2675,
+            "outputTokens": 42,
+            "promptChars": 11327,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-2950-GO-REV",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "count 3, go-ahead, then a revision lands — expect plan-review",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3263,
+            "cost": 0.00233,
+            "inputTokens": 2673,
+            "outputTokens": 179,
+            "promptChars": 11061,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2838,
+            "cost": 0.00224,
+            "inputTokens": 2673,
+            "outputTokens": 170,
+            "promptChars": 11061,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4640,
+            "cost": 0.00291,
+            "inputTokens": 2673,
+            "outputTokens": 237,
+            "promptChars": 11061,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-PR-1603-APPROVE-LANDED",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan-review Approve, then the implementation landed (PR opened) — expect review; the earlier Approve no longer points at implementation",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1412,
+            "cost": 0.0009418,
+            "inputTokens": 2832,
+            "outputTokens": 37,
+            "promptChars": 11868,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1328,
+            "cost": 0.0009718,
+            "inputTokens": 2832,
+            "outputTokens": 40,
+            "promptChars": 11868,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1818,
+            "cost": 0.0009418,
+            "inputTokens": 2832,
+            "outputTokens": 37,
+            "promptChars": 11868,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "NSC-LIN-3309-LANDED",
+      "source": "B",
+      "provenance": "fixtures/recommend/next-stage-choice.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "real LIN-3309 trail: two Request Changes, Revision 3, the FC go-ahead, then PR #1748 opened — expect review (implementation landed)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2903,
+            "cost": 0.0015722,
+            "inputTokens": 3634,
+            "outputTokens": 84,
+            "promptChars": 14743,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2598,
+            "cost": 0.0015522,
+            "inputTokens": 3634,
+            "outputTokens": 82,
+            "promptChars": 14743,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2760,
+            "cost": 0.0017622,
+            "inputTokens": 3634,
+            "outputTokens": 103,
+            "promptChars": 14743,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-gated-recorded",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan on record whose own text records 'plan-review due: yes' for criterion (d), credential surface, still unimplemented (expect -> plan-review; the designed primary path — the plan writes the decision, the router reads it)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1496,
+            "cost": 0.0009462,
+            "inputTokens": 2404,
+            "outputTokens": 46,
+            "promptChars": 10326,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1856,
+            "cost": 0.0009062,
+            "inputTokens": 2404,
+            "outputTokens": 42,
+            "promptChars": 10326,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2639,
+            "cost": 0.0009062,
+            "inputTokens": 2404,
+            "outputTokens": 42,
+            "promptChars": 10326,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-gated-rederive",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan on record that MEETS criterion (c) — it drops a validation assertion — but predates the gate, so it records no decision and the router must judge the criteria itself (expect -> plan-review; the fallback path, measured because scripts/eval-plan-review.mjs shows it is the weak one)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1241,
+            "cost": 0.0008882,
+            "inputTokens": 2364,
+            "outputTokens": 41,
+            "promptChars": 10166,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1478,
+            "cost": 0.0008882,
+            "inputTokens": 2364,
+            "outputTokens": 41,
+            "promptChars": 10166,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2580,
+            "cost": 0.0008882,
+            "inputTokens": 2364,
+            "outputTokens": 41,
+            "promptChars": 10166,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-clean-small",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "clean single-surface plan, gate met by NONE of (a)-(d), decision recorded as 'plan-review due: no' (expect -> implementation, NOT plan-review; this is the over-fire guard and the phase's acceptance criterion — zero added dispatches on a clean plan)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1320,
+            "cost": 0.0008908,
+            "inputTokens": 2377,
+            "outputTokens": 41,
+            "promptChars": 10215,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1282,
+            "cost": 0.0008908,
+            "inputTokens": 2377,
+            "outputTokens": 41,
+            "promptChars": 10215,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2484,
+            "cost": 0.0008908,
+            "inputTokens": 2377,
+            "outputTokens": 41,
+            "promptChars": 10215,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-verdict-approve",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "gated plan whose trail already carries a plan-review Approve, work still unimplemented (expect -> implementation: an Approve routes on session-fit exactly as before, and must NOT trigger a second plan-review — nor be read as close-out evidence)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1404,
+            "cost": 0.0009034,
+            "inputTokens": 2690,
+            "outputTokens": 36,
+            "promptChars": 11425,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1355,
+            "cost": 0.0009034,
+            "inputTokens": 2690,
+            "outputTokens": 36,
+            "promptChars": 11425,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1675,
+            "cost": 0.0009434,
+            "inputTokens": 2690,
+            "outputTokens": 40,
+            "promptChars": 11425,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-request-changes-1",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "gated plan whose trail carries ONE plan-review Request Changes (expect -> plan: the revision pass, the single exception to 'completed prep ⇒ never re-emit the prep verb')",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1254,
+            "cost": 0.0011192,
+            "inputTokens": 2619,
+            "outputTokens": 59,
+            "promptChars": 11160,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1415,
+            "cost": 0.0011192,
+            "inputTokens": 2619,
+            "outputTokens": 59,
+            "promptChars": 11160,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1620,
+            "cost": 0.0011292,
+            "inputTokens": 2619,
+            "outputTokens": 60,
+            "promptChars": 11160,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-request-changes-2",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "same plan after one revision cycle, trail carries a SECOND Request Changes on the same unaddressed finding with no reply (expect -> plan: LIN-3309 moved the escalation point to the third unanswered Request Changes; the second is still the revision pass)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2674,
+            "cost": 0.0021194,
+            "inputTokens": 2820,
+            "outputTokens": 155,
+            "promptChars": 11902,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2920,
+            "cost": 0.0022494,
+            "inputTokens": 2820,
+            "outputTokens": 168,
+            "promptChars": 11902,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4163,
+            "cost": 0.0031094,
+            "inputTokens": 2820,
+            "outputTokens": 254,
+            "promptChars": 11902,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "PR-1603-request-changes-3",
+      "source": "B",
+      "provenance": "fixtures/recommend/plan-review-gate.json",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "same plan after two revision cycles, trail carries a THIRD Request Changes so the code-computed count reaches 3 with no reply (expect -> blocked: LIN-3309 moves the escalation point from the second to the third unanswered Request Changes)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": "blocked",
+            "latencyMs": 0,
+            "cost": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "promptChars": 11439,
+            "servedModel": "code-route",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": "blocked",
+            "latencyMs": 0,
+            "cost": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "promptChars": 11439,
+            "servedModel": "code-route",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": "blocked",
+            "latencyMs": 0,
+            "cost": 0,
+            "inputTokens": 0,
+            "outputTokens": 0,
+            "promptChars": 11439,
+            "servedModel": "code-route",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "FIX-448-leaf",
+      "source": "B",
+      "provenance": "fixtures/recommend/synthetic.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "plan-less research->implementation leaf, merged but In Progress (expect -> review)",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2954,
+            "cost": 0.001678,
+            "inputTokens": 2413,
+            "outputTokens": 119,
+            "promptChars": 10328,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3053,
+            "cost": 0.001408,
+            "inputTokens": 2413,
+            "outputTokens": 92,
+            "promptChars": 10328,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3179,
+            "cost": 0.001588,
+            "inputTokens": 2413,
+            "outputTokens": 110,
+            "promptChars": 10328,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-325",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "research"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Deliverable substance must be gathered from the track record; ticket even prescribes a research Method first. THE gold case — verbatim text reproduces the real plan-over-research failure.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2247,
+            "cost": 0.0010034,
+            "inputTokens": 2740,
+            "outputTokens": 45,
+            "promptChars": 11826,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1799,
+            "cost": 0.0009934,
+            "inputTokens": 2740,
+            "outputTokens": 44,
+            "promptChars": 11826,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1278,
+            "cost": 0.0010034,
+            "inputTokens": 2740,
+            "outputTokens": 45,
+            "promptChars": 11826,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-551",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "research"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL case behind LIN-557 (\"research too easily skipped\"). Clear intent, but the deliverable depends on code that must be discovered first — where merge-strategy wording lives across the prompt surfaces and where the settings value is stored/threaded. Knowledge is ungathered, so research is the honest next action; live production routes it to plan/implementation instead. Baseline gpt-5.4-mini K=12: research 0/12 (plan-heavy) — grades the under-fire direction.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3123,
+            "cost": 0.0015516,
+            "inputTokens": 2281,
+            "outputTokens": 109,
+            "promptChars": 9808,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3010,
+            "cost": 0.0016116,
+            "inputTokens": 2281,
+            "outputTokens": 115,
+            "promptChars": 9808,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3525,
+            "cost": 0.0015216,
+            "inputTokens": 2281,
+            "outputTokens": 106,
+            "promptChars": 9808,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-2",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "research"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Integration depends on an external API whose contract is not pinned down.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5187,
+            "cost": 0.0025006,
+            "inputTokens": 2276,
+            "outputTokens": 204,
+            "promptChars": 9757,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3826,
+            "cost": 0.0012606,
+            "inputTokens": 2276,
+            "outputTokens": 80,
+            "promptChars": 9757,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3462,
+            "cost": 0.0013906,
+            "inputTokens": 2276,
+            "outputTokens": 93,
+            "promptChars": 9757,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-3",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "research",
+        "spike"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "\"Investigate whether\" — approach assumed, not confirmed.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "spike",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1241,
+            "cost": 0.0009518,
+            "inputTokens": 2282,
+            "outputTokens": 49,
+            "promptChars": 9794,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "spike",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1206,
+            "cost": 0.0009218,
+            "inputTokens": 2282,
+            "outputTokens": 46,
+            "promptChars": 9794,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "spike",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1424,
+            "cost": 0.0009518,
+            "inputTokens": 2282,
+            "outputTokens": 49,
+            "promptChars": 9794,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-4",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "research",
+        "look into",
+        "triage",
+        "scoping"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Too thin to know what to do — needs preparation of some kind.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4866,
+            "cost": 0.0016934,
+            "inputTokens": 2240,
+            "outputTokens": 124,
+            "promptChars": 9597,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3737,
+            "cost": 0.0013934,
+            "inputTokens": 2240,
+            "outputTokens": 94,
+            "promptChars": 9597,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3931,
+            "cost": 0.0015534,
+            "inputTokens": 2240,
+            "outputTokens": 110,
+            "promptChars": 9597,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-13",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "research",
+        "look into"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Substance lives in the current code/history, not the ticket — must be gathered before writing.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1475,
+            "cost": 0.0008856,
+            "inputTokens": 2301,
+            "outputTokens": 42,
+            "promptChars": 9919,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1338,
+            "cost": 0.0008256,
+            "inputTokens": 2301,
+            "outputTokens": 36,
+            "promptChars": 9919,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1227,
+            "cost": 0.0008356,
+            "inputTokens": 2301,
+            "outputTokens": 37,
+            "promptChars": 9919,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-5",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Clear, familiar approach but spans surfaces and has no documented plan.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3205,
+            "cost": 0.0018138,
+            "inputTokens": 2292,
+            "outputTokens": 135,
+            "promptChars": 9845,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2987,
+            "cost": 0.0017138,
+            "inputTokens": 2292,
+            "outputTokens": 125,
+            "promptChars": 9845,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3297,
+            "cost": 0.0018038,
+            "inputTokens": 2292,
+            "outputTokens": 134,
+            "promptChars": 9845,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-6",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Familiar refactor; borderline plan/implement.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2732,
+            "cost": 0.001594,
+            "inputTokens": 2293,
+            "outputTokens": 113,
+            "promptChars": 9817,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1729,
+            "cost": 0.000844,
+            "inputTokens": 2293,
+            "outputTokens": 38,
+            "promptChars": 9817,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1719,
+            "cost": 0.000924,
+            "inputTokens": 2293,
+            "outputTokens": 46,
+            "promptChars": 9817,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-23",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "design"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Requirements clear + knowledge gathered + ≥2 materially-different shapes named and unchosen → design, not plan. Proves the hatch CAN fire design when the fork is legible in the context.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "design",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1432,
+            "cost": 0.0008904,
+            "inputTokens": 2425,
+            "outputTokens": 40,
+            "promptChars": 10478,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "design",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2479,
+            "cost": 0.0008404,
+            "inputTokens": 2425,
+            "outputTokens": 35,
+            "promptChars": 10478,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "design",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1881,
+            "cost": 0.0008404,
+            "inputTokens": 2425,
+            "outputTokens": 35,
+            "promptChars": 10478,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-7",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Obvious, tiny, no unknowns.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2076,
+            "cost": 0.0008894,
+            "inputTokens": 2270,
+            "outputTokens": 43,
+            "promptChars": 9707,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1409,
+            "cost": 0.0008594,
+            "inputTokens": 2270,
+            "outputTokens": 40,
+            "promptChars": 9707,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1422,
+            "cost": 0.0008894,
+            "inputTokens": 2270,
+            "outputTokens": 43,
+            "promptChars": 9707,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-8",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Complete plan in description, commits to \"fits one session\".",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2342,
+            "cost": 0.0008922,
+            "inputTokens": 2334,
+            "outputTokens": 42,
+            "promptChars": 9986,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1315,
+            "cost": 0.0009322,
+            "inputTokens": 2334,
+            "outputTokens": 46,
+            "promptChars": 9986,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1490,
+            "cost": 0.0008622,
+            "inputTokens": 2334,
+            "outputTokens": 39,
+            "promptChars": 9986,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-9",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement",
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Single-surface, approach obvious; readiness check should skip prep.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1564,
+            "cost": 0.0008926,
+            "inputTokens": 2286,
+            "outputTokens": 43,
+            "promptChars": 9803,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1124,
+            "cost": 0.0008626,
+            "inputTokens": 2286,
+            "outputTokens": 40,
+            "promptChars": 9803,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1220,
+            "cost": 0.0008426,
+            "inputTokens": 2286,
+            "outputTokens": 38,
+            "promptChars": 9803,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-14",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan",
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Findings + chosen approach already in the description — research is complete, do not loop it.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1380,
+            "cost": 0.000852,
+            "inputTokens": 2333,
+            "outputTokens": 38,
+            "promptChars": 10026,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1712,
+            "cost": 0.000852,
+            "inputTokens": 2333,
+            "outputTokens": 38,
+            "promptChars": 10026,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1651,
+            "cost": 0.000872,
+            "inputTokens": 2333,
+            "outputTokens": 40,
+            "promptChars": 10026,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-15",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement",
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "A passing \"not sure which file\" is resolved by a grep, not a research phase.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3128,
+            "cost": 0.0016738,
+            "inputTokens": 2292,
+            "outputTokens": 121,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3514,
+            "cost": 0.0018738,
+            "inputTokens": 2292,
+            "outputTokens": 141,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4061,
+            "cost": 0.0018638,
+            "inputTokens": 2292,
+            "outputTokens": 140,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-10",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "blocked"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Blocked label + external dependency.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1672,
+            "cost": 0.0008014,
+            "inputTokens": 2280,
+            "outputTokens": 34,
+            "promptChars": 9788,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1529,
+            "cost": 0.0008014,
+            "inputTokens": 2280,
+            "outputTokens": 34,
+            "promptChars": 9788,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "blocked",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1228,
+            "cost": 0.0008014,
+            "inputTokens": 2280,
+            "outputTokens": 34,
+            "promptChars": 9788,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-11",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "bug"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Bug label + unexpected behavior to investigate.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1804,
+            "cost": 0.000832,
+            "inputTokens": 2283,
+            "outputTokens": 37,
+            "promptChars": 9774,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1597,
+            "cost": 0.000832,
+            "inputTokens": 2283,
+            "outputTokens": 37,
+            "promptChars": 9774,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1168,
+            "cost": 0.000802,
+            "inputTokens": 2283,
+            "outputTokens": 34,
+            "promptChars": 9774,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-12",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": true,
+      "overrideReason": "Same LIN-1603 criterion-(a) trap as LIN-571: an explicit \"Needs multiple sessions\" scope answer with no plan-review verdict on trail. Original gold (breakdown) predates the gate's existence in this suite.",
+      "goldSourceComment": "Complete plan that explicitly needs multiple sessions.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1217,
+            "cost": 0.0008116,
+            "inputTokens": 2331,
+            "outputTokens": 34,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3720,
+            "cost": 0.0025816,
+            "inputTokens": 2331,
+            "outputTokens": 211,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5222,
+            "cost": 0.0033416,
+            "inputTokens": 2331,
+            "outputTokens": 287,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-16",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "SYNTHETIC cheap pre-check — the committed real counterpart is [real] LIN-420 (fixtures/LIN-420-landed-review.json). Implementation has demonstrably landed per the completion recap (PR open, CI green) but is not yet reviewed → confirm-and-close, not re-implement. Real shape: LIN-420/LIN-542 pre-merge state.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1182,
+            "cost": 0.0008796,
+            "inputTokens": 2421,
+            "outputTokens": 39,
+            "promptChars": 10328,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1120,
+            "cost": 0.0008596,
+            "inputTokens": 2421,
+            "outputTokens": 37,
+            "promptChars": 10328,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1297,
+            "cost": 0.0008596,
+            "inputTokens": 2421,
+            "outputTokens": 37,
+            "promptChars": 10328,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-17",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement",
+        "blocked",
+        "plan",
+        "bug"
+      ],
+      "avoid": "review",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "SYNTHETIC cheap pre-check — the committed real counterpart is [real] LIN-510 (fixtures/LIN-510-review-loop.json), which carries the same loop at real scale. Three consecutive reviews all Request-Changes on the SAME unaddressed blocker (dishonest visual baselines, no acknowledgment commit) against an unchanged commit. A 4th review repeats the loop; the correct break is to route to the blocker fix (regenerate the baselines) — Step-3 already-landed guard: \"if review would surface a blocker that must be fixed first, route the next action to that blocker, not a repeated review\".",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1763,
+            "cost": 0.000964,
+            "inputTokens": 2543,
+            "outputTokens": 45,
+            "promptChars": 10887,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1334,
+            "cost": 0.000944,
+            "inputTokens": 2543,
+            "outputTokens": 43,
+            "promptChars": 10887,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3928,
+            "cost": 0.002774,
+            "inputTokens": 2543,
+            "outputTokens": 226,
+            "promptChars": 10887,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-18",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement",
+        "plan"
+      ],
+      "avoid": "bug",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "SYNTHETIC cheap pre-check — the committed real counterpart is [real] LIN-537 (fixtures/LIN-537-bug-investigated.json). This synthetic ADDS a `bug` label the real task lacked, so it (not the real fixture) is the bug-LABEL-specific test: the label marks unexpected behavior, not investigation still owed — advance to the fix, do not re-investigate. The comment trail already records a code-grounded investigation naming the root cause AND a minimal fix approach.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1369,
+            "cost": 0.0009356,
+            "inputTokens": 2451,
+            "outputTokens": 44,
+            "promptChars": 10511,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1424,
+            "cost": 0.0009756,
+            "inputTokens": 2451,
+            "outputTokens": 48,
+            "promptChars": 10511,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1511,
+            "cost": 0.0009256,
+            "inputTokens": 2451,
+            "outputTokens": 43,
+            "promptChars": 10511,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-19",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan",
+        "research",
+        "blocked"
+      ],
+      "avoid": "implement",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Two implementation recaps both hit the SAME wall: the chosen approach rests on an assumption the code contradicts, and each attempt patches-then-reverts with no forward progress. Repeating implementation repeats the loop; the honest break is to re-ground the approach (plan/research) or surface that it is genuinely blocked — not a third identical attempt.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4559,
+            "cost": 0.0028334,
+            "inputTokens": 2490,
+            "outputTokens": 233,
+            "promptChars": 10713,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5429,
+            "cost": 0.0033434,
+            "inputTokens": 2490,
+            "outputTokens": 284,
+            "promptChars": 10713,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4647,
+            "cost": 0.0029534,
+            "inputTokens": 2490,
+            "outputTokens": 245,
+            "promptChars": 10713,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-20",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan",
+        "implement"
+      ],
+      "avoid": "research",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Comment-driven version of the \"research already done\" trap: a prior research recap in the trail establishes the findings AND a chosen, validated approach. Re-recommending research loops it; the work should move forward. Proves the engine reads completion evidence from the comment trail, not only from a description block.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1080,
+            "cost": 0.0008488,
+            "inputTokens": 2417,
+            "outputTokens": 36,
+            "promptChars": 10364,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1322,
+            "cost": 0.0008488,
+            "inputTokens": 2417,
+            "outputTokens": 36,
+            "promptChars": 10364,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1444,
+            "cost": 0.0008488,
+            "inputTokens": 2417,
+            "outputTokens": 36,
+            "promptChars": 10364,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-21",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "bug",
+        "research"
+      ],
+      "avoid": "implement",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "SYNTHETIC cheap pre-check (mechanism D) — the committed real anchor is [real] HAR-697 (fixtures/HAR-697-red.json), which is ~10x scale and the honest red bar; this small case is directional only (the findings doc measures it ~4-5x more forgiving). Comment 1 proposes a code-grounded root cause (serialized-fs module-load stall) + a fix direction but states the live repro was NOT run. Comment 2 (live capture) REFUTES that cause — the wedge is upstream, the proposed cause does not fire — and the decisive install→render experiment still has not produced a pass. The cause is contradicted and unvalidated, so the honest next action is to run the decisive experiment / re-investigate, NOT to implement a fix against a refuted cause. The live engine picks implement (\"investigation complete enough to fix\") — the fix-before-validate trap.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1471,
+            "cost": 0.0010472,
+            "inputTokens": 2659,
+            "outputTokens": 51,
+            "promptChars": 11406,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1954,
+            "cost": 0.0010172,
+            "inputTokens": 2659,
+            "outputTokens": 48,
+            "promptChars": 11406,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1323,
+            "cost": 0.0010072,
+            "inputTokens": 2659,
+            "outputTokens": 47,
+            "promptChars": 11406,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-22",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "bug",
+        "research"
+      ],
+      "avoid": "implement",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "SYNTHETIC cheap pre-check (mechanism E). Kept synthetic on purpose: in the real HAR-697 trail the witness-unreliability signal is entangled with the mechanism-D refutation already frozen in fixtures/HAR-697-red.json, so it does not isolate cleanly as a separate real slice. The acceptance proxy (`loadedModules > 0`) was shown unreliable: it stayed 0 in a run where the app in fact rendered fully styled, and no boot-progress frame is emitted, so the signal does not track the real outcome. Building a fix that optimizes against an unconfirmed measurement chases a wrong goalpost — the witness must be pinned first. The trap is advancing to implement (or close) against the bad metric.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "scoping",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1627,
+            "cost": 0.0010058,
+            "inputTokens": 2502,
+            "outputTokens": 50,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "scoping",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5715,
+            "cost": 0.0044658,
+            "inputTokens": 2502,
+            "outputTokens": 396,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8801,
+            "cost": 0.0061858,
+            "inputTokens": 2502,
+            "outputTokens": 568,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-1084",
+      "source": "D",
+      "provenance": "fixtures-widened/LIN-1084.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "LIN-1084 autopilot note, 2026-07-06T10:47:57.757Z (\"picked `close-out` here even though no review verdict exists yet\"). CONTRACT CHECK (today, LIN-1603): its plan touched dispatch-contract surfaces (criterion (d)) at PLANNING time, but the freeze point is post-implementation, at the review-vs-close-out fork the gate does not govern; `review` holds.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2447,
+            "cost": 0.0013966,
+            "inputTokens": 5106,
+            "outputTokens": 37,
+            "promptChars": 21115,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1706,
+            "cost": 0.0013866,
+            "inputTokens": 5106,
+            "outputTokens": 36,
+            "promptChars": 21115,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1153,
+            "cost": 0.0013666,
+            "inputTokens": 5106,
+            "outputTokens": 34,
+            "promptChars": 21115,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-830@implement",
+      "source": "D",
+      "provenance": "fixtures-widened/LIN-830.json",
+      "expect": [
+        "implement"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "LIN-830 override #1, 2026-06-30T15:59:54.405Z (\"engine picked `breakdown` → stepping as `implementation`\"). CONTRACT CHECK (today, LIN-1603): LIN-830 has 0 children and no plan-review verdict on its trail; its \"needs multiple sessions\" text is a QUOTE of the meta-prompt, not a session-fit answer for its own scope — override #1 says it has \"no independently-landable multi-session phase structure\". Criterion (a) therefore does NOT fire; `implement` is unambiguous gold under today's contract.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3918,
+            "cost": 0.0024862,
+            "inputTokens": 3004,
+            "outputTokens": 188,
+            "promptChars": 12953,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4136,
+            "cost": 0.0026462,
+            "inputTokens": 3004,
+            "outputTokens": 204,
+            "promptChars": 12953,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4075,
+            "cost": 0.0025162,
+            "inputTokens": 3004,
+            "outputTokens": 191,
+            "promptChars": 12953,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "LIN-830@review",
+      "source": "D",
+      "provenance": "fixtures-widened/LIN-830.json",
+      "expect": [
+        "review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "LIN-830 override #2, 2026-06-30T16:52:21.983Z (\"engine picked `close-out` → pinning `review`\"). CONTRACT CHECK (today, LIN-1603): criterion (a) does not fire (same reason as @implement). `review` is sound: the PR was open, unmerged and CI-green (`f4bf5ba`) with no Approve on record; the subsequent review at 16:57 confirms \"the `review` pin was correct\". Freeze composition = description + override #1 + exactly THREE intervening comments (16:06:32, 16:43:11, 16:49:46).",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1787,
+            "cost": 0.0013192,
+            "inputTokens": 4619,
+            "outputTokens": 39,
+            "promptChars": 19011,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2685,
+            "cost": 0.0013092,
+            "inputTokens": 4619,
+            "outputTokens": 38,
+            "promptChars": 19011,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 10678,
+            "cost": 0.0013092,
+            "inputTokens": 4619,
+            "outputTokens": 38,
+            "promptChars": 19011,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "all-terminal-node",
+      "source": "D",
+      "provenance": "fixtures-widened/all-terminal-node.json",
+      "expect": [
+        "review",
+        "close-out"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "Synthetic. Live contract (meta-prompt Step 0, LIN-353): a task whose own state is terminal OR whose every subtask is terminal routes to review/close, never a no-op. No committed fixture has an all-terminal-children node; constructed to exercise the defer-ineligibility branch.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2973,
+            "cost": 0.0021686,
+            "inputTokens": 2416,
+            "outputTokens": 168,
+            "promptChars": 10237,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1324,
+            "cost": 0.0008186,
+            "inputTokens": 2416,
+            "outputTokens": 33,
+            "promptChars": 10237,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2238,
+            "cost": 0.0008186,
+            "inputTokens": 2416,
+            "outputTokens": 33,
+            "promptChars": 10237,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "breakdown-fork-neg",
+      "source": "D",
+      "provenance": "fixtures-widened/breakdown-fork-neg.json",
+      "expect": [
+        "breakdown"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "LIN-838 description (\"Negative (must STILL pick `breakdown`): a genuine multi-session task with an enumerated plan + arrows\") + LIN-3107 plan §6 D.4 (contract-safety: attach a recorded plan-review Approve so LIN-1603 criterion (a) does not re-route to plan-review).",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "breakdown",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1495,
+            "cost": 0.0009026,
+            "inputTokens": 2636,
+            "outputTokens": 37,
+            "promptChars": 11395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "breakdown",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1540,
+            "cost": 0.0009026,
+            "inputTokens": 2636,
+            "outputTokens": 37,
+            "promptChars": 11395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "breakdown",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1343,
+            "cost": 0.0009026,
+            "inputTokens": 2636,
+            "outputTokens": 37,
+            "promptChars": 11395,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    }
+  ]
+}

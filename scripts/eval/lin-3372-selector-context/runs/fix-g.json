@@ -1,0 +1,200 @@
+[
+ {
+  "id": "P12",
+  "k": 0,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, and John completed the remaining post-deploy checks and explicitly said close-out can set the ticket Done.",
+  "cost": 0.0018424,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 1,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John completed the post-deploy checks, confirmed the task page is excellent, and explicitly said close-out can set the merged ticket to Done.",
+  "cost": 0.0032124,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 2,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, and John’s post-deploy owner check explicitly says the remaining checks are discharged and close-out can set the ticket to Done.",
+  "cost": 0.0018924,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 3,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, John completed the remaining post-deploy checks, and explicitly said close-out can set the ticket to Done.",
+  "cost": 0.0018524,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 4,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, and John’s post-deploy owner check explicitly says the remaining checks are discharged and close-out can set the ticket Done.",
+  "cost": 0.0018824,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 5,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "John’s post-deploy check approved the result and explicitly said close-out can set the still-In-Progress ticket to Done.",
+  "cost": 0.0031624,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 6,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, and John’s post-deploy approval explicitly says close-out can set the ticket to Done.",
+  "cost": 0.018331,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 7,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The approved work is merged and deployed, and John’s successful post-deploy owner check discharged the final hold, so close-out can mark the ticket Done.",
+  "cost": 0.0018824,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12",
+  "k": 8,
+  "chars": 27858,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, but the ticket remains In Progress; John completed the final post-deploy checks and explicitly said close-out can set it Done.",
+  "cost": 0.0018924,
+  "promptTokens": 6985,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 0,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, but the ticket remains In Progress; John’s post-deploy owner check discharged the remaining condition and explicitly says close-out can set it Done.",
+  "cost": 0.017986,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 1,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The approved work is merged and post-deploy checks passed, but the ticket remains In Progress and still needs to be set to Done.",
+  "cost": 0.0030628,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 2,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and post-deploy checks passed, but the ticket is still In Progress and needs to be set to Done.",
+  "cost": 0.0027928,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 3,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, but the ticket remains In Progress; John’s post-deploy owner check discharged the final hold and explicitly said close-out can set it Done.",
+  "cost": 0.0019228,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 4,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "PR #1781 is merged and deployed, John completed the remaining post-deploy checks, and the ticket is still In Progress awaiting closure as Done.",
+  "cost": 0.0018728,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 5,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "PR #1781 is merged and deployed, John completed the remaining post-deploy check, and the ticket is still In Progress awaiting closure as Done.",
+  "cost": 0.0018728,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 6,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, and John’s post-deploy approval explicitly says close-out can set the ticket to Done.",
+  "cost": 0.0028928,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 7,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and John discharged the final post-deploy checks, but the ticket remains In Progress and now needs to be set Done.",
+  "cost": 0.0026328,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ },
+ {
+  "id": "P12b",
+  "k": 8,
+  "chars": 27870,
+  "action": "close-out",
+  "deferTo": null,
+  "whyNow": "The PR is merged and deployed, John completed the remaining post-deploy checks, and the ticket is still In Progress rather than Done.",
+  "cost": 0.0018428,
+  "promptTokens": 6987,
+  "provider": "OpenAI"
+ }
+]

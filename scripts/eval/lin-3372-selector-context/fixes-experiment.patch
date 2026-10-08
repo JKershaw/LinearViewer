@@ -1,0 +1,133 @@
+diff --git a/lib/openrouter.js b/lib/openrouter.js
+index c0121d65..b7e8af5e 100644
+--- a/lib/openrouter.js
++++ b/lib/openrouter.js
+@@ -6,6 +6,7 @@
+  */
+ 
+ import https from 'https';
++const FIX = new Set((process.env.FIX || '').split(',').filter(Boolean)); // LIN-3372 experiment toggles
+ import { deriveDispatchKind, generatePrompt } from './prompt-templates.js';
+ import { formatAttachmentsSection } from './prompt-formatters.js';
+ // LIN-3304: the next-stage choice's own seam — the routing prompt, its contract and
+@@ -881,11 +882,14 @@ export function buildSelectorArgs(issue, context = {}, featureFlags = {}, provid
+   const children = context.children || [];
+   const comments = context.comments || [];
+   const runs = formatRecentRuns(context.runs);
+-  const trail = formatTrailFactsBlock(assembleTrailFacts(comments, issue.description, { leaf: children.length === 0 }), comments.length, { runs: !!runs });
++  const leaf = FIX.has('a') ? true : children.length === 0;
++  const parentPlan = FIX.has('c') && children.length === 0 && context.parent?.description ? { identifier: context.parent.identifier, description: context.parent.description } : null;
++  const trail = formatTrailFactsBlock(assembleTrailFacts(comments, issue.description, { leaf, parentPlan }), comments.length, { runs: !!runs });
+   return {
+     view: formatSelectorView(issue, context),
+     identifier: issue.identifier,
+-    facts: [trail, formatNodeFactsBlock(assembleNodeFacts(issue, children), children.length), runs].filter(Boolean).join('\n'),
++    facts: [trail, FIX.has('f') ? `- Task Done: ${isTerminalState(issue.state?.type) ? 'yes' : 'no'} (state: ${issue.state?.name || 'Unknown'})` : '', formatNodeFactsBlock(assembleNodeFacts(issue, children), children.length), runs].filter(Boolean).join('\n'),
++    terminal: isTerminalState(issue.state?.type),
+     featureFlags,
+     providerUi
+   };
+diff --git a/lib/prompt-template-defs.js b/lib/prompt-template-defs.js
+index bdf03669..7a648345 100644
+--- a/lib/prompt-template-defs.js
++++ b/lib/prompt-template-defs.js
+@@ -1136,7 +1136,7 @@ export const PROMPT_TEMPLATES = {
+     completionSignals: COMPLETION_SIGNALS['retrospective-audit'],
+     route: {
+       when: 'The work is merged and Done, with a code review on record.',
+-      whenNot: 'The work has not merged (`review`).'
++      whenNot: (process.env.FIX || '').split(',').includes('g') ? 'The work has not merged (`review`), or has merged but the task is not Done (`close-out`).' : 'The work has not merged (`review`).'
+     },
+     generate: (issue, context, featureFlags = {}) => {
+       const sections = [
+diff --git a/lib/prompt-templates.js b/lib/prompt-templates.js
+index ad2b9411..409dd4d8 100644
+--- a/lib/prompt-templates.js
++++ b/lib/prompt-templates.js
+@@ -174,7 +174,9 @@ export const RECOMMEND_META_ROUTES = {
+   defer: {
+     purpose: 'Descend into a subtask: the next real work lives in a child, not in this task.',
+     when: 'The task has an open, actionable subtask and its subtasks cover its remaining scope.',
+-    whenNot: 'A leaf; every subtask done (close the parent); or the task needs its own work first (`breakdown` for scope no subtask covers, `triage` if mis-filed).',
++    whenNot: (process.env.FIX || '').split(',').includes('b')
++      ? 'A leaf; every subtask done (close the parent); or the task needs its own work first (`plan-review` when its own plan is due one, `breakdown` for scope no subtask covers, `triage` if mis-filed).'
++      : 'A leaf; every subtask done (close the parent); or the task needs its own work first (`breakdown` for scope no subtask covers, `triage` if mis-filed).',
+     requires: 'The child to descend into, on the DeferTo line.'
+   }
+ }
+@@ -448,8 +450,8 @@ export function getSelectableStages() {
+ }
+ 
+ /** The selector's option list, rendered from the stages' own descriptions. */
+-export function formatStageOptions() {
+-  return getSelectableStages().map(s => [
++export function formatStageOptions(exclude = new Set()) {
++  return getSelectableStages().filter(s => !exclude.has(s.key)).map(s => [
+     `- \`${s.key}\`: ${s.purpose}`,
+     `  When: ${s.when}`,
+     `  Not when: ${s.whenNot}`,
+diff --git a/lib/recommendation-facts.js b/lib/recommendation-facts.js
+index 1c6dc6a3..618554fe 100644
+--- a/lib/recommendation-facts.js
++++ b/lib/recommendation-facts.js
+@@ -282,7 +282,7 @@ const day = (at) => (at || '').slice(0, 16).replace('T', ' ') || 'undated';
+  * @param {string} [description]
+  * @param {{leaf?: boolean}} [options] - plan facts are a leaf's; a node reads its subtask facts
+  */
+-export function assembleTrailFacts(comments = [], description = '', { leaf = true } = {}) {
++export function assembleTrailFacts(comments = [], description = '', { leaf = true, parentPlan = null } = {}) {
+   const sorted = byTime(comments);
+   const reviewComment = latestReviewComment(sorted);
+   const ledger = reviewComment ? parseRunLedger(reviewComment) : null;
+@@ -319,6 +319,7 @@ export function assembleTrailFacts(comments = [], description = '', { leaf = tru
+       sessionFit: extractSessionFit(text),
+       planReviewDue: (text.match(PLAN_REVIEW_DUE)?.[1] || '').toLowerCase() || null
+     };
++    if (!plan.where && parentPlan && extractPlanSection(parentPlan.description) !== null) plan.parent = parentPlan.identifier;
+   }
+ 
+   return {
+@@ -355,7 +356,7 @@ export function formatTrailFactsBlock(facts, commentCount, { runs = false } = {}
+   const lines = [
+     `**TRAIL FACTS (computed in code from all ${commentCount} comments — do not re-derive):**`,
+     r
+-      ? `- Latest code review: ${r.verdict} (${day(r.at)}; ledger: ${r.ledgerItems} item(s), ${r.ledgerOpen} not discharged)`
++      ? `- Latest code review: ${r.verdict} (${day(r.at)}; ledger: ${r.ledgerItems} item(s), ${r.ledgerOpen} ${(process.env.FIX || '').split(',').includes('d') && /^approve/.test(r.verdict) ? 'left for close-out to discharge' : 'not discharged'})`
+       : '- Latest code review: none (a plan-review verdict, a bug write-up or a run summary is not one)'
+   ];
+   if (r) {
+@@ -376,7 +377,7 @@ export function formatTrailFactsBlock(facts, commentCount, { runs = false } = {}
+   }
+   if (facts.plan) {
+     const p = facts.plan;
+-    lines.push(`- Implementation plan: ${p.where === 'comment' ? `in a comment (${day(p.at)})` : p.where === 'description' ? 'in the description' : 'none'}`);
++    lines.push(`- Implementation plan: ${p.where === 'comment' ? `in a comment (${day(p.at)})` : p.where === 'description' ? 'in the description' : p.parent ? `none on this task; it is part of the plan in its parent ${p.parent}'s description` : 'none'}`);
+     lines.push(`- Session fit stated: ${p.sessionFit || 'none'}`);
+     lines.push(`- Plan-review due stated: ${p.planReviewDue || 'none'}`);
+   }
+diff --git a/lib/stage-router.js b/lib/stage-router.js
+index 0c403b25..f2948d16 100644
+--- a/lib/stage-router.js
++++ b/lib/stage-router.js
+@@ -80,9 +80,10 @@ export function applyRouterCapabilities(prompt, featureFlags, providerUi) {
+  *   from lib/openrouter.js buildSelectorArgs
+  * @returns {string}
+  */
+-export function buildRouterPrompt({ view, identifier, facts, featureFlags, providerUi }) {
++export function buildRouterPrompt({ view, identifier, facts, featureFlags, providerUi, terminal = true }) {
+   const example = `${String(identifier || '').split('-')[0] || 'ABC'}-123`;
+-  const keys = getSelectableStages().map(s => s.key);
++  const exclude = new Set((process.env.FIX || '').split(',').includes('e') && !terminal ? ['retrospective-audit'] : []);
++  const keys = getSelectableStages().map(s => s.key).filter(k => !exclude.has(k));
+   const prompt = `You choose the next stage of work for one Linear ticket. You do not do the work or write its prompt: code assembles the chosen stage's prompt.
+ 
+ ## The ticket
+@@ -95,7 +96,7 @@ ${facts}
+ 
+ ## Stages
+ 
+-${formatStageOptions()}
++${formatStageOptions(exclude)}
+ 
+ ${SELECTOR_RULES}
+ 

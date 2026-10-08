@@ -1,0 +1,567 @@
+{
+  "task": "LIN-3107",
+  "ranAt": "2026-10-08T21:06:18.292Z",
+  "dryRun": false,
+  "models": {
+    "jev": "typesafe/jev-1.13",
+    "incumbent": "openai/gpt-5.6-sol"
+  },
+  "k": 6,
+  "arms": {
+    "arm3": {
+      "hits": 19,
+      "n": 24,
+      "rate": 0.7916666666666666,
+      "wilson": {
+        "lo": 0.5952915551476453,
+        "hi": 0.9075531089521192
+      },
+      "avoids": 0,
+      "loopRepeat": 0
+    }
+  },
+  "fixtureCount": 4,
+  "sourceCounts": {
+    "A": 1,
+    "C": 3
+  },
+  "goldOverrides": [
+    {
+      "id": "SYN-12",
+      "expect": [
+        "plan-review"
+      ],
+      "reason": "Same LIN-1603 criterion-(a) trap as LIN-571: an explicit \"Needs multiple sessions\" scope answer with no plan-review verdict on trail. Original gold (breakdown) predates the gate's existence in this suite."
+    }
+  ],
+  "deferRule": "defer eligible only on a node with a real non-terminal child; leaf defer is a miss in every arm; node defer scored on action only; arms 1/2 filter at prompt time, arm 3 at grading time",
+  "corpusQuery": {
+    "query": "GET https://harbour.cat/api/proxy/search?q=verb%20override",
+    "runAt": "2026-09-26T21:16:42Z",
+    "groundedAt": "b5c528c4",
+    "hitCount": 50,
+    "cap": 50,
+    "included": 1,
+    "excluded": 49
+  },
+  "paired": {},
+  "calibration": null,
+  "resources": {
+    "arm3": {
+      "calls": 24,
+      "latencyMs": {
+        "min": 1557,
+        "median": 4971,
+        "max": 8856,
+        "mean": 4799.666666666667
+      },
+      "totalCostUsd": 0.07131480000000003,
+      "meanCostUsd": 0.002971450000000001,
+      "inputTokens": 67326,
+      "outputTokens": 5772
+    }
+  },
+  "deferByArm": {
+    "arm3": {
+      "leaf": {
+        "defer": 0,
+        "n": 24
+      },
+      "node": {
+        "defer": 0,
+        "n": 0
+      }
+    }
+  },
+  "arm3DeferToAgreement": {
+    "agree": 0,
+    "n": 0
+  },
+  "fix830PosDistribution": null,
+  "normalizationRewrites": 5,
+  "goNoGo": {
+    "decided": false,
+    "note": "both arm 1 and arm 3 required"
+  },
+  "cases": [
+    {
+      "id": "HAR-697",
+      "source": "A",
+      "provenance": "fixtures/HAR-697-red.json",
+      "expect": [
+        "bug",
+        "research"
+      ],
+      "avoid": "implement",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "REAL full-scale HAR-697 frozen after HAR-705 refuted the module-load-stall cause and before the review filed HAR-707. The refutation is buried after a multi-thousand-char investigation that ends \"ready to hand to an implementation task\", so the trail is dense with fix-oriented prose around a refuted, unvalidated cause whose decisive live experiment never passed. Correct: re-investigate / run the decisive experiment; advancing to implement is the fix-before-validate trap. Real-scale counterpart to the forgiving synthetic SYN-21.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6361,
+            "cost": 0.0042646,
+            "inputTokens": 4096,
+            "outputTokens": 344,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 7216,
+            "cost": 0.0044346,
+            "inputTokens": 4096,
+            "outputTokens": 361,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6958,
+            "cost": 0.0042846,
+            "inputTokens": 4096,
+            "outputTokens": 346,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4335,
+            "cost": 0.0033246,
+            "inputTokens": 4096,
+            "outputTokens": 250,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4971,
+            "cost": 0.0031246,
+            "inputTokens": 4096,
+            "outputTokens": 230,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3587,
+            "cost": 0.0031946,
+            "inputTokens": 4096,
+            "outputTokens": 237,
+            "promptChars": 16765,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-15",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "implement",
+        "plan"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "A passing \"not sure which file\" is resolved by a grep, not a research phase.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3529,
+            "cost": 0.0017038,
+            "inputTokens": 2292,
+            "outputTokens": 124,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3222,
+            "cost": 0.0017538,
+            "inputTokens": 2292,
+            "outputTokens": 129,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4426,
+            "cost": 0.0016838,
+            "inputTokens": 2292,
+            "outputTokens": 122,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5361,
+            "cost": 0.0030338,
+            "inputTokens": 2292,
+            "outputTokens": 257,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4365,
+            "cost": 0.0016938,
+            "inputTokens": 2292,
+            "outputTokens": 123,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "implementation",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 3153,
+            "cost": 0.0021638,
+            "inputTokens": 2292,
+            "outputTokens": 170,
+            "promptChars": 9777,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-12",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "plan-review"
+      ],
+      "avoid": null,
+      "loop": false,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": true,
+      "overrideReason": "Same LIN-1603 criterion-(a) trap as LIN-571: an explicit \"Needs multiple sessions\" scope answer with no plan-review verdict on trail. Original gold (breakdown) predates the gate's existence in this suite.",
+      "goldSourceComment": "Complete plan that explicitly needs multiple sessions.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5884,
+            "cost": 0.0041216,
+            "inputTokens": 2331,
+            "outputTokens": 365,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "plan",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6495,
+            "cost": 0.0043416,
+            "inputTokens": 2331,
+            "outputTokens": 387,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1557,
+            "cost": 0.0008116,
+            "inputTokens": 2331,
+            "outputTokens": 34,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 5571,
+            "cost": 0.0037116,
+            "inputTokens": 2331,
+            "outputTokens": 324,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6115,
+            "cost": 0.0046516,
+            "inputTokens": 2331,
+            "outputTokens": 418,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "plan-review",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1695,
+            "cost": 0.0008016,
+            "inputTokens": 2331,
+            "outputTokens": 33,
+            "promptChars": 10028,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    },
+    {
+      "id": "SYN-22",
+      "source": "C",
+      "provenance": "scripts/eval-research-routing.mjs CASES[]",
+      "expect": [
+        "bug",
+        "research"
+      ],
+      "avoid": "implement",
+      "loop": true,
+      "deferEligible": false,
+      "deferTarget": null,
+      "overridden": false,
+      "overrideReason": null,
+      "goldSourceComment": "SYNTHETIC cheap pre-check (mechanism E). Kept synthetic on purpose: in the real HAR-697 trail the witness-unreliability signal is entangled with the mechanism-D refutation already frozen in fixtures/HAR-697-red.json, so it does not isolate cleanly as a separate real slice. The acceptance proxy (`loadedModules > 0`) was shown unreliable: it stayed 0 in a run where the app in fact rendered fully styled, and no boot-progress frame is emitted, so the signal does not track the real outcome. Building a fix that optimizes against an unconfirmed measurement chases a wrong goalpost — the witness must be pinned first. The trap is advancing to implement (or close) against the bad metric.",
+      "runs": [
+        {
+          "k": 0,
+          "arm3": {
+            "action": "bug",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 8856,
+            "cost": 0.0053558,
+            "inputTokens": 2502,
+            "outputTokens": 485,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 1,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6662,
+            "cost": 0.0042158,
+            "inputTokens": 2502,
+            "outputTokens": 371,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 2,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 1913,
+            "cost": 0.0009658,
+            "inputTokens": 2502,
+            "outputTokens": 46,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 3,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 4894,
+            "cost": 0.0031058,
+            "inputTokens": 2502,
+            "outputTokens": 260,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 4,
+          "arm3": {
+            "action": "research",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 6060,
+            "cost": 0.0035358,
+            "inputTokens": 2502,
+            "outputTokens": 303,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": true,
+            "gradeKind": "action"
+          }
+        },
+        {
+          "k": 5,
+          "arm3": {
+            "action": "scoping",
+            "deferTo": null,
+            "codeRoute": null,
+            "latencyMs": 2006,
+            "cost": 0.0010358,
+            "inputTokens": 2502,
+            "outputTokens": 53,
+            "promptChars": 10732,
+            "servedModel": "openai/gpt-5.6-sol",
+            "deferToAgrees": null,
+            "hit": false,
+            "gradeKind": "action"
+          }
+        }
+      ]
+    }
+  ]
+}
