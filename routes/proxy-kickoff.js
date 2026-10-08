@@ -10,7 +10,6 @@ import { MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../lib/issue-write-vali
 import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { parseRepoFromDescription } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { buildAutopilotManual } from '../lib/prompts/autopilot-manual.js';
@@ -111,10 +110,9 @@ export function createKickoffRoutes({
    *
    * Body (all optional): { goal?, mode?, variant?, issueIdentifier?, target?, repo?, appendProxyContext?, sessionId?, subscription? }
    *   - issueIdentifier present → SCOPED run ("autopilot until THIS task is
-   *     done"): the issue's title is resolved for the goal line, a non-empty
-   *     `goal` is appended as additional human context (LIN-2818), and its
-   *     project `repo=` is inherited (an explicit caller `repo` wins, mirroring
-   *     /prompt).
+   *     done"): the issue's title is resolved for the goal line, and a non-empty
+   *     `goal` is appended as additional human context (LIN-2818). `repo` is the
+   *     caller's runner-folder override, stored verbatim.
    *   - issueIdentifier absent  → GENERAL run; `goal` focuses the stack walk.
    *   - mode: 'write' (default) | 'readonly'.
    *   - variant: 'standard' (default) | 'stepper' (warm beat-stepping disposition,
@@ -307,7 +305,7 @@ export function createKickoffRoutes({
           return notFound.json(res, 'Issue not found');
         }
         issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
-        resolvedRepo = repo || parseRepoFromDescription(ctx.project?.description) || null;
+        resolvedRepo = repo || null;
         persistedBindingFields = dispatchIssueSourceField(issueSource);
       }
 

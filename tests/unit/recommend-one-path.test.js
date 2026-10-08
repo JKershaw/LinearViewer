@@ -67,11 +67,13 @@ const PROVIDER_UI = { write: true, comments: true, estimates: false, subtasks: t
 const STALE_PREFS = { briefWriter: true };
 const handwritten = (kind, issue = LEAF) => generatePrompt(kind, issue, ctxOf(issue), {}, PROVIDER_UI).prompt;
 
-// The repo inventory read recommend-and-dispatch makes just before its enqueue
-// (validateDispatchRepo). A test can hold it open to land a hang-up in the gap
-// between the prompt being assembled and the enqueue starting; it then fails, which
-// the guard treats as "no inventory, accept the repo".
-let inventoryHold = null;
+// The issue-context read the pinned recommend-and-dispatch arm makes just before
+// its enqueue-boundary hang-up check. A test can hold it open to land a hang-up in
+// the gap between the prompt being assembled and the enqueue starting. (The routed
+// arm awaits nothing between the model call and its enqueue boundary once the repo
+// guard was removed — a hang-up there ends in the routing catch, covered by the
+// "hang-up during the routing call" test below.)
+let contextHold = null;
 // The issue context read; a test can delay it so a keepalive armed with a past
 // X-Request-Start flushes before the route replies.
 let contextDelayMs = 0;
@@ -83,8 +85,7 @@ registerProvider({
   ui: { write: true, comments: true, estimates: false, subtasks: true, displayName: 'Linear' },
   supports: () => true,
   async fetchRecommendationContext(_scope, id) { if (contextDelayMs) await new Promise(r => setTimeout(r, contextDelayMs)); return contextFor(id); },
-  async fetchIssueContext(_scope, id) { if (contextDelayMs) await new Promise(r => setTimeout(r, contextDelayMs)); return contextFor(id); },
-  async fetchProjectsList() { if (inventoryHold) await inventoryHold(); throw new Error('no inventory'); }
+  async fetchIssueContext(_scope, id) { if (contextHold) await contextHold(); if (contextDelayMs) await new Promise(r => setTimeout(r, contextDelayMs)); return contextFor(id); }
 });
 
 /** A canned OpenRouter reply usable by both the buffered and the streaming reader. */
@@ -457,33 +458,33 @@ describe('a client hang-up on the proxy', () => {
     }
   });
 
-  for (const [label, body, modelCalls] of [
-    ['pinned (kind)', { issueIdentifier: LEAF.identifier, kind: 'review', appendProxyContext: false }, 0],
-    ['routed', { issueIdentifier: LEAF.identifier, appendProxyContext: false }, 1]
-  ]) {
-    test(`recommend-and-dispatch, ${label}: a client that left after the prompt was assembled but before the enqueue gets nothing enqueued`, async () => {
-      const calls = capture();
-      let held;
-      const inventoryStarted = new Promise(r => { held = r; });
-      inventoryHold = async () => { held(); await new Promise(r => setTimeout(r, 300)); };
-      let added = 0;
-      const events = [];
-      const srv = await listen(buildProxyApp({ features: {}, events, addItem: async (urlKey, item) => { added++; return { _id: 'disp-1', ...item }; } }));
-      try {
-        const ac = new AbortController();
-        const pending = postDispatch(srv, { ...body, repo: 'owner/repo' }, ac.signal);
-        await inventoryStarted;
-        assert.equal(calls.length, modelCalls);
-        ac.abort();
-        await pending;
-        assert.ok(await waitFor(() => events.some(e => e.status === 499)), `the route recorded the hang-up: ${JSON.stringify(events.map(e => e.status))}`);
-        assert.equal(added, 0, 'nothing was enqueued');
-      } finally {
-        inventoryHold = null;
-        await srv.close();
-      }
-    });
+  test('recommend-and-dispatch, pinned (kind): a client that left after the prompt was assembled but before the enqueue gets nothing enqueued', async () => {
+    const calls = capture();
+    let held;
+    const contextStarted = new Promise(r => { held = r; });
+    contextHold = async () => { held(); await new Promise(r => setTimeout(r, 300)); };
+    let added = 0;
+    const events = [];
+    const srv = await listen(buildProxyApp({ features: {}, events, addItem: async (urlKey, item) => { added++; return { _id: 'disp-1', ...item }; } }));
+    try {
+      const ac = new AbortController();
+      const pending = postDispatch(srv, { issueIdentifier: LEAF.identifier, kind: 'review', appendProxyContext: false }, ac.signal);
+      await contextStarted;
+      assert.equal(calls.length, 0, 'the pinned arm makes no model call');
+      ac.abort();
+      await pending;
+      assert.ok(await waitFor(() => events.some(e => e.status === 499)), `the route recorded the hang-up: ${JSON.stringify(events.map(e => e.status))}`);
+      assert.equal(added, 0, 'nothing was enqueued');
+    } finally {
+      contextHold = null;
+      await srv.close();
+    }
+  });
 
+  for (const [label, body] of [
+    ['pinned (kind)', { issueIdentifier: LEAF.identifier, kind: 'review', appendProxyContext: false }],
+    ['routed', { issueIdentifier: LEAF.identifier, appendProxyContext: false }]
+  ]) {
     test(`recommend-and-dispatch, ${label}: a client that left once the enqueue had started still gets the dispatch`, async () => {
       capture();
       let addStarted;

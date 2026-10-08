@@ -688,7 +688,7 @@
           // LIN-3079: the kickoff body promises a `readWrite` proxy token, so only
           // this autopilot result forces proxy context (copy/download/dispatch) and
           // suppresses the now-inert +proxy toggle. Every other result stays unforced.
-          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, repo: result.repo || null, generatedAt: Date.now() };
+          const entry = { label, name: result.promptName || 'Autopilot', kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true, generatedAt: Date.now() };
           promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
           lastPromptLabel.set(sessionPromptKey(issueId), label);
           savePromptMemory(opts.urlKey, issueId, entry);
@@ -705,7 +705,7 @@
           const result = await window.api(`${apiPrefix}/api/prompt/${issueId}/${encodeURIComponent(label)}${query}`, { signal: ac.signal, on401: false });
           if (abortController !== ac || destroyed) return;
           const html = renderMarkdown(result.prompt);
-          const entry = { label, name: result.promptName || '', raw: result.prompt, html, repo: result.repo || null, generatedAt: Date.now() };
+          const entry = { label, name: result.promptName || '', raw: result.prompt, html, generatedAt: Date.now() };
           promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
           lastPromptLabel.set(sessionPromptKey(issueId), label);
           savePromptMemory(opts.urlKey, issueId, entry);
@@ -732,10 +732,6 @@
       let renderPending = false;
       let prevChildCount = 0;
       let truncated = false;
-      // The `done` frame carries the project repo (parsed from the description),
-      // forwarded to a dispatch so the queued item keeps its repo (parity with
-      // the retired Home renderer, which read it off the recommend stream).
-      let repo = null;
 
       // First render: swap to fresh with empty body so the stream animates inline.
       // `streaming` lives on this placeholder result, so it ends with it: the
@@ -810,9 +806,6 @@
         if (payload.truncated === true) {
           truncated = true;
         }
-        if (payload.repo) {
-          repo = payload.repo;
-        }
       }
 
       await window.readSSEStream(response, onEvent);
@@ -832,7 +825,7 @@
       }
       const entry = {
         label, name: 'AI Recommendation', raw: displayText,
-        html: finalHtml, reasoning: reasoningRaw, warning, repo, generatedAt: Date.now()
+        html: finalHtml, reasoning: reasoningRaw, warning, generatedAt: Date.now()
       };
       promptCache.set(`${sessionPromptKey(issueId)}:${label}`, entry);
       lastPromptLabel.set(sessionPromptKey(issueId), label);
@@ -1021,10 +1014,6 @@
           prompt: raw,
           promptName: (state.result && state.result.name) || 'Prompt',
           kind: (state.result && state.result.kind) || undefined,
-          // LIN-2944 P1: carry the project repo the prompt disclosed, so the
-          // queued item's repo is preserved (parity with the retired Home
-          // renderer; common.js dispatchPrompt forwards it).
-          repo: (state.result && state.result.repo) || undefined,
           issue,
           target,
           model,

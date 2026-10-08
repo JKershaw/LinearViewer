@@ -2,8 +2,9 @@
 //
 // Run with: node --test tests/unit/run-evidence.test.js
 //
-// Covers the S1 PR-URL source (tracker comments, newest first, allowlist
-// restricted, evidence URLs corroborating only), and buildRunEvidence's
+// Covers the S1 PR-URL source (tracker comments, newest first, evidence URLs
+// corroborating only — the repo allowlist filter was retired in LIN-3333), and
+// buildRunEvidence's
 // zero / one / many / unreadable derivation into `{ state, evidence, ledger,
 // closeOut }`.
 
@@ -21,30 +22,30 @@ const PR_A = 'https://github.com/acme/widget/pull/12';
 const PR_B = 'https://github.com/acme/gadget/pull/7';
 
 describe('run-evidence: extractPrUrls', () => {
-  test('collects allowlisted PR URLs newest-comment first, deduped', () => {
+  test('collects PR URLs newest-comment first, deduped', () => {
     const comments = [
       comment(`see ${PR_A}`, '2026-07-01T00:00:00.000Z'),
       comment(`again ${PR_A} and ${PR_B}`, '2026-07-03T00:00:00.000Z'),
     ];
-    const urls = extractPrUrls(comments, new Set(['acme/widget', 'acme/gadget']));
+    const urls = extractPrUrls(comments);
     assert.deepEqual(urls.map(u => u.url), [PR_A, PR_B]);
     assert.equal(urls[0].repo, 'acme/widget');
     assert.equal(urls[0].number, 12);
   });
 
-  test('restricts to the workspace allowlist — an unlisted repo is dropped', () => {
+  test('any repo is accepted — the workspace allowlist filter is gone (LIN-3333)', () => {
     const comments = [comment(`${PR_A}`, '2026-07-01T00:00:00.000Z')];
-    assert.deepEqual(extractPrUrls(comments, new Set(['acme/other'])), []);
+    assert.deepEqual(extractPrUrls(comments).map(u => u.url), [PR_A]);
   });
 
   test('an evidence URL is corroboration only — never the sole PR-URL source', () => {
-    const urls = extractPrUrls([], new Set(['acme/widget']), [PR_A]);
+    const urls = extractPrUrls([], [PR_A]);
     assert.deepEqual(urls, [], 'zero comment URLs stays zero even with an evidence URL');
   });
 
   test('marks a comment URL corroborated when the same URL appears in evidence', () => {
     const comments = [comment(PR_A, '2026-07-01T00:00:00.000Z')];
-    const urls = extractPrUrls(comments, new Set(['acme/widget']), [PR_A]);
+    const urls = extractPrUrls(comments, [PR_A]);
     assert.equal(urls.length, 1);
     assert.equal(urls[0].corroborated, true);
   });
@@ -74,15 +75,14 @@ describe('run-evidence: state derivation', () => {
   };
 
   test('zero PR URLs → no-pr', () => {
-    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], allowlist: new Set(['acme/widget']) });
+    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], });
     assert.equal(m.state.status, 'no-pr');
     assert.match(m.state.message, /no pull request/);
   });
 
   test('exactly one open PR → ready, with the PR and checks link', () => {
     const m = buildRunEvidence({
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      allowlist: new Set(['acme/widget']), prStatus: oneOpen,
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
     });
     assert.equal(m.state.status, 'ready');
     assert.equal(m.state.pr.number, 12);
@@ -94,7 +94,6 @@ describe('run-evidence: state derivation', () => {
     const m = buildRunEvidence({
       issueIdentifier: 'LIN-1',
       comments: [comment(`${PR_A} ${PR_B}`, '2026-07-01T00:00:00.000Z')],
-      allowlist: new Set(['acme/widget', 'acme/gadget']),
     });
     assert.equal(m.state.status, 'multiple-prs');
     assert.match(m.state.message, /more than one PR/);
@@ -102,8 +101,7 @@ describe('run-evidence: state derivation', () => {
 
   test('an unreadable PR read → unknown (fail-open), never throws', () => {
     const m = buildRunEvidence({
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      allowlist: new Set(['acme/widget']), prStatus: { readable: false, state: 'unknown', reason: 'private' },
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { readable: false, state: 'unknown', reason: 'private' },
     });
     assert.equal(m.state.status, 'unknown');
     assert.equal(m.evidence.checked.now.state, 'unknown');
@@ -112,13 +110,11 @@ describe('run-evidence: state derivation', () => {
 
   test('a closed (unmerged) PR → pr-not-open; a merged one → merged', () => {
     const closed = buildRunEvidence({
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      allowlist: new Set(['acme/widget']), prStatus: { ...oneOpen, state: 'closed' },
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed' },
     });
     assert.equal(closed.state.status, 'pr-not-open');
     const merged = buildRunEvidence({
-      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      allowlist: new Set(['acme/widget']), prStatus: { ...oneOpen, state: 'closed', merged: true },
+      issueIdentifier: 'LIN-1', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: { ...oneOpen, state: 'closed', merged: true },
     });
     assert.equal(merged.state.status, 'merged');
   });
@@ -136,7 +132,7 @@ describe('run-evidence: evidence rows and close-out', () => {
       comment(PR_A, '2026-07-01T00:00:00.000Z'),
       comment(`${REPLY}\n\nhead \`abc1234\``, '2026-07-02T00:00:00.000Z'),
     ];
-    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments, allowlist: new Set(['acme/widget']), prStatus: oneOpen });
+    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments, prStatus: oneOpen });
     assert.equal(m.evidence.checked.review.verdict, 'approve-conditional');
     assert.equal(m.evidence.checked.review.sha, 'abc1234');
     assert.equal(m.evidence.checked.now.headSha, 'deadbeefdead');
@@ -147,24 +143,23 @@ describe('run-evidence: evidence rows and close-out', () => {
   test('asked comes from the issue title; done from the resolved PR', () => {
     const m = buildRunEvidence({
       issueIdentifier: 'LIN-1', issue: { title: 'Do the thing' },
-      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')],
-      allowlist: new Set(['acme/widget']), prStatus: oneOpen,
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z')], prStatus: oneOpen,
     });
     assert.equal(m.evidence.asked, 'Do the thing');
     assert.equal(m.evidence.done, 'PR #12');
   });
 
   test('closeOut carries the owner flag and the state', () => {
-    const guest = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], allowlist: new Set(), owner: false });
+    const guest = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], owner: false });
     assert.equal(guest.closeOut.owner, false);
-    const owner = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], allowlist: new Set(), owner: true });
+    const owner = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [], owner: true });
     assert.equal(owner.closeOut.owner, true);
   });
 
   test('the ledger model is threaded through for the collapsed fragment', () => {
     const m = buildRunEvidence({
       issueIdentifier: 'LIN-1', comments: [comment(REPLY, '2026-07-02T00:00:00.000Z')],
-      allowlist: new Set(), prStatus: null,
+      prStatus: null,
     });
     assert.equal(m.ledger.verdict, 'approve-conditional');
     assert.equal(m.ledger.ledger.items.length, 1);

@@ -17,7 +17,7 @@ import { createPromptsRoutes } from './workspace-api-prompts.js';
 import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
 import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
 import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
-import { parseRepoFromDescription, buildPromptFilename } from '../lib/prompt-formatters.js';
+import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
@@ -54,7 +54,7 @@ import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetiremen
 import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
-import { resolveRepoAllowlist, readPrStatusFailOpen } from '../lib/github-pr-status.js';
+import { readPrStatusFailOpen } from '../lib/github-pr-status.js';
 import { readRunLedger } from '../lib/run-ledger.js';
 import { deriveCloseOutState, closeOutSetsDone, listRows } from '../lib/run-closeout-state.js';
 import { buildContextGraph } from '../lib/context-graph.js';
@@ -209,7 +209,6 @@ export function buildMockRecommendationHop(ctx) {
     truncated: false,
     completionTokens: null,
     issueUrl: ctx.issue.url,
-    repo: parseRepoFromDescription(ctx.project?.description),
     state: ctx.issue.state,
     children: ctx.children,
   };
@@ -540,7 +539,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           result = generatePrompt(labelName, issueObj, mockContext, getFeatureFlags(req.session), providerUi);
         }
 
-        const mockProjectDescription = mockProject?.content || null
         return sendPromptResult(req, res, {
           identifier,
           downloadName: result.name,
@@ -548,8 +546,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           json: {
             label: labelName,
             promptName: result.name,
-            prompt: result.prompt,
-            repo: parseRepoFromDescription(mockProjectDescription)
+            prompt: result.prompt
           }
         })
       }
@@ -591,8 +588,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         json: {
           label: labelName,
           promptName: result.name,
-          prompt: result.prompt,
-          repo: parseRepoFromDescription(project?.description)
+          prompt: result.prompt
         }
       })
     } catch (error) {
@@ -672,7 +668,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           return notFound.json(res, 'Issue not found')
         }
         const identifier = mockIssue.url?.split('/').pop() || ''
-        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
         const prompt = buildAutopilotKickoff({
           baseUrl,
           issue: { identifier, title: mockIssue.title },
@@ -689,8 +684,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
             label: stepper ? 'autopilot-stepper' : 'autopilot',
             promptName: stepper ? `Autopilot (stepped) — ${identifier}` : `Autopilot — ${identifier}`,
             kind: 'autopilot',
-            prompt,
-            repo: parseRepoFromDescription(mockProject?.content || null)
+            prompt
           }
         })
       }
@@ -719,8 +713,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           label: stepper ? 'autopilot-stepper' : 'autopilot',
           promptName: stepper ? `Autopilot (stepped) — ${issue.identifier}` : `Autopilot — ${issue.identifier}`,
           kind: 'autopilot',
-          prompt,
-          repo: parseRepoFromDescription(project?.description)
+          prompt
         }
       })
     } catch (error) {
@@ -959,14 +952,12 @@ ${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
 
 ${goal}`
 
-        const mockRecommendProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
         const result = {
           reasoning,
           prompt,
           truncated: false,
           completionTokens: null,
-          issueUrl: mockIssue.url,
-          repo: parseRepoFromDescription(mockRecommendProject?.content)
+          issueUrl: mockIssue.url
         }
 
         return keepalive.send(200, result)
@@ -1014,7 +1005,6 @@ ${goal}`
             recommendedAction: r.recommendedAction,
             deferTo: r.deferTo,
             issueUrl: ctx.issue.url,
-            repo: parseRepoFromDescription(ctx.project?.description),
             // Node state + children (with state) feed the resolver's terminal-state
             // descent guard (LIN-353) — already fetched in ctx, no extra round-trip.
             state: ctx.issue.state,
@@ -1029,7 +1019,6 @@ ${goal}`
         truncated: rec.truncated,
         completionTokens: rec.completionTokens,
         issueUrl: rec.issueUrl,
-        repo: rec.repo,
         // Terminal identifier + descent breadcrumb (LIN-327, additive).
         identifier: rec.identifier,
         deferredVia,
@@ -1187,13 +1176,12 @@ ${goal}`
           sendSSE(res, 'delta', { section: 'reasoning', content: `\n\n↳ ${idOf(path[k])} is a container → routing to ${idOf(path[k + 1])}\n\n` });
         }
         const term = generateMockRecommendation(terminal);
-        const termProject = testMockData.projects.find(p => p.id === terminal.project?.id);
         sendSSE(res, 'delta', { section: 'reasoning', content: term.reasoning });
         sendSSE(res, 'phase', { phase: 'prompt' });
         sendSSE(res, 'delta', { section: 'prompt', content: term.prompt });
         const doneData = {
           truncated: false, completionTokens: null,
-          issueUrl: terminal.url, repo: parseRepoFromDescription(termProject?.content),
+          issueUrl: terminal.url,
           identifier: idOf(terminal), deferredVia, deferTruncated: false
         };
         sendSSE(res, 'done', doneData);
@@ -1202,7 +1190,6 @@ ${goal}`
       }
 
       const { reasoning, prompt } = generateMockRecommendation(mockIssue);
-      const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id);
 
       // Start SSE
       res.set({
@@ -1230,8 +1217,7 @@ ${goal}`
       const doneData = {
         truncated: false,
         completionTokens: null,
-        issueUrl: mockIssue.url,
-        repo: parseRepoFromDescription(mockProject?.content)
+        issueUrl: mockIssue.url
       };
 
       sendSSE(res, 'done', doneData);
@@ -1354,7 +1340,7 @@ ${goal}`
                 identifier: ctx.issue.identifier, reasoning: r.reasoning, prompt: r.prompt,
                 truncated: r.truncated, completionTokens: r.completionTokens,
                 recommendedAction: r.recommendedAction, deferTo: r.deferTo,
-                issueUrl: ctx.issue.url, repo: parseRepoFromDescription(ctx.project?.description),
+                issueUrl: ctx.issue.url,
                 // Node state + children (with state) feed the resolver's terminal-state
                 // descent guard (LIN-353) — already in ctx, no extra round-trip.
                 state: ctx.issue.state, children: ctx.children
@@ -1366,7 +1352,7 @@ ${goal}`
         });
         if (closed) return;
 
-        const metadata = { issueUrl: rec.issueUrl, repo: rec.repo, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason };
+        const metadata = { issueUrl: rec.issueUrl, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason };
 
         if (rec.recommendedAction === 'defer' || !rec.prompt) {
           // Abnormal stop (depth/cycle/unresolved/timeout) — surface, don't ship a defer.
@@ -1385,8 +1371,7 @@ ${goal}`
 
       // Build metadata to merge into the done event
       const metadata = {
-        issueUrl: issue.url,
-        repo: parseRepoFromDescription(project?.description)
+        issueUrl: issue.url
       };
 
       // AI mock (local session) leaf fast-path: emit the same SSE phase/delta/done
@@ -4377,8 +4362,8 @@ ${goal}`
   /**
    * Run evidence (LIN-3247, P2 of LIN-2949). The data half of the page seam:
    * returns `{ state, evidence, ledger, closeOut }` for a run's issue. The PR
-   * URL comes from the run's OWN tracker comments (newest first), restricted to
-   * the workspace repo allowlist; the live PR state comes from the shared
+   * URL comes from the run's OWN tracker comments (newest first); the live PR
+   * state comes from the shared
    * fail-open reader (never throws — unreadable → `state: 'unknown'`). This
    * fabricates nothing: `deriveCloseOutState` and the press are P3.
    *
@@ -4511,23 +4496,14 @@ ${goal}`
       const { provider, callScope } = resolveProvider(workspace, requestedSource);
 
       const comments = await provider.fetchIssueComments(callScope, issueIdentifier);
-      let allowlist = new Set();
-      try {
-        allowlist = await resolveRepoAllowlist(provider, callScope);
-      } catch {
-        allowlist = new Set();
-      }
-      const prUrls = extractPrUrls(comments, allowlist);
+      const prUrls = extractPrUrls(comments);
       const readPrStatus = seam.readPrStatus || readPrStatusFailOpen;
       const prStatuses = await Promise.all(prUrls.map(async pr => {
         try {
           return await readPrStatus({
-            provider,
-            scope: callScope,
             repo: pr.repo,
             number: pr.number,
             doFetch: seam.githubFetch || null,
-            allowlist,
           });
         } catch (err) {
           // Fail open: an unreadable PR state is "unknown", never a 500.

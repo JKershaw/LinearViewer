@@ -177,7 +177,6 @@ The planned feature — **follow-on prompts triggered by Claude Code** — would
 |----------|------|---------|
 | `fetchIssueContext()` | `lib/linear.js` | Handwritten prompts |
 | `fetchRecommendationContext()` | `lib/linear.js` | AI recommendations (two-tier parent/subtask) |
-| `parseRepoFromDescription()` | `lib/linear.js` | Extracts repo URL from project descriptions |
 
 ### Completion Signals (Already Defined)
 

@@ -152,12 +152,12 @@ test.describe('Dispatch Queue', () => {
     await expect(dispatchBtn).toHaveText('cli', { timeout: 3000 });
   });
 
-  test('dispatching a prompt includes repo from project description', async ({ page, request }) => {
+  test('dispatching a prompt stores a null repo — no project-description derivation (LIN-3333)', async ({ page, request }) => {
     // Create a consumer token
     const tokenResponse = await request.get(`/test/create-dispatch-token?urlKey=${URL_KEY}`);
     const { token } = await tokenResponse.json();
 
-    // Find and expand a task with prompts (blocked issue is in proj-alpha which has repo=test-repo)
+    // Find and expand a task with prompts
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
 
@@ -185,13 +185,13 @@ test.describe('Dispatch Queue', () => {
     // Wait for dispatch to complete
     await expect(dispatchBtn).toHaveText('✓');
 
-    // Verify the dispatched item has the repo field via consumer API
+    // Verify the dispatched item carries no repo (the project repo= feature is gone).
     const pollResponse = await request.get('/api/dispatch/poll', {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await pollResponse.json();
     expect(data.items.length).toBe(1);
-    expect(data.items[0].repo).toBe('test-repo');
+    expect(data.items[0].repo).toBe(null);
   });
 
   test('queue badge appears after dispatch', async ({ page }) => {

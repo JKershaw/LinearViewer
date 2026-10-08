@@ -32,12 +32,9 @@ function getHandler(router, method, path) {
   return layer.route.stack[layer.route.stack.length - 1].handle;
 }
 
-function fakeProvider({ repo = 'acme/widget', comments = [] } = {}) {
+function fakeProvider({ comments = [] } = {}) {
   return {
     async fetchIssueComments() { return comments; },
-    async fetchProjects() {
-      return { projects: [{ id: 'p1', name: 'P', content: `repo=${repo}` }], issues: [] };
-    },
   };
 }
 
@@ -55,7 +52,6 @@ const reviewBody = (verdict = 'Approve') => `## Review\n\n### What CI Did Not Pr
 const comment = (body, createdAt) => ({ body, createdAt, user: 'reviewer' });
 
 function makeRouter({
-  repo = 'acme/widget',
   comments = [],
   statuses = {},
   readPrStatus = null,
@@ -70,7 +66,7 @@ function makeRouter({
     workspaceFromUrl: (req, res, next) => next(),
     closeOutEventsStore: store,
     closeOut: {
-      resolveProvider: () => ({ provider: fakeProvider({ repo, comments }), callScope: 'scope' }),
+      resolveProvider: () => ({ provider: fakeProvider({ comments }), callScope: 'scope' }),
       readPrStatus: readPrStatus || (async ({ number }) => statuses[number] || unknownStatus(number)),
       isStopAtRun: isStopAtRun || (async () => 'pr'),
       runnerReady,
@@ -88,7 +84,6 @@ function makeDefaultMarkDoneRouter({ throwOnUpdate = false } = {}) {
   const calls = { updateIssue: [] };
   const provider = {
     async fetchIssueComments() { return [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')]; },
-    async fetchProjects() { return { projects: [{ id: 'p1', name: 'P', content: 'repo=acme/widget' }], issues: [] }; },
     async fetchIssueContext() { return { issue: { id: 'issue-uuid', identifier: 'LIN-1', team: { id: 'team-1' } } }; },
     async issueWriteGuard() { return { team: { id: 'team-1' } }; },
     async states() { return [{ id: 'st-open', name: 'In Progress', type: 'started' }, { id: 'st-done', name: 'Done', type: 'completed' }]; },
@@ -157,12 +152,13 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(built.calls.markDone, 0);
   });
 
-  test('issue scoping: a PR for a repo the workspace does not name is dropped (no-pr, nothing recorded)', async () => {
-    const built = makeRouter({ repo: 'acme/other', comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')] });
+  test('any repo: a PR URL is accepted now the allowlist is gone (LIN-3333)', async () => {
+    const PR_FOREIGN = 'https://github.com/acme/other/pull/12';
+    const built = makeRouter({ comments: [comment(PR_FOREIGN, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')], statuses: { 12: openStatus(12) } });
     const res = await check(built);
     assert.equal(res.statusCode, 200);
-    assert.equal(res.jsonBody.state.status, 'no-pr');
-    assert.equal((await rows(built.collection)).length, 0);
+    assert.equal(res.jsonBody.state.status, 'ready');
+    assert.equal(res.jsonBody.state.pr.repo, 'acme/other');
   });
 
   test('fails open on an unreadable PR state: unknown, no record, no Done', async () => {

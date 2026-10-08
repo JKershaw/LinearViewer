@@ -5,7 +5,7 @@
  * `GET /api/run/:runId/pr-state` block in dashboard-routes.test.js. This file
  * pins what the lift adds: one budget and one cache shared by every caller of
  * one instance (including the real dashboard router), `fetchedAt`/`via`,
- * the shared allowlist cache, the pure one-URL rule, and the server's single
+ * the pure one-URL rule, and the server's single
  * instance. Injected clock, counting fetch stub: no sleeps, no network.
  */
 import { test, describe, beforeEach } from 'node:test';
@@ -166,35 +166,6 @@ describe('pr-state-store: fetchedAt and via', () => {
   });
 });
 
-describe('pr-state-store: shared allowlist cache', () => {
-  test('one tracker read per workspace per 15 min, shared by every caller of the store', async () => {
-    let reads = 0;
-    const clock = { t: 10_000_000 };
-    const store = createPrStateStore({
-      now: () => clock.t,
-      resolveAllowlist: async () => { reads += 1; return new Set(['acme/widget']); }
-    });
-    const a = await store.allowlist('ws-a', {}, 'scope', clock.t);
-    const b = await store.allowlist('ws-a', {}, 'scope', clock.t + 1000);
-    assert.equal(a, b);
-    assert.equal(reads, 1);
-    await store.allowlist('ws-b', {}, 'scope', clock.t);
-    assert.equal(reads, 2, 'keyed per workspace');
-    await store.allowlist('ws-a', {}, 'scope', clock.t + 15 * 60 * 1000 + 1);
-    assert.equal(reads, 3, 'expires after 15 min');
-  });
-
-  test('a failed allowlist read fails closed to an empty set (cached)', async () => {
-    let reads = 0;
-    const store = createPrStateStore({ resolveAllowlist: async () => { reads += 1; throw new Error('tracker down'); } });
-    const v = await store.allowlist('ws-a', {}, 'scope', 1);
-    assert.ok(v instanceof Set);
-    assert.equal(v.size, 0);
-    await store.allowlist('ws-a', {}, 'scope', 2);
-    assert.equal(reads, 1);
-  });
-});
-
 describe('pr-state-store: pure helpers', () => {
   test('resolveRunPrRef applies the one-URL rule', () => {
     assert.deepEqual(resolveRunPrRef(null), { status: 'none', ref: null });
@@ -273,12 +244,11 @@ describe('pr-state-store: one instance serves the dashboard router and a second 
     return res;
   }
 
-  test('the route fills and spends the injected store; a second caller sees the same cache, budget and allowlist', async () => {
+  test('the route fills and spends the injected store; a second caller sees the same cache and budget', async () => {
     const clock = { t: 12_000_000 };
-    const counts = { github: 0, fetchProjects: 0 };
+    const counts = { github: 0 };
     const provider = {
-      async fetchIssueComments() { return [{ body: REF.url, createdAt: '2026-07-01T00:00:00.000Z', user: 'worker' }]; },
-      async fetchProjects() { counts.fetchProjects += 1; return { projects: [{ id: 'p1', name: 'P', content: 'repo=acme/widget' }], issues: [] }; }
+      async fetchIssueComments() { return [{ body: REF.url, createdAt: '2026-07-01T00:00:00.000Z', user: 'worker' }]; }
     };
     const store = createPrStateStore({ cache: new Map(), now: () => clock.t, githubFetch: githubStub(counts) });
     const r = router(store, provider);
@@ -287,15 +257,12 @@ describe('pr-state-store: one instance serves the dashboard router and a second 
     assert.equal(first.jsonBody.state, 'open', 'the injected store won over the bag\'s spent bucket');
     assert.equal(counts.github, 4);
     assert.equal(store.budgetUsed(clock.t), 4, 'the route spent the shared budget');
-    assert.ok(store.allowlistCache.has('ws-a'), 'the route filled the shared allowlist cache');
 
     // Second caller: a cache hit on what the route read, at the route's fetchedAt.
     const second = await store.readResult(REF, clock.t + 1000);
     assert.equal(second.via, PR_STATE_VIA.CACHE);
     assert.equal(second.fetchedAt, 12_000_000);
     assert.equal(counts.github, 4);
-    assert.equal(await store.allowlist('ws-a', provider, 'scope', clock.t + 1000), store.allowlistCache.get('ws-a').value);
-    assert.equal(counts.fetchProjects, 1, 'the allowlist was read once across both callers');
 
     // The second caller spends the rest; the route is then refused upstream.
     for (let i = 0; i < 8; i++) await store.readResult({ repo: 'acme/b', number: i + 1 }, clock.t);

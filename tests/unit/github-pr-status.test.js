@@ -1,32 +1,23 @@
 // Unit tests for the extracted PR-state reader and the fail-open wrapper
-// (LIN-3247).
+// (LIN-3247), plus the slug guard that replaced the retired repo allowlist
+// (LIN-3333).
 //
 // Run with: node --test tests/unit/github-pr-status.test.js
 //
 // `lib/github-pr-status.js` is a verbatim extraction of the `get_pr_status`
-// reader that lived in `lib/chat-tools.js` (LIN-2624). The chat tool's own
-// behaviour is pinned by tests/unit/chat-tools.test.js, which stays untouched;
-// this file covers the fail-open wrapper the run-evidence route calls: a throw
-// (403 rate limit, timeout) or a `readable:false` read yields `state:'unknown'`
-// ("not checked"), and a readable result passes through unchanged.
+// reader that lived in `lib/chat-tools.js` (LIN-2624). This file covers the
+// fail-open wrapper the run-evidence route calls: a throw (403 rate limit,
+// timeout) or a `readable:false` read yields `state:'unknown'` ("not checked"),
+// and a readable result passes through unchanged. LIN-3333 deleted the repo
+// allowlist; `isGitHubRepoSlug` is the safety check that keeps a comment- or
+// model-supplied string out of the api.github.com path.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { readPrStatusFailOpen } from '../../lib/github-pr-status.js';
+import { readPrStatusFailOpen, fetchPrStatus, isGitHubRepoSlug } from '../../lib/github-pr-status.js';
 
 const REPO = 'JKershaw/LinearViewer';
 const SHA = 'abc1234abc1234abc1234abc1234abc1234abcd';
-
-// A provider whose fetchProjects reports one project bound to `repo` via the
-// `repo=` convention (lib/workspace-repos.js) — the same allowlist source the
-// chat tool uses.
-function makeProvider({ repo = REPO } = {}) {
-  return {
-    async fetchProjects() {
-      return { projects: [{ id: 'p1', name: 'P', content: `repo=${repo}` }], issues: [] };
-    },
-  };
-}
 
 // A fetch fake that records every call and answers a fixed script of GitHub
 // REST responses keyed by path. Unset paths 404.
@@ -60,10 +51,27 @@ const SUCCESS_RESPONSES = {
   },
 };
 
+describe('isGitHubRepoSlug (LIN-3333)', () => {
+  test('accepts owner/name with the characters GitHub allows', () => {
+    for (const repo of [REPO, 'a/b', 'A-1_.x/B-2_.y', 'owner/repo.with.dots']) {
+      assert.strictEqual(isGitHubRepoSlug(repo), true, repo);
+    }
+  });
+
+  test('refuses anything that is not exactly two safe, non-empty segments', () => {
+    for (const repo of [
+      '../x/y', 'a/..', 'a/b/c', 'owner/', '/name', '', 'owner', 'owner /name',
+      'a b/c', 'a/b c', './a', 'a/.', null, undefined, 42, {}, 'a//b',
+    ]) {
+      assert.strictEqual(isGitHubRepoSlug(repo), false, JSON.stringify(repo));
+    }
+  });
+});
+
 describe('readPrStatusFailOpen', () => {
   test('a readable result passes through unchanged — the PR state field still means open/merged/closed', async () => {
     const result = await readPrStatusFailOpen({
-      provider: makeProvider(), scope: 'tok', repo: REPO, number: 42, sha: SHA,
+      repo: REPO, number: 42, sha: SHA,
       doFetch: makeFakeFetch(SUCCESS_RESPONSES), cache: new Map(),
     });
     assert.deepStrictEqual(result, {
@@ -88,40 +96,48 @@ describe('readPrStatusFailOpen', () => {
       [`/repos/${REPO}`]: { status: 403, body: { message: 'API rate limit exceeded' } },
     });
     const result = await readPrStatusFailOpen({
-      provider: makeProvider(), scope: 'tok', repo: REPO, number: 42, doFetch, cache: new Map(),
+      repo: REPO, number: 42, doFetch, cache: new Map(),
     });
     assert.strictEqual(result.readable, false);
     assert.strictEqual(result.state, 'unknown');
     assert.match(result.reason, /HTTP 403/);
   });
 
-  test('a readable:false read (private repo probe 404s) yields state unknown', async () => {
+  test('a readable:false read (repo probe 404s) yields state unknown', async () => {
     const doFetch = makeFakeFetch({});
     const result = await readPrStatusFailOpen({
-      provider: makeProvider(), scope: 'tok', repo: REPO, number: 42, doFetch, cache: new Map(),
+      repo: REPO, number: 42, doFetch, cache: new Map(),
     });
     assert.deepStrictEqual(result, {
       repo: REPO,
       readable: false,
       state: 'unknown',
-      reason: 'not readable: private repository',
+      reason: 'not readable: private or unknown repository',
     });
   });
 
-  test('a repo outside the workspace allowlist is never fetched and reads unknown', async () => {
+  test('a non-slug repo is never fetched and reads unknown', async () => {
     const doFetch = makeFakeFetch(SUCCESS_RESPONSES);
     const result = await readPrStatusFailOpen({
-      provider: makeProvider(), scope: 'tok', repo: 'someone-else/not-named', number: 42, doFetch, cache: new Map(),
+      repo: '../x/y', number: 42, doFetch, cache: new Map(),
     });
     assert.strictEqual(result.readable, false);
     assert.strictEqual(result.state, 'unknown');
-    assert.strictEqual(doFetch.calls.length, 0, 'an unlisted repo must never reach a GitHub fetch');
+    assert.strictEqual(doFetch.calls.length, 0, 'a non-slug repo must never reach a GitHub fetch');
+  });
+
+  test('fetchPrStatus refuses a non-slug before the fetch seam is touched', async () => {
+    const doFetch = makeFakeFetch(SUCCESS_RESPONSES);
+    for (const repo of ['../x/y', 'a/..', 'a/b/c', 'owner/']) {
+      await assert.rejects(() => fetchPrStatus(doFetch, { repo, number: 42 }), /Invalid GitHub repo/);
+    }
+    assert.strictEqual(doFetch.calls.length, 0, 'no path was built for a non-slug');
   });
 
   test('its own 60-second cache answers a repeated read without another fetch', async () => {
     const doFetch = makeFakeFetch(SUCCESS_RESPONSES);
     const cache = new Map();
-    const args = { provider: makeProvider(), scope: 'tok', repo: REPO, number: 42, sha: SHA, doFetch, cache };
+    const args = { repo: REPO, number: 42, sha: SHA, doFetch, cache };
     await readPrStatusFailOpen(args);
     const callsAfterFirst = doFetch.calls.length;
     assert.ok(callsAfterFirst > 0);

@@ -127,7 +127,10 @@ const PINS = [
   {
     id: 'test-token-guards',
     label: "accessToken === 'test-token' guards",
-    expected: 38,
+    // LIN-3333: 38 -> 37 — the dispatch page's repo-selector block (server.js)
+    // carried a `workspace.accessToken === 'test-token'` test-mode guard; it was
+    // deleted with the repo= selector.
+    expected: 37,
     sources: RAW,
     count: countTestTokenGuards,
     plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),

@@ -213,10 +213,9 @@ describe('LIN-901 — recommend-and-dispatch subscription is declared, not recon
 // validateOpaqueDispatchField helper with reportReceivedLength:true, mirroring
 // the model/harness calls a few lines below it in this same handler.
 //
-// proj-alpha (TEST-1's project) has a project-description `repo=test-repo`
-// line, so an explicit caller repo can be distinguished from the derived one
-// (LIN-537: explicit wins). proj-beta (TEST-4's project) has no repo= line, so
-// it is the fixture for "no repo at all, explicit or derived".
+// LIN-3333: the project `repo=` derivation and the workspace-repo guard are gone, so
+// the stored `repo` is exactly the explicit caller value (or null) — never a
+// project-derived one.
 describe('LIN-2075 — recommend-and-dispatch repo validation messages', () => {
   test('a non-string repo is rejected with 400', async () => {
     const captured = {};
@@ -266,11 +265,7 @@ describe('LIN-2075 — recommend-and-dispatch repo validation messages', () => {
     assert.equal(captured.item.repo, 'my-org/my-repo');
   });
 
-  test('repo: null is now accepted as absent (intentional relaxation) and falls back to the project-derived repo', async () => {
-    // Previously null fell through to the type check and was rejected; the
-    // shared helper treats null the same as omitted/undefined, so resolution
-    // continues to resolveDispatchRepo's caller-then-derived precedence
-    // (LIN-537), same as an omitted repo below.
+  test('repo: null is accepted as absent and stored as null (no project derivation — LIN-3333)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -278,10 +273,10 @@ describe('LIN-2075 — recommend-and-dispatch repo validation messages', () => {
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.repo, 'test-repo', 'falls back to the project-derived repo, same as omitted');
+    assert.strictEqual(captured.item.repo, null, 'nothing is derived from the project anymore');
   });
 
-  test('an omitted repo still behaves as today: falls back to the project-derived repo', async () => {
+  test('an omitted repo stores null (no project derivation — LIN-3333)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {
@@ -289,7 +284,7 @@ describe('LIN-2075 — recommend-and-dispatch repo validation messages', () => {
     });
 
     assert.equal(res.status, 201, `expected 201, got ${res.status}: ${JSON.stringify(res.body)}`);
-    assert.equal(captured.item.repo, 'test-repo');
+    assert.strictEqual(captured.item.repo, null);
   });
 
   test('an omitted repo with no project-derived repo either resolves to null', async () => {

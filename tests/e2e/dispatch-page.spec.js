@@ -5,22 +5,19 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 // Migrated onto a GENUINE `provider: 'local'` session (LIN-425, parent S3). The
 // dispatch queue/tokens/history stores stay store-backed (urlKey-scoped), NOT
 // provider-backed — so every `/test/*` cleanup/create route must carry
-// `?urlKey=local-workspace` (they default to the test-token workspace). The repo selector
-// reads the provider's projects, so we seed exactly ONE project carrying
-// `repo=test-repo` (→ "none" + one repo option, matching the old testMockData set).
+// `?urlKey=local-workspace` (they default to the test-token workspace).
 // Per-worker key + nav/API URLs are bound before every test by the top-level
 // beforeEach (LIN-627); the request-shim helper and test bodies read these
 // module-scoped lets. Playwright workers are separate processes, so this is
 // per-worker state, never shared across parallel workers.
 let WS, DISPATCH_URL, SETTINGS_URL, API_PREFIX;
 
-// Minimal provider seed for the repo selector: a single project whose content
-// carries `repo=test-repo`, so the selector renders exactly two options
-// (the "none" default + "Project Alpha (test-repo)"). No issues are needed —
-// the dispatch page does not render the issue tree.
+// Minimal provider seed: one project and the issue referents the dispatch guard
+// needs. No issues are needed for the page tree — the dispatch page does not
+// render the issue tree.
 const REPO_SEED = {
   projects: [
-    { id: 'local-proj-1', name: 'Project Alpha', content: 'repo=test-repo', sortOrder: 1 },
+    { id: 'local-proj-1', name: 'Project Alpha', content: 'Seeded project', sortOrder: 1 },
   ],
   // LIN-1948: the dangling-referent guard refuses a dispatch whose
   // `issueIdentifier` resolves to no issue in the workspace. Tests below that
@@ -185,45 +182,11 @@ test.describe('Dispatch Page', () => {
       await expect(recentItem.first()).toContainText('First custom prompt');
     });
 
-    test('repo selector shows projects with repo= in description', async ({ page }) => {
-      const select = page.locator('.dispatch-repo-select');
-      await expect(select).toBeVisible();
-
-      // Should have "none" default plus Project Alpha (which has repo=test-repo)
-      const options = select.locator('option');
-      await expect(options).toHaveCount(2);
-      await expect(options.first()).toHaveText('none');
-      await expect(options.nth(1)).toContainText('test-repo');
-    });
-
-    test('repo selector defaults to none', async ({ page }) => {
-      const select = page.locator('.dispatch-repo-select');
-      await expect(select).toHaveValue('');
-    });
-
-    test('custom prompt dispatch includes selected repo', async ({ page }) => {
-      const textarea = page.locator('.dispatch-prompt-input');
-      await textarea.fill('Prompt with repo');
-
-      // Select a repo
-      const select = page.locator('.dispatch-repo-select');
-      await select.selectOption('test-repo');
-
-      const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
-      await dispatchBtn.click();
-      await expect(dispatchBtn).toHaveText('dispatched!');
-
-      // Verify item has repo field via API
-      const listResponse = await page.request.get(`${API_PREFIX}/api/dispatch`);
-      const { items } = await listResponse.json();
-      expect(items[0].repo).toBe('test-repo');
-    });
-
     test('custom prompt dispatch without repo sends null', async ({ page }) => {
       const textarea = page.locator('.dispatch-prompt-input');
       await textarea.fill('Prompt without repo');
 
-      // Leave repo as "none" (default)
+      // No repo picker exists anymore (LIN-3333) — the item carries null.
       const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
       await dispatchBtn.click();
       await expect(dispatchBtn).toHaveText('dispatched!');

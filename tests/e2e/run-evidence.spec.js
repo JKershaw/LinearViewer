@@ -62,7 +62,7 @@ async function seedLocalWorkspaceWithEvidence(page, { extraPrUrl = null } = {}) 
     data: {
       urlKey: URL_KEY,
       features: { dispatch: true },
-      projects: [{ id: id('rev-proj'), name: 'Evidence Project', content: `repo=${REPO}`, sortOrder: 1 }],
+      projects: [{ id: id('rev-proj'), name: 'Evidence Project', content: 'Seeded project', sortOrder: 1 }],
       issues: [{
         id: id('rev-issue'), identifier: 'LOCAL-EV1', title: 'Finished run evidence', description: 'Seeded run-evidence task',
         projectId: id('rev-proj'), sortOrder: 1, state: { name: 'In Progress', type: 'started' },
@@ -178,7 +178,7 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     await seedLocalWorkspaceWithEvidence(page);
     await seedFinishedRun(page);
     await page.request.post('/test/seed-pr-status', {
-      data: { repo: REPO, number: 12, readable: false, reason: 'not readable: private repository' },
+      data: { repo: REPO, number: 12, readable: false, reason: 'not readable: private or unknown repository' },
     });
     const sessionId = await discoverSessionId(page);
     await gotoSession(page, sessionId);
