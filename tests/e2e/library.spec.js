@@ -107,3 +107,54 @@ test.describe('Library — crawler files', () => {
     expect(body).not.toMatch(/Disallow:/);
   });
 });
+
+// LIN-3351: figures are <img> SVGs with their own prefers-color-scheme rule. An
+// <img> SVG follows the embedder's color-scheme in Chromium/Firefox; WebKit does
+// not (accepted status quo — it keeps the light figure), so this is Chromium-only.
+test.describe('Library figures — dark mode', () => {
+  const canvasLuminance = async (page) => {
+    const img = page.locator('.library-doc__body img').first();
+    await expect(img).toBeVisible();
+    await img.scrollIntoViewIfNeeded();
+    const png = await img.screenshot();
+    return page.evaluate(async (b64) => {
+      const i = new Image();
+      i.src = `data:image/png;base64,${b64}`;
+      await i.decode();
+      const c = document.createElement('canvas');
+      c.width = i.width; c.height = i.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(i, 0, 0);
+      const [r, g, b] = ctx.getImageData(2, 2, 1, 1).data;
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    }, png.toString('base64'));
+  };
+
+  test.describe('OS dark scheme', () => {
+    test.use({ colorScheme: 'dark' });
+    test('a figure canvas is dark, not a white block', async ({ page, browserName }) => {
+      test.skip(browserName === 'webkit', 'WebKit does not apply the embedder color-scheme to <img> SVGs');
+      await page.goto('/library/cost-mix');
+      expect(await canvasLuminance(page)).toBeLessThan(0.2);
+    });
+  });
+
+  test.describe('theme=dark cookie with a light OS', () => {
+    test.use({ colorScheme: 'light' });
+    test('the html.theme-dark path also darkens the figure', async ({ page, context, browserName }) => {
+      test.skip(browserName === 'webkit', 'WebKit does not apply the embedder color-scheme to <img> SVGs');
+      await context.addCookies([{ name: 'theme', value: 'dark', url: 'http://localhost:3001' }]);
+      await page.goto('/library/cost-mix');
+      await expect(page.locator('html')).toHaveClass(/theme-dark/);
+      expect(await canvasLuminance(page)).toBeLessThan(0.2);
+    });
+  });
+
+  test.describe('light scheme', () => {
+    test.use({ colorScheme: 'light' });
+    test('a figure canvas stays white', async ({ page }) => {
+      await page.goto('/library/cost-mix');
+      expect(await canvasLuminance(page)).toBeGreaterThan(0.9);
+    });
+  });
+});
