@@ -83,6 +83,7 @@ import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../li
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
 import { buildModelOptions, getModelCatalog as defaultGetModelCatalog } from '../lib/openrouter-catalog.js';
+// Closes a static cycle (→ workspace-api → proxy → proxy-flight-companion → here); harmless because shouldMockAi is only called inside handlers — never use a workspace-api binding at module top level.
 import { shouldMockAi } from './workspace-api.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
