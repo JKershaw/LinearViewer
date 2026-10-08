@@ -58,6 +58,13 @@ describe('library catalog', () => {
     }
   });
 
+  test('summaries carry no raw blockquote markers (R1)', () => {
+    for (const doc of catalog.docs) {
+      assert.doesNotMatch(doc.summary, /(^|\s)>(\s|$)/, `${doc.slug}: no raw '>' marker`);
+    }
+    assert.match(catalog.docForSlug('doc/charter').summary, /^Status: DRAFT/);
+  });
+
   test('the 16 front-matter-less documents all get date and author from the tables', () => {
     const overrides = [
       'fleet-complexity-read',
