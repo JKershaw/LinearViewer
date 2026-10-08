@@ -227,7 +227,7 @@ test.describe('Feature Toggle Settings', () => {
 
     // Templates are gone; the primary remains.
     await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
-    await expect(component.locator('[data-testid="opened-task-go"]')).toBeVisible();
+    await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeVisible();
   });
 
   test('prompts section is visible by default (promptButtons on)', async ({ page, localWorkerUrlKey }) => {
@@ -261,7 +261,7 @@ test.describe('Feature Toggle Settings', () => {
     await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
     const component = page.locator('.in-progress-items .prompt-section').first();
 
-    const go = component.locator('[data-testid="opened-task-go"]');
+    const go = component.locator('[data-testid="opened-task-next-step"]');
     await expect(go).toBeDisabled();
     await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/AI suggestions are off/i);
 
@@ -278,7 +278,7 @@ test.describe('Feature Toggle Settings', () => {
 
     await page.locator('.in-progress-items .line.expandable').first().click();
     await page.locator('.in-progress-items .detail-toggle[data-toggle="prompts"]').first().click();
-    const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-go"]').first();
+    const go = page.locator('.in-progress-items .prompt-section [data-testid="opened-task-next-step"]').first();
     await expect(go).toBeVisible();
   });
 

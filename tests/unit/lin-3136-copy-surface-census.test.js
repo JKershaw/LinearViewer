@@ -146,6 +146,7 @@ const EMITTERS = [
   { file: 'lib/render.js', snippet: 'proxyForce: true', class: 'copy-container', reason: 'its sole proxyForce:true caller: the periodical "+ Autopilot" variant' },
   { file: 'public/prompt-section.js', snippet: "kind: result.kind || 'autopilot', raw: result.prompt, html, proxyForce: true", class: 'copy-container', reason: 'the Autopilot result entry' },
   { file: 'public/prompt-section.js', snippet: `' data-proxy-force="runner"'`, class: 'dispatch-rung', reason: 'LIN-3098 N3 run-step rung: dispatch only, never reaches maybeAppend' },
+  { file: 'public/prompt-section.js', snippet: 'proxyForce: true,', class: 'dispatch-go', reason: 'LIN-3341 one-press Go autopilot dispatch: server-side mint' },
   { file: 'public/next-run.js', snippet: 'proxyForce: true,', class: 'dispatch', reason: 'next-run autopilot dispatch: server-side mint' }
 ];
 const EMITTER_TOKENS = ['data-proxy-force="true"', 'proxyForce: true', 'data-proxy-force="runner"'];
@@ -195,7 +196,8 @@ const DISPATCH_FORCED = [
   { file: 'public/app.js', snippet: "const proxyForce = promptContainer.dataset.proxyForce === 'true'" },
   { file: 'public/dispatch.js', snippet: "proxyForce: kind === 'autopilot'" },
   { file: 'public/next-run.js', snippet: 'proxyForce: true,' },
-  { file: 'public/prompt-section.js', snippet: "proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner'" }
+  { file: 'public/prompt-section.js', snippet: "proxyForce: !!(state.result && state.result.proxyForce) || btn.dataset.proxyForce === 'runner'" },
+  { file: 'public/prompt-section.js', snippet: 'proxyForce: true,' }
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

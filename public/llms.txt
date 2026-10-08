@@ -196,7 +196,7 @@ relationship between the tasks, not as a label.
 - `.prompt-text` - the prompt text (inside container)
 - `.prompt-copy` - copy button (inside container)
 - `.prompt-download` - download button (inside container); saves the prompt as a `.md` file. Use this instead of copy for very large prompts (e.g. retro on an epic) that exceed clipboard limits. The file matches what copy yields, including the `+proxy` block when that toggle is on. Filename: `<identifier>-<promptName>.md`.
-- **Opened-task component (Home & Swipe):** `[data-prompt-mount]` → `.prompt-section`; the ✦ action is `[data-testid="opened-task-go"]`, templates are `[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="<key>"]`, the prompt text is `[data-prompt-body]`, reasoning is `[data-testid="opened-task-reasoning"]` (visible by default), and copy/download are `.swipe-prompt-copy` / `.swipe-prompt-download`.
+- **Opened-task component (Home & Swipe):** `[data-prompt-mount]` → `.prompt-section`; Go (starts the run) is `[data-testid="opened-task-go"]`, the ✦ next-step prompt button is `[data-testid="opened-task-next-step"]`, templates are `[data-testid="other-prompts"] .swipe-prompt-btn[data-prompt="<key>"]`, the prompt text is `[data-prompt-body]`, reasoning is `[data-testid="opened-task-reasoning"]` (visible by default), and copy/download are `.swipe-prompt-copy` / `.swipe-prompt-download`.
 
 ### Available Prompt Templates (17 total)
 
@@ -241,11 +241,13 @@ Templates (including `retro`) are available on completed/canceled issues too.
 4. Click any template to load it into the component
 
 ### AI Recommendation Selectors (shared opened-task component)
-- `[data-testid="opened-task-go"]` - ✦ next step (AI-tailored prompt; requires OpenRouter or free tier)
-- `[data-testid="opened-task-primary-reason"]` - plain-words reason when the action is disabled
+- `[data-testid="opened-task-go"]` - Go: one press starts the run (fetches the kickoff and dispatches it, bounded to the PR)
+- `[data-testid="opened-task-next-step"]` - ✦ next step (AI-tailored prompt; requires OpenRouter or free tier)
+- `[data-testid="opened-task-primary-reason"]` - plain-words reason when the ✦ action is disabled
+- `[data-testid="opened-task-started"]` - the started/running line shown in the Go slot (carries the task-page link); Go is replaced while a run is live
 - `[data-testid="opened-task-reasoning"]` - AI reasoning text (visible by default)
 - `[data-prompt-body]` - generated prompt text
-- `[data-testid="opened-task-ladder"]` - copy → run-this-step → run-whole-task ladder
+- `[data-testid="opened-task-ladder"]` - copy → run-this-step ladder (the run-whole-task rung is Go now)
 - `[data-free-tier-status]` - free tier status on settings page
 - `[data-free-tier-usage]` - free-tier runs-per-day allowance on settings page
 

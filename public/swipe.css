@@ -913,7 +913,88 @@ body[data-proxy-active="true"] .prompt-section .prompt-proxy-toggle {
   color: var(--amber-dim);
 }
 
-/* The ladder: a sequence of rungs, copy -> run this step -> run the whole task. */
+/* LIN-3341: Go is the primary; the ✦ next step is a secondary, and Go's
+   started/refusal lines sit in the same slot. The started line reuses the task
+   page's own `.task-status` / `.task-sentence` markup (styled only in
+   task-page.css), so those two rules are mirrored here for Home and Swipe. */
+.opened-task-next-step-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.opened-task-next-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--font-content);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.opened-task-next-step:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.opened-task-started {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.opened-task-started .task-status {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.opened-task-started .task-status-pill { flex-shrink: 0; }
+
+.opened-task-started .task-sentence {
+  margin: 0;
+  font-family: var(--font-content);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.opened-task-started-link,
+.opened-task-go-notice-link {
+  font-family: var(--font-content);
+  font-size: 12px;
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.opened-task-go-notice {
+  flex-basis: 100%;
+  font-family: var(--font-content);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--amber-dim);
+}
+
+.opened-task-go-notice:empty { display: none; }
+
+.opened-task-run-quota {
+  font-family: var(--font-content);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* The ladder: a sequence of rungs, copy -> run this step. (Go is the run-task
+   move now, rendered above the ladder.) */
 .opened-task-ladder {
   display: flex;
   flex-wrap: wrap;

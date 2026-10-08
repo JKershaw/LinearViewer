@@ -368,7 +368,7 @@ test.describe('AI Recommendations', () => {
 
   test('renders the ✦ primary enabled when OpenRouter is configured', async ({ page }) => {
     const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    const go = component.locator('[data-testid="opened-task-go"]');
+    const go = component.locator('[data-testid="opened-task-next-step"]');
     await expect(go).toBeVisible();
     await expect(go).toContainText(/next step/i);
     await expect(go).toBeEnabled();
@@ -382,14 +382,14 @@ test.describe('AI Recommendations', () => {
     await page.waitForLoadState('networkidle');
 
     const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    const go = component.locator('[data-testid="opened-task-go"]');
+    const go = component.locator('[data-testid="opened-task-next-step"]');
     await expect(go).toBeDisabled();
     await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toContainText(/needs OpenRouter/i);
   });
 
   test('the ✦ primary streams reasoning that stays visible, then the prompt', async ({ page }) => {
     const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    await component.locator('[data-testid="opened-task-go"]').click();
+    await component.locator('[data-testid="opened-task-next-step"]').click();
 
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
     // LIN-2944 reverses LIN-70: reasoning stays visible by default.
@@ -406,7 +406,7 @@ test.describe('AI Recommendations', () => {
     });
 
     const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    await component.locator('[data-testid="opened-task-go"]').click();
+    await component.locator('[data-testid="opened-task-next-step"]').click();
     await expect(component).toHaveAttribute('data-phase', 'generating');
 
     release();
@@ -416,7 +416,7 @@ test.describe('AI Recommendations', () => {
 
   test('↻ change dismisses the generated prompt back to idle', async ({ page }) => {
     const component = await openTaskPrompts(page, '.in-progress-items', BLOCKED_ISSUE_ID);
-    await component.locator('[data-testid="opened-task-go"]').click();
+    await component.locator('[data-testid="opened-task-next-step"]').click();
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
 
     await component.locator('[data-action="change"]').first().click();

@@ -298,7 +298,7 @@ test.describe('Streaming AI Recommendations - UI', () => {
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
     const component = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] .prompt-section`);
     await expect(component).toBeVisible();
-    await component.locator('[data-testid="opened-task-go"]').click();
+    await component.locator('[data-testid="opened-task-next-step"]').click();
     return component;
   }
 
