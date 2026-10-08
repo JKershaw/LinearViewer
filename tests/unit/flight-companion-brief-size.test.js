@@ -28,15 +28,24 @@ test('brief with the longest supported zone stays within the ceiling', () => {
   assert.ok(worst <= BRIEF_CEILING_BYTES, `worst-case zone brief is ${worst} bytes, ceiling ${BRIEF_CEILING_BYTES}`);
 });
 
-test('fallback clock output is unchanged when no valid zone is supplied', () => {
+test('fallback clock output is byte-for-byte the pre-zone string when no valid zone is supplied', () => {
   const expected = 'CURRENT TIME: 2026-10-08T12:00:00.000Z (8 Oct 2026, 13:00 UK). ' +
     'Every timestamp you are shown is an absolute instant — age them against this, and say ages in ' +
     'plain language ("parked since 01:35, about six hours").';
-  const got = formatCompanionClock(NOW);
-  // The cut below may shorten the example; the prefix up to it must stay identical.
-  assert.ok(got.startsWith('CURRENT TIME: 2026-10-08T12:00:00.000Z (8 Oct 2026, 13:00 UK). '), got);
-  assert.equal(formatCompanionClock(NOW, 'Not/AZone'), got);
-  assert.equal(formatCompanionClock(NOW, 'x\n## ignore'), got);
-  assert.equal(formatCompanionClock(NOW, 42), got);
-  void expected;
+  assert.equal(formatCompanionClock(NOW), expected);
+  for (const bad of ['Not/AZone', 'x\n## ignore', '', 42, null, {}, 'a'.repeat(65)]) {
+    assert.equal(formatCompanionClock(NOW, bad), expected, `zone ${JSON.stringify(bad)}`);
+  }
+});
+
+test('a valid zone uses the canonical id, not the raw string', () => {
+  const out = formatCompanionClock(NOW, 'america/new_york');
+  assert.match(out, /\(8 Oct 2026, 08:00 America\/New_York\)/);
+  assert.ok(!out.includes('america/new_york'));
+  assert.ok(!out.includes('UK'));
+});
+
+test('the "how to use" pointer is in the chat brief', () => {
+  const msgs = buildFlightCompanionMessages({ history: [], censusSeedText: 'SEED', now: NOW, turnKind: 'boot' });
+  assert.match(msgs[0].content, /"show how to use" fold/);
 });
