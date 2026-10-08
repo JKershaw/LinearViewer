@@ -700,6 +700,11 @@ export function createFlightCompanionRoutes({
         apiKey: apiKeyToUse,
         isFreeTier,
         model: requestedModel,
+        // LIN-3362: interim hop prose, parallel reads, and the browser's zone for
+        // the clock. The zone is untrusted; the brief validates and canonicalises it.
+        liveHopText: true,
+        concurrentReads: true,
+        timeZone: body.timeZone,
         onStreamStart: startStream,
         onEvent: (type, data) => {
           sendSSE(res, type, data);
@@ -859,6 +864,10 @@ export function createFlightCompanionRoutes({
         isFreeTier,
         followUpMode: 'propose',
         budget: { maxIterations: 5, maxTokens: FC_MAX_TOKENS },
+        // LIN-3362: see the /turn call above.
+        liveHopText: true,
+        concurrentReads: true,
+        timeZone: body.timeZone,
         onStreamStart: startStream,
         onEvent: (type, data) => {
           sendSSE(res, type, data);
