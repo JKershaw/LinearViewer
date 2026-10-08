@@ -5,7 +5,7 @@
  */
 import { test, describe, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert';
-import { streamChat, streamChatWithTools, setLlmCallRecorder } from '../../lib/openrouter.js';
+import { streamChat, streamChatWithTools, setLlmCallRecorder, setFetchImpl } from '../../lib/openrouter.js';
 
 const USAGE = {
   prompt_tokens: 100, completion_tokens: 4000, total_tokens: 4100, cost: 0.01,
@@ -41,6 +41,7 @@ describe('LIN-3359 call-log telemetry', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    setFetchImpl(null);
     setLlmCallRecorder(null);
     for (const [k, v] of Object.entries(savedProxyEnv)) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
@@ -62,6 +63,22 @@ describe('LIN-3359 call-log telemetry', () => {
     const body = JSON.parse(global.fetch.mock.calls[0].arguments[1].body);
     assert.strictEqual(body.max_tokens, 4000);
     assert.ok(!('reasoning' in body));
+  });
+
+  test('the non-streaming streamChat row (HTTPS_PROXY set) carries maxTokens + reasoningTokens', async () => {
+    process.env.HTTPS_PROXY = 'http://proxy.invalid:3128';
+    setFetchImpl(async () => ({
+      ok: true,
+      json: async () => ({
+        model: 'm', provider: 'p', usage: USAGE,
+        choices: [{ finish_reason: 'length', message: { content: 'cut' } }]
+      })
+    }));
+    await streamChat([{ role: 'user', content: 'hi' }], { apiKey: 'k', maxTokens: 4000 }, () => {});
+    assert.strictEqual(records.length, 1);
+    assert.strictEqual(records[0].finishReason, 'length');
+    assert.strictEqual(records[0].maxTokens, 4000);
+    assert.strictEqual(records[0].reasoningTokens, 3900);
   });
 
   test('reasoningTokens is null when usage carries no completion_tokens_details', async () => {
