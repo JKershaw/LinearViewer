@@ -21,7 +21,7 @@ cites:
 
 **The selector is given more than it needs and less than it should, and cutting is not the
 fix.** A call carries a median 11.9k characters (p90 28k, most 48k). Fifty-seven percent is
-fixed stage descriptions and rules, 24% the description, 12% the newest three comments and 4%
+fixed text (stage descriptions, rules and the reply contract), 24% the description, 12% the newest three comments and 4%
 facts computed in code. Those facts decide the routes that went wrong on 8 October. The
 description's late sections were not unseen: the hypothesis was tested and is refuted. The
 misroutes come from four shapes in the facts and the stage descriptions, and a fifth effect,
@@ -90,8 +90,8 @@ concurrently:
 
 The description decides terse tickets (LIN-1892, FIX-830-neg, SYN-10, 12, 14, 23 fail without it).
 The cropped and comment-limited variants are within noise on the corpus but save 10% and 7%, and
-cropping made a known case worse (finding 2). Removing the facts fixes P2–P6 and P8–P9 and breaks
-P11–P12: the facts decide, both ways. Hiding comment bodies breaks P8 and P9 (a spike's PR link has
+cropping made a known case worse (finding 2). Removing the facts mostly fixes P2–P6 (15 of 20), fixes
+P8–P9 (8 of 8) and breaks P11–P12 (0 of 8): the facts decide, both ways. Hiding comment bodies breaks P8 and P9 (a spike's PR link has
 no explanation). So no cut is recommended. Nor is there "plenty of safe context": the part that
 decides is the 4% of facts, and the 57% fixed text is the stage vocabulary.
 
@@ -153,5 +153,5 @@ fixtures. The selector-change pins that ticket must update are the
 source-byte freeze fails on the patch), a `scripts/prompt-template-change-log.md` row, and
 `docs/architecture/prompt-system.md`. Fix c touches Linear, Jira and Local providers; GitHub and
 GitHub Projects have no hierarchy, so it is inert there. This paper itself updates none of them.
-One line goes into `proposals.md`: whether the fixed 57% of the prompt (the stage descriptions) is
+One line goes into `proposals.md`: whether the fixed 57% of the prompt (stage descriptions, rules and reply contract) is
 what makes the model split where signals disagree.
