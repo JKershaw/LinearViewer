@@ -279,6 +279,48 @@ describe('B4 merger rule', () => {
   });
 });
 
+describe('B4 owner load: a press merge is never "merged by you" (review F1)', () => {
+  const PRESS = [{ by: 'press', prUrl: PR_URL, merged: true, at: '2026-10-08T18:05:00.000Z' }];
+
+  async function ownerPage({ stateType, events = PRESS, comments }) {
+    const { loader, access } = makeLoader({ ctx: ctxFor({ stateType, ...(comments ? { comments } : {}) }), events });
+    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true });
+    return { model, html: renderTaskPage(model, { viewer: 'owner', urlKey: 'ws', now: NOW }) };
+  }
+
+  for (const stateType of ['completed', 'started']) {
+    test(`owner, press event, task ${stateType}: the page text never says the owner merged`, async () => {
+      const { model, html } = await ownerPage({ stateType });
+      assert.equal(model.evidence.closeOut.mergedBy, 'close-out');
+      assert.equal(model.evidence.closeOut.mergedByYou, false);
+      assert.doesNotMatch(pageText(body(html)), /You merged|merged by you/i);
+      // finished: the third-person merger sentence; not finished: the neutral lead and the owner box's close-out wording
+      assert.match(pageText(body(html)), stateType === 'completed' ? /merged by Harbour's close-out/ : /PR #41 is merged\..*the pull request was merged by close-out/);
+    });
+  }
+
+  test('a press event for another PR leaves the owner self-merge claim alone', async () => {
+    const { model } = await ownerPage({ stateType: 'started', events: [{ by: 'press', prUrl: OTHER_PR_URL, merged: true }] });
+    assert.equal(model.evidence.closeOut.mergedBy, null);
+    assert.equal(model.evidence.closeOut.mergedByYou, true);
+  });
+
+  test('partial merge with a press event: the owner box does not claim it either', async () => {
+    const partial = { status: 'partial', pr: { number: 41, url: PR_URL }, mergedByYou: true, message: 'PR #41 merged · 1 more PR open' };
+    const loader = createTaskPageLoader({
+      dispatchStore: {}, agentStatusStore: {}, briefCacheStore: { async get() { return null; } }, recapCacheStore: { async get() { return null; } },
+      closeOutEventsStore: { async listForIssue() { return PRESS; } },
+      readRunEvidence: async () => ({ closeOut: partial, ledger: null, state: { pr: partial.pr } }),
+      prStateStore: null, readTaskRunFacts: async () => ({ stopAt: 'pr', variant: 'standard' }),
+      enrichLoop, deriveSessionWaiting, getLoopsForIssue: async () => [loop()], now: () => NOW,
+    });
+    const access = { provider: { async fetchRecommendationContext() { return ctxFor({ stateType: 'started' }); } }, callScope: 'tok' };
+    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true });
+    assert.equal(model.evidence.closeOut.mergedBy, 'close-out');
+    assert.equal(model.evidence.closeOut.mergedByYou, false);
+  });
+});
+
 describe('deriveCloseOutState: "merged by you" belongs to the owner only', () => {
   const merged = { readable: true, state: 'closed', merged: true, head: { sha: 'a' } };
   const run = (owner) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: [merged], review: null, owner, stopAt: 'pr' });
