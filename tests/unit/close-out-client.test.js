@@ -21,14 +21,14 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/close-out.js'), 'utf8');
 
-function load({ window = {} } = {}) {
+function load({ window = {}, document } = {}) {
   const module = { exports: {} };
-  const document = {
+  const doc = document || {
     createElement() { return { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' }; },
     addEventListener() {},
   };
   vm.runInNewContext(SRC, {
-    module, window, document, URLSearchParams, console, setTimeout, clearTimeout, Promise,
+    module, window, document: doc, URLSearchParams, console, setTimeout, clearTimeout, Promise,
     Array, String, encodeURIComponent,
   });
   return module.exports;
@@ -155,6 +155,45 @@ describe('close-out.js: the check', () => {
     };
     const { runCheck } = load({ window });
     await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'ready' }));
+    assert.equal(reloads, 1);
+  });
+
+  /**
+   * B1 (review `388f4246`): after the first Done write, `/check` returns
+   * `done: true` on every later call, so a page that already shows the tracker
+   * as Done would reload forever. A `done` result must NOT reload then.
+   */
+  test('a done result on a page already showing done makes 0 reloads', async () => {
+    let reloads = 0;
+    const window = {
+      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true }); },
+      location: { reload() { reloads++; } },
+    };
+    const { runCheck, pageAlreadyDone } = load({ window });
+    const main = { getAttribute: (k) => (k === 'data-status' ? 'done' : null) };
+    const doc = { querySelector: (sel) => (sel === '[data-testid="task-page"]' ? main : null) };
+    assert.equal(pageAlreadyDone(doc), true);
+    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
+    assert.equal(reloads, 0, 'no reload loop on the end state the feature exists for');
+  });
+
+  test('pageAlreadyDone is false without a main / status / document', () => {
+    const { pageAlreadyDone } = load();
+    assert.equal(pageAlreadyDone(), false);
+    assert.equal(pageAlreadyDone({ querySelector: () => null }), false);
+    assert.equal(pageAlreadyDone({ querySelector: () => ({ getAttribute: () => 'idle' }) }), false);
+    assert.equal(pageAlreadyDone({ querySelector: () => ({ getAttribute: () => 'done' }) }), true);
+  });
+
+  test('a done result reloads once on a page not yet done (In Progress → Done)', async () => {
+    let reloads = 0;
+    const window = {
+      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true }); },
+      location: { reload() { reloads++; } },
+    };
+    const { runCheck } = load({ window });
+    const doc = { querySelector: () => ({ getAttribute: () => 'running' }) };
+    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
     assert.equal(reloads, 1);
   });
 });

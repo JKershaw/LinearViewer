@@ -394,6 +394,45 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(res.jsonBody.recorded[0].by, 'close-out');
     assert.equal(res.jsonBody.state.mergedByYou, false);
   });
+
+  // LIN-3340 F4 (review `388f4246`): the route-level wiring from
+  // `defaultIsStopAtRun` to the shared `readTaskRunFacts` reader had no test of
+  // its own. A subtask worked under a parent's stop-at run carries no
+  // `stopAt`/`variant` on its own rows — only a `sessionId` naming the parent
+  // run row. The check route must reach Done for it, via the same hop the
+  // dispatch guard makes.
+  test('LIN-3340 F4: a subtask under a stop-at parent run reaches Done through the sessionId hop', async () => {
+    const db = harness.freshDb();
+    const queueStore = new DispatchQueueStore({
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history'),
+    });
+    // The parent autopilot run: stop-at-PR, keyed to its own issue; its row id
+    // becomes the worker's `sessionId`.
+    const parent = await queueStore.addItem('ws', { prompt: 'orchestrate', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-parent', stopAt: 'pr', variant: 'standard' });
+    // The subtask's own worker row carries neither fact, only the sessionId.
+    await queueStore.addItem('ws', { prompt: 'build the subtask', promptName: 'implementation', kind: 'implementation', issueIdentifier: 'LIN-sub', sessionId: parent._id });
+
+    const store = new CloseOutEventsStore({ collection: db.collection('close-out-events') });
+    const calls = { markDone: 0 };
+    const router = createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, res, next) => next(),
+      dispatchQueueStore: queueStore,
+      closeOutEventsStore: store,
+      closeOut: {
+        resolveProvider: () => ({ provider: fakeProvider({ comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')] }), callScope: 'scope' }),
+        readPrStatus: async ({ number }) => mergedStatus(number),
+        runnerReady: () => true,
+        markDone: async () => { calls.markDone += 1; },
+        // no `isStopAtRun` seam: exercise the real defaultIsStopAtRun → helper hop.
+      },
+    });
+    const res = await callRoute(router, CHECK_PATH, 'post', baseReq({ params: { urlKey: 'ws', issueIdentifier: 'LIN-sub' } }));
+    assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
+    assert.equal(res.jsonBody.recorded.length, 1);
+    assert.equal(res.jsonBody.done, true);
+    assert.equal(calls.markDone, 1);
+  });
 });
 
 describe('POST /api/run-evidence/:issueIdentifier/close-out-press', () => {

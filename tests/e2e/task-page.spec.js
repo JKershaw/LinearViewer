@@ -445,4 +445,59 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await guestCtx.close();
     await page.request.get('/test/clear-pr-status');
   });
+
+  // LIN-3340 B1 (review `388f4246`): once a merge has been recorded, `/check`
+  // returns `done: true` on EVERY later call. An owner opening the page when the
+  // PR is already merged and the tracker is already Done must NOT reload in a
+  // loop — the old client reloaded unconditionally, so this end state (the one
+  // the feature exists for) loaded forever.
+  test('B1: an already-merged, already-Done stop-at PR settles without a reload loop', async ({ page }) => {
+    await page.request.get('/test/clear-pr-status');
+    const id = (raw) => localSeedId(URL_KEY, raw);
+    const PR_URL = 'https://github.com/acme/app/pull/41';
+    const TASK_UUID = '22222222-3333-4444-5555-666666666666';
+    const resp = await page.request.post('/test/set-local-session', {
+      data: {
+        urlKey: URL_KEY,
+        features: { dispatch: true },
+        projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
+        issues: [{
+          id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A finished task',
+          description: 'The task description.', projectId: id('tp-proj'), sortOrder: 1,
+          state: { name: 'Done', type: 'completed' }, url: `/workspace/${URL_KEY}/issue/${TASK_UUID}`,
+          comments: [
+            { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
+            { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+          ],
+        }],
+      },
+    });
+    expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+
+    const token = await runnerToken(page);
+    const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'orchestrate', promptName: 'Autopilot (LOCAL-TP1)', kind: 'autopilot', issueIdentifier: 'LOCAL-TP1', issueTitle: 'A finished task', target: 'cli', stopAt: 'pr', variant: 'standard' },
+    });
+    expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+    const anchorId = (await anchor.json()).item.id;
+    await page.request.post(`/api/dispatch/take/${anchorId}`, { headers: { Authorization: `Bearer ${token}` } });
+    await postFeedback(page, token, anchorId, '[done] orchestrated the run');
+    // The PR is merged and the tracker is already Done: the end state.
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: 'acme/app', number: 41, readable: true, state: 'closed', merged: true, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+
+    let loads = 0;
+    page.on('load', () => { loads++; });
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-status', 'done');
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="merged"]')).toBeVisible();
+
+    // Give any runaway reload a few seconds to show itself. The fixed client
+    // reloads 0 times here (the page already says done); the old one loaded
+    // continuously (the probe saw 15 in 8 s).
+    await page.waitForTimeout(4000);
+    expect(loads, `page reloaded ${loads} times in 4 s`).toBeLessThanOrEqual(2);
+    await page.request.get('/test/clear-pr-status');
+  });
 });

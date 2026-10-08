@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus, harbourHref } from '../../lib/render-task-page.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { CLOSE_OUT_STATUS } from '../../lib/run-closeout-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(__dirname, '../fixtures/render-task-page-golden.json');
@@ -210,6 +211,31 @@ describe('task page structure', () => {
     const docs = html.indexOf('data-testid="task-page-docs"');
     assert.ok(docs > html.indexOf('data-testid="task-page-context-mount"'));
     assert.ok(docs < html.indexOf('data-testid="task-page-details"'));
+  });
+
+  // LIN-3340 F3 (review `388f4246`): every close-out status must render a
+  // sensible line on the task page, as it does on the run page. This iterates
+  // the enum, so a status that renders nothing fails here.
+  test('every close-out status renders a line on the task page (C5)', () => {
+    const statuses = Object.values(CLOSE_OUT_STATUS);
+    assert.equal(statuses.length, 8, 'the enum has all eight statuses');
+    for (const status of statuses) {
+      const m = model('running-blocked-repeat');
+      const withBox = {
+        ...m,
+        evidence: {
+          ...m.evidence,
+          closeOut: {
+            owner: true, status, variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
+            pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' },
+          },
+        },
+      };
+      const html = renderTaskPage(withBox, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+      assert.match(html, /data-testid="run-evidence-closeout"/, `${status}: the box is present`);
+      assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"/, `${status}: the box renders a line`);
+      assert.match(html, new RegExp(`data-state="${status}"`), `${status}: the box carries the status`);
+    }
   });
 
   test('guesses: after the furthest stage reached; none once done', () => {

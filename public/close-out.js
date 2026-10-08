@@ -148,10 +148,31 @@
   }
 
   /**
+   * Whether the page is already showing the tracker as Done. Read off the task
+   * page's `<main data-status>`. B1: the check route returns `done: true` on
+   * EVERY later call once a merge has been recorded (the "already written for
+   * this merge" branch), so reloading unconditionally loops forever on the very
+   * end state a stop-at task reaches. Never reload when the page already says
+   * done. A missing document (unit seams) or no `<main>` reports false.
+   *
+   * @param {Document} [doc]
+   * @returns {boolean}
+   */
+  function pageAlreadyDone(doc) {
+    const d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d || typeof d.querySelector !== 'function') return false;
+    const main = d.querySelector('[data-testid="task-page"]');
+    return !!(main && typeof main.getAttribute === 'function' && main.getAttribute('data-status') === 'done');
+  }
+
+  /**
    * The self-merge / state check. Stop-at-PR runs only, and only while the box
    * is `ready`/`merged`/`partial` (the same gate the run page uses).
+   *
+   * @param {HTMLElement} box
+   * @param {Document} [doc] - the page document, for the B1 done-guard
    */
-  function runCheck(box) {
+  function runCheck(box, doc) {
     const ctx = boxContext(box);
     if (!ctx.urlKey || !ctx.issueIdentifier) return Promise.resolve(null);
     if (ctx.stopAt !== 'pr') return Promise.resolve(null);
@@ -162,8 +183,10 @@
       body: JSON.stringify(checkBody(ctx.source)),
     }).then(function (result) {
       applyCloseOutState(box, result && result.state);
-      // A merge we just set Done for: reload so the tracker's header shows it.
-      if (result && result.done && typeof window.location !== 'undefined' && window.location.reload) {
+      // A merge we just set Done for: reload once so the tracker's header shows
+      // it. Never when the page already says done (B1) — otherwise the repeated
+      // `done:true` result loops the page forever.
+      if (result && result.done && !pageAlreadyDone(doc) && typeof window.location !== 'undefined' && window.location.reload) {
         window.location.reload();
       }
       return result;
@@ -172,11 +195,11 @@
 
   // Debounce tab-return so one return fires one check (the run page's N-a fix).
   let checkTimer = null;
-  function scheduleCheck(box) {
+  function scheduleCheck(box, doc) {
     if (checkTimer) return;
     checkTimer = setTimeout(function () {
       checkTimer = null;
-      runCheck(box);
+      runCheck(box, doc);
     }, 300);
   }
 
@@ -198,9 +221,9 @@
       e.preventDefault();
       pressCloseOut(box, btn);
     });
-    runCheck(box);
-    window.addEventListener('focus', function () { scheduleCheck(box); });
-    doc.addEventListener('visibilitychange', function () { if (!doc.hidden) scheduleCheck(box); });
+    runCheck(box, doc);
+    window.addEventListener('focus', function () { scheduleCheck(box, doc); });
+    doc.addEventListener('visibilitychange', function () { if (!doc.hidden) scheduleCheck(box, doc); });
     return box;
   }
 
@@ -213,6 +236,7 @@
     pressCloseOut: pressCloseOut,
     runCheck: runCheck,
     applyCloseOutState: applyCloseOutState,
+    pageAlreadyDone: pageAlreadyDone,
   };
 
   if (typeof document !== 'undefined' && document.addEventListener) {
@@ -220,6 +244,6 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { promptUrl, checkUrl, checkBody, boxContext, pressCloseOut, runCheck, applyCloseOutState };
+    module.exports = { promptUrl, checkUrl, checkBody, boxContext, pressCloseOut, runCheck, applyCloseOutState, pageAlreadyDone };
   }
 })();

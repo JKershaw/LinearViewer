@@ -545,6 +545,7 @@
       contextNeedsRepaint: contextNeedsRepaint,
       enhanceMarkdown: enhanceMarkdown,
       enhanceContextMarkdown: enhanceContextMarkdown,
+      mountWidgets: mountWidgets,
       FAST_MS: FAST_MS,
       SLOW_MS: SLOW_MS,
       MAX_BACKOFF_MS: MAX_BACKOFF_MS
