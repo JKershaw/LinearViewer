@@ -83,6 +83,18 @@ function sliceIsPinnedToBottomSource() {
 }
 const IS_PINNED_TO_BOTTOM_SRC = sliceIsPinnedToBottomSource();
 
+// LIN-3361: the REAL window.sourceQuery + window.taskPageHref (common.js), so
+// the thread's task links are built by the shipped helper, never a stub.
+function sliceWindowFnSource(name) {
+  const startMarker = `window.${name} = function ${name}(`;
+  const startIdx = COMMON_JS_SRC.indexOf(startMarker);
+  assert.ok(startIdx !== -1, `${name} marker not found in public/common.js — has it moved/been renamed?`);
+  const endIdx = COMMON_JS_SRC.indexOf('\n};', startIdx);
+  assert.ok(endIdx !== -1, `closing \`};\` for ${name} not found`);
+  return COMMON_JS_SRC.slice(startIdx, endIdx + 3);
+}
+const TASK_PAGE_HREF_SRC = sliceWindowFnSource('sourceQuery') + '\n' + sliceWindowFnSource('taskPageHref');
+
 // ─── Minimal DOM shim ───────────────────────────────────────────────────────
 
 class FakeClassList {
@@ -104,6 +116,14 @@ function findByClass(el, cls) {
     if (found) return found;
   }
   return null;
+}
+
+function findAllByClass(el, cls, out = []) {
+  for (const child of el.children) {
+    if (child.classList && child.classList.contains(cls)) out.push(child);
+    findAllByClass(child, cls, out);
+  }
+  return out;
 }
 
 class FakeElement {
@@ -165,8 +185,17 @@ class FakeElement {
     this.classList = new FakeClassList();
     String(v || '').split(/\s+/).filter(Boolean).forEach(c => this.classList.add(c));
   }
-  appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  // LIN-3361: like the DOM, inserting a node that already has a parent MOVES
+  // it (the grouping and fold helpers rely on this).
+  _detach(child) {
+    if (child.parentNode && child.parentNode.children) {
+      const at = child.parentNode.children.indexOf(child);
+      if (at !== -1) child.parentNode.children.splice(at, 1);
+    }
+  }
+  appendChild(child) { this._detach(child); child.parentNode = this; this.children.push(child); return child; }
   insertBefore(child, ref) {
+    this._detach(child);
     const idx = this.children.indexOf(ref);
     child.parentNode = this;
     if (idx === -1) this.children.push(child); else this.children.splice(idx, 0, child);
@@ -247,6 +276,7 @@ function makeDocument({ hiddenInitial = false } = {}) {
     getElementById(id) { return byId[id] || null; },
     querySelector(sel) { return sel === '.flight-companion-page' ? page : null; },
     createElement(tag) { return new FakeElement(tag); },
+    createTreeWalker() { return { nextNode() { return null; } }; },
     addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
     removeEventListener(type, fn) {
       if (!listeners[type]) return;
@@ -281,6 +311,14 @@ function makeChatUI(doc) {
     // from the REAL chat.js rather than a second hand-rolled fake, so a real
     // regression in the shared helper fails these tests too.
     renderMarkdownText: realChatUI.renderMarkdownText,
+    // LIN-3361: the scannable-thread helpers, also from the real chat.js. The
+    // shim has no text nodes/fragments, so linkify's DOM walk is proven in
+    // the e2e spec; the pure collectors and the tool-row DOM run here.
+    appendToolRow: realChatUI.appendToolRow,
+    foldAfterAnchor: realChatUI.foldAfterAnchor,
+    linkifyIdentifiers: realChatUI.linkifyIdentifiers,
+    collectIdentifiers: realChatUI.collectIdentifiers,
+    collectIdentifiersFromText: realChatUI.collectIdentifiersFromText,
     appendMessage(thread, opts) {
       calls.appendMessage.push(opts);
       const li = new FakeElement('li');
@@ -543,6 +581,7 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   // readSSEStream first, same context — mirrors production's script order
   // (common.js, then flight-companion.js) so both share one realm.
   vm.runInContext(READ_SSE_STREAM_SRC, sandbox, { filename: 'common.js (readSSEStream slice)' });
+  vm.runInContext(TASK_PAGE_HREF_SRC, sandbox, { filename: 'common.js (taskPageHref slice)' });
   vm.runInContext(CLIENT_SRC, sandbox, { filename: 'flight-companion.js' });
 
   return {
@@ -1361,7 +1400,8 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
     m.autoWakeTick();
     await flush();
     assert.strictEqual(chatUICalls.appendMessage.length, 0, 'no bubble may be created for a tool-only turn');
-    assert.strictEqual(chatUICalls.appendNote.length, 1, 'the call breadcrumb renders (settled by the result, not a second note)');
+    assert.strictEqual(chatUICalls.appendNote.length, 0, 'the call renders as a tool row (LIN-3361), not a note');
+    assert.strictEqual(thread.children.filter(li => li.className.includes('chat-tool-row')).length, 1, 'one tool row, settled by the result');
     assert.ok(thread.children.every(li => !li.className.includes('chat-msg')), 'every row is a note, never a bubble');
   });
 
@@ -1713,7 +1753,7 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
     await flush();
     // you -> breadcrumb -> assistant row, in that order.
     assert.strictEqual(thread.children.length, 3);
-    assert.ok(thread.children[1].className.includes('fc-inline-note'), 'the breadcrumb lands between the user turn and the answer');
+    assert.ok(thread.children[1].className.includes('chat-tool-row'), 'the breadcrumb lands between the user turn and the answer');
     assert.strictEqual(thread.children[2].querySelector('.fc-msg-body').textContent, 'done hop');
   });
 
@@ -1872,6 +1912,9 @@ describe('flight-companion.js — the thinking state (typed turns) and "checking
 
 // ─── Tool-wire phases + proposal control ────────────────────────────────
 
+// LIN-3361: a tool row is li > details > [summary, body].
+function toolSummary(row) { return row.children[0].children[0]; }
+
 describe('flight-companion.js — tool-wire phases (F5) + the proposal control', () => {
   test('phase: "cap" renders exactly one note, does not throw, and is never mistaken for a proposal', async () => {
     const { exports: m, chatUICalls } = loadClient({
@@ -1899,10 +1942,11 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     });
     m.autoWakeTick();
     await flush();
-    assert.strictEqual(chatUICalls.appendNote.length, 1);
-    assert.equal(chatUICalls.appendNote[0].text, '↳ checked the task stack …');
-    const li = thread.children.find(l => l.textContent.includes('checked the task stack'));
-    assert.ok(li, 'expected the pending breadcrumb in the thread');
+    // LIN-3361: a tool row (expandable <details>), not a note.
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    const row = thread.children.find(l => l.className.includes('chat-tool-row'));
+    assert.ok(row, 'expected the pending tool row in the thread');
+    assert.equal(toolSummary(row).textContent, '↳ checked the task stack …');
   });
 
   test('"result" settles the matching "call" breadcrumb in place (no new note), dropping the pending ellipsis', async () => {
@@ -1915,11 +1959,15 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     });
     m.autoWakeTick();
     await flush();
-    // Settling mutates the existing note in place — it must not append a
+    // Settling mutates the existing row in place — it must not append a
     // second one.
-    assert.strictEqual(chatUICalls.appendNote.length, 1);
-    const li = thread.children.find(l => l.className.includes('fc-inline-note'));
-    assert.equal(li.textContent, '↳ checked sessions for LIN-9', 'settled text keeps the call-time specifics and drops the ellipsis');
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    const rows = thread.children.filter(l => l.className.includes('chat-tool-row'));
+    assert.strictEqual(rows.length, 1);
+    assert.equal(toolSummary(rows[0]).textContent, '↳ checked sessions for LIN-9', 'settled text keeps the call-time specifics and drops the ellipsis');
+    const pres = rows[0].children[0].children[1].children;
+    assert.equal(pres[0].textContent, JSON.stringify({ issueId: 'LIN-9' }, null, 2), 'the arguments are in the body');
+    assert.equal(pres[1].textContent, '[]', 'the result is in the body');
   });
 
   test('"error" marks the matching "call" breadcrumb failed, recomputed from the error event', async () => {
@@ -1932,9 +1980,10 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     });
     m.autoWakeTick();
     await flush();
-    assert.strictEqual(chatUICalls.appendNote.length, 1);
-    const li = thread.children.find(l => l.className.includes('fc-inline-note'));
-    assert.equal(li.textContent, '↳ get_session failed: boom');
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    const li = thread.children.find(l => l.className.includes('chat-tool-row'));
+    assert.equal(toolSummary(li).textContent, '↳ get_session failed: boom');
+    assert.equal(li.dataset.error, '1');
   });
 
   test('a result/error with no matching call id is a defensive no-op (never throws, no orphan note)', async () => {
@@ -1961,8 +2010,14 @@ describe('flight-companion.js — tool-wire phases (F5) + the proposal control',
     });
     m.autoWakeTick();
     await flush();
-    assert.strictEqual(chatUICalls.appendNote.length, 2, 'each call gets exactly one note, settling mutates in place');
-    const notes = thread.children.filter(l => l.className.includes('fc-inline-note')).map(l => l.textContent);
+    assert.strictEqual(chatUICalls.appendNote.length, 0);
+    // Two adjacent tool rows compact into ONE group; each settles on its own.
+    const groups = thread.children.filter(l => l.className.includes('chat-tool-group'));
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(thread.children.filter(l => l.className.includes('chat-tool-row')).length, 0, 'rows live inside the group');
+    assert.equal(groups[0].children[0].children[0].textContent, 'checked 2 things');
+    assert.equal(groups[0].dataset.hasError, '1');
+    const notes = groups[0].children[0].children[1].children.map(r => toolSummary(r).textContent);
     assert.ok(notes.includes('↳ checked the task stack'), 'the "a" breadcrumb settled');
     assert.ok(notes.includes('↳ get_session failed: timeout'), 'the "b" breadcrumb failed independently');
   });
@@ -2155,7 +2210,9 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     const { exports: m, thread } = loadClient({ fetchImpl: () => sseResponse([decisionToolFrame([d1, d2]), sseFrame('done', { surface: true })]) });
     m.autoWakeTick();
     await flush();
-    const cards = thread.children.filter(li => li.querySelector('.fc-decision'));
+    // LIN-3361: both cards sit in ONE closed fold, all in the DOM.
+    assert.strictEqual(thread.children.filter(li => li.querySelector('.fc-decisions-fold')).length, 1);
+    const cards = findAllByClass(thread, 'fc-decision-msg');
     assert.strictEqual(cards.length, 2);
     assert.strictEqual(cards[0].querySelector('.fc-decision-question').textContent, 'First?');
     assert.strictEqual(cards[1].querySelector('.fc-decision-question').textContent, 'Second?');
@@ -2248,7 +2305,7 @@ describe('flight-companion.js — LIN-2621 beat 4: decisions as option buttons',
     });
     m.autoWakeTick();
     await flush();
-    const cards = thread.children.filter(li => li.querySelector('.fc-decision')).map(li => li.querySelector('.fc-decision'));
+    const cards = findAllByClass(thread, 'fc-decision');
     assert.strictEqual(cards.length, 2);
 
     cards[0].querySelector('.chat-options-row').children[1].dispatch('click'); // loop-bound "Hold"
@@ -3193,7 +3250,7 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
     // A breadcrumb note plus the user bubble plus the assistant bubble — the
     // reader classified every frame type correctly with no boot-specific
     // branch of its own.
-    assert.ok(thread.children.some((li) => li.className.includes('fc-inline-note')), 'the tool breadcrumb must render');
+    assert.ok(thread.children.some((li) => li.className.includes('chat-tool-row')), 'the tool breadcrumb must render');
     const bubbles = thread.children.filter((li) => li.className.includes('fc-msg'));
     assert.strictEqual(bubbles.length, 2);
     assert.strictEqual(bubbles[1].querySelector('.fc-msg-body').textContent, 'orienting');
@@ -3490,7 +3547,7 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
   // the SAME blob as history/totals. LIN-2771: `cadence` joined it too — the
   // wake-cadence record, null when no anchor is persisted (a fresh session,
   // an old blob, or a timer that is not armed).
-  const EMPTY_SESSION = { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null, cadence: null };
+  const EMPTY_SESSION = { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null, cadence: null, seenIdentifiers: [] };
 
   test('round-trip: a saved session reloads with the same thread and the same history the next turn would carry', () => {
     const { exports: m } = loadClient();
@@ -3502,7 +3559,7 @@ describe('flight-companion.js — session persistence helper (LIN-2716)', () => 
       tabCheckInCount: 1,
       tabTotalCost: 0.0042,
       selectedModel: 'anthropic/claude-opus-5',
-      cadence: null,
+      cadence: null, seenIdentifiers: [],
     };
     m.saveStoredSession('acme', session);
     // looseDeepEqual (node:assert's non-strict deepEqual), not
@@ -3989,5 +4046,176 @@ describe('flight-companion.js — proposal persistence + read-only rehydrate (LI
     assert.strictEqual(stored.tabTotalCost, 0);
     assert.strictEqual(stored.selectedModel, null);
     assert.strictEqual(stored.cadence.stoppedReason, null);
+  });
+});
+
+// ─── LIN-3361: a thread you can scan ────────────────────────────────────────
+
+describe('flight-companion.js — scannable thread (LIN-3361)', () => {
+  const rowsIn = (thread) => thread.children.filter((l) => l.className.includes('chat-tool-row') || l.className.includes('chat-tool-group'));
+  const decisionResult = (decisions) => JSON.stringify({ decisions });
+  const dec = (over) => Object.assign({
+    decisionId: 'dec-1', issueIdentifier: 'LIN-100', issueId: 'uuid-100', loopId: 'loop-1', sessionId: 's',
+    question: 'Ship it?', options: [{ id: 'y', label: 'Yes' }, { id: 'n', label: 'No' }],
+    optionsTotal: 2, recommended: 'y', disposition: 'resumable', canReply: true,
+  }, over || {});
+
+  test('two consecutive tool calls compact into one "checked 2 things" group', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
+        sseFrame('tool', { phase: 'call', id: 'b', name: 'list_active_sessions', arguments: {} }),
+        sseFrame('tool', { phase: 'result', id: 'a', name: 'get_stack', result: '{}' }),
+        sseFrame('tool', { phase: 'result', id: 'b', name: 'list_active_sessions', result: '[]' }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const groups = rowsIn(thread);
+    assert.strictEqual(groups.length, 1);
+    assert.strictEqual(groups[0].className, 'chat-tool-group');
+    assert.strictEqual(groups[0].children[0].children[0].textContent, 'checked 2 things');
+  });
+
+  test('a proposal card between two calls splits the run — the card is never a group member', async () => {
+    const proposal = { proposed: true, sessionId: 'sess-1', prompt: 'go' };
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'get_stack', arguments: {} }),
+        sseFrame('tool', { id: 'p', name: 'send_follow_up', phase: 'proposed', result: JSON.stringify(proposal) }),
+        sseFrame('tool', { phase: 'call', id: 'b', name: 'get_stack', arguments: {} }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.deepStrictEqual(thread.children.map((l) => l.className.split(' ')[0]), ['chat-tool-row', 'chat-msg', 'chat-tool-row']);
+  });
+
+  test('tool-row and fold text never reach chatHistory', async () => {
+    const { exports: m, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
+        sseFrame('tool', { phase: 'result', id: 'a', name: 'list_task_sessions', result: '{"secret":"row-body"}' }),
+        sseFrame('token', { token: 'answer' }),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'q';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(JSON.stringify(m.getChatHistory()).includes('row-body'), false);
+    assert.strictEqual(JSON.stringify(m.getChatHistory()).includes('checked sessions'), false);
+  });
+
+  test('identifiers from structured args/results are collected and persisted with the session; prose ones are not', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m, questionInput } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
+        sseFrame('tool', { phase: 'result', id: 'a', name: 'list_task_sessions', result: '{"sessions":[{"issueIdentifier":"LIN-12","note":"also LIN-13"}]}' }),
+        sseFrame('token', { token: 'see LIN-9' }),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'q';
+    m.submitQuestion();
+    await flush();
+    const stored = JSON.parse(storage.getItem('flight-companion-session:acme'));
+    assert.deepStrictEqual([...stored.seenIdentifiers].sort(), ['LIN-12', 'LIN-9']);
+  });
+
+  test('the persisted set is restored on load and cleared with the session', () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({ history: [], seenIdentifiers: ['LIN-5', 'junk', 7] }),
+    });
+    const { exports: m } = loadClient({ storageImpl: storage });
+    looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, ['LIN-5']);
+    m.clearStoredSession('acme');
+    looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, []);
+  });
+
+  test('a save from a partial session object keeps the live set (no call site can drop it)', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'call', id: 'a', name: 'list_task_sessions', arguments: { issueId: 'LIN-9' } }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    m.saveStoredSession('acme', { history: [], tabCheckInCount: 0, tabTotalCost: 0 });
+    looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, ['LIN-9']);
+  });
+
+  test('decisions: one closed fold "N decisions waiting" with a Rulings link, rows all in the DOM', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec(), dec({ decisionId: 'dec-2', issueIdentifier: 'LIN-101' })]) }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const fold = findByClass(thread, 'fc-decisions-fold');
+    assert.ok(fold, 'the fold renders');
+    assert.strictEqual(fold.children[0].textContent, '2 decisions waiting');
+    assert.strictEqual(findByClass(fold, 'fc-decisions-rulings-link').getAttribute('href'), '/workspace/acme/observation?view=rulings');
+    assert.strictEqual(findAllByClass(fold, 'fc-decision').length, 2);
+    assert.strictEqual(findAllByClass(thread, 'fc-decision-task-link').length, 0, 'testid is an attribute, not a class');
+  });
+
+  test('a single decision reads "1 decision waiting"; zero decisions render nothing', async () => {
+    const one = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    one.exports.autoWakeTick();
+    await flush();
+    assert.strictEqual(findByClass(one.thread, 'fc-decisions-fold').children[0].textContent, '1 decision waiting');
+
+    const none = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([]) }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    none.exports.autoWakeTick();
+    await flush();
+    assert.strictEqual(findByClass(none.thread, 'fc-decisions-fold'), null);
+  });
+
+  test('a decision row links its task and adds it to the persisted set; the option click still replies', async () => {
+    const storage = makeFakeStorage();
+    const { exports: m, thread, replyDeliveryCalls } = loadClient({
+      storageImpl: storage,
+      fetchImpl: () => sseResponse([
+        sseFrame('tool', { phase: 'result', id: 't', name: 'list_pending_decisions', result: decisionResult([dec()]) }),
+        sseFrame('done', { surface: true }),
+      ]),
+    });
+    m.autoWakeTick();
+    await flush();
+    const card = findByClass(thread, 'fc-decision');
+    const link = findByClass(card, 'fc-decision-ref').children[0];
+    assert.strictEqual(link.getAttribute('href'), '/workspace/acme/task/LIN-100');
+    assert.strictEqual(link.textContent, 'LIN-100');
+    assert.deepStrictEqual(JSON.parse(storage.getItem('flight-companion-session:acme')).seenIdentifiers, ['LIN-100']);
+    findByClass(card, 'chat-options-row').children[0].dispatch('click');
+    await flush();
+    assert.strictEqual(replyDeliveryCalls.length, 1);
+    assert.ok(card.classList.contains('fc-decision--resolved'));
+  });
+
+  test('readout headings come from the page attribute; a malformed attribute degrades to none', () => {
+    const ok = loadClient({ pageDataset: { fcReadoutHeadings: '["The big thread"]' } });
+    assert.ok(ok.exports);
+    assert.doesNotThrow(() => loadClient({ pageDataset: { fcReadoutHeadings: '{oops' } }));
   });
 });

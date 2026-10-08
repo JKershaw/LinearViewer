@@ -267,6 +267,7 @@ Every surface that shows a task links there through the shared helper (`lib/task
 - `[data-testid="obs-task-page-link"]` - Observation per-task block
 - `[data-testid="lc-lane-task-page-link"]` - Live Console lane (adjacent to the Observation link, which is unchanged)
 - `[data-testid="queue-item-task-page-link"]` / `[data-testid="history-task-page-link"]` - dispatch queue / history rows
+- `[data-testid="fc-decision-task-link"]` / `[data-testid="chat-task-link"]` - Flight Companion decision row / a seen task identifier in bubble text; `[data-testid="fc-obs-attention-issue-link"]` - Flight Companion observer-report attention row (`row.issue` only; a `loopId` stays plain text)
 
 ### Task Share (LIN-3330)
 
@@ -394,7 +395,7 @@ Chat is the FIRST section on the page (LIN-2443; it has no visible title since L
 
 Every `done` frame carries the turn's own summed usage (LIN-2631 sums hop usage server-side onto the FINAL `done` only). A visible turn's own bubble grows a trailing meta line (`.fc-msg-meta`, "N tokens · $x") reading exactly what that frame carried, no caveat text; the strip's running total and check-in count (LIN-2621 beat 3) accumulate on EVERY `done` this tab observes — visible or silent, any turn kind — since a silent tick's cost otherwise has nowhere to appear. `lib/openrouter.js` does not yet attach per-hop usage to a tool-using turn's intermediate frames, so a multi-hop turn's displayed cost under-reports today until that lands as its own follow-up — a known, out-of-scope gap, not a defect of this page.
 
-Tool use is visible (LIN-2632 beat 2, "it doesn't appear to use tools?"): a `tool` event's `call` phase renders a quiet breadcrumb row (`↳ <label> …`, `.fc-inline-note`), correlated by the event's own `id` to the matching `result` (which settles it — drops the ellipsis, keeps the call-time label) or `error` (which marks it, recomputed as `<name> failed: <reason>`) that closes it out; a `proposed` event still renders the Approve/Dismiss card instead, and `cap` still shows the tool-call-limit note. A `list_pending_decisions` result ALSO renders each returned decision as an option-button card (`.fc-decision`, LIN-2621 beat 4) in the thread, reusing the rulings tab's own primitive (`window.ChatUI.appendOptions`, `chat.css`'s `.chat-options*`) verbatim — no fork. Breadcrumbs are notes, not bubbles — they never enter chat history and never trigger bubble creation on their own; on a user-initiated turn a breadcrumb arriving mid-hop inserts BEFORE the (already-present) thinking/answer row, reading `you → ↳ tool → the answer`.
+Tool use is visible (LIN-2632 beat 2, "it doesn't appear to use tools?"): a `tool` event's `call` phase renders a quiet breadcrumb row (`↳ <label> …`, `.fc-inline-note`), correlated by the event's own `id` to the matching `result` (which settles it — drops the ellipsis, keeps the call-time label) or `error` (which marks it, recomputed as `<name> failed: <reason>`) that closes it out; a `proposed` event still renders the Approve/Dismiss card instead, and `cap` still shows the tool-call-limit note. A `list_pending_decisions` result ALSO renders each returned decision as an option-button card (`.fc-decision`, LIN-2621 beat 4) in the thread, reusing the rulings tab's own primitive (`window.ChatUI.appendOptions`, `chat.css`'s `.chat-options*`) verbatim — no fork. Since LIN-3361 a breadcrumb is an expandable tool row (`.chat-tool-row`, a closed `<details>` with the arguments and clipped result), a run of adjacent ones compacts into one `.chat-tool-group` ("checked N things"), a result's decisions sit in one closed `.fc-decisions-fold`, and a long boot readout folds under "full readout" (`.chat-fold`). Breadcrumbs are rows, not bubbles — they never enter chat history and never trigger bubble creation on their own; on a user-initiated turn a breadcrumb arriving mid-hop inserts BEFORE the (already-present) thinking/answer row, reading `you → ↳ tool → the answer`.
 
 **Narrow viewports (≤600px) take the phone shape** (Shape B, LIN-1412 D2 / LIN-2632 beat 4): `.flight-companion-chat-section` becomes an ordinary (non-positioned) `height: 100dvh` column — the thread grows to fill the available height (chat.css's `--chat-thread-max-height` overridden to `none` here, rather than the shared 40vh default) instead of sitting in a short box, and the composer ends up flush with the viewport's own bottom edge as the column's last child once scrolled to, staying anchored even as a software keyboard shrinks the visual viewport (the `dvh` unit, not `vh`). No `position` of its own is needed: the page's own shared header (`.nav-bar`) is already `position: sticky`, which closes the header-height gap for free. `How to use` / `Kickoff prompt` / `Latest observer report` fold below — genuinely reachable (clickable, not merely geometrically in the viewport) by scrolling past the chat section. An earlier revision made the section itself `position: sticky`, which review (LIN-2632 finding F2) found pinned it over those sections for nearly the whole page scroll instead — fixed by dropping `position` entirely. This is a per-surface override of chat.css's own documented `--chat-thread-max-height` contract, not a fork of it — chat.css itself is untouched, so every other `.chat-thread`/`.chat-composer` consumer (Task Chat, Collective, the session reply surface) is unaffected. Above 600px the page is unstyled by this rule (Shape A: the thread stays inside the ordinary scrolling page).
 
@@ -515,11 +516,52 @@ main.flight-companion-page[data-url-key]  - page container
                                               frame carried, never a fabricated "0
                                               tokens · $0.00" when usage is absent
                                               (LIN-2621 beat 3)
-      .fc-inline-note (chat-note)              - a tool breadcrumb ("↳ <label> …" on
-                                              call, settled/marked in place on the
+      .chat-tool-row                           - (LIN-3361) a tool call: li > closed
+                                              <details>; summary "↳ <label> …" while
+                                              pending, settled/marked in place on the
                                               matching result/error by the tool event's
-                                              own id — never a new row) or a cap-limit /
-                                              proposal-fallback note (LIN-2632 beat 2)
+                                              own id (LIN-2632 beat 2); the body holds
+                                              the arguments and the clipped result as
+                                              <pre> text. Not a bubble, not persisted
+                                              (rows are gone after a reload)
+      .chat-tool-group                         - (LIN-3361) a run of 2+ DOM-adjacent tool
+                                              rows: li > details, summary "checked N
+                                              things" (… while any is pending,
+                                              [data-has-error] if any failed) over
+                                              ul.chat-tool-group-list. Any other li (a
+                                              decision, proposal card, note, bubble)
+                                              between rows breaks the run
+      .fc-inline-note (chat-note)              - a cap-limit / proposal-fallback / error
+                                              note (LIN-2632 beat 2) — notes break a
+                                              tool run
+      .fc-decisions-fold                       - (LIN-3361) ONE closed <details> per
+                                              `list_pending_decisions` result,
+                                              summary "N decisions waiting", holding a
+                                              Rulings link
+                                              `[data-testid="fc-decisions-rulings-link"]`
+                                              (/workspace/{urlKey}/observation?view=
+                                              rulings) and the `.fc-decision` cards. The
+                                              cards stay in the DOM while it is closed,
+                                              so their buttons work once opened
+        .fc-decision-ref a                     - the decision's task link
+                                              `[data-testid="fc-decision-task-link"]`
+      .chat-fold                               - (LIN-3361) inside an assistant bubble: a
+                                              closed <details>, summary "full readout",
+                                              holding everything from the first
+                                              h1-h6/hr (or a bold label naming a readout
+                                              heading, `data-fc-readout-headings` on the
+                                              page element) on. Only when something
+                                              precedes the anchor and the tail is ≥ ~280
+                                              characters; otherwise the bubble is not
+                                              folded. Display only: history and saved
+                                              transcripts keep the raw text
+      a.chat-task-link                         - (LIN-3361) `[data-testid="chat-task-link"]`
+                                              a task identifier in bubble text, linked
+                                              ONLY when it was seen in structured tool
+                                              data (args/results) or a decision row
+                                              this session (the seen set is persisted
+                                              with the session); never linked inside
+                                              a/code/pre/summary/button
       .fc-decision                             - a waiting-on-you decision, rendered from
                                               a `list_pending_decisions` tool result
                                               (LIN-2621 beat 4) — the question plus the

@@ -229,8 +229,20 @@
     return SESSION_STORAGE_PREFIX + urlKeyArg;
   }
 
+  var IDENTIFIER_SHAPE = /^[A-Z][A-Z0-9]*-\d+$/;
+  var SEEN_IDENTIFIERS_CAP = 200;
+  // LIN-3361: identifiers seen in structured data this session (tool args and
+  // results, decision rows) — the only things the thread ever links.
+  var seenIdentifiers = new Set();
+
+  function mergedSeenIdentifiers(extra) {
+    var all = Array.from(seenIdentifiers);
+    (Array.isArray(extra) ? extra : []).forEach(function (id) { if (all.indexOf(id) === -1) all.push(id); });
+    return all.slice(-SEEN_IDENTIFIERS_CAP);
+  }
+
   function emptyStoredSession() {
-    return { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null, cadence: null };
+    return { history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: null, cadence: null, seenIdentifiers: [] };
   }
 
   // Never throws into the page: a missing entry, a JSON.parse failure, and
@@ -283,7 +295,14 @@
           stoppedReason: typeof parsed.cadence.stoppedReason === 'string' && parsed.cadence.stoppedReason ? parsed.cadence.stoppedReason : null,
         };
       }
-      return { history: history, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost, selectedModel: selectedModel, cadence: cadence };
+      // LIN-3361: the identifiers the thread has seen in structured tool
+      // data. Tool rows are not persisted but the assistant text that cites
+      // them is, so the set rides the session or a message would link live and
+      // read as plain text after a reload. Strings of identifier shape only.
+      var seenIds = Array.isArray(parsed.seenIdentifiers)
+        ? parsed.seenIdentifiers.filter(function (id) { return typeof id === 'string' && IDENTIFIER_SHAPE.test(id); }).slice(-SEEN_IDENTIFIERS_CAP)
+        : [];
+      return { history: history, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost, selectedModel: selectedModel, cadence: cadence, seenIdentifiers: seenIds };
     } catch (e) {
       return emptyStoredSession();
     }
@@ -304,6 +323,10 @@
         // (every pre-existing call site) writes null, preserving today's
         // shape — the anchor is written by persistCadence, never by accident.
         cadence: session.cadence || null,
+        // LIN-3361: the live set is authoritative (the many partial-object
+        // save sites below omit the field); union with the caller's copy so a
+        // load-modify-save never drops ids the live set has not yet seen.
+        seenIdentifiers: mergedSeenIdentifiers(session.seenIdentifiers),
       }));
     } catch (e) {
       // Nothing to do — the in-memory state stays authoritative for this tab.
@@ -375,6 +398,7 @@
   function clearStoredSession(urlKeyArg) {
     try {
       sessionStorage.removeItem(sessionStorageKey(urlKeyArg));
+      seenIdentifiers.clear();
     } catch (e) {
       // ignore
     }
@@ -987,14 +1011,65 @@
       return;
     }
     // Nothing pending: the model's own prose says so — no dead UI to add.
+    if (!parsed.decisions.length) return;
+    // LIN-3361: one closed fold per result. Every row is built and appended
+    // up front (nothing lazy, nothing removed), so the option buttons' click
+    // handlers and `fc-decision--resolved` work the same once it is opened.
+    var foldLi = document.createElement('li');
+    foldLi.className = 'chat-msg fc-decisions-fold-msg';
+    var fold = document.createElement('details');
+    fold.className = 'fc-decisions-fold';
+    fold.setAttribute('data-testid', 'fc-decisions-fold');
+    var summary = document.createElement('summary');
+    var count = parsed.decisions.length;
+    summary.textContent = count + (count === 1 ? ' decision waiting' : ' decisions waiting');
+    fold.appendChild(summary);
+    var rulingsHref = urlKey ? '/workspace/' + encodeURIComponent(urlKey) + '/observation?view=rulings' : '';
+    if (rulingsHref) {
+      var rulingsLink = document.createElement('a');
+      rulingsLink.className = 'fc-decisions-rulings-link';
+      rulingsLink.setAttribute('data-testid', 'fc-decisions-rulings-link');
+      rulingsLink.setAttribute('href', rulingsHref);
+      rulingsLink.textContent = 'open the Rulings tab';
+      fold.appendChild(rulingsLink);
+    }
+    var list = document.createElement('ul');
+    list.className = 'fc-decisions-list';
+    fold.appendChild(list);
+    foldLi.appendChild(fold);
+    if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(foldLi, beforeLi);
+    else thread.appendChild(foldLi);
     parsed.decisions.forEach(function (decision) {
-      renderOneDecision(decision, beforeLi);
+      renderOneDecision(decision, null, list);
     });
+    thread.hidden = false;
+    thread.scrollTop = thread.scrollHeight;
+    setEmptyVisible(false);
   }
 
-  function renderOneDecision(decision, beforeLi) {
+  // `container` (LIN-3361): the list the row is appended to; absent, the row
+  // goes into the thread before `beforeLi` as it always did.
+  function renderOneDecision(decision, beforeLi, container) {
     var wrap = document.createElement('div');
     wrap.className = 'fc-decision';
+
+    // LIN-3361: the decision's task is a structured field, so it is both
+    // linked here and added to the set the thread's text links against.
+    if (decision.issueIdentifier && IDENTIFIER_SHAPE.test(decision.issueIdentifier)) {
+      noteSeenIdentifiers([decision.issueIdentifier]);
+      var taskHref = window.taskPageHref ? window.taskPageHref({ urlKey: urlKey, identifier: decision.issueIdentifier }) : '';
+      if (taskHref) {
+        var ref = document.createElement('p');
+        ref.className = 'fc-decision-ref';
+        var refLink = document.createElement('a');
+        refLink.className = 'chat-task-link';
+        refLink.setAttribute('data-testid', 'fc-decision-task-link');
+        refLink.setAttribute('href', taskHref);
+        refLink.textContent = decision.issueIdentifier;
+        ref.appendChild(refLink);
+        wrap.appendChild(ref);
+      }
+    }
 
     if (decision.question) {
       var q = document.createElement('p');
@@ -1080,11 +1155,44 @@
     var li = document.createElement('li');
     li.className = 'chat-msg fc-decision-msg';
     li.appendChild(wrap);
-    if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(li, beforeLi);
+    if (container) container.appendChild(li);
+    else if (beforeLi && beforeLi.parentNode === thread) thread.insertBefore(li, beforeLi);
     else thread.appendChild(li);
     thread.hidden = false;
     thread.scrollTop = thread.scrollHeight;
     setEmptyVisible(false);
+  }
+
+  // LIN-3361: record identifiers from structured values and persist the set
+  // with the session (load-modify-save, like persistCadence, so it never
+  // clobbers history/totals mid-turn).
+  function noteSeenIdentifiers(ids) {
+    ids.forEach(function (id) { seenIdentifiers.add(id); });
+    persistSeenIdentifiers();
+  }
+
+  function persistSeenIdentifiers() {
+    if (!urlKey) return;
+    saveStoredSession(urlKey, loadStoredSession(urlKey));
+  }
+
+  // LIN-3361: the readout fold + identifier links for a rendered assistant
+  // bubble. Fold first so links inside the fold work too. Display only —
+  // chatHistory and transcripts keep the raw text.
+  function readoutHeadings() {
+    try {
+      var parsed = JSON.parse((page && page.dataset.fcReadoutHeadings) || '[]');
+      return Array.isArray(parsed) ? parsed.filter(function (h) { return typeof h === 'string'; }) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function foldReadout(el) {
+    window.ChatUI.foldAfterAnchor(el, { summary: 'full readout', headings: readoutHeadings() });
+    window.ChatUI.linkifyIdentifiers(el, seenIdentifiers, function (id) {
+      return window.taskPageHref ? window.taskPageHref({ urlKey: urlKey, identifier: id }) : '';
+    });
   }
 
   // ─── Tool-wire phase handling (F5: all five phases explicit) ───────────
@@ -1100,7 +1208,7 @@
   function settleToolCall(data, toolLis) {
     var entry = toolLis && data.id ? toolLis[data.id] : null;
     if (!entry) return;
-    entry.li.textContent = '↳ ' + entry.label;
+    entry.settle(data.result);
   }
 
   // Mark a 'call' breadcrumb failed on its matching 'error'. Unlike settle,
@@ -1110,7 +1218,7 @@
   function failToolCall(data, toolLis) {
     var entry = toolLis && data.id ? toolLis[data.id] : null;
     if (!entry) return;
-    entry.li.textContent = '↳ ' + window.ChatUI.toolBreadcrumbLabel({ phase: 'error', name: data.name, error: data.error });
+    entry.fail(window.ChatUI.toolBreadcrumbLabel({ phase: 'error', name: data.name, error: data.error }));
   }
 
   function handleToolEvent(data, beforeLi, toolLis) {
@@ -1124,10 +1232,20 @@
       // matching 'result' below, marked on 'error'.
       var label = window.ChatUI.toolBreadcrumbLabel(data);
       if (!label) return;
-      var li = showInlineNote('↳ ' + label + ' …', beforeLi);
-      if (toolLis && data.id) toolLis[data.id] = { li: li, label: label };
+      // LIN-3361: an expandable row (args + result in a closed <details>),
+      // joined into a `checked N things` group when it follows another tool
+      // row. Not persisted — rows are gone after a reload by design.
+      var handle = window.ChatUI.appendToolRow(thread, { label: label, args: data.arguments, before: beforeLi });
+      setEmptyVisible(false);
+      if (data.arguments) {
+        window.ChatUI.collectIdentifiers(data.arguments, seenIdentifiers);
+        persistSeenIdentifiers();
+      }
+      if (toolLis && data.id) toolLis[data.id] = handle;
     } else if (data.phase === 'result') {
       settleToolCall(data, toolLis);
+      window.ChatUI.collectIdentifiersFromText(data.result, seenIdentifiers);
+      persistSeenIdentifiers();
       // LIN-2621 beat 4: additive to the ordinary breadcrumb settle above —
       // `list_pending_decisions` is a plain read-only tool with no server-
       // side phase relabel (unlike send_follow_up's 'proposed'), so this
@@ -1596,6 +1714,7 @@
               // replacement (rather than an in-place innerHTML write) is the
               // one thing that could trip that guard.
               window.ChatUI.renderMarkdownText(answerEl, answerText);
+              foldReadout(answerEl);
               setBubbleState(answerLi, 'done');
               if (hitLimit) appendCutOffNote(answerEl);
             } else if (hitLimit) {
@@ -1773,6 +1892,7 @@
   var keepStopped = false;
   if (urlKey) {
     var restoredSession = loadStoredSession(urlKey);
+    restoredSession.seenIdentifiers.forEach(function (id) { seenIdentifiers.add(id); });
     if (restoredSession.history.length) {
       chatHistory = restoredSession.history;
       restoredSession.history.forEach(function (turn) {
@@ -1781,6 +1901,7 @@
         } else if (turn.role === 'assistant') {
           var restoredBody = appendAssistantBubble();
           window.ChatUI.renderMarkdownText(restoredBody, turn.content);
+          foldReadout(restoredBody);
           setBubbleState(restoredBody.closest('li'), 'done');
         } else if (turn.kind === 'proposal') {
           // LIN-2772: re-render through the SAME renderProposal the live
