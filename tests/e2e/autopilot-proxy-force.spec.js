@@ -54,8 +54,11 @@ async function revealHomeAutopilot(page) {
   const component = details.locator('.prompt-section');
   await expect(component).toBeVisible();
 
-  // LIN-2944 P1: the Autopilot kickoff is the ladder's "run the whole task" rung.
-  await component.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').click();
+  // LIN-3341: the standard Autopilot kickoff is Go now (one press dispatches it,
+  // no result is loaded). The "Autopilot · stepped" sibling still loads an
+  // Autopilot kickoff into the fresh body (its two-step shape is unchanged), so
+  // the forced-proxy copy/download/dispatch cases use it.
+  await component.locator('[data-testid="other-prompts"] [data-prompt="__autopilot_stepper__"]').click();
   await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
   return component;
 }
@@ -66,10 +69,9 @@ async function revealSwipeAutopilot(page) {
   await page.waitForLoadState('networkidle');
 
   await page.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
-  // LIN-2944 P0: the Autopilot kickoff is now the ladder's "run the whole task"
-  // rung (the old `.swipe-prompt-btn.autopilot-btn` pill retired). Same truth
-  // condition: an Autopilot result renders fresh and forces the proxy append.
-  await page.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').first().click();
+  // LIN-3341: the standard Autopilot kickoff is Go now. The "Autopilot · stepped"
+  // sibling still loads an Autopilot result (kind:autopilot, forced proxy).
+  await page.locator('[data-testid="other-prompts"] [data-prompt="__autopilot_stepper__"]').first().click();
   const section = page.locator('.prompt-section');
   await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
   return section;
@@ -225,28 +227,31 @@ test.describe('LIN-3079 Swipe Autopilot — proxy forced with toggle OFF', () =>
     expect(captured.body.kind).toBe('autopilot');
   });
 
-  // LIN-2944 P0 addendum 2 (F11): the remembered prompt survives a reload with
-  // `proxyForce`/`kind` intact, so the forced proxy block is still appended on
-  // copy after the entry is restored from per-task memory rather than regenerated.
-  test('a reloaded Swipe card restores the remembered Autopilot prompt and still forces the proxy on copy', async ({ page }) => {
+  // LIN-3341 deliberately REVERSES LIN-2944 P0 addendum 2 (F11) for autopilot
+  // results (FC call bf44d014): an autopilot prompt is a one-shot dispatch, so
+  // it is neither saved nor restored. Before, a restored autopilot prompt brought
+  // the mislabelled "run this step" rung back after a reload. Inverted, not
+  // deleted, so the reversal stays witnessed.
+  test('a reloaded Swipe card does NOT restore a remembered Autopilot prompt', async ({ page }) => {
     await setSession(page);
-    await revealSwipeAutopilot(page); // generates and persists the entry
+    await revealSwipeAutopilot(page); // generates the stepper result
 
     await page.reload();
     await page.waitForLoadState('networkidle');
     await page.locator('.swipe-accordion-header[data-accordion="prompts"]').click();
 
+    // No autopilot result is hydrated: the component mounts idle, with no
+    // remembered prompt body and no proxy-forced state.
     const section = page.locator('.prompt-section');
-    await expect(section).toHaveAttribute('data-phase', 'fresh', { timeout: 10000 });
-    await expect(section.locator('[data-prompt-body]')).not.toContainText('Loading');
-    // Restored proxyForce suppresses the now-inert +proxy toggle.
-    await expect(section.locator('.prompt-proxy-toggle')).toHaveCount(0);
+    await expect(section).toHaveAttribute('data-phase', 'idle', { timeout: 10000 });
+    await expect(section.locator('[data-prompt-body]')).toHaveCount(0);
 
-    const copyBtn = section.locator('.swipe-prompt-copy');
-    await copyBtn.click();
-    await expect(copyBtn).toHaveText('copied!');
-
-    await assertClipboardHasProxyBlock(page);
+    // The stale record is removed from storage on load.
+    const keys = await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('harbour:prompt-memory:')));
+    const autopilotRecords = await page.evaluate((ks) => ks.filter((k) => {
+      try { return /autopilot/.test(localStorage.getItem(k) || ''); } catch { return false; }
+    }), keys);
+    expect(autopilotRecords).toEqual([]);
   });
 });
 

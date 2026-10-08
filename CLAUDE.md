@@ -74,7 +74,7 @@ Test servers in `tests/unit` bind `127.0.0.1` explicitly (`app.listen(0, '127.0.
 - Click "reset" → restore default collapse state
 - Collapse state persisted in localStorage
 - 401 errors clear session and redirect to landing page
-- Free tier users are bounded by runs per account per UTC day (`FREE_TIER_RUN_LIMIT`, default 10); prompts are unlimited (a global hourly safety net only). The Go ladder shows remaining runs and disables only run rungs at the limit; run gating 429s carry `freeTier.used: true` + `runsUsed`.
+- Free tier users are bounded by runs per account per UTC day (`FREE_TIER_RUN_LIMIT`, default 10); prompts are unlimited (a global hourly safety net only). Go shows remaining runs and disables itself and the run-step rung at the limit; run gating 429s carry `freeTier.used: true` + `runsUsed`.
 - `/kpis` is a public, intentionally unlinked page of instance-wide aggregate stats (Chart.js charts, 60s server cache). `lib/kpi-stats.js` is the privacy boundary: only counts and app-defined labels, never workspace keys or content
 
 ## AI Agent Support

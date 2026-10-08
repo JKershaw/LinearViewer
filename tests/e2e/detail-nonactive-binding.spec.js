@@ -297,7 +297,7 @@ test.describe('Recap / Brief / Recommend / Task Chat on a non-active (Jira) bind
     await jiraNode.locator('[data-toggle="prompts"]').first().click();
     const component = jiraNode.locator('.prompt-section').first();
     await expect(component).toBeVisible();
-    await component.locator('[data-testid="opened-task-go"]').click();
+    await component.locator('[data-testid="opened-task-next-step"]').click();
     await expect(component.locator('[data-prompt-body]')).toContainText('ENG-1', { timeout: 5000 });
   });
 

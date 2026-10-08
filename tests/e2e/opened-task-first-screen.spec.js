@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedGitHubWorkspace, GITHUB_WORKSPACE_URL_KEY } from '../fixtures/github-harness.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // =============================================================================
 // LIN-2944 — The first screen: the opened task, shared by Home and Swipe.
@@ -23,12 +24,13 @@ import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
 // DOM CONTRACT this spec pins (the P0 implementation must emit these hooks):
 //   .prompt-section                                  the shared opened-task component
 //   [data-testid="opened-task-why"]                  one-line why (buildWhy reasons)
-//   [data-testid="opened-task-go"]                   ✦ next-step primary action
-//   [data-testid="opened-task-primary-reason"]       plain-words reason when disabled
+//   [data-testid="opened-task-go"]                   Go: one press starts the run (run-task rung)
+//   [data-testid="opened-task-next-step"]            ✦ next step (the AI-tailored prompt)
+//   [data-testid="opened-task-started"]              Go's started/running line (LIN-3341)
+//   [data-testid="opened-task-primary-reason"]       plain-words reason when ✦ is disabled
 //   [data-testid="opened-task-reasoning"]            reasoning, VISIBLE by default
-//   [data-testid="opened-task-ladder"]               the copy → run-step → run-task ladder
+//   [data-testid="opened-task-ladder"]               the copy → run-step ladder
 //   [data-testid="opened-task-ladder"] [data-rung="run-step"]
-//   [data-testid="opened-task-ladder"] [data-rung="run-task"]
 //   [data-testid="other-prompts"]                    templates under "other prompts"
 //
 // NOTE ON THE GITHUB WHY (settled in P0 beat 2, corrected): GitHub REST returns
@@ -80,24 +82,27 @@ const SSE_BODY = [
 async function assertOpenedTaskShell(page) {
   const component = page.locator('.prompt-section').first();
 
-  // The ladder is present with its not-yet-enabled rungs SHOWN as "○ set up ›".
+  // The ladder is present with its not-yet-enabled rung SHOWN as "○ set up ›".
+  // LIN-3341: the ladder is copy → run this step; the run-whole-task move is Go.
   const ladder = component.locator('[data-testid="opened-task-ladder"]');
   await expect(ladder).toBeVisible();
   await expect(ladder.locator('[data-rung="run-step"]')).toBeVisible();
   await expect(ladder.locator('[data-rung="run-step"]')).toContainText(/set up/i);
-  await expect(ladder.locator('[data-rung="run-task"]')).toBeVisible();
-  await expect(ladder.locator('[data-rung="run-task"]')).toContainText(/set up/i);
 
   // Templates live under "other prompts", not as the primary action.
   await expect(component.locator('[data-testid="other-prompts"]')).toBeVisible();
 
-  // The primary action is the ✦ next step.
+  // Go is the primary (the run-task entry); ✦ next step is the secondary that
+  // streams the tailored prompt.
   const go = component.locator('[data-testid="opened-task-go"]');
   await expect(go).toBeVisible();
-  await expect(go).toContainText(/next step/i);
-  await expect(go).toBeEnabled();
+  await expect(go).toContainText(/Go/);
+  const next = component.locator('[data-testid="opened-task-next-step"]');
+  await expect(next).toBeVisible();
+  await expect(next).toContainText(/next step/i);
+  await expect(next).toBeEnabled();
 
-  return { component, go };
+  return { component, go, next };
 }
 
 test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
@@ -137,7 +142,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       // Nothing spends AI before the explicit click.
       expect(seen).toEqual([]);
 
-      const { component, go } = await assertOpenedTaskShell(page);
+      const { component, next } = await assertOpenedTaskShell(page);
 
       // Honest behaviour for an empty buildWhy(): GitHub issues carry no priority
       // or relations, so there is no ranking reason to advertise and the
@@ -145,7 +150,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       // explicitly, not by omission.
       await expect(component.locator('[data-testid="opened-task-why"]')).toHaveCount(0);
 
-      await go.click();
+      await next.click();
 
       // The tailored prompt, with its reasoning VISIBLE (never collapsed).
       await expect(component.locator('[data-prompt-body]')).toContainText('Next step');
@@ -177,14 +182,14 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await openPrompts(page);
       expect(seen).toEqual([]);
 
-      const { component, go } = await assertOpenedTaskShell(page);
+      const { component, next } = await assertOpenedTaskShell(page);
 
       // The one-line why is visible and names the ranking reason (bug).
       const why = component.locator('[data-testid="opened-task-why"]');
       await expect(why).toBeVisible();
       await expect(why).toContainText(/bug/i);
 
-      await go.click();
+      await next.click();
 
       await expect(component.locator('[data-prompt-body]')).toContainText('Help me with task TEST-13');
       const reasoning = component.locator('[data-testid="opened-task-reasoning"]');
@@ -202,7 +207,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
   // ---------------------------------------------------------------------------
   test.describe('per-state negatives', () => {
     async function clickDisabledWithoutSpend(page, component) {
-      const go = component.locator('[data-testid="opened-task-go"]');
+      const go = component.locator('[data-testid="opened-task-next-step"]');
       await expect(go).toBeVisible();
       await expect(go).toBeDisabled();
       // A disabled control can't be actionably clicked; force it to prove that
@@ -252,7 +257,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await openPrompts(page);
 
       const component = page.locator('.prompt-section').first();
-      await expect(component.locator('[data-testid="opened-task-go"]')).toBeEnabled();
+      await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
       await expect(component.locator('[data-testid="opened-task-primary-reason"]')).toHaveCount(0);
     });
   });
@@ -296,7 +301,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
       await page.waitForLoadState('networkidle');
       await openPrompts(page);
-      await page.locator('.prompt-section').first().locator('[data-testid="opened-task-go"]').click();
+      await page.locator('.prompt-section').first().locator('[data-testid="opened-task-next-step"]').click();
       await expect(page.locator('.prompt-section').first().locator('[data-testid="opened-task-reasoning"]')).toBeVisible({ timeout: 10000 });
       const spent = seen.length;
       expect(spent).toBeGreaterThan(0);
@@ -325,7 +330,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
 
       const component = page.locator('.prompt-section').first();
       await expect(component.locator('[data-testid="other-prompts"]')).toHaveCount(0);
-      await expect(component.locator('[data-testid="opened-task-go"]')).toBeVisible();
+      await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeVisible();
     });
 
     // N1: a `○ set up ›` rung in the FRESH state must say what it needs (the
@@ -422,7 +427,7 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       const body = component.locator('[data-prompt-body]');
       const notice = component.locator('.opened-task-setup-notice');
 
-      await component.locator('[data-testid="opened-task-go"]').click();
+      await component.locator('[data-testid="opened-task-next-step"]').click();
       await expect(component).toHaveClass(/streaming/);
       await expect(body).toContainText(STREAMED_REASONING);
 
@@ -431,8 +436,8 @@ test.describe('LIN-2944 P0 — the opened task on Swipe', () => {
       await expect(body).toContainText(STREAMED_REASONING);
       await expect(component.getByText(/generate a prompt first/i)).toHaveCount(0);
 
-      // run the whole task needs the proxy: its notice shows, the body is kept.
-      await ladder.locator('[data-rung="run-task"]').click();
+      // Go needs the proxy: its notice shows in the same notice slot, body kept.
+      await component.locator('[data-testid="opened-task-go"]').click();
       await expect(notice).toContainText(/proxy set up/i);
       await expect(body).toContainText(STREAMED_REASONING);
 
@@ -539,7 +544,7 @@ test.describe('LIN-2942 — the ladder records its mode', () => {
     const { component, identifier } = await openTopTask(page, seedLocal, localWorkerUrlKey, { openRouterConnected: true });
 
     // Entered on "run the whole task" (not set up), then fell back to copy.
-    await component.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').click();
+    await component.locator('[data-testid="opened-task-go"]').click();
     await modeWithEvents(page, localWorkerUrlKey, identifier, 1);
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await pickTemplate(component);
@@ -622,7 +627,7 @@ test.describe('LIN-2944 P1 — Home first-screen witness (R1/R2)', () => {
     const component = page.locator('.prompt-section').first();
     await expect(component).toBeVisible();
     await expect(component.locator('[data-testid="opened-task-why"]')).toContainText('bug');
-    const go = component.locator('[data-testid="opened-task-go"]');
+    const go = component.locator('[data-testid="opened-task-next-step"]');
     await expect(go).toBeVisible();
     await expect(go).toBeEnabled();
 
@@ -840,5 +845,84 @@ test.describe('LIN-2944 P3 — seed demotion on the first screen', () => {
     await page.locator('[data-testid="swipe-filter"]').selectOption('in-progress');
     await expect(page.locator('[data-testid="swipe-onboarding"]')).toHaveCount(0);
     await expect(page.locator('.swipe-card-title')).toHaveText('Welcome to your local workspace');
+  });
+});
+
+// =============================================================================
+// LIN-3341 — Go is one press.
+//
+// Pressing Go once starts the run: exactly one autopilot dispatch, then a
+// visible started line that links to the task page. Reopening a task whose run
+// is already live reads the stored task-state endpoint once and shows the
+// running line instead of a pressable Go.
+// =============================================================================
+test.describe('LIN-3341 — Go is one press', () => {
+  test('one press on Go dispatches the run once and shows the started line with a task-page link', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true, dispatch: true } });
+    // Go always forces the proxy attach, which mints the owner-only driver copy;
+    // record the workspace owner so the dispatch is admitted (LIN-3136).
+    await seedWorkspaceOwnership(page, localWorkerUrlKey);
+    // A clean slate: no stored dispatch rows means the mount live-check reports
+    // not-live and Go stays pressable (the 3001 data dir persists across runs).
+    await page.request.get(`/test/clear-dispatch-queue?urlKey=${localWorkerUrlKey}`);
+    await page.request.get(`/test/clear-dispatch-history?urlKey=${localWorkerUrlKey}`);
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await openPrompts(page);
+
+    const component = page.locator('.prompt-section').first();
+    const identifier = (await page.locator('.swipe-card-identifier').textContent()).trim();
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeEnabled();
+
+    const dispatchPosts = [];
+    page.on('request', (req) => {
+      if (req.method() === 'POST' && new URL(req.url()).pathname.endsWith('/api/dispatch')) {
+        try { dispatchPosts.push(req.postDataJSON()); } catch { dispatchPosts.push(null); }
+      }
+    });
+
+    await go.click();
+
+    await expect(component.locator('[data-testid="opened-task-started"]')).toBeVisible({ timeout: 10000 });
+    await expect(component.locator('[data-testid="opened-task-started-link"]')).toHaveAttribute('href', new RegExp(`/task/${identifier}`));
+
+    expect(dispatchPosts).toHaveLength(1);
+    expect(dispatchPosts[0]).toMatchObject({
+      kind: 'autopilot',
+      entryRung: 'run-task',
+      stopAt: 'pr',
+      variant: 'standard',
+      target: 'cli',
+      attachProxy: true,
+      issueIdentifier: identifier,
+    });
+
+    // No runner has polled this test workspace, so the 201 carries the
+    // no-runner warning and our plain-words line appears.
+    await expect(component.locator('[data-testid="opened-task-go-notice"]')).toContainText(/listening/i, { timeout: 10000 });
+  });
+
+  test('reopening with a live run shows the running line and no Go (the John-on-his-phone case)', async ({ page, seedLocal, localWorkerUrlKey }) => {
+    await seedLocal(workspaceApiLocalSeed, { openRouterConnected: true, features: { proxy: true, dispatch: true } });
+    await page.route('**/api/task/*/state*', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'running',
+        live: true,
+        headerHtml: '<div class="task-status" data-testid="task-page-status"><span class="status-pill status-pill--running"></span><p class="task-sentence" data-testid="task-page-sentence">Autopilot running since 09:00.</p></div>',
+        trackHtml: '',
+        contextHtml: '',
+      }),
+    }));
+    await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
+    await page.waitForLoadState('networkidle');
+    await openPrompts(page);
+
+    const component = page.locator('.prompt-section').first();
+    await expect(component.locator('[data-testid="opened-task-started"]')).toBeVisible({ timeout: 10000 });
+    await expect(component.locator('[data-testid="opened-task-started"]')).toContainText('Autopilot running since 09:00.');
+    await expect(component.locator('[data-testid="opened-task-go"]')).toHaveCount(0);
   });
 });

@@ -138,10 +138,10 @@ describe('LIN-2942 vocabulary drift pin', () => {
     const rungs = new Set();
     const needs = new Set();
     const collect = (html) => {
-      const ladder = html.match(/<div class="opened-task-ladder"[\s\S]*?<\/div>/);
-      if (!ladder) return;
-      for (const m of ladder[0].matchAll(/data-rung="([^"]+)"/g)) rungs.add(m[1]);
-      for (const m of ladder[0].matchAll(/data-setup-needs="([^"]+)"/g)) needs.add(m[1]);
+      // LIN-3341: `run-task` is now emitted by the Go block, not the ladder, so
+      // scan the whole opened-task markup, not just `.opened-task-ladder`.
+      for (const m of html.matchAll(/data-rung="([^"]+)"/g)) rungs.add(m[1]);
+      for (const m of html.matchAll(/data-setup-needs="([^"]+)"/g)) needs.add(m[1]);
     };
     for (const dispatchEnabled of [true, false]) {
       for (const proxyEnabled of [true, false]) {

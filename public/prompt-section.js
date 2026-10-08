@@ -39,6 +39,15 @@
     return `${issueId}`;
   }
 
+  // LIN-3341: the two autopilot result labels. An autopilot prompt is not a
+  // reusable step prompt, and once Go dispatches directly a remembered one is
+  // stale — it brings the mislabelled "run this step" rung back after a reload.
+  // So durable memory neither saves nor hydrates either label (and a legacy
+  // record already in localStorage is discarded on load).
+  function isAutopilotLabel(label) {
+    return label === '__autopilot__' || label === '__autopilot_stepper__';
+  }
+
   // Read compatibility: an old-shape/foreign record that is malformed or lacks a
   // usable `raw` is treated as absent (no crash, no partial hydrate). A record
   // missing the newer fields (generatedAt/kind/proxyForce/warning) still
@@ -50,6 +59,11 @@
       if (!stored) return null;
       const parsed = JSON.parse(stored);
       if (!parsed || typeof parsed !== 'object' || typeof parsed.raw !== 'string') return null;
+      // LIN-3341: never hydrate an autopilot result; drop a legacy record too.
+      if (isAutopilotLabel(parsed.label) || parsed.kind === 'autopilot') {
+        try { window.localStorage.removeItem(memoryKey(urlKey, issueId)); } catch { /* best-effort */ }
+        return null;
+      }
       return parsed;
     } catch {
       return null;
@@ -58,6 +72,9 @@
 
   function savePromptMemory(urlKey, issueId, entry) {
     if (!entry || typeof entry.raw !== 'string') return;
+    // LIN-3341: an autopilot result is a one-shot dispatch, not a reusable
+    // prompt; it is never persisted (both labels), so it cannot reappear.
+    if (isAutopilotLabel(entry.label) || entry.kind === 'autopilot') return;
     try {
       if (!window.localStorage) return;
       const record = {
@@ -175,14 +192,16 @@
   }
 
   /**
-   * The ✦ next-step primary action ("Go", docs/v1.md step 4). It is the AI-tailored
-   * prompt request (`__ai__`), shown disabled with its plain-words reason rather
-   * than hidden when AI cannot run.
+   * The ✦ next-step action: the AI-tailored prompt request (`__ai__`), shown
+   * disabled with its plain-words reason rather than hidden when AI cannot run.
+   * Since LIN-3341 it is the SECONDARY action on the idle opened task — Go is
+   * the primary that starts the run — so it keeps its own testid
+   * (`opened-task-next-step`) and is no longer called "Go".
    */
-  function renderPrimary(opts, state) {
+  function renderNextStep(opts, state) {
     const reason = primaryDisabledReason(opts, state);
-    let html = '<div class="opened-task-primary">';
-    html += `<button class="opened-task-go" data-testid="opened-task-go" data-prompt="__ai__"${reason ? ' disabled' : ''}>\u2726 next step</button>`;
+    let html = '<div class="opened-task-next-step-row">';
+    html += `<button class="opened-task-next-step" data-testid="opened-task-next-step" data-prompt="__ai__"${reason ? ' disabled' : ''}>\u2726 next step</button>`;
     if (reason) {
       html += `<span class="opened-task-primary-reason" data-testid="opened-task-primary-reason">${esc(reason)}</span>`;
     }
@@ -191,8 +210,88 @@
   }
 
   /**
-   * The ladder beside the primary: copy \u2192 run this step \u2192 run the whole
-   * task. A rung not yet enabled is SHOWN as "\u25CB set up \u203A", never hidden,
+   * LIN-3341: the one-press Go. It is the PRIMARY action on the opened task in
+   * EVERY phase (idle, generating, fresh, error) — Go does not need a prompt,
+   * so it cannot go missing because no prompt exists. A single press builds the
+   * autopilot kickoff and dispatches it through the shared assemblers
+   * (`window.fetchAutopilotKickoff` + `window.dispatchPrompt`), then shows that
+   * the run has started.
+   *
+   * Go's own states live on `state.go` (outside `phase`/`result`):
+   *   - ready: pressable. Rung vocabulary stays `run-task` (data-rung, pinned by
+   *     task-mode-store.test.js). Ready means dispatch AND proxy AND autopilot.
+   *   - not set up: shown as "Go ○ set up ›" (never hidden); a press records
+   *     intent and writes the notice, dispatching nothing.
+   *   - run-limited: disabled with the run-limit reason, from the same quota as
+   *     the run-step rung.
+   *   - starting: disabled, "starting…".
+   *   - started/running: the task-page state line replaces the button.
+   * The run allowance ("N of M runs left today") lives beside Go, so it shows in
+   * every phase and is the same account-wide count the run rungs used.
+   */
+  function goReady(opts) {
+    return !!(opts.dispatchEnabled && opts.proxyEnabled && opts.hasAutopilot);
+  }
+
+  function renderGo(opts, state) {
+    const g = state.go || { status: 'ready' };
+    const ready = goReady(opts);
+    const quota = state.runQuota;
+    const quotaKnown = !!(quota && quota.runsUsed != null
+      && typeof quota.remaining === 'number' && typeof quota.limit === 'number');
+    const runsExhausted = quotaKnown && quota.remaining <= 0;
+    const runLimitTitle = 'daily run limit reached \u00b7 resets at midnight UTC';
+
+    let html = '<div class="opened-task-primary" data-go-slot>';
+
+    if (g.status === 'started' || g.status === 'running') {
+      // The started/running line: the task page's OWN sentence (the one source
+      // of queued/running truth), with a link to the task page. Until a state
+      // read lands, it says "Started" — true on a 201, not a status claim.
+      const href = window.taskPageHref({
+        urlKey: opts.urlKey,
+        identifier: opts.issue && opts.issue.identifier,
+        source: opts.issue && opts.issue.source
+      });
+      const link = href
+        ? ` <a class="opened-task-started-link" href="${esc(href)}" data-testid="opened-task-started-link">watch on the task page \u203A</a>`
+        : '';
+      const body = g.headerHtml
+        ? g.headerHtml
+        : '<p class="task-sentence" data-testid="opened-task-sentence">Started.</p>';
+      html += `<div class="opened-task-started" data-testid="opened-task-started" data-go-status="${esc(g.status)}">${body}${link}</div>`;
+    } else if (!ready) {
+      const needs = opts.dispatchEnabled ? 'proxy' : 'dispatch';
+      html += `<button class="opened-task-go opened-task-go--setup" data-testid="opened-task-go" data-rung="run-task" data-action="setup" data-setup-needs="${needs}">Go <span class="opened-task-setup">\u25CB set up \u203A</span></button>`;
+    } else if (runsExhausted) {
+      html += `<button class="opened-task-go opened-task-go--limited" data-testid="opened-task-go" data-rung="run-task" disabled title="${runLimitTitle}">Go <span class="opened-task-setup">${runLimitTitle}</span></button>`;
+    } else if (g.status === 'starting') {
+      html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" disabled>starting\u2026</button>';
+    } else {
+      html += '<button class="opened-task-go" data-testid="opened-task-go" data-rung="run-task" data-action="go">Go</button>';
+    }
+
+    // The allowance sits beside Go, the control it governs — shown only when the
+    // count was readable, so it never invents a number (LIN-3239).
+    if (quotaKnown) {
+      html += `<span class="opened-task-run-quota" data-testid="opened-task-run-quota" data-runs-remaining="${quota.remaining}" data-runs-limit="${quota.limit}">${quota.remaining} of ${quota.limit} runs left today</span>`;
+    }
+
+    // The plain-words line a refusal / not-set-up press writes. Always rendered
+    // (empty or filled) so a press can write into it without a full render,
+    // preserving N4 (a press never rebuilds the streamed body).
+    const noticeLink = g.noticeLink
+      ? ` <a class="opened-task-go-notice-link" href="${esc(g.noticeLink)}">${esc(g.noticeLinkLabel || 'watch \u203A')}</a>`
+      : '';
+    html += `<div class="opened-task-go-notice" data-testid="opened-task-go-notice" data-go-notice-slot aria-live="polite">${g.notice ? esc(g.notice) : ''}${noticeLink}</div>`;
+
+    html += '</div>';
+    return html;
+  }
+
+  /**
+   * The ladder beside Go: copy \u2192 run this step. A rung not yet enabled is
+   * SHOWN as "\u25CB set up \u203A", never hidden,
    * and keyed on `featureFlags.dispatch` / `featureFlags.proxy`. Pressing a
    * not-yet-enabled rung says what it needs, and the press is recorded as a
    * mode event (LIN-2942); `data-rung` / `data-setup-needs` are that record's
@@ -240,7 +339,7 @@
       ? `<button class="opened-task-rung opened-task-rung--pending" data-rung="${rung}" disabled title="a prompt is generating">${text} <span class="opened-task-setup">generating\u2026</span></button>`
       : `<button class="opened-task-rung opened-task-rung--setup" data-rung="${rung}" data-action="setup" data-setup-needs="prompt" title="generate a prompt first">${text} <span class="opened-task-setup">\u25CB set up \u203A</span></button>`);
     // LIN-3239: the caller's own run allowance, read from GET /api/dispatch/quota
-    // at load. It gates ONLY the run rungs (run this step / run the whole task);
+    // at load. It gates the run-step rung here and Go above (LIN-3239/LIN-3341);
     // copy and ✦ generation are never gated by it. `runsUsed` null means the
     // count was unreadable — nothing to show, and no limit to claim.
     const quota = state.runQuota;
@@ -276,18 +375,10 @@
     } else {
       rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-step" data-action="setup" data-setup-needs="dispatch">run this step <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
     }
-    if (opts.proxyEnabled && opts.hasAutopilot) {
-      rungs.push(runsExhausted
-        ? runLimited('run-task', 'run the whole task')
-        : '<button class="opened-task-rung opened-task-rung--ready" data-rung="run-task" data-prompt="__autopilot__">run the whole task</button>');
-    } else {
-      rungs.push('<button class="opened-task-rung opened-task-rung--setup" data-rung="run-task" data-action="setup" data-setup-needs="proxy">run the whole task <span class="opened-task-setup">\u25CB set up \u203A</span></button>');
-    }
-    // The allowance sits beside the run rungs it governs — shown only when the
-    // count was readable, so it never invents a number (LIN-3239).
-    if (quotaKnown) {
-      rungs.push(`<span class="opened-task-run-quota" data-testid="opened-task-run-quota" data-runs-remaining="${quota.remaining}" data-runs-limit="${quota.limit}">${quota.remaining} of ${quota.limit} runs left today</span>`);
-    }
+    // LIN-3341: the `run the whole task` rung is DELETED — Go is that rung now
+    // (it dispatches directly rather than fetching a copyable prompt), and the
+    // `data-rung="run-task"` vocabulary stays on Go. The ladder is copy →
+    // run this step; the run allowance moved into the Go block above.
     // "run on my machine ›" is not a rung: since S4b it sits on the card that
     // opens the task (runnerLinkHtml), so it is not repeated here.
     return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>`;
@@ -378,15 +469,17 @@
   }
 
   /**
-   * Build the idle opened-task shell: the one-line why, the ✦ primary action,
-   * the ladder, and the templates under "other prompts" (LIN-2944).
+   * Build the idle opened-task shell: the one-line why, Go (the primary that
+   * starts the run), the ✦ next-step secondary, the ladder, and the templates
+   * under "other prompts" (LIN-2944, LIN-3341).
    */
   function renderIdle(opts, state) {
     let html = '<div class="swipe-prompt-header"><span class="swipe-prompt-name">next step</span>';
     html += renderEditSlot(opts);
     html += '</div>';
     html += renderWhy(opts);
-    html += renderPrimary(opts, state);
+    html += renderGo(opts, state);
+    html += renderNextStep(opts, state);
     html += renderLadder(opts, state);
     html += renderSetupNotice(state);
     html += renderOtherPrompts(opts, state);
@@ -477,18 +570,21 @@
       ${renderProxyLimitNotice(state)}
       ${warningBanner}
       ${reasoningBlock}
+      ${renderGo(opts, state)}
       ${renderLadder(opts, state)}
       ${renderSetupNotice(state)}
       <div class="swipe-prompt-text" data-prompt-body>${html}</div>`;
   }
 
-  function renderGenerating(state) {
+  function renderGenerating(state, opts) {
     const name = state.activeLabelName || 'generating';
     return `
       <div class="swipe-prompt-header">
         <span class="swipe-prompt-name">${esc(name)} \u00b7 generating\u2026</span>
         <span class="recap-spinner" aria-hidden="true"></span>
       </div>
+      ${renderGo(opts, state)}
+      ${renderSetupNotice(state)}
       <div class="swipe-prompt-text" data-prompt-body>Loading\u2026</div>`;
   }
 
@@ -498,6 +594,8 @@
         <span class="swipe-prompt-name">prompt \u00b7 error</span>
         <button class="swipe-prompt-change" data-action="change">\u21BB back</button>
       </div>
+      ${renderGo(opts, state)}
+      ${renderSetupNotice(state)}
       <div class="swipe-prompt-text recap-error">${esc(state.error || 'Failed to load prompt.')}</div>`;
   }
 
@@ -531,10 +629,23 @@
       // Load-time run allowance (LIN-3239). Only fetched when the caller marks
       // the workspace as free-tier, so ordinary units never hit the network
       // here. `null` until the read resolves; it gates ONLY the run rungs.
-      runQuota: null
+      runQuota: null,
+      // LIN-3341: Go's own state, deliberately OUTSIDE `phase`/`result` so
+      // `enterPhase` and `goIdle` never clear it — the started/running line and
+      // the refusal notice survive every re-render and every stream settle.
+      // status: 'ready' | 'starting' | 'started' | 'running'; headerHtml is the
+      // task-page state endpoint's own sentence; notice is our plain-words line.
+      go: { status: 'ready', headerHtml: null, notice: null }
     };
     let abortController = null;
     let destroyed = false;
+    // LIN-3341: the mount-time "is a run already live?" read and its poll. The
+    // read is one best-effort call to the stored-data task state endpoint; the
+    // promise is shared with `startRun` so a press during an in-flight read can
+    // wait for it (and paint the running line if it reports in progress).
+    let mountRead = null;
+    let pollTimer = null;
+    let pollFailures = 0;
 
     // Restore from durable per-task memory (F11): the in-memory-only Cache is
     // replaced by the persisted record, so a mount hydrates from storage, not
@@ -578,12 +689,23 @@
       if (state.phase === 'idle') {
         applyState(container, renderIdle(opts, state), 'idle');
       } else if (state.phase === 'generating') {
-        applyState(container, renderGenerating(state), 'generating');
+        applyState(container, renderGenerating(state, opts), 'generating');
       } else if (state.phase === 'fresh') {
         applyState(container, renderFresh(state, opts), 'fresh');
       } else if (state.phase === 'error') {
         applyState(container, renderError(state, opts), 'error');
       }
+    }
+
+    // LIN-3341: repaint ONLY the Go slot. A full render() during the ✦ stream
+    // would rebuild [data-prompt-body] and wipe the streamed text (N4), so every
+    // Go state change touches only [data-go-slot] (falling back to a full render
+    // when the slot is absent, e.g. a caller that skins the component).
+    function paintGo() {
+      if (destroyed) return;
+      const slot = container.querySelector && container.querySelector('[data-go-slot]');
+      if (slot) slot.outerHTML = renderGo(opts, state);
+      else render();
     }
 
     function goIdle() {
@@ -619,11 +741,11 @@
     }
 
     // The rung an act on the current result belongs to: an autopilot result is
-    // "run the whole task"; any other result is copied ("copy") or dispatched
+    // "run-task"; any other result is copied ("copy") or dispatched
     // ("run this step").
     function isAutopilotResult() {
       const label = state.result && state.result.label;
-      return label === '__autopilot__' || label === '__autopilot_stepper__';
+      return isAutopilotLabel(label);
     }
 
     async function fetchPrompt(label) {
@@ -835,6 +957,159 @@
       render();
     }
 
+    // ── LIN-3341: Go's start / mount-read / poll ────────────────────────────
+    //
+    // Read the task-page stored state once (best-effort). Same endpoint the task
+    // page polls; never a provider call. A non-2xx/throw is a no-op, exactly
+    // like the quota read (routes/task-page.js).
+    function readTaskState() {
+      if (typeof window.api !== 'function') return Promise.resolve(null);
+      if (!opts.urlKey || !issue.identifier || !issueId) return Promise.resolve(null);
+      const url = `/workspace/${encodeURIComponent(opts.urlKey)}/api/task/${encodeURIComponent(issue.identifier)}/state?issueId=${encodeURIComponent(issueId)}`;
+      return Promise.resolve()
+        .then(() => window.api(url, { on401: false }))
+        .catch(() => null);
+    }
+
+    // Round-3 fix 1A: a WAITING session counts as in progress too — `live` only
+    // covers running/queued. Go must be suppressed while a run awaits an answer,
+    // or a second press starts a second orchestrator.
+    function goInProgress(data) {
+      return !!(data && (data.live === true || data.status === 'waiting'));
+    }
+
+    // Paint the started/running line from the state endpoint and keep reading
+    // while the run is in progress.
+    function setGoRunning(headerHtml) {
+      state.go = { status: 'running', headerHtml: headerHtml || null, notice: null, noticeLink: null, noticeLinkLabel: null };
+      paintGo();
+      startPoll();
+    }
+
+    function stopPoll() {
+      if (pollTimer != null) { clearTimeout(pollTimer); pollTimer = null; }
+    }
+
+    function schedulePoll(delay) {
+      stopPoll();
+      if (destroyed) return;
+      pollTimer = setTimeout(runPoll, delay);
+    }
+
+    // One poll beat. A failed read backs off x2 to 60s; a successful read paints
+    // the task page's own sentence and keeps going while (live || waiting).
+    function runPoll() {
+      pollTimer = null;
+      if (destroyed) return;
+      if (!state.go || (state.go.status !== 'running' && state.go.status !== 'started')) return;
+      if (typeof document !== 'undefined' && document.hidden) { schedulePoll(10000); return; }
+      readTaskState().then((data) => {
+        if (destroyed) return;
+        if (!data) {
+          pollFailures += 1;
+          schedulePoll(Math.min(60000, 10000 * Math.pow(2, pollFailures)));
+          return;
+        }
+        pollFailures = 0;
+        if (data.headerHtml) {
+          state.go = { status: 'running', headerHtml: data.headerHtml, notice: null, noticeLink: null, noticeLinkLabel: null };
+          paintGo();
+        }
+        if (goInProgress(data)) schedulePoll(10000);
+        // else: the run ended; keep the last sentence and stop polling.
+      });
+    }
+
+    function startPoll() {
+      pollFailures = 0;
+      schedulePoll(10000);
+    }
+
+    function applyGoRefusal(error) {
+      const code = error && error.body && error.body.code;
+      const g = { status: 'ready', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+      if (code === 'DUPLICATE_DISPATCH') {
+        g.notice = 'Already running';
+        g.noticeLink = window.taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source });
+        g.noticeLinkLabel = 'watch \u203A';
+      } else if (code === 'RUN_LIMIT_REACHED') {
+        g.notice = 'You\u2019ve used today\u2019s runs \u00b7 resets at midnight UTC';
+      } else {
+        // Includes a code-less 503 (proxyAttachFailed) and RUN_LIMIT_UNVERIFIED:
+        // branch on `code`, never on the status (review 1, outcomes).
+        g.notice = 'Couldn\u2019t start the run. Try again in a minute, or';
+        g.noticeLink = runnerSetupHref(opts);
+        g.noticeLinkLabel = 'run on my machine \u203A';
+      }
+      state.go = g;
+      paintGo();
+    }
+
+    // The one-press Go: kickoff then dispatch through the shared assemblers,
+    // then show that it started. Auto-ignores a second press.
+    async function startRun() {
+      if (!state.go || state.go.status !== 'ready') return;
+      state.go = { status: 'starting', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
+      paintGo();
+      recordTaskMode({ rung: 'run-task', ready: true, needs: null, act: 'press' });
+
+      // Race (round-3 fix 1B): if the mount read is still in flight, wait for it;
+      // if it reports in progress, paint the running line and start the poll HERE
+      // (the mount handler drops its own result because Go is now `starting`).
+      if (mountRead) {
+        const data = await mountRead.catch(() => null);
+        if (destroyed) return;
+        if (goInProgress(data)) { setGoRunning(data.headerHtml); return; }
+        if (state.go.status !== 'starting') return;
+      }
+
+      try {
+        const kickoff = await window.fetchAutopilotKickoff({
+          urlKey: opts.urlKey,
+          issueId,
+          source: issue.source || undefined,
+          stopAt: 'pr',
+          on401: false
+        });
+        if (destroyed) return;
+        const panel = container.querySelector('.swipe-prompt-options');
+        const { model, harness: panelHarness } = window.readDispatchExecControls(panel);
+        const result = await window.dispatchPrompt({
+          urlKey: opts.urlKey,
+          prompt: kickoff.prompt,
+          promptName: kickoff.promptName || 'Autopilot',
+          kind: kickoff.kind || 'autopilot',
+          issue,
+          target: 'cli',
+          model,
+          // LIN-3211: a blank harness falls back to claude-code, so the item
+          // carries the structured bootstrap token, never a token in prose.
+          harness: (panelHarness || 'claude-code'),
+          proxyForce: true,
+          entryRung: 'run-task',
+          stopAt: 'pr',
+          variant: 'standard',
+          surface: opts.surface
+        });
+        if (destroyed) return;
+        // The 201's no-runner warning (routes/dispatch.js) is our own plain-words
+        // line, never the server's string (FC call bf44d014).
+        const noRunner = !!(result && result.warning);
+        state.go = {
+          status: 'started',
+          headerHtml: null,
+          notice: noRunner ? 'Nothing is listening for this run yet.' : null,
+          noticeLink: noRunner ? runnerSetupHref(opts) : null,
+          noticeLinkLabel: noRunner ? 'run on my machine \u203A' : null
+        };
+        paintGo();
+        startPoll();
+      } catch (error) {
+        if (destroyed) return;
+        applyGoRefusal(error);
+      }
+    }
+
     function handleClick(e) {
       const btn = e.target.closest('button, .swipe-reasoning-toggle');
       if (!btn || !container.contains(btn)) return;
@@ -868,15 +1143,22 @@
         // it cannot rebuild the prompt body — above all the streamed text while
         // the ✦ stream is in flight (the stream paints the body directly).
         const needs = btn.dataset.setupNeeds;
-        state.setupNotice = needs === 'dispatch'
+        const notice = needs === 'dispatch'
           ? 'running this step needs the dispatch runner set up'
           : needs === 'prompt'
             ? 'generate a prompt first'
             : 'running the whole task needs the proxy set up';
+        state.setupNotice = notice;
         state.setupNoticeLink = needs === 'dispatch' || needs === 'proxy' ? runnerSetupHref(opts) : null;
         const slot = container.querySelector('[data-setup-notice-slot]');
         if (slot) slot.innerHTML = setupNoticeHtml(state.setupNotice, state.setupNoticeLink);
         recordTaskMode({ rung: btn.dataset.rung, ready: false, needs, act: 'press' });
+        return;
+      }
+
+      if (action === 'go') {
+        // LIN-3341: one press starts the run.
+        startRun();
         return;
       }
 
@@ -1082,9 +1364,27 @@
         });
     }
 
+    // LIN-3341 finding 7: on mount, ask once whether a run is already live on
+    // this task, so a reopened task shows the running/waiting line instead of a
+    // pressable Go. Best-effort and guarded exactly like the quota read, so a
+    // unit with no window.api makes no network call and no unhandled rejection.
+    // The promise is kept in `mountRead` so a press during the in-flight read can
+    // wait for it (round-3 fix 1B).
+    if (goReady(opts) && typeof window.api === 'function'
+      && opts.urlKey && issue.identifier && issueId) {
+      mountRead = readTaskState();
+      mountRead.then((data) => {
+        if (destroyed) return;
+        if (!goInProgress(data)) return;
+        if (!state.go || state.go.status !== 'ready') return; // a press already won
+        setGoRunning(data.headerHtml);
+      });
+    }
+
     return {
       destroy() {
         destroyed = true;
+        stopPoll();
         // Aborting the controller aborts the in-flight fetch/recommend stream;
         // window.readSSEStream's read() then rejects with AbortError, which
         // fetchPrompt's catch swallows (and onEvent already no-ops once
