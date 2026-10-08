@@ -1852,6 +1852,7 @@
       getChatHistory: function () { return chatHistory; },
       getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
       getTabTotalText: function () { return tabTotalEl ? tabTotalEl.textContent : null; },
+      updateTabTotalDisplay: updateTabTotalDisplay,
       getTabTotals: function () { return { count: tabCheckInCount, cost: tabTotalCost }; },
       updateModelPriceDisplay: updateModelPriceDisplay,
       getModelPriceText: function () { return modelPriceEl ? modelPriceEl.textContent : null; },

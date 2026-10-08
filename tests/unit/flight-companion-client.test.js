@@ -1522,8 +1522,11 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
     const { exports: m, stripTabTotalEl } = loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', { usage: { total_tokens: 5, cost: 0.5 } })]),
     });
-    m.updateTabTotalDisplay && m.updateTabTotalDisplay();
-    stripTabTotalEl.hidden = true;
+    // At 0 check-ins updateTabTotalDisplay itself must hide the total (the
+    // session-restore path re-runs it with a count of 0).
+    stripTabTotalEl.hidden = false;
+    m.updateTabTotalDisplay();
+    assert.strictEqual(stripTabTotalEl.hidden, true);
     m.autoWakeTick();
     await flush();
     assert.strictEqual(stripTabTotalEl.hidden, false);

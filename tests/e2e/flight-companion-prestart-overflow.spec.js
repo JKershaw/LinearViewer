@@ -292,3 +292,29 @@ for (const viewport of [{ width: 375, height: 812 }, { width: 1024, height: 812 
     }
   });
 }
+
+// LIN-3360 review F1: at 375x812 the open fold (~227px) is under its 40dvh cap
+// (325px), so the cap never applies there. At 375x500 the cap (200px) is what
+// holds the fold down; without `max-height` the fold is ~227px and this fails.
+test.describe('Flight Companion — open Settings fold is capped on a short phone (LIN-3360)', () => {
+  test.use({ viewport: { width: 375, height: 500 } });
+
+  test('the open fold is at most 40dvh tall and Start/composer stay in the viewport and clickable', async ({ page }) => {
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await seedPlaybook(page, URL_KEY);
+    await page.goto(PAGE_URL);
+    await waitForPlaybookPainted(page);
+    await page.locator('details.fc-settings > summary').click();
+    await expect(page.locator('details.fc-settings')).toHaveJSProperty('open', true);
+
+    const box = await page.locator('details.fc-settings').boundingBox();
+    expect(box.height).toBeLessThanOrEqual(0.4 * 500 + 1);
+
+    await page.locator('.fc-chat-composer').scrollIntoViewIfNeeded();
+    await assertControlsStayInSection(page);
+    await expect(page.locator('#flight-companion-start')).toBeInViewport();
+    await expect(page.locator('#flight-companion-send')).toBeInViewport();
+    await page.locator('#flight-companion-start').click({ trial: true, timeout: 2000 });
+    await page.locator('#flight-companion-send').click({ trial: true, timeout: 2000 });
+  });
+});

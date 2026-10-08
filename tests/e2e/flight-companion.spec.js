@@ -1472,3 +1472,37 @@ test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () 
     await expect(select).toHaveValue('anthropic/claude-opus-5');
   });
 });
+
+// LIN-3360 review F2: the page-load wiring of the shared local-time helper.
+// No FC fixture renders a `time[data-local-time]` node (the observer report
+// and last-check-in times need live data), so the document is served with
+// one injected; removing `initLocalTimes()` from common.js's DOMContentLoaded
+// list leaves the ISO text in place and fails this.
+test.describe('LIN-3360: server-rendered page times are rewritten to local time on load', () => {
+  test.use({ timezoneId: 'Asia/Tokyo', locale: 'en-GB' });
+
+  test('a time[data-local-time] node shows local D Mon, HH:MM with the ISO value as its title; a missing value stays `unknown`', async ({ page }) => {
+    const ISO = '2026-10-06T01:05:00Z';
+    await page.route(
+      (url) => url.pathname === `/workspace/${URL_KEY}/flight-companion`,
+      async (route) => {
+        if (route.request().resourceType() !== 'document') return route.continue();
+        const response = await route.fetch();
+        const body = (await response.text()).replace(
+          '</body>',
+          `<time id="lt-probe" datetime="${ISO}" data-local-time>${ISO}</time>` +
+          '<time id="lt-empty" datetime="" data-local-time>unknown</time></body>',
+        );
+        return route.fulfill({ response, body });
+      },
+    );
+    await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
+    await page.goto(PAGE_URL);
+    await page.waitForLoadState('networkidle');
+
+    // 01:05Z on 6 Oct is 10:05 in Tokyo (UTC+9).
+    await expect(page.locator('#lt-probe')).toHaveText('6 Oct, 10:05');
+    await expect(page.locator('#lt-probe')).toHaveAttribute('title', ISO);
+    await expect(page.locator('#lt-empty')).toHaveText('unknown');
+  });
+});
