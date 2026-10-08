@@ -82,7 +82,8 @@ import { PASS_INSTANCE_PREFIX } from '../lib/observer-pass.js';
 import { buildCompanionSnapshot, DEFAULT_SWEEP_LIVENESS_HORIZON_MS } from '../lib/flight-companion-gate.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isToolCapableModel, AVAILABLE_MODELS, getModelPricingHint } from '../lib/openrouter.js';
-import { buildModelOptions } from '../lib/openrouter-catalog.js';
+import { buildModelOptions, getModelCatalog as defaultGetModelCatalog } from '../lib/openrouter-catalog.js';
+import { shouldMockAi } from './workspace-api.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog, CHAT_TOOL_RESULT_BUDGETS } from '../lib/chat-tools.js';
 import { buildFlightCompanionMessages, renderStaleAttentionLine } from '../lib/prompts/flight-companion-brief.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
@@ -151,25 +152,34 @@ const SWEEP_INSTANCE_PREFIX = 'sweep:v1:';
 // itself deliberately stays here: it is coupled to this route's census read and
 // to `buildCompanionSnapshot`, neither of which belongs in a prompt module.
 /**
- * Validate the turn endpoint's optional per-turn `model` override against the
- * curated AVAILABLE_MODELS allow-list (LIN-2623 beat 2).
+ * Validate the turn endpoint's optional per-turn `model` override: it must be a
+ * curated AVAILABLE_MODELS id OR an id present in the cached model catalog
+ * (the same list Settings' dispatch rows offer) — LIN-2623 beat 2, widened by
+ * LIN-3363/LIN-3370.
  *
  * Modeled on `resolveRoadmapModelOverride` (routes/workspace-api-roadmap.js)'s
  * allow-list source, but DELIBERATELY does not share its silent-fallback
- * behaviour: that function degrades an uncurated id to the workspace default,
+ * behaviour: that function degrades an unknown id to the workspace default,
  * which this ticket forbids — a bad explicit id must 400, never silently
  * degrade to the workspace default or drop to tools-off. This is validation
  * only; it never resolves a final model itself, so the turn core
  * (`lib/agent-turn.js`) stays the single resolution site.
  *
+ * The catalog is read lazily: a curated id returns without calling
+ * `loadCatalog`, so the common path never pays for a catalog read. A loader
+ * that rejects or returns a non-array counts as an empty catalog (fail closed:
+ * a clean 400, never a 500).
+ *
  * @param {*} rawModel - Raw `req.body.model` (untrusted)
- * @returns {{model: string|null, error: string|null}} `model` is the trimmed
- *   curated id when one was supplied and valid; `null` when the field was
+ * @param {Object} [deps]
+ * @param {() => Promise<Array<{id: string}>>} [deps.loadCatalog] - reads the model catalog
+ * @returns {Promise<{model: string|null, error: string|null}>} `model` is the
+ *   trimmed id when one was supplied and valid; `null` when the field was
  *   absent/null/empty (not an error — the turn core falls back to
  *   `resolveAiOperationModel`). `error` is a user-facing message when an
- *   explicitly supplied value is non-string or not a curated id.
+ *   explicitly supplied value is non-string or in neither set.
  */
-export function resolveTurnModelOverride(rawModel) {
+export async function resolveTurnModelOverride(rawModel, { loadCatalog } = {}) {
   if (rawModel === undefined || rawModel === null || rawModel === '') {
     return { model: null, error: null };
   }
@@ -178,8 +188,20 @@ export function resolveTurnModelOverride(rawModel) {
   }
   const id = rawModel.trim();
   if (!id) return { model: null, error: null };
-  if (!AVAILABLE_MODELS.some(m => m.id === id)) {
-    return { model: null, error: `model "${id}" is not a curated model id` };
+  if (AVAILABLE_MODELS.some(m => m.id === id)) {
+    return { model: id, error: null };
+  }
+  let catalog = [];
+  if (typeof loadCatalog === 'function') {
+    try {
+      const loaded = await loadCatalog();
+      if (Array.isArray(loaded)) catalog = loaded;
+    } catch {
+      catalog = [];
+    }
+  }
+  if (!catalog.some(m => m && m.id === id)) {
+    return { model: null, error: `model "${id}" is not an offered model id (curated or in the model catalog)` };
   }
   return { model: id, error: null };
 }
@@ -306,13 +328,14 @@ export function buildCensusSeedText(currentCensusDoc) {
  * established phrase, rather than re-deriving the no-census classification.
  *
  * LIN-2623 beat 3 adds the per-turn model picker's own data: `modelOptions`
- * (the exact curated set `resolveTurnModelOverride`, routes/flight-
- * companion.js, accepts — never widened by the live OpenRouter catalog,
- * which would offer a selection the turn endpoint could then 400. The set
- * itself is built via the shared `buildModelOptions` merge (lib/openrouter-
- * catalog.js), reused rather than forked, over `AVAILABLE_MODELS`' own ids;
- * display name/pricing for each entry come straight from `AVAILABLE_MODELS`,
- * which already carries both) and `currentPricing` (the resolved default's
+ * (curated `AVAILABLE_MODELS` ids plus the cached model catalog — the set
+ * `resolveTurnModelOverride`, routes/flight-companion.js, accepts, so no
+ * option can 400. Built via the shared `buildModelOptions` merge (lib/
+ * openrouter-catalog.js), reused rather than forked. Each option carries
+ * `curated`; the renderer currently offers curated options only, LIN-3363 S2
+ * widens the picker. Curated display name/pricing come straight from
+ * `AVAILABLE_MODELS`; a catalog-only id uses its catalog label and a null
+ * pricing hint) and `currentPricing` (the resolved default's
  * own rate-card hint, `null` when unpriced — never fabricated, matching
  * `getModelPricingHint`'s own contract).
  *
@@ -323,26 +346,30 @@ export function buildCensusSeedText(currentCensusDoc) {
  * @param {boolean} [p.isFreeTier] - LIN-2623 beat 3: whether this page load's
  *   requests will be free-tier clamped — surfaced so the page can make that
  *   clamp legible rather than silently overriding a visible picker choice.
+ * @param {Array<{id: string, label?: string, free?: boolean}>} [p.catalog] - cached model catalog (`getModelCatalog`); `[]` yields curated options only
  * @param {number} [p.now] - injected clock (epoch ms), for deterministic tests
- * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string, isFreeTier: boolean, modelOptions: Array<{id: string, name: string, pricing: string|null}>, currentPricing: string|null}}
+ * @returns {{model: string, toolsOn: boolean, lastCheckInAt: string|null, nextCheckInAt: null, sweepStatus: 'no-census'|'alive'|'stale', sweepLastSeenAt: string|null, mode: string, isFreeTier: boolean, modelOptions: Array<{id: string, name: string, pricing: string|null, toolsOn: boolean, free: boolean, curated: boolean}>, currentPricing: string|null}}
  */
-export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier = false, now = Date.now() } = {}) {
+export function buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier = false, catalog = [], now = Date.now() } = {}) {
   const toolsOn = isToolCapableModel(model);
   const lastTurnAt = companionDoc?.state?.lastTurnAt || null;
   const lastCheckInAt = lastTurnAt ? new Date(lastTurnAt).toISOString() : null;
 
-  // LIN-2623 beat 3 — Trap 1/Trap 2: `buildModelOptions` is reused ONLY for
-  // its curated-id merge/dedup machinery, called with curatedIds alone (no
-  // live catalog). Passing the live catalog in as `catalog` here would widen
-  // the SELECTABLE set past AVAILABLE_MODELS (a picker option the turn
-  // endpoint's own curated allow-list would then 400) — the coherent reading
-  // this beat settled on. Display name/pricing intentionally come from
-  // AVAILABLE_MODELS directly (already rich: name + a resolved rate card),
-  // not from the descriptor's own `label`/`free` fields, which are shaped for
-  // the DIFFERENT dispatch-harness suggestion lists that have no such source.
-  const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id) }).map((d) => {
+  // LIN-3363: the option set is curated ids plus the cached catalog, deduped
+  // by `buildModelOptions` (curated first). Curated entries keep their
+  // AVAILABLE_MODELS name/pricing; a catalog-only id uses its catalog label and
+  // `getModelPricingHint` (null for it). `curated` lets the renderer (curated
+  // only in S1) tell the two apart; `toolsOn`/`free` are per-option facts.
+  const modelOptions = buildModelOptions({ curatedIds: AVAILABLE_MODELS.map((m) => m.id), catalog }).map((d) => {
     const curated = AVAILABLE_MODELS.find((m) => m.id === d.id);
-    return { id: d.id, name: curated ? curated.name : d.id, pricing: getModelPricingHint(d.id) };
+    return {
+      id: d.id,
+      name: curated ? curated.name : (d.label ?? d.id),
+      pricing: getModelPricingHint(d.id),
+      toolsOn: isToolCapableModel(d.id),
+      free: !!d.free,
+      curated: !!curated,
+    };
   });
   const currentPricing = getModelPricingHint(model);
 
@@ -474,6 +501,9 @@ export function createFlightCompanionRoutes({
   taskDecisionsStore, shelvedRulingsStore,
   chatClient = { streamChat: defaultStreamChat, streamChatWithTools: defaultStreamChatWithTools },
   createToolCatalog = defaultCreateChatToolCatalog,
+  // LIN-3363: the model-catalog seam (cached, never throws). A dep so route
+  // fixtures stay hermetic — their workspaces do not satisfy `shouldMockAi`.
+  getModelCatalog = defaultGetModelCatalog,
 }) {
   const router = Router();
 
@@ -524,7 +554,13 @@ export function createFlightCompanionRoutes({
       const censusDoc = observerStateStore
         ? await observerStateStore.readCurrent(`${SWEEP_INSTANCE_PREFIX}${workspace.urlKey}`).catch(() => null)
         : null;
-      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier });
+      // getModelCatalog is itself the cache (stale-while-revalidate); a cold
+      // read can wait on its timeout. The catch keeps an injected failure from
+      // turning the page into the error page — it degrades to curated-only.
+      const catalog = await Promise.resolve()
+        .then(() => getModelCatalog({ mock: shouldMockAi(workspace) }))
+        .catch(() => []);
+      const strip = buildFlightCompanionStripData({ model, companionDoc, censusDoc, isFreeTier, catalog });
 
       const html = renderFlightCompanionPage(
         { prompt, observerReportDoc, strip },
@@ -600,11 +636,13 @@ export function createFlightCompanionRoutes({
     }
 
     // LIN-2623 beat 2: validate BEFORE the free-tier clamp is even consulted,
-    // so an uncurated id 400s the same way on every tier. A curated id is
-    // still threaded through — the turn core (`runAgentTurn`)
+    // so an id in neither the curated list nor the catalog 400s the same way
+    // on every tier. A valid id is still threaded through — the turn core (`runAgentTurn`)
     // decides whether it actually wins, since free tier must keep clamping to
     // the default regardless of what a valid override asked for.
-    const { model: requestedModel, error: modelError } = resolveTurnModelOverride(body.model);
+    const { model: requestedModel, error: modelError } = await resolveTurnModelOverride(body.model, {
+      loadCatalog: () => getModelCatalog({ mock: shouldMockAi(req.workspace) }),
+    });
     if (modelError) {
       return res.status(400).json({ error: modelError });
     }

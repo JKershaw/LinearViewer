@@ -438,8 +438,9 @@ main.flight-companion-page[data-url-key]  - page container
                                               strip before you send anything. Exactly one
                                               trigger: the resolved DEFAULT is not tool-
                                               capable — never re-derived from the picker's
-                                              own selection below (every picker option is
-                                              curated, so always tool-capable)
+                                              own selection below (every option the picker
+                                              currently offers is curated, so always tool-
+                                              capable)
       .fc-strip-checkin                       - "last check-in: <time>|never" — the
                                               companion doc's own lastTurnAt
       #flight-companion-strip-next            - "next check-in: —" server-rendered
@@ -463,12 +464,13 @@ main.flight-companion-page[data-url-key]  - page container
                                               turns this into a real control later
       .fc-strip-model-picker                  - (LIN-2623) the per-turn model override,
                                               beside the rate card. Options are EXACTLY
-                                              the curated AVAILABLE_MODELS allow-list the
-                                              turn endpoint's resolveTurnModelOverride
-                                              accepts — deliberately never widened by the
-                                              live OpenRouter catalog (LIN-1111), since a
-                                              wider selectable set would offer a choice
-                                              the endpoint then rejects with 400
+                                              the curated AVAILABLE_MODELS ids for now (a
+                                              subset of what the turn endpoint's
+                                              resolveTurnModelOverride accepts: curated OR
+                                              a model-catalog id — LIN-3363 widens the
+                                              picker to the catalog); every offered choice
+                                              is one the endpoint accepts, never a choice
+                                              it would reject with 400
         #flight-companion-model-select           - the <select> itself, aria-label
                                               "Per-turn model override" (a visible
                                               "override:" label sits beside it too). The
@@ -485,7 +487,7 @@ main.flight-companion-page[data-url-key]  - page container
                                               exactly as it did before this picker
                                               existed — it can never silently swap a
                                               possibly-uncurated workspace default for
-                                              some other curated id. Disabled outright on
+                                              some other offered id. Disabled outright on
                                               a free-tier request (see .fc-strip-freetier)
         #flight-companion-model-price            - the rate card, next to the picker —
                                               the selected option's own data-pricing
@@ -592,7 +594,7 @@ main.flight-companion-page[data-url-key]  - page container
 ```
 
 ### Flight Companion Endpoints
-- `POST /workspace/{urlKey}/api/flight-companion/turn` — SSE chat turn; body `{ message?, history[], model? }` (an absent/empty `message` is an auto-wake tick, never a client-asserted flag). `model` (LIN-2623 beat 2) is the picker's own optional per-turn override — omitted or empty means "no override" (beat 1's `resolveAiOperationModel` decides); an explicitly supplied id must be one of the curated `AVAILABLE_MODELS` ids or the request is a clean `400` (never a silent tools-off degrade); a valid override is still clamped to the free-tier default when the request is free-tier. Events: `token`, `tool` (`phase`: `call`/`result`/`error`/`cap`/`proposed`), `done` (an auto-wake `done` carries `surface`), `error`. A non-spend auto-wake tick returns plain JSON `{ turnKind, spent:false, reason }` instead of streaming.
+- `POST /workspace/{urlKey}/api/flight-companion/turn` — SSE chat turn; body `{ message?, history[], model? }` (an absent/empty `message` is an auto-wake tick, never a client-asserted flag). `model` (LIN-2623 beat 2) is the picker's own optional per-turn override — omitted or empty means "no override" (beat 1's `resolveAiOperationModel` decides); an explicitly supplied id must be a curated `AVAILABLE_MODELS` id or an id in the cached model catalog (the Settings model list) or the request is a clean `400` (`not an offered model id`) (never a silent tools-off degrade); a valid override is still clamped to the free-tier default when the request is free-tier. Events: `token`, `tool` (`phase`: `call`/`result`/`error`/`cap`/`proposed`), `done` (an auto-wake `done` carries `surface`), `error`. A non-spend auto-wake tick returns plain JSON `{ turnKind, spent:false, reason }` instead of streaming.
 - `POST /workspace/{urlKey}/api/flight-companion/boot` — SSE boot (orient) turn (LIN-2622), driven by `#flight-companion-start`/`#flight-companion-reorient`; body `{ history[] }` only — `message`/turn kind/`followUpMode`/budget are all endpoint-hardcoded server-side, never read from the body (the same "never client-asserted" rule as `/turn`). Propose-only (never executes a follow-up), its own budget (5 tool iterations / 2500 tokens) and lease, and it charges the free tier with the SAME 429 shape a typed turn gets — never auto-wake's silent refusal. Same SSE frame set as `/turn` (`token`/`tool`/`done`/`error`), consumed by the identical client stream reader — no boot-specific parsing exists.
 - `POST /workspace/{urlKey}/api/flight-companion/approve-follow-up` — body `{ sessionId, prompt }`; enqueues the follow-up the model proposed on a prior auto-wake turn.
 

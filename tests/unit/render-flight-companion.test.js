@@ -326,12 +326,31 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
         prompt: 'kickoff',
         strip: {
           model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x',
-          modelOptions: [{ id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: '$15.00 in / $75.00 out per 1M tokens' }],
+          modelOptions: [{ id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: '$15.00 in / $75.00 out per 1M tokens', curated: true }],
         },
       },
       { urlKey: 'ws' }
     );
     assert.match(html, /<option value="anthropic\/claude-opus-5" data-pricing="\$15\.00 in \/ \$75\.00 out per 1M tokens">Claude Opus 5<\/option>/);
+  });
+
+  test('LIN-3370: only curated options render — catalog entries (curated:false) and entries with no flag are filtered out', () => {
+    const html = renderFlightCompanionPage(
+      {
+        prompt: 'kickoff',
+        strip: {
+          model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x',
+          modelOptions: [
+            { id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: null, curated: true },
+            { id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two', pricing: null, curated: false },
+            { id: 'mock-provider/no-flag', name: 'No Flag', pricing: null },
+          ],
+        },
+      },
+      { urlKey: 'ws' }
+    );
+    assert.match(html, /<option value="anthropic\/claude-opus-5">Claude Opus 5<\/option>/);
+    assert.doesNotMatch(html, /catalog-model-two|Catalog Model Two|no-flag|No Flag/);
   });
 
   test('an unpriced curated option renders with no data-pricing attribute at all (never a fabricated price)', () => {
@@ -340,7 +359,7 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
         prompt: 'kickoff',
         strip: {
           model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x',
-          modelOptions: [{ id: 'some-new-model/id', name: 'Some New Model', pricing: null }],
+          modelOptions: [{ id: 'some-new-model/id', name: 'Some New Model', pricing: null, curated: true }],
         },
       },
       { urlKey: 'ws' }
