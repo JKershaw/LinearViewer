@@ -1284,6 +1284,66 @@ describe('flight-companion.js — LIN-2443 stream render lifecycle', () => {
       'the display-only no-reply sentence must never be pushed to history');
   });
 
+  // LIN-3359: a `finishReason: 'length'` done is a cut-off, never a finished answer.
+  test('LIN-3359: text + length shows the cut-off note under the bubble, and history keeps only the raw answer', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'partial answer' }), sseFrame('done', { finishReason: 'length' })]),
+    });
+    questionInput.value = 'readout?';
+    m.submitQuestion();
+    await flush();
+    const answerLi = thread.children[1];
+    assert.strictEqual(answerLi.querySelector('.fc-cutoff-note').textContent, 'cut off: hit the token limit');
+    looseDeepEqual(m.getChatHistory(), [
+      { role: 'user', content: 'readout?' }, { role: 'assistant', content: 'partial answer' },
+    ], 'the note is display-only — never in chatHistory');
+  });
+
+  test('LIN-3359: finishReason stop shows no cut-off note', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'whole answer' }), sseFrame('done', { finishReason: 'stop' })]),
+    });
+    questionInput.value = 'readout?';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(thread.children[1].querySelector('.fc-cutoff-note'), null);
+  });
+
+  test('LIN-3359: empty + length on a user-initiated turn says "cut off before it could answer", not history', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { finishReason: 'length' })]),
+    });
+    questionInput.value = 'anything?';
+    m.submitQuestion();
+    await flush();
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'cut off before it could answer');
+    looseDeepEqual(m.getChatHistory(), [{ role: 'user', content: 'anything?' }]);
+  });
+
+  test('LIN-3359: empty + length on a boot turn says "cut off before it could answer"', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { finishReason: 'length' })]),
+    });
+    m.startBoot();
+    await flush();
+    const bodies = thread.children.map((li) => li.querySelector('.fc-msg-body')).filter(Boolean);
+    assert.ok(bodies.some((b) => b.textContent === 'cut off before it could answer'));
+  });
+
+  test('LIN-3359: an auto-wake that ends empty + length paints the cut-off bubble and still leaves the composer untouched', async () => {
+    const { exports: m, thread, questionInput, sendBtn } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { finishReason: 'length', surface: true })]),
+    });
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(thread.children.length, 1, 'a silent drop would be the very bug');
+    assert.strictEqual(thread.children[0].querySelector('.fc-msg-body').textContent, 'cut off before it could answer');
+    looseDeepEqual(m.getChatHistory(), []);
+    assert.strictEqual(questionInput._disabledWriteCount, 0);
+    assert.strictEqual(sendBtn._disabledWriteCount, 0);
+    assert.strictEqual(questionInput._focusCallCount, 0, 'no focus change');
+  });
+
   // LIN-2632 beat 2 narrows this: AC3's real invariant is "no empty assistant
   // BUBBLE for a tool-only tick" — it predates tool breadcrumbs existing at
   // all, back when 'call'/'result' rendered nothing whatsoever. Now that they

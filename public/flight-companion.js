@@ -747,6 +747,19 @@
     answerEl.parentNode.appendChild(meta);
   }
 
+  // LIN-3359: a turn that ended on `finishReason: 'length'` hit the token limit,
+  // and without this it reads as a finished answer. Display-only sibling of the
+  // bubble (same idiom as `.fc-msg-meta`); NEVER pushed to chatHistory. Touches
+  // no composer or focus state, so the auto-wake path (LIN-2718, LIN-2632) is
+  // unchanged.
+  function appendCutOffNote(answerEl) {
+    if (!answerEl || !answerEl.parentNode) return;
+    var note = document.createElement('span');
+    note.className = 'fc-cutoff-note';
+    note.textContent = 'cut off: hit the token limit';
+    answerEl.parentNode.appendChild(note);
+  }
+
   function updateTabTotalDisplay() {
     if (!tabTotalEl) return;
     tabTotalEl.textContent = formatTabTotal(tabCheckInCount, tabTotalCost);
@@ -1553,6 +1566,7 @@
             // entry would be forwarded to the model on every subsequent
             // turn. Only the DOM effect of the empty case moves, and it now
             // diverges by turn kind (AC1 vs AC2).
+            var hitLimit = !!(eventData && eventData.finishReason === 'length');
             if (answerText) {
               answerEl.classList.remove('chat-cursor');
               // Raw Markdown goes into chatHistory FIRST — the render below is
@@ -1570,6 +1584,15 @@
               // replacement (rather than an in-place innerHTML write) is the
               // one thing that could trip that guard.
               window.ChatUI.renderMarkdownText(answerEl, answerText);
+              setBubbleState(answerLi, 'done');
+              if (hitLimit) appendCutOffNote(answerEl);
+            } else if (hitLimit) {
+              // LIN-3359: empty + `length` is not "nothing to add" on ANY turn
+              // kind — a silent auto-wake drop would be the very bug. Display-
+              // only; never pushed to chatHistory.
+              var cutEl = ensureAssistantBubble();
+              cutEl.classList.remove('chat-cursor');
+              cutEl.textContent = 'cut off before it could answer';
               setBubbleState(answerLi, 'done');
             } else if (turnKind === 'user-initiated' || turnKind === 'boot') {
               // AC2: the human asked and deserves a row. Display-only — this

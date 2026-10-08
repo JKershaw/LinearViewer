@@ -37,7 +37,7 @@ import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
 import { sendSSE } from '../../lib/sse.js';
 import { COMPANION_SEED_STATE } from '../../lib/flight-companion-gate.js';
-import { runAgentTurn } from '../../lib/agent-turn.js';
+import { runAgentTurn, FC_MAX_TOKENS } from '../../lib/agent-turn.js';
 
 const OPENROUTER_KEY = 'sk-secret-openrouter-key-abc';
 const BEARER = 'sekret-proxy-token-xyz';
@@ -274,6 +274,23 @@ describe('LIN-2620: reservation isolation — a message-less proxy turn touches 
     assert.equal(body.reason, 'lost-race');
     assert.deepEqual(body.tools, []);
     assert.equal(body.text, '');
+  });
+});
+
+describe('LIN-3359: the proxy /turn requests the sized bare cap', () => {
+  test('the model call gets maxTokens FC_MAX_TOKENS and no reasoning field', async () => {
+    let captured = null;
+    const chatClient = {
+      async streamChat(_m, o, onEvent) { captured = o; onEvent('done', {}); },
+      async streamChatWithTools(_m, o, onEvent) { captured = o; onEvent('done', {}); },
+    };
+    const { status } = await postTurn(
+      { dispatchQueueStore: makeDispatchQueueStore(), flightCompanionChatClient: chatClient },
+      { message: 'hi' }
+    );
+    assert.equal(status, 200);
+    assert.equal(captured.maxTokens, FC_MAX_TOKENS);
+    assert.ok(!('reasoning' in captured));
   });
 });
 

@@ -214,6 +214,16 @@
   font-size: 0.78em;
 }
 
+/* LIN-3359: display-only "hit the token limit" note under a bubble; mirrors
+   `.fc-msg-meta` (muted, small, structural font), no new tokens. */
+.fc-cutoff-note {
+  display: block;
+  margin-top: 0.15rem;
+  font-family: var(--font-structural);
+  color: var(--muted);
+  font-size: 0.78em;
+}
+
 /* Chat thread + composer (LIN-2435). `.chat-thread`/`.chat-composer`
    themselves need no new rules — chat.css already styles them; this is the
    page-local proposal sub-component + a couple of thin composer hooks,
