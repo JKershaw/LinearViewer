@@ -463,3 +463,70 @@ describe('read-side adversarial: item-scoped withdrawal discharge (LIN-3036)', (
     assert.strictEqual(rows[0].decision.decision_id, 'd-1');
   });
 });
+
+// ─── markDecisionWithdrawn (LIN-3366) ────────────────────────────────────────
+
+describe('DispatchQueueStore#markDecisionWithdrawn (LIN-3366)', () => {
+  async function openItem(store, { decisionId = 'd-1' } = {}) {
+    const item = await store.addItem(URL_KEY, { prompt: 'p', kind: 'implementation', issueIdentifier: 'LIN-42' });
+    await store.takeItem(item._id, URL_KEY, 'token-a');
+    await store.addFeedback(item._id, URL_KEY, { message: JSON.stringify({ decision_id: decisionId, question: 'q', options: [] }), kind: 'decision' }, 'token-a');
+    return item;
+  }
+
+  test('success: appends a decision-withdrawn entry {decision_id, reason}, bumps feedbackVersion, keeps the digest fresh', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await openItem(store);
+    const before = (await historyCollection.findOne({ _id: item._id }) || {}).feedbackVersion ?? 0;
+    const res = await store.markDecisionWithdrawn(item._id, URL_KEY, 'd-1', 'ticket-closed: LIN-42 reached completed');
+    assert.equal(res.success, true);
+    const stored = await historyCollection.findOne({ _id: item._id });
+    const entry = stored.feedback.find(e => e.kind === 'decision-withdrawn');
+    assert.deepEqual(JSON.parse(entry.message), { decision_id: 'd-1', reason: 'ticket-closed: LIN-42 reached completed' });
+    assert.equal(stored.feedbackVersion, before + 1);
+    assert.equal(_findDecisionWithdrawal(stored.feedback, 'd-1')?.decisionId, 'd-1');
+  });
+
+  test('refused reversed: a human-reversed pair gets NO append', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+    await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1');
+    const count = (await historyCollection.findOne({ _id: item._id })).feedback.length;
+    assert.deepEqual(await store.markDecisionWithdrawn(item._id, URL_KEY, 'd-1', 'r'), { refused: 'reversed' });
+    assert.equal((await historyCollection.findOne({ _id: item._id })).feedback.length, count);
+  });
+
+  test('refused withdrawn: an already live withdrawal gets NO second append', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+    const count = (await historyCollection.findOne({ _id: item._id })).feedback.length;
+    assert.deepEqual(await store.markDecisionWithdrawn(item._id, URL_KEY, 'd-1', 'r'), { refused: 'withdrawn' });
+    assert.equal((await historyCollection.findOne({ _id: item._id })).feedback.length, count);
+  });
+
+  test('refused not-found; and the reversed refusal does not write the digest (no refusal-heal)', async () => {
+    const { store, historyCollection } = makeStore();
+    assert.deepEqual(await store.markDecisionWithdrawn('missing', URL_KEY, 'd-1', 'r'), { refused: 'not-found' });
+    const item = await withdrawnItem(store, { decisionId: 'd-1' });
+    await store.markDecisionWithdrawalReversed(item._id, URL_KEY, 'd-1');
+    await historyCollection.updateOne({ _id: item._id }, { $set: { feedbackDigest: { sentinel: true } } });
+    await store.markDecisionWithdrawn(item._id, URL_KEY, 'd-1', 'r');
+    assert.deepEqual((await historyCollection.findOne({ _id: item._id })).feedbackDigest, { sentinel: true });
+  });
+
+  test('null for bad args, a wrong workspace is not-found, and a lost CAS is null', async () => {
+    const { store, historyCollection } = makeStore();
+    const item = await openItem(store);
+    assert.equal(await store.markDecisionWithdrawn(item._id, URL_KEY, 'd-1', ''), null);
+    assert.equal(await store.markDecisionWithdrawn(item._id, URL_KEY, '', 'r'), null);
+    assert.deepEqual(await store.markDecisionWithdrawn(item._id, 'other-ws', 'd-1', 'r'), { refused: 'not-found' });
+    const realFind = historyCollection.findOne.bind(historyCollection);
+    historyCollection.findOne = async (q) => {
+      const doc = await realFind(q);
+      await historyCollection.updateOne({ _id: item._id }, { $inc: { feedbackVersion: 1 } });
+      return doc;
+    };
+    assert.equal(await store.markDecisionWithdrawn(item._id, URL_KEY, 'd-1', 'r'), null);
+    assert.equal((await realFind({ _id: item._id })).feedback.some(e => e.kind === 'decision-withdrawn'), false);
+  });
+});

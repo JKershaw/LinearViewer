@@ -142,6 +142,7 @@ const EXPECTED_GOLDEN_LOOP = {
     { decisionId: 'd-1', raisedAt: at(32), resolvedAt: at(40), outcome: 'answered' }
   ],
   withdrawal: null,
+  withdrawalReversed: false,
   source: 'history',
   historyStatus: 'done',
   bookkeeping: null,

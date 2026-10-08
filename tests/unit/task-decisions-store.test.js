@@ -1747,3 +1747,36 @@ describe('TaskDecisionsStore.listCandidatesForWorkspace (LIN-2649 WS2)', () => {
     assert.deepEqual(page.items, []);
   });
 });
+
+// LIN-3366: the ticket-closed closer's marker.
+describe('TaskDecisionsStore ticketClosed marker (LIN-3366)', () => {
+  let collection, store;
+  beforeEach(async () => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+    await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
+  });
+  const id = () => TaskDecisionsStore.buildId(ISSUE_ID, HASH_A);
+
+  test('ticketClosed:true on a self-resolved stamp sets ticketClosedAt; toRecord exposes it', async () => {
+    const rec = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: id(), outcome: 'self-resolved', outcomeReason: 'Ticket closed', outcomeBasisHash: HASH_B, ticketClosed: true });
+    assert.ok(rec.ticketClosedAt);
+    assert.equal(rec.firstStampWins, true);
+  });
+
+  test('without the flag ticketClosedAt stays null (existing callers are unchanged), and the flag is ignored for other outcomes', async () => {
+    const rec = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: id(), outcome: 'self-resolved', outcomeReason: 'r', outcomeBasisHash: HASH_B });
+    assert.equal(rec.ticketClosedAt, null);
+    const { _id } = await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B, decision: sampleDecision({ decision_id: 'x' }) }) || {};
+    const other = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: TaskDecisionsStore.buildId(ISSUE_ID, HASH_B), outcome: 'dismissed', ticketClosed: true });
+    assert.equal(other.ticketClosedAt, null);
+  });
+
+  test('reverseOutcome clears the outcome fields but NOT ticketClosedAt (an open row carrying it was un-retired by a human)', async () => {
+    await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: id(), outcome: 'self-resolved', outcomeReason: 'r', outcomeBasisHash: HASH_B, ticketClosed: true });
+    await store.reverseOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: id() });
+    const status = await store.getStatus(URL_KEY, ISSUE_ID);
+    assert.equal(status.outcome, null);
+    assert.ok(status.ticketClosedAt);
+  });
+});
