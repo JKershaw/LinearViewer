@@ -99,7 +99,8 @@ async function noHorizontalScroll(page) {
   expect(scroll, `page scrolls sideways: ${scroll} > ${client}`).toBeLessThanOrEqual(client);
 }
 
-const step = (page, kind) => page.locator(`[data-testid="task-page-step"][data-kind="${kind}"]`);
+const step = (page, kind) => page.locator(`[data-testid="task-page-stage"][data-kind="${kind}"]`);
+const head = (page, kind) => step(page, kind).locator('[data-testid="task-page-stage-head"]');
 
 test.describe('Task page, owner view (LIN-3329)', () => {
   test('running: the header answers, the running row is open, the rest are closed and calm', async ({ page }) => {
@@ -114,24 +115,26 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Build running since');
 
     // Oldest-first, the running row open, the finished one closed.
-    await expect(page.locator('[data-testid="task-page-step"]')).toHaveCount(2);
+    await expect(page.locator('[data-testid="task-page-stage"]')).toHaveCount(2);
     await expect(step(page, 'plan')).not.toHaveClass(/sess-run--expanded/);
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);
-    await expect(step(page, 'implementation').locator('[data-testid="task-page-step-body"]')).toBeVisible();
-    await expect(step(page, 'plan').locator('[data-testid="task-page-step-body"]')).toBeHidden();
+    await expect(head(page, 'implementation')).toHaveAttribute('aria-expanded', 'true');
+    await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-body"]')).toBeVisible();
+    await expect(step(page, 'plan').locator('[data-testid="task-page-stage-body"]')).toBeHidden();
+    await expect(step(page, 'plan').locator('[data-testid="task-page-stage-state"]')).toHaveText('done');
+    await expect(step(page, 'plan').locator('[data-testid="task-page-stage-took"]')).toContainText('took');
+    await expect(step(page, 'plan').locator('[data-testid="task-page-stage-ago"]')).toContainText('started');
+    await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-took"]')).toContainText('running');
 
-    // Phone calm: a closed row shows no chips; opening it shows them.
-    const planChips = step(page, 'plan').locator('.sess-chips');
-    await expect(planChips).toHaveCount(1);
-    await expect(planChips).toBeHidden();
-    await step(page, 'plan').locator('[data-testid="session-run-toggle"]').click();
+    // Opening a finished stage shows its session's message and evidence link.
+    await head(page, 'plan').click();
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/);
-    await expect(planChips).toBeVisible();
-    await expect(step(page, 'plan').locator('[data-testid="task-page-step-message"]')).toHaveText('planned it');
-    await expect(step(page, 'plan').locator('[data-testid="task-page-step-link"]')).toHaveText('plan doc');
+    await expect(step(page, 'plan').locator('[data-testid="task-page-session-message"]')).toHaveText('planned it');
+    await expect(step(page, 'plan').locator('[data-testid="task-page-session-link"]')).toHaveText('plan doc');
 
-    // The quiet guesses after the furthest stage reached, and details closed.
-    await expect(page.locator('[data-testid="task-page-guess"]')).toHaveText([/Review/, /Close-out/]);
+    // The stages still ahead, dotted and quiet; details closed.
+    await expect(page.locator('[data-testid="task-page-stage-ahead"]')).toHaveText([/Review/, /Close-out/]);
+    await expect(page.locator('[data-testid="task-page-stage-ahead"] .task-stage-head').first()).toHaveCSS('border-top-style', 'dashed');
     await expect(page.locator('[data-testid="task-page-details"]')).not.toHaveAttribute('open', '');
     await expect(page.locator('[data-testid="task-page-subtasks-link"]')).toHaveText('LOCAL-TP4');
 
@@ -147,7 +150,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP2`);
     await expect(page.locator('[data-testid="task-page-status"]')).toHaveAttribute('data-status', 'done');
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Finished');
-    await expect(page.locator('[data-testid="task-page-guess"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="task-page-stage-ahead"]')).toHaveCount(0);
     await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-status', 'done');
     await noHorizontalScroll(page);
   });
@@ -163,7 +166,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('which API key should the build use?');
     await expect(page.locator('[data-testid="task-page-sentence"]')).not.toContainText('[blocked]');
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);
-    await expect(step(page, 'implementation').locator('[data-testid="task-page-step-summary"]')).toContainText('blocked: which API key');
+    await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-state"]')).toHaveText('waiting for an answer');
+    await expect(step(page, 'implementation').locator('[data-testid="task-page-session-message"]')).toContainText('which API key should the build use?');
     await noHorizontalScroll(page);
   });
 
@@ -184,7 +188,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     });
 
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
-    await step(page, 'plan').locator('[data-testid="session-run-toggle"]').click();
+    await head(page, 'plan').click();
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/);
     // The task's evidence (from the tracker's review comment) sits in the
     // Pull request section, outside every repainted mount (LIN-3340).
@@ -196,7 +200,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await postFeedback(page, token, buildId, '[done] built it');
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('No session running. Last: Build done');
-    await expect(step(page, 'implementation').locator('[data-testid="task-page-step-summary"]')).toContainText('done');
+    await expect(step(page, 'implementation').locator('[data-testid="task-page-stage-state"]')).toHaveText('done');
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/, { timeout: 1000 });
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);
     // The Pull request section lives outside every repainted mount, so a poll
@@ -218,6 +222,50 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     }
     expect(stateRequests.filter(p => p === briefUrl).length, 'one brief GET on mount').toBe(1);
     expect(stateRequests.filter(p => p === recapUrl).length, 'one recap GET on mount').toBe(1);
+  });
+
+  // LIN-3356: the layout John asked for, on a phone and on desktop.
+  test('layout: one calm column on a phone (answer, stages, PR); stages beside the brief on desktop; the PR reads in the content face', async ({ page }) => {
+    await seedTasks(page, { reviewed: true });
+    const token = await runnerToken(page);
+    await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'plan', feedback: ['[done] planned it'] });
+    await seedSession(page, token, { identifier: 'LOCAL-TP1', title: 'A task with a running build', kind: 'implementation' });
+    const box = async (testid) => page.locator(`[data-testid="${testid}"]`).first().boundingBox();
+
+    // Phone (360): a single column in reading order, no sideways scroll.
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    const answer = await box('task-page-answer');
+    const stages = await box('task-page-track-mount');
+    const pr = await box('task-page-pr-mount');
+    const context = await box('task-page-context-mount');
+    expect(answer.y).toBeLessThan(stages.y);
+    expect(stages.y).toBeLessThan(pr.y);
+    expect(pr.y).toBeLessThan(context.y);
+    expect(Math.abs(stages.x - context.x), 'one column').toBeLessThan(2);
+    await noHorizontalScroll(page);
+
+    // The PR justification is the content face, not the page's mono body font.
+    const fonts = await page.evaluate(() => {
+      const face = (sel) => getComputedStyle(document.querySelector(sel)).fontFamily;
+      return { body: face('body'), lead: face('[data-testid="task-page-pr-lead"]'), detail: face('[data-testid="task-page-pr-detail"]') };
+    });
+    expect(fonts.lead).not.toBe(fonts.body);
+    expect(fonts.lead).toBe(fonts.detail);
+    expect(fonts.lead).toMatch(/Inter|sans-serif/);
+
+    // Desktop (1280): the stages and the brief/recap sit side by side, in a
+    // plain column (not sticky, no scroll area of its own).
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.reload();
+    const dStages = await box('task-page-track-mount');
+    const dContext = await box('task-page-context-mount');
+    expect(dContext.x).toBeGreaterThan(dStages.x + dStages.width - 2);
+    expect(Math.abs(dContext.y - dStages.y), 'aligned at the top of the same band').toBeLessThan(80);
+    const aside = await page.locator('.task-context-section').evaluate((el) => { const cs = getComputedStyle(el); return { position: cs.position, overflowY: cs.overflowY }; });
+    expect(aside.position).not.toBe('sticky');
+    expect(aside.overflowY).toBe('visible');
+    await noHorizontalScroll(page);
+    await page.screenshot({ path: test.info().outputPath('task-page-running-1280.png'), fullPage: true });
   });
 
   test('no stored-only page; unknown and signed-out', async ({ page, browser }) => {
@@ -257,12 +305,13 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-testid="task-page-sentence"]',
       '[data-testid="task-page-status-pill"]',
       '[data-testid="task-page-ident"]',
-      '[data-kind="plan"] [data-testid="task-page-step-stage"]',
-      '[data-kind="plan"] [data-testid="task-page-step-summary"]',
-      '[data-kind="implementation"] [data-testid="task-page-step-summary"]',
-      '[data-kind="implementation"] [data-testid="task-page-step-message"]',
-      '.task-guesses-label',
-      '[data-testid="task-page-guess"]',
+      '[data-kind="plan"] [data-testid="task-page-stage-name"]',
+      '[data-kind="plan"] [data-testid="task-page-stage-state"]',
+      '[data-kind="plan"] [data-testid="task-page-stage-time"]',
+      '[data-kind="implementation"] [data-testid="task-page-stage-state"]',
+      '[data-kind="implementation"] [data-testid="task-page-session-message"]',
+      '[data-testid="task-page-stage-ahead"] .task-stage-name',
+      '[data-testid="task-page-stage-ahead"] .task-stage-state',
       '[data-testid="task-page-description"] .disclosure__label',
       '.brief-placeholder',
       '[data-testid="task-page-back"]',
@@ -405,9 +454,14 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     });
 
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    // The raw evidence and ledger sit in a closed disclosure under the plain words.
+    await expect(page.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeHidden();
+    await page.locator('[data-testid="task-page-pr-raw"] > summary').click();
     await expect(page.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toHaveText('Merge PR #41');
+    await expect(page.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
     await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('Harbour never merges on its own');
     // The header says waiting on the person, and the page says it is merge-ready.
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Approved. PR #41 is ready to merge.');
@@ -438,8 +492,10 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     const guest = await guestCtx.newPage();
     const origin = new URL(page.url()).origin;
     await guest.goto(`${origin}${path}`);
-    await expect(guest.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeVisible();
+    await expect(guest.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeAttached();
     await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
+    await expect(guest.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
+    await expect(guest.locator('[data-action="closeout-press"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(1);
     await guestCtx.close();

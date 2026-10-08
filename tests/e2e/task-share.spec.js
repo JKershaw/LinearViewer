@@ -85,7 +85,7 @@ test.describe('Task share link (LIN-3330)', () => {
     expect(new URL(guest.url()).pathname).toBe(path, 'no redirect for a signed-out guest');
 
     await expect(guest.locator('[data-testid="task-page-title"]')).toHaveText('A shared task');
-    await expect(guest.locator('[data-testid="task-page-step"]')).toHaveCount(1);
+    await expect(guest.locator('[data-testid="task-page-stage"]')).toHaveCount(1);
     // Owner controls are omitted server-side; in-page Harbour chrome stays.
     await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);

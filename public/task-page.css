@@ -33,73 +33,150 @@
   overflow-wrap: anywhere;
 }
 
-/* ── Progress: the track ─────────────────────────────────────────────────── */
-.task-track { list-style: none; margin: 0; padding: 0; }
-/* The face's per-row identifier and issue title repeat the page header on every
-   row; the stage word on `.task-step-line` names the row instead. */
-.task-step .sess-run-ident,
-.task-step .sess-run-kind,
-.task-step .sess-run-title { display: none; }
-.task-step-line {
+/* The brief's `## Current` paragraph, under the one sentence (LIN-3356). */
+.task-summary {
+  flex-basis: 100%;
+  margin: 0.25rem 0 0;
   font-family: var(--font-content);
-  font-size: 0.85rem;
-  color: var(--text);
-  margin-top: 0.25rem;
-  min-width: 0;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
-.task-step-stage { font-weight: 600; }
-.task-step-summary { color: var(--muted); }
-.task-step[data-state="waiting"] .task-step-summary { color: var(--amber-dim); }
-.task-step-body {
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--line);
-  cursor: auto;
+
+/* ── Stages: one bar per stage (LIN-3356) ─────────────────────────────────── */
+.task-stages-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.task-stage { min-width: 0; }
+.task-stage-head {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  font: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 }
-.task-step-message {
-  margin: 0 0 0.4rem;
+.task-stage-head--ahead { cursor: default; }
+.task-stage-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
   font-family: var(--font-content);
+  font-size: 0.95rem;
+}
+.task-stage-name { font-weight: 600; }
+.task-stage-attempts,
+.task-stage-state,
+.task-stage-time { font-size: 0.8rem; color: var(--muted); }
+.task-stage-time { font-family: var(--font-content); }
+.task-stage-state { margin-left: auto; }
+.task-stage[data-tone="error"] .task-stage-state { color: var(--red-dim, var(--red)); }
+.task-stage[data-tone="waiting"] .task-stage-state { color: var(--amber-dim); }
+.task-stage-bar {
+  display: block;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--faint);
+  overflow: hidden;
+}
+.task-stage-fill { display: block; height: 100%; width: 100%; border-radius: inherit; }
+.task-stage[data-tone="done"] .task-stage-fill { background: var(--green); }
+.task-stage[data-tone="error"] .task-stage-fill { background: var(--red); }
+.task-stage[data-tone="queued"] .task-stage-fill { background: var(--slate); width: 15%; }
+.task-stage[data-tone="waiting"] .task-stage-fill { background: var(--amber); width: 60%; }
+/* Running has no honest denominator: an indeterminate sweep, never a made-up %. */
+.task-stage[data-tone="running"] .task-stage-fill {
+  background: var(--amber);
+  width: 35%;
+  animation: task-stage-sweep 1.8s ease-in-out infinite alternate;
+}
+@keyframes task-stage-sweep {
+  from { transform: translateX(0); }
+  to { transform: translateX(185%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-stage[data-tone="running"] .task-stage-fill { animation: none; width: 60%; }
+}
+/* Still ahead: a grey dotted-out bar, quiet, a guess not a promise. */
+.task-stage--ahead .task-stage-head {
+  background: transparent;
+  border-style: dashed;
+  color: var(--muted);
+}
+.task-stage--ahead .task-stage-bar { background: transparent; border: 1px dashed var(--line); }
+.task-stage-body {
+  display: none;
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-family: var(--font-content);
+}
+.task-stage.sess-run--expanded .task-stage-body { display: block; }
+.task-stage-sessions { list-style: none; margin: 0; padding: 0; }
+.task-stage-session { padding: 0.4rem 0; border-top: 1px solid var(--line); }
+.task-stage-session:first-child { border-top: 0; }
+.task-stage-session-line { font-size: 0.8rem; color: var(--muted); }
+.task-stage-session[data-state="waiting"] .task-stage-session-line { color: var(--amber-dim); }
+.task-stage-message {
+  margin: 0.25rem 0 0;
   font-size: 0.9rem;
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.task-step-links {
+.task-stage-links {
   list-style: none;
-  margin: 0 0 0.4rem;
+  margin: 0.25rem 0 0;
   padding: 0;
   font-family: var(--font-structural);
   font-size: 0.8rem;
 }
-.task-step-links li { overflow-wrap: anywhere; }
+.task-stage-links li { overflow-wrap: anywhere; }
+.task-checkins { margin: 0.4rem 0; font-size: 0.8rem; color: var(--muted); }
+.task-checkins summary { cursor: pointer; }
+.task-checkin-list { list-style: none; margin: 0.3rem 0 0; padding: 0 0 0 0.75rem; border-left: 2px solid var(--line); }
+.task-checkin { padding: 0.15rem 0; overflow-wrap: anywhere; }
+.task-checkin-message { display: block; color: var(--muted); }
 .task-ext,
 .task-ref-ident { color: var(--brand-dim); text-underline-offset: 2px; }
-.task-step-evidence:empty { display: none; }
-.task-step-evidence { font-size: 0.85rem; overflow-wrap: anywhere; }
-.task-step-evidence .rev-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.15rem 0; }
-.task-step-evidence .rev-row-label { color: var(--muted); font-family: var(--font-content); min-width: 4.5rem; }
-.task-step-evidence .rev-row-body { min-width: 0; }
-.task-step-evidence a { color: var(--brand-dim); }
 
-/* The usual stages ahead — drawn quietly, a guess, not a promise. */
-.task-guesses {
-  margin-top: 0.4rem;
-  font-family: var(--font-content);
-  font-size: 0.8rem;
-  color: var(--muted);
+/* ── Pull request: the justification, then one clear button (LIN-3356) ─────
+   Everything here is the content face; the shared evidence fragment brings no
+   styles of its own, so its rows are styled here, scoped to this section. */
+.task-pr-section { font-family: var(--font-content); }
+.task-pr-says { margin: 0 0 0.75rem; }
+.task-pr-lead { margin: 0 0 0.25rem; font-size: 1rem; font-weight: 600; line-height: 1.4; }
+.task-pr-detail { margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--muted); }
+.task-pr-section .rev-closeout { display: grid; gap: 0.5rem; justify-items: start; margin: 0 0 0.75rem; }
+.task-pr-section .rev-closeout p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.task-pr-section .rev-closeout-actions { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; width: 100%; }
+.task-pr-section .rev-closeout-press {
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
 }
-.task-guesses-label { display: block; margin-bottom: 0.25rem; font-style: italic; }
-.task-guess-list {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 0.85rem;
-  border-left: 2px dashed var(--line);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+.task-pr-section .rev-closeout-press:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--brand) 85%, black);
+  border-color: color-mix(in srgb, var(--brand) 85%, black);
 }
-.task-guess-dot { font-family: var(--font-structural); }
+.task-pr-section .rev-closeout-press[disabled] { opacity: 0.7; cursor: progress; }
+.task-pr-section .rev-closeout-actions a { font-size: 0.8rem; color: var(--brand-dim); text-align: center; }
+.task-pr-raw { font-size: 0.85rem; overflow-wrap: anywhere; }
+.task-pr-raw .rev-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.15rem 0; }
+.task-pr-raw .rev-row-label { color: var(--muted); min-width: 4.5rem; }
+.task-pr-raw .rev-row-body { min-width: 0; }
+.task-pr-raw a { color: var(--brand-dim); }
 
 /* ── Brief and recap ─────────────────────────────────────────────────────── */
 .task-context { display: grid; gap: 0.75rem; }
@@ -199,12 +276,20 @@
   .task-share-row { flex-wrap: wrap; }
 }
 
-/* ── Phone: the track stays calm ─────────────────────────────────────────────
-   Counts and chips belong inside an opened session (John's check-in, 6 Oct):
-   a closed row shows its stage, how it went and when — nothing more. */
-@media (max-width: 720px) {
-  .task-step:not(.sess-run--expanded) .sess-chips,
-  .task-step:not(.sess-run--expanded) .sess-run-cost,
-  .task-step:not(.sess-run--expanded) .sess-ticket-walk,
-  .task-step:not(.sess-run--expanded) .sess-run-times { display: none; }
+/* ── Desktop: the stages and the brief side by side (LIN-3356) ────────────────
+   Source order is the phone order (answer, stages, PR, brief/recap, docs, …);
+   desktop only places it. A plain column: not sticky, no scroll area of its own. */
+@media (min-width: 1024px) {
+  .sess-page.task-page {
+    max-width: 1200px;
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    column-gap: 1.5rem;
+    align-items: start;
+  }
+  .sess-page.task-page > * { grid-column: 1 / -1; }
+  .sess-page.task-page > .task-stages,
+  .sess-page.task-page > .task-pr-section { grid-column: 1; }
+  .sess-page.task-page > .task-context-section { grid-column: 2; grid-row: 4 / span 2; }
+  .task-context { grid-template-columns: 1fr; }
 }

@@ -143,7 +143,7 @@
 
   function setRowOpen(row, open) {
     if (open) row.classList.add(OPEN_CLASS); else row.classList.remove(OPEN_CLASS);
-    var head = row.querySelector('.sess-run-head');
+    var head = row.querySelector('.task-stage-head') || row.querySelector('.sess-run-head');
     if (head) head.setAttribute('aria-expanded', String(!!open));
   }
 
@@ -193,6 +193,7 @@
     return rm ? h + 'h ' + rm + 'm' : h + 'h';
   }
 
+  /** Tick every live clock: stage "running Xm" counters and "started X ago" labels. */
   function tickClocks(root) {
     var els = root.querySelectorAll('[data-testid="session-run-elapsed"]');
     for (var i = 0; i < els.length; i++) {
@@ -200,6 +201,41 @@
       if (isNaN(start)) continue;
       var text = formatElapsed(Date.now() - start);
       if (text) els[i].textContent = 'in progress · ' + text;
+    }
+    var running = root.querySelectorAll('[data-running-since]');
+    for (var j = 0; j < running.length; j++) {
+      var since = Date.parse(running[j].getAttribute('data-running-since') || '');
+      var span = isNaN(since) ? null : formatElapsed(Date.now() - since);
+      if (span) running[j].textContent = 'running ' + span;
+    }
+    var agos = root.querySelectorAll('[data-started-at]');
+    for (var k = 0; k < agos.length; k++) {
+      var at = Date.parse(agos[k].getAttribute('data-started-at') || '');
+      var ago = isNaN(at) ? null : formatElapsed(Date.now() - at);
+      if (ago) agos[k].textContent = 'started ' + ago + ' ago';
+    }
+  }
+
+  // ── Check-ins across repaints ──────────────────────────────────────────────
+
+  /** Stage ids whose folded check-ins the reader opened (a repaint closes them). */
+  function openCheckIns(root) {
+    var ids = [];
+    var open = root.querySelectorAll('.task-stage details.task-checkins[open]');
+    for (var i = 0; i < open.length; i++) {
+      var row = open[i].closest ? open[i].closest('.task-stage') : null;
+      if (row) ids.push(rowId(row));
+    }
+    return ids;
+  }
+
+  function restoreCheckIns(root, ids) {
+    if (!ids.length) return;
+    var rows = root.querySelectorAll('.task-stage');
+    for (var i = 0; i < rows.length; i++) {
+      if (ids.indexOf(rowId(rows[i])) === -1) continue;
+      var d = rows[i].querySelector('details.task-checkins');
+      if (d) d.setAttribute('open', '');
     }
   }
 
@@ -459,17 +495,12 @@
     }
 
     if (trackMount) {
+      // The stage head is a real button, so Enter/Space arrive as a click too.
+      // Links and the check-ins disclosure inside an opened stage are theirs.
       trackMount.addEventListener('click', function (e) {
-        var row = e.target.closest ? e.target.closest('.task-step') : null;
-        if (!row || e.target.closest('a[href], button')) return;
-        toggle(row);
-      });
-      trackMount.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        var head = e.target.closest ? e.target.closest('.sess-run-head') : null;
+        var head = e.target.closest ? e.target.closest('.task-stage-head') : null;
         var row = head && head.closest('.task-step');
         if (!row) return;
-        e.preventDefault();
         toggle(row);
       });
     }
@@ -489,7 +520,11 @@
       // close-out session started) overrides it.
       var keepReady = shouldKeepReady(main.getAttribute('data-merge-ready'), state.status);
       if (answer && typeof state.headerHtml === 'string' && !keepReady) answer.innerHTML = state.headerHtml;
-      if (trackMount && typeof state.trackHtml === 'string') trackMount.innerHTML = state.trackHtml;
+      if (trackMount && typeof state.trackHtml === 'string') {
+        var checkIns = openCheckIns(trackMount);
+        trackMount.innerHTML = state.trackHtml;
+        restoreCheckIns(trackMount, checkIns);
+      }
       if (contextMount && typeof state.contextHtml === 'string' && contextNeedsRepaint(state.contextSig, contextMount.getAttribute('data-context-sig'), widgetsMounted)) {
         contextMount.innerHTML = state.contextHtml;
         if (state.contextSig != null) contextMount.setAttribute('data-context-sig', state.contextSig);
@@ -540,6 +575,9 @@
       rememberToggle: rememberToggle,
       applyOpenMemory: applyOpenMemory,
       formatElapsed: formatElapsed,
+      tickClocks: tickClocks,
+      openCheckIns: openCheckIns,
+      restoreCheckIns: restoreCheckIns,
       isGuestStateUrl: isGuestStateUrl,
       shouldKeepReady: shouldKeepReady,
       contextNeedsRepaint: contextNeedsRepaint,

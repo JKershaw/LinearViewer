@@ -10,7 +10,7 @@
  * and say why in the commit — never by widening an assertion.
  *
  * Also pinned here:
- *   - the page order (answer → progress → brief/recap → details → share);
+ *   - the page order (answer → stages → pull request → brief/recap → docs → details → share);
  *   - `renderOwnerControls` is the ONLY owner/guest difference: owner HTML with
  *     its two fragments removed is byte-identical to the guest HTML;
  *   - every in-Harbour href goes through `harbourHref` (carries the source kind),
@@ -22,9 +22,10 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus, harbourHref } from '../../lib/render-task-page.js';
+import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
-import { CLOSE_OUT_STATUS } from '../../lib/run-closeout-state.js';
+import { CLOSE_OUT_STATUS, deriveCloseOutState } from '../../lib/run-closeout-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(__dirname, '../fixtures/render-task-page-golden.json');
@@ -108,17 +109,47 @@ const RUNNING_LOOPS = [
   loop({ loopId: 'wake-1', kind: 'wake', source: 'live', agentState: 'queued', dispatchedAt: '2026-10-06T14:55:00.000Z', takenAt: null }),
 ];
 
+// LIN-3351's shape (the run John watched): a kick-off, check-ins, an abort row,
+// Build x -> aborted -> ok, Review -> Build -> Review, and a trailing check-in.
+const T = (hh, mm) => `2026-10-06T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00.000Z`;
+const orch = (loopId, kind, hh, mm) => done({ loopId, kind, dispatchedAt: T(hh, mm), takenAt: T(hh, mm), terminalCompletedAt: T(hh, mm + 1) });
+const work = (loopId, kind, hh, mm, endH, endM, over = {}) => done({ loopId, kind, dispatchedAt: T(hh, mm), takenAt: T(hh, mm), terminalCompletedAt: T(endH, endM), ...over });
+const LIN3351_LOOPS = [
+  orch('kick', 'autopilot', 8, 0),
+  work('design', 'design', 8, 1, 8, 9),
+  orch('w1', 'wake', 8, 9),
+  work('plan', 'plan', 8, 10, 8, 13),
+  orch('w2', 'wake', 8, 13),
+  work('b1', 'implementation', 8, 14, 8, 30, { terminalStatus: 'failed' }),
+  orch('w3', 'wake', 8, 31),
+  work('b2', 'implementation', 8, 32, 8, 40, { terminalStatus: 'aborted' }),
+  orch('abort', 'custom', 8, 41),
+  orch('w4', 'wake', 8, 41),
+  work('b3', 'implementation', 8, 42, 9, 50),
+  orch('w5', 'wake', 9, 50),
+  work('r1', 'review', 9, 51, 9, 56),
+  orch('w6', 'wake', 9, 56),
+  work('b4', 'implementation', 9, 57, 10, 10),
+  orch('w7', 'wake', 10, 10),
+  work('r2', 'review', 10, 11, 10, 18),
+  orch('w8', 'wake', 10, 18),
+  loop({ loopId: 'co', kind: 'close-out', dispatchedAt: T(10, 54), takenAt: T(10, 54) }),
+  loop({ loopId: 'w9', kind: 'wake', agentState: 'queued', dispatchedAt: T(10, 58), takenAt: null }),
+];
+
 function model(name) {
   const base = { identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, now: NOW };
   switch (name) {
     case 'running-blocked-repeat':
       return buildTaskPageModel({ ...base, loops: RUNNING_LOOPS, ctx: ctx(), evidence: EVIDENCE,
-        brief: { brief: '## Brief\nBuild it.', model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
+        brief: { brief: '## Current\nThe **review** is running on `PR #41`; the build landed.\n\n## Constraints\n- keep it small', model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' },
         recap: { recap: { done: [{ item: 'plan', evidence: 'comment' }], pending: [], deviations: [] }, model: 'm', generatedAt: '2026-10-06T09:00:00.000Z' } });
     case 'waiting':
       return buildTaskPageModel({ ...base, loops: [done({ loopId: 'plan-1', kind: 'plan' }), loop({ loopId: 'impl-2', wakeMarker: 'blocked', waitingMessage: '[blocked] which API key?', feedback: [{ message: '[blocked] which API key?' }] })], ctx: ctx() });
     case 'done':
       return buildTaskPageModel({ ...base, loops: [done({ loopId: 'impl-1' }), loop({ loopId: 'rev-stale', kind: 'review' })], ctx: ctx({ stateType: 'completed', stateName: 'Done' }), evidence: EVIDENCE });
+    case 'lin-3351':
+      return buildTaskPageModel({ ...base, loops: LIN3351_LOOPS, ctx: ctx(), evidence: EVIDENCE });
     case 'no-sessions':
       return buildTaskPageModel({ ...base, loops: [], ctx: ctx({ stateType: 'unstarted', stateName: 'Todo' }) });
     default:
@@ -126,7 +157,7 @@ function model(name) {
   }
 }
 
-const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions'];
+const CASES = ['running-blocked-repeat', 'waiting', 'done', 'no-sessions', 'lin-3351'];
 
 function render(name, viewer = 'owner') {
   return renderTaskPage(model(name), {
@@ -157,39 +188,70 @@ describe('task page owner golden (LIN-3329)', () => {
 });
 
 describe('task page structure', () => {
-  test('page order: answer → pull request → progress → brief/recap → docs → details → share', () => {
+  test('page order: answer → stages → pull request → brief/recap → docs → details → share', () => {
     const html = render('running-blocked-repeat');
     const at = (testid) => html.indexOf(`data-testid="${testid}"`);
-    const order = ['task-page-answer', 'task-page-pr-mount', 'task-page-track', 'task-page-context', 'task-page-docs', 'task-page-details', 'task-page-share-slot'].map(at);
+    const order = ['task-page-answer', 'task-page-track', 'task-page-pr-mount', 'task-page-context', 'task-page-docs', 'task-page-details', 'task-page-share-slot'].map(at);
     assert.ok(order.every(i => i > 0), JSON.stringify(order));
     assert.deepEqual([...order].sort((a, b) => a - b), order);
   });
 
-  test('every session is its own row, oldest-first; running and blocked start open', () => {
+  test('stages, oldest-first: same-kind sessions fold into one stage; the running stage starts open', () => {
     const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
-    const rows = [...html.matchAll(/<li class="([^"]*)" data-testid="task-page-step" data-status="[^"]*" data-state="([^"]*)" data-kind="[^"]*" data-loop-id="([^"]*)"/g)]
-      .map(m => ({ id: m[3], state: m[2], open: m[1].includes('sess-run--expanded') }));
-    assert.deepEqual(rows.map(r => r.id), ['plan-1', 'impl-1', 'rev-1', 'impl-2', 'impl-3', 'rev-2', 'wake-1']);
-    assert.deepEqual(rows.map(r => r.state), ['done', 'done', 'done', 'continued', 'done', 'running', 'queued']);
-    assert.deepEqual(rows.filter(r => r.open).map(r => r.id), ['rev-2'], 'the replied-to block is closed; the running review is open');
-    assert.equal((html.match(/aria-expanded="true"/g) || []).length, 1, 'only the open row says so');
+    const rows = [...html.matchAll(/<li class="([^"]*)" data-testid="task-page-stage" data-state="([^"]*)" data-tone="[^"]*" data-kind="([^"]*)" data-loop-id="([^"]*)"/g)]
+      .map(m => ({ id: m[4], kind: m[3], state: m[2], open: m[1].includes('sess-run--expanded') }));
+    assert.deepEqual(rows.map(r => r.id), ['plan-1', 'impl-1', 'rev-1', 'impl-2', 'rev-2'], 'a stage is keyed by its first session');
+    assert.deepEqual(rows.map(r => r.state), ['done', 'done', 'done', 'done', 'running']);
+    assert.deepEqual(rows.filter(r => r.open).map(r => r.id), ['rev-2'], 'only the running stage is open');
+    assert.equal((html.match(/aria-expanded="true"/g) || []).length, 1, 'only the open stage says so');
+    assert.match(html, /2 attempts/, 'the replied-to build and its follow-up are one stage');
+    assert.doesNotMatch(html, /task-page-step"/, 'no session-by-session feed');
   });
 
-  test('a queued session reads queued on its face, not running', () => {
+  test('a queued check-in folds into the stage it waits on, closed, not a top-level row', () => {
     const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
-    const row = html.slice(html.indexOf('data-loop-id="wake-1"'));
-    assert.match(html, /data-status="queued" data-state="queued" data-kind="wake"/);
-    assert.match(row, /status-pill--queued" data-testid="session-run-status"><span class="status-pill__dot" aria-hidden="true"><\/span>queued</);
-    assert.doesNotMatch(row, /status-pill--running/);
+    assert.doesNotMatch(html, /data-kind="wake" data-loop-id/, 'a check-in is never a stage row');
+    const stage = html.slice(html.indexOf('data-loop-id="rev-2"'));
+    assert.match(stage, /<details class="task-checkins" data-testid="task-page-checkins"><summary>1 check-in<\/summary>/, 'folded and closed');
   });
 
-  test('the task evidence renders once, in the Pull request section; the track has no slot', () => {
+  test('LIN-3351 shape: 19 rows become 7 stages, with no orchestration row on top', () => {
+    const m = model('lin-3351');
+    const done = m.stages.filter(st => st.state !== 'ahead');
+    assert.deepEqual(done.map(st => st.label), ['Design', 'Plan', 'Build', 'Review', 'Build', 'Review', 'Close-out']);
+    assert.deepEqual(done.map(st => st.attempts), [1, 1, 3, 1, 1, 1, 1]);
+    assert.deepEqual(done.map(st => st.checkIns.length), [1, 1, 4, 1, 1, 1, 2]);
+    const html = renderTaskTrack(m, { now: NOW });
+    assert.equal((html.match(/data-testid="task-page-stage"/g) || []).length, 7);
+    assert.doesNotMatch(html, /data-kind="(wake|autopilot|custom|periodical)"[^>]*data-loop-id/);
+    assert.match(html, /9 check-ins|2 check-ins/);
+  });
+
+  test('stages still ahead are drawn dashed, with no id and no toggle', () => {
+    const html = renderTaskTrack(model('running-blocked-repeat'), { now: NOW });
+    assert.match(html, /<li class="task-stage task-stage--ahead" data-testid="task-page-stage-ahead" data-state="ahead" data-tone="ahead" data-kind="close-out">/);
+    assert.doesNotMatch(html.slice(html.indexOf('task-stage--ahead')), /<button/);
+    assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-stage-ahead/, 'none once the tracker says done');
+    const none = renderTaskTrack(model('no-sessions'), { now: NOW });
+    assert.equal((none.match(/data-testid="task-page-stage-ahead"/g) || []).length, 5);
+    assert.match(none, /no sessions yet/);
+  });
+
+  test('the answer carries the brief\'s ## Current paragraph, plain; absent without a brief; no second strip', () => {
+    const html = render('running-blocked-repeat');
+    assert.match(html, /data-testid="task-page-summary">The review is running on PR #41; the build landed\.</);
+    const summary = html.slice(html.indexOf('data-testid="task-page-summary"'), html.indexOf('</p>', html.indexOf('data-testid="task-page-summary"')));
+    assert.doesNotMatch(summary, /keep it small|Constraints/, 'only the Current section');
+    assert.doesNotMatch(renderTaskStatus(model('waiting')), /task-page-summary/);
+    assert.doesNotMatch(html, /segment-bar|task-strip/, 'one progress picture: the stage bars');
+  });
+
+  test('the task evidence renders once, in the Pull request section, after the stages', () => {
     const html = render('running-blocked-repeat');
     assert.equal((html.match(/data-testid="run-evidence"/g) || []).length, 1, 'evidence once');
-    assert.equal((html.match(/data-evidence-slot/g) || []).length, 0, 'no evidence slot in any row');
     assert.equal((html.match(/data-testid="task-page-pr-mount"/g) || []).length, 1, 'one PR section');
-    // The section sits before Progress, so it is outside every repainted mount.
-    assert.ok(html.indexOf('data-testid="task-page-pr-mount"') < html.indexOf('data-testid="task-page-track-mount"'));
+    assert.ok(html.indexOf('data-testid="task-page-pr-mount"') > html.indexOf('data-testid="task-page-track-mount"'));
+    assert.match(html, /<details class="disclosure task-pr-raw"(?![^>]* open)/, 'the raw evidence is a closed disclosure');
   });
 
   test('an evidence model with no PR and no ledger renders no Pull request section', () => {
@@ -225,6 +287,20 @@ describe('task page structure', () => {
         ...m,
         evidence: {
           ...m.evidence,
+          // A review and a ledger, so the review, checks and ledger sentences are
+          // rendered under the no-SHA / no-ISO assertion below (review F2). The sha
+          // carries digits: the assertion's SHA pattern requires one.
+          evidence: {
+            ...m.evidence.evidence,
+            checked: {
+              ...(m.evidence.evidence && m.evidence.evidence.checked),
+              review: { verdict: 'approve', verdictText: 'Approve', at: '2026-10-06T10:00:00.000Z', sha: 'd34db33f'.repeat(5) },
+            },
+          },
+          ledger: { ledger: { present: true, empty: false, items: [
+            { id: 'L1', scope: 'inside', claim: 'x', discharged: true },
+            { id: 'L2', scope: 'inside', claim: 'y', discharged: false },
+          ] } },
           closeOut: {
             owner: true, status, variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
             pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' },
@@ -235,14 +311,52 @@ describe('task page structure', () => {
       assert.match(html, /data-testid="run-evidence-closeout"/, `${status}: the box is present`);
       assert.match(html, /data-testid="run-evidence-closeout-(ready|merged|neutral|setup|withheld)"/, `${status}: the box renders a line`);
       assert.match(html, new RegExp(`data-state="${status}"`), `${status}: the box carries the status`);
+      // The justification is plain words for every status: no SHA, no ISO time, no id.
+      const from = html.indexOf('data-testid="task-page-pr-summary"');
+      const says = html.slice(from, html.indexOf('</div>', from));
+      assert.match(says, /task-page-pr-lead">[^<]{12,}</, `${status}: a plain-words lead`);
+      const detail = (says.match(/task-page-pr-detail">([^<]*)</) || [])[1] || '';
+      assert.match(detail, /Review approved it on 6 Oct/, `${status}: the review sentence`);
+      assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
+      assert.doesNotMatch(says, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
+      // One clear button, and only when the close-out is ready.
+      const buttons = html.match(/data-action="closeout-press"/g) || [];
+      assert.equal(buttons.length, status === 'ready' ? 1 : 0, `${status}: the merge button iff ready`);
+      if (status === 'ready') assert.match(html, /data-action="closeout-press">Merge PR #41<\/button>/);
+      const guestHtml = renderTaskPage(withBox, { viewer: 'guest', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+      assert.doesNotMatch(guestHtml, /closeout-press/, `${status}: a guest never gets the button`);
+      assert.match(guestHtml, /task-page-pr-lead/, `${status}: a guest still gets the justification`);
     }
   });
 
-  test('guesses: after the furthest stage reached; none once done', () => {
-    assert.match(renderTaskTrack(model('running-blocked-repeat'), { now: NOW }), /data-testid="task-page-guess" data-kind="close-out"/);
-    assert.doesNotMatch(renderTaskTrack(model('done'), { now: NOW }), /task-page-guess/);
-    const none = renderTaskTrack(model('no-sessions'), { now: NOW });
-    assert.equal((none.match(/data-testid="task-page-guess"/g) || []).length, 5);
+  // LIN-3356 review F1: the plain-words lead is viewer-blind. A guest's load has
+  // no runner (`runnerReady:false`, `owner:false`), so its close-out reads
+  // 'not-ready' / 'runner-not-set-up' for the same approved PR the owner sees as
+  // ready. The guest must not be told the PR isn't ready.
+  test('a guest is not told an approved, ready PR is not ready (F1)', () => {
+    const REPO = 'acme/app';
+    const derive = (over) => deriveCloseOutState({
+      prs: [{ url: `https://github.com/${REPO}/pull/41`, repo: REPO, number: 41, corroborated: false }],
+      prStatuses: [{ repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }],
+      review: { verdict: 'approve', verdictText: 'Approve', sha: 'aaaaaaa' },
+      stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
+      ...over,
+    });
+    const guestState = derive({ owner: false, runnerReady: false });
+    assert.equal(guestState.status, CLOSE_OUT_STATUS.NOT_READY, 'the guest inputs do produce not-ready');
+    assert.equal(guestState.reason, 'runner-not-set-up');
+    const ownerState = derive({ owner: true, runnerReady: true });
+    assert.equal(ownerState.status, CLOSE_OUT_STATUS.READY);
+    const lead = (closeOut, viewer) => {
+      const m = model('running-blocked-repeat');
+      const html = renderTaskPage({ ...m, evidence: { ...m.evidence, closeOut } }, { viewer, urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+      return (html.match(/data-testid="task-page-pr-lead">([^<]*)</) || [])[1];
+    };
+    const sentence = 'PR #41 is approved and ready to merge.';
+    assert.equal(lead(ownerState, 'owner'), sentence);
+    assert.equal(lead(guestState, 'guest'), sentence, 'the guest reads the same sentence as the owner');
+    // Other not-ready reasons keep their wording.
+    assert.match(lead(derive({ owner: false, runnerReady: false, review: { verdict: 'request-changes', verdictText: 'Request changes', sha: 'aaaaaaa' } }), 'guest'), /isn&#039;t ready to merge yet/);
   });
 
   test('header answers running / waiting / done', () => {
@@ -290,5 +404,26 @@ describe('viewer isolation', () => {
     assert.deepEqual(links(render('running-blocked-repeat', 'guest')), links(owner), 'a guest keeps every Harbour link');
     assert.equal(harbourHref('/x', { source: '' }), '/x', 'empty provenance is dropped');
     assert.throws(() => renderTaskPage(model('done'), { viewer: 'stranger' }), /unknown viewer/);
+  });
+});
+
+describe('shared renderers stay as the run page has them (LIN-3356)', () => {
+  const closeOut = { owner: true, status: 'ready', variant: 'standard', pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' } };
+
+  test('renderCloseOutBox keeps the run page text unless the task page passes pressLabel', () => {
+    assert.match(renderCloseOutBox(closeOut), /data-action="closeout-press">\[ close out &amp; merge \]<\/button>/);
+    assert.match(renderCloseOutBox(closeOut, { pressLabel: 'Merge PR #41' }), /data-action="closeout-press">Merge PR #41<\/button>/);
+    assert.equal(
+      renderCloseOutBox(closeOut, { pressLabel: null }),
+      renderCloseOutBox(closeOut),
+      'an absent label changes nothing',
+    );
+  });
+
+  test('every close-out hook close-out.js drives survives on the task page', () => {
+    const html = render('running-blocked-repeat', 'owner');
+    for (const hook of ['data-testid="run-evidence-closeout"', 'data-action="closeout-press"', 'data-pr-url=', 'data-head-sha=', 'data-issue-id=', 'data-source=', 'data-url-key=', 'data-issue-identifier=']) {
+      assert.ok(html.includes(hook), hook);
+    }
   });
 });

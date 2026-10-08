@@ -17,7 +17,9 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskPageLoader, buildTaskPageModel, guessStages, deriveHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { createTaskPageLoader, buildTaskPageModel, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
@@ -428,4 +430,138 @@ test('fmtWhen is UTC and adds the year only when it differs from now', () => {
   assert.equal(fmtWhen('2025-01-02T23:59:00.000Z', NOW), '2 Jan 2025, 23:59 UTC');
   assert.equal(fmtWhen(null, NOW), null);
   assert.equal(fmtWhen('not a date', NOW), null);
+});
+
+// LIN-3356: sessions fold into stages; orchestration rows fold into the stage
+// they waited on, by time order alone.
+describe('buildTaskStages (LIN-3356)', () => {
+  const at = (n) => `2026-10-06T${String(8 + Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}:00.000Z`;
+  /** A model-session double: the fields buildTaskStages reads. */
+  const sess = (loopId, kind, state, startMin, endMin = null) => ({
+    loopId, kind, label: kind, state,
+    endedAt: endMin == null ? null : at(endMin),
+    message: null, links: [],
+    loop: { takenAt: at(startMin), dispatchedAt: at(startMin) },
+  });
+  const kinds = (stages) => stages.map(s => s.kind);
+
+  test('orchestration rows fold into the next work session, closed; no row on top', () => {
+    const stages = buildTaskStages([
+      sess('kick', 'autopilot', 'done', 0, 1),
+      sess('d', 'design', 'done', 1, 9),
+      sess('w1', 'wake', 'done', 9, 10),
+      sess('p', 'plan', 'done', 10, 13),
+    ], { trackerType: 'completed' });
+    assert.deepEqual(kinds(stages), ['design', 'plan']);
+    assert.deepEqual(stages.map(s => s.checkIns.map(c => c.loopId)), [['kick'], ['w1']]);
+  });
+
+  test('consecutive same-kind sessions are one stage of N attempts; a check-in between does not break it', () => {
+    const stages = buildTaskStages([
+      sess('b1', 'implementation', 'failed', 0, 10),
+      sess('w1', 'wake', 'done', 10, 11),
+      sess('b2', 'implementation', 'aborted', 11, 20),
+      sess('abort', 'custom', 'done', 20, 21),
+      sess('w2', 'wake', 'done', 21, 22),
+      sess('b3', 'implementation', 'done', 22, 60),
+      sess('r1', 'review', 'done', 60, 65),
+      sess('b4', 'implementation', 'done', 65, 80),
+    ], { trackerType: 'completed' });
+    assert.deepEqual(kinds(stages), ['implementation', 'review', 'implementation']);
+    assert.equal(stages[0].attempts, 3);
+    assert.deepEqual(stages[0].checkIns.map(c => c.loopId), ['w1', 'abort', 'w2']);
+    assert.equal(stages[0].id, 'b1', 'keyed by the first session, stable when an attempt is added');
+    assert.equal(stages[0].state, 'done', 'the LAST session decides');
+    assert.equal(stages[0].durationMs, 60 * 60 * 1000, 'first start to last end');
+  });
+
+  test('a trailing check-in folds into the last stage; a running stage has no end or duration', () => {
+    const stages = buildTaskStages([
+      sess('co', 'close-out', 'running', 0),
+      sess('w9', 'wake', 'queued', 5),
+    ]);
+    assert.equal(stages.filter(s => s.state !== 'ahead').length, 1);
+    assert.deepEqual(stages[0].checkIns.map(c => c.loopId), ['w9']);
+    assert.equal(stages[0].endedAt, null);
+    assert.equal(stages[0].durationMs, null);
+    assert.equal(stages[0].open, true);
+  });
+
+  test('a task of only orchestration rows keeps them as stages', () => {
+    const stages = buildTaskStages([sess('c1', 'custom', 'done', 0, 3), sess('c2', 'custom', 'done', 4, 6)], { trackerType: 'completed' });
+    assert.deepEqual(kinds(stages), ['custom'], 'two consecutive same-kind rows are one stage of two attempts');
+    assert.equal(stages[0].attempts, 2);
+    assert.equal(stages[0].checkIns.length, 0);
+  });
+
+  test('every DISPATCH_KINDS member (and wake) is either folded or forms a stage', () => {
+    const all = [...new Set([...DISPATCH_KINDS, 'wake'])];
+    for (const kind of all) {
+      const alone = buildTaskStages([sess('x', kind, 'done', 0, 1), sess('y', 'review', 'done', 2, 3)], { trackerType: 'completed' });
+      if (ORCHESTRATION_KINDS.has(kind)) {
+        assert.equal(alone.length, 1, `${kind}: folded into the review stage`);
+        assert.equal(alone[0].checkIns.length, 1, `${kind}: as a check-in`);
+      } else if (kind === 'review') {
+        assert.equal(alone.length, 1, 'review + review is one stage');
+        assert.equal(alone[0].attempts, 2);
+      } else {
+        assert.equal(alone.length, 2, `${kind}: forms a stage`);
+        assert.equal(alone[0].kind, kind);
+      }
+    }
+    assert.deepEqual([...ORCHESTRATION_KINDS].sort(), ['autopilot', 'custom', 'periodical', 'wake'], 'the fold set is the documented one');
+  });
+
+  test('every session state maps onto a stage state; the stage state is its last session\'s', () => {
+    for (const state of ['queued', 'running', 'waiting', 'done', 'failed', 'aborted', 'cancelled', 'expired', 'continued']) {
+      const [st] = buildTaskStages([sess('a', 'plan', 'done', 0, 1), sess('b', 'plan', state, 2, 3)], { trackerType: 'completed' });
+      assert.equal(st.state, state);
+      const live = state === 'queued' || state === 'running' || state === 'waiting';
+      assert.equal(st.endedAt, live ? null : at(3), `${state}: endedAt`);
+      assert.equal(st.open, state === 'running' || state === 'waiting', `${state}: starts open only when live`);
+    }
+  });
+
+  test('ahead stages follow the guess rule, are marked ahead and carry no id; none once finished', () => {
+    const sessions = [sess('p', 'plan', 'done', 0, 3)];
+    const open = buildTaskStages(sessions, { trackerType: 'started' });
+    assert.deepEqual(open.filter(s => s.state === 'ahead').map(s => s.kind), guessStages(sessions, 'started'));
+    assert.ok(open.filter(s => s.state === 'ahead').every(s => s.id === undefined));
+    assert.equal(buildTaskStages(sessions, { trackerType: 'completed' }).some(s => s.state === 'ahead'), false);
+    assert.equal(buildTaskStages([], { trackerType: 'started' }).length, 5, 'a task with no sessions shows the usual five');
+  });
+
+  test('the model carries stages and the brief\'s summary', () => {
+    const model = buildTaskPageModel({
+      identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW,
+      brief: { brief: '## Current\nIt is going well.\n\n## Constraints\n- none', model: 'm', generatedAt: null },
+    });
+    assert.equal(model.summary, 'It is going well.');
+    assert.equal(model.stages.length, 5);
+    const bare = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW });
+    assert.equal(bare.summary, null, 'no brief, no paragraph, nothing generated');
+  });
+});
+
+describe('briefCurrentSection (LIN-3356)', () => {
+  test('returns the Current paragraph only', () => {
+    assert.equal(briefCurrentSection('## Current\nOne paragraph.\n\n## Constraints\n- a'), 'One paragraph.');
+  });
+  test('missing, empty or non-string input is null', () => {
+    for (const v of [null, undefined, '', 42, {}]) assert.equal(briefCurrentSection(v), null);
+  });
+  test('no Current heading is null', () => {
+    assert.equal(briefCurrentSection('## Constraints\n- a\n\n## Changelog\n- b'), null);
+  });
+  test('an empty or _None._ Current is null', () => {
+    assert.equal(briefCurrentSection('## Current\n\n## Constraints\n- a'), null);
+    assert.equal(briefCurrentSection('## Current\n- _None._\n\n## Constraints'), null);
+    assert.equal(briefCurrentSection('## Current\n_None._'), null);
+  });
+  test('### text inside Current stays; only a level-2 heading ends it', () => {
+    assert.equal(briefCurrentSection('## Current\nIntro.\n### Detail\nMore.\n## Constraints\n- a'), 'Intro.\n### Detail\nMore.');
+  });
+  test('the last section ends at the end of the body, and a preamble is skipped', () => {
+    assert.equal(briefCurrentSection('Here is the brief:\n\n## Current\nOnly this.'), 'Only this.');
+  });
 });
