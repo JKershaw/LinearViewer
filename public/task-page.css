@@ -89,6 +89,7 @@
 .task-stage[data-tone="done"] .task-stage-fill { background: var(--green); }
 .task-stage[data-tone="error"] .task-stage-fill { background: var(--red); }
 .task-stage[data-tone="queued"] .task-stage-fill { background: var(--slate); width: 15%; }
+.task-stage[data-tone="neutral"] .task-stage-fill { background: var(--slate); }
 .task-stage[data-tone="waiting"] .task-stage-fill { background: var(--amber); width: 60%; }
 /* Running has no honest denominator: an indeterminate sweep, never a made-up %. */
 .task-stage[data-tone="running"] .task-stage-fill {

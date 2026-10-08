@@ -60,6 +60,7 @@ describe('LIN-3258 static-import boundary', () => {
     const specifiers = importSpecifiers(readSrc('lib/liveness-alarm-sweep.js')).sort();
     assert.deepEqual(specifiers, [
       './consumer-poll-warning.js',
+      './dispatch-terminal.js', // LIN-3364: pure marker/stamp helpers (isRowClosed), no store or write path
       './liveness-alarm-store.js',
       './liveness-detectors.js',
       './pipeline-loops.js',

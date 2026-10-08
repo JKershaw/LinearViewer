@@ -58,7 +58,7 @@ import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
-import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
@@ -226,7 +226,10 @@ function effectiveAgentState(loop) {
   // built elsewhere. The lean feed drops raw feedback[], so this read must not
   // depend on it (LIN-622).
   const marker = loop.terminalStatus !== undefined ? loop.terminalStatus : deriveTerminalStatus(loop.feedback);
-  return marker ? MARKER_TO_AGENT_STATE[marker] : loop.agentState;
+  if (marker) return MARKER_TO_AGENT_STATE[marker];
+  // LIN-3364: a row closed at the source (bookkeeping stamp) is complete, so the
+  // enriched agentState agrees with isTerminalLoop (precedent: skipped -> complete).
+  return isRowClosed(loop) ? 'complete' : loop.agentState;
 }
 
 // Exported (LIN-2773 Area 4) so routes/proxy-rulings.js can reuse this EXACT
@@ -235,7 +238,7 @@ function effectiveAgentState(loop) {
 // is exactly the disagreement class LIN-1728's own module doc (top of
 // lib/unanswered-decisions.js) already names as a prior incident.
 export function isTerminalLoop(loop) {
-  return !!loop && TERMINAL_AGENT_STATES.has(loop.agentState);
+  return !!loop && (TERMINAL_AGENT_STATES.has(loop.agentState) || isRowClosed(loop));
 }
 
 // Marker-aware terminal check for a raw session loop (loops from
@@ -532,7 +535,9 @@ export function enrichLoop(loop) {
   return {
     ...loop,
     agentState: effectiveAgentState(loop),
-    completedAt: terminalCompletedAt || (isTerminalLoop(loop) ? (loop.resolvedAt || null) : null)
+    // LIN-3364: a closed row's completion is the close time, not its resolvedAt.
+    completedAt: terminalCompletedAt
+      || (isRowClosed(loop) ? (loop.bookkeeping.at || null) : (isTerminalLoop(loop) ? (loop.resolvedAt || null) : null))
   };
 }
 
