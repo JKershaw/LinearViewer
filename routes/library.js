@@ -43,6 +43,42 @@ function baseUrl(req) {
   return `${req.protocol}://${safe}`;
 }
 
+/** XML-escape a value destined for a sitemap `<loc>`/`<lastmod>`. */
+function escapeXml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Every canonical, query-free URL the sitemap lists. The set is derived from
+ * the catalog by construction (never hand-written), so it cannot drift from the
+ * routes: the two top-level public pages, every paper and listed document at
+ * its one canonical path, and every Archive edition. No `?q=` URL can appear —
+ * the loop never builds one.
+ *
+ * @param {ReturnType<import('../lib/library.js').loadLibrary>} catalog
+ * @returns {{path: string, lastmod: string|null}[]}
+ */
+function sitemapEntries(catalog) {
+  const entries = [
+    { path: '/', lastmod: null },
+    { path: '/library', lastmod: null },
+  ];
+  for (const doc of [...catalog.papers, ...catalog.listed]) {
+    // `lastmod` only when the date is a real `YYYY-MM-DD`; omit rather than invent.
+    const lastmod = /^\d{4}-\d{2}-\d{2}$/.test(doc.date || '') ? doc.date : null;
+    entries.push({ path: `/library/${doc.slug}`, lastmod });
+  }
+  for (const edition of catalog.archiveEditions) {
+    entries.push({ path: `/archive/${edition.n}`, lastmod: null });
+  }
+  return entries;
+}
+
 /**
  * @param {Object} [deps]
  * @param {string} [deps.docsRoot] - Injectable docs root (defaults to `<repo>/docs`).
@@ -86,6 +122,32 @@ export function createLibraryRouter({ docsRoot = DEFAULT_DOCS_ROOT } = {}) {
     res.set('Content-Security-Policy', LIBRARY_CSP);
     return res.status(404).send(renderErrorPage('Page not found', 'There is no Library document at that address.'));
   }
+
+  // ── Crawler files (LIN-3345) ───────────────────────────────────────────────
+  // Public, session-less, and nosniff'd by the shared predicate above. The
+  // sitemap reuses this router's `baseUrl`/catalog; no new auth surface.
+  router.get('/sitemap.xml', (req, res) => {
+    const base = baseUrl(req);
+    const urls = sitemapEntries(catalog).map(({ path, lastmod }) => {
+      const loc = `<loc>${escapeXml(`${base}${path}`)}</loc>`;
+      return `  <url>${loc}${lastmod ? `<lastmod>${escapeXml(lastmod)}</lastmod>` : ''}</url>`;
+    }).join('\n');
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.send(xml);
+  });
+
+  // robots.txt deliberately has no `Disallow: /library?q=`: a crawler blocked
+  // from fetching a results page never sees its `X-Robots-Tag: noindex`, so
+  // blocking it would weaken A's mechanism. It lists no app paths either — a
+  // site-wide crawl policy is outside this ticket.
+  router.get('/robots.txt', (req, res) => {
+    const base = baseUrl(req);
+    const body = `User-agent: *\nAllow: /\nSitemap: ${base}/sitemap.xml\n`;
+    res.set('Content-Type', 'text/plain; charset=utf-8');
+    return res.send(body);
+  });
 
   // ── Listed documents first (so `/library/doc/...` cannot fall to `:slug`) ──
   router.get('/library/doc/:slug.md', (req, res) => sendMarkdown(res, `doc/${req.params.slug}`));

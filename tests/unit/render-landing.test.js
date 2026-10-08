@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderLandingPage } from '../../lib/render-landing.js';
 import { DEFAULT_MODEL, AVAILABLE_MODELS, formatModelPricing } from '../../lib/openrouter.js';
+import { START_HERE } from '../../lib/library-metadata.js';
+import { escapeHtml } from '../../lib/utils/html.js';
 
 // LIN-980: the bespoke Harbour showcase landing. These lock the composition
 // contract — the top area, the fake-data glimpses of real surfaces, the distinct
@@ -64,6 +66,26 @@ test('has an archive section linking the latest Harbour Archive edition', () => 
   assert.match(html, /href="\/archive\/2"/);
   // Placed at the end of the showcase, after the Harbour OS section.
   assert.ok(html.indexOf('data-testid="landing-os"') < html.indexOf('data-testid="landing-archive"'));
+});
+
+// LIN-3345: the Library section — the homepage's discoverability link into the
+// Library. Item 1 goes to the Archive, the other five to their catalogued
+// documents; the section sits immediately above the Archive section.
+test('has a Library section above the Archive, driven by START_HERE', () => {
+  const html = renderLandingPage({});
+  const libIdx = html.indexOf('data-testid="landing-library"');
+  const archiveIdx = html.indexOf('data-testid="landing-archive"');
+  assert.ok(libIdx !== -1, 'has landing-library');
+  assert.ok(libIdx < archiveIdx, 'Library sits above the Archive');
+  assert.match(html, /<a href="\/library" class="lx-library__cta" data-testid="landing-library-link">/);
+
+  // Item 1 → Archive; every other item → its Library document, from the data.
+  const section = html.slice(libIdx, archiveIdx);
+  const hrefs = [...section.matchAll(/<a class="lx-library__link" href="([^"]+)"/g)].map(m => m[1]);
+  assert.equal(hrefs.length, 6);
+  assert.equal(hrefs[0], '/archive/2');
+  assert.deepEqual(hrefs.slice(1), START_HERE.filter(i => i.slug).map(i => `/library/${i.slug}`));
+  for (const item of START_HERE) assert.ok(section.includes(escapeHtml(item.note)), `note: ${item.title}`);
 });
 
 test('does NOT render the fake project-tree structure', () => {

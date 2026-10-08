@@ -195,3 +195,75 @@ describe('library routes', () => {
     assert.equal(res.status, 404);
   });
 });
+
+// LIN-3345, Part B of LIN-3342: the crawler-facing files. The catalogue is the
+// same `loadLibrary` instance the routes use, so the sitemap cannot drift from
+// the routes by construction.
+describe('crawler files (LIN-3345)', () => {
+  test('/sitemap.xml lists the canonical, query-free URL set', async () => {
+    const res = await get('/sitemap.xml');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'application/xml; charset=utf-8');
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(res.headers.get('cache-control'), 'public, max-age=3600');
+
+    const xml = await res.text();
+    assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
+    assert.match(xml, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
+
+    const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
+    for (const loc of locs) {
+      assert.ok(loc.startsWith(`${base}/`), `absolute loc: ${loc}`);
+      assert.ok(!loc.includes('?'), `no query string in loc: ${loc}`);
+    }
+    assert.ok(locs.includes(`${base}/`));
+    assert.ok(locs.includes(`${base}/library`));
+    for (const doc of catalog.docs) {
+      assert.ok(locs.includes(`${base}/library/${doc.slug}`), `${doc.slug} listed`);
+    }
+    for (const edition of catalog.archiveEditions) {
+      assert.ok(locs.includes(`${base}/archive/${edition.n}`), `archive ${edition.n} listed`);
+    }
+    assert.equal(locs.length, 2 + catalog.docs.length + catalog.archiveEditions.length);
+
+    // `lastmod` only where the date is a real YYYY-MM-DD.
+    const lastmods = [...xml.matchAll(/<lastmod>([^<]+)<\/lastmod>/g)].map(m => m[1]);
+    const dated = catalog.docs.filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date || ''));
+    assert.equal(lastmods.length, dated.length);
+    for (const value of lastmods) assert.match(value, /^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('every <loc> served by this router resolves 200 without noindex', async () => {
+    const xml = await (await get('/sitemap.xml')).text();
+    const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
+    // `/` is the landing, and Archive editions are served by server.js — both
+    // outside this router; e2e covers those. Here prove every Library loc.
+    const routerLocs = locs.filter(loc => new URL(loc).pathname.startsWith('/library'));
+    assert.ok(routerLocs.length > 0);
+    for (const loc of routerLocs) {
+      const res = await fetch(loc, { redirect: 'manual' });
+      assert.equal(res.status, 200, loc);
+      assert.notEqual(res.headers.get('x-robots-tag'), 'noindex', loc);
+    }
+  });
+
+  test('/robots.txt allows crawling and points at the sitemap', async () => {
+    const res = await get('/robots.txt');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'text/plain; charset=utf-8');
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    const body = await res.text();
+    assert.match(body, /^User-agent: \*$/m);
+    assert.match(body, /^Allow: \/$/m);
+    assert.ok(body.includes(`Sitemap: ${base}/sitemap.xml`), 'absolute sitemap line');
+    // Blocking the results page would hide its noindex from crawlers (A's rule).
+    assert.ok(!/Disallow:/.test(body), 'no Disallow rules');
+  });
+
+  test('case-variant /Sitemap.xml reaches the same handler (pins the shared predicate)', async () => {
+    const res = await get('/Sitemap.xml');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.match(res.headers.get('content-type'), /application\/xml/);
+  });
+});
