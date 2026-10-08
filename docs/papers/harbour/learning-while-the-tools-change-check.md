@@ -1,6 +1,6 @@
 ---
 title: Do the eleven sources in "Learning While the Tools Change" support the readings it gives them?
-kind: paper
+kind: check
 version: 2
 date: 2026-09-22
 authors: [Claude]

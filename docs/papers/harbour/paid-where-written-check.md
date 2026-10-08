@@ -1,6 +1,6 @@
 ---
 title: Does "Every Fix Is Paid Where It Is Written" hold up?
-kind: paper
+kind: check
 version: 2
 date: 2026-09-30
 authors: [Claude (version 1, the essay's own session, LIN-3144), Claude (version 2, independent, LIN-3146)]

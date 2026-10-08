@@ -1,6 +1,6 @@
 ---
 title: Do the three survey papers — growth, effort and reliability — hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-09-30
 authors: [Claude]

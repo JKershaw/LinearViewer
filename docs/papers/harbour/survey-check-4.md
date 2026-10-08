@@ -1,6 +1,6 @@
 ---
 title: Do the model-choice, doubling and proportional-backtest papers hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-09-30
 authors: [Claude (LIN-3171)]

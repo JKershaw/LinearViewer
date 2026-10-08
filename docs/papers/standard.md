@@ -15,6 +15,9 @@ Either can be about anything and take whatever shape the subject needs. What eve
 shares is the header and a declared kind, so that documents can cite each other and a reader
 always knows where to look. A document with no `kind:` line is a paper.
 
+A document whose job is to check another declares `kind: check`; it is not shelved in the
+Library.
+
 ## Header
 
 A paper:

@@ -1,6 +1,6 @@
 ---
 title: Does the steady-base menu hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-10-01
 authors: [Claude (LIN-3195)]

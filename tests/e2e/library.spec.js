@@ -10,11 +10,13 @@ import { test, expect } from '@playwright/test';
 test.describe('Library — server-rendered, no JavaScript', () => {
   test.use({ javaScriptEnabled: false });
 
-  test('index renders Start here, papers and Archive editions', async ({ page }) => {
+  test('index renders Start here, the shelves and Archive editions', async ({ page }) => {
     await page.goto('/library');
-    await expect(page.locator('h2', { hasText: 'Start here' })).toBeVisible();
-    await expect(page.locator('h2', { hasText: 'Papers and essays' })).toBeVisible();
-    await expect(page.locator('h2', { hasText: 'Archive editions' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Start here', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Essays', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Papers', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Other documents', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Archive editions', exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="library-item-link"]').first()).toBeVisible();
   });
 
@@ -42,6 +44,13 @@ test.describe('Library — server-rendered, no JavaScript', () => {
     const res = await request.get('/library/review-loops.md');
     expect(res.status()).toBe(200);
     expect(await res.text()).toMatch(/plan-review/i);
+  });
+
+  test('a document page has a link back to the Library', async ({ page }) => {
+    await page.goto('/library/review-loops');
+    await page.locator('[data-testid="library-back-link"]').click();
+    await expect(page).toHaveURL(/\/library$/);
+    await expect(page.locator('h2', { hasText: 'Papers' })).toBeVisible();
   });
 });
 

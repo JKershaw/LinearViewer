@@ -1,6 +1,6 @@
 ---
 title: Do the throughput-halving and rules-that-pay papers hold up?
-kind: paper
+kind: check
 version: 1
 date: 2026-09-30
 authors: [Claude (LIN-3167)]

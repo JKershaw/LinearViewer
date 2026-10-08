@@ -42,10 +42,48 @@ async function get(path) {
 }
 
 describe('library catalog', () => {
-  test('every papers file on disk and the 14 listed docs is catalogued', () => {
-    assert.equal(catalog.papers.length, papersOnDisk.length, 'one paper per .md file');
+  test('every papers file on disk and the 14 listed docs is catalogued and served', () => {
+    assert.equal(catalog.docs.length, papersOnDisk.length + LISTED_DOCS.length,
+      'one catalog entry per .md file plus the listed docs');
     assert.equal(catalog.listed.length, LISTED_DOCS.length, 'all 14 listed docs resolve');
-    assert.equal(catalog.docs.length, papersOnDisk.length + LISTED_DOCS.length);
+  });
+
+  test('shelf membership comes from the document front matter kind (allow-list)', () => {
+    // Every shelf entry declares a shelf kind; nothing else is shelved.
+    assert.ok(catalog.essays.length > 0, 'essays shelf is non-empty');
+    assert.ok(catalog.papers.length > 0, 'papers shelf is non-empty');
+    for (const doc of catalog.essays) assert.equal(doc.docKind, 'essay', `${doc.slug}: docKind essay`);
+    for (const doc of catalog.papers) assert.equal(doc.docKind, 'paper', `${doc.slug}: docKind paper`);
+
+    // Every papers-folder document is either on a shelf or off it for a reason
+    // its own kind states — never for its location or name.
+    const shelved = new Set([...catalog.essays, ...catalog.papers].map(d => d.slug));
+    const offShelf = catalog.docs.filter(d => d.kind === 'paper' && !shelved.has(d.slug));
+    assert.ok(offShelf.length > 0, 'there are off-shelf documents');
+    const shelfKinds = new Set(['essay', 'paper']);
+    for (const doc of offShelf) {
+      assert.ok(!shelfKinds.has(doc.docKind), `${doc.slug}: off-shelf for a non-shelf kind (${doc.docKind})`);
+    }
+    // The expected off-shelf set: 19 checks, the pre-registration, the data appendix.
+    assert.equal(offShelf.length, 21, 'exactly the 21 non-shelf documents are off the shelves');
+    for (const slug of [
+      'survey-check', 'survey-check-7', 'steady-base-check', 'paid-where-written-check',
+      'learning-while-the-tools-change-check', 'between-the-sessions-check',
+      'what-should-an-agent-leave-behind-check', 'coherence-as-it-grows-check',
+      'replay-small-work-preregistration', 'what-should-an-agent-leave-behind-evidence',
+    ]) {
+      assert.ok(offShelf.some(d => d.slug === slug), `${slug} is off-shelf`);
+    }
+    // A paper whose name looks like a check stays on the shelf (kind is truth).
+    assert.ok(catalog.papers.some(d => d.slug === 'what-the-reviews-checked'), 'what-the-reviews-checked stays on Papers');
+  });
+
+  test('off-shelf documents stay in the catalog and keep their URL', () => {
+    const shelved = new Set([...catalog.essays, ...catalog.papers, ...catalog.listed].map(d => d.slug));
+    const off = catalog.docs.filter(d => !shelved.has(d.slug));
+    for (const doc of off) {
+      assert.ok(catalog.bySlug.has(doc.slug), `${doc.slug}: still in bySlug`);
+    }
   });
 
   test('every document has a title, date, author, summary and non-empty html', () => {
@@ -65,12 +103,12 @@ describe('library catalog', () => {
     assert.match(catalog.docForSlug('doc/charter').summary, /^Status: DRAFT/);
   });
 
-  test('the 16 front-matter-less documents all get date and author from the tables', () => {
+  test('the 15 front-matter-less documents all get date and author from the tables', () => {
     const overrides = [
       'fleet-complexity-read',
-      'what-should-an-agent-leave-behind-evidence',
       ...LISTED_DOCS.map(d => `doc/${d.path.replace(/\.md$/, '').split('/').pop()}`),
     ];
+    assert.equal(overrides.length, 15);
     for (const slug of overrides) {
       const doc = catalog.docForSlug(slug);
       assert.ok(doc, `${slug} resolves`);
@@ -84,15 +122,38 @@ describe('library catalog', () => {
     assert.equal(catalog.docForSlug('doc'), null, 'no paper slug `doc`');
   });
 
-  test('papers and listed docs are newest first (undated last)', () => {
+  test('essays, papers and listed docs are newest first (undated last)', () => {
     const isSorted = list => list.every((doc, i) => {
       if (i === 0) return true;
       const prev = Date.parse(list[i - 1].date || 0);
       const cur = Date.parse(doc.date || 0);
       return prev >= cur;
     });
+    assert.ok(isSorted(catalog.essays), 'essays sorted');
     assert.ok(isSorted(catalog.papers), 'papers sorted');
     assert.ok(isSorted(catalog.listed), 'listed sorted');
+  });
+
+  // Characterization guard: the excerpt skip rule is for the papers folder
+  // only, so it must change the six essays and nothing on the papers or listed
+  // shelves. The fixture is the summaries as they were before this change.
+  test('the excerpt rule changes only the essays, never a shelf paper or listed doc', () => {
+    const before = JSON.parse(readFileSync(
+      new URL('../fixtures/library-doc-summaries.json', import.meta.url), 'utf8'));
+    for (const doc of [...catalog.papers, ...catalog.listed]) {
+      assert.equal(doc.summary, before[doc.slug], `${doc.slug}: summary unchanged`);
+    }
+    assert.equal(catalog.essays.length, 6, 'six essays');
+    for (const doc of catalog.essays) {
+      assert.notEqual(doc.summary, before[doc.slug], `${doc.slug}: no longer the italic subtitle`);
+    }
+  });
+
+  test('figureCount equals the number of <img> tags', () => {
+    for (const doc of catalog.docs) {
+      assert.equal(doc.figureCount, (doc.html.match(/<img\b/g) || []).length, `${doc.slug}: figureCount`);
+    }
+    assert.ok(catalog.docs.some(d => d.figureCount > 0), 'at least one document has figures');
   });
 
   test('Start-here slugs all resolve', () => {
@@ -167,7 +228,7 @@ describe('library routes', () => {
     for (const doc of catalog.docs) {
       const res = await get(`/library/${doc.slug}`);
       const html = await res.text();
-      const main = /<main class="library">([\s\S]*?)<\/main>/.exec(html);
+      const main = /<main class="library[^"]*">([\s\S]*?)<\/main>/.exec(html);
       assert.ok(main, `${doc.slug}: has a <main>`);
       const h1Count = (main[1].match(/<h1\b/g) || []).length;
       assert.equal(h1Count, 1, `${doc.slug}: exactly one H1 in main (no duplicated title)`);
@@ -185,6 +246,47 @@ describe('library routes', () => {
       const res = await get(path);
       assert.equal(res.status, 404, path);
     }
+  });
+
+  test('the index shelves essays, papers and other documents with a derived meta line', async () => {
+    const html = await (await get('/library')).text();
+    assert.match(html, /<h2>Essays<\/h2>/);
+    assert.match(html, /<h2>Papers<\/h2>/);
+    assert.match(html, /<h2>Other documents<\/h2>/);
+    assert.doesNotMatch(html, /Papers and essays/);
+    // The papers shelf is a list of items, not every .md file on disk.
+    const papersSection = /<h2>Papers<\/h2>[\s\S]*?<\/section>/.exec(html)[0];
+    assert.equal((papersSection.match(/data-testid="library-item-link"/g) || []).length, catalog.papers.length);
+    assert.doesNotMatch(papersSection, /survey-check/);
+
+    const entry = slug => {
+      const re = new RegExp(`<li class="library-item">(?:(?!</li>)[\\s\\S])*?href="/library/${slug}"[\\s\\S]*?</li>`);
+      return re.exec(html);
+    };
+    // A dated, figure-heavy paper prints date · N min read · N figures.
+    const costMix = entry('cost-mix')[0];
+    const costMeta = /<p class="library-item__meta">([^<]*)<\/p>/.exec(costMix)[1];
+    assert.match(costMeta, /min read/);
+    assert.match(costMeta, new RegExp(`\\b${catalog.docForSlug('cost-mix').figureCount} figures`));
+    // A zero-figure document omits the figure part entirely.
+    const reviewLoops = entry('review-loops')[0];
+    const reviewMeta = /<p class="library-item__meta">([^<]*)<\/p>/.exec(reviewLoops)[1];
+    assert.match(reviewMeta, /min read/);
+    assert.doesNotMatch(reviewMeta, /figure/);
+  });
+
+  test('the document page has a back link, an aside and a folder GitHub link', async () => {
+    const html = await (await get('/library/cost-mix')).text();
+    assert.match(html, /<a href="\/library" data-testid="library-back-link">← Library<\/a>/, 'back link to the Library');
+    assert.match(html, /<aside class="library-doc__aside">/, 'further-reading aside');
+    assert.match(
+      html,
+      /href="https:\/\/github\.com\/JKershaw\/LinearViewer\/tree\/main\/docs\/papers\/harbour"/,
+      'GitHub link points at the document folder',
+    );
+    assert.doesNotMatch(html, /\/blob\/main\/docs\/papers\/harbour\/cost-mix\.md/, 'not a file blob link');
+    assert.match(html, /data-testid="library-markdown-link"/, 'Markdown link kept');
+    assert.doesNotMatch(html, /library-doc__footer/, 'the old footer is gone');
   });
 
   test('search works with no JavaScript and is noindexed', async () => {
@@ -279,8 +381,7 @@ describe('crawler files (LIN-3345)', () => {
   // the exported helpers — a mutation of either must turn these red.
   test('sitemapEntries omits `lastmod` unless the date is a real YYYY-MM-DD', () => {
     const entries = sitemapEntries({
-      papers: [{ slug: 'a&b', date: '2026-01' }, { slug: 'c' }],
-      listed: [],
+      docs: [{ slug: 'a&b', date: '2026-01' }, { slug: 'c' }],
       archiveEditions: [],
     });
     const docEntries = entries.filter(e => e.path.startsWith('/library/'));
