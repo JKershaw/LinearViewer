@@ -4,11 +4,11 @@
 Usage, from the repository root (read-only against git; writes only to --out):
 
   python3 -I docs/papers/harbour/coherence-as-it-grows-scripts/decision-exposure.py \\
-      --prs    <scratch>/data/prs.json \\
-      --tickets <scratch>/data/ticket-outcomes.json \\
-      --exposure <scratch>/data/exposure.json \\
-      --readings <scratch>/results/B/m3-readings.json \\
-      --out    <scratch>/results/B [--since 2026-06-01] [--window 15] [--file-sites]
+      --prs    data/prs.json \\
+      --tickets data/ticket-outcomes.json \\
+      --exposure data/exposure.json \\
+      --readings docs/papers/harbour/coherence-as-it-grows-m3-readings.json \\
+      --out    data/exposure-round2 [--since 2026-06-01] [--window 15] [--file-sites]
 
   Sensitivities used in the round-2 write-up: `--window 3` (a hunk must lie within ±3 lines of a
   site) and `--file-sites` (every match of a decision in one file is one site, the census's unit).
