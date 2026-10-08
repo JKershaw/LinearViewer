@@ -287,9 +287,9 @@ describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
 // assertion here targets NEW sibling markup only.
 describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card, tools-off warning', () => {
   // Mandated red-first case: the tools-off warning must be VISIBLE on the
-  // strip before the user sends anything, whenever the resolved workspace
-  // default is not tool-capable — exactly one trigger (see the function's
-  // own doc comment).
+  // strip before the user sends anything whenever the resolved workspace
+  // default is not tool-capable. Since LIN-3363 it is always emitted,
+  // `hidden` while the default is tools-on, and the client toggles it on a pick.
   test('an uncurated (not tool-capable) default renders a VISIBLE tools-off warning', () => {
     const html = renderFlightCompanionPage(
       { prompt: 'kickoff', strip: { model: 'not-curated', toolsOn: false, mode: 'x' } },

@@ -1484,6 +1484,25 @@ test.describe('Flight Companion — LIN-2623 beat 3 / LIN-3363 S2: per-turn mode
     await expect(warning).toBeHidden();
   });
 
+  // LIN-3371 review ledger: the pick commits on mobile only because the list's
+  // `mousedown` preventDefault stops the input's `blur` closing the list before
+  // `click` lands. Every desktop-mouse test above passes either way; this one
+  // taps like a phone does.
+  test.describe('touch (375x812, hasTouch)', () => {
+    test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
+
+    test('LIN-3371: tapping a catalog row commits it and shows the tools-off warning', async ({ page }) => {
+      await page.locator('details.fc-settings > summary').tap();
+      await expect(search(page)).toBeVisible();
+      await search(page).tap();
+      await row(page, 'mock-provider/catalog-model-two').tap();
+
+      await expect(page.locator('#flight-companion-model')).toHaveValue('mock-provider/catalog-model-two');
+      await expect(search(page)).toHaveValue('Catalog Model Two');
+      await expect(page.locator('#flight-companion-tools-warning')).toBeVisible();
+    });
+  });
+
   test('keyboard: type, ArrowDown, Enter commits; text matching nothing commits nothing', async ({ page }) => {
     await openFold(page);
     await search(page).click();
