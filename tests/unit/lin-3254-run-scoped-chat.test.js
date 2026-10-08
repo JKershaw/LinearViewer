@@ -15,7 +15,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { runAgentTurn } from '../../lib/agent-turn.js';
 import { createChatToolCatalog } from '../../lib/chat-tools.js';
@@ -296,5 +296,104 @@ describe('LIN-3254 — run-scoped task-chat turn (REAL AI path)', () => {
     assert.strictEqual(runProposalsStore.created[0].runId, RUN_ID);
     assert.strictEqual(runProposalsStore.created[0].prompt, 'do the next thing');
     assert.ok(text.includes('"phase":"proposed"'), 'the stream reports the proposed result, not a queued one');
+  });
+});
+
+// ── LIN-3383: the execute-mode follow-up is owner-only, through the turn core ─
+
+describe('LIN-3383 — send_follow_up in execute mode is owner-only (threaded through runAgentTurn)', () => {
+  // Like followUpClient, but records the tool error a real chat client would
+  // hand the model instead of letting the throw escape the test.
+  const errors = [];
+  const guardedClient = (sessionId, prompt) => ({
+    async streamChat() { throw new Error('unused'); },
+    async streamChatWithTools(_m, options, onEvent) {
+      try {
+        await options.executeTool({ id: 'call-1', name: 'send_follow_up', arguments: { sessionId, prompt } });
+      } catch (err) {
+        errors.push(err.message);
+      }
+      onEvent('done', {});
+    },
+  });
+  const toolResults = () => errors;
+  beforeEach(() => { errors.length = 0; });
+
+  async function ordinaryTurn(stores, deps, extra = {}) {
+    const events = [];
+    await runAgentTurn({
+      workspace: { urlKey: URL_KEY },
+      turnKind: 'user-initiated',
+      message: 'please follow up',
+      apiKey: 'sk-test',
+      onEvent: (t, d) => events.push([t, d]),
+      ...extra,
+      deps,
+    });
+    return events;
+  }
+
+  test('a non-owner guard refuses: nothing enqueued, the model sees the coded refusal', async () => {
+    const stores = makeSessionStores();
+    const seen = [];
+    const guard = async ({ target }) => {
+      seen.push(target);
+      return { code: 'RUNNER_ENQUEUE_OWNER_ONLY', status: 403, retryable: false, error: "Only this workspace's owner can queue work for its runner." };
+    };
+    const events = await ordinaryTurn(stores, {
+      ...turnDeps(stores, { chatClient: guardedClient('sess-run', 'do the next thing') }),
+      enqueueGuard: guard,
+    });
+    assert.strictEqual(stores.addItemCalls.length, 0, 'nothing enqueued');
+    assert.deepEqual(seen, ['cli'], 'the guard is asked about the anchor target');
+    assert.match(JSON.stringify(toolResults()), /send_follow_up refused \(RUNNER_ENQUEUE_OWNER_ONLY\)/);
+  });
+
+  test('an owner guard lets the follow-up through', async () => {
+    const stores = makeSessionStores();
+    await ordinaryTurn(stores, {
+      ...turnDeps(stores, { chatClient: followUpClient('sess-run', 'do the next thing') }),
+      enqueueGuard: async () => null,
+    });
+    assert.strictEqual(stores.addItemCalls.length, 1);
+  });
+
+  test('a transient (retryable) refusal relays retry copy, never the owner-only text', async () => {
+    const stores = makeSessionStores();
+    const events = await ordinaryTurn(stores, {
+      ...turnDeps(stores, { chatClient: guardedClient('sess-run', 'do the next thing') }),
+      enqueueGuard: async () => ({ code: 'OWNER_CHECK_UNAVAILABLE', status: 503, retryable: true, error: 'Owner verification is temporarily unavailable' }),
+    });
+    assert.strictEqual(stores.addItemCalls.length, 0);
+    assert.match(JSON.stringify(toolResults()), /send_follow_up refused \(OWNER_CHECK_UNAVAILABLE\): retry once shortly/);
+  });
+
+  test('execute mode with NO guard wired fails closed', async () => {
+    const stores = makeSessionStores();
+    const deps = turnDeps(stores, { chatClient: guardedClient('sess-run', 'do the next thing') });
+    delete deps.enqueueGuard;
+    const events = await ordinaryTurn(stores, deps);
+    assert.strictEqual(stores.addItemCalls.length, 0);
+    assert.match(JSON.stringify(toolResults()), /send_follow_up refused \(OWNER_CHECK_UNAVAILABLE\)/);
+  });
+
+  test('propose mode (run-scoped / auto-wake) never consults the guard and needs none', async () => {
+    const stores = makeSessionStores();
+    const proposals = [];
+    let consulted = 0;
+    const deps = {
+      ...turnDeps(stores, { chatClient: followUpClient('sess-run', 'do the next thing') }),
+      enqueueGuard: async () => { consulted++; return { code: 'RUNNER_ENQUEUE_OWNER_ONLY', status: 403, retryable: false, error: 'x' }; },
+    };
+    await ordinaryTurn(stores, deps, { followUpMode: 'propose', onProposal: (p) => proposals.push(p) });
+    assert.strictEqual(proposals.length, 1);
+    assert.strictEqual(consulted, 0);
+    assert.strictEqual(stores.addItemCalls.length, 0);
+
+    const bare = turnDeps(stores, { chatClient: followUpClient('sess-run', 'do the next thing') });
+    delete bare.enqueueGuard;
+    const more = [];
+    await ordinaryTurn(stores, bare, { followUpMode: 'propose', onProposal: (p) => more.push(p) });
+    assert.strictEqual(more.length, 1, 'propose works with no guard at all');
   });
 });

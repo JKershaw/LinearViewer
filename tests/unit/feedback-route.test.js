@@ -70,7 +70,7 @@ function fakeProxyTokenStore(token = 'minted-rw-token') {
   };
 }
 
-function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore, workspacePreferencesStore: wsPrefs, freeTierStore, accountStore = null } = {}) {
+function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features = {}, proxyTokenStore, workspacePreferencesStore: wsPrefs, freeTierStore, accountStore = null, ownerCheck } = {}) {
   registerProvider(provider);
   const app = express();
   // Mirror the production global JSON parser (250kb, application/json only) so
@@ -78,7 +78,7 @@ function buildApp({ provider, dispatchQueueStore, token = 'ws-token', features =
   app.use(express.json({ limit: '250kb' }));
   const router = createWorkspaceApiRoutes({
     // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
-    workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    workspaceOwnerCheck: ownerCheck === undefined ? (async () => ({ status: 'owner' })) : ownerCheck,
     workspaceFromUrl: (req, res, next) => {
       req.workspace = { urlKey: req.params.urlKey, provider: PROVIDER_NAME, accessToken: token };
       req.session = { accountId: 'u1', linearUserId: 'user-1', features };
@@ -922,5 +922,76 @@ describe('feedback submit — free-tier run limit (LIN-3238 Q10)', () => {
     assert.strictEqual(status, 201, JSON.stringify(body));
     assert.strictEqual(dispatch.items.length, 1, 'a non-free-tier run launches');
     assert.strictEqual(body.autopilot, undefined, 'no refusal key on a successful launch');
+  });
+});
+
+// LIN-3383 — both lanes enqueue a cli row on the owner's runner, so only the
+// workspace owner may start one. A non-owner's feedback still files.
+describe('feedback submit — owner-only lanes (LIN-3383)', () => {
+  let savedTeamEnv;
+  beforeEach(() => { savedTeamEnv = process.env.FEEDBACK_TEAM_ID; delete process.env.FEEDBACK_TEAM_ID; });
+  afterEach(() => { if (savedTeamEnv === undefined) delete process.env.FEEDBACK_TEAM_ID; else process.env.FEEDBACK_TEAM_ID = savedTeamEnv; });
+
+  const notOwner = async () => ({ status: 'not-owner' });
+  const REFUSED = { launched: false, code: 'RUNNER_ENQUEUE_OWNER_ONLY', retryable: false, message: "Only this workspace's owner can queue work for its runner." };
+
+  for (const [lane, payload, features] of [
+    ['autopilot', { message: 'run it', action: 'autopilot' }, {}],
+    ['triage (explicit)', { message: 'triage it', action: 'triage' }, {}],
+    ['triage (legacy flag send)', { message: 'triage it' }, { feedbackTriage: true }]
+  ]) {
+    test(`a non-owner's ${lane} feedback still files; the lane is refused and nothing is enqueued or minted`, async () => {
+      const { provider, calls } = makeFakeProvider();
+      const dispatch = capturingDispatchStore();
+      const proxyTokenStore = fakeProxyTokenStore();
+      const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore, features, ownerCheck: notOwner });
+
+      const { status, body } = await submit(app, 'acme', payload);
+
+      assert.strictEqual(status, 201);
+      assert.strictEqual(body.success, true);
+      assert.strictEqual(calls.createIssue.length, 1, 'the issue is filed');
+      assert.strictEqual(dispatch.items.length, 0, 'nothing enqueued');
+      assert.strictEqual(proxyTokenStore.calls.length + proxyTokenStore.grantCalls.length, 0, 'no token minted');
+      const key = lane.startsWith('autopilot') ? 'autopilot' : 'triage';
+      assert.deepEqual(body[key], REFUSED);
+    });
+  }
+
+  test("a plain 'save' (and a plain send with the flag off) reports no refusal and never consults the seam", async () => {
+    for (const payload of [{ message: 'just file it', action: 'save' }, { message: 'plain send' }]) {
+      const { provider, calls } = makeFakeProvider();
+      let consulted = 0;
+      const app = buildApp({ provider, dispatchQueueStore: capturingDispatchStore(), proxyTokenStore: fakeProxyTokenStore(), ownerCheck: async () => { consulted++; return { status: 'not-owner' }; } });
+      const { status, body } = await submit(app, 'acme', payload);
+      assert.strictEqual(status, 201);
+      assert.strictEqual(calls.createIssue.length, 1);
+      assert.strictEqual('triage' in body || 'autopilot' in body, false);
+      assert.strictEqual(consulted, 0);
+    }
+  });
+
+  test('an unwired seam fails closed on a lane (OWNER_CHECK_UNAVAILABLE, retryable), the issue still files', async () => {
+    const { provider, calls } = makeFakeProvider();
+    const dispatch = capturingDispatchStore();
+    const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore(), ownerCheck: null });
+    const { status, body } = await submit(app, 'acme', { message: 'run it', action: 'autopilot' });
+    assert.strictEqual(status, 201);
+    assert.strictEqual(calls.createIssue.length, 1);
+    assert.strictEqual(dispatch.items.length, 0);
+    assert.strictEqual(body.autopilot.code, 'OWNER_CHECK_UNAVAILABLE');
+    assert.strictEqual(body.autopilot.retryable, true);
+  });
+
+  test('the owner still enqueues both lanes', async () => {
+    for (const [action, kind] of [['autopilot', 'autopilot'], ['triage', undefined]]) {
+      const { provider } = makeFakeProvider();
+      const dispatch = capturingDispatchStore();
+      const app = buildApp({ provider, dispatchQueueStore: dispatch, proxyTokenStore: fakeProxyTokenStore() });
+      const { status } = await submit(app, 'acme', { message: 'go', action });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(dispatch.items.length, 1, action);
+      if (kind) assert.strictEqual(dispatch.items[0].item.kind, kind);
+    }
   });
 });

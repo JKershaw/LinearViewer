@@ -112,14 +112,14 @@ function createMockCollection() {
   };
 }
 
-function buildApp({ dispatchStore, runProposalsStore, proxyTokenStore }) {
+function buildApp({ dispatchStore, runProposalsStore, proxyTokenStore, ownerCheck }) {
   const app = express();
   app.use(express.json());
   app.use(createDashboardRoutes({
     // LIN-3383: owner-only runner enqueue — this fixture acts as the workspace owner.
-    workspaceOwnerCheck: async () => ({ status: 'owner' }),
+    workspaceOwnerCheck: ownerCheck === undefined ? (async () => ({ status: 'owner' })) : ownerCheck,
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: URL_KEY };
+      req.workspace = { urlKey: URL_KEY, id: 'ws-acme' };
       req.session = { accountId: 'u1', features: {}, workspaces: [{ urlKey: URL_KEY, name: 'Acme' }] };
       next();
     },
@@ -305,6 +305,49 @@ describe('LIN-3254 — run proposal Apply', () => {
     assert.strictEqual(addItemCalls.length, 0);
     assert.strictEqual(applyCalls, 0, 'the cross-workspace run is refused before the proposal is claimed');
     assert.strictEqual((await runProposalsStore.get(URL_KEY, OTHER_RUN_ID, proposal.id)).status, 'proposed');
+  });
+});
+
+describe('LIN-3383 — Apply is owner-only, refused before the CAS claim', () => {
+  async function applyAs(ownerCheck) {
+    const { store: dispatchStore, addItemCalls } = makeDispatchStore([historyRow()]);
+    const runProposalsStore = new RunProposalsStore({ collection: createMockCollection() });
+    const proposal = await runProposalsStore.create({ urlKey: URL_KEY, runId: RUN_ID, prompt: 'do the next thing' });
+    const originalApply = runProposalsStore.apply.bind(runProposalsStore);
+    let applyCalls = 0;
+    runProposalsStore.apply = async (...args) => { applyCalls++; return originalApply(...args); };
+    const res = await post(buildApp({ dispatchStore, runProposalsStore, ownerCheck }), proposalPath(RUN_ID, proposal.id, 'apply'));
+    const row = await runProposalsStore.get(URL_KEY, RUN_ID, proposal.id);
+    return { res, addItemCalls, applyCalls, row };
+  }
+
+  test('a non-owner is refused 403 RUNNER_ENQUEUE_OWNER_ONLY: applyCalls === 0, nothing enqueued, still proposed', async () => {
+    const seen = [];
+    const { res, addItemCalls, applyCalls, row } = await applyAs(async (a) => { seen.push(a); return { status: 'not-owner' }; });
+    assert.strictEqual(res.status, 403);
+    assert.strictEqual(res.body.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    assert.strictEqual(res.body.error, "Only this workspace's owner can queue work for its runner.");
+    assert.strictEqual(applyCalls, 0, 'refused before the proposal is claimed (never flips to applied)');
+    assert.strictEqual(addItemCalls.length, 0);
+    assert.strictEqual(row.status, 'proposed');
+    assert.deepEqual(seen, [{ workspaceId: 'ws-acme', accountId: 'u1' }]);
+  });
+
+  test('an absent owner seam fails closed (503 OWNER_CHECK_UNAVAILABLE), claiming and enqueuing nothing', async () => {
+    const { res, addItemCalls, applyCalls, row } = await applyAs(null);
+    assert.strictEqual(res.status, 503);
+    assert.strictEqual(res.body.code, 'OWNER_CHECK_UNAVAILABLE');
+    assert.strictEqual(applyCalls, 0);
+    assert.strictEqual(addItemCalls.length, 0);
+    assert.strictEqual(row.status, 'proposed');
+  });
+
+  test('the owner still applies: claimed once, enqueued once', async () => {
+    const { res, addItemCalls, applyCalls, row } = await applyAs(async () => ({ status: 'owner' }));
+    assert.strictEqual(res.status, 200, JSON.stringify(res.body));
+    assert.strictEqual(applyCalls, 1);
+    assert.strictEqual(addItemCalls.length, 1);
+    assert.strictEqual(row.status, 'applied');
   });
 });
 
