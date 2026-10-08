@@ -30,7 +30,7 @@ const ISSUE_UUID = '11111111-2222-3333-4444-555555555555';
 const PR_URL = 'https://github.com/acme/app/pull/41';
 
 /** A tracker context in `fetchRecommendationContext`'s canonical shape. */
-function ctxFor(identifier, { stateType = 'started', stateName = 'In Progress', comments = [] } = {}) {
+function ctxFor(identifier, { stateType = 'started', stateName = 'In Progress', comments = [], description = null } = {}) {
   return {
     issue: {
       id: ISSUE_UUID,
@@ -40,6 +40,7 @@ function ctxFor(identifier, { stateType = 'started', stateName = 'In Progress', 
       state: { name: stateName, type: stateType },
       labels: ['frontend'],
       blockedBy: [{ identifier: 'LIN-1', title: 'Lift helpers', state: { name: 'Done', type: 'completed' } }],
+      description,
       createdAt: '2026-10-01T09:00:00.000Z',
       updatedAt: '2026-10-06T10:00:00.000Z',
     },
@@ -108,11 +109,11 @@ function done(over = {}) {
   return loop({ terminalStatus: 'done', terminalCompletedAt: '2026-10-06T11:00:00.000Z', feedback: [{ message: '[done] landed it', timestamp: '2026-10-06T11:00:00.000Z' }], ...over });
 }
 
-function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, evidence = undefined, prStateStore = null } = {}) {
+function loaderWith({ loops = [], brief = null, recap = null, getLoops = null, evidence = undefined, prStateStore = null, dispatchStore = {} } = {}) {
   const briefSpy = cacheSpy(brief);
   const recapSpy = cacheSpy(recap);
   const loader = createTaskPageLoader({
-    dispatchStore: {},
+    dispatchStore,
     agentStatusStore: {},
     briefCacheStore: briefSpy.store,
     recapCacheStore: recapSpy.store,
@@ -305,6 +306,9 @@ describe('deriveHeader: one row per branch, in order done → waiting → runnin
     ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'running', 'Review queued, waiting for a worker.'],
     ['idle after a session', { sessions: [s('failed', 'review')], waiting: noWait, tracker: tracker('started') }, 'idle', 'No session running. Last: Review failed 6 Oct, 13:30 UTC.'],
     ['idle, nothing yet', { sessions: [], waiting: noWait, tracker: tracker('unstarted') }, 'idle', 'No sessions yet.'],
+    ['ready PR with nothing running: waiting on the person', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'waiting', 'Approved. PR #41 is ready to merge.'],
+    ['a running session beats ready', { sessions: [s('done', 'review'), s('running', 'close-out')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'ready', pr: { number: 41 } } }, 'running', 'Close-out running since 6 Oct, 14:02 UTC.'],
+    ['a not-ready close-out stays idle', { sessions: [s('done', 'review')], waiting: noWait, tracker: tracker('started'), closeOut: { status: 'not-ready', pr: { number: 41 } } }, 'idle', 'No session running. Last: Review done 6 Oct, 13:30 UTC.'],
     ['tracker not read (the state endpoint): never done, no suffix', { sessions: [s('done', 'close-out')], waiting: noWait, tracker: null }, 'idle', 'No session running. Last: Close-out done 6 Oct, 13:30 UTC.'],
     ['unknown kind falls back to stepKindWord', { sessions: [s('running', 'brand-new-kind')], waiting: noWait, tracker: null }, 'running', 'Brand-new-kind running since 6 Oct, 14:02 UTC.'],
   ];
@@ -339,13 +343,16 @@ describe('session rows', () => {
     assert.equal(followed.status, 'idle', 'a replied-to block never drives the header');
   });
 
-  test('evidence is hosted once, by the newest implementation/review/close-out row', () => {
+  test('evidence is task-level on the model; no session hosts an evidence slot', () => {
     const model = buildTaskPageModel({
       identifier: 'LIN-50',
       loops: [done({ loopId: 'p', kind: 'plan' }), done({ loopId: 'i', kind: 'implementation' }), done({ loopId: 'r', kind: 'review' }), done({ loopId: 'w', kind: 'wake' })],
+      ctx: ctxFor('LIN-50'),
+      evidence: { state: { status: 'ready', pr: { url: 'https://github.com/a/b/pull/1' } } },
       enrichLoop, deriveSessionWaiting, now: NOW,
     });
-    assert.deepEqual(model.sessions.filter(s => s.evidenceHost).map(s => s.loopId), ['r']);
+    assert.equal(model.evidence.state.pr.url, 'https://github.com/a/b/pull/1');
+    assert.deepEqual(model.sessions.filter(s => 'evidenceHost' in s), [], 'no session carries the old slot flag');
   });
 
   test('[evidence] links are http(s) only', () => {
@@ -355,6 +362,64 @@ describe('session rows', () => {
       enrichLoop, deriveSessionWaiting, now: NOW,
     });
     assert.deepEqual(model.sessions[0].links, [{ url: 'https://example.com/pr/1', label: 'PR' }]);
+  });
+});
+
+describe('description and comments (LIN-3340)', () => {
+  test('the model carries description and comments with both author shapes', () => {
+    const comments = [
+      { body: 'Linear shape', user: { name: 'Ada' }, createdAt: '2026-10-05T09:00:00.000Z' },
+      { body: 'GitHub/Jira shape', user: 'Bob', createdAt: '2026-10-06T09:00:00.000Z' },
+      { body: '', user: 'nobody' },
+    ];
+    const model = buildTaskPageModel({
+      identifier: 'LIN-50',
+      loops: [done()],
+      ctx: ctxFor('LIN-50', { comments, description: 'The **description**.' }),
+      enrichLoop, deriveSessionWaiting, now: NOW,
+    });
+    assert.equal(model.description, 'The **description**.');
+    assert.deepEqual(model.comments, [
+      { body: 'Linear shape', author: 'Ada', createdAt: '2026-10-05T09:00:00.000Z' },
+      { body: 'GitHub/Jira shape', author: 'Bob', createdAt: '2026-10-06T09:00:00.000Z' },
+    ], 'the body-less comment is dropped');
+  });
+
+  test('no description and no comments is null/empty, not an error', () => {
+    const model = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxFor('LIN-50'), enrichLoop, deriveSessionWaiting, now: NOW });
+    assert.equal(model.description, null);
+    assert.deepEqual(model.comments, []);
+  });
+});
+
+describe('the loader forwards the run facts the box consumes (LIN-3340)', () => {
+  test('owner load passes viewerIsOwner, stopAt, variant and runnerReady to readRunEvidence', async () => {
+    const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
+    const seen = [];
+    const stopAtRow = { kind: 'autopilot', stopAt: 'pr', variant: 'standard' };
+    const dispatchStore = { async listItems() { return [stopAtRow]; }, async listHistory() { return { items: [] }; } };
+    const { loader } = loaderWith({
+      loops: [done()],
+      dispatchStore,
+      evidence: async (args) => { seen.push(args); return { closeOut: {} }; },
+    });
+    await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' }, viewerIsOwner: true, runnerReady: true });
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0].viewerIsOwner, true);
+    assert.equal(seen[0].runnerReady, true);
+    assert.equal(seen[0].stopAt, 'pr');
+    assert.equal(seen[0].variant, 'standard');
+  });
+
+  test('guest load passes neither ownership nor runner readiness (defaults false)', async () => {
+    const { provider } = spyProvider({ ctx: ctxFor('LIN-50') });
+    const seen = [];
+    const { loader } = loaderWith({ loops: [done()], evidence: async (args) => { seen.push(args); return null; } });
+    await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-50', access: { provider, callScope: 'tok' } });
+    assert.equal(seen[0].viewerIsOwner, false);
+    assert.equal(seen[0].runnerReady, false);
+    assert.equal(seen[0].stopAt, null);
+    assert.equal(seen[0].variant, 'unknown');
   });
 });
 

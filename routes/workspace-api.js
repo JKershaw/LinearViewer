@@ -56,7 +56,8 @@ import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
 import { readPrStatusFailOpen } from '../lib/github-pr-status.js';
 import { readRunLedger } from '../lib/run-ledger.js';
-import { deriveCloseOutState, closeOutSetsDone, listRows } from '../lib/run-closeout-state.js';
+import { deriveCloseOutState, closeOutSetsDone } from '../lib/run-closeout-state.js';
+import { readTaskRunFacts } from '../lib/task-run-facts.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
@@ -4423,18 +4424,14 @@ ${goal}`
     return counts;
   }
 
-  // Is the task's run a stop-at-PR run? The run row is the autopilot kickoff
-  // whose `issueIdentifier` matches; `stopAt: 'pr'` is the boundary P1a landed.
-  // A finished run's row lives in history only, and `listHistory` returns
-  // `{ items, total }` — `listRows` normalizes both shapes (F3). Fail-open to
-  // null (a run without the fact behaves as today).
+  // Is the task's run a stop-at-PR run? Keyed by TASK (LIN-3340): the shared
+  // reader checks the task's own rows and, for a subtask worked under a parent's
+  // stop-at run, hops through each row's `sessionId` to the parent run row — the
+  // same read the dispatch guard makes. `lib/task-run-facts.js`; this keeps the
+  // check route's Done path and the guard on one definition.
   async function defaultIsStopAtRun({ urlKey, issueIdentifier }) {
-    const has = async (fn) => { try { return await fn(); } catch { return null; } };
-    const queue = listRows(await has(() => dispatchQueueStore?.listItems?.(urlKey, { issueIdentifier })));
-    if (queue.some(row => row && row.stopAt === 'pr')) return 'pr';
-    const history = listRows(await has(() => dispatchQueueStore?.listHistory?.(urlKey, { issueIdentifier })));
-    if (history.some(row => row && row.stopAt === 'pr')) return 'pr';
-    return null;
+    const { stopAt } = await readTaskRunFacts({ store: dispatchQueueStore, urlKey, issueIdentifier });
+    return stopAt;
   }
 
   // Set the tracker issue Done. Resolves the issue's team, its completed

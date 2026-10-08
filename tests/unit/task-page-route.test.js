@@ -121,7 +121,7 @@ describe('GET /workspace/:urlKey/task/:identifier', () => {
     assert.match(res.body, /data-testid="task-page"/);
     assert.match(res.body, /data-testid="task-page-title">Build the task page</);
     assert.match(res.body, /data-state-url="\/workspace\/acme\/api\/task\/LIN-50\/state\?issueId=11111111-2222-3333-4444-555555555555"/);
-    assert.match(res.body, /data-testid="task-page-ask-update"/, 'the owner controls render');
+    assert.match(res.body, /data-testid="task-page-owner-widgets"/, 'the owner controls render');
     assert.deepEqual(calls.filter(c => c !== 'fetchProjects'), ['fetchRecommendationContext']);
   });
 
@@ -173,12 +173,13 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     const res = await call(makeRouter(makeLoader()), STATE, { provider: name, params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
     assert.equal(res.statusCode, 200);
     assert.deepEqual(calls, [], 'the state endpoint never touches the provider');
-    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['contextHtml', 'headerHtml', 'live', 'status', 'trackHtml']);
+    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['contextHtml', 'contextSig', 'headerHtml', 'live', 'status', 'trackHtml']);
     assert.equal(res.jsonBody.status, 'running');
     assert.equal(res.jsonBody.live, true);
     assert.match(res.jsonBody.headerHtml, /data-testid="task-page-status"/);
     assert.match(res.jsonBody.trackHtml, /data-loop-id="l1"/);
-    assert.doesNotMatch(res.jsonBody.contextHtml, /task-page-ask/, 'viewer-blind: no owner control is re-sent');
+    assert.equal(typeof res.jsonBody.contextSig, 'string');
+    assert.doesNotMatch(res.jsonBody.contextHtml, /task-page-ask|task-page-owner-widgets/, 'viewer-blind: no owner control is re-sent');
     assert.equal(res.headers['Cache-Control'], 'no-store');
   });
 

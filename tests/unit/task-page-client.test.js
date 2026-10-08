@@ -196,7 +196,47 @@ describe('createPoller', () => {
   });
 });
 
-// LIN-3330 review, ledger 2: only a guest share URL may report "gone".
+// LIN-3340: the poll must not wipe the load-time ready header, and a guest's
+// client-side markdown must survive an unchanged brief.
+describe('poll safety (LIN-3340)', () => {
+  const { shouldKeepReady, contextNeedsRepaint } = load();
+
+  test('the ready-to-merge header is kept only across an idle poll', () => {
+    assert.equal(shouldKeepReady('true', 'idle'), true);
+    assert.equal(shouldKeepReady('true', 'running'), false, 'a started close-out overrides');
+    assert.equal(shouldKeepReady('true', 'waiting'), false);
+    assert.equal(shouldKeepReady('false', 'idle'), false);
+    assert.equal(shouldKeepReady(null, 'idle'), false);
+  });
+
+  test('the context mount repaints only on a changed signature, and never once widgets mount', () => {
+    assert.equal(contextNeedsRepaint(undefined, 'abc', false), true, 'no sig: repaint');
+    assert.equal(contextNeedsRepaint('abc', 'abc', false), false, 'unchanged brief is not repainted');
+    assert.equal(contextNeedsRepaint('def', 'abc', false), true, 'changed brief is repainted');
+    assert.equal(contextNeedsRepaint('def', 'abc', true), false, 'the owner widgets own their refresh');
+  });
+
+  test('a guest brief `<pre>` is upgraded to markdown and the upgrade is idempotent', () => {
+    const module = { exports: {} };
+    const document = { createElement: () => ({ className: '', innerHTML: '' }) };
+    const window = { renderMarkdown: (t) => `<p>${t}</p>` };
+    vm.runInNewContext(SRC, { module, window, document, Set, Math, Promise, Date, String, isNaN, Array });
+    const { enhanceContextMarkdown } = module.exports;
+
+    const pre = { textContent: 'A **brief**', parentNode: null, replacedWith: null };
+    const parent = { replaceChild(div, old) { this.child = div; this.replaced = old; } };
+    pre.parentNode = parent;
+    let present = [pre];
+    const mount = { querySelectorAll: (sel) => (sel === 'pre.sess-ctx-body' ? (present = present.filter(p => p !== parent.replaced && p)) : []) };
+    parent.replaceChild = function (div, old) { this.child = div; this.replaced = old; present = []; };
+
+    enhanceContextMarkdown(mount);
+    assert.equal(parent.child.innerHTML, '<p>A **brief**</p>', 'markdown rendered');
+    assert.equal(parent.replaced, pre, 'the <pre> was replaced');
+    enhanceContextMarkdown(mount); // no pre left — a no-op
+    assert.equal(parent.child.innerHTML, '<p>A **brief**</p>');
+  });
+});
 describe('isGuestStateUrl (the onGone gate)', () => {
   const { isGuestStateUrl } = load();
 

@@ -186,8 +186,9 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
     await step(page, 'plan').locator('[data-testid="session-run-toggle"]').click();
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/);
-    // The task's evidence (from the tracker's review comment) sits in the build row.
-    const evidence = step(page, 'implementation').locator('[data-testid="task-page-evidence"] [data-testid="run-evidence"]');
+    // The task's evidence (from the tracker's review comment) sits in the
+    // Pull request section, outside every repainted mount (LIN-3340).
+    const evidence = page.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]');
     await expect(evidence).toHaveCount(1);
 
     // The build finishes; the next poll (forced as the tab-return catch-up)
@@ -198,20 +199,25 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(step(page, 'implementation').locator('[data-testid="task-page-step-summary"]')).toContainText('done');
     await expect(step(page, 'plan')).toHaveClass(/sess-run--expanded/, { timeout: 1000 });
     await expect(step(page, 'implementation')).toHaveClass(/sess-run--expanded/);
-    // The state endpoint can't read evidence (it needs the tracker); the client
-    // carried the page's evidence into the repainted row.
+    // The Pull request section lives outside every repainted mount, so a poll
+    // can never touch the evidence (LIN-3340).
     await expect(evidence).toHaveCount(1, { timeout: 1000 });
     await expect(evidence.locator('[data-testid="run-evidence-checked-review-verdict"]')).toContainText('Approve');
 
     // The page only ever polled its stored-data state endpoint, plus the
-    // one-time owner share list load — no AI read.
+    // one-time owner share list load and the owner widgets' one status GET each
+    // (LIN-3340 G2). A poll adds nothing; opening the widgets spends no AI.
     expect(stateRequests.length).toBeGreaterThan(0);
     const stateUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/state`;
     const sharesUrl = `/workspace/${URL_KEY}/api/task/LOCAL-TP1/shares`;
+    const briefUrl = `/workspace/${URL_KEY}/api/brief/LOCAL-TP1`;
+    const recapUrl = `/workspace/${URL_KEY}/api/recap/LOCAL-TP1`;
     expect(stateRequests).toContain(stateUrl);
     for (const path of stateRequests) {
-      expect([stateUrl, sharesUrl], `unexpected task-page request: ${path}`).toContain(path);
+      expect([stateUrl, sharesUrl, briefUrl, recapUrl], `unexpected task-page request: ${path}`).toContain(path);
     }
+    expect(stateRequests.filter(p => p === briefUrl).length, 'one brief GET on mount').toBe(1);
+    expect(stateRequests.filter(p => p === recapUrl).length, 'one recap GET on mount').toBe(1);
   });
 
   test('no stored-only page; unknown and signed-out', async ({ page, browser }) => {
@@ -257,8 +263,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
       '[data-kind="implementation"] [data-testid="task-page-step-message"]',
       '.task-guesses-label',
       '[data-testid="task-page-guess"]',
-      '[data-testid="task-page-ask-brief"]',
-      '[data-testid="session-brief-generate"]',
+      '[data-testid="task-page-description"] .disclosure__label',
+      '.brief-placeholder',
       '[data-testid="task-page-back"]',
       '.task-details .disclosure__label',
     ];
@@ -349,5 +355,94 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     // Not the BINDING_REQUIRED JSON body: the real task page, resolved through
     // the issue's own (Jira, connection-backed) binding.
     await expect(page.locator('[data-testid="task-page-title"]')).toHaveText('Jira task to do');
+  });
+
+  // LIN-3340: the task page is the person's page — the PR with its evidence, the
+  // merge click from the task's own data, and a guest who sees everything but
+  // cannot trigger anything.
+  test('the PR section: evidence, ready header and merge click for the owner; a guest sees evidence but no box', async ({ page, browser }) => {
+    await page.request.get('/test/clear-pr-status');
+    const id = (raw) => localSeedId(URL_KEY, raw);
+    const PR_URL = 'https://github.com/acme/app/pull/41';
+    // A UUID issue id (not the seeded slug): the dispatch route validates
+    // `issueId` as a UUID, and this test presses the real dispatch.
+    const TASK_UUID = '11111111-2222-3333-4444-555555555555';
+    const resp = await page.request.post('/test/set-local-session', {
+      data: {
+        urlKey: URL_KEY,
+        // append:true gives this session's account a FRESH workspace id so its
+        // first edge marks it the owner (LIN-1892) — required to mint a share.
+        append: true,
+        features: { dispatch: true },
+        projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
+        issues: [{
+          id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A task with a running build',
+          description: 'The **task** description.', projectId: id('tp-proj'), sortOrder: 1,
+          state: { name: 'In Progress', type: 'started' }, url: `/workspace/${URL_KEY}/issue/${TASK_UUID}`,
+          comments: [
+            { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
+            { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+          ],
+        }],
+      },
+    });
+    expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+
+    // A stop-at-PR run keyed to the task, on its own row, plus an open PR whose
+    // review approved: the ready state. GitHub is stubbed via /test/seed-pr-status.
+    const token = await runnerToken(page);
+    const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'orchestrate', promptName: 'Autopilot (LOCAL-TP1)', kind: 'autopilot', issueIdentifier: 'LOCAL-TP1', issueTitle: 'A task with a running build', target: 'cli', stopAt: 'pr', variant: 'standard' },
+    });
+    expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+    const anchorId = (await anchor.json()).item.id;
+    await page.request.post(`/api/dispatch/take/${anchorId}`, { headers: { Authorization: `Bearer ${token}` } });
+    // The run finished: nothing is running, so the header can say "waiting on
+    // the person to merge".
+    await postFeedback(page, token, anchorId, '[done] orchestrated the run');
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: 'acme/app', number: 41, readable: true, state: 'open', merged: false, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    await expect(page.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('Harbour never merges on its own');
+    // The header says waiting on the person, and the page says it is merge-ready.
+    await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Approved. PR #41 is ready to merge.');
+    await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-merge-ready', 'true');
+    // The description and comments are visible (and markdown-upgraded).
+    await expect(page.locator('[data-testid="task-page-description"]')).toBeVisible();
+    await expect(page.locator('[data-testid="task-page-comments"]')).toContainText('Comments (2)');
+    await noHorizontalScroll(page);
+
+    // The 8 Oct witness: the merge click works from the task page, which has NO
+    // session reply box. It fetches the close-out prompt by the task's tracker
+    // UUID (carrying source) and dispatches the close-out — nothing silent.
+    const reqs = [];
+    page.on('request', (r) => {
+      const p = new URL(r.url()).pathname;
+      if (/\/api\/prompt\/.+\/close-out$/.test(p) || p.endsWith('/api/dispatch') || /\/close-out-press$/.test(p)) reqs.push(p);
+    });
+    await page.locator('[data-testid="run-evidence-closeout-press"]').click();
+    await expect.poll(() => reqs.some(p => /close-out-press$/.test(p)), { timeout: 10000 }).toBe(true);
+    expect(reqs.some(p => /\/api\/prompt\/.+\/close-out$/.test(p)), 'the press fetched the close-out prompt').toBe(true);
+    expect(reqs.some(p => p.endsWith('/api/dispatch')), 'the press dispatched the close-out').toBe(true);
+
+    // A guest sees the evidence and the text, but no box and no widgets.
+    const minted = await page.request.post(`/workspace/${URL_KEY}/api/task/LOCAL-TP1/share`, { data: { source: 'local' } });
+    expect(minted.status(), `mint failed: ${await minted.text()}`).toBe(201);
+    const { path } = await minted.json();
+    const guestCtx = await browser.newContext({ viewport: PHONE });
+    const guest = await guestCtx.newPage();
+    const origin = new URL(page.url()).origin;
+    await guest.goto(`${origin}${path}`);
+    await expect(guest.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeVisible();
+    await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
+    await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
+    await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(1);
+    await guestCtx.close();
+    await page.request.get('/test/clear-pr-status');
   });
 });
