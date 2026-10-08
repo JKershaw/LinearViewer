@@ -452,6 +452,7 @@ def main():
     ap.add_argument('--since', default='2026-06-01')
     ap.add_argument('--window', type=int, default=15, help='±lines around a site that count as touching it')
     ap.add_argument('--file-sites', action='store_true', help='sensitivity: one site per file (all matches in a file merge)')
+    ap.add_argument('--exclude-twins', default='', help='comma-separated 0-based indexes into codes.json admissions.twins to leave out (round 2 final run: 1,3,20,32, the four the second reading rejected)')
     ap.add_argument('--readings', help='JSON {"<firstPr>|<decision>|<laterPr>": {"reading": "sibling-fix|unrelated|unclear", "note": "..."}}')
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
@@ -462,7 +463,10 @@ def main():
     decisions = census['decisions']
     codes = json.load(open(CODES))['admissions']
     twins = []
+    excluded = {int(x) for x in args.exclude_twins.split(',') if x.strip()}
     for i, tw in enumerate(codes['twins']):
+        if i in excluded:
+            continue
         t = dict(TWINS[i])
         t['name'] = 'twin: ' + tw['decision']
         t['firstDeclared'] = tw['firstDeclared']

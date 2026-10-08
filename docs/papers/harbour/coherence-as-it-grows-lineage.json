@@ -1,0 +1,4042 @@
+{
+"about": "Lineage of four multi-site decisions (birth, each new site, touches, fixes and complaints, helpers) from coherence-as-it-grows-scripts/lineage.py at d61903f3, 2026-10-08; ticket attribution from merge subjects, inner commits where the merge has none (estimates marked in the notes).",
+"ground": "d61903f3",
+"generated": "2026-10-08",
+"patterns": "Patterns (all run as `git grep -nE <re> <sha> -- server.js lib routes public`, classified in `classify()`):\n\n- D1 Tolerant timestamp parse: `^\\s*function (toMillis|toMs|_epoch)\\(` in server.js, lib/, routes/, public/ (public/*.min.js excluded as vendored). Given by the brief.\n- D2 Page-shell option bag: `deployInfo: getDeployInfo\\(\\)` in routes/ only (14 at ground). server.js carries the same literal (8 at ground, first 2026-02-08) and is reported separately, not counted. Given by the brief.\n- D3 Hand-rolled workspace lookup \u2014 derived from the review's own command `grep -rn \"urlKey === urlKey\" lib/ routes/ server.js`: `urlKey === urlKey` in lib/, routes/, server.js, minus comment lines and minus the canonical helper body (`session.workspaces.find` in lib/workspace.js). Reproduces the review's 16 at 292ac962 and 17 at b5c528c4 exactly. The 06-25 edition's \"4\" counted only the renderer `getProviderForWorkspace(workspaces?.find(w => w.urlKey === urlKey))` incantation; this pattern gives 9 at d9c51da (navbar 2, render.js 2, render-roadmap 1, server.js 1 extra).\n- D4 Inline error envelope \u2014 the review's stated command `grep -rnE \"res\\.status\\(4[0-9][0-9]\\)|res\\.status\\(5[0-9][0-9]\\)\" routes/*.js server.js | grep \"\\.json(\" | grep -v routes/test.js`: `res\\.status\\([45][0-9][0-9]\\)` and `.json(` on the same line, in routes/*.js (no subdirectories) + server.js, routes/test.js excluded. Reproduces the review's 76 at 292ac962 and 87 at b5c528c4 exactly.\n\nMethod: first-parent walk of d61903f3 (1,824 commits, 2026-01-04 \u2192 2026-10-08), one `git grep` per commit; a \"site\" event is a per-file count increase between consecutive first-parent snapshots (a per-snapshot diff, equivalent to `git log --first-parent -S` but file-attributed); a \"touch\" is a first-parent commit since 2026-06-01 whose `git diff -U0 parent..commit` hunks overlap \u00b115 lines of a site that existed in the parent. Tickets come from the merge subject (`LIN-\\d+`); when the subject carries none, the inner commits of the merged branch were read by hand (D1 birth #291 \u2192 LIN-299; #958 \u2192 LIN-1436). Fixes/complaints: regex scan of results/A/input.json (title, description, reason, comments), results/C/input.json send-back bodies and data/tracker-merged.json (title, description); each match hand-classified direct/incidental from its context. Review-edition rows were read from docs/reviews/drift-coherence-review-*.md.\n\nReproduce: `python3 -I lineage.py --repo /home/user/LinearViewer --ground d61903f3 --out <this dir> --defects results/A/input.json --sendbacks results/C/input.json --tracker data/tracker-merged.json` (\u22483 min; writes lineage.json, snapshots.json, lineage.md = narratives.md + this table).",
+"decisions": {
+"D1": {
+"name": "Tolerant timestamp parse",
+"events": [
+{
+"kind": "birth",
+"date": "2026-05-29",
+"sha": "d433a2ba",
+"ticket": null,
+"pr": 291,
+"file": "lib/report-history-store.js",
+"note": "+1 site(s) in lib/report-history-store.js; total 0\u21921"
+},
+{
+"kind": "site",
+"date": "2026-06-24",
+"sha": "90fc6ce5",
+"ticket": "LIN-598",
+"pr": 595,
+"file": "lib/task-snapshot-store.js",
+"note": "+1 site(s) in lib/task-snapshot-store.js; total 1\u21922"
+},
+{
+"kind": "site",
+"date": "2026-07-04",
+"sha": "5f4f51ba",
+"ticket": "LIN-1008",
+"pr": 797,
+"file": "lib/saved-chat-store.js",
+"note": "+1 site(s) in lib/saved-chat-store.js; total 2\u21923"
+},
+{
+"kind": "site",
+"date": "2026-07-05",
+"sha": "f81d6171",
+"ticket": "LIN-1048",
+"pr": 817,
+"file": "lib/collective-characters-store.js",
+"note": "+1 site(s) in lib/collective-characters-store.js; total 3\u21924"
+},
+{
+"kind": "site",
+"date": "2026-07-09",
+"sha": "1c28b8b9",
+"ticket": "LIN-818",
+"pr": 866,
+"file": "lib/ship-biscuit-history-store.js",
+"note": "+1 site(s) in lib/ship-biscuit-history-store.js; total 4\u21926"
+},
+{
+"kind": "site",
+"date": "2026-07-09",
+"sha": "1c28b8b9",
+"ticket": "LIN-818",
+"pr": 866,
+"file": "lib/ship-biscuit.js",
+"note": "+1 site(s) in lib/ship-biscuit.js; total 4\u21926"
+},
+{
+"kind": "site",
+"date": "2026-07-19",
+"sha": "5ec586fa",
+"ticket": null,
+"pr": 958,
+"file": "lib/live-console.js",
+"note": "+1 site(s) in lib/live-console.js; total 6\u21927"
+},
+{
+"kind": "site",
+"date": "2026-07-26",
+"sha": "952fb659",
+"ticket": "LIN-1586",
+"pr": 1017,
+"file": "lib/proxy-events.js",
+"note": "+1 site(s) in lib/proxy-events.js; total 7\u21928"
+},
+{
+"kind": "complaint",
+"date": "2026-08-01",
+"sha": null,
+"ticket": "LIN-1684",
+"file": null,
+"note": "code-review send-back names `toMillis`",
+"strength": "incidental"
+},
+{
+"kind": "site",
+"date": "2026-08-03",
+"sha": "fc319a32",
+"ticket": "LIN-1827",
+"pr": 1061,
+"file": "lib/periodical-runs.js",
+"note": "+1 site(s) in lib/periodical-runs.js; total 8\u21929"
+},
+{
+"kind": "site",
+"date": "2026-08-22",
+"sha": "7960bb48",
+"ticket": "LIN-2197",
+"pr": 1172,
+"file": "lib/task-decisions-store.js",
+"note": "+1 site(s) in lib/task-decisions-store.js; total 9\u219210"
+},
+{
+"kind": "touch",
+"date": "2026-08-22",
+"sha": "e968cf3a",
+"ticket": "LIN-2197",
+"pr": 1175,
+"file": "lib/task-decisions-store.js",
+"touched": 1,
+"existing": 10,
+"note": "touched 1 of 10 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-08-23",
+"sha": "0cc3fb85",
+"ticket": "LIN-2133",
+"pr": 1208,
+"file": "lib/observer-efficacy-signal.js",
+"note": "+1 site(s) in lib/observer-efficacy-signal.js; total 10\u219211"
+},
+{
+"kind": "site",
+"date": "2026-08-23",
+"sha": "93ed7ccd",
+"ticket": "LIN-1736",
+"pr": 1209,
+"file": "lib/escalation-kpis.js",
+"note": "+1 site(s) in lib/escalation-kpis.js; total 11\u219212"
+},
+{
+"kind": "site",
+"date": "2026-08-23",
+"sha": "0e8a1461",
+"ticket": "LIN-1727",
+"pr": 1213,
+"file": "lib/shelved-rulings-store.js",
+"note": "+1 site(s) in lib/shelved-rulings-store.js; total 12\u219213"
+},
+{
+"kind": "touch",
+"date": "2026-08-25",
+"sha": "50b568df",
+"ticket": "LIN-2263",
+"pr": 1247,
+"file": "lib/observer-efficacy-signal.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-27",
+"sha": "97803873",
+"ticket": "LIN-2310",
+"pr": 1267,
+"file": "lib/observer-efficacy-signal.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-08-28",
+"sha": null,
+"ticket": "LIN-2358",
+"file": null,
+"note": "defect row (escaped, found by agent): \"plan-review round-trips \u2014 computePlanReviewRoundTrips does not validate options.rulerChang\" \u2014 names `toMs(` in description",
+"strength": "direct"
+},
+{
+"kind": "touch",
+"date": "2026-09-05",
+"sha": "6be2857f",
+"ticket": "LIN-2241",
+"pr": 1384,
+"file": "lib/task-decisions-store.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-05",
+"sha": "dd3fa38b",
+"ticket": "LIN-2665",
+"pr": 1412,
+"file": "lib/task-decisions-store.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-10",
+"sha": "13912cf5",
+"ticket": "LIN-2650",
+"pr": 1428,
+"file": "lib/task-decisions-store.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-11",
+"sha": "5feeefd0",
+"ticket": "LIN-2756",
+"pr": 1437,
+"file": "lib/shelved-rulings-store.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-25",
+"sha": "7dafd8c1",
+"ticket": "LIN-2891",
+"pr": 1581,
+"file": "lib/observer-efficacy-signal.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-10-01",
+"sha": "d72b9036",
+"ticket": "LIN-3200",
+"pr": 1700,
+"file": "lib/file-pointer.js",
+"note": "+1 site(s) in lib/file-pointer.js; total 13\u219214"
+},
+{
+"kind": "site",
+"date": "2026-10-02",
+"sha": "f5c7d394",
+"ticket": "LIN-2942",
+"pr": 1711,
+"file": "lib/task-mode-store.js",
+"note": "+1 site(s) in lib/task-mode-store.js; total 14\u219215"
+},
+{
+"kind": "site",
+"date": "2026-10-02",
+"sha": "22ddd868",
+"ticket": "LIN-3250",
+"pr": 1717,
+"file": "lib/run-view.js",
+"note": "+1 site(s) in lib/run-view.js; total 15\u219216"
+},
+{
+"kind": "site",
+"date": "2026-10-02",
+"sha": "1d1dbc3c",
+"ticket": "LIN-3254",
+"pr": 1721,
+"file": "lib/run-proposals-store.js",
+"note": "+1 site(s) in lib/run-proposals-store.js; total 16\u219217"
+},
+{
+"kind": "site",
+"date": "2026-10-03",
+"sha": "325064ee",
+"ticket": "LIN-2952",
+"pr": 1713,
+"file": "lib/milestone-funnel.js",
+"note": "+1 site(s) in lib/milestone-funnel.js; total 17\u219218"
+},
+{
+"kind": "site",
+"date": "2026-10-05",
+"sha": "e655e73e",
+"ticket": "LIN-3312",
+"pr": 1754,
+"file": "lib/guest-run.js",
+"note": "+1 site(s) in lib/guest-run.js; total 18\u219219"
+},
+{
+"kind": "site",
+"date": "2026-10-05",
+"sha": "9db497f1",
+"ticket": "LIN-3313",
+"pr": 1755,
+"file": "lib/share-run-reader.js",
+"note": "+1 site(s) in lib/share-run-reader.js; total 19\u219220"
+},
+{
+"kind": "removal",
+"date": "2026-10-06",
+"sha": "dcfbf7fa",
+"ticket": "LIN-3325",
+"pr": 1759,
+"file": "lib/guest-run.js, lib/share-run-reader.js",
+"note": "\u22122 site(s); total 20\u219218"
+},
+{
+"kind": "touch",
+"date": "2026-10-06",
+"sha": "dcfbf7fa",
+"ticket": "LIN-3325",
+"pr": 1759,
+"file": "lib/guest-run.js, lib/share-run-reader.js",
+"touched": 2,
+"existing": 20,
+"note": "touched 2 of 20 existing site(s) within \u00b115 lines; count 20\u219218"
+}
+]
+},
+"D2": {
+"name": "Page-shell option bag (deployInfo: getDeployInfo())",
+"events": [
+{
+"kind": "helper",
+"date": "2026-01-18",
+"sha": "5a34977d",
+"ticket": null,
+"pr": 65,
+"file": "server.js",
+"note": "getDeployInfo() born in server.js (footer requirements); first `deployInfo: getDeployInfo()` in server.js 2026-02-08 c946d9cf (#145)"
+},
+{
+"kind": "birth",
+"date": "2026-06-13",
+"sha": "2b7ad939",
+"ticket": "LIN-450",
+"pr": 454,
+"file": "routes/collective.js",
+"note": "+1 site(s) in routes/collective.js; total 0\u21921"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "8d48dfe5",
+"ticket": "LIN-450",
+"pr": 456,
+"file": "routes/collective.js",
+"touched": 1,
+"existing": 1,
+"note": "touched 1 of 1 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-06-15",
+"sha": "0d319aa6",
+"ticket": null,
+"pr": 471,
+"file": "routes/task-chat.js",
+"note": "+1 site(s) in routes/task-chat.js; total 1\u21922"
+},
+{
+"kind": "site",
+"date": "2026-06-15",
+"sha": "03c7715a",
+"ticket": "LIN-509",
+"pr": 487,
+"file": "routes/dashboard.js",
+"note": "+1 site(s) in routes/dashboard.js; total 2\u21923"
+},
+{
+"kind": "touch",
+"date": "2026-06-22",
+"sha": "6017c664",
+"ticket": "LIN-595",
+"pr": 559,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 3,
+"note": "touched 1 of 3 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-06-24",
+"sha": "b0b4d99f",
+"ticket": "LIN-603",
+"pr": 599,
+"file": "routes/next-run.js",
+"note": "+1 site(s) in routes/next-run.js; total 3\u21924"
+},
+{
+"kind": "touch",
+"date": "2026-06-25",
+"sha": "18209f9e",
+"ticket": "LIN-640",
+"pr": 605,
+"file": "routes/next-run.js",
+"touched": 1,
+"existing": 4,
+"note": "touched 1 of 4 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-03",
+"sha": "574871b6",
+"ticket": "LIN-922",
+"pr": 760,
+"file": "routes/flight-companion.js",
+"note": "+1 site(s) in routes/flight-companion.js; total 4\u21925"
+},
+{
+"kind": "site",
+"date": "2026-07-04",
+"sha": "858c643c",
+"ticket": "LIN-1003",
+"pr": 792,
+"file": "routes/dashboard.js",
+"note": "+1 site(s) in routes/dashboard.js; total 5\u21926"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "858c643c",
+"ticket": "LIN-1003",
+"pr": 792,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 5,
+"note": "touched 1 of 5 existing site(s) within \u00b115 lines; count 5\u21926"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "5f4f51ba",
+"ticket": "LIN-1008",
+"pr": 797,
+"file": "routes/task-chat.js",
+"touched": 1,
+"existing": 6,
+"note": "touched 1 of 6 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "5e853d83",
+"ticket": "LIN-1021",
+"pr": 799,
+"file": "routes/dashboard.js",
+"touched": 2,
+"existing": 6,
+"note": "touched 2 of 6 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-05",
+"sha": "f81d6171",
+"ticket": "LIN-1048",
+"pr": 817,
+"file": "routes/collective.js",
+"touched": 1,
+"existing": 6,
+"note": "touched 1 of 6 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-06",
+"sha": "de23691b",
+"ticket": "LIN-1050",
+"pr": 827,
+"file": "routes/collective.js",
+"touched": 1,
+"existing": 6,
+"note": "touched 1 of 6 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-09",
+"sha": "1c28b8b9",
+"ticket": "LIN-818",
+"pr": 866,
+"file": "routes/ship-biscuit.js",
+"note": "+1 site(s) in routes/ship-biscuit.js; total 6\u21927"
+},
+{
+"kind": "touch",
+"date": "2026-07-11",
+"sha": "b65e515b",
+"ticket": "LIN-1258",
+"pr": 899,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 7,
+"note": "touched 1 of 7 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-11",
+"sha": "2f6d664c",
+"ticket": "LIN-1259",
+"pr": 901,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 7,
+"note": "touched 1 of 7 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-13",
+"sha": "1d446622",
+"ticket": "LIN-1314",
+"pr": 913,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 7,
+"note": "touched 1 of 7 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-16",
+"sha": "94d3fb9a",
+"ticket": "LIN-1353",
+"pr": 926,
+"file": "routes/task-chat.js",
+"touched": 1,
+"existing": 7,
+"note": "touched 1 of 7 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-07-17",
+"sha": null,
+"ticket": "LIN-1388",
+"file": null,
+"note": "tracker ticket \"5 deployInfo JSDoc sites still document the source as \"Heroku\"\" [Done; front:maintenance] names `deployInfo` in title",
+"strength": "direct"
+},
+{
+"kind": "helper",
+"date": "2026-07-17",
+"sha": "a7faf17a",
+"ticket": "LIN-1385",
+"pr": 940,
+"file": "lib/deploy-info.js",
+"note": "getDeployInfo() extracted to lib/deploy-info.js (footer blank after Railway migration); call sites untouched"
+},
+{
+"kind": "site",
+"date": "2026-07-19",
+"sha": "5ec586fa",
+"ticket": null,
+"pr": 958,
+"file": "routes/live-console.js",
+"note": "+1 site(s) in routes/live-console.js; total 7\u21928"
+},
+{
+"kind": "touch",
+"date": "2026-07-23",
+"sha": "3341d00b",
+"ticket": "LIN-1494",
+"pr": 989,
+"file": "routes/live-console.js",
+"touched": 1,
+"existing": 8,
+"note": "touched 1 of 8 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-25",
+"sha": "65ae5249",
+"ticket": "LIN-1565",
+"pr": 1009,
+"file": "routes/task-edit.js",
+"note": "+1 site(s) in routes/task-edit.js; total 8\u21929"
+},
+{
+"kind": "touch",
+"date": "2026-07-26",
+"sha": "96eac2b7",
+"ticket": "LIN-1588",
+"pr": 1021,
+"file": "routes/live-console.js",
+"touched": 1,
+"existing": 9,
+"note": "touched 1 of 9 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-01",
+"sha": null,
+"ticket": "LIN-1388",
+"file": null,
+"note": "plan-review send-back names `deployInfo`",
+"strength": "direct"
+},
+{
+"kind": "fix",
+"date": "2026-08-01",
+"sha": "636148ef",
+"ticket": "LIN-1388",
+"pr": 1044,
+"file": "server.js, routes/dashboard.js, lib/render-*.js",
+"strength": "direct",
+"note": "LIN-1388 fix: reword stale Heroku deployInfo/dyno wording at 5 JSDoc sites (7 files)"
+},
+{
+"kind": "complaint",
+"date": "2026-08-03",
+"sha": null,
+"ticket": "LIN-1503",
+"file": null,
+"note": "code-review send-back names `getDeployInfo`",
+"strength": "incidental"
+},
+{
+"kind": "site",
+"date": "2026-08-03",
+"sha": "8cc52b73",
+"ticket": "LIN-1849",
+"pr": 1067,
+"file": "routes/passage-planner.js",
+"note": "+1 site(s) in routes/passage-planner.js; total 9\u219210"
+},
+{
+"kind": "touch",
+"date": "2026-08-07",
+"sha": "3a734f24",
+"ticket": "LIN-1904",
+"pr": 1082,
+"file": "routes/task-edit.js",
+"touched": 1,
+"existing": 10,
+"note": "touched 1 of 10 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-08-09",
+"sha": "025aa9b8",
+"ticket": "LIN-1685",
+"pr": 1094,
+"file": "routes/ship-journey.js",
+"note": "+1 site(s) in routes/ship-journey.js; total 10\u219211"
+},
+{
+"kind": "site",
+"date": "2026-08-09",
+"sha": "44e91e58",
+"ticket": "LIN-1973",
+"pr": 1101,
+"file": "routes/task-create.js",
+"note": "+1 site(s) in routes/task-create.js; total 11\u219212"
+},
+{
+"kind": "touch",
+"date": "2026-08-13",
+"sha": "a00ee5ed",
+"ticket": "LIN-1910",
+"pr": 1118,
+"file": "routes/task-chat.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-30",
+"sha": "dbfcdaa4",
+"ticket": "LIN-2395",
+"pr": 1299,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-30",
+"sha": "d0ea9f1b",
+"ticket": "LIN-2410",
+"pr": 1300,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-06",
+"sha": "23d53bd7",
+"ticket": "LIN-2621",
+"pr": 1420,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-06",
+"sha": "2b8884d7",
+"ticket": "LIN-2706",
+"pr": 1424,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-11",
+"sha": "213d1587",
+"ticket": "LIN-2623",
+"pr": 1442,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-13",
+"sha": "b68e52e6",
+"ticket": "LIN-2771",
+"pr": 1491,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-21",
+"sha": "c65af807",
+"ticket": "LIN-2970",
+"pr": 1535,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-10-01",
+"sha": "26014544",
+"ticket": "LIN-3098",
+"pr": 1623,
+"file": "routes/runner-setup.js",
+"note": "+1 site(s) in routes/runner-setup.js; total 12\u219213"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "0924b595",
+"ticket": "LIN-3240",
+"pr": 1718,
+"file": "routes/task-chat.js, routes/task-create.js, routes/task-edit.js",
+"touched": 3,
+"existing": 13,
+"note": "touched 3 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "1d1dbc3c",
+"ticket": "LIN-3254",
+"pr": 1721,
+"file": "routes/task-chat.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-05",
+"sha": "cd25bce5",
+"ticket": "LIN-3311",
+"pr": 1753,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-05",
+"sha": "c517b442",
+"ticket": "LIN-2944",
+"pr": 1736,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-10-06",
+"sha": "7613ee47",
+"ticket": "LIN-3329",
+"pr": 1762,
+"file": "routes/task-page.js",
+"note": "+1 site(s) in routes/task-page.js; total 13\u219214"
+},
+{
+"kind": "touch",
+"date": "2026-10-07",
+"sha": "bf58918b",
+"ticket": "LIN-3335",
+"pr": 1765,
+"file": "routes/task-chat.js, routes/task-create.js, routes/task-edit.js, routes/task-page.js",
+"touched": 4,
+"existing": 14,
+"note": "touched 4 of 14 existing site(s) within \u00b115 lines"
+}
+]
+},
+"D3": {
+"name": "Hand-rolled workspace lookup (urlKey === urlKey)",
+"events": [
+{
+"kind": "birth",
+"date": "2026-01-20",
+"sha": "71395df9",
+"ticket": null,
+"pr": null,
+"file": "lib/render.js",
+"note": "+3 site(s) in lib/render.js; total 0\u21923"
+},
+{
+"kind": "helper",
+"date": "2026-01-20",
+"sha": "000531a5",
+"ticket": "LIN-100",
+"pr": 100,
+"file": "lib/workspace.js",
+"note": "canonical getWorkspaceByUrlKey(session, urlKey) added \u2014 one first-parent commit BEFORE the birth commit 71395df9 the same day"
+},
+{
+"kind": "move",
+"date": "2026-01-29",
+"sha": "06cb822b",
+"ticket": null,
+"pr": null,
+"file": "lib/components/navbar.js",
+"note": "site(s) moved lib/render.js \u2192 lib/components/navbar.js; total unchanged at 3"
+},
+{
+"kind": "site",
+"date": "2026-03-06",
+"sha": "3d18a149",
+"ticket": "LIN-193",
+"pr": 166,
+"file": "server.js",
+"note": "+1 site(s) in server.js; total 3\u21924"
+},
+{
+"kind": "site",
+"date": "2026-03-27",
+"sha": "cf8adc91",
+"ticket": null,
+"pr": 216,
+"file": "server.js",
+"note": "+1 site(s) in server.js; total 4\u21925"
+},
+{
+"kind": "site",
+"date": "2026-05-24",
+"sha": "d5b03aec",
+"ticket": null,
+"pr": 274,
+"file": "lib/render-roadmap.js",
+"note": "+1 site(s) in lib/render-roadmap.js; total 5\u21926"
+},
+{
+"kind": "touch",
+"date": "2026-06-05",
+"sha": "bb3bb8a0",
+"ticket": null,
+"pr": 322,
+"file": "server.js",
+"touched": 1,
+"existing": 6,
+"note": "touched 1 of 6 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-06-09",
+"sha": "b564acf4",
+"ticket": "LIN-335",
+"pr": 378,
+"file": "lib/render-foreman.js",
+"note": "+1 site(s) in lib/render-foreman.js; total 6\u21929"
+},
+{
+"kind": "site",
+"date": "2026-06-09",
+"sha": "b564acf4",
+"ticket": "LIN-335",
+"pr": 378,
+"file": "lib/render-swipe.js",
+"note": "+1 site(s) in lib/render-swipe.js; total 6\u21929"
+},
+{
+"kind": "site",
+"date": "2026-06-09",
+"sha": "b564acf4",
+"ticket": "LIN-335",
+"pr": 378,
+"file": "lib/render.js",
+"note": "+1 site(s) in lib/render.js; total 6\u21929"
+},
+{
+"kind": "complaint",
+"date": "2026-06-10",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-06-10.md",
+"strength": "direct",
+"note": "review names `provider-resolution-incantation` (Low): \"copy-pasted 8\u00d7 across 6 files\""
+},
+{
+"kind": "site",
+"date": "2026-06-10",
+"sha": "112b0b42",
+"ticket": "LIN-356",
+"pr": 385,
+"file": "lib/render-ship.js",
+"note": "+1 site(s) in lib/render-ship.js; total 9\u219211"
+},
+{
+"kind": "site",
+"date": "2026-06-10",
+"sha": "112b0b42",
+"ticket": "LIN-356",
+"pr": 385,
+"file": "lib/render-swim.js",
+"note": "+1 site(s) in lib/render-swim.js; total 9\u219211"
+},
+{
+"kind": "complaint",
+"date": "2026-06-11",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-06-11.md",
+"strength": "direct",
+"note": "review re-grounds to 5 renderer sites"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "dbdfc33c",
+"ticket": "LIN-417",
+"pr": 411,
+"file": "server.js",
+"touched": 2,
+"existing": 11,
+"note": "touched 2 of 11 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "be04f988",
+"ticket": "LIN-455",
+"pr": 447,
+"file": "lib/render-foreman.js, lib/render.js",
+"touched": 2,
+"existing": 11,
+"note": "touched 2 of 11 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "5acca3b6",
+"ticket": "LIN-462",
+"pr": 453,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 11,
+"note": "touched 1 of 11 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "2b7ad939",
+"ticket": "LIN-450",
+"pr": 454,
+"file": "lib/components/navbar.js",
+"touched": 1,
+"existing": 11,
+"note": "touched 1 of 11 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "removal",
+"date": "2026-06-15",
+"sha": "8bc48b81",
+"ticket": "LIN-498",
+"pr": 473,
+"file": "server.js",
+"note": "\u22121 site(s); total 11\u219210"
+},
+{
+"kind": "touch",
+"date": "2026-06-15",
+"sha": "8bc48b81",
+"ticket": "LIN-498",
+"pr": 473,
+"file": "server.js",
+"touched": 1,
+"existing": 11,
+"note": "touched 1 of 11 existing site(s) within \u00b115 lines; count 11\u219210"
+},
+{
+"kind": "removal",
+"date": "2026-06-16",
+"sha": "a0ad7310",
+"ticket": "LIN-451",
+"pr": 498,
+"file": "lib/render-foreman.js",
+"note": "\u22121 site(s); total 10\u21929"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "15a6a17e",
+"ticket": "LIN-525",
+"pr": 494,
+"file": "lib/render-foreman.js, lib/render.js",
+"touched": 2,
+"existing": 10,
+"note": "touched 2 of 10 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "9888c6f0",
+"ticket": "LIN-522",
+"pr": 497,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 10,
+"note": "touched 1 of 10 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "a0ad7310",
+"ticket": "LIN-451",
+"pr": 498,
+"file": "lib/components/navbar.js, lib/render-foreman.js, lib/render-swipe.js",
+"touched": 3,
+"existing": 10,
+"note": "touched 3 of 10 existing site(s) within \u00b115 lines; count 10\u21929"
+},
+{
+"kind": "touch",
+"date": "2026-06-21",
+"sha": "e9d12ee4",
+"ticket": "LIN-572",
+"pr": 532,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 9,
+"note": "touched 1 of 9 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-24",
+"sha": "1c1b1cfd",
+"ticket": "LIN-544",
+"pr": 594,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 9,
+"note": "touched 1 of 9 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-24",
+"sha": "cbe4d5ee",
+"ticket": "LIN-581",
+"pr": 600,
+"file": "server.js",
+"touched": 1,
+"existing": 9,
+"note": "touched 1 of 9 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-06-25",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-06-25.md",
+"strength": "direct",
+"note": "review: improved, 4 renderer sites (foreman retired)"
+},
+{
+"kind": "touch",
+"date": "2026-06-26",
+"sha": "59df0404",
+"ticket": "LIN-726",
+"pr": 648,
+"file": "lib/render.js",
+"touched": 2,
+"existing": 9,
+"note": "touched 2 of 9 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-01",
+"sha": "5dad7a47",
+"ticket": "LIN-877",
+"pr": 721,
+"file": "lib/components/navbar.js",
+"touched": 1,
+"existing": 9,
+"note": "touched 1 of 9 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-02",
+"sha": "d53c2b5a",
+"ticket": "LIN-927",
+"pr": 743,
+"file": "lib/render-observation.js",
+"note": "+2 site(s) in lib/render-observation.js; total 9\u219211"
+},
+{
+"kind": "touch",
+"date": "2026-07-03",
+"sha": "a9e760f2",
+"ticket": "LIN-975",
+"pr": 768,
+"file": "lib/render-roadmap.js",
+"touched": 1,
+"existing": 11,
+"note": "touched 1 of 11 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "removal",
+"date": "2026-07-04",
+"sha": "bdff8ebb",
+"ticket": "LIN-978",
+"pr": 772,
+"file": "lib/render-observation.js",
+"note": "\u22122 site(s); total 11\u21929"
+},
+{
+"kind": "site",
+"date": "2026-07-04",
+"sha": "26092197",
+"ticket": "LIN-962",
+"pr": 778,
+"file": "lib/workspace-title-resolver.js",
+"note": "+1 site(s) in lib/workspace-title-resolver.js; total 9\u219210"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "bdff8ebb",
+"ticket": "LIN-978",
+"pr": 772,
+"file": "lib/render-observation.js",
+"touched": 2,
+"existing": 11,
+"note": "touched 2 of 11 existing site(s) within \u00b115 lines; count 11\u21929"
+},
+{
+"kind": "touch",
+"date": "2026-07-10",
+"sha": "356e678e",
+"ticket": "LIN-1222",
+"pr": 882,
+"file": "lib/render-roadmap.js",
+"touched": 1,
+"existing": 10,
+"note": "touched 1 of 10 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-16",
+"sha": "9a9fd12d",
+"ticket": "LIN-1366",
+"pr": 932,
+"file": "lib/workspace-token-resolver.js",
+"note": "+2 site(s) in lib/workspace-token-resolver.js; total 10\u219211; also \u22121 elsewhere (server.js)"
+},
+{
+"kind": "touch",
+"date": "2026-07-16",
+"sha": "9a9fd12d",
+"ticket": "LIN-1366",
+"pr": 932,
+"file": "server.js",
+"touched": 1,
+"existing": 10,
+"note": "touched 1 of 10 existing site(s) within \u00b115 lines; count 10\u219211"
+},
+{
+"kind": "site",
+"date": "2026-07-19",
+"sha": "7a32732a",
+"ticket": "LIN-1373",
+"pr": 955,
+"file": "lib/workspace-token-resolver.js",
+"note": "+1 site(s) in lib/workspace-token-resolver.js; total 11\u219212"
+},
+{
+"kind": "site",
+"date": "2026-07-20",
+"sha": "d26d26fa",
+"ticket": "LIN-1413",
+"pr": 967,
+"file": "lib/workspace-token-resolver.js",
+"note": "+1 site(s) in lib/workspace-token-resolver.js; total 12\u219213"
+},
+{
+"kind": "touch",
+"date": "2026-07-20",
+"sha": "d26d26fa",
+"ticket": "LIN-1413",
+"pr": 967,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 12,
+"note": "touched 1 of 12 existing site(s) within \u00b115 lines; count 12\u219213"
+},
+{
+"kind": "touch",
+"date": "2026-07-21",
+"sha": "3e324e4f",
+"ticket": "LIN-1506",
+"pr": 982,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-21",
+"sha": "18f34db8",
+"ticket": "LIN-1512",
+"pr": 983,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 13,
+"note": "touched 1 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-21",
+"sha": "99b7a92f",
+"ticket": "LIN-1499",
+"pr": 981,
+"file": "lib/workspace-token-resolver.js",
+"touched": 2,
+"existing": 13,
+"note": "touched 2 of 13 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-23",
+"sha": "938450d6",
+"ticket": "LIN-1524",
+"pr": 986,
+"file": "lib/workspace-token-resolver.js",
+"note": "+1 site(s) in lib/workspace-token-resolver.js; total 13\u219214"
+},
+{
+"kind": "site",
+"date": "2026-07-23",
+"sha": "a6a588cc",
+"ticket": null,
+"pr": 990,
+"file": "lib/workspace-token-resolver.js",
+"note": "+1 site(s) in lib/workspace-token-resolver.js; total 14\u219215"
+},
+{
+"kind": "touch",
+"date": "2026-07-25",
+"sha": "19ff6d2f",
+"ticket": "LIN-1448",
+"pr": 1010,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-07",
+"sha": "c6b640d6",
+"ticket": "LIN-1891",
+"pr": 1078,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-10",
+"sha": "63b5308e",
+"ticket": "LIN-2006",
+"pr": 1106,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "move",
+"date": "2026-08-14",
+"sha": "9fd910c9",
+"ticket": "LIN-1986",
+"pr": 1137,
+"file": "lib/workspace-token-resolver.js",
+"note": "site(s) moved lib/workspace-title-resolver.js \u2192 lib/workspace-token-resolver.js; total unchanged at 15"
+},
+{
+"kind": "touch",
+"date": "2026-08-14",
+"sha": "9fd910c9",
+"ticket": "LIN-1986",
+"pr": 1137,
+"file": "lib/workspace-title-resolver.js, lib/workspace-token-resolver.js",
+"touched": 2,
+"existing": 15,
+"note": "touched 2 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-14",
+"sha": "656afac3",
+"ticket": "LIN-2097",
+"pr": 1138,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-22",
+"sha": "604d9125",
+"ticket": "LIN-1728",
+"pr": 1174,
+"file": "lib/components/navbar.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-22",
+"sha": "a78dadc2",
+"ticket": "LIN-2197",
+"pr": 1177,
+"file": "lib/render.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-08-23",
+"sha": "80b35088",
+"ticket": "LIN-2235",
+"pr": 1188,
+"file": "lib/workspace-token-resolver.js",
+"note": "+1 site(s) in lib/workspace-token-resolver.js; total 15\u219216"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "80b35088",
+"ticket": "LIN-2235",
+"pr": 1188,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 15,
+"note": "touched 1 of 15 existing site(s) within \u00b115 lines; count 15\u219216"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "edbe5e7e",
+"ticket": "LIN-2236",
+"pr": 1189,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 16,
+"note": "touched 1 of 16 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "1c6cc1db",
+"ticket": "LIN-1982",
+"pr": 1214,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 16,
+"note": "touched 1 of 16 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-24",
+"sha": "8f78a23f",
+"ticket": "LIN-2275",
+"pr": 1238,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 16,
+"note": "touched 1 of 16 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-28",
+"sha": "a361265e",
+"ticket": "LIN-2278",
+"pr": 1272,
+"file": "lib/workspace-token-resolver.js",
+"touched": 2,
+"existing": 16,
+"note": "touched 2 of 16 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-29",
+"sha": null,
+"ticket": "LIN-2389",
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-08-29.md",
+"strength": "direct",
+"note": "review: \"worsened sharply (4 \u2192 16 sites)\"; mints LIN-2389 (change getWorkspaceByUrlKey to accept a workspaces array). LIN-2389 is absent from the tracker cache and no first-parent commit cites it \u2014 never landed"
+},
+{
+"kind": "site",
+"date": "2026-08-30",
+"sha": "2392a537",
+"ticket": "LIN-2412",
+"pr": 1307,
+"file": "lib/openrouter-key-resolver.js",
+"note": "+1 site(s) in lib/openrouter-key-resolver.js; total 16\u219217"
+},
+{
+"kind": "touch",
+"date": "2026-09-04",
+"sha": "eb8361e9",
+"ticket": "LIN-2523",
+"pr": 1353,
+"file": "lib/render-ship.js, lib/render-swim.js",
+"touched": 2,
+"existing": 17,
+"note": "touched 2 of 17 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-04",
+"sha": "d87d4525",
+"ticket": "LIN-2529",
+"pr": 1361,
+"file": "lib/render.js",
+"touched": 2,
+"existing": 17,
+"note": "touched 2 of 17 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-05",
+"sha": "987e5e6d",
+"ticket": "LIN-2349",
+"pr": 1397,
+"file": "lib/workspace-token-resolver.js",
+"touched": 1,
+"existing": 17,
+"note": "touched 1 of 17 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-12",
+"sha": "1cbf41a6",
+"ticket": "LIN-2802",
+"pr": 1460,
+"file": "lib/components/navbar.js",
+"touched": 1,
+"existing": 17,
+"note": "touched 1 of 17 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-09-26",
+"sha": null,
+"ticket": "LIN-2389",
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-09-26.md",
+"strength": "direct",
+"note": "review: worsened 16 \u2192 17; \"root cause unchanged: a signature mismatch\"; LIN-2389 still the standing fix"
+},
+{
+"kind": "complaint",
+"date": "2026-09-29",
+"sha": null,
+"ticket": "LIN-3125",
+"file": null,
+"note": "plan-review send-back names `getWorkspaceByUrlKey`",
+"strength": "incidental"
+},
+{
+"kind": "helper",
+"date": "2026-09-29",
+"sha": "b45a390e",
+"ticket": "LIN-3124",
+"pr": 1610,
+"file": "tests/unit/lin-3124-pr1-count-pins.test.js",
+"note": "not a helper: a COUNT PIN \u2014 `w?.urlKey === urlKey` pinned at expected 16 (the `w`-named form only). Two later sites dodge it: LIN-3186 (lib/superseded-selection.js, variable named `candidate` with a comment saying so) and LIN-3282 (lib/connection-credential.js, `r.urlKey`); pin still reads 16 at ground while the review-pattern count is 19"
+},
+{
+"kind": "touch",
+"date": "2026-09-29",
+"sha": "6a3a0e78",
+"ticket": "LIN-2944",
+"pr": 1604,
+"file": "lib/render-swipe.js",
+"touched": 1,
+"existing": 17,
+"note": "touched 1 of 17 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-10-01",
+"sha": "b536ee44",
+"ticket": "LIN-3186",
+"pr": 1696,
+"file": "lib/superseded-selection.js",
+"note": "+1 site(s) in lib/superseded-selection.js; total 17\u219218"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "16359f5e",
+"ticket": "LIN-2944",
+"pr": 1720,
+"file": "lib/render-swipe.js, lib/render.js",
+"touched": 3,
+"existing": 18,
+"note": "touched 3 of 18 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "b08396f2",
+"ticket": "LIN-3239",
+"pr": 1729,
+"file": "lib/render-swipe.js",
+"touched": 1,
+"existing": 18,
+"note": "touched 1 of 18 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-10-03",
+"sha": "065e776f",
+"ticket": "LIN-3282",
+"pr": 1741,
+"file": "lib/connection-credential.js",
+"note": "+1 site(s) in lib/connection-credential.js; total 18\u219219"
+},
+{
+"kind": "touch",
+"date": "2026-10-05",
+"sha": "c517b442",
+"ticket": "LIN-2944",
+"pr": 1736,
+"file": "lib/render-swipe.js, lib/render.js",
+"touched": 3,
+"existing": 19,
+"note": "touched 3 of 19 existing site(s) within \u00b115 lines"
+}
+]
+},
+"D4": {
+"name": "Inline error envelope (res.status(4xx|5xx).json)",
+"events": [
+{
+"kind": "birth",
+"date": "2026-01-11",
+"sha": "4d9150d6",
+"ticket": null,
+"pr": 10,
+"file": "server.js",
+"note": "+3 site(s) in server.js; total 0\u21923"
+},
+{
+"kind": "site",
+"date": "2026-01-11",
+"sha": "c4027535",
+"ticket": null,
+"pr": 13,
+"file": "server.js",
+"note": "+8 site(s) in server.js; total 3\u219211"
+},
+{
+"kind": "site",
+"date": "2026-01-16",
+"sha": "f55373a6",
+"ticket": null,
+"pr": 26,
+"file": "server.js",
+"note": "+9 site(s) in server.js; total 11\u219220"
+},
+{
+"kind": "helper",
+"date": "2026-01-18",
+"sha": "d1222b5c",
+"ticket": "LIN-36",
+"pr": 55,
+"file": "lib/errors.js",
+"note": "canonical lib/errors.js (jsonError, badRequest, \u2026) added; 20 inline sites already in server.js"
+},
+{
+"kind": "site",
+"date": "2026-01-20",
+"sha": "000531a5",
+"ticket": "LIN-100",
+"pr": 100,
+"file": "server.js",
+"note": "+3 site(s) in server.js; total 20\u219223"
+},
+{
+"kind": "site",
+"date": "2026-01-20",
+"sha": "0d918d50",
+"ticket": "LIN-66",
+"pr": 104,
+"file": "routes/dispatch.js",
+"note": "+30 site(s) in routes/dispatch.js; total 23\u219256"
+},
+{
+"kind": "site",
+"date": "2026-01-20",
+"sha": "0d918d50",
+"ticket": "LIN-66",
+"pr": 104,
+"file": "server.js",
+"note": "+3 site(s) in server.js; total 23\u219256"
+},
+{
+"kind": "site",
+"date": "2026-01-29",
+"sha": "e054a870",
+"ticket": "LIN-156",
+"pr": 129,
+"file": "server.js",
+"note": "+14 site(s) in server.js; total 56\u219270"
+},
+{
+"kind": "site",
+"date": "2026-01-29",
+"sha": "ba232b23",
+"ticket": "LIN-156",
+"pr": 130,
+"file": "server.js",
+"note": "+1 site(s) in server.js; total 70\u219271"
+},
+{
+"kind": "site",
+"date": "2026-02-07",
+"sha": "a7c2ae1a",
+"ticket": null,
+"pr": 139,
+"file": "server.js",
+"note": "+4 site(s) in server.js; total 71\u219275"
+},
+{
+"kind": "removal",
+"date": "2026-02-08",
+"sha": "324bee90",
+"ticket": null,
+"pr": 143,
+"file": "server.js",
+"note": "\u221241 site(s); total 75\u219271; +37 in routes/legacy-redirects.js, routes/workspace-api.js"
+},
+{
+"kind": "site",
+"date": "2026-02-09",
+"sha": "fb282e72",
+"ticket": "LIN-160",
+"pr": 150,
+"file": "routes/dispatch.js",
+"note": "+1 site(s) in routes/dispatch.js; total 71\u219272"
+},
+{
+"kind": "site",
+"date": "2026-02-14",
+"sha": "23d748d1",
+"ticket": null,
+"pr": 152,
+"file": "routes/dispatch.js",
+"note": "+7 site(s) in routes/dispatch.js; total 72\u219279"
+},
+{
+"kind": "site",
+"date": "2026-02-14",
+"sha": "e1495bbd",
+"ticket": "LIN-155",
+"pr": null,
+"file": "routes/dispatch.js",
+"note": "+1 site(s) in routes/dispatch.js; total 79\u219280"
+},
+{
+"kind": "site",
+"date": "2026-02-16",
+"sha": "8c73db6a",
+"ticket": null,
+"pr": 154,
+"file": "routes/dispatch.js",
+"note": "+2 site(s) in routes/dispatch.js; total 80\u219282"
+},
+{
+"kind": "site",
+"date": "2026-02-17",
+"sha": "c35a4721",
+"ticket": null,
+"pr": 157,
+"file": "routes/workspace-api.js",
+"note": "+5 site(s) in routes/workspace-api.js; total 82\u219287"
+},
+{
+"kind": "site",
+"date": "2026-02-26",
+"sha": "c80e07c6",
+"ticket": null,
+"pr": 160,
+"file": "routes/dispatch.js",
+"note": "+11 site(s) in routes/dispatch.js; total 87\u219298"
+},
+{
+"kind": "site",
+"date": "2026-03-06",
+"sha": "3d18a149",
+"ticket": "LIN-193",
+"pr": 166,
+"file": "routes/proxy.js",
+"note": "+77 site(s) in routes/proxy.js; total 98\u2192175"
+},
+{
+"kind": "removal",
+"date": "2026-03-10",
+"sha": "78cf319c",
+"ticket": null,
+"pr": 184,
+"file": "routes/proxy.js",
+"note": "\u221215 site(s); total 175\u2192160"
+},
+{
+"kind": "removal",
+"date": "2026-03-10",
+"sha": "2635214e",
+"ticket": null,
+"pr": 188,
+"file": "routes/workspace-api.js",
+"note": "\u22127 site(s); total 175\u2192168"
+},
+{
+"kind": "site",
+"date": "2026-03-10",
+"sha": "2a3ee637",
+"ticket": null,
+"pr": 185,
+"file": "routes/workspace-api.js",
+"note": "+15 site(s) in routes/workspace-api.js; total 160\u2192175"
+},
+{
+"kind": "site",
+"date": "2026-03-13",
+"sha": "f2b4865b",
+"ticket": null,
+"pr": 192,
+"file": "routes/workspace-api.js",
+"note": "+7 site(s) in routes/workspace-api.js; total 168\u2192175"
+},
+{
+"kind": "site",
+"date": "2026-03-14",
+"sha": "779850f0",
+"ticket": null,
+"pr": 191,
+"file": "routes/proxy.js",
+"note": "+22 site(s) in routes/proxy.js; total 175\u2192197"
+},
+{
+"kind": "removal",
+"date": "2026-03-15",
+"sha": "425b5b21",
+"ticket": null,
+"pr": null,
+"file": "routes/workspace-api.js",
+"note": "\u22127 site(s); total 197\u2192190"
+},
+{
+"kind": "site",
+"date": "2026-03-24",
+"sha": "8d7dbf9f",
+"ticket": null,
+"pr": 208,
+"file": "routes/workspace-api.js",
+"note": "+12 site(s) in routes/workspace-api.js; total 190\u2192202"
+},
+{
+"kind": "site",
+"date": "2026-03-27",
+"sha": "88ed7cf7",
+"ticket": null,
+"pr": 215,
+"file": "routes/proxy.js",
+"note": "+5 site(s) in routes/proxy.js; total 202\u2192207"
+},
+{
+"kind": "site",
+"date": "2026-04-11",
+"sha": "8e354062",
+"ticket": null,
+"pr": 234,
+"file": "routes/proxy.js",
+"note": "+3 site(s) in routes/proxy.js; total 207\u2192210"
+},
+{
+"kind": "site",
+"date": "2026-04-12",
+"sha": "13668fc2",
+"ticket": "LIN-243",
+"pr": 244,
+"file": "routes/pipeline.js",
+"note": "+5 site(s) in routes/pipeline.js; total 210\u2192215"
+},
+{
+"kind": "site",
+"date": "2026-04-12",
+"sha": "4f6b58d0",
+"ticket": null,
+"pr": 250,
+"file": "routes/dispatch.js",
+"note": "+1 site(s) in routes/dispatch.js; total 215\u2192216"
+},
+{
+"kind": "site",
+"date": "2026-04-19",
+"sha": "088fed43",
+"ticket": null,
+"pr": 254,
+"file": "routes/workspace-api.js",
+"note": "+15 site(s) in routes/workspace-api.js; total 216\u2192231"
+},
+{
+"kind": "site",
+"date": "2026-04-19",
+"sha": "9329a7d1",
+"ticket": null,
+"pr": 256,
+"file": "routes/dispatch.js",
+"note": "+2 site(s) in routes/dispatch.js; total 231\u2192233"
+},
+{
+"kind": "removal",
+"date": "2026-04-20",
+"sha": "d2f1226b",
+"ticket": null,
+"pr": 264,
+"file": "routes/proxy.js, routes/workspace-api.js",
+"note": "\u221215 site(s); total 247\u2192232"
+},
+{
+"kind": "site",
+"date": "2026-04-20",
+"sha": "c2e2f77e",
+"ticket": null,
+"pr": 259,
+"file": "routes/proxy.js",
+"note": "+14 site(s) in routes/proxy.js; total 233\u2192247"
+},
+{
+"kind": "site",
+"date": "2026-04-20",
+"sha": "bff9ff34",
+"ticket": null,
+"pr": 265,
+"file": "routes/proxy.js",
+"note": "+5 site(s) in routes/proxy.js; total 232\u2192237"
+},
+{
+"kind": "site",
+"date": "2026-04-21",
+"sha": "9c72a9a9",
+"ticket": null,
+"pr": 266,
+"file": "routes/workspace-api.js",
+"note": "+6 site(s) in routes/workspace-api.js; total 237\u2192243"
+},
+{
+"kind": "site",
+"date": "2026-05-24",
+"sha": "453b1251",
+"ticket": null,
+"pr": 275,
+"file": "routes/workspace-api.js",
+"note": "+18 site(s) in routes/workspace-api.js; total 243\u2192261"
+},
+{
+"kind": "site",
+"date": "2026-05-27",
+"sha": "f548b3b8",
+"ticket": null,
+"pr": 282,
+"file": "routes/workspace-api.js",
+"note": "+6 site(s) in routes/workspace-api.js; total 261\u2192267"
+},
+{
+"kind": "site",
+"date": "2026-05-29",
+"sha": "d433a2ba",
+"ticket": null,
+"pr": 291,
+"file": "routes/workspace-api.js",
+"note": "+9 site(s) in routes/workspace-api.js; total 267\u2192276"
+},
+{
+"kind": "site",
+"date": "2026-05-29",
+"sha": "3bd97f68",
+"ticket": null,
+"pr": 292,
+"file": "routes/workspace-api.js",
+"note": "+4 site(s) in routes/workspace-api.js; total 276\u2192280"
+},
+{
+"kind": "site",
+"date": "2026-05-31",
+"sha": "2fecb665",
+"ticket": null,
+"pr": 299,
+"file": "routes/workspace-api.js",
+"note": "+3 site(s) in routes/workspace-api.js; total 280\u2192283"
+},
+{
+"kind": "site",
+"date": "2026-05-31",
+"sha": "65148f03",
+"ticket": null,
+"pr": 300,
+"file": "routes/workspace-api.js",
+"note": "+10 site(s) in routes/workspace-api.js; total 283\u2192293"
+},
+{
+"kind": "site",
+"date": "2026-05-31",
+"sha": "5cd2abad",
+"ticket": null,
+"pr": 301,
+"file": "routes/proxy.js",
+"note": "+10 site(s) in routes/proxy.js; total 293\u2192303"
+},
+{
+"kind": "site",
+"date": "2026-05-31",
+"sha": "7db59195",
+"ticket": null,
+"pr": 305,
+"file": "routes/proxy.js",
+"note": "+3 site(s) in routes/proxy.js; total 303\u2192306"
+},
+{
+"kind": "site",
+"date": "2026-06-04",
+"sha": "45f68f89",
+"ticket": null,
+"pr": 312,
+"file": "routes/workspace-api.js",
+"note": "+3 site(s) in routes/workspace-api.js; total 306\u2192309"
+},
+{
+"kind": "touch",
+"date": "2026-06-04",
+"sha": "45f68f89",
+"ticket": null,
+"pr": 312,
+"file": "routes/workspace-api.js",
+"touched": 3,
+"existing": 306,
+"note": "touched 3 of 306 existing site(s) within \u00b115 lines; count 306\u2192309"
+},
+{
+"kind": "touch",
+"date": "2026-06-04",
+"sha": "44942fa3",
+"ticket": "LIN-300",
+"pr": 319,
+"file": "routes/proxy.js",
+"touched": 2,
+"existing": 309,
+"note": "touched 2 of 309 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "removal",
+"date": "2026-06-05",
+"sha": "2ad11ee2",
+"ticket": null,
+"pr": 321,
+"file": "routes/workspace-api.js",
+"note": "\u221217 site(s); total 309\u2192292"
+},
+{
+"kind": "site",
+"date": "2026-06-05",
+"sha": "bb3bb8a0",
+"ticket": null,
+"pr": 322,
+"file": "routes/proxy.js",
+"note": "+19 site(s) in routes/proxy.js; total 292\u2192311"
+},
+{
+"kind": "site",
+"date": "2026-06-05",
+"sha": "ec2970bd",
+"ticket": null,
+"pr": 323,
+"file": "routes/proxy.js",
+"note": "+4 site(s) in routes/proxy.js; total 311\u2192315"
+},
+{
+"kind": "touch",
+"date": "2026-06-05",
+"sha": "2ad11ee2",
+"ticket": null,
+"pr": 321,
+"file": "routes/workspace-api.js",
+"touched": 25,
+"existing": 309,
+"note": "touched 25 of 309 existing site(s) within \u00b115 lines; count 309\u2192292"
+},
+{
+"kind": "touch",
+"date": "2026-06-05",
+"sha": "bb3bb8a0",
+"ticket": null,
+"pr": 322,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 292,
+"note": "touched 1 of 292 existing site(s) within \u00b115 lines; count 292\u2192311"
+},
+{
+"kind": "touch",
+"date": "2026-06-05",
+"sha": "ec2970bd",
+"ticket": null,
+"pr": 323,
+"file": "routes/proxy.js",
+"touched": 6,
+"existing": 311,
+"note": "touched 6 of 311 existing site(s) within \u00b115 lines; count 311\u2192315"
+},
+{
+"kind": "site",
+"date": "2026-06-06",
+"sha": "f5354783",
+"ticket": "LIN-319",
+"pr": 327,
+"file": "routes/dispatch.js",
+"note": "+1 site(s) in routes/dispatch.js; total 315\u2192317"
+},
+{
+"kind": "site",
+"date": "2026-06-06",
+"sha": "f5354783",
+"ticket": "LIN-319",
+"pr": 327,
+"file": "routes/proxy.js",
+"note": "+1 site(s) in routes/proxy.js; total 315\u2192317"
+},
+{
+"kind": "site",
+"date": "2026-06-06",
+"sha": "49f00ce6",
+"ticket": null,
+"pr": 330,
+"file": "routes/workspace-api.js",
+"note": "+8 site(s) in routes/workspace-api.js; total 317\u2192325"
+},
+{
+"kind": "site",
+"date": "2026-06-06",
+"sha": "5171d7c8",
+"ticket": "LIN-319",
+"pr": 332,
+"file": "routes/proxy.js",
+"note": "+5 site(s) in routes/proxy.js; total 325\u2192330"
+},
+{
+"kind": "touch",
+"date": "2026-06-06",
+"sha": "9c133cd3",
+"ticket": null,
+"pr": 325,
+"file": "routes/proxy.js",
+"touched": 2,
+"existing": 315,
+"note": "touched 2 of 315 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-06",
+"sha": "f5354783",
+"ticket": "LIN-319",
+"pr": 327,
+"file": "routes/dispatch.js, routes/proxy.js",
+"touched": 18,
+"existing": 315,
+"note": "touched 18 of 315 existing site(s) within \u00b115 lines; count 315\u2192317"
+},
+{
+"kind": "touch",
+"date": "2026-06-06",
+"sha": "49f00ce6",
+"ticket": null,
+"pr": 330,
+"file": "routes/workspace-api.js",
+"touched": 3,
+"existing": 317,
+"note": "touched 3 of 317 existing site(s) within \u00b115 lines; count 317\u2192325"
+},
+{
+"kind": "touch",
+"date": "2026-06-06",
+"sha": "5171d7c8",
+"ticket": "LIN-319",
+"pr": 332,
+"file": "routes/proxy.js",
+"touched": 10,
+"existing": 325,
+"note": "touched 10 of 325 existing site(s) within \u00b115 lines; count 325\u2192330"
+},
+{
+"kind": "touch",
+"date": "2026-06-07",
+"sha": "76e38a05",
+"ticket": "LIN-328",
+"pr": 348,
+"file": "routes/proxy.js",
+"touched": 4,
+"existing": 330,
+"note": "touched 4 of 330 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-07",
+"sha": "4f600b6e",
+"ticket": "LIN-329",
+"pr": 349,
+"file": "routes/workspace-api.js",
+"touched": 2,
+"existing": 330,
+"note": "touched 2 of 330 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-07",
+"sha": "45bf490a",
+"ticket": "LIN-331",
+"pr": 352,
+"file": "routes/workspace-api.js",
+"touched": 16,
+"existing": 330,
+"note": "touched 16 of 330 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-06-08",
+"sha": "0092e3f3",
+"ticket": "LIN-340",
+"pr": 355,
+"file": "server.js",
+"note": "+1 site(s) in server.js; total 330\u2192331"
+},
+{
+"kind": "touch",
+"date": "2026-06-08",
+"sha": "0092e3f3",
+"ticket": "LIN-340",
+"pr": 355,
+"file": "server.js",
+"touched": 1,
+"existing": 330,
+"note": "touched 1 of 330 existing site(s) within \u00b115 lines; count 330\u2192331"
+},
+{
+"kind": "touch",
+"date": "2026-06-08",
+"sha": "fad20d66",
+"ticket": "LIN-346",
+"pr": 360,
+"file": "routes/proxy.js",
+"touched": 2,
+"existing": 331,
+"note": "touched 2 of 331 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-06-09",
+"sha": "b9367977",
+"ticket": "LIN-365",
+"pr": 380,
+"file": "routes/proxy.js",
+"note": "+1 site(s) in routes/proxy.js; total 331\u2192332"
+},
+{
+"kind": "touch",
+"date": "2026-06-09",
+"sha": "9172e590",
+"ticket": "LIN-316",
+"pr": 376,
+"file": "routes/workspace-api.js",
+"touched": 20,
+"existing": 331,
+"note": "touched 20 of 331 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-09",
+"sha": "ed93dc2b",
+"ticket": "LIN-177",
+"pr": 379,
+"file": "routes/workspace-api.js",
+"touched": 6,
+"existing": 331,
+"note": "touched 6 of 331 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-09",
+"sha": "b9367977",
+"ticket": "LIN-365",
+"pr": 380,
+"file": "routes/proxy.js",
+"touched": 9,
+"existing": 331,
+"note": "touched 9 of 331 existing site(s) within \u00b115 lines; count 331\u2192332"
+},
+{
+"kind": "complaint",
+"date": "2026-06-10",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-06-10.md",
+"strength": "direct",
+"note": "review names `routes-error-envelope-fragmentation` (Medium): 239 inline sites, 1 importer"
+},
+{
+"kind": "touch",
+"date": "2026-06-10",
+"sha": "6474bc59",
+"ticket": "LIN-356",
+"pr": 382,
+"file": "routes/workspace-api.js",
+"touched": 14,
+"existing": 332,
+"note": "touched 14 of 332 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-06-11",
+"sha": null,
+"ticket": "LIN-417",
+"file": null,
+"note": "tracker ticket \"Surface system errors with cause + actionable signal (structured error envelope)\" [Done; front:operating-model] names `error envelope` in title",
+"strength": "direct"
+},
+{
+"kind": "complaint",
+"date": "2026-06-11",
+"sha": null,
+"ticket": "LIN-420",
+"file": null,
+"note": "tracker ticket \"Adopt lib/errors.js in the three largest route files (proxy, workspace-api, dispatch)\" [Done; front:maintenance, kind:review-residue] names `lib/errors.js` in title",
+"strength": "direct"
+},
+{
+"kind": "complaint",
+"date": "2026-06-11",
+"sha": null,
+"ticket": "LIN-420",
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-06-11.md",
+"strength": "direct",
+"note": "review: 246 inline sites, 2 importers (LIN-417 put the structured envelope in canon); mints LIN-420"
+},
+{
+"kind": "removal",
+"date": "2026-06-11",
+"sha": "dbdfc33c",
+"ticket": "LIN-417",
+"pr": 411,
+"file": "routes/proxy.js",
+"note": "\u221226 site(s); total 347\u2192321"
+},
+{
+"kind": "removal",
+"date": "2026-06-11",
+"sha": "fea16b74",
+"ticket": "LIN-413",
+"pr": 417,
+"file": "routes/workspace-api.js",
+"note": "\u22121 site(s); total 321\u2192320"
+},
+{
+"kind": "site",
+"date": "2026-06-11",
+"sha": "98401918",
+"ticket": "LIN-399",
+"pr": 404,
+"file": "routes/proxy.js",
+"note": "+1 site(s) in routes/proxy.js; total 332\u2192333"
+},
+{
+"kind": "site",
+"date": "2026-06-11",
+"sha": "8cea7847",
+"ticket": "LIN-398",
+"pr": 405,
+"file": "routes/proxy.js",
+"note": "+13 site(s) in routes/proxy.js; total 333\u2192346"
+},
+{
+"kind": "site",
+"date": "2026-06-11",
+"sha": "e461b1db",
+"ticket": "LIN-405",
+"pr": 408,
+"file": "routes/workspace-api.js",
+"note": "+1 site(s) in routes/workspace-api.js; total 346\u2192347"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "b4654668",
+"ticket": "LIN-392",
+"pr": 396,
+"file": "routes/proxy.js",
+"touched": 5,
+"existing": 332,
+"note": "touched 5 of 332 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "eecc60a5",
+"ticket": "LIN-388",
+"pr": 399,
+"file": "routes/workspace-api.js",
+"touched": 8,
+"existing": 332,
+"note": "touched 8 of 332 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "81e01d26",
+"ticket": "LIN-400",
+"pr": 401,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 332,
+"note": "touched 1 of 332 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "98401918",
+"ticket": "LIN-399",
+"pr": 404,
+"file": "routes/proxy.js",
+"touched": 16,
+"existing": 332,
+"note": "touched 16 of 332 existing site(s) within \u00b115 lines; count 332\u2192333"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "8cea7847",
+"ticket": "LIN-398",
+"pr": 405,
+"file": "routes/proxy.js",
+"touched": 3,
+"existing": 333,
+"note": "touched 3 of 333 existing site(s) within \u00b115 lines; count 333\u2192346"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "e461b1db",
+"ticket": "LIN-405",
+"pr": 408,
+"file": "routes/workspace-api.js",
+"touched": 7,
+"existing": 346,
+"note": "touched 7 of 346 existing site(s) within \u00b115 lines; count 346\u2192347"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "dbdfc33c",
+"ticket": "LIN-417",
+"pr": 411,
+"file": "routes/proxy.js, server.js",
+"touched": 79,
+"existing": 347,
+"note": "touched 79 of 347 existing site(s) within \u00b115 lines; count 347\u2192321"
+},
+{
+"kind": "touch",
+"date": "2026-06-11",
+"sha": "fea16b74",
+"ticket": "LIN-413",
+"pr": 417,
+"file": "routes/workspace-api.js",
+"touched": 5,
+"existing": 321,
+"note": "touched 5 of 321 existing site(s) within \u00b115 lines; count 321\u2192320"
+},
+{
+"kind": "site",
+"date": "2026-06-12",
+"sha": "7a6b5b2d",
+"ticket": "LIN-401",
+"pr": 421,
+"file": "routes/proxy.js",
+"note": "+4 site(s) in routes/proxy.js; total 320\u2192324"
+},
+{
+"kind": "touch",
+"date": "2026-06-12",
+"sha": "7a6b5b2d",
+"ticket": "LIN-401",
+"pr": 421,
+"file": "routes/proxy.js",
+"touched": 21,
+"existing": 320,
+"note": "touched 21 of 320 existing site(s) within \u00b115 lines; count 320\u2192324"
+},
+{
+"kind": "site",
+"date": "2026-06-13",
+"sha": "8d129791",
+"ticket": "LIN-442",
+"pr": 440,
+"file": "routes/workspace-api.js",
+"note": "+5 site(s) in routes/workspace-api.js; total 324\u2192329"
+},
+{
+"kind": "site",
+"date": "2026-06-13",
+"sha": "2b7ad939",
+"ticket": "LIN-450",
+"pr": 454,
+"file": "routes/collective.js",
+"note": "+13 site(s) in routes/collective.js; total 329\u2192342"
+},
+{
+"kind": "site",
+"date": "2026-06-13",
+"sha": "8d48dfe5",
+"ticket": "LIN-450",
+"pr": 456,
+"file": "routes/collective.js",
+"note": "+2 site(s) in routes/collective.js; total 342\u2192344"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "8d129791",
+"ticket": "LIN-442",
+"pr": 440,
+"file": "routes/workspace-api.js",
+"touched": 3,
+"existing": 324,
+"note": "touched 3 of 324 existing site(s) within \u00b115 lines; count 324\u2192329"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "4a38a16a",
+"ticket": null,
+"pr": 445,
+"file": "routes/proxy.js",
+"touched": 2,
+"existing": 329,
+"note": "touched 2 of 329 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-13",
+"sha": "8d48dfe5",
+"ticket": "LIN-450",
+"pr": 456,
+"file": "routes/collective.js",
+"touched": 4,
+"existing": 342,
+"note": "touched 4 of 342 existing site(s) within \u00b115 lines; count 342\u2192344"
+},
+{
+"kind": "site",
+"date": "2026-06-15",
+"sha": "0d319aa6",
+"ticket": null,
+"pr": 471,
+"file": "routes/task-chat.js",
+"note": "+10 site(s) in routes/task-chat.js; total 344\u2192354"
+},
+{
+"kind": "site",
+"date": "2026-06-15",
+"sha": "03c7715a",
+"ticket": "LIN-509",
+"pr": 487,
+"file": "routes/dashboard.js",
+"note": "+13 site(s) in routes/dashboard.js; total 354\u2192367"
+},
+{
+"kind": "removal",
+"date": "2026-06-16",
+"sha": "a0ad7310",
+"ticket": "LIN-451",
+"pr": 498,
+"file": "routes/proxy.js, routes/workspace-api.js",
+"note": "\u221215 site(s); total 372\u2192357"
+},
+{
+"kind": "site",
+"date": "2026-06-16",
+"sha": "15a6a17e",
+"ticket": "LIN-525",
+"pr": 494,
+"file": "routes/proxy.js",
+"note": "+1 site(s) in routes/proxy.js; total 367\u2192368"
+},
+{
+"kind": "site",
+"date": "2026-06-16",
+"sha": "707cd1ea",
+"ticket": "LIN-415",
+"pr": 495,
+"file": "routes/dispatch.js",
+"note": "+2 site(s) in routes/dispatch.js; total 368\u2192372"
+},
+{
+"kind": "site",
+"date": "2026-06-16",
+"sha": "707cd1ea",
+"ticket": "LIN-415",
+"pr": 495,
+"file": "routes/proxy.js",
+"note": "+2 site(s) in routes/proxy.js; total 368\u2192372"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "05c76ab7",
+"ticket": "LIN-509",
+"pr": 488,
+"file": "routes/dashboard.js",
+"touched": 6,
+"existing": 367,
+"note": "touched 6 of 367 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "af9faf66",
+"ticket": "LIN-512",
+"pr": 490,
+"file": "routes/proxy.js",
+"touched": 13,
+"existing": 367,
+"note": "touched 13 of 367 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "1cf208e6",
+"ticket": "LIN-513",
+"pr": 491,
+"file": "routes/workspace-api.js",
+"touched": 3,
+"existing": 367,
+"note": "touched 3 of 367 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "15a6a17e",
+"ticket": "LIN-525",
+"pr": 494,
+"file": "routes/proxy.js",
+"touched": 4,
+"existing": 367,
+"note": "touched 4 of 367 existing site(s) within \u00b115 lines; count 367\u2192368"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "707cd1ea",
+"ticket": "LIN-415",
+"pr": 495,
+"file": "routes/dispatch.js, routes/proxy.js",
+"touched": 15,
+"existing": 368,
+"note": "touched 15 of 368 existing site(s) within \u00b115 lines; count 368\u2192372"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "cbbf971e",
+"ticket": "LIN-528",
+"pr": 496,
+"file": "routes/proxy.js",
+"touched": 15,
+"existing": 372,
+"note": "touched 15 of 372 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "a0ad7310",
+"ticket": "LIN-451",
+"pr": 498,
+"file": "routes/proxy.js, routes/workspace-api.js",
+"touched": 23,
+"existing": 372,
+"note": "touched 23 of 372 existing site(s) within \u00b115 lines; count 372\u2192357"
+},
+{
+"kind": "touch",
+"date": "2026-06-16",
+"sha": "41c6cd88",
+"ticket": "LIN-533",
+"pr": 499,
+"file": "routes/dispatch.js, routes/proxy.js, routes/workspace-api.js",
+"touched": 25,
+"existing": 357,
+"note": "touched 25 of 357 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "helper",
+"date": "2026-06-18",
+"sha": "8fadcb9b",
+"ticket": "LIN-420",
+"pr": 505,
+"file": "routes/proxy.js, routes/workspace-api.js, routes/dispatch.js",
+"note": "adopt lib/errors.js in the big-three routes: 357 \u2192 53 sites (\u2212304), the only sweep"
+},
+{
+"kind": "removal",
+"date": "2026-06-18",
+"sha": "8fadcb9b",
+"ticket": "LIN-420",
+"pr": 505,
+"file": "routes/dispatch.js, routes/proxy.js, routes/workspace-api.js",
+"note": "\u2212304 site(s); total 357\u219253"
+},
+{
+"kind": "touch",
+"date": "2026-06-18",
+"sha": "8fadcb9b",
+"ticket": "LIN-420",
+"pr": 505,
+"file": "routes/dispatch.js, routes/proxy.js, routes/workspace-api.js",
+"touched": 304,
+"existing": 357,
+"note": "touched 304 of 357 existing site(s) within \u00b115 lines; count 357\u219253"
+},
+{
+"kind": "site",
+"date": "2026-06-21",
+"sha": "5d7d07a0",
+"ticket": "LIN-578",
+"pr": 534,
+"file": "routes/workspace-api.js",
+"note": "+1 site(s) in routes/workspace-api.js; total 53\u219254"
+},
+{
+"kind": "touch",
+"date": "2026-06-21",
+"sha": "6e73d26d",
+"ticket": "LIN-309",
+"pr": 540,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 54,
+"note": "touched 1 of 54 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "removal",
+"date": "2026-06-22",
+"sha": "6017c664",
+"ticket": "LIN-595",
+"pr": 559,
+"file": "routes/dashboard.js",
+"note": "\u22124 site(s); total 67\u219263"
+},
+{
+"kind": "site",
+"date": "2026-06-22",
+"sha": "dc448d4f",
+"ticket": "LIN-592",
+"pr": 554,
+"file": "routes/dashboard.js",
+"note": "+8 site(s) in routes/dashboard.js; total 54\u219262"
+},
+{
+"kind": "site",
+"date": "2026-06-22",
+"sha": "9697e461",
+"ticket": "LIN-593",
+"pr": 556,
+"file": "routes/dashboard.js",
+"note": "+5 site(s) in routes/dashboard.js; total 62\u219267"
+},
+{
+"kind": "touch",
+"date": "2026-06-22",
+"sha": "dc448d4f",
+"ticket": "LIN-592",
+"pr": 554,
+"file": "routes/dashboard.js",
+"touched": 3,
+"existing": 54,
+"note": "touched 3 of 54 existing site(s) within \u00b115 lines; count 54\u219262"
+},
+{
+"kind": "touch",
+"date": "2026-06-22",
+"sha": "9697e461",
+"ticket": "LIN-593",
+"pr": 556,
+"file": "routes/dashboard.js",
+"touched": 3,
+"existing": 62,
+"note": "touched 3 of 62 existing site(s) within \u00b115 lines; count 62\u219267"
+},
+{
+"kind": "touch",
+"date": "2026-06-22",
+"sha": "6017c664",
+"ticket": "LIN-595",
+"pr": 559,
+"file": "routes/dashboard.js",
+"touched": 16,
+"existing": 67,
+"note": "touched 16 of 67 existing site(s) within \u00b115 lines; count 67\u219263"
+},
+{
+"kind": "removal",
+"date": "2026-06-23",
+"sha": "203f4ee3",
+"ticket": "LIN-615",
+"pr": 578,
+"file": "routes/dashboard.js, routes/pipeline.js",
+"note": "\u221210 site(s); total 64\u219254"
+},
+{
+"kind": "site",
+"date": "2026-06-23",
+"sha": "92e9fdaa",
+"ticket": "LIN-608",
+"pr": 567,
+"file": "server.js",
+"note": "+1 site(s) in server.js; total 63\u219264"
+},
+{
+"kind": "touch",
+"date": "2026-06-23",
+"sha": "92e9fdaa",
+"ticket": "LIN-608",
+"pr": 567,
+"file": "routes/dashboard.js",
+"touched": 5,
+"existing": 63,
+"note": "touched 5 of 63 existing site(s) within \u00b115 lines; count 63\u219264"
+},
+{
+"kind": "touch",
+"date": "2026-06-23",
+"sha": "2816e2e7",
+"ticket": "LIN-609",
+"pr": 571,
+"file": "server.js",
+"touched": 1,
+"existing": 64,
+"note": "touched 1 of 64 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-23",
+"sha": "203f4ee3",
+"ticket": "LIN-615",
+"pr": 578,
+"file": "routes/dashboard.js, routes/pipeline.js",
+"touched": 14,
+"existing": 64,
+"note": "touched 14 of 64 existing site(s) within \u00b115 lines; count 64\u219254"
+},
+{
+"kind": "site",
+"date": "2026-06-24",
+"sha": "b0b4d99f",
+"ticket": "LIN-603",
+"pr": 599,
+"file": "routes/next-run.js",
+"note": "+5 site(s) in routes/next-run.js; total 54\u219259"
+},
+{
+"kind": "touch",
+"date": "2026-06-24",
+"sha": "90c7e2b7",
+"ticket": "LIN-632",
+"pr": 591,
+"file": "routes/dashboard.js",
+"touched": 5,
+"existing": 54,
+"note": "touched 5 of 54 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-24",
+"sha": "cbe4d5ee",
+"ticket": "LIN-581",
+"pr": 600,
+"file": "server.js",
+"touched": 1,
+"existing": 59,
+"note": "touched 1 of 59 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-06-24",
+"sha": "6c933dc3",
+"ticket": "LIN-633",
+"pr": 601,
+"file": "routes/next-run.js",
+"touched": 3,
+"existing": 59,
+"note": "touched 3 of 59 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-06-25",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-06-25.md",
+"strength": "direct",
+"note": "review: improved markedly (~53 non-test residue) but \"the residue is a new, smaller frontier\": dashboard 17, collective 15, task-chat 10, next-run 5, legacy-redirects 4"
+},
+{
+"kind": "touch",
+"date": "2026-06-25",
+"sha": "c06973eb",
+"ticket": "LIN-713",
+"pr": 639,
+"file": "routes/next-run.js, routes/task-chat.js",
+"touched": 7,
+"existing": 59,
+"note": "touched 7 of 59 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-06-26",
+"sha": null,
+"ticket": "LIN-735",
+"file": null,
+"note": "defect row (escaped, found by human): \"Fix Providers\" \u2014 names `lib/errors.js` in comments",
+"strength": "incidental"
+},
+{
+"kind": "site",
+"date": "2026-06-27",
+"sha": "f9b94dfa",
+"ticket": "LIN-756",
+"pr": 663,
+"file": "server.js",
+"note": "+2 site(s) in server.js; total 59\u219261"
+},
+{
+"kind": "touch",
+"date": "2026-06-27",
+"sha": "4299d38a",
+"ticket": "LIN-742",
+"pr": 669,
+"file": "routes/next-run.js",
+"touched": 3,
+"existing": 61,
+"note": "touched 3 of 61 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "removal",
+"date": "2026-06-28",
+"sha": "b6e7cf27",
+"ticket": "LIN-756",
+"pr": 670,
+"file": "server.js",
+"note": "\u22122 site(s); total 61\u219259"
+},
+{
+"kind": "touch",
+"date": "2026-06-28",
+"sha": "b6e7cf27",
+"ticket": "LIN-756",
+"pr": 670,
+"file": "server.js",
+"touched": 2,
+"existing": 61,
+"note": "touched 2 of 61 existing site(s) within \u00b115 lines; count 61\u219259"
+},
+{
+"kind": "site",
+"date": "2026-06-30",
+"sha": "462ecafd",
+"ticket": "LIN-785",
+"pr": 703,
+"file": "server.js",
+"note": "+2 site(s) in server.js; total 59\u219261"
+},
+{
+"kind": "touch",
+"date": "2026-07-03",
+"sha": "852f5534",
+"ticket": "LIN-961",
+"pr": 763,
+"file": "routes/dashboard.js, routes/next-run.js, routes/proxy.js, routes/task-chat.js",
+"touched": 12,
+"existing": 61,
+"note": "touched 12 of 61 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-03",
+"sha": "a639eef8",
+"ticket": "LIN-779",
+"pr": 769,
+"file": "routes/next-run.js",
+"touched": 2,
+"existing": 61,
+"note": "touched 2 of 61 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-04",
+"sha": "5f4f51ba",
+"ticket": "LIN-1008",
+"pr": 797,
+"file": "routes/task-chat.js",
+"note": "+9 site(s) in routes/task-chat.js; total 61\u219270"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "5cbb0968",
+"ticket": "LIN-990",
+"pr": 785,
+"file": "routes/task-chat.js",
+"touched": 2,
+"existing": 61,
+"note": "touched 2 of 61 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "5f4f51ba",
+"ticket": "LIN-1008",
+"pr": 797,
+"file": "routes/task-chat.js",
+"touched": 5,
+"existing": 61,
+"note": "touched 5 of 61 existing site(s) within \u00b115 lines; count 61\u219270"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "4e190164",
+"ticket": "LIN-1022",
+"pr": 800,
+"file": "routes/dashboard.js",
+"touched": 8,
+"existing": 70,
+"note": "touched 8 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-04",
+"sha": "792a8336",
+"ticket": "LIN-1022",
+"pr": 802,
+"file": "routes/dashboard.js",
+"touched": 9,
+"existing": 70,
+"note": "touched 9 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-05",
+"sha": "f81d6171",
+"ticket": "LIN-1048",
+"pr": 817,
+"file": "routes/collective.js",
+"touched": 9,
+"existing": 70,
+"note": "touched 9 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-05",
+"sha": "f9ca9276",
+"ticket": "LIN-1049",
+"pr": 822,
+"file": "routes/collective.js",
+"touched": 4,
+"existing": 70,
+"note": "touched 4 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-06",
+"sha": "de23691b",
+"ticket": "LIN-1050",
+"pr": 827,
+"file": "routes/collective.js",
+"touched": 1,
+"existing": 70,
+"note": "touched 1 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-06",
+"sha": "fddf5271",
+"ticket": "LIN-1094",
+"pr": 829,
+"file": "server.js",
+"touched": 1,
+"existing": 70,
+"note": "touched 1 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-08",
+"sha": "acb6361f",
+"ticket": "LIN-1145",
+"pr": 849,
+"file": "routes/dashboard.js, routes/next-run.js",
+"touched": 7,
+"existing": 70,
+"note": "touched 7 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-07-09",
+"sha": null,
+"ticket": "LIN-1158",
+"file": null,
+"note": "defect row (escaped, found by agent): \"Malformed JSON request body returns unhandled 500 instead of 400 (proxy write endpoints)\" \u2014 names `lib/errors.js` in comments",
+"strength": "direct"
+},
+{
+"kind": "site",
+"date": "2026-07-09",
+"sha": "1c28b8b9",
+"ticket": "LIN-818",
+"pr": 866,
+"file": "routes/ship-biscuit.js",
+"note": "+5 site(s) in routes/ship-biscuit.js; total 70\u219275"
+},
+{
+"kind": "touch",
+"date": "2026-07-09",
+"sha": "2ebf16fc",
+"ticket": "LIN-1158",
+"pr": 857,
+"file": "server.js",
+"touched": 1,
+"existing": 70,
+"note": "touched 1 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-09",
+"sha": "e4f37e38",
+"ticket": "LIN-1162",
+"pr": 862,
+"file": "server.js",
+"touched": 1,
+"existing": 70,
+"note": "touched 1 of 70 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "removal",
+"date": "2026-07-10",
+"sha": "0cc09c71",
+"ticket": "LIN-1203",
+"pr": 874,
+"file": "routes/ship-biscuit.js",
+"note": "\u22124 site(s); total 76\u219272"
+},
+{
+"kind": "site",
+"date": "2026-07-10",
+"sha": "6b92c2f1",
+"ticket": "LIN-1185",
+"pr": 868,
+"file": "routes/ship-biscuit.js",
+"note": "+1 site(s) in routes/ship-biscuit.js; total 75\u219276"
+},
+{
+"kind": "touch",
+"date": "2026-07-10",
+"sha": "6b92c2f1",
+"ticket": "LIN-1185",
+"pr": 868,
+"file": "routes/ship-biscuit.js",
+"touched": 3,
+"existing": 75,
+"note": "touched 3 of 75 existing site(s) within \u00b115 lines; count 75\u219276"
+},
+{
+"kind": "touch",
+"date": "2026-07-10",
+"sha": "20db4a6a",
+"ticket": "LIN-1197",
+"pr": 872,
+"file": "routes/ship-biscuit.js",
+"touched": 1,
+"existing": 76,
+"note": "touched 1 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-10",
+"sha": "0cc09c71",
+"ticket": "LIN-1203",
+"pr": 874,
+"file": "routes/ship-biscuit.js",
+"touched": 6,
+"existing": 76,
+"note": "touched 6 of 76 existing site(s) within \u00b115 lines; count 76\u219272"
+},
+{
+"kind": "touch",
+"date": "2026-07-10",
+"sha": "42681b77",
+"ticket": "LIN-1212",
+"pr": 877,
+"file": "routes/ship-biscuit.js",
+"touched": 1,
+"existing": 72,
+"note": "touched 1 of 72 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-16",
+"sha": "94d3fb9a",
+"ticket": "LIN-1353",
+"pr": 926,
+"file": "routes/task-chat.js, server.js",
+"touched": 11,
+"existing": 72,
+"note": "touched 11 of 72 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-17",
+"sha": "071da362",
+"ticket": "LIN-1332",
+"pr": 941,
+"file": "routes/task-chat.js",
+"touched": 1,
+"existing": 72,
+"note": "touched 1 of 72 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-17",
+"sha": "2568272c",
+"ticket": "LIN-1390",
+"pr": 942,
+"file": "server.js",
+"touched": 1,
+"existing": 72,
+"note": "touched 1 of 72 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-07-18",
+"sha": "e3018c4f",
+"ticket": "LIN-1397",
+"pr": 952,
+"file": "routes/dispatch.js",
+"note": "+1 site(s) in routes/dispatch.js; total 72\u219273"
+},
+{
+"kind": "fix",
+"date": "2026-07-19",
+"sha": null,
+"ticket": "LIN-1413",
+"file": null,
+"note": "defect row (escaped, found by human): \"Proxy token pinned to stale createdBy/accountId survives re-auth (503 persists after \"add \" \u2014 names `lib/errors.js` in description",
+"strength": "incidental"
+},
+{
+"kind": "removal",
+"date": "2026-07-19",
+"sha": "4a84bd0b",
+"ticket": "LIN-1447",
+"pr": 964,
+"file": "routes/dispatch.js",
+"note": "\u22121 site(s); total 75\u219274"
+},
+{
+"kind": "site",
+"date": "2026-07-19",
+"sha": "5ec586fa",
+"ticket": null,
+"pr": 958,
+"file": "routes/live-console.js",
+"note": "+2 site(s) in routes/live-console.js; total 73\u219275"
+},
+{
+"kind": "touch",
+"date": "2026-07-19",
+"sha": "4a84bd0b",
+"ticket": "LIN-1447",
+"pr": 964,
+"file": "routes/dispatch.js",
+"touched": 1,
+"existing": 75,
+"note": "touched 1 of 75 existing site(s) within \u00b115 lines; count 75\u219274"
+},
+{
+"kind": "complaint",
+"date": "2026-07-20",
+"sha": null,
+"ticket": "LIN-1413",
+"file": null,
+"note": "code-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "complaint",
+"date": "2026-07-20",
+"sha": null,
+"ticket": "LIN-1413",
+"file": null,
+"note": "code-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-07-20",
+"sha": "976b1ce4",
+"ticket": null,
+"pr": 975,
+"file": "routes/dashboard.js",
+"touched": 2,
+"existing": 74,
+"note": "touched 2 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-07-21",
+"sha": null,
+"ticket": "LIN-1503",
+"file": null,
+"note": "defect row (escaped, found by agent): \"401-retry path removes GitHub/github-projects workspaces instead of re-minting (provider-b\" \u2014 names `lib/errors.js` in comments",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-07-23",
+"sha": "3341d00b",
+"ticket": "LIN-1494",
+"pr": 989,
+"file": "routes/live-console.js",
+"touched": 2,
+"existing": 74,
+"note": "touched 2 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-23",
+"sha": "bd51f799",
+"ticket": "LIN-1540",
+"pr": 992,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-24",
+"sha": "37246a74",
+"ticket": "LIN-1511",
+"pr": 999,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-07-25",
+"sha": null,
+"ticket": "LIN-1576",
+"file": null,
+"note": "defect row (escaped, found by unclear): \"Ownerless (createdBy:null) proxy tokens from the LIN-1447 compat lane 503 every workspace \" \u2014 names `lib/errors.js` in comments",
+"strength": "incidental"
+},
+{
+"kind": "fix",
+"date": "2026-07-25",
+"sha": null,
+"ticket": "LIN-1577",
+"file": null,
+"note": "defect row (not-defect, found by unclear): \"No detection for per-session credential death: workspace health reports OK while in-flight\" \u2014 names `lib/errors.js` in comments",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-07-26",
+"sha": "96eac2b7",
+"ticket": "LIN-1588",
+"pr": 1021,
+"file": "routes/live-console.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-07-31",
+"sha": "03e4f4da",
+"ticket": "LIN-1691",
+"pr": 1039,
+"file": "server.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-01",
+"sha": null,
+"ticket": "LIN-1388",
+"file": null,
+"note": "plan-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "complaint",
+"date": "2026-08-01",
+"sha": null,
+"ticket": "LIN-1388",
+"file": null,
+"note": "plan-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-08-01",
+"sha": "636148ef",
+"ticket": "LIN-1388",
+"pr": 1044,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-03",
+"sha": null,
+"ticket": "LIN-1503",
+"file": null,
+"note": "plan-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-08-03",
+"sha": "a4f9638e",
+"ticket": "LIN-1458",
+"pr": 1073,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-07",
+"sha": null,
+"ticket": "LIN-1886",
+"file": null,
+"note": "plan-review send-back names `jsonError`",
+"strength": "direct"
+},
+{
+"kind": "touch",
+"date": "2026-08-07",
+"sha": "c6b640d6",
+"ticket": "LIN-1891",
+"pr": 1078,
+"file": "server.js",
+"touched": 1,
+"existing": 74,
+"note": "touched 1 of 74 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-10",
+"sha": null,
+"ticket": "LIN-2025",
+"file": null,
+"note": "other-review send-back names `jsonError`",
+"strength": "direct"
+},
+{
+"kind": "site",
+"date": "2026-08-13",
+"sha": "dfff91a0",
+"ticket": "LIN-1948",
+"pr": 1112,
+"file": "routes/dispatch.js",
+"note": "+1 site(s) in routes/dispatch.js; total 74\u219275"
+},
+{
+"kind": "site",
+"date": "2026-08-13",
+"sha": "a00ee5ed",
+"ticket": "LIN-1910",
+"pr": 1118,
+"file": "routes/task-chat.js",
+"note": "+1 site(s) in routes/task-chat.js; total 75\u219276"
+},
+{
+"kind": "touch",
+"date": "2026-08-13",
+"sha": "a00ee5ed",
+"ticket": "LIN-1910",
+"pr": 1118,
+"file": "routes/task-chat.js",
+"touched": 10,
+"existing": 75,
+"note": "touched 10 of 75 existing site(s) within \u00b115 lines; count 75\u219276"
+},
+{
+"kind": "touch",
+"date": "2026-08-13",
+"sha": "3d92408a",
+"ticket": "LIN-1505",
+"pr": 1125,
+"file": "routes/live-console.js",
+"touched": 1,
+"existing": 76,
+"note": "touched 1 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-14",
+"sha": "e0d2f9ff",
+"ticket": "LIN-2047",
+"pr": 1128,
+"file": "routes/task-chat.js",
+"touched": 5,
+"existing": 76,
+"note": "touched 5 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-22",
+"sha": "de572f58",
+"ticket": "LIN-1728",
+"pr": 1170,
+"file": "routes/dashboard.js",
+"touched": 2,
+"existing": 76,
+"note": "touched 2 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "move",
+"date": "2026-08-23",
+"sha": "80bd043d",
+"ticket": "LIN-2246",
+"pr": 1232,
+"file": "routes/workspace-api-prompts.js",
+"note": "site(s) moved routes/workspace-api.js \u2192 routes/workspace-api-prompts.js; total unchanged at 76"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "59505907",
+"ticket": "LIN-2225",
+"pr": 1192,
+"file": "routes/dashboard.js",
+"touched": 2,
+"existing": 76,
+"note": "touched 2 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "93ed7ccd",
+"ticket": "LIN-1736",
+"pr": 1209,
+"file": "routes/dashboard.js",
+"touched": 2,
+"existing": 76,
+"note": "touched 2 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "77698407",
+"ticket": "LIN-2216",
+"pr": 1211,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 76,
+"note": "touched 1 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-08-23",
+"sha": "80bd043d",
+"ticket": "LIN-2246",
+"pr": 1232,
+"file": "routes/workspace-api.js",
+"touched": 1,
+"existing": 76,
+"note": "touched 1 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-08-26",
+"sha": null,
+"ticket": "LIN-2327",
+"file": null,
+"note": "defect row (escaped, found by agent): \"Credential self-heal loops silently on byte-identical Linear refresh; escalate to re-auth \" \u2014 names `lib/errors.js` in comments",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-08-27",
+"sha": "5cdf6f6b",
+"ticket": "LIN-2327",
+"pr": 1264,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 76,
+"note": "touched 1 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-08-29",
+"sha": null,
+"ticket": "LIN-2351",
+"file": null,
+"note": "code-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "complaint",
+"date": "2026-08-29",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-08-29.md",
+"strength": "direct",
+"note": "review: 76 residue at 292ac962; dashboard.js a half-adopter (imports jsonError, converted 0 of 17)"
+},
+{
+"kind": "fix",
+"date": "2026-08-29",
+"sha": null,
+"ticket": "LIN-2363",
+"file": null,
+"note": "defect row (escaped, found by agent): \"autopilot/kickoff forwards classifyUpstreamError's Linear-named detail into non-Linear pro\" \u2014 names `error envelope` in description",
+"strength": "direct"
+},
+{
+"kind": "fix",
+"date": "2026-08-29",
+"sha": null,
+"ticket": "LIN-2370",
+"file": null,
+"note": "defect row (escaped, found by agent): \"Browser copy-prompt blocks still hardcode \"currently backed by Linear\" (public/proxy.js, p\" \u2014 names `lib/errors.js` in comments",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-08-29",
+"sha": "bfab2f58",
+"ticket": "LIN-2357",
+"pr": 1288,
+"file": "routes/workspace-api-prompts.js",
+"touched": 1,
+"existing": 76,
+"note": "touched 1 of 76 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "site",
+"date": "2026-08-30",
+"sha": "2392a537",
+"ticket": "LIN-2412",
+"pr": 1307,
+"file": "routes/openrouter-auth.js",
+"note": "+2 site(s) in routes/openrouter-auth.js; total 76\u219278"
+},
+{
+"kind": "site",
+"date": "2026-08-31",
+"sha": "5ade5687",
+"ticket": "LIN-2432",
+"pr": 1315,
+"file": "routes/flight-companion.js",
+"note": "+4 site(s) in routes/flight-companion.js; total 78\u219282"
+},
+{
+"kind": "touch",
+"date": "2026-09-01",
+"sha": "f339e788",
+"ticket": "LIN-2435",
+"pr": 1317,
+"file": "routes/flight-companion.js",
+"touched": 2,
+"existing": 82,
+"note": "touched 2 of 82 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-02",
+"sha": "3ef182bb",
+"ticket": "LIN-2442",
+"pr": 1320,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 82,
+"note": "touched 1 of 82 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-09-05",
+"sha": null,
+"ticket": "LIN-2641",
+"file": null,
+"note": "plan-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "site",
+"date": "2026-09-05",
+"sha": "4b3bfb3d",
+"ticket": "LIN-2620",
+"pr": 1413,
+"file": "routes/proxy-flight-companion.js",
+"note": "+1 site(s) in routes/proxy-flight-companion.js; total 82\u219283"
+},
+{
+"kind": "site",
+"date": "2026-09-05",
+"sha": "2fe3d4e3",
+"ticket": "LIN-2622",
+"pr": 1415,
+"file": "routes/flight-companion.js",
+"note": "+3 site(s) in routes/flight-companion.js; total 83\u219286"
+},
+{
+"kind": "touch",
+"date": "2026-09-05",
+"sha": "64433a6d",
+"ticket": "LIN-2631",
+"pr": 1405,
+"file": "routes/flight-companion.js",
+"touched": 3,
+"existing": 82,
+"note": "touched 3 of 82 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-05",
+"sha": "cf53c824",
+"ticket": "LIN-2641",
+"pr": 1407,
+"file": "routes/dashboard.js",
+"touched": 2,
+"existing": 82,
+"note": "touched 2 of 82 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-05",
+"sha": "321848e1",
+"ticket": "LIN-2625",
+"pr": 1418,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 83,
+"note": "touched 1 of 83 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-09-10",
+"sha": null,
+"ticket": "LIN-2650",
+"file": null,
+"note": "code-review send-back names `jsonError`",
+"strength": "incidental"
+},
+{
+"kind": "site",
+"date": "2026-09-11",
+"sha": "213d1587",
+"ticket": "LIN-2623",
+"pr": 1442,
+"file": "routes/flight-companion.js",
+"note": "+1 site(s) in routes/flight-companion.js; total 86\u219287"
+},
+{
+"kind": "touch",
+"date": "2026-09-11",
+"sha": "213d1587",
+"ticket": "LIN-2623",
+"pr": 1442,
+"file": "routes/flight-companion.js",
+"touched": 1,
+"existing": 86,
+"note": "touched 1 of 86 existing site(s) within \u00b115 lines; count 86\u219287"
+},
+{
+"kind": "touch",
+"date": "2026-09-11",
+"sha": "5b9664cf",
+"ticket": "LIN-2775",
+"pr": 1443,
+"file": "routes/dashboard.js, server.js",
+"touched": 2,
+"existing": 87,
+"note": "touched 2 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-11",
+"sha": "a0f5782f",
+"ticket": "LIN-2634",
+"pr": 1449,
+"file": "routes/proxy-flight-companion.js",
+"touched": 1,
+"existing": 87,
+"note": "touched 1 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-09-21",
+"sha": null,
+"ticket": "LIN-2974",
+"file": null,
+"note": "defect row (escaped, found by unclear): \"Dispatch repo validation passes a name the runner then refuses, and the failed row still b\" \u2014 names `error envelope` in description",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-09-21",
+"sha": "a0854d18",
+"ticket": "LIN-2968",
+"pr": 1531,
+"file": "routes/flight-companion.js",
+"touched": 2,
+"existing": 87,
+"note": "touched 2 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-21",
+"sha": "c65af807",
+"ticket": "LIN-2970",
+"pr": 1535,
+"file": "routes/flight-companion.js, routes/task-chat.js",
+"touched": 8,
+"existing": 87,
+"note": "touched 8 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "fix",
+"date": "2026-09-22",
+"sha": null,
+"ticket": "LIN-3003",
+"file": null,
+"note": "defect row (not-defect, found by agent): \"Harbour reads every Linear project body as blank, so the known-repos inventory is empty (b\" \u2014 names `error envelope` in description",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-09-22",
+"sha": "c988128e",
+"ticket": "LIN-2978",
+"pr": 1540,
+"file": "routes/dashboard.js, routes/next-run.js, routes/ship-biscuit.js",
+"touched": 11,
+"existing": 87,
+"note": "touched 11 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-09-24",
+"sha": null,
+"ticket": "LIN-2933",
+"file": null,
+"note": "plan-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "complaint",
+"date": "2026-09-24",
+"sha": null,
+"ticket": "LIN-2933",
+"file": null,
+"note": "plan-review send-back names `lib/errors.js`",
+"strength": "incidental"
+},
+{
+"kind": "touch",
+"date": "2026-09-25",
+"sha": "42865081",
+"ticket": "LIN-3023",
+"pr": 1567,
+"file": "server.js",
+"touched": 1,
+"existing": 87,
+"note": "touched 1 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-09-25",
+"sha": "7dafd8c1",
+"ticket": "LIN-2891",
+"pr": 1581,
+"file": "server.js",
+"touched": 1,
+"existing": 87,
+"note": "touched 1 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-09-26",
+"sha": null,
+"ticket": null,
+"pr": null,
+"file": "docs/reviews/drift-coherence-review-2026-09-26.md",
+"strength": "direct",
+"note": "review: 76 \u2192 87, \"+11, all in code written this window\"; flight-companion.js a second half-adopter (0 \u2192 8); importer count 14 \u2192 26 is a file-split artifact (LIN-679)"
+},
+{
+"kind": "site",
+"date": "2026-09-29",
+"sha": "75f206dd",
+"ticket": "LIN-3098",
+"pr": 1621,
+"file": "routes/runner-kit.js",
+"note": "+2 site(s) in routes/runner-kit.js; total 87\u219289"
+},
+{
+"kind": "touch",
+"date": "2026-09-29",
+"sha": "bd27fb83",
+"ticket": "LIN-3124",
+"pr": 1618,
+"file": "routes/dashboard.js",
+"touched": 1,
+"existing": 87,
+"note": "touched 1 of 87 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-01",
+"sha": "35983c52",
+"ticket": "LIN-3137",
+"pr": 1617,
+"file": "server.js",
+"touched": 1,
+"existing": 89,
+"note": "touched 1 of 89 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "complaint",
+"date": "2026-10-02",
+"sha": null,
+"ticket": "LIN-3254",
+"file": null,
+"note": "code-review send-back names `jsonError`",
+"strength": "direct"
+},
+{
+"kind": "site",
+"date": "2026-10-02",
+"sha": "1d1dbc3c",
+"ticket": "LIN-3254",
+"pr": 1721,
+"file": "routes/task-chat.js",
+"note": "+4 site(s) in routes/task-chat.js; total 89\u219293"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "f5c7d394",
+"ticket": "LIN-2942",
+"pr": 1711,
+"file": "server.js",
+"touched": 1,
+"existing": 89,
+"note": "touched 1 of 89 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "d933496f",
+"ticket": "LIN-3243",
+"pr": 1714,
+"file": "server.js",
+"touched": 1,
+"existing": 89,
+"note": "touched 1 of 89 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "0924b595",
+"ticket": "LIN-3240",
+"pr": 1718,
+"file": "routes/task-chat.js",
+"touched": 5,
+"existing": 89,
+"note": "touched 5 of 89 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "f17b4a88",
+"ticket": "LIN-3238",
+"pr": 1715,
+"file": "server.js",
+"touched": 1,
+"existing": 89,
+"note": "touched 1 of 89 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "1d1dbc3c",
+"ticket": "LIN-3254",
+"pr": 1721,
+"file": "routes/task-chat.js",
+"touched": 9,
+"existing": 89,
+"note": "touched 9 of 89 existing site(s) within \u00b115 lines; count 89\u219293"
+},
+{
+"kind": "touch",
+"date": "2026-10-02",
+"sha": "56874f8d",
+"ticket": "LIN-3241",
+"pr": 1727,
+"file": "routes/proxy.js",
+"touched": 1,
+"existing": 93,
+"note": "touched 1 of 93 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-03",
+"sha": "325064ee",
+"ticket": "LIN-2952",
+"pr": 1713,
+"file": "server.js",
+"touched": 1,
+"existing": 93,
+"note": "touched 1 of 93 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-05",
+"sha": "b35d1d8c",
+"ticket": "LIN-3242",
+"pr": 1734,
+"file": "routes/dispatch.js",
+"touched": 1,
+"existing": 93,
+"note": "touched 1 of 93 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-05",
+"sha": "cd25bce5",
+"ticket": "LIN-3311",
+"pr": 1753,
+"file": "server.js",
+"touched": 1,
+"existing": 93,
+"note": "touched 1 of 93 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-06",
+"sha": "dcfbf7fa",
+"ticket": "LIN-3325",
+"pr": 1759,
+"file": "server.js",
+"touched": 1,
+"existing": 93,
+"note": "touched 1 of 93 existing site(s) within \u00b115 lines"
+},
+{
+"kind": "touch",
+"date": "2026-10-07",
+"sha": "bf58918b",
+"ticket": "LIN-3335",
+"pr": 1765,
+"file": "routes/dispatch.js, routes/proxy.js, routes/task-chat.js",
+"touched": 5,
+"existing": 93,
+"note": "touched 5 of 93 existing site(s) within \u00b115 lines"
+}
+]
+}
+}
+}
