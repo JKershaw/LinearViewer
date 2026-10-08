@@ -70,7 +70,9 @@ The decisions that grew are the ones a new module needs on its first day: how to
 | A declared list kept beside the thing it describes, in one module | 5 | `PROVIDER_SURFACE` beside the provider methods; two interval constants that "MUST stay the same value" |
 | A plain convenience copy where an import was possible | 7 | "Copied verbatim from lib/live-console.js's `_epoch`" |
 
-Twenty-one of the 33 name a boundary or a rule. The largest single producer is a line in the project's first commit: "Keep it minimal - no frameworks, no build step" (`CLAUDE.md:43`, from `a82b8758`, 4 January). Read as "no shared module between server and browser", it has produced eleven twins, six of them before the fleet existed (the swim-lanes prototype of 16 March and the radial Ship view of 16 May). Browsers load ES modules without a build step, so the rule does not require the copies; the reading of it does. The copy in `public/swim.js` has pointed at LIN-174 as the place its unification would be filed since 7 June; LIN-174 closed on 10 June with no such child. The 2 October twin was made the day before the October authority rules landed, by an agent that found the original, named it, and declined to import it for a reason of its own.
+Twenty-one of the 33 name a boundary or a rule. The largest single producer is a line in the project's first commit (a82b8758, 4 January), CLAUDE.md:43: `Keep it minimal - no frameworks, no build step`.
+
+Read as "no shared module between server and browser", that line has produced eleven twins, six of them before the fleet existed (the swim-lanes prototype of 16 March and the radial Ship view of 16 May). Browsers load ES modules without a build step, so the rule does not require the copies; the reading of it does. The copy in `public/swim.js` has pointed at LIN-174 as the place its unification would be filed since 7 June; LIN-174 closed on 10 June with no such child. The 2 October twin was made the day before the October authority rules landed, by an agent that found the original, named it, and declined to import it for a reason of its own.
 
 ### 3. The duplicated decisions are an obligation paid when the decision changes
 
