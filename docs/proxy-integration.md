@@ -176,10 +176,13 @@ Response:
 ```
 
 Use `<WORKING_TOKEN>` as the Bearer on every subsequent call. The bootstrap is spent by the
-exchange (a second exchange returns `401`) and can never call a data endpoint itself, so the
-durable prompt — which is persisted in the dispatch queue/history and is readable via
-`GET /api/proxy/dispatch/{id}/prompt` — only ever carries an already-spent credential. This is
-what lets a leaked prompt leak nothing usable. A workspace operator can mint a bootstrap via
+exchange (a second exchange returns `401`) and can never call a data endpoint itself. The
+durable prompt is persisted in the dispatch queue/history, and a bootstrap that has not been
+exchanged yet (for example on a cancelled or expired row) is still live, so session-readable
+responses mask it: `GET /api/proxy/dispatch/{id}/prompt`, the /dispatch list, history, and trim
+replace the token with `[REDACTED-BOOTSTRAP-TOKEN]` unless the caller is the row's own dispatcher.
+A declared-resume row is masked for everyone (LIN-3384). Runners receive the token through
+poll/take. A workspace operator can mint a bootstrap via
 `POST /workspace/:urlKey/api/proxy/tokens` with `"bootstrap": true`.
 
 **Bootstrap mints require an owner when strict mode is on.** A bootstrap carries the `createdBy`

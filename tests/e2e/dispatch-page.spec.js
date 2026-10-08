@@ -644,9 +644,21 @@ test.describe('Dispatch Page', () => {
       expect(item.harness).toBe('claude-code');
       // The MCP token-field path: token travels as a structured field, and the
       // injection-prone token/curl prose is gone from the prompt.
-      expect(item.bootstrapToken).toBeTruthy();
+      // LIN-3384: the session-readable list must NOT carry the live token...
+      expect(item.bootstrapToken).toBeNull();
       expect(item.prompt).toContain(PROXY_MARKER);
       expect(item.prompt).not.toContain('curl -X POST');
+
+      // ...it is delivered only on the runner's poll.
+      await seedWorkspaceOwnership(page, WS);
+      const tokenRes = await page.request.post(`${API_PREFIX}/api/dispatch/tokens`, { data: { label: 'lin-3384-e2e' } });
+      expect(tokenRes.status()).toBe(201);
+      const { token } = await tokenRes.json();
+      const poll = await page.request.get('/api/dispatch/poll', { headers: { Authorization: `Bearer ${token}` } });
+      expect(poll.status()).toBe(200);
+      const polled = (await poll.json()).items.find(i => i.prompt.startsWith('MCP token path test'));
+      expect(polled).toBeDefined();
+      expect(polled.bootstrapToken).toBeTruthy();
     });
 
     test('opencode + proxy on → prose block, no bootstrapToken field (non-claude-code unaffected)', async ({ page }) => {
