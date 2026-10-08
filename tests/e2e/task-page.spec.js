@@ -461,7 +461,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toHaveText('Merge PR #41');
-    await expect(page.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is open and ready for you to merge.');
+    await expect(page.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
     await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('Harbour never merges on its own');
     // The header says waiting on the person, and the page says it is merge-ready.
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Approved. PR #41 is ready to merge.');
@@ -494,7 +494,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await guest.goto(`${origin}${path}`);
     await expect(guest.locator('[data-testid="task-page-pr-mount"] [data-testid="run-evidence"]')).toBeAttached();
     await expect(guest.locator('[data-testid="run-evidence-closeout"]')).toHaveCount(0);
-    await expect(guest.locator('[data-testid="task-page-pr-lead"]')).toContainText('PR #41');
+    await expect(guest.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
     await expect(guest.locator('[data-action="closeout-press"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-owner-widgets"]')).toHaveCount(0);
     await expect(guest.locator('[data-testid="task-page-description-body"] p')).toHaveCount(1);

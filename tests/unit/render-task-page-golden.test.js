@@ -25,7 +25,7 @@ import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus,
 import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
-import { CLOSE_OUT_STATUS } from '../../lib/run-closeout-state.js';
+import { CLOSE_OUT_STATUS, deriveCloseOutState } from '../../lib/run-closeout-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GOLDEN_PATH = join(__dirname, '../fixtures/render-task-page-golden.json');
@@ -287,6 +287,20 @@ describe('task page structure', () => {
         ...m,
         evidence: {
           ...m.evidence,
+          // A review and a ledger, so the review, checks and ledger sentences are
+          // rendered under the no-SHA / no-ISO assertion below (review F2). The sha
+          // carries digits: the assertion's SHA pattern requires one.
+          evidence: {
+            ...m.evidence.evidence,
+            checked: {
+              ...(m.evidence.evidence && m.evidence.evidence.checked),
+              review: { verdict: 'approve', verdictText: 'Approve', at: '2026-10-06T10:00:00.000Z', sha: 'd34db33f'.repeat(5) },
+            },
+          },
+          ledger: { ledger: { present: true, empty: false, items: [
+            { id: 'L1', scope: 'inside', claim: 'x', discharged: true },
+            { id: 'L2', scope: 'inside', claim: 'y', discharged: false },
+          ] } },
           closeOut: {
             owner: true, status, variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
             pr: { url: 'https://github.com/acme/app/pull/41', number: 41, headSha: 'abc1234' },
@@ -301,6 +315,9 @@ describe('task page structure', () => {
       const from = html.indexOf('data-testid="task-page-pr-summary"');
       const says = html.slice(from, html.indexOf('</div>', from));
       assert.match(says, /task-page-pr-lead">[^<]{12,}</, `${status}: a plain-words lead`);
+      const detail = (says.match(/task-page-pr-detail">([^<]*)</) || [])[1] || '';
+      assert.match(detail, /Review approved it on 6 Oct/, `${status}: the review sentence`);
+      assert.match(detail, /2 things CI couldn&#039;t prove: 1 of 2 checked/, `${status}: the ledger sentence`);
       assert.doesNotMatch(says, /\b(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b|\d{4}-\d{2}-\d{2}T\d{2}:/, `${status}: no SHA or ISO time in the justification`);
       // One clear button, and only when the close-out is ready.
       const buttons = html.match(/data-action="closeout-press"/g) || [];
@@ -310,6 +327,36 @@ describe('task page structure', () => {
       assert.doesNotMatch(guestHtml, /closeout-press/, `${status}: a guest never gets the button`);
       assert.match(guestHtml, /task-page-pr-lead/, `${status}: a guest still gets the justification`);
     }
+  });
+
+  // LIN-3356 review F1: the plain-words lead is viewer-blind. A guest's load has
+  // no runner (`runnerReady:false`, `owner:false`), so its close-out reads
+  // 'not-ready' / 'runner-not-set-up' for the same approved PR the owner sees as
+  // ready. The guest must not be told the PR isn't ready.
+  test('a guest is not told an approved, ready PR is not ready (F1)', () => {
+    const REPO = 'acme/app';
+    const derive = (over) => deriveCloseOutState({
+      prs: [{ url: `https://github.com/${REPO}/pull/41`, repo: REPO, number: 41, corroborated: false }],
+      prStatuses: [{ repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'aaaaaaa' }, ref: 'aaaaaaa', checks: [] }],
+      review: { verdict: 'approve', verdictText: 'Approve', sha: 'aaaaaaa' },
+      stopAt: 'pr', variant: 'standard', urlKey: 'acme', issueIdentifier: 'LIN-50',
+      ...over,
+    });
+    const guestState = derive({ owner: false, runnerReady: false });
+    assert.equal(guestState.status, CLOSE_OUT_STATUS.NOT_READY, 'the guest inputs do produce not-ready');
+    assert.equal(guestState.reason, 'runner-not-set-up');
+    const ownerState = derive({ owner: true, runnerReady: true });
+    assert.equal(ownerState.status, CLOSE_OUT_STATUS.READY);
+    const lead = (closeOut, viewer) => {
+      const m = model('running-blocked-repeat');
+      const html = renderTaskPage({ ...m, evidence: { ...m.evidence, closeOut } }, { viewer, urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+      return (html.match(/data-testid="task-page-pr-lead">([^<]*)</) || [])[1];
+    };
+    const sentence = 'PR #41 is approved and ready to merge.';
+    assert.equal(lead(ownerState, 'owner'), sentence);
+    assert.equal(lead(guestState, 'guest'), sentence, 'the guest reads the same sentence as the owner');
+    // Other not-ready reasons keep their wording.
+    assert.match(lead(derive({ owner: false, runnerReady: false, review: { verdict: 'request-changes', verdictText: 'Request changes', sha: 'aaaaaaa' } }), 'guest'), /isn&#039;t ready to merge yet/);
   });
 
   test('header answers running / waiting / done', () => {
