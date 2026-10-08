@@ -1,3 +1,12 @@
+---
+title: The lineage of four multi-site decisions
+kind: data
+version: 1
+date: 2026-10-08
+authors: [Claude, for John Kershaw]
+grounded_at: d61903f39f757ec84f989f541f0552dd86c8b26f (LinearViewer, origin/main, 2026-10-07)
+---
+
 # Lineage of four decisions — Harbour (`/home/user/LinearViewer`), ground `d61903f3` (2026-10-08)
 
 Read-only reconstruction from the first-parent history of `main`, the Drift & Coherence review editions under

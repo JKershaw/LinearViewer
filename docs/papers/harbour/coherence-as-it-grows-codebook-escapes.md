@@ -1,3 +1,12 @@
+---
+title: Codebook: cause of an escaped defect
+kind: codebook
+version: 1
+date: 2026-10-08
+authors: [Claude, for John Kershaw]
+grounded_at: d61903f39f757ec84f989f541f0552dd86c8b26f (LinearViewer, origin/main, 2026-10-07)
+---
+
 # Codebook: cause of an escaped defect
 
 Code every row by what the fault was, from the Bug ticket's description and comments and the introducing ticket's record, not from the row's `reason` alone. One primary class per row. Record the evidence quote (≤ 200 chars) that decided it.

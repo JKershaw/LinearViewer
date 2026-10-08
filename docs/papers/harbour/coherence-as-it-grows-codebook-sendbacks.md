@@ -1,3 +1,12 @@
+---
+title: Codebook: what a review send-back asked for
+kind: codebook
+version: 1
+date: 2026-10-08
+authors: [Claude, for John Kershaw]
+grounded_at: d61903f39f757ec84f989f541f0552dd86c8b26f (LinearViewer, origin/main, 2026-10-07)
+---
+
 # Codebook: what a review send-back asked for
 
 A send-back is a comment whose head is a Request Changes or Needs Discussion verdict (plan review or code review). Code each send-back comment, not each ticket. Record every finding class present; mark the first-listed finding as `lead`.
