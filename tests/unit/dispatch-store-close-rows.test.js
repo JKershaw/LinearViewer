@@ -67,6 +67,29 @@ describe('bulk close (real MangoDB tmpdir, LIN-3364)', () => {
       assert.deepEqual(notified.sort(), ['a', 'b'], 'each closed row notified once');
     });
 
+    test('takenBefore leaves a row taken at/after the bound open; unset is unchanged (LIN-3365)', async () => {
+      await seed('early', { resolvedAt: T(2) });
+      await seed('late', { resolvedAt: T(25) });
+      await seed('tie', { resolvedAt: T(10) });
+      const r = await store.closeLineageRows(URL_KEY, 'root-1', { beforeDispatchedAt: T(20), takenBefore: T(10), reason: 'lineage-terminal' });
+      assert.deepEqual(r.closedIds, ['early']);
+      const rest = await store.closeLineageRows(URL_KEY, 'root-1', { beforeDispatchedAt: T(20), reason: 'lineage-terminal' });
+      assert.deepEqual(rest.closedIds.sort(), ['late', 'tie']);
+    });
+
+    test('ids closes only the named rows, composes with exceptId, and still re-asserts the other bounds (LIN-3365)', async () => {
+      await seed('a');
+      await seed('b');
+      await seed('c');
+      await seed('terminal', { feedback: [{ message: '[done] ok', timestamp: T(2) }] });
+      const r = await store.closeLineageRows(URL_KEY, 'root-1', { beforeDispatchedAt: T(20), ids: ['a', 'b', 'terminal'], exceptId: 'b', reason: 'handed-on' });
+      assert.deepEqual(r.closedIds, ['a']);
+      assert.equal(await stamped('c') ?? null, null);
+      assert.equal(await stamped('terminal') ?? null, null, 'named but terminated: the write filter still refuses it');
+      const none = await store.closeLineageRows(URL_KEY, 'root-1', { beforeDispatchedAt: T(20), ids: [], reason: 'handed-on' });
+      assert.deepEqual(none.closedIds, [], 'an empty ids list closes nothing, it does not mean "all"');
+    });
+
     test('exceptId and kinds narrow the set; wrong urlKey never matches', async () => {
       await seed('keep');
       await seed('go');
