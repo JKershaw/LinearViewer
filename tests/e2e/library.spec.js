@@ -54,11 +54,16 @@ test.describe('Library — CSP', () => {
       });
     });
 
+    // `addInitScript` resets the array on every navigation, so assert after EACH
+    // goto. Reading only at the end would check just the last page and miss a
+    // violation on the index or the document (LIN-3344 review F3).
     await page.goto('/library');
-    await page.goto('/library/review-loops');
-    await page.goto('/library?q=review+loops');
+    expect(await page.evaluate(() => window.__cspViolations), 'index').toEqual([]);
 
-    const violations = await page.evaluate(() => window.__cspViolations || []);
-    expect(violations).toEqual([]);
+    await page.goto('/library/review-loops');
+    expect(await page.evaluate(() => window.__cspViolations), 'document').toEqual([]);
+
+    await page.goto('/library?q=review+loops');
+    expect(await page.evaluate(() => window.__cspViolations), 'results').toEqual([]);
   });
 });

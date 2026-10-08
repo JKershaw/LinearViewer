@@ -12,6 +12,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import http from 'node:http';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,23 @@ before(async () => {
 after(() => new Promise(resolve => server.close(resolve)));
 
 const get = path => fetch(`${base}${path}`, { redirect: 'manual' });
+
+/**
+ * Send a path verbatim. `fetch` resolves `..` on the client, so it can never
+ * prove what the router does with a traversal; `http.get` transmits the path
+ * unnormalised, as a raw client would (LIN-3344 review F4).
+ */
+function rawGet(path) {
+  return new Promise((resolve, reject) => {
+    const req = http.get({ host: '127.0.0.1', port: server.address().port, path }, res => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
+    });
+    req.on('error', reject);
+  });
+}
 
 describe('library rendering is script-safe', () => {
   let html;
@@ -92,6 +110,24 @@ describe('library response headers and 404s', () => {
     assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
   });
 
+  test('case-variant Library URLs behave like the lowercase ones', async () => {
+    const index = await get('/Library');
+    assert.equal(index.status, 200, 'uppercase index serves');
+    assert.equal(index.headers.get('content-security-policy'), LIBRARY_CSP);
+    assert.equal(index.headers.get('x-content-type-options'), 'nosniff', 'nosniff on a case-variant index');
+
+    const page = await get('/Library/hostile');
+    assert.equal(page.status, 200, 'uppercase path serves the page');
+    assert.equal(page.headers.get('content-security-policy'), LIBRARY_CSP);
+    assert.equal(page.headers.get('x-content-type-options'), 'nosniff', 'nosniff on a case-variant page');
+
+    const md = await get('/LIBRARY/hostile.md');
+    assert.equal(md.status, 200, 'uppercase path serves the markdown');
+    assert.equal(md.headers.get('content-type'), 'text/markdown; charset=utf-8');
+    assert.equal(md.headers.get('content-security-policy'), MARKDOWN_CSP);
+    assert.equal(md.headers.get('x-content-type-options'), 'nosniff', 'nosniff on a case-variant .md');
+  });
+
   test('.md is markdown, sandboxed and nosniff', async () => {
     const res = await get('/library/hostile.md');
     assert.equal(res.headers.get('content-type'), 'text/markdown; charset=utf-8');
@@ -108,15 +144,25 @@ describe('library response headers and 404s', () => {
     assert.match(res.headers.get('content-type'), /image\/svg\+xml/);
   });
 
-  test('traversal and wrong-form paths 404', async () => {
+  test('wrong-form slugs 404 at the router', async () => {
+    const res = await get('/library/doc/hostile');
+    assert.equal(res.status, 404);
+    assert.equal(res.headers.get('content-security-policy'), LIBRARY_CSP);
+  });
+
+  test('traversal paths 404 at the router (raw, unnormalised paths)', async () => {
     for (const path of [
-      '/library/../server.js',
-      '/library/figures/../../server.js',
-      '/library/figures/%2e%2e/%2e%2e/server.js',
-      '/library/doc/hostile',
+      '/library/figures/../../../server.js',
+      '/library/figures/..%2f..%2f..%2fserver.js',
+      '/library/figures/%2e%2e/%2e%2e/%2e%2e/server.js',
     ]) {
-      const res = await get(path);
+      const res = await rawGet(path);
       assert.equal(res.status, 404, path);
+      // The router's own 404 carries the Library CSP; Express's default 404 does
+      // not. Asserting it proves the request reached the router, which `fetch`
+      // could not (it resolves `..` before sending).
+      assert.equal(res.headers['content-security-policy'], LIBRARY_CSP, `${path} 404 came from the router`);
+      assert.equal(res.headers['x-content-type-options'], 'nosniff', path);
     }
   });
 });

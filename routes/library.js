@@ -25,6 +25,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { themePrepaintScriptHash } from '../lib/components/page.js';
 import { DEFAULT_DOCS_ROOT, loadLibrary } from '../lib/library.js';
 import { renderLibraryDoc, renderLibraryIndex } from '../lib/render-library.js';
+import { isPublicLibraryPath } from '../lib/guest-task-path.js';
 
 /** The HTML CSP: only the shell's inline theme script may run. */
 export const LIBRARY_CSP = `default-src 'none'; script-src '${themePrepaintScriptHash()}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; form-action 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'self'`;
@@ -42,10 +43,6 @@ function baseUrl(req) {
   return `${req.protocol}://${safe}`;
 }
 
-function isLibraryPath(path) {
-  return path === '/library' || path.startsWith('/library/');
-}
-
 /**
  * @param {Object} [deps]
  * @param {string} [deps.docsRoot] - Injectable docs root (defaults to `<repo>/docs`).
@@ -58,10 +55,13 @@ export function createLibraryRouter({ docsRoot = DEFAULT_DOCS_ROOT } = {}) {
 
   const router = Router();
 
-  // Header hygiene scoped to Library paths only, so mounting the router at `/`
-  // cannot touch the rest of the app.
+  // Header hygiene scoped to public Library paths only, so mounting the router
+  // at `/` cannot touch the rest of the app. Uses the shared case-insensitive
+  // predicate so a route Express serves case-insensitively (`/Library/x`) still
+  // gets the header; a second, case-sensitive copy here would drift (LIN-3344
+  // review F2).
   router.use((req, res, next) => {
-    if (isLibraryPath(req.path)) res.set('X-Content-Type-Options', 'nosniff');
+    if (isPublicLibraryPath(req.path)) res.set('X-Content-Type-Options', 'nosniff');
     next();
   });
 

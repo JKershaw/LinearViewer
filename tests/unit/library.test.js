@@ -156,6 +156,23 @@ describe('library routes', () => {
     }
   });
 
+  test('every document page renders exactly one H1 with the byline right after it', async () => {
+    for (const doc of catalog.docs) {
+      const res = await get(`/library/${doc.slug}`);
+      const html = await res.text();
+      const main = /<main class="library">([\s\S]*?)<\/main>/.exec(html);
+      assert.ok(main, `${doc.slug}: has a <main>`);
+      const h1Count = (main[1].match(/<h1\b/g) || []).length;
+      assert.equal(h1Count, 1, `${doc.slug}: exactly one H1 in main (no duplicated title)`);
+      assert.match(
+        main[1],
+        /<h1\b[\s\S]*?<\/h1>\s*<p class="library-doc__byline">/,
+        `${doc.slug}: byline directly follows the H1`,
+      );
+      assert.equal((main[1].match(/library-doc__byline/g) || []).length, 1, `${doc.slug}: one byline`);
+    }
+  });
+
   test('wrong-form slugs 404 (canonical URL per document)', async () => {
     for (const path of ['/library/ladder', '/library/doc/writing-length', '/library/nope']) {
       const res = await get(path);
