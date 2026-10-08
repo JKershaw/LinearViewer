@@ -1665,14 +1665,13 @@
     var endpoint = turnKind === 'boot' ? 'boot' : 'turn';
     // LIN-3362: the browser's zone so the model's clock reads in the person's own
     // time. Only a hint — the server validates it and falls back to UK — so a
-    // runtime without Intl just omits it. Both endpoints; auto-wake is silent
-    // and has no reply to localise.
-    if (turnKind === 'user-initiated' || turnKind === 'boot') {
-      try {
-        var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (typeof zone === 'string' && zone) body.timeZone = zone;
-      } catch (e) { /* omit */ }
-    }
+    // runtime without Intl just omits it. Every turn kind: auto-wake posts to
+    // `/turn` too and speaks when there is a decision, a stall or a landing, so
+    // it needs the same zone or its bubbles would read in UK time.
+    try {
+      var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (typeof zone === 'string' && zone) body.timeZone = zone;
+    } catch (e) { /* omit */ }
 
     // Raw fetch carve-out: this response may be a Server-Sent Events stream
     // consumed via readSSEStream (public/common.js); window.api() parses the

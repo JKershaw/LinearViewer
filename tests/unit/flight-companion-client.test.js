@@ -4266,4 +4266,15 @@ describe('flight-companion.js — LIN-3362: hello, interim hop text, browser zon
     await flush();
     assert.strictEqual(typeof boot.fetchCalls[0].body.timeZone, 'string');
   });
+
+  test('timeZone is sent on an auto-wake /turn too', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { fetchCalls } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    t.mock.timers.tick(30000);
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(typeof fetchCalls[0].body.timeZone, 'string');
+    assert.ok(fetchCalls[0].body.timeZone.length > 0);
+  });
 });
