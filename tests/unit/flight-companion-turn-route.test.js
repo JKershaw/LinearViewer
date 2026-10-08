@@ -186,7 +186,8 @@ function fakeFreeTierStore(result, calls = []) {
 
 function buildApp({
   observerStateStore, freeTierStore, flightCompanionEnabled = true, session = {},
-  chatClient, createToolCatalog, workspacePreferencesStore,
+  chatClient, createToolCatalog, workspacePreferencesStore, getModelCatalog = async () => [],
+  workspace = { urlKey: 'acme' },
 } = {}) {
   const app = express();
   app.use(express.json());
@@ -195,10 +196,14 @@ function buildApp({
     next();
   });
   app.use(createFlightCompanionRoutes({
-    workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: 'acme' }; next(); },
+    workspaceFromUrl: (req, res, next) => { req.workspace = workspace; next(); },
     getOpenRouterSource: () => null,
     getDeployInfo: () => ({}),
     observerStateStore,
+    // LIN-3370: ALWAYS inject a catalog loader. This fixture's workspace
+    // (`{ urlKey: 'acme' }`) does not satisfy `shouldMockAi`, so the route's
+    // default would call live openrouter.ai from a unit test.
+    getModelCatalog,
     freeTierStore,
     workspacePreferencesStore,
     // LIN-2432 beat 4: the DI seam — omitted here (undefined) means every
@@ -724,29 +729,60 @@ describe('Flight Companion turn endpoint (LIN-2432 beat 4) — live-model-call s
   });
 });
 
-describe('resolveTurnModelOverride (LIN-2623 beat 2) — pure allow-list validation', () => {
-  test('absent, null, or empty string: no override, not an error', () => {
-    assert.deepStrictEqual(resolveTurnModelOverride(undefined), { model: null, error: null });
-    assert.deepStrictEqual(resolveTurnModelOverride(null), { model: null, error: null });
-    assert.deepStrictEqual(resolveTurnModelOverride(''), { model: null, error: null });
-    assert.deepStrictEqual(resolveTurnModelOverride('   '), { model: null, error: null });
+describe('resolveTurnModelOverride (LIN-2623 beat 2, LIN-3370) — pure curated-or-catalog validation', () => {
+  const CATALOG = [{ id: 'mock-provider/catalog-model-two' }];
+  const neverLoad = () => { throw new Error('loadCatalog must not be called'); };
+
+  test('absent, null, or empty string: no override, not an error, catalog untouched', async () => {
+    assert.deepStrictEqual(await resolveTurnModelOverride(undefined, { loadCatalog: neverLoad }), { model: null, error: null });
+    assert.deepStrictEqual(await resolveTurnModelOverride(null, { loadCatalog: neverLoad }), { model: null, error: null });
+    assert.deepStrictEqual(await resolveTurnModelOverride('', { loadCatalog: neverLoad }), { model: null, error: null });
+    assert.deepStrictEqual(await resolveTurnModelOverride('   ', { loadCatalog: neverLoad }), { model: null, error: null });
   });
 
-  test('a non-string value is an error', () => {
-    const { model, error } = resolveTurnModelOverride(12345);
+  test('a non-string value is an error', async () => {
+    const { model, error } = await resolveTurnModelOverride(12345, { loadCatalog: neverLoad });
     assert.strictEqual(model, null);
     assert.match(error, /must be a string/);
   });
 
-  test('a curated id is accepted verbatim (trimmed)', () => {
-    assert.deepStrictEqual(resolveTurnModelOverride('  anthropic/claude-opus-5  '), { model: 'anthropic/claude-opus-5', error: null });
+  test('a curated id is accepted verbatim (trimmed) WITHOUT calling the catalog loader', async () => {
+    let loads = 0;
+    const loadCatalog = async () => { loads++; return []; };
+    assert.deepStrictEqual(await resolveTurnModelOverride('  anthropic/claude-opus-5  ', { loadCatalog }), { model: 'anthropic/claude-opus-5', error: null });
+    assert.strictEqual(loads, 0);
   });
 
-  test('an uncurated id is rejected, naming the rejected id', () => {
-    const { model, error } = resolveTurnModelOverride('evil/undisclosed-expensive-model');
+  test('a non-curated id present in the catalog is accepted', async () => {
+    let loads = 0;
+    const loadCatalog = async () => { loads++; return CATALOG; };
+    assert.deepStrictEqual(await resolveTurnModelOverride(' mock-provider/catalog-model-two ', { loadCatalog }), { model: 'mock-provider/catalog-model-two', error: null });
+    assert.strictEqual(loads, 1);
+  });
+
+  test('an id in neither set is rejected, naming the id and the offered-model wording', async () => {
+    const { model, error } = await resolveTurnModelOverride('evil/undisclosed-expensive-model', { loadCatalog: async () => CATALOG });
     assert.strictEqual(model, null);
     assert.match(error, /evil\/undisclosed-expensive-model/);
-    assert.match(error, /not a curated model id/);
+    assert.match(error, /not an offered model id \(curated or in the model catalog\)/);
+  });
+
+  test('a free-text Settings-box style id that is not in the catalog is rejected', async () => {
+    const { error } = await resolveTurnModelOverride('my-org/self-hosted-finetune', { loadCatalog: async () => CATALOG });
+    assert.match(error, /not an offered model id/);
+  });
+
+  test('a rejecting loader, a non-array result, or no loader at all fails closed as an empty catalog (clean error, no throw)', async () => {
+    for (const opts of [
+      { loadCatalog: async () => { throw new Error('boom'); } },
+      { loadCatalog: async () => ({ not: 'an array' }) },
+      { loadCatalog: async () => null },
+      {},
+    ]) {
+      const { model, error } = await resolveTurnModelOverride('mock-provider/catalog-model-two', opts);
+      assert.strictEqual(model, null);
+      assert.match(error, /not an offered model id/);
+    }
   });
 });
 
@@ -776,7 +812,7 @@ describe('Flight Companion turn endpoint (LIN-2623 beat 2) — per-turn model ov
     });
 
     assert.strictEqual(status, 400);
-    assert.match(json.error, /not a curated model id/);
+    assert.match(json.error, /not an offered model id/);
     assert.deepStrictEqual(observerStateStore.calls, [], 'the 400 must fire before any store is touched');
   });
 
@@ -850,6 +886,77 @@ describe('Flight Companion turn endpoint (LIN-2623 beat 2) — per-turn model ov
     assert.strictEqual(calls[0].model, DEFAULT_MODEL, 'a valid explicit override must still be clamped to DEFAULT_MODEL on free tier');
   });
 
+  test('a catalog-only id passes the gate and runs the tools-off branch (no tool catalog built)', async () => {
+    const calls = [];
+    const chatClient = fakeChatClient(calls);
+    let catalogBuilds = 0;
+    const createToolCatalog = () => { catalogBuilds++; return {}; };
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: { async tryUse() { throw new Error('paid session key present'); } },
+      workspacePreferencesStore: { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } },
+      chatClient, createToolCatalog,
+      getModelCatalog: async () => [{ id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two' }],
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+      message: 'status please', model: 'mock-provider/catalog-model-two',
+    });
+
+    assert.strictEqual(status, 200);
+    assert.deepStrictEqual(calls, [{ fn: 'streamChat', model: 'mock-provider/catalog-model-two' }]);
+    assert.strictEqual(catalogBuilds, 0, 'a tools-off model never builds the tool catalog');
+  });
+
+  test('a curated id never reads the catalog; a non-curated one does', async () => {
+    let loads = 0;
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: { async tryUse() { throw new Error('paid session key present'); } },
+      chatClient: fakeChatClient([]),
+      getModelCatalog: async () => { loads++; return []; },
+      session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'hi', model: 'anthropic/claude-opus-5' });
+    assert.strictEqual(loads, 0);
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'hi', model: 'nope/not-offered' });
+    assert.strictEqual(status, 400);
+    assert.strictEqual(loads, 1);
+  });
+
+  test('free tier + a catalog pick: the default still wins (clamp unchanged)', async () => {
+    const calls = [];
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: fakeFreeTierStore({ allowed: true }),
+      workspacePreferencesStore: { async getWorkspacePreferences() { return { modelId: 'anthropic/claude-sonnet-5' }; } },
+      chatClient: fakeChatClient(calls),
+      getModelCatalog: async () => [{ id: 'mock-provider/catalog-model-two' }],
+    });
+    await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
+      const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', {
+        message: 'status please', model: 'mock-provider/catalog-model-two',
+      });
+      assert.strictEqual(status, 200);
+    });
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(calls[0].model, DEFAULT_MODEL);
+  });
+
+  test('the seam receives mock:true for a local-provider workspace and mock:false otherwise (pins shouldMockAi, no network)', async () => {
+    for (const [workspace, expected] of [[{ urlKey: 'acme', provider: 'local' }, true], [{ urlKey: 'acme' }, false]]) {
+      const seen = [];
+      const app = buildApp({
+        observerStateStore: fakeObserverStateStore(), freeTierStore: fakeFreeTierStore({ allowed: true }),
+        workspace, getModelCatalog: async (opts) => { seen.push(opts); return []; },
+      });
+      await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'hi', model: 'nope/not-offered' });
+      await get(app, '/workspace/acme/flight-companion');
+      assert.deepStrictEqual(seen, [{ mock: expected }, { mock: expected }]);
+    }
+  });
+
   test('5. free tier + an uncurated explicit model: still 400 (validate-then-clamp ordering)', async () => {
     const observerStateStore = fakeObserverStateStore();
     const app = buildApp({ observerStateStore, freeTierStore: fakeFreeTierStore({ allowed: true }) });
@@ -859,7 +966,7 @@ describe('Flight Companion turn endpoint (LIN-2623 beat 2) — per-turn model ov
         message: 'status please', model: 'evil/undisclosed-expensive-model',
       });
       assert.strictEqual(status, 400);
-      assert.match(json.error, /not a curated model id/);
+      assert.match(json.error, /not an offered model id/);
     });
     assert.deepStrictEqual(observerStateStore.calls, [], 'a bad id 400s even on free tier, before any store is touched');
   });
@@ -2102,14 +2209,35 @@ describe('buildFlightCompanionStripData (LIN-2621) — pure derivation, no I/O',
     assert.strictEqual(strip.nextCheckInAt, null);
   });
 
-  // LIN-2623 beat 3
-  test('modelOptions is exactly the curated AVAILABLE_MODELS set — Trap 1: the same set resolveTurnModelOverride accepts, never widened', () => {
+  // LIN-2623 beat 3, widened by LIN-3370
+  test('modelOptions with no catalog is exactly the curated AVAILABLE_MODELS set, each flagged curated', () => {
     const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null });
     assert.deepEqual(strip.modelOptions.map((m) => m.id), AVAILABLE_MODELS.map((m) => m.id));
     for (const m of strip.modelOptions) {
       assert.strictEqual(typeof m.name, 'string');
       assert.ok(m.name.length > 0);
+      assert.strictEqual(m.curated, true);
+      assert.strictEqual(m.toolsOn, true);
+      assert.strictEqual(m.free, false);
     }
+  });
+
+  test('modelOptions with a catalog is curated + catalog (curated first), catalog entries flagged curated:false, tools off, unpriced', () => {
+    const catalog = [
+      { id: 'mock-provider/catalog-model-one', name: 'Catalog Model One', pricing: { prompt: '0', completion: '0' } },
+      { id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two', pricing: { prompt: '0.000002', completion: '0.00001' } },
+      { id: AVAILABLE_MODELS[0].id, name: 'Dup of a curated id' },
+    ];
+    const strip = buildFlightCompanionStripData({ model: 'openai/gpt-5.4-mini', companionDoc: null, censusDoc: null, catalog });
+    assert.deepEqual(strip.modelOptions.map((m) => m.id), [...AVAILABLE_MODELS.map((m) => m.id), 'mock-provider/catalog-model-one', 'mock-provider/catalog-model-two']);
+    const one = strip.modelOptions.find((m) => m.id === 'mock-provider/catalog-model-one');
+    assert.deepStrictEqual(one, { id: 'mock-provider/catalog-model-one', name: 'Catalog Model One', pricing: null, toolsOn: false, free: true, curated: false });
+    const two = strip.modelOptions.find((m) => m.id === 'mock-provider/catalog-model-two');
+    assert.strictEqual(two.free, false);
+    assert.strictEqual(two.curated, false);
+    const dup = strip.modelOptions.find((m) => m.id === AVAILABLE_MODELS[0].id);
+    assert.strictEqual(dup.curated, true, 'a catalog duplicate of a curated id is deduped and stays curated');
+    assert.strictEqual(dup.name, AVAILABLE_MODELS[0].name);
   });
 
   test('currentPricing is the resolved default\'s own rate-card hint, and null for an uncurated default — never fabricated', () => {
@@ -2154,6 +2282,25 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     const { status } = await get(app, '/workspace/acme/flight-companion');
     assert.strictEqual(status, 200);
     assert.strictEqual(prefCalls.length, 1, 'exactly one resolveAiOperationModel-backing read per page load');
+  });
+
+  test('LIN-3370: catalog models never reach the rendered <select> (curated-only markup), and match a no-catalog render', async () => {
+    const mk = (getModelCatalog) => buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: null }),
+      workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini', []),
+      flightCompanionEnabled: true,
+      getModelCatalog,
+    });
+    const withCatalog = await get(mk(async () => [{ id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two' }]), '/workspace/acme/flight-companion');
+    const empty = await get(mk(async () => []), '/workspace/acme/flight-companion');
+    const rejecting = await get(mk(async () => { throw new Error('catalog down'); }), '/workspace/acme/flight-companion');
+    assert.strictEqual(withCatalog.status, 200);
+    assert.strictEqual(rejecting.status, 200, 'a failing loader degrades to curated-only, not the error page');
+    assert.doesNotMatch(withCatalog.text, /catalog-model-two|Catalog Model Two/);
+    const selectOf = (t) => t.match(/<select id="flight-companion-model-select"[\s\S]*?<\/select>/)[0];
+    assert.strictEqual(selectOf(withCatalog.text), selectOf(empty.text));
+    assert.strictEqual(selectOf(rejecting.text), selectOf(empty.text));
+    assert.match(selectOf(empty.text), /anthropic\/claude-opus-5/);
   });
 
   // LIN-2623 R1 (review, PR #1442) — the mandated red-first case: before the

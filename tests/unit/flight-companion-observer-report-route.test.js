@@ -79,7 +79,10 @@ function buildApp({ observerStateStore }) {
     workspaceFromUrl: (req, res, next) => { req.workspace = { urlKey: 'acme' }; next(); },
     getOpenRouterSource: () => null,
     getDeployInfo: () => ({}),
-    observerStateStore
+    observerStateStore,
+    // LIN-3370: explicit catalog loader — this fixture's workspace does not
+    // satisfy shouldMockAi, so the default would reach live openrouter.ai.
+    getModelCatalog: async () => []
   }));
   return app;
 }
