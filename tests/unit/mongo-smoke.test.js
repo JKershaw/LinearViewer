@@ -40,6 +40,7 @@ import { establishAccount } from '../../lib/account-session.js';
 import { MagicLinkStore } from '../../lib/email-auth.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
 import { computeOwnershipReport } from '../../scripts/dry-run-workspace-ownership.mjs';
+import { computeUrlKeyDuplicateReport } from '../../scripts/dry-run-urlkey-duplicates.mjs';
 
 const uri = process.env.MONGODB_TEST_URI;
 if (!uri && process.env.CI) {
@@ -298,6 +299,35 @@ describe(
         assert.strictEqual(report.d_localOnlyAccounts.count, 1, 'only acct-local; acct-mixed also has linear');
         const json = JSON.stringify(report);
         for (const value of ['sid-SECRET', 'SECRET-AT-1', 'SECRET-AT-2', 'SECRET-RT-3', 'SECRET-CRED-1', 'SECRET-CRED-2']) {
+          assert.ok(!json.includes(value), `the report must not contain ${value}`);
+        }
+      } finally {
+        await dryRunDb.dropDatabase();
+      }
+    });
+
+    test('the urlKey duplicate dry-run finds a collision across all holder stores and keeps secrets out on real MongoDB (LIN-3381 S1.1)', async () => {
+      const dryRunDb = client.db(`${db.databaseName}_urlkeydup`);
+      try {
+        const t = new Date('2026-09-01T00:00:00.000Z');
+        await dryRunDb.collection('proxy-tokens').insertOne({ _id: 'p1', urlKey: 'k', createdBy: 'acct-aaaaaaaa-1', createdAt: t, tokenHash: 'SECRET-HASH' });
+        await dryRunDb.collection('dispatch-tokens').insertOne({ _id: 'd1', urlKey: 'k', createdBy: 'acct-bbbbbbbb-2', createdAt: t, tokenHash: 'SECRET-HASH' });
+        await dryRunDb.collection('connections').insertOne({
+          _id: 'acct-cccccccc-3::jira::u', accountId: 'acct-cccccccc-3', provider: 'jira',
+          credentials: { accessToken: 'SECRET-CRED' }, referents: [{ urlKey: 'k', provider: 'jira' }], createdAt: t
+        });
+        await dryRunDb.collection('sessions').insertOne({
+          _id: 'sid-SECRET', expires: new Date(Date.now() + 60_000),
+          session: { workspaces: [{ id: 'org-a', urlKey: 'k', accessToken: 'SECRET-AT' }, { id: 'org-b', urlKey: 'other', accessToken: 'SECRET-AT' }] }
+        });
+
+        const report = await computeUrlKeyDuplicateReport({ db: dryRunDb });
+
+        assert.strictEqual(report.collisions.count, 1);
+        assert.strictEqual(report.collisions.rows[0].holders.length, 3);
+        assert.strictEqual(report.liveSessionHolders.liveKeys, 2, 'both workspaces of the session are counted');
+        const json = JSON.stringify(report);
+        for (const value of ['SECRET-HASH', 'SECRET-CRED', 'SECRET-AT', 'sid-SECRET', 'acct-aaaaaaaa-1']) {
           assert.ok(!json.includes(value), `the report must not contain ${value}`);
         }
       } finally {
