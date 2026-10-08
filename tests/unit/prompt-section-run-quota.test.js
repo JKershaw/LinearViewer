@@ -128,7 +128,7 @@ const QUOTA_FULL = { limited: true, runsUsed: 3, limit: 10, remaining: 7, resets
 const QUOTA_ZERO = { limited: true, runsUsed: 10, limit: 10, remaining: 0, resetsAt: '2026-10-03T00:00:00.000Z' };
 
 describe('LIN-3239 — ladder run allowance', () => {
-  test('N>0: the ladder shows "N of <limit> runs left today" and both run rungs are ready', async () => {
+  test('N>0: Go shows "N of <limit> runs left today" and Go + run this step are ready', async () => {
     const m = await mountFresh({}, { quota: QUOTA_FULL });
     const html = m.container.innerHTML;
 
@@ -138,10 +138,11 @@ describe('LIN-3239 — ladder run allowance', () => {
     assert.match(html, /7 of 10 runs left today/, 'the human-readable allowance');
 
     assert.match(tagFor(html, 'run-step') || '', /data-action="run-step"/, 'run this step is ready');
-    assert.match(tagFor(html, 'run-task') || '', /data-prompt="__autopilot__"/, 'run the whole task is ready');
+    // LIN-3341: Go replaced the run-task rung; it stays a ready run-task entry.
+    assert.match(html, /data-rung="run-task"[^>]*data-action="go"/, 'Go is the ready run-task entry');
   });
 
-  test('N=0: only the run rungs are disabled, with the run-limit reason', async () => {
+  test('N=0: only Go and run this step are disabled, with the run-limit reason', async () => {
     const m = await mountFresh({}, { quota: QUOTA_ZERO });
     const html = m.container.innerHTML;
 
@@ -152,17 +153,18 @@ describe('LIN-3239 — ladder run allowance', () => {
     assert.match(runStep, /daily run limit reached/, 'the reason is the run limit');
     assert.doesNotMatch(runStep, /data-action="run-step"/, 'no ready handler at zero');
 
-    const runTask = tagFor(html, 'run-task');
-    assert.match(runTask, /disabled/, 'run the whole task is disabled at zero');
-    assert.match(runTask, /daily run limit reached/, 'the reason is the run limit');
-    assert.doesNotMatch(runTask, /data-prompt="__autopilot__"/, 'no autopilot handler at zero');
+    const go = html.match(/<button[^>]*data-testid="opened-task-go"[^>]*>/);
+    assert.ok(go, 'Go is rendered');
+    assert.match(go[0], /disabled/, 'Go is disabled at zero');
+    assert.match(go[0], /daily run limit reached/, 'the reason is the run limit');
+    assert.doesNotMatch(go[0], /data-action="go"/, 'no ready handler at zero');
   });
 
-  test('N=0: ✦ generation stays enabled (prompts are unlimited)', async () => {
+  test('N=0: ✦ next step stays enabled (prompts are unlimited)', async () => {
     const m = await mountIdle({}, { quota: QUOTA_ZERO });
-    const goTag = m.container.innerHTML.match(/<button[^>]*data-testid="opened-task-go"[^>]*>/);
-    assert.ok(goTag, 'the ✦ primary is rendered');
-    assert.doesNotMatch(goTag[0], / disabled/, 'the ✦ primary is NOT disabled by the run limit');
+    const goTag = m.container.innerHTML.match(/<button[^>]*data-testid="opened-task-next-step"[^>]*>/);
+    assert.ok(goTag, 'the ✦ next step is rendered');
+    assert.doesNotMatch(goTag[0], / disabled/, 'the ✦ next step is NOT disabled by the run limit');
   });
 
   test('N=0: the idle copy rung still asks for a prompt, never the run limit', async () => {
@@ -178,7 +180,7 @@ describe('LIN-3239 — ladder run allowance', () => {
     const html = m.container.innerHTML;
     assert.doesNotMatch(html, /data-testid="opened-task-run-quota"/, 'no fabricated allowance');
     assert.match(tagFor(html, 'run-step') || '', /data-action="run-step"/, 'run this step stays ready');
-    assert.match(tagFor(html, 'run-task') || '', /data-prompt="__autopilot__"/, 'run the whole task stays ready');
+    assert.match(html, /data-rung="run-task"[^>]*data-action="go"/, 'Go stays ready');
   });
 
   test('not free tier: no quota read is made and the ladder is unchanged', async () => {

@@ -84,8 +84,9 @@ test.describe('Swipe recap / brief / recommend on a non-active (Jira) binding (L
   // prompt fetch and the Autopilot kickoff now thread `source` like the
   // recommend stream does. (The swipe.js comments fetch stays LIN-1916's.)
   test('template-prompt and Autopilot requests for a Jira row carry source=jira (LIN-1916 rows 1-2)', async ({ page, seedLocal }) => {
-    // The proxy feature enables the ladder's "run the whole task" (Autopilot) rung.
-    await seedAndGoto(page, seedLocal, 'ENG-1', { proxy: true });
+    // LIN-3341: Go dispatches directly and fetches the kickoff; it needs the
+    // dispatch feature (and proxy, which is hasAutopilot) to be ready.
+    await seedAndGoto(page, seedLocal, 'ENG-1', { proxy: true, dispatch: true });
     await expect(page.locator('.swipe-card-title')).toContainText('Jira task to do');
 
     await page.locator('.swipe-accordion-header[data-accordion="prompts"]').first().click();
@@ -98,7 +99,7 @@ test.describe('Swipe recap / brief / recommend on a non-active (Jira) binding (L
 
     const [autopilotReq] = await Promise.all([
       page.waitForRequest(req => req.url().includes('/api/autopilot-prompt/')),
-      page.locator('[data-testid="opened-task-ladder"] [data-rung="run-task"]').first().click(),
+      page.locator('[data-testid="opened-task-go"]').first().click(),
     ]);
     expect(autopilotReq.url()).toContain('source=jira');
   });

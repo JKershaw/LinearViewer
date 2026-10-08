@@ -287,36 +287,75 @@ describe('P0 addendum 1: source is threaded on the template and Autopilot fetche
 });
 
 // ---------------------------------------------------------------------------
-// Addendum 2 — persisted prompt memory (proxyForce/kind survive; no proxy block)
+// Addendum 2 — persisted prompt memory. LIN-3341 DELIBERATELY REVERSES the
+// autopilot half (FC call bf44d014): an autopilot prompt is a one-shot dispatch,
+// so it is neither saved nor hydrated — a restored one brought the mislabelled
+// "run this step" rung back after a reload.
 // ---------------------------------------------------------------------------
 
-describe('P0 addendum 2: prompt memory persists proxyForce/kind across a reload', () => {
-  test('a persisted Autopilot entry is restored with proxyForce/kind and still suppresses +proxy', async () => {
+describe('P0 addendum 2 REVERSED by LIN-3341: autopilot prompt memory is not restored', () => {
+  test('a persisted Autopilot entry is NOT restored (idle mount) and its stale key is dropped', async () => {
     const ls = makeLocalStorage();
     const issue = { id: 'issue-7', identifier: 'LIN-7' };
 
-    // Session 1: generate an Autopilot prompt (persists).
+    // Session 1: generate an Autopilot prompt. LIN-3341 no longer persists it.
     const first = loadPromptSection({ localStorage: ls });
     const c1 = makeContainer();
     first.PromptSection.init(c1, baseOpts(issue, { proxyEnabled: true }));
     await c1.click({ prompt: '__autopilot__' });
     await flush();
+    assert.equal(ls.dump()['harbour:prompt-memory:ws:issue-7'], undefined, 'an autopilot result is never saved');
+
+    // A legacy-style autopilot record already in storage (from before LIN-3341).
+    ls.setItem('harbour:prompt-memory:ws:issue-7', JSON.stringify({
+      v: 1, label: '__autopilot__', name: 'Autopilot', raw: 'AUTOPILOT PROMPT', kind: 'autopilot', proxyForce: true,
+    }));
 
     // Session 2: a fresh module instance sharing the same storage (a reload).
     const second = loadPromptSection({ localStorage: ls });
     const c2 = makeContainer();
     second.PromptSection.init(c2, baseOpts(issue, { proxyEnabled: true, dispatchEnabled: true }));
 
-    assert.equal(c2.getAttribute('data-phase'), 'fresh');
-    assert.match(c2.innerHTML, /AUTOPILOT PROMPT/);
-    assert.equal(c2.innerHTML.includes('prompt-proxy-toggle'), false);
+    assert.equal(c2.getAttribute('data-phase'), 'idle', 'the autopilot prompt is NOT hydrated');
+    assert.doesNotMatch(c2.innerHTML, /AUTOPILOT PROMPT/, 'no remembered autopilot prompt reappears');
+    assert.equal(ls.getItem('harbour:prompt-memory:ws:issue-7'), null, 'the stale autopilot record is removed on load');
+  });
 
-    // kind + proxyForce are carried on the record, observed through dispatch.
-    await c2.click({ action: 'dispatch', target: 'cli' });
-    await flush();
-    assert.equal(second.calls.dispatch.length, 1);
-    assert.equal(second.calls.dispatch[0].kind, 'autopilot');
-    assert.equal(second.calls.dispatch[0].proxyForce, true);
+  test('a stored stepper autopilot record is dropped on mount and never cached (the stepper arm)', () => {
+    const ls = makeLocalStorage();
+    const issue = { id: 'issue-stepper', identifier: 'LIN-ST' };
+
+    // A legacy-style record under the OTHER autopilot label, keyed on `kind`.
+    ls.setItem('harbour:prompt-memory:ws:issue-stepper', JSON.stringify({
+      v: 1, label: '__autopilot_stepper__', name: 'Autopilot · stepped', raw: 'STEPPER PROMPT', kind: 'autopilot',
+    }));
+
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(issue, { proxyEnabled: true, dispatchEnabled: true }));
+
+    assert.equal(container.getAttribute('data-phase'), 'idle', 'the stepper autopilot prompt is NOT hydrated');
+    assert.doesNotMatch(container.innerHTML, /STEPPER PROMPT/, 'no remembered stepper prompt reappears');
+    assert.equal(ls.getItem('harbour:prompt-memory:ws:issue-stepper'), null, 'the stale stepper record is removed on load');
+    assert.equal(PromptSection.getCached('issue-stepper', 'ws'), null, 'getCached does not surface a dropped autopilot record');
+  });
+
+  test('a stored __ai__ record still hydrates fresh (the filter is autopilot-only)', () => {
+    const ls = makeLocalStorage();
+    const issue = { id: 'issue-ai', identifier: 'LIN-AI' };
+    ls.setItem('harbour:prompt-memory:ws:issue-ai', JSON.stringify({
+      v: 1, label: '__ai__', name: 'AI Recommendation', raw: 'AI PROMPT', generatedAt: Date.now(),
+    }));
+
+    const { PromptSection } = loadPromptSection({ localStorage: ls });
+    const container = makeContainer();
+    PromptSection.init(container, baseOpts(issue, { aiState: 'off' }));
+
+    assert.equal(container.getAttribute('data-phase'), 'fresh', 'a non-autopilot prompt still hydrates');
+    assert.match(container.innerHTML, /AI PROMPT/);
+    const cached = PromptSection.getCached('issue-ai', 'ws');
+    assert.equal(cached && cached.label, '__ai__');
+    assert.equal(cached && cached.name, 'AI Recommendation');
   });
 
   test('the appended proxy block is never persisted', async () => {
@@ -982,12 +1021,12 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
     assert.ok(container.innerHTML.includes('data-testid="opened-task-go"'), '✦ primary still shown');
   });
 
-  test('AI off by choice disables the ✦ primary with a reason and a click spends nothing (F9)', async () => {
+  test('AI off by choice disables the ✦ next-step with a reason and a click spends nothing (F9)', async () => {
     const { PromptSection, calls } = loadPromptSection();
     const container = makeContainer();
     PromptSection.init(container, baseOpts({ id: 'issue-ai', identifier: 'LIN-AI' }, { aiState: 'off', hasAI: false }));
 
-    assert.match(container.innerHTML, /data-testid="opened-task-go"[^>]*disabled/, 'primary is disabled');
+    assert.match(container.innerHTML, /data-testid="opened-task-next-step"[^>]*disabled/, 'next step is disabled');
     assert.match(container.innerHTML, /data-testid="opened-task-primary-reason"[^>]*>AI suggestions are off/, 'plain-words reason shown');
 
     // A disabled button never fires a click (the browser guarantee); the guard in
@@ -1000,10 +1039,9 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
 });
 
 // =============================================================================
-// LIN-836 / LIN-2944 P1: the Autopilot proxy gate, re-pinned on the shared
-// component. The old render.test.js pinned "proxy on ⇒ classic + stepper
-// anchors render; proxy off ⇒ neither". The classic entry is now the ladder's
-// "run the whole task" rung; the stepper is the "other prompts" sibling.
+// LIN-836 / LIN-2944 P1 / LIN-3341: the Autopilot proxy gate, re-pinned on the
+// shared component. Go is the classic entry now (it dispatches directly); the
+// stepper is the "other prompts" sibling.
 // =============================================================================
 describe('LIN-836 / LIN-2944 P1: the Autopilot proxy gate', () => {
   const issue = { id: 'issue-ap', identifier: 'LIN-AP', title: 'A task', state: { type: 'started' }, labels: { nodes: [] } };
@@ -1014,16 +1052,16 @@ describe('LIN-836 / LIN-2944 P1: the Autopilot proxy gate', () => {
     return container;
   };
 
-  test('proxy on ⇒ both Autopilot entries render (ladder run-task + stepper sibling)', () => {
-    const container = mount({ proxyEnabled: true, hasAutopilot: true });
-    assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-prompt="__autopilot__"/, 'classic entry is the enabled run-task rung');
+  test('proxy on ⇒ Go is the enabled run-task entry, plus the stepper sibling', () => {
+    const container = mount({ proxyEnabled: true, hasAutopilot: true, dispatchEnabled: true });
+    assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'Go is the enabled run-task entry');
     assert.match(container.innerHTML, /data-prompt="__autopilot_stepper__"/, 'stepper sibling renders under other prompts');
   });
 
-  test('proxy off ⇒ neither Autopilot entry acts (run-task is a set-up rung, no stepper)', () => {
+  test('proxy off ⇒ Go is a set-up entry, no stepper', () => {
     const container = mount({ proxyEnabled: false, hasAutopilot: false });
-    assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'run-task shows ○ set up');
-    assert.equal(container.innerHTML.includes('data-prompt="__autopilot__"'), false, 'no enabled Autopilot rung');
+    assert.match(container.innerHTML, /data-rung="run-task"[^>]*data-action="setup"/, 'Go shows ○ set up');
+    assert.equal(container.innerHTML.includes('data-prompt="__autopilot__"'), false, 'no enabled Autopilot entry');
     assert.equal(container.innerHTML.includes('data-prompt="__autopilot_stepper__"'), false, 'no stepper sibling');
   });
 });

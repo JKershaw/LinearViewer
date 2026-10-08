@@ -129,7 +129,7 @@ test.describe('Free Tier run contract (ladder)', () => {
     await clearRuns(page, localWorkerUrlKey);
   });
 
-  test('N>0: the ladder shows "N of <limit> runs left today" and the run rungs are ready', async ({ page, localWorkerUrlKey }) => {
+  test('N>0: Go shows "N of <limit> runs left today" and Go is ready', async ({ page, localWorkerUrlKey }) => {
     const { limit, remaining } = await readQuota(page, localWorkerUrlKey);
     await page.goto(`/workspace/${localWorkerUrlKey}/swipe`);
     await page.waitForLoadState('networkidle');
@@ -140,16 +140,16 @@ test.describe('Free Tier run contract (ladder)', () => {
     await expect(quotaEl).toBeVisible();
     await expect(quotaEl).toHaveText(`${remaining} of ${limit} runs left today`);
 
-    const ladder = component.locator('[data-testid="opened-task-ladder"]');
-    const runTask = ladder.locator('[data-rung="run-task"]');
-    await expect(runTask).toBeEnabled();
-    await expect(runTask).not.toContainText(/run limit/i);
+    // LIN-3341: Go is the run-task entry now; ready at N>0.
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeEnabled();
+    await expect(go).not.toContainText(/run limit/i);
 
     // ✦ generation stays enabled regardless of the run allowance.
-    await expect(component.locator('[data-testid="opened-task-go"]')).toBeEnabled();
+    await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
   });
 
-  test('N=0: only the run rungs are disabled; generation still works', async ({ page, localWorkerUrlKey }) => {
+  test('N=0: only Go and the run-step rung are disabled; generation still works', async ({ page, localWorkerUrlKey }) => {
     const { limit } = await readQuota(page, localWorkerUrlKey);
     for (let i = 0; i < limit; i++) {
       const res = await postRun(page, localWorkerUrlKey, i);
@@ -164,21 +164,20 @@ test.describe('Free Tier run contract (ladder)', () => {
     const quotaEl = component.locator('[data-testid="opened-task-run-quota"]');
     await expect(quotaEl).toHaveText(`0 of ${limit} runs left today`);
 
-    const ladder = component.locator('[data-testid="opened-task-ladder"]');
-    const runTask = ladder.locator('[data-rung="run-task"]');
-    await expect(runTask).toBeDisabled();
-    await expect(runTask).toContainText(/run limit reached/i);
-
-    // Generation is NOT gated by the run limit: the ✦ primary is enabled and
-    // produces a prompt.
     const go = component.locator('[data-testid="opened-task-go"]');
-    await expect(go).toBeEnabled();
-    await go.click();
+    await expect(go).toBeDisabled();
+    await expect(go).toContainText(/run limit reached/i);
+
+    // Generation is NOT gated by the run limit: the ✦ next step is enabled and
+    // produces a prompt.
+    const next = component.locator('[data-testid="opened-task-next-step"]');
+    await expect(next).toBeEnabled();
+    await next.click();
     await expect(component.locator('[data-testid="opened-task-reasoning"]')).toBeVisible({ timeout: 10000 });
 
     // Once a prompt exists, run-this-step would otherwise be ready — it too is
     // disabled by the run limit.
-    const runStep = ladder.locator('[data-rung="run-step"]');
+    const runStep = component.locator('[data-testid="opened-task-ladder"] [data-rung="run-step"]');
     await expect(runStep).toBeDisabled();
     await expect(runStep).toContainText(/run limit reached/i);
   });
@@ -196,15 +195,15 @@ test.describe('Free Tier UI', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('shows the ✦ primary enabled for free tier users', async ({ page }) => {
+  test('shows the ✦ next step enabled for free tier users', async ({ page }) => {
     const taskLine = page.locator('.in-progress-items .line:has-text("Blocked on external API")');
     await taskLine.click();
     await expandPromptsSection(page, '.in-progress-items', BLOCKED_ISSUE_ID);
 
-    // Free tier acts like having a key: the ✦ primary is runnable.
-    const go = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-go"]`);
-    await expect(go).toBeVisible();
-    await expect(go).toBeEnabled();
+    // Free tier acts like having a key: the ✦ next step is runnable.
+    const next = page.locator(`.in-progress-items .details[data-details-for="${BLOCKED_ISSUE_ID}"] [data-testid="opened-task-next-step"]`);
+    await expect(next).toBeVisible();
+    await expect(next).toBeEnabled();
   });
 
   test('footer shows the free tier status with no daily-prompt count', async ({ page }) => {
@@ -231,7 +230,7 @@ test.describe('Free Tier UI', () => {
 
     // Generating a prompt still works, and the retired free-tier prompt meter
     // (the old daily-prompt allowance) never appears (LIN-3239).
-    await component.locator('[data-testid="opened-task-go"]').click();
+    await component.locator('[data-testid="opened-task-next-step"]').click();
     await expect(component).toHaveAttribute('data-phase', 'fresh', { timeout: 15000 });
     await expect(component.locator('[data-prompt-body]')).not.toBeEmpty();
     await expect(page.locator('[data-testid="free-tier-info"]')).toHaveCount(0);
@@ -261,14 +260,14 @@ test.describe('Free Tier UI', () => {
     await expect(component.locator('[data-testid="opened-task-run-quota"]'))
       .toHaveText(`0 of ${limit} runs left today`);
 
-    const ladder = component.locator('[data-testid="opened-task-ladder"]');
-    const runTask = ladder.locator('[data-rung="run-task"]');
-    await expect(runTask).toBeDisabled();
-    await expect(runTask).toContainText(/run limit reached/i);
+    // LIN-3341: Go is the run-task entry; it is disabled at the limit.
+    const go = component.locator('[data-testid="opened-task-go"]');
+    await expect(go).toBeDisabled();
+    await expect(go).toContainText(/run limit reached/i);
 
     // Generation is NOT gated by run state, and the retired prompt-quota reason
     // is nowhere on the component (LIN-3239).
-    await expect(component.locator('[data-testid="opened-task-go"]')).toBeEnabled();
+    await expect(component.locator('[data-testid="opened-task-next-step"]')).toBeEnabled();
     await expect(component).not.toContainText(/daily free-tier limit reached/i);
   });
 });

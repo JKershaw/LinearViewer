@@ -166,7 +166,7 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
 - Prompts are never refused for a person's daily usage. The only prompt refusal is the global hourly safety net (`Service busy, try again later`, 50/hour across all workspaces), which resets at the top of the next UTC hour
 - Per-workspace prompt counts are still recorded best-effort for the KPI chart, but they never refuse a prompt
 - Uses atomic check-and-increment (`tryUse()`) to prevent race conditions
-- Settings shows `N of L runs left today`; the Go ladder shows the run allowance before Go and disables only the run rungs at 0 (copy and generation stay enabled)
+- Settings shows `N of L runs left today`; Go and the run-step rung show the run allowance and are disabled at 0 (copy and generation stay enabled)
 - Returns 429 with usage metadata when a limit is exceeded
 - Free-tier calls are **clamped to one model**, ignoring the workspace preference and any
   per-request override, so a free user can never bill an arbitrary/expensive model against

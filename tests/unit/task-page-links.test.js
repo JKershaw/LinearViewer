@@ -86,6 +86,11 @@ const LITERAL_ALLOW_LIST = [
     reason: 'the stored-data repaint endpoint /api/task/:id/state — not the page',
   },
   {
+    file: 'public/prompt-section.js',
+    snippet: '/api/task/',
+    reason: 'the stored-data task state read /api/task/:id/state — the running-line poll (LIN-3341), not the page',
+  },
+  {
     file: 'lib/render-task-page.js',
     snippet: '/api/task/',
     reason: 'the owner share management endpoints /api/task/:identifier/share(s) — API routes, not the task page (LIN-3330)',
