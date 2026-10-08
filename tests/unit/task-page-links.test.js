@@ -85,6 +85,11 @@ const LITERAL_ALLOW_LIST = [
     snippet: '/api/task/',
     reason: 'the stored-data repaint endpoint /api/task/:id/state — not the page',
   },
+  {
+    file: 'lib/render-task-page.js',
+    snippet: '/api/task/',
+    reason: 'the owner share management endpoints /api/task/:identifier/share(s) — API routes, not the task page (LIN-3330)',
+  },
 ];
 
 function class1Files() {

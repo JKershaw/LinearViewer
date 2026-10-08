@@ -21,6 +21,7 @@ import { ProxyEventStore } from '../../lib/proxy-events.js';
 import { PromptTraceStore } from '../../lib/prompt-trace-store.js';
 import { LlmCallLogStore } from '../../lib/llm-call-log.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
+import { TaskShareStore } from '../../lib/task-share-store.js';
 import { recordingCollection } from '../fixtures/mango-tmpdir.js';
 
 // Collections the audit deliberately left on the auto `_id` index.
@@ -505,6 +506,21 @@ describe('db-indexes', () => {
         `${collection}: the declared index key must equal the list sort with the urlKey prefix, in order (LIN-3163)`
       );
     }
+  });
+
+  test('task_share_links list index equals its cursor sort after the urlKey prefix (LIN-3330 parity guard)', async () => {
+    const recorded = recordingCollection(freshDb().collection('task_share_links'));
+    await new TaskShareStore({ collection: recorded }).listForTask('parity-ws', 'LIN-1');
+    const cursor = recorded.__record.cursors.at(-1);
+    assert.ok(cursor, 'listForTask issued a find()');
+    assert.strictEqual(cursor.sorts.length, 1, 'exactly one sort is pushed into the cursor');
+    const spec = INDEX_SPECS.find(s => s.collection === 'task_share_links' && s.keySpec.issueIdentifier === 1);
+    assert.ok(spec, 'the urlKey-prefixed list index is declared');
+    assert.deepStrictEqual(
+      Object.entries(spec.keySpec),
+      [['urlKey', 1], ['issueIdentifier', 1], ...Object.entries(cursor.sorts[0])],
+      'the declared index key must equal the query equality prefix + listForTask\'s sort, in order (LIN-3163)'
+    );
   });
 
   test('B removed the pre-A2 expiry specs; observation-sessions keeps its cleanup index (LIN-3163)', () => {
