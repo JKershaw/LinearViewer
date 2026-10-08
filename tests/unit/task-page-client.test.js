@@ -341,3 +341,58 @@ describe('open rows survive a repaint', () => {
     assert.equal(after[0].isOpen(), true);
   });
 });
+
+describe('stage rows: head, clocks and check-ins across a repaint (LIN-3356)', () => {
+  const { applyOpenMemory, createOpenMemory, tickClocks, openCheckIns, restoreCheckIns } = load();
+
+  function stage(id, open) {
+    const classes = new Set(open ? ['sess-run--expanded'] : []);
+    const head = { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; } };
+    return {
+      getAttribute: (k) => (k === 'data-loop-id' ? id : null),
+      classList: { contains: c => classes.has(c), add: c => classes.add(c), remove: c => classes.delete(c) },
+      querySelector: (sel) => (sel === '.task-stage-head' ? head : null),
+      head,
+      isOpen: () => classes.has('sess-run--expanded'),
+    };
+  }
+
+  test('a stage head (not the legacy face head) carries aria-expanded', () => {
+    const memory = createOpenMemory([stage('a', true)]);
+    const after = [stage('a', false)];
+    applyOpenMemory(after, memory);
+    assert.equal(after[0].head.attrs['aria-expanded'], 'true');
+  });
+
+  test('tickClocks refreshes running counters and "started ago" labels', () => {
+    const now = Date.now();
+    const els = [
+      { attrs: { 'data-running-since': new Date(now - 4 * 60 * 1000).toISOString() }, textContent: '' },
+      { attrs: { 'data-started-at': new Date(now - 125 * 60 * 1000).toISOString() }, textContent: '' },
+    ].map(e => ({ ...e, getAttribute: (k) => e.attrs[k] || null }));
+    const root = {
+      querySelectorAll: (sel) => {
+        if (sel === '[data-running-since]') return [els[0]];
+        if (sel === '[data-started-at]') return [els[1]];
+        return [];
+      },
+    };
+    tickClocks(root);
+    assert.equal(els[0].textContent, 'running 4m');
+    assert.equal(els[1].textContent, 'started 2h 5m ago');
+  });
+
+  test('opened check-ins are remembered by stage id and reopened after the swap', () => {
+    const details = { opened: false, setAttribute(k) { if (k === 'open') this.opened = true; } };
+    const rows = [
+      { id: 'a', closest: () => null, getAttribute: () => 'a', querySelector: () => details },
+      { id: 'b', closest: () => null, getAttribute: () => 'b', querySelector: () => ({ setAttribute() { throw new Error('b was not open'); } }) },
+    ];
+    const openDetails = { closest: () => rows[0] };
+    const before = { querySelectorAll: () => [openDetails] };
+    const ids = openCheckIns(before);
+    assert.deepEqual([...ids], ['a']);
+    restoreCheckIns({ querySelectorAll: () => rows }, ids);
+    assert.equal(details.opened, true);
+  });
+});
