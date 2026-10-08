@@ -211,7 +211,8 @@ describe('assertion 5: /dispatch status enum — every occurrence parses to the 
   // (see the `queued`+`taken` anchor below). LIN-2245: the copies moved verbatim
   // from routes/proxy.js's /api/proxy/instructions catalog to
   // lib/proxy-instructions.js, so routes/proxy.js carries none.
-  const STATUS_ENUM = 'queued|taken|done|failed|blocked|aborted';
+  // LIN-3364: `closed` joined the wire enum (a row stamped `bookkeeping`).
+  const STATUS_ENUM = 'queued|taken|done|failed|blocked|aborted|closed';
   const STATUS_SET = [...STATUS_ENUM.split('|')].sort();
 
   // Selection rule (deliberately not anchored on any single member, so a run

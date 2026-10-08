@@ -15,7 +15,7 @@ import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-valid
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
-import { deriveCompletedAt, deriveLifecycleStatus, deriveTerminalStatus, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
+import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
@@ -61,11 +61,11 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null) {
   // LIN-2079: the REPORTED status is the lifecycle one (terminal, else `blocked`
   // when the lineage is parked on a human). `item.feedback` is already
   // lineage-merged by getItemStatus({includeGroupFeedback:true}).
-  // This is the ONLY call site here that moves: `alreadyTerminal`, the long-poll
-  // baseline and `dispatchWatchChanged` all deliberately keep calling
-  // `deriveTerminalStatus`, because a `blocked` item is NOT terminal and must
-  // keep holding the long poll rather than short-circuiting it.
-  const terminalStatus = deriveLifecycleStatus(item.feedback);
+  // LIN-3364: a row stamped `bookkeeping` (closed at the source) reads `closed`
+  // (terminal > closed > blocked). `alreadyTerminal`, the long-poll baseline and
+  // `dispatchWatchChanged` call `deriveWireTerminal` (terminal or closed), never
+  // this: a `blocked` item is NOT terminal and must keep holding the long poll.
+  const terminalStatus = deriveWireStatus(item);
   const body = {
     id: item.id,
     status: terminalStatus || item.status,
@@ -104,6 +104,8 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null) {
     // completion. completedAt is the real completion time, null until terminal.
     resolvedAt: item.resolvedAt || null,
     completedAt: deriveCompletedAt(item.feedback),
+    // LIN-3364: the closed-row fact (`bookkeeping` stamp), normalised to the documented enum.
+    ...closedProjection(item.bookkeeping),
     // Consumer poll-recency stamp + derived warning (LIN-2885): the stamp is
     // whatever createDispatchItem persisted at enqueue time; the warning is
     // re-derived against the CURRENT clock each read (via the same pure
@@ -146,7 +148,7 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null) {
 // handler's first read.
 function dispatchWatchChanged(baseline, item) {
   return (
-    (deriveTerminalStatus(item.feedback) || item.status) !== baseline.status ||
+    (deriveWireTerminal(item) || item.status) !== baseline.status ||
     (item.feedback || []).length !== baseline.feedbackLength
   );
 }
@@ -1647,7 +1649,7 @@ export function createDispatchRoutes({
         const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
         const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor, i.dispatchedAt) : (i.feedback || []);
         const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
-        return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveLifecycleStatus(terminalFeedback) || i.status };
+        return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveWireStatus({ feedback: terminalFeedback, bookkeeping: i.bookkeeping }) || i.status };
       });
 
       // `status` is derived from feedback (not stored), so it stays a JS filter;
@@ -1682,6 +1684,8 @@ export function createDispatchRoutes({
         // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,
         completedAt: deriveCompletedAt(i._terminalFeedback),
+        // LIN-3364: explicit allow-list entries (this list is not a spread of `i`).
+        ...closedProjection(i.bookkeeping),
         // LIN-1470: lineage-wide (own + verified siblings), not just this row's
         // own stored feedback — see the merge above. Excludes any synthetic
         // harvested-abort entry (that only lives in `_terminalFeedback`).
@@ -1774,7 +1778,7 @@ export function createDispatchRoutes({
       const wakeShadow = item.kind === 'wake'
         ? await dispatchQueueStore.getWakeShadow(req.proxyUrlKey, item.id)
         : null;
-      const alreadyTerminal = deriveTerminalStatus(current.feedback) !== null;
+      const alreadyTerminal = deriveWireTerminal(current) !== null;
       if (waitSeconds > 0) {
         // Long-poll path. The response carries `reason`/`waitedMs` so the caller
         // can tell WHY it came back (see formatDispatchWatch) — a terminal item
@@ -1791,7 +1795,7 @@ export function createDispatchRoutes({
         // return — the caller never loses data, only an early return.
         const keepalive = armKeepalive(res);
         const baseline = {
-          status: deriveTerminalStatus(current.feedback) || current.status,
+          status: deriveWireTerminal(current) || current.status,
           feedbackLength: (current.feedback || []).length
         };
         const waitStart = Date.now();

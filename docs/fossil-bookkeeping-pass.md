@@ -165,8 +165,34 @@ entry is not independently guarded beyond gates 7 and 8.
   most needs to know about before authorising the stamp: retiring a fossil
   correctly stops it from reporting as waiting-on-a-human.
 
-It is **not** exposed on the consumer proxy surfaces: `GET /api/proxy/dispatch` and
-`GET /api/proxy/dispatch/{id}` each build their response from an explicit field
-allowlist that does not include `bookkeeping`. That absence is deliberate — nothing in
-the agent-facing contract needs the stamp, and adding it would widen a wire contract for
-no consumer. See the note in `docs/proxy-integration.md`.
+**Since LIN-3364 the stamp is the one closed-row fact on every reader, not only the
+census.** `isRowClosed(loop)` (`lib/dispatch-terminal.js`) is the single predicate; no
+reader re-reads `.bookkeeping`. A stamped row now also:
+
+* reads `status: "closed"` on `GET /api/proxy/dispatch` and `/{id}` (terminal > closed >
+  blocked > taken, `deriveWireStatus`), with `closedAt` (`bookkeeping.at`) and
+  `closedReason` (normalised: the fossil pass's `fossil-pass-lin2633` reads `operator`).
+  Watchers treat `closed` as terminal (`deriveWireTerminal`); `blocked` stays non-terminal.
+  The raw `bookkeeping` object is still not on the wire — only the projection above. See
+  `docs/proxy-integration.md`.
+* leaves the live views: `isLoopActive` (`lib/live-console.js`), the D2 waiter selection
+  (`lib/liveness-alarm-sweep.js`), the task page's session state and stage bar
+  (`lib/task-page-loader.js`, `lib/render-task-page.js`, neutral tone, not error), the
+  dashboard's terminal/waiting checks and `completedAt` (`routes/dashboard.js`), the chat
+  follow-up `force` (`lib/chat-tools.js`), and the run face and run view
+  (`lib/render-run-steps.js`, `lib/run-view.js`).
+* is a `NO_ATTEMPT` status for `lib/recent-runs.js` and `lib/effort-readout.js` /
+  `lib/plan-review-round-trips.js` (`closed`). **This reverses the earlier "stays
+  right-censored" note above for the effort/round-trip instruments:** a closed row never
+  completed and has no `completedAt`, so it is excluded and counted per kind rather than
+  left in flight forever.
+
+Deliberately unchanged: `lib/observer-efficacy-signal.js` (closing a row is not a human
+answering a `[blocked]` wake) and the display-only readers that only mention the markers
+(`lib/render-session.js`, `lib/run-paragraph.js`, `lib/sessions-view.js`,
+`lib/unanswered-decisions.js`, `lib/chat-tools.js` `latestLoopMarker`).
+
+The stamp is written by `stampBookkeeping` (one row, no notify), and in bulk by
+`closeLineageRows` / `closeIssueRows` (`lib/dispatch-store.js`): select the ids, then a
+guarded `updateMany` that re-asserts the bound (before-dispatched, or no feedback after
+`quietSince`) in the write filter, then notify each closed row.
