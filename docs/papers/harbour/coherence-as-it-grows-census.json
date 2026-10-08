@@ -1,0 +1,1442 @@
+{
+ "about": "Companion census for docs/papers/harbour/coherence-as-it-grows.md. Production code = server.js, lib/, routes/, non-vendored public/ (steady-base-code.mjs definition). jscpd@4.0.5, --min-tokens 50 --min-lines 5 --format javascript; the jscpd30 field is the same at --min-tokens 30.",
+ "snapshots": [
+  {
+   "month": "2026-01",
+   "sha": "6c959c2b",
+   "day": "2026-01-31",
+   "prodFiles": 33,
+   "prodLines": 11226,
+   "jscpd50": {
+    "lines": 7110,
+    "duplicatedLines": 16,
+    "percentage": 0.23,
+    "clones": 1,
+    "crossFilePairs": 0,
+    "crossAreaPairs": 0
+   },
+   "admissions": {
+    "all": 1,
+    "files": 1,
+    "T": 0,
+    "S": 1,
+    "H": 0,
+    "P": 0,
+    "O": 0,
+    "unmatched": 0
+   },
+   "syncTests": 0,
+   "twinsPer10kLines": 0.0,
+   "crossFilePairsPer10kLines": 0.0
+  },
+  {
+   "month": "2026-02",
+   "sha": "cd20df11",
+   "day": "2026-02-26",
+   "prodFiles": 44,
+   "prodLines": 14234,
+   "jscpd50": {
+    "lines": 12782,
+    "duplicatedLines": 195,
+    "percentage": 1.53,
+    "clones": 18,
+    "crossFilePairs": 0,
+    "crossAreaPairs": 0
+   },
+   "admissions": {
+    "all": 1,
+    "files": 1,
+    "T": 0,
+    "S": 1,
+    "H": 0,
+    "P": 0,
+    "O": 0,
+    "unmatched": 0
+   },
+   "syncTests": 0,
+   "twinsPer10kLines": 0.0,
+   "crossFilePairsPer10kLines": 0.0
+  },
+  {
+   "month": "2026-03",
+   "sha": "abde98e7",
+   "day": "2026-03-30",
+   "prodFiles": 66,
+   "prodLines": 22760,
+   "jscpd50": {
+    "lines": 17012,
+    "duplicatedLines": 409,
+    "percentage": 2.4,
+    "clones": 34,
+    "crossFilePairs": 12,
+    "crossAreaPairs": 9
+   },
+   "admissions": {
+    "all": 2,
+    "files": 2,
+    "T": 1,
+    "S": 1,
+    "H": 0,
+    "P": 0,
+    "O": 0,
+    "unmatched": 0
+   },
+   "syncTests": 0,
+   "twinsPer10kLines": 0.44,
+   "crossFilePairsPer10kLines": 5.27
+  },
+  {
+   "month": "2026-04",
+   "sha": "8298af18",
+   "day": "2026-04-25",
+   "prodFiles": 80,
+   "prodLines": 29744,
+   "jscpd50": {
+    "lines": 22577,
+    "duplicatedLines": 533,
+    "percentage": 2.36,
+    "clones": 49,
+    "crossFilePairs": 15,
+    "crossAreaPairs": 10
+   },
+   "admissions": {
+    "all": 3,
+    "files": 3,
+    "T": 1,
+    "S": 1,
+    "H": 0,
+    "P": 0,
+    "O": 0,
+    "unmatched": 1
+   },
+   "syncTests": 0,
+   "twinsPer10kLines": 0.34,
+   "crossFilePairsPer10kLines": 5.04
+  },
+  {
+   "month": "2026-05",
+   "sha": "05d33f51",
+   "day": "2026-05-31",
+   "prodFiles": 94,
+   "prodLines": 35468,
+   "jscpd50": {
+    "lines": 26093,
+    "duplicatedLines": 650,
+    "percentage": 2.49,
+    "clones": 59,
+    "crossFilePairs": 24,
+    "crossAreaPairs": 13
+   },
+   "admissions": {
+    "all": 13,
+    "files": 6,
+    "T": 9,
+    "S": 2,
+    "H": 1,
+    "P": 0,
+    "O": 0,
+    "unmatched": 1
+   },
+   "syncTests": 0,
+   "twinsPer10kLines": 2.54,
+   "crossFilePairsPer10kLines": 6.77,
+   "jscpd30": {
+    "percentage": 4.92,
+    "clones": 148,
+    "crossFilePairs": 52
+   }
+  },
+  {
+   "month": "2026-06",
+   "sha": "462ecafd",
+   "day": "2026-06-30",
+   "prodFiles": 171,
+   "prodLines": 61992,
+   "jscpd50": {
+    "lines": 45005,
+    "duplicatedLines": 936,
+    "percentage": 2.08,
+    "clones": 75,
+    "crossFilePairs": 43,
+    "crossAreaPairs": 21
+   },
+   "admissions": {
+    "all": 33,
+    "files": 17,
+    "T": 16,
+    "S": 10,
+    "H": 2,
+    "P": 0,
+    "O": 3,
+    "unmatched": 2
+   },
+   "syncTests": 0,
+   "twinsPer10kLines": 2.58,
+   "crossFilePairsPer10kLines": 6.94
+  },
+  {
+   "month": "2026-07",
+   "sha": "a208d6b3",
+   "day": "2026-07-31",
+   "prodFiles": 231,
+   "prodLines": 87484,
+   "jscpd50": {
+    "lines": 54052,
+    "duplicatedLines": 1026,
+    "percentage": 1.9,
+    "clones": 87,
+    "crossFilePairs": 58,
+    "crossAreaPairs": 33
+   },
+   "admissions": {
+    "all": 68,
+    "files": 34,
+    "T": 37,
+    "S": 21,
+    "H": 3,
+    "P": 1,
+    "O": 5,
+    "unmatched": 1
+   },
+   "syncTests": 3,
+   "twinsPer10kLines": 4.23,
+   "crossFilePairsPer10kLines": 6.63,
+   "jscpd30": {
+    "percentage": 4.13,
+    "clones": 235,
+    "crossFilePairs": 153
+   }
+  },
+  {
+   "month": "2026-08",
+   "sha": "8b2be424",
+   "day": "2026-08-31",
+   "prodFiles": 291,
+   "prodLines": 114213,
+   "jscpd50": {
+    "lines": 70636,
+    "duplicatedLines": 1383,
+    "percentage": 1.96,
+    "clones": 117,
+    "crossFilePairs": 76,
+    "crossAreaPairs": 34
+   },
+   "admissions": {
+    "all": 92,
+    "files": 48,
+    "T": 45,
+    "S": 31,
+    "H": 3,
+    "P": 2,
+    "O": 10,
+    "unmatched": 1
+   },
+   "syncTests": 11,
+   "twinsPer10kLines": 3.94,
+   "crossFilePairsPer10kLines": 6.65
+  },
+  {
+   "month": "2026-09",
+   "sha": "982fc662",
+   "day": "2026-09-30",
+   "prodFiles": 347,
+   "prodLines": 144607,
+   "jscpd50": {
+    "lines": 89115,
+    "duplicatedLines": 1125,
+    "percentage": 1.26,
+    "clones": 101,
+    "crossFilePairs": 60,
+    "crossAreaPairs": 33
+   },
+   "admissions": {
+    "all": 122,
+    "files": 65,
+    "T": 52,
+    "S": 37,
+    "H": 6,
+    "P": 5,
+    "O": 21,
+    "unmatched": 1
+   },
+   "syncTests": 25,
+   "twinsPer10kLines": 3.6,
+   "crossFilePairsPer10kLines": 4.15,
+   "jscpd30": {
+    "percentage": 3.01,
+    "clones": 301,
+    "crossFilePairs": 177
+   }
+  },
+  {
+   "month": "2026-10",
+   "sha": "d61903f3",
+   "day": "2026-10-07",
+   "prodFiles": 398,
+   "prodLines": 160384,
+   "jscpd50": {
+    "lines": 98296,
+    "duplicatedLines": 1155,
+    "percentage": 1.18,
+    "clones": 106,
+    "crossFilePairs": 61,
+    "crossAreaPairs": 32
+   },
+   "admissions": {
+    "all": 126,
+    "files": 68,
+    "T": 55,
+    "S": 38,
+    "H": 6,
+    "P": 5,
+    "O": 22,
+    "unmatched": 0
+   },
+   "syncTests": 33,
+   "twinsPer10kLines": 3.43,
+   "crossFilePairsPer10kLines": 3.8,
+   "jscpd30": {
+    "percentage": 2.79,
+    "clones": 312,
+    "crossFilePairs": 192
+   }
+  }
+ ],
+ "mirroredChanges": {
+  "k": 3,
+  "byMonth": {
+   "2026-01": {
+    "prs": 132,
+    "mirrored": 2,
+    "pairs": 2
+   },
+   "2026-02": {
+    "prs": 26,
+    "mirrored": 2,
+    "pairs": 2
+   },
+   "2026-03": {
+    "prs": 59,
+    "mirrored": 7,
+    "pairs": 7
+   },
+   "2026-04": {
+    "prs": 49,
+    "mirrored": 2,
+    "pairs": 2
+   },
+   "2026-05": {
+    "prs": 35,
+    "mirrored": 2,
+    "pairs": 7
+   },
+   "2026-06": {
+    "prs": 389,
+    "mirrored": 11,
+    "pairs": 13
+   },
+   "2026-07": {
+    "prs": 316,
+    "mirrored": 16,
+    "pairs": 45
+   },
+   "2026-08": {
+    "prs": 266,
+    "mirrored": 9,
+    "pairs": 12
+   },
+   "2026-09": {
+    "prs": 310,
+    "mirrored": 9,
+    "pairs": 19
+   },
+   "2026-10": {
+    "prs": 104,
+    "mirrored": 10,
+    "pairs": 13
+   }
+  },
+  "prsWithMirroredAdds": 70
+ },
+ "coupling": {
+  "2026-01-01": {
+   "since": "2026-01-01",
+   "until": "2026-01-31",
+   "prs": 132,
+   "pairs": 49,
+   "hidden": 28,
+   "hiddenBothLib": 19,
+   "hiddenCrossArea": 21,
+   "top": [
+    {
+     "a": "lib/render.js",
+     "b": "public/app.js",
+     "co": 21
+    },
+    {
+     "a": "public/app.js",
+     "b": "server.js",
+     "co": 14
+    },
+    {
+     "a": "lib/render-fancy.js",
+     "b": "server.js",
+     "co": 8
+    },
+    {
+     "a": "lib/render-fancy.js",
+     "b": "lib/render.js",
+     "co": 8
+    },
+    {
+     "a": "lib/audit.js",
+     "b": "public/fancy.js",
+     "co": 6
+    },
+    {
+     "a": "lib/render-settings.js",
+     "b": "lib/render.js",
+     "co": 6
+    },
+    {
+     "a": "lib/linear.js",
+     "b": "lib/openrouter.js",
+     "co": 5
+    },
+    {
+     "a": "lib/linear.js",
+     "b": "lib/render.js",
+     "co": 4
+    },
+    {
+     "a": "lib/render-fancy.js",
+     "b": "public/fancy.js",
+     "co": 4
+    },
+    {
+     "a": "public/fancy.js",
+     "b": "server.js",
+     "co": 4
+    },
+    {
+     "a": "lib/prompt-templates.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 4
+    },
+    {
+     "a": "lib/render-fancy.js",
+     "b": "lib/render-settings.js",
+     "co": 4
+    }
+   ]
+  },
+  "2026-02-01": {
+   "since": "2026-02-01",
+   "until": "2026-05-31",
+   "prs": 169,
+   "pairs": 105,
+   "hidden": 75,
+   "hiddenBothLib": 48,
+   "hiddenCrossArea": 62,
+   "top": [
+    {
+     "a": "lib/render-swipe.js",
+     "b": "public/swipe.js",
+     "co": 14
+    },
+    {
+     "a": "lib/prompt-template-defs.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 9
+    },
+    {
+     "a": "lib/swim-lanes.js",
+     "b": "public/swim.js",
+     "co": 9
+    },
+    {
+     "a": "lib/render.js",
+     "b": "public/app.js",
+     "co": 8
+    },
+    {
+     "a": "public/swipe.js",
+     "b": "server.js",
+     "co": 8
+    },
+    {
+     "a": "lib/render.js",
+     "b": "routes/workspace-api.js",
+     "co": 7
+    },
+    {
+     "a": "lib/render-dispatch.js",
+     "b": "public/dispatch.js",
+     "co": 7
+    },
+    {
+     "a": "lib/render-swim.js",
+     "b": "public/swim.js",
+     "co": 7
+    },
+    {
+     "a": "public/roadmap.js",
+     "b": "routes/workspace-api.js",
+     "co": 7
+    },
+    {
+     "a": "lib/prompt-templates.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 6
+    },
+    {
+     "a": "routes/test.js",
+     "b": "routes/workspace-api.js",
+     "co": 6
+    },
+    {
+     "a": "lib/prompts/roadmap-narrative-template.js",
+     "b": "lib/roadmap.js",
+     "co": 6
+    }
+   ]
+  },
+  "2026-06-01": {
+   "since": "2026-06-01",
+   "until": "2026-07-31",
+   "prs": 705,
+   "pairs": 373,
+   "hidden": 251,
+   "hiddenBothLib": 165,
+   "hiddenCrossArea": 145,
+   "top": [
+    {
+     "a": "routes/proxy.js",
+     "b": "routes/workspace-api.js",
+     "co": 27
+    },
+    {
+     "a": "lib/prompt-template-defs.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 26
+    },
+    {
+     "a": "lib/dispatch-store.js",
+     "b": "routes/proxy.js",
+     "co": 20
+    },
+    {
+     "a": "routes/dispatch.js",
+     "b": "routes/proxy.js",
+     "co": 19
+    },
+    {
+     "a": "lib/render.js",
+     "b": "public/app.js",
+     "co": 17
+    },
+    {
+     "a": "routes/auth.js",
+     "b": "server.js",
+     "co": 14
+    },
+    {
+     "a": "public/common.js",
+     "b": "public/dispatch.js",
+     "co": 12
+    },
+    {
+     "a": "lib/completion-signals.js",
+     "b": "lib/prompt-template-defs.js",
+     "co": 11
+    },
+    {
+     "a": "public/app.js",
+     "b": "public/prompt-section.js",
+     "co": 10
+    },
+    {
+     "a": "lib/completion-signals.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 10
+    },
+    {
+     "a": "lib/prompt-templates.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 10
+    },
+    {
+     "a": "public/observation.js",
+     "b": "routes/dashboard.js",
+     "co": 10
+    }
+   ]
+  },
+  "2026-08-01": {
+   "since": "2026-08-01",
+   "until": "2026-09-30",
+   "prs": 576,
+   "pairs": 255,
+   "hidden": 168,
+   "hiddenBothLib": 129,
+   "hiddenCrossArea": 110,
+   "top": [
+    {
+     "a": "lib/prompt-template-defs.js",
+     "b": "lib/prompts/meta-prompt-template.js",
+     "co": 22
+    },
+    {
+     "a": "public/observation.js",
+     "b": "routes/dashboard.js",
+     "co": 13
+    },
+    {
+     "a": "lib/dispatch-store.js",
+     "b": "routes/dispatch.js",
+     "co": 11
+    },
+    {
+     "a": "lib/render-flight-companion.js",
+     "b": "public/flight-companion.js",
+     "co": 10
+    },
+    {
+     "a": "routes/dispatch.js",
+     "b": "routes/proxy.js",
+     "co": 10
+    },
+    {
+     "a": "lib/render-observation.js",
+     "b": "public/observation.js",
+     "co": 9
+    },
+    {
+     "a": "public/common.js",
+     "b": "routes/workspace-api.js",
+     "co": 8
+    },
+    {
+     "a": "lib/render-pages.js",
+     "b": "server.js",
+     "co": 8
+    },
+    {
+     "a": "lib/proxy-instructions.js",
+     "b": "routes/proxy-rulings.js",
+     "co": 8
+    },
+    {
+     "a": "lib/proxy-instructions.js",
+     "b": "server.js",
+     "co": 8
+    },
+    {
+     "a": "lib/render.js",
+     "b": "public/app.js",
+     "co": 7
+    },
+    {
+     "a": "routes/jira-auth.js",
+     "b": "server.js",
+     "co": 7
+    }
+   ]
+  },
+  "2026-10-01": {
+   "since": "2026-10-01",
+   "until": "2026-10-31",
+   "prs": 104,
+   "pairs": 137,
+   "hidden": 107,
+   "hiddenBothLib": 52,
+   "hiddenCrossArea": 73,
+   "top": [
+    {
+     "a": "public/common.js",
+     "b": "public/prompt-section.js",
+     "co": 9
+    },
+    {
+     "a": "lib/render-session.js",
+     "b": "public/session.js",
+     "co": 8
+    },
+    {
+     "a": "public/prompt-section.js",
+     "b": "server.js",
+     "co": 7
+    },
+    {
+     "a": "public/app.js",
+     "b": "public/common.js",
+     "co": 7
+    },
+    {
+     "a": "public/session.js",
+     "b": "routes/dashboard.js",
+     "co": 7
+    },
+    {
+     "a": "public/prompt-section.js",
+     "b": "public/swipe.js",
+     "co": 6
+    },
+    {
+     "a": "public/common.js",
+     "b": "routes/workspace-api.js",
+     "co": 6
+    },
+    {
+     "a": "public/prompt-section.js",
+     "b": "routes/workspace-api.js",
+     "co": 6
+    },
+    {
+     "a": "public/common.js",
+     "b": "public/swipe.js",
+     "co": 6
+    },
+    {
+     "a": "lib/render.js",
+     "b": "public/prompt-section.js",
+     "co": 5
+    },
+    {
+     "a": "lib/render.js",
+     "b": "public/swipe.js",
+     "co": 5
+    },
+    {
+     "a": "public/app.js",
+     "b": "public/prompt-section.js",
+     "co": 5
+    }
+   ]
+  }
+ },
+ "knownDecisions": {
+  "how": "git grep -l -E <pattern> <sha> -- server.js lib routes public | wc -l (production files; .min. excluded)",
+  "decisions": {
+   "terminal states literal": "\\['completed', ?'canceled', ?'duplicate'\\]",
+   "model JSON reply fence parse": "fence = text\\.match\\(/```",
+   "tolerant timestamp parse": "function (toMillis|toMs|_epoch)\\(",
+   "duration formatting": "function format(Duration|Elapsed)\\(",
+   "bookkeeping stamp classifier": "decision-withdrawal-reversed",
+   "session classification": "isStandaloneSession|isTerminalLoop",
+   "ship layout primitives": "orderByDependency|computeProximityRings",
+   "segment rank": "SEGMENT_RANK",
+   "review ledger heading": "What CI Did Not Prove",
+   "page-shell option bag": "deployInfo: getDeployInfo\\(\\)",
+   "store clear(urlKey) boilerplate": "async clear\\(urlKey\\)"
+  },
+  "sites": {
+   "month": [
+    "2026-05",
+    "2026-06",
+    "2026-07",
+    "2026-08",
+    "2026-09",
+    "2026-10"
+   ],
+   "terminal states literal": [
+    4,
+    4,
+    4,
+    4,
+    5,
+    5
+   ],
+   "model JSON reply fence parse": [
+    1,
+    4,
+    5,
+    7,
+    7,
+    8
+   ],
+   "tolerant timestamp parse": [
+    1,
+    2,
+    8,
+    13,
+    13,
+    18
+   ],
+   "duration formatting": [
+    0,
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "bookkeeping stamp classifier": [
+    0,
+    0,
+    0,
+    0,
+    7,
+    8
+   ],
+   "session classification": [
+    0,
+    1,
+    3,
+    3,
+    5,
+    6
+   ],
+   "ship layout primitives": [
+    4,
+    4,
+    4,
+    4,
+    4,
+    4
+   ],
+   "segment rank": [
+    2,
+    2,
+    2,
+    2,
+    2,
+    2
+   ],
+   "review ledger heading": [
+    0,
+    4,
+    5,
+    5,
+    5,
+    6
+   ],
+   "page-shell option bag": [
+    1,
+    5,
+    9,
+    12,
+    12,
+    14
+   ],
+   "store clear(urlKey) boilerplate": [
+    7,
+    11,
+    13,
+    15,
+    16,
+    19
+   ],
+   "production files": [
+    94,
+    171,
+    231,
+    291,
+    347,
+    398
+   ]
+  }
+ },
+ "driftCoherenceReview": {
+  "source": "docs/reviews/drift-coherence-review-2026-*.md (five persisted editions; the 2026-07-12 edition was never persisted)",
+  "rows": {
+   "provider-resolution incantation sites": {
+    "2026-06-10": 5,
+    "2026-06-25": 4,
+    "2026-08-29": 16,
+    "2026-09-26": 17
+   },
+   "inline error-envelope sites (metric widened at 08-29; 06-10 counted all res.status(4xx))": {
+    "2026-06-10": 239,
+    "2026-06-25": 53,
+    "2026-08-29": 76,
+    "2026-09-26": 87
+   },
+   "lib/errors.js importers": {
+    "2026-06-10": 1,
+    "2026-06-25": 5,
+    "2026-08-29": 14,
+    "2026-09-26": 26
+   },
+   "native confirm() sites against a registry of 4": {
+    "2026-08-29": 6,
+    "2026-09-26": 9
+   },
+   "provider-seam import SCC members": {
+    "2026-08-29": 13,
+    "2026-09-26": 15
+   }
+  },
+  "fix tickets minted by the review and their state on 2026-10-08": {
+   "LIN-675": "Backlog (minted 2026-06-25)",
+   "LIN-2388": "Backlog (minted 2026-08-29)",
+   "LIN-2389": "Backlog (minted 2026-08-29)"
+  }
+ },
+ "consolidations": {
+  "how": "git grep -l <pattern> <sha> -- routes lib | wc -l, at the commit before the consolidation (^), at it, and at d61903f3",
+  "rows": [
+   {
+    "ticket": "LIN-1157",
+    "commit": "c7454341",
+    "date": "2026-07-09",
+    "what": "one function mints the bootstrap token and appends the proxy preamble",
+    "pattern": "mintHandoffBootstrap / inline createToken+append in routes/proxy.js and routes/workspace-api.js",
+    "oldSitesBefore": 6,
+    "oldSitesAt": 0,
+    "oldSitesHead": 0,
+    "note": "both route files changed in the same PR"
+   },
+   {
+    "ticket": "LIN-1084",
+    "commit": "0c4eb0a4",
+    "date": "2026-07-06",
+    "what": "one validator for opaque dispatch fields (model, harness, terminal)",
+    "pattern": "const MAX_NAME_LENGTH",
+    "oldSitesBefore": 3,
+    "oldSitesAt": 4,
+    "oldSitesHead": 5,
+    "note": "validateOpaqueDispatchField is imported by 8 files at HEAD; the length bound is still declared locally in 5"
+   },
+   {
+    "ticket": "LIN-2631",
+    "commit": "64433a6d",
+    "date": "2026-09-05",
+    "what": "one SSE frame writer (lib/sse.js)",
+    "pattern": "res.write(`event: ",
+    "oldSitesBefore": 4,
+    "oldSitesAt": 3,
+    "oldSitesHead": 2,
+    "note": "routes/workspace-api-roadmap.js:52 and routes/workspace-api.js:1075 still inline at HEAD"
+   },
+   {
+    "ticket": "LIN-2970/LIN-2978",
+    "commit": "ede3a6d4 / d3d89f36",
+    "date": "2026-09-21",
+    "what": "one chat-request preamble (credential chain, free-tier gate)",
+    "pattern": "import of lib/chat-request.js against inline resolveChatCredential( in routes",
+    "importersHead": 13,
+    "inlineHead": 8,
+    "note": "the helper is adopted; the surrounding scaffold is still copied in 8 route files"
+   },
+   {
+    "ticket": "LIN-3300",
+    "commit": "19d7198a",
+    "date": "2026-10-04",
+    "what": "delete the model-written meta-prompt path",
+    "sizes": {
+     "lib/prompt-template-defs.js": {
+      "2026-09-30": 131754,
+      "2026-10-07": 109927
+     },
+     "lib/prompts/meta-prompt-template.js": {
+      "2026-09-30": 106011,
+      "2026-10-07": "absent"
+     },
+     "lib/stage-router.js": {
+      "2026-09-30": "absent",
+      "2026-10-07": 8115
+     }
+    },
+    "coChange": "of 63 PRs touching prompt-template-defs.js from June to 7 October, 53 also touched meta-prompt-template.js"
+   }
+  ]
+ },
+ "twins": [
+  {
+   "decision": "chat-tools isTerminalLoop \u2194 routes/dashboard.js",
+   "hits": [
+    3
+   ],
+   "files": [
+    "lib/chat-tools.js"
+   ],
+   "serverClient": false,
+   "reason": "layering rule",
+   "reasonNote": "a lib module must not import a route module, so the predicate is re-declared (\"loop-local mirror\")",
+   "firstDeclared": "2026-07-20",
+   "sites": 1
+  },
+  {
+   "decision": "connection record \u2194 row credentials mirror",
+   "hits": [
+    8
+   ],
+   "files": [
+    "lib/connection-credential.js"
+   ],
+   "serverClient": false,
+   "reason": "data mirror kept for compatibility",
+   "reasonNote": "the row keeps a copy of the owner record for older readers; the mirror \"may be stale\" (the LIN-3275 incident)",
+   "firstDeclared": "2026-10-03",
+   "sites": 1
+  },
+  {
+   "decision": "db index key \u2194 list sort",
+   "hits": [
+    11
+   ],
+   "files": [
+    "lib/db-indexes.js"
+   ],
+   "serverClient": false,
+   "reason": "two artefacts of one fact",
+   "reasonNote": "an index declaration and a query sort must agree; no shared representation exists",
+   "firstDeclared": "2026-09-30",
+   "sites": 1
+  },
+  {
+   "decision": "tracker repo namespace \u2194 runner host namespace",
+   "hits": [
+    14
+   ],
+   "files": [
+    "lib/dispatch-repo-guard.js"
+   ],
+   "serverClient": false,
+   "reason": "cross-system",
+   "reasonNote": "the tracker and the runner each hold a repo list; \"nothing keeps the two in sync\"",
+   "firstDeclared": "2026-09-22",
+   "sites": 1
+  },
+  {
+   "decision": "dispatch archive allow-list \u2194 addItem document",
+   "hits": [
+    15
+   ],
+   "files": [
+    "lib/dispatch-store.js"
+   ],
+   "serverClient": false,
+   "reason": "two lists in one module",
+   "reasonNote": "the archive allow-list restates the document shape addItem writes",
+   "firstDeclared": "2026-09-29",
+   "sites": 1
+  },
+  {
+   "decision": "dispatch-store _id de-dupe copied",
+   "hits": [
+    16
+   ],
+   "files": [
+    "lib/dispatch-store.js"
+   ],
+   "serverClient": false,
+   "reason": "convenience copy",
+   "reasonNote": "copied from a sibling function in the same module",
+   "firstDeclared": "2026-10-01",
+   "sites": 1
+  },
+  {
+   "decision": "LANE_KEYS restated (flight-companion-gate \u2194 observer-sweep)",
+   "hits": [
+    20
+   ],
+   "files": [
+    "lib/flight-companion-gate.js"
+   ],
+   "serverClient": false,
+   "reason": "layering rule",
+   "reasonNote": "\"consumed as plain data (never imported), same discipline as the rest of this module\"",
+   "firstDeclared": "2026-08-31",
+   "sites": 1
+  },
+  {
+   "decision": "_epoch copied (periodical-runs \u2194 live-console)",
+   "hits": [
+    26
+   ],
+   "files": [
+    "lib/periodical-runs.js"
+   ],
+   "serverClient": false,
+   "reason": "convenience copy",
+   "reasonNote": "\"Copied verbatim from lib/live-console.js\"",
+   "firstDeclared": "2026-08-03",
+   "sites": 1
+  },
+  {
+   "decision": "autopilot kickoff text \u2194 docs/autopilot-kickoff.md",
+   "hits": [
+    28
+   ],
+   "files": [
+    "lib/prompts/autopilot-kickoff.js"
+   ],
+   "serverClient": false,
+   "reason": "code and document",
+   "reasonNote": "the runtime prompt and a design document must not drift",
+   "firstDeclared": "2026-06-06",
+   "sites": 1
+  },
+  {
+   "decision": "PRINCIPLE_ZERO_HEADING \u2194 manual heading",
+   "hits": [
+    30
+   ],
+   "files": [
+    "lib/prompts/autopilot-manual.js"
+   ],
+   "serverClient": false,
+   "reason": "code and document",
+   "reasonNote": "a heading string in code must match a markdown anchor",
+   "firstDeclared": "2026-08-22",
+   "sites": 1
+  },
+  {
+   "decision": "PROVIDER_SURFACE \u2194 method declarations",
+   "hits": [
+    33
+   ],
+   "files": [
+    "lib/providers/interface.js"
+   ],
+   "serverClient": false,
+   "reason": "declared list beside the implementation",
+   "reasonNote": "a hand-kept list of methods beside the methods themselves",
+   "firstDeclared": "2026-06-07",
+   "sites": 1
+  },
+  {
+   "decision": "ADF emit list \u2194 parse functions",
+   "hits": [
+    35
+   ],
+   "files": [
+    "lib/providers/jira/adf.js"
+   ],
+   "serverClient": false,
+   "reason": "declared list beside the implementation",
+   "reasonNote": "a hand-kept list of node types beside the functions that emit them",
+   "firstDeclared": "2026-09-02",
+   "sites": 1
+  },
+  {
+   "decision": "model preset list \u2194 simple-dispatcher list",
+   "hits": [
+    52
+   ],
+   "files": [
+    "lib/render-settings.js"
+   ],
+   "serverClient": false,
+   "reason": "cross-repo",
+   "reasonNote": "\"the two lists are hand-mirrored across repositories. Update both\"",
+   "firstDeclared": "2026-09-11",
+   "sites": 1
+  },
+  {
+   "decision": "DISPATCH_MODEL_OTHER_VALUE server \u2194 client",
+   "hits": [
+    53
+   ],
+   "files": [
+    "lib/render-settings.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "\"the two runtimes can't share a module\"",
+   "firstDeclared": "2026-09-11",
+   "sites": 1
+  },
+  {
+   "decision": "ship-biscuit COLUMN_WEIGHT_FLOOR/DESK_ORDER server \u2194 client",
+   "hits": [
+    54,
+    55,
+    99
+   ],
+   "files": [
+    "lib/render-ship-biscuit.js",
+    "public/ship-biscuit.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "constants kept in lockstep with the client mirror",
+   "firstDeclared": "2026-07-10",
+   "sites": 2
+  },
+  {
+   "decision": "ship-biscuit layoutIndex server \u2194 client",
+   "hits": [
+    56
+   ],
+   "files": [
+    "lib/render-ship-biscuit.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "\"this exact logic is mirrored in public/ship-biscuit.js\"",
+   "firstDeclared": "2026-07-10",
+   "sites": 1
+  },
+  {
+   "decision": "LINEAR_IMAGE_HOSTS \u2194 relay allowedHosts",
+   "hits": [
+    57
+   ],
+   "files": [
+    "lib/render.js"
+   ],
+   "serverClient": false,
+   "reason": "convenience copy",
+   "reasonNote": "a host list kept in sync with the relay route's list by hand",
+   "firstDeclared": "2026-06-25",
+   "sites": 1
+  },
+  {
+   "decision": "isStandaloneSession run-view \u2194 dashboard",
+   "hits": [
+    59
+   ],
+   "files": [
+    "lib/run-view.js"
+   ],
+   "serverClient": false,
+   "reason": "layering rule",
+   "reasonNote": "\"Inlined here (rather than importing the route) to keep this module pure\" (2 October)",
+   "firstDeclared": "2026-10-02",
+   "sites": 1
+  },
+  {
+   "decision": "computeFitZoom server \u2194 client",
+   "hits": [
+    63,
+    81,
+    82
+   ],
+   "files": [
+    "lib/ship-layout.js",
+    "public/common.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "\"Mirrored in public/common.js\"",
+   "firstDeclared": "2026-07-29",
+   "sites": 2
+  },
+  {
+   "decision": "CI/verify signature transcript-spend \u2194 wall-clock-summary",
+   "hits": [
+    65
+   ],
+   "files": [
+    "lib/transcript-spend.js"
+   ],
+   "serverClient": false,
+   "reason": "layering rule",
+   "reasonNote": "\"Re-declared here rather than imported so this module stays a leaf\"",
+   "firstDeclared": "2026-07-11",
+   "sites": 1
+  },
+  {
+   "decision": "binding credentials \u2194 legacy scalar mirror",
+   "hits": [
+    74,
+    75
+   ],
+   "files": [
+    "lib/workspace.js"
+   ],
+   "serverClient": false,
+   "reason": "data mirror kept for compatibility",
+   "reasonNote": "the legacy scalar fields are written beside the binding for older readers (LIN-562)",
+   "firstDeclared": "2026-06-24",
+   "sites": 1
+  },
+  {
+   "decision": "theme primitives lib/components \u2194 public/audit.js",
+   "hits": [
+    78,
+    79
+   ],
+   "files": [
+    "public/audit.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "client-side mirrors of lib/components",
+   "firstDeclared": "2026-07-01",
+   "sites": 1
+  },
+  {
+   "decision": "timeline zoom/pan/overlap/fit server \u2194 client",
+   "hits": [
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89
+   ],
+   "files": [
+    "public/common.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "four pure functions mirrored into public/common.js",
+   "firstDeclared": "2026-07-31",
+   "sites": 1
+  },
+  {
+   "decision": "component replicas lib/components \u2194 public/common.js",
+   "hits": [
+    90
+   ],
+   "files": [
+    "public/common.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "\"ONE replica, many consumers, no drift\"",
+   "firstDeclared": "2026-07-01",
+   "sites": 1
+  },
+  {
+   "decision": "bulk-agree button label SSR \u2194 client",
+   "hits": [
+    97
+   ],
+   "files": [
+    "public/observation.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "a label template that must match the server-rendered button",
+   "firstDeclared": "2026-09-12",
+   "sites": 1
+  },
+  {
+   "decision": "popover behaviour swim.js \u2194 ship.js",
+   "hits": [
+    101
+   ],
+   "files": [
+    "public/ship.js"
+   ],
+   "serverClient": true,
+   "reason": "convenience copy",
+   "reasonNote": "copied between two browser pages (May prototype)",
+   "firstDeclared": "2026-05-16",
+   "sites": 1
+  },
+  {
+   "decision": "TERMINAL_STATES lib/tree.js \u2194 ship.js, swim.js, swipe.js",
+   "hits": [
+    102,
+    111,
+    113
+   ],
+   "files": [
+    "public/ship.js",
+    "public/swim.js",
+    "public/swipe.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "\"mirrored from lib/tree.js (no shared import in public/)\"; four sites",
+   "firstDeclared": "2026-05-20",
+   "sites": 4
+  },
+  {
+   "decision": "ship layout primitives server \u2194 client (6 functions)",
+   "hits": [
+    103,
+    104,
+    105,
+    106,
+    107,
+    108
+   ],
+   "files": [
+    "public/ship.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "six layout functions mirrored into public/ship.js (May prototype)",
+   "firstDeclared": "2026-05-16",
+   "sites": 1
+  },
+  {
+   "decision": "swim lane assignment server \u2194 client",
+   "hits": [
+    110,
+    112
+   ],
+   "files": [
+    "public/swim.js"
+   ],
+   "serverClient": true,
+   "reason": "server and browser runtimes",
+   "reasonNote": "\"the no build step constraint (CLAUDE.md) prevents importing from lib/\"; a follow-up under LIN-174 was named and never filed",
+   "firstDeclared": "2026-03-16",
+   "sites": 1
+  },
+  {
+   "decision": "favourites validation copied from recents",
+   "hits": [
+    114,
+    115,
+    116
+   ],
+   "files": [
+    "routes/dispatch.js"
+   ],
+   "serverClient": false,
+   "reason": "convenience copy",
+   "reasonNote": "\"Validation is copied verbatim from the recents POST\"",
+   "firstDeclared": "2026-07-04",
+   "sites": 1
+  },
+  {
+   "decision": "dispatch scope bound routes/dispatch \u2194 proxy-dispatch",
+   "hits": [
+    120
+   ],
+   "files": [
+    "routes/proxy-dispatch.js"
+   ],
+   "serverClient": false,
+   "reason": "convenience copy",
+   "reasonNote": "two entrances each apply the same bound",
+   "firstDeclared": "2026-09-22",
+   "sites": 1
+  },
+  {
+   "decision": "UPLOAD_HOSTS discovery \u2194 relay guard",
+   "hits": [
+    122
+   ],
+   "files": [
+    "routes/proxy-reads.js"
+   ],
+   "serverClient": false,
+   "reason": "convenience copy",
+   "reasonNote": "\"Kept in lockstep with discovery's UPLOAD_HOSTS\"",
+   "firstDeclared": "2026-09-04",
+   "sites": 1
+  },
+  {
+   "decision": "OBSERVER_SWEEP_INTERVAL_MS constants",
+   "hits": [
+    125
+   ],
+   "files": [
+    "server.js"
+   ],
+   "serverClient": false,
+   "reason": "two lists in one module",
+   "reasonNote": "two constants that \"MUST stay the same value\"",
+   "firstDeclared": "2026-08-16",
+   "sites": 1
+  }
+ ],
+ "headClasses": {
+  "S": 38,
+  "O": 22,
+  "T": 55,
+  "H": 6,
+  "P": 5
+ }
+}
