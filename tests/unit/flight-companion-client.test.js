@@ -1517,6 +1517,20 @@ describe('flight-companion.js — LIN-2621 beat 3: per-turn cost + the running "
     await flush();
     assert.strictEqual(m.getTabTotalText(), '1 check-in · $0.5000 this tab');
   });
+
+  test('LIN-3360: the total stays hidden at 0 check-ins and is revealed after the first done', async () => {
+    const { exports: m, stripTabTotalEl } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('done', { usage: { total_tokens: 5, cost: 0.5 } })]),
+    });
+    // At 0 check-ins updateTabTotalDisplay itself must hide the total (the
+    // session-restore path re-runs it with a count of 0).
+    stripTabTotalEl.hidden = false;
+    m.updateTabTotalDisplay();
+    assert.strictEqual(stripTabTotalEl.hidden, true);
+    m.autoWakeTick();
+    await flush();
+    assert.strictEqual(stripTabTotalEl.hidden, false);
+  });
 });
 
 describe('flight-companion.js — LIN-2670: done-frame Markdown swap, in place', () => {
@@ -2456,6 +2470,21 @@ describe('flight-companion.js — response matrix outcomes end-to-end', () => {
     assert.ok(chatUICalls.appendNote.some(c => /Free tier limit reached/.test(c.text) && /remaining/.test(c.text)));
     assert.strictEqual(sendBtn.disabled, false);
     assert.strictEqual(m.getCadenceState().delayMs, 30000);
+  });
+
+  test('LIN-3360: the free-tier note shows resetsAt via window.formatLocalTime when present, else the raw value', async () => {
+    const run = async (withHelper) => {
+      const loaded = loadClient({
+        fetchImpl: () => jsonResponse(429, { error: 'Free tier limit reached', freeTier: { remaining: 0, limit: 10, resetsAt: '2026-10-09T00:00:00.000Z' } }),
+      });
+      if (withHelper) loaded.windowShim.formatLocalTime = (iso) => `LOCAL(${iso})`;
+      loaded.questionInput.value = 'status please';
+      loaded.exports.submitQuestion();
+      await flush();
+      return loaded.chatUICalls.appendNote.map(c => c.text).join('\n');
+    };
+    assert.match(await run(true), /resets LOCAL\(2026-10-09T00:00:00\.000Z\)/);
+    assert.match(await run(false), /resets 2026-10-09T00:00:00\.000Z/);
   });
 
   test('400 message-too-long is user-initiated only; composer text is preserved for editing, no auto-retry', async () => {

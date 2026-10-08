@@ -750,6 +750,9 @@
   function updateTabTotalDisplay() {
     if (!tabTotalEl) return;
     tabTotalEl.textContent = formatTabTotal(tabCheckInCount, tabTotalCost);
+    // LIN-3360: hidden until the tab has counted a check-in, so a fresh page
+    // does not open with "0 check-ins · $0.00".
+    tabTotalEl.hidden = !(tabCheckInCount > 0);
   }
 
   // LIN-2623 beat 3: mirrors lib/render-settings.js's own inline model-select
@@ -792,11 +795,20 @@
     return li;
   }
 
+  // LIN-3360: local time via the shared common.js helper; falls back to the raw
+  // value when common.js is absent (pure-function client tests) or the value
+  // does not parse.
+  function localResetsAt(raw) {
+    var fmt = typeof window !== 'undefined' && window.formatLocalTime;
+    var local = typeof fmt === 'function' ? fmt(raw) : null;
+    return local || raw;
+  }
+
   function freeTierMessage(classification) {
     var ft = classification.freeTier;
     var base = classification.message || 'Free tier limit reached.';
     if (ft && typeof ft.remaining === 'number' && typeof ft.limit === 'number') {
-      return base + ' (' + ft.remaining + '/' + ft.limit + ' remaining' + (ft.resetsAt ? ', resets ' + ft.resetsAt : '') + ')';
+      return base + ' (' + ft.remaining + '/' + ft.limit + ' remaining' + (ft.resetsAt ? ', resets ' + localResetsAt(ft.resetsAt) : '') + ')';
     }
     return base;
   }
@@ -1840,6 +1852,7 @@
       getChatHistory: function () { return chatHistory; },
       getNextCheckInText: function () { return nextCheckInEl ? nextCheckInEl.textContent : null; },
       getTabTotalText: function () { return tabTotalEl ? tabTotalEl.textContent : null; },
+      updateTabTotalDisplay: updateTabTotalDisplay,
       getTabTotals: function () { return { count: tabCheckInCount, cost: tabTotalCost }; },
       updateModelPriceDisplay: updateModelPriceDisplay,
       getModelPriceText: function () { return modelPriceEl ? modelPriceEl.textContent : null; },

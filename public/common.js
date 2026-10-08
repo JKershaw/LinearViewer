@@ -3117,11 +3117,64 @@ function initRulingsBadge() {
 }
 
 // =============================================================================
+// Local Time Formatting (LIN-3360)
+// =============================================================================
+
+/**
+ * Format an ISO timestamp in the viewer's local timezone: "HH:MM" for today,
+ * "D Mon, HH:MM" for any other day. Returns null for missing/invalid input so
+ * callers can keep their server-rendered text. `nowMs` / `timeZone` exist for
+ * deterministic tests only.
+ *
+ * @param {string} iso
+ * @param {{nowMs?: number, timeZone?: string}} [opts]
+ * @returns {string|null}
+ */
+function formatLocalTime(iso, opts) {
+  if (!iso) return null;
+  var date = new Date(iso);
+  if (isNaN(date.getTime())) return null;
+  var o = opts || {};
+  var tz = o.timeZone ? { timeZone: o.timeZone } : {};
+  var timeOpts = Object.assign({ hour: '2-digit', minute: '2-digit' }, tz);
+  var now = new Date(typeof o.nowMs === 'number' ? o.nowMs : Date.now());
+  var dayKey = function (d) {
+    return d.toLocaleDateString('en-CA', tz);
+  };
+  var time = date.toLocaleTimeString([], timeOpts);
+  if (dayKey(date) === dayKey(now)) return time;
+  var day = date.toLocaleDateString('en-GB', Object.assign({ day: 'numeric', month: 'short' }, tz));
+  return day + ', ' + time;
+}
+
+/**
+ * Rewrite `time[datetime][data-local-time]` elements to local time, keeping the
+ * original server text in `title`. Any element that fails to parse is left
+ * untouched.
+ */
+function initLocalTimes(root) {
+  var scope = root || document;
+  var els = scope.querySelectorAll('time[datetime][data-local-time]');
+  Array.prototype.forEach.call(els, function (el) {
+    var local = formatLocalTime(el.getAttribute('datetime'));
+    if (!local) return;
+    el.setAttribute('title', el.textContent);
+    el.textContent = local;
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.formatLocalTime = formatLocalTime;
+  window.initLocalTimes = initLocalTimes;
+}
+
+// =============================================================================
 // Auto-initialization
 // =============================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
   initDeployTime();
+  initLocalTimes();
   initDisclosure();
   initNavBar();
   initThemeToggle();
