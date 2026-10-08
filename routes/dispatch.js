@@ -40,7 +40,7 @@ import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
-import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
@@ -962,7 +962,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // queue list and the nav-badge popover (both rendered off this response
       // via window.renderQueueRow) can show "no runner has polled..." on a
       // stale queued row without duplicating the threshold logic client-side.
-      res.json({ items: items.map(item => ({ ...item, consumerPollWarning: buildConsumerPollWarning(item.consumerLastSeenAt) })) });
+      // LIN-3367: warning from the LIVE poll recency (read once per request, not
+      // per row), queued rows only. This collection is the queue itself, so
+      // every row here is queued — the status gate is a no-op; it is routed
+      // through the shared helper so the rule lives in one place.
+      const liveLastSeenAt = items.length
+        ? await getConsumerLastSeenAt(dispatchTokenStore, workspace.urlKey, proxyTokenStore)
+        : null;
+      res.json({ items: items.map(item => ({ ...item, consumerPollWarning: buildQueuedPollWarning('queued', liveLastSeenAt) })) });
     } catch (err) {
       console.error('List dispatch items error:', err.message);
       jsonError(res, 500, 'Failed to list dispatch items');
