@@ -13,7 +13,7 @@ import express from 'express';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadLibrary, GITHUB_BASE, DEFAULT_DOCS_ROOT } from '../../lib/library.js';
-import { createLibraryRouter } from '../../routes/library.js';
+import { createLibraryRouter, escapeXml, sitemapEntries } from '../../routes/library.js';
 import { LISTED_DOCS, START_HERE } from '../../lib/library-metadata.js';
 
 const docsRoot = DEFAULT_DOCS_ROOT;
@@ -265,5 +265,25 @@ describe('crawler files (LIN-3345)', () => {
     assert.equal(res.status, 200);
     assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
     assert.match(res.headers.get('content-type'), /application\/xml/);
+  });
+
+  // The real catalog cannot exercise these two claims (every doc has an ISO date
+  // and no slug carries an XML-special character), so pin them directly against
+  // the exported helpers — a mutation of either must turn these red.
+  test('sitemapEntries omits `lastmod` unless the date is a real YYYY-MM-DD', () => {
+    const entries = sitemapEntries({
+      papers: [{ slug: 'a&b', date: '2026-01' }, { slug: 'c' }],
+      listed: [],
+      archiveEditions: [],
+    });
+    const docEntries = entries.filter(e => e.path.startsWith('/library/'));
+    assert.deepEqual(docEntries, [
+      { path: '/library/a&b', lastmod: null },
+      { path: '/library/c', lastmod: null },
+    ]);
+  });
+
+  test('escapeXml escapes every XML-special character', () => {
+    assert.equal(escapeXml(`a&b<"'>`), 'a&amp;b&lt;&quot;&apos;&gt;');
   });
 });

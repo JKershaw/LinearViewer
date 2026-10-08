@@ -44,7 +44,7 @@ function baseUrl(req) {
 }
 
 /** XML-escape a value destined for a sitemap `<loc>`/`<lastmod>`. */
-function escapeXml(value) {
+export function escapeXml(value) {
   return String(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -63,7 +63,7 @@ function escapeXml(value) {
  * @param {ReturnType<import('../lib/library.js').loadLibrary>} catalog
  * @returns {{path: string, lastmod: string|null}[]}
  */
-function sitemapEntries(catalog) {
+export function sitemapEntries(catalog) {
   const entries = [
     { path: '/', lastmod: null },
     { path: '/library', lastmod: null },
