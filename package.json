@@ -12,7 +12,8 @@
     "test:hermetic": "node scripts/assert-unit-suite-hermetic.mjs",
     "test:hermetic:proxy": "node scripts/assert-unit-suite-hermetic.mjs --proxy",
     "secret-scan": "node scripts/secret-scan.mjs",
-    "scan:public-pages": "node scripts/scan-public-pages.mjs"
+    "scan:public-pages": "node scripts/scan-public-pages.mjs",
+    "figures:theme": "node scripts/figure-theme.mjs"
   },
   "dependencies": {
     "@jkershaw/mangodb": "^0.1.2",

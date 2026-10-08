@@ -259,6 +259,24 @@
   margin: var(--space-4) auto;
 }
 
+/* LIN-3351: figures are <img> SVGs carrying their own prefers-color-scheme rule
+   (scripts/lib/figure-theme.mjs). An <img> SVG follows the embedding element's
+   color-scheme, so declare it per dark path: the theme=dark cookie
+   (html.theme-dark) and the OS scheme on landing pages (body.is-landing).
+   Scoped to Library figures, not app-wide. WebKit ignores it and keeps the
+   light figure. */
+.library-doc__body img {
+  color-scheme: light;
+}
+.theme-dark .library-doc__body img {
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  body.is-landing .library-doc__body img {
+    color-scheme: dark;
+  }
+}
+
 /* A figure spans the full panel width and clears the floated aside, so a wide
    diagram drops below the further-reading panel instead of colliding with it. */
 .library-doc__body p:has(> img) {

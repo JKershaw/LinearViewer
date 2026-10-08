@@ -11,10 +11,12 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { loadLibrary, GITHUB_BASE, DEFAULT_DOCS_ROOT } from '../../lib/library.js';
 import { createLibraryRouter, escapeXml, sitemapEntries } from '../../routes/library.js';
 import { LISTED_DOCS, START_HERE } from '../../lib/library-metadata.js';
+import { themeSvg, THEME_MARKER, DARK_PALETTE } from '../../scripts/lib/figure-theme.mjs';
+import { listFigures, FIGURES_DIR } from '../../scripts/figure-theme.mjs';
 
 const docsRoot = DEFAULT_DOCS_ROOT;
 const papersDir = join(docsRoot, 'papers', 'harbour');
@@ -393,5 +395,62 @@ describe('crawler files (LIN-3345)', () => {
 
   test('escapeXml escapes every XML-special character', () => {
     assert.equal(escapeXml(`a&b<"'>`), 'a&amp;b&lt;&quot;&apos;&gt;');
+  });
+});
+
+describe('figure dark-mode theme (LIN-3351)', () => {
+  const figureFiles = listFigures();
+
+  test('every figure SVG carries the theme block (new or regenerated figures fail until themed)', () => {
+    assert.ok(figureFiles.length > 0, 'figures found');
+    const untreated = figureFiles
+      .filter(f => !readFileSync(f, 'utf8').includes(`<style ${THEME_MARKER}=`))
+      .map(f => relative(FIGURES_DIR, f));
+    assert.deepEqual(untreated, [], `untreated figures — run \`npm run figures:theme\`: ${untreated.join(', ')}`);
+  });
+
+  test('every figure is exactly what the transform produces (no stale palette)', () => {
+    const stale = figureFiles.filter(f => {
+      const text = readFileSync(f, 'utf8');
+      return themeSvg(text) !== text;
+    }).map(f => relative(FIGURES_DIR, f));
+    assert.deepEqual(stale, [], `stale figures — run \`npm run figures:theme\`: ${stale.join(', ')}`);
+  });
+
+  test("the transform's dark values equal the .theme-dark tokens in style.css (drift guard)", () => {
+    const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'style.css'), 'utf8');
+    const block = /^\.theme-dark\s*\{([^}]*)\}/m.exec(css)[1];
+    const token = name => new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(block)[1].toLowerCase();
+    assert.deepEqual({ ...DARK_PALETTE }, {
+      bg: token('bg'), panel: token('bg-muted'), fg: token('fg'), dim: token('fg-dim'), border: token('border'),
+    });
+  });
+
+  test('themeSvg is idempotent and rebuilds rather than stacks the block', () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10" fill="#fff"/><text fill="#1f2937">x</text></svg>';
+    const once = themeSvg(svg);
+    assert.equal(themeSvg(once), once);
+    assert.equal(once.match(new RegExp(THEME_MARKER, 'g')).length, 1);
+    assert.ok(once.includes('@media (prefers-color-scheme: dark)'));
+  });
+
+  test('translucent rects are flattened over white; circle opacity and white overlays are not', () => {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg">'
+      + '<rect fill="#000000" fill-opacity="0.5"/><circle fill="#2a78d6" fill-opacity="0.4"/>'
+      + '<rect fill="#fff" fill-opacity="0.55"/><rect fill="#ffffff" fill-opacity="0.92"/></svg>';
+    const out = themeSvg(svg);
+    assert.match(out, /<rect fill="#808080"\/>/);
+    assert.match(out, /<circle fill="#2a78d6" fill-opacity="0.4"\/>/);
+    assert.match(out, /<rect fill="#fff" fill-opacity="0.55"\/>/, 'pale white overlay stays white');
+    // Near-opaque white plates sit behind text that turns light, so only they get a dark rule.
+    assert.match(out, /rect\[fill="#ffffff"\]\[fill-opacity="0.92"\]/);
+    assert.doesNotMatch(out, /fill-opacity="0.55"\]/);
+  });
+
+  test('library.css sets the figure color-scheme for both dark paths, scoped to Library figures', () => {
+    const css = readFileSync(join(import.meta.dirname, '..', '..', 'public', 'library.css'), 'utf8');
+    assert.match(css, /\.library-doc__body img\s*\{\s*color-scheme:\s*light;/);
+    assert.match(css, /\.theme-dark \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
+    assert.match(css, /@media \(prefers-color-scheme: dark\)\s*\{\s*body\.is-landing \.library-doc__body img\s*\{\s*color-scheme:\s*dark;/);
   });
 });
