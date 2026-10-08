@@ -150,7 +150,7 @@ describe('close-out.js: the check', () => {
   test('a done result reloads so the tracker Finished header shows', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });
@@ -159,14 +159,31 @@ describe('close-out.js: the check', () => {
   });
 
   /**
-   * B1 (review `388f4246`): after the first Done write, `/check` returns
-   * `done: true` on every later call, so a page that already shows the tracker
-   * as Done would reload forever. A `done` result must NOT reload then.
+   * B1' (review `a1845467`): `done` is true on every later call once a merge is
+   * recorded, so reloading on `done` loops on a reopened task (the record says
+   * Done, the tracker is back In Progress). Reload only when THIS call wrote
+   * Done (`doneNow`). A stale record on a not-done page must make 0 reloads.
    */
-  test('a done result on a page already showing done makes 0 reloads', async () => {
+  test('a done result from an already-recorded merge (doneNow:false) makes 0 reloads', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: false }, done: true, doneNow: false }); },
+      location: { reload() { reloads++; } },
+    };
+    const { runCheck } = load({ window });
+    const doc = { querySelector: () => ({ getAttribute: () => 'idle' }) };
+    await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
+    assert.equal(reloads, 0, 'a recorded Done must not reload a page the tracker reopened');
+  });
+
+  /**
+   * B1 (review `388f4246`): the page-already-done guard stays as a second
+   * safeguard behind `doneNow`.
+   */
+  test('a doneNow result on a page already showing done makes 0 reloads', async () => {
+    let reloads = 0;
+    const window = {
+      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck, pageAlreadyDone } = load({ window });
@@ -185,10 +202,10 @@ describe('close-out.js: the check', () => {
     assert.equal(pageAlreadyDone({ querySelector: () => ({ getAttribute: () => 'done' }) }), true);
   });
 
-  test('a done result reloads once on a page not yet done (In Progress → Done)', async () => {
+  test('a doneNow result reloads once on a page not yet done (In Progress → Done)', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });

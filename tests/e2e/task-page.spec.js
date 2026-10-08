@@ -500,4 +500,76 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     expect(loads, `page reloaded ${loads} times in 4 s`).toBeLessThanOrEqual(2);
     await page.request.get('/test/clear-pr-status');
   });
+
+  // LIN-3340 B1' (review `a1845467`): the page-already-done guard only fixes the
+  // case where the tracker still says Done. Once a merge is recorded, `/check`
+  // returns `done: true` on every later call whatever the tracker says — so a
+  // REOPENED task (recorded Done, tracker back In Progress) still looped. The
+  // client now reloads only on `doneNow` (this call wrote Done). Two phases, as
+  // in the review's probe: the first visit after a self-merge reloads once, the
+  // reopen must settle.
+  test("B1': a reopened stop-at task (Done recorded, tracker reopened) settles without a reload loop", async ({ page }) => {
+    await page.request.get('/test/clear-pr-status');
+    const id = (raw) => localSeedId(URL_KEY, raw);
+    // A fresh PR number each run: the close-out event store is Mongo-backed and
+    // is NOT cleared per test, so a fixed number would carry a recorded Done
+    // from an earlier run into phase 1 (making the test order-dependent).
+    const PR_NUM = 100000 + (Date.now() % 100000);
+    const PR_URL = `https://github.com/acme/app/pull/${PR_NUM}`;
+    const TASK_UUID = '33333333-4444-5555-6666-777777777777';
+    const seedTask = (state) => ({
+      urlKey: URL_KEY,
+      // append:true marks this session's account the owner on a fresh edge
+      // (LIN-1892), so the share-box-backed pages render the owner controls.
+      append: true,
+      features: { dispatch: true },
+      projects: [{ id: id('tp-proj'), name: 'Task page project', content: 'A project', sortOrder: 1 }],
+      issues: [{
+        id: TASK_UUID, identifier: 'LOCAL-TP1', title: 'A reopened task',
+        description: 'The task description.', projectId: id('tp-proj'), sortOrder: 1,
+        state, url: `/workspace/${URL_KEY}/issue/${TASK_UUID}`,
+        comments: [
+          { id: 'c-pr', body: `Opened the pull request: ${PR_URL}`, createdAt: '2026-10-06T09:00:00Z', user: 'Runner' },
+          { id: 'c-review', body: REVIEW_BODY, createdAt: '2026-10-06T10:00:00Z', user: 'Reviewer' },
+        ],
+      }],
+    });
+
+    let resp = await page.request.post('/test/set-local-session', { data: seedTask({ name: 'In Progress', type: 'started' }) });
+    expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+
+    const token = await runnerToken(page);
+    const anchor = await page.request.post(`/workspace/${URL_KEY}/api/dispatch`, {
+      data: { prompt: 'orchestrate', promptName: 'Autopilot (LOCAL-TP1)', kind: 'autopilot', issueIdentifier: 'LOCAL-TP1', issueTitle: 'A reopened task', target: 'cli', stopAt: 'pr', variant: 'standard' },
+    });
+    expect(anchor.status(), `anchor seed failed: ${await anchor.text()}`).toBe(201);
+    const anchorId = (await anchor.json()).item.id;
+    await page.request.post(`/api/dispatch/take/${anchorId}`, { headers: { Authorization: `Bearer ${token}` } });
+    await postFeedback(page, token, anchorId, '[done] orchestrated the run');
+    // The PR is merged, the tracker is NOT done: the first check writes Done.
+    await page.request.post('/test/seed-pr-status', {
+      data: { repo: 'acme/app', number: PR_NUM, readable: true, state: 'closed', merged: true, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+    });
+
+    let loads = 0;
+    page.on('load', () => { loads++; });
+
+    // Phase 1: In Progress + merged PR → the check writes Done and reloads once.
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-status', 'done');
+    await page.waitForTimeout(2500);
+    expect(loads, `phase 1 reloaded ${loads} times`).toBeLessThanOrEqual(2);
+
+    // Phase 2: the person reopens the task. The close-out event still carries a
+    // recorded Done, but the tracker says In Progress again — the state the
+    // page-already-done guard cannot see. Must settle with at most one load.
+    resp = await page.request.post('/test/set-local-session', { data: seedTask({ name: 'In Progress', type: 'started' }) });
+    expect(resp.ok(), `reopen seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+    loads = 0;
+    await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="merged"]')).toBeVisible();
+    await page.waitForTimeout(4000);
+    expect(loads, `reopen phase reloaded ${loads} times in 4 s`).toBeLessThanOrEqual(1);
+    await page.request.get('/test/clear-pr-status');
+  });
 });

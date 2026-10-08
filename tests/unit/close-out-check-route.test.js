@@ -347,6 +347,24 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal((await rows(built.collection)).length, 1);
   });
 
+  // LIN-3340 B1' (review `a1845467`): `done` stays true on every later call once
+  // the merge's event carries `doneAt`, so the client needs `doneNow` to tell
+  // "this call wrote Done" from "a Done is already recorded" — otherwise a
+  // reopened task (recorded Done, tracker back In Progress) loops reloading.
+  test("B1': doneNow is true on the call that writes Done, false on the next call", async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      statuses: { 41: mergedStatus(41) },
+    });
+    const first = await check(built);
+    assert.equal(first.jsonBody.done, true);
+    assert.equal(first.jsonBody.doneNow, true, 'the call that wrote Done reports doneNow');
+    const second = await check(built);
+    assert.equal(second.jsonBody.done, true, 'still reports the recorded Done');
+    assert.equal(second.jsonBody.doneNow, false, 'but this call did not write it');
+    assert.equal(built.calls.markDone, 1);
+  });
+
   test('F3: a taken (history-only) stop-at-PR run is found without a seam and sets Done', async () => {
     const db = harness.freshDb();
     const queueStore = new DispatchQueueStore({

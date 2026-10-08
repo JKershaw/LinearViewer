@@ -149,11 +149,8 @@
 
   /**
    * Whether the page is already showing the tracker as Done. Read off the task
-   * page's `<main data-status>`. B1: the check route returns `done: true` on
-   * EVERY later call once a merge has been recorded (the "already written for
-   * this merge" branch), so reloading unconditionally loops forever on the very
-   * end state a stop-at task reaches. Never reload when the page already says
-   * done. A missing document (unit seams) or no `<main>` reports false.
+   * page's `<main data-status>`. A second safeguard behind `doneNow` (B1'): a
+   * missing document (unit seams) or no `<main>` reports false.
    *
    * @param {Document} [doc]
    * @returns {boolean}
@@ -183,10 +180,12 @@
       body: JSON.stringify(checkBody(ctx.source)),
     }).then(function (result) {
       applyCloseOutState(box, result && result.state);
-      // A merge we just set Done for: reload once so the tracker's header shows
-      // it. Never when the page already says done (B1) — otherwise the repeated
-      // `done:true` result loops the page forever.
-      if (result && result.done && !pageAlreadyDone(doc) && typeof window.location !== 'undefined' && window.location.reload) {
+      // B1' (review `a1845467`): reload only when THIS check call wrote the
+      // tracker's Done (`doneNow`), not merely because `/check` reports
+      // `done: true` — that is true on EVERY later call once a merge is
+      // recorded, so a reopened task (recorded Done, tracker back In Progress)
+      // would loop forever. `pageAlreadyDone` stays as a second safeguard.
+      if (result && result.doneNow && !pageAlreadyDone(doc) && typeof window.location !== 'undefined' && window.location.reload) {
         window.location.reload();
       }
       return result;

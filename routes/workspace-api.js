@@ -4466,7 +4466,9 @@ ${goal}`
    * live, derives the close-out state with `deriveCloseOutState` (never P2's
    * looser `closeOut.status`), records a `{ by: 'person' }` event when a PR is
    * merged, and sets Done only within R1's bounds — all on the signed-in
-   * person's own provider session, never a worker or proxy token.
+   * person's own provider session, never a worker or proxy token. Returns
+   * `done` (a Done is recorded for the merge) and `doneNow` (THIS call wrote
+   * the tracker's Done) so the client reloads only on the real transition.
    *
    * @route POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check
    */
@@ -4528,6 +4530,12 @@ ${goal}`
 
       const recorded = [];
       let done = false;
+      // B1' (review `a1845467`): `done` is true on EVERY later call once a merge
+      // is recorded, so a client that reloads on `done` loops on a reopened task
+      // (Done recorded, tracker back to In Progress). `doneNow` is true only on
+      // the call that actually wrote the provider's Done, so the client reloads
+      // on the real transition, never on a page that merely reports the record.
+      let doneNow = false;
       let doneError = null;
 
       // Close-out is a stop-at-PR surface only: a normal run records and sets
@@ -4579,6 +4587,7 @@ ${goal}`
               const markDone = seam.markDone || defaultMarkDone;
               await markDone({ provider, callScope, issueIdentifier });
               done = true;
+              doneNow = true;
               if (mergedEvent && closeOutEventsStore) {
                 mergedEvent = await closeOutEventsStore.stampDone({
                   urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: new Date(), doneError: null,
@@ -4603,7 +4612,7 @@ ${goal}`
         }
       }
 
-      return res.json({ state, recorded, done, doneError });
+      return res.json({ state, recorded, done, doneNow, doneError });
     } catch (error) {
       console.error('Close-out check error:', error);
       jsonError(res, 500, 'Failed to check close-out state', { message: error.message });
