@@ -434,17 +434,26 @@ describe('figure dark-mode theme (LIN-3351)', () => {
     assert.ok(once.includes('@media (prefers-color-scheme: dark)'));
   });
 
-  test('translucent rects are flattened over white; circle opacity and white overlays are not', () => {
+  test('translucent rects are flattened over white in the dark block only; circle opacity and white overlays are not', () => {
     const svg = '<svg xmlns="http://www.w3.org/2000/svg">'
       + '<rect fill="#000000" fill-opacity="0.5"/><circle fill="#2a78d6" fill-opacity="0.4"/>'
       + '<rect fill="#fff" fill-opacity="0.55"/><rect fill="#ffffff" fill-opacity="0.92"/></svg>';
     const out = themeSvg(svg);
-    assert.match(out, /<rect fill="#808080"\/>/);
+    // Light render keeps the original markup (translucency still shows what is drawn under the rect)...
+    assert.match(out, /<rect fill="#000000" fill-opacity="0.5"\/>/);
+    // ...and the dark block carries the flattened solid.
+    assert.ok(out.includes('rect[fill="#000000"][fill-opacity="0.5"]{fill:#808080;fill-opacity:1}'));
+    assert.doesNotMatch(out, /circle\[fill="#2a78d6"\]\[fill-opacity/);
     assert.match(out, /<circle fill="#2a78d6" fill-opacity="0.4"\/>/);
     assert.match(out, /<rect fill="#fff" fill-opacity="0.55"\/>/, 'pale white overlay stays white');
     // Near-opaque white plates sit behind text that turns light, so only they get a dark rule.
     assert.match(out, /rect\[fill="#ffffff"\]\[fill-opacity="0.92"\]/);
     assert.doesNotMatch(out, /fill-opacity="0.55"\]/);
+  });
+
+  test('#111827 strokes (legend keys on the canvas) are remapped like the other dark neutrals', () => {
+    const out = themeSvg('<svg xmlns="http://www.w3.org/2000/svg"><line stroke="#111827" stroke-dasharray="2 2"/></svg>');
+    assert.match(out, /\[stroke="#111827"\][^{}]*\{stroke:#e6e6e6\}/);
   });
 
   test('white non-rect shapes (hollow markers) get the dark canvas fill; coloured shapes do not', () => {

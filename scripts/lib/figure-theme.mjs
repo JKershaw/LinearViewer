@@ -26,7 +26,7 @@ export const DARK_PALETTE = Object.freeze({
 });
 
 const WHITES = ['#fff', '#ffffff', 'white'];
-const TEXT_DARK = ['#1f2937', '#333', '#1f2328', '#555', '#475569'];
+const TEXT_DARK = ['#111827', '#1f2937', '#333', '#1f2328', '#555', '#475569'];
 const TEXT_MID = ['#6b7280', '#666', '#667085', '#888', '#6e7781', '#999', '#aaa', '#bbb', '#9ca3af', '#94a3b8'];
 const GRID = ['#e5e7eb', '#eee', '#d1d5db', '#f0f0f0', '#cbd5e1', '#d9d9d9'];
 const TRACKS = ['#f0f0f0', '#d1d5db', '#e5e7eb', '#eee'];
@@ -88,6 +88,23 @@ function hollowRules(svg) {
   ]);
 }
 
+/**
+ * Non-white translucent <rect>s read darker over the dark canvas, so "pale" would invert. Flatten them against
+ * white in the dark block only: the light render keeps the original translucency (grid/range lines still show
+ * through), and the dark render gets the solid pale hex. <circle> opacity is left alone (overlap shows density).
+ */
+function translucentRectRules(svg) {
+  const seen = new Map();
+  for (const tag of svg.match(/<rect\b[^>]*>/g) || []) {
+    const fill = /\sfill="([^"]*)"/.exec(tag)?.[1];
+    const op = /\sfill-opacity="([^"]*)"/.exec(tag)?.[1];
+    if (!fill || op === undefined || WHITES.includes(fill)) continue;
+    const solid = flattenOverWhite(fill, Number(op));
+    if (solid) seen.set(`${fill}|${op}`, rule(`rect[fill="${fill}"][fill-opacity="${op}"]`, `fill:${solid};fill-opacity:1`));
+  }
+  return [...seen.values()];
+}
+
 function buildCss(svg) {
   const p = DARK_PALETTE;
   const rules = [
@@ -114,6 +131,7 @@ function buildCss(svg) {
     rule('svg .f', `fill:${p.panel};stroke:${p.border}`),
     rule('svg .g', `stroke:${p.border}`),
     ...Object.entries(TINTS).map(([from, to]) => rule(`rect[fill="${from}"]`, `fill:${to}`)),
+    ...translucentRectRules(svg),
     ...heatmapRules(svg),
   ];
   return `@media (prefers-color-scheme: dark){${rules.join('')}}`;
@@ -135,18 +153,6 @@ function flattenOverWhite(color, alpha) {
   let h = m[1];
   if (h.length === 3) h = [...h].map(c => c + c).join('');
   return '#' + [0, 2, 4].map(i => hex(255 + (parseInt(h.slice(i, i + 2), 16) - 255) * alpha)).join('');
-}
-
-/** Flatten non-white translucent <rect>s to a solid colour: identical on the white canvas, correct on the dark one. <circle> opacity is left alone. */
-function flattenRects(svg) {
-  return svg.replace(/<rect\b[^>]*>/g, tag => {
-    const fill = /\bfill="([^"]*)"/.exec(tag)?.[1];
-    const opM = /\sfill-opacity="([^"]*)"/.exec(tag);
-    if (!fill || !opM || WHITES.includes(fill)) return tag;
-    const solid = flattenOverWhite(fill, Number(opM[1]));
-    if (!solid) return tag;
-    return tag.replace(opM[0], '').replace(`fill="${fill}"`, `fill="${solid}"`);
-  });
 }
 
 const ON_FILL = 'data-on-fill';
@@ -172,7 +178,10 @@ function markTextOnFill(svg) {
   return svg.replace(/<rect\b[^>]*>|<text\b[^>]*>/g, tag => {
     if (tag.startsWith('<rect')) {
       const [x, y, w, h] = ['x', 'y', 'width', 'height'].map(n => num(tag, n));
-      const fill = /\sfill="([^"]*)"/.exec(tag)?.[1];
+      let fill = /\sfill="([^"]*)"/.exec(tag)?.[1];
+      const op = /\sfill-opacity="([^"]*)"/.exec(tag)?.[1];
+      // A translucent rect is judged by the colour it shows over white (what the dark block flattens it to).
+      if (fill && op !== undefined && !WHITES.includes(fill)) fill = flattenOverWhite(fill, Number(op)) ?? fill;
       if ([x, y, w, h].every(Number.isFinite) && fill && fill !== 'none') rects.push({ x, y, w, h, fill });
       return tag;
     }
@@ -197,7 +206,7 @@ export function themeSvg(svgText, name) {
   if (LIGHT_ONLY.includes(name)) {
     return bare.replace(/<svg\b[^>]*>/, open => `${open}<style ${THEME_MARKER}="light-only">/* light-only: caption colour words name neutrals */</style>`);
   }
-  const marked = markTextOnFill(flattenRects(bare));
+  const marked = markTextOnFill(bare);
   const block = `<style ${THEME_MARKER}="1">${buildCss(marked)}</style>`;
   return marked.replace(/<svg\b[^>]*>/, open => open + block);
 }
