@@ -72,7 +72,7 @@ describe('createPoller', () => {
   const { createPoller } = load();
   const STATE_URL = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
 
-  function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true } }) {
+  function makePoller({ responses, visible = { value: true }, initial = { status: 'running', live: true }, onGone = null }) {
     const timers = makeTimers();
     const urls = [];
     const applied = [];
@@ -88,6 +88,7 @@ describe('createPoller', () => {
       apply: (s) => applied.push(s),
       isVisible: () => visible.value,
       initial,
+      onGone,
       setTimer: timers.setTimer,
       clearTimer: timers.clearTimer,
     });
@@ -164,6 +165,19 @@ describe('createPoller', () => {
     const { poller, timers } = makePoller({ responses: [Object.assign(new Error('Unauthorized'), { status: 401 })] });
     await poller.poll();
     assert.equal(timers.pending.size, 0);
+  });
+
+  // LIN-3330: a guest page whose link was revoked (or never issued) gets a 404
+  // from its state endpoint — the loop stops and reports "gone".
+  test('a 404 stops the loop and reports gone', async () => {
+    let gone = 0;
+    const { poller, timers } = makePoller({
+      responses: [Object.assign(new Error('Not found'), { status: 404 })],
+      onGone: () => { gone++; },
+    });
+    await poller.poll();
+    assert.equal(gone, 1);
+    assert.equal(timers.pending.size, 0, 'no further poll is scheduled');
   });
 });
 

@@ -255,6 +255,10 @@ Every surface that shows a task links there through the shared helper (`lib/task
 - `[data-testid="lc-lane-task-page-link"]` - Live Console lane (adjacent to the Observation link, which is unchanged)
 - `[data-testid="queue-item-task-page-link"]` / `[data-testid="history-task-page-link"]` - dispatch queue / history rows
 
+### Task Share (LIN-3330)
+
+A task share link is the SAME task page seen by a signed-out guest, at an unguessable key: `GET /t/{token}` (and its stored-data repaint `GET /t/{token}/state`, the same JSON as the owner state route). The token is 43 base64url chars; only its SHA-256 is stored in the `task_share_links` collection (never `shares`). A guest sees the page with only the owner controls hidden (the "ask for an update" and share/revoke controls); links back into Harbour stay. Owner controls on the task page are `[data-testid="task-share-create"]` (mint — the one-time URL shows in `[data-testid="task-share-new"]`), `[data-testid="task-share-list"]` (one `[data-testid="task-share-row"]` per link, each with `[data-testid="task-share-revoke"]`). Owner routes (session auth): `POST /workspace/{urlKey}/api/task/{identifier}/share` (201 `{id, path, createdAt}`), `GET .../shares`, `POST .../shares/{id}/revoke`. A revoked or unknown link is a plain 404 for the guest; `/s/<anything>` stays 404 (the retired run-share surface). No rate limit; public-page secret scanning is LIN-3261.
+
 ## Collective (experimental)
 
 The Collective page (`/workspace/{urlKey}/collective`) dispatches full Claude Code sessions — one per chosen character (persona) — into one Yap chat channel for a watched cross-project discussion. Each character is bound to a connected workspace/repo. Requires the per-user `collective` feature flag; surfaced only via a link in Settings.

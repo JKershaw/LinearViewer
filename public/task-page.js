@@ -98,6 +98,13 @@
           }
         }, function (err) {
           if (err && err.status === 401) { stopped = true; return; }
+          if (err && err.status === 404) {
+            // A revoked (or never-issued) link: stop and say so. Only a guest
+            // page's state URL can 404 this way; an owner page's cannot.
+            stopped = true;
+            if (o.onGone) o.onGone();
+            return;
+          }
           failures += 1;
         })
         .then(function () {
@@ -187,11 +194,148 @@
     }
   }
 
+  // ── Share controls (LIN-3330, owner only) ───────────────────────────────────
+
+  /** A share's stored timestamps as a short label. */
+  function shareWhen(value) {
+    if (!value) return '';
+    var d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 10);
+  }
+
+  /** The absolute URL a created share's path points at, as shown once. */
+  function absoluteUrl(path) {
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      return window.location.origin + path;
+    }
+    return path;
+  }
+
+  async function copyText(text) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Wire the owner share controls. Guests have no share slot, so this finds
+   * nothing there. The server rendered only the mount points and URLs; the list
+   * and the one-time URL box are built here.
+   */
+  function initShare(doc) {
+    var slot = doc.querySelector('[data-testid="task-page-share-slot"][data-shares-url]');
+    if (!slot) return null;
+    var createUrl = slot.getAttribute('data-create-url');
+    var sharesUrl = slot.getAttribute('data-shares-url');
+    // Revoke lives under the same base; drop the `?source=` the base carries.
+    var base = (sharesUrl || '').split('?')[0];
+    var list = slot.querySelector('[data-testid="task-share-list"]');
+    var newBox = slot.querySelector('[data-testid="task-share-new"]');
+    var note = slot.querySelector('[data-testid="task-share-note"]');
+    var button = slot.querySelector('[data-testid="task-share-create"]');
+
+    function say(message) { if (note) note.textContent = message || ''; }
+
+    function renderList(shares) {
+      if (!list) return;
+      list.innerHTML = '';
+      (shares || []).forEach(function (share) {
+        var li = doc.createElement('li');
+        li.className = 'task-share-row';
+        li.setAttribute('data-testid', 'task-share-row');
+        li.setAttribute('data-share-id', share.id);
+        li.setAttribute('data-revoked', share.revokedAt ? 'true' : 'false');
+        var when = doc.createElement('span');
+        when.className = 'task-share-when';
+        when.textContent = shareWhen(share.createdAt) + (share.revokedAt ? ' · revoked' : '');
+        li.appendChild(when);
+        if (!share.revokedAt) {
+          var revoke = doc.createElement('button');
+          revoke.type = 'button';
+          revoke.className = 'task-share-revoke';
+          revoke.setAttribute('data-action', 'task-share-revoke');
+          revoke.setAttribute('data-testid', 'task-share-revoke');
+          revoke.textContent = 'Revoke';
+          revoke.addEventListener('click', function () {
+            revoke.disabled = true;
+            window.api(base + '/' + encodeURIComponent(share.id) + '/revoke', { method: 'POST', on401: false })
+              .then(function () { say('revoked'); return loadList(); },
+                function (err) { say('could not revoke: ' + ((err && err.message) || 'error')); revoke.disabled = false; });
+          });
+          li.appendChild(revoke);
+        }
+        list.appendChild(li);
+      });
+    }
+
+    function loadList() {
+      return window.api(sharesUrl, { on401: false }).then(function (body) {
+        renderList(body && body.shares);
+      }, function (err) {
+        say('could not load links: ' + ((err && err.message) || 'error'));
+      });
+    }
+
+    function showNew(path) {
+      if (!newBox) return;
+      var url = absoluteUrl(path);
+      newBox.innerHTML = '';
+      newBox.hidden = false;
+      var label = doc.createElement('span');
+      label.className = 'task-share-new-label';
+      label.textContent = 'Link created — copy it now, it is shown once:';
+      var input = doc.createElement('input');
+      input.type = 'text';
+      input.readOnly = true;
+      input.className = 'task-share-url';
+      input.setAttribute('data-testid', 'task-share-url');
+      input.value = url;
+      var copy = doc.createElement('button');
+      copy.type = 'button';
+      copy.className = 'task-share-copy';
+      copy.setAttribute('data-testid', 'task-share-copy');
+      copy.textContent = 'Copy';
+      copy.addEventListener('click', function () {
+        copyText(url).then(function (ok) { say(ok ? 'copied' : 'select and copy the link'); });
+      });
+      newBox.appendChild(label);
+      newBox.appendChild(input);
+      newBox.appendChild(copy);
+    }
+
+    if (button) {
+      button.addEventListener('click', function () {
+        button.disabled = true;
+        say('creating…');
+        var body = {};
+        var stateUrl = null;
+        var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
+        if (main) {
+          stateUrl = main.getAttribute('data-state-url');
+          if (main.getAttribute('data-source')) body.source = main.getAttribute('data-source');
+        }
+        var m = stateUrl && /[?&]issueId=([^&]+)/.exec(stateUrl);
+        if (m) body.issueId = decodeURIComponent(m[1]);
+        window.api(createUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), on401: false })
+          .then(function (created) { say(''); showNew(created.path); return loadList(); },
+            function (err) { say('could not create a link: ' + ((err && err.message) || 'error')); })
+          .then(function () { button.disabled = false; });
+      });
+    }
+
+    loadList();
+    return { loadList: loadList, renderList: renderList };
+  }
+
   // ── Page wiring ────────────────────────────────────────────────────────────
 
   function init(doc) {
     var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
     if (!main) return null;
+    initShare(doc);
     var answer = doc.querySelector('[data-testid="task-page-answer"]');
     var trackMount = doc.querySelector('[data-testid="task-page-track-mount"]');
     var contextMount = doc.querySelector('[data-testid="task-page-context-mount"]');
@@ -246,7 +390,11 @@
         fetchJson: function (url) { return window.api(url, { on401: '/logout' }); },
         apply: apply,
         isVisible: function () { return !doc.hidden; },
-        initial: initial
+        initial: initial,
+        onGone: function () {
+          // A guest link that 404s (revoked, or never issued): the page is gone.
+          main.innerHTML = '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>';
+        }
       });
       poller.start();
       doc.addEventListener('visibilitychange', function () { poller.onVisibilityChange(doc.hidden); });
