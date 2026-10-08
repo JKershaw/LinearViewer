@@ -150,6 +150,11 @@ async function seed(db) {
   await db.collection('close-out-events').insertOne({ _id: 'co1', urlKey: 'k-actor-closeout', accountId: X });
   await db.collection('user-preferences').insertOne({ _id: X, preferences: { selectedTeamByWorkspace: { 'k-actor-prefs': 'team-1' } } });
   await db.collection('workspace-halt').insertOne({ _id: 'k-halt-only' });
+  // parse witnesses: composite ids whose key is HELD (k-collision) must not add a no-holder key
+  await db.collection('harbour-comments').insertOne({ _id: 'k-collision::c2' });
+  await db.collection('brief-cache').insertOne({ _id: 'k-collision:issue-2' });
+  await db.collection('recap-cache').insertMany([{ _id: 'k-collision:issue-3' }, { _id: 'github:k-src-recap-2:issue-uuid' }]);
+  await db.collection('observer-state').insertMany([{ _id: 'sweep:v1:k-collision' }, { _id: 'companion:v1:k-collision:proxy' }]);
 
   await db.collection('sessions').insertMany([
     { _id: 'SECRET-SID-1', expires: FUTURE, session: { accountId: L1, workspaces: [{ id: 'W-live', urlKey: 'k-live-only', accessToken: 'SECRET-SESSION-AT' }, { id: 'W-shared', urlKey: 'k-shared' }] } },
@@ -295,12 +300,14 @@ describe('dry-run-urlkey-duplicates (LIN-3381 S1.1)', () => {
   test('no-holder keys are bucketed disjointly, with the S1.2 residual separate', () => {
     const { buckets, s1_2Residual, total } = report.keysWithNoHolder;
     // actorOnly: k-actor-only (dispatch-history), k-actor-closeout (close-out-events.accountId), k-actor-prefs (user-preferences map key)
-    assert.deepStrictEqual(buckets, { liveSession: 1, staleSession: 1, actorOnly: 3, dataOnly: 12 });
-    assert.strictEqual(total, 17);
+    assert.deepStrictEqual(buckets, { liveSession: 1, staleSession: 1, actorOnly: 3, dataOnly: 13 });
+    assert.strictEqual(total, 18);
     // data-only: k-data-only, slug-0a1b2c3d, k-halt-only, k-ownerless (token with no owner), plus one key seeded ONLY in each of
     // run-proposals (field), local-issues (scope), workspace-preferences (_id), harbour-comments (_id prefix),
-    // observer-state (sweep and companion ids), brief-cache and recap-cache (workspace id prefix of the _id)
-    assert.strictEqual(s1_2Residual.count, 12);
+    // observer-state (sweep and companion ids), brief-cache and recap-cache (workspace id prefix of the _id),
+    // plus github:k-src-recap-2 (a second recap-cache key whose workspace id itself contains a colon). The parse-witness rows
+    // seeded on k-collision are held, so a correct parse adds nothing for them and a wrong parse adds a bogus key each.
+    assert.strictEqual(s1_2Residual.count, 13);
     assert.deepStrictEqual(report.keysWithNoHolder.unenumeratedSources.map(u => u.collection), ['run-summary-cache', 'session-summary-cache']);
     assert.strictEqual(s1_2Residual.localShapeSubCount, 1);
   });

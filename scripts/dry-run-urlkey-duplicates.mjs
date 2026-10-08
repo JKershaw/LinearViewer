@@ -67,9 +67,10 @@ export const SESSIONS_URLKEY_PROJECTION = Object.freeze({
 /**
  * Class C: every store that carries a urlKey, by storage shape, for the
  * no-holder count. `field` reads a top-level `urlKey` with `distinct`; `id`
- * means the document `_id` IS the key. (Composite-`_id` caches, which hold the
- * key inside a joined string, are not enumerated.) Fields absent from a
- * collection read as empty.
+ * means the document `_id` IS the key; `id` with `parse` extracts the key from
+ * a composite `_id`; composite caches whose key cannot be split safely are
+ * listed in `UNENUMERATED_SOURCES`. Fields absent from a collection read as
+ * empty.
  */
 export const URLKEY_SOURCES = Object.freeze([
   ...[
