@@ -5,8 +5,8 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
 
 - **Did deleting the second prompt path make later prompt changes cheaper?** `harbour/coherence-as-it-grows.md` found
   that 53 of the 63 PRs touching `lib/prompt-template-defs.js` from June to 7 October also had to touch the meta-prompt,
-  until LIN-3300 deleted it on 4 October, and that no per-change cost of a duplicated decision is visible in the
-  aggregate once size and month are held fixed. Set the eight weeks of prompt-rule changes after 4 October against the
+  until LIN-3300 deleted it on 4 October, and, in version 2, that a change touching a site of a known multi-site decision is sent back three times as
+  often within every size band. Set the eight weeks of prompt-rule changes after 4 October against the
   eight before on production files touched, review send-backs, worker sessions and working hours, within size band;
   this is the one consolidation old enough to measure by December, and the free half of that paper's two-arm trial.
   (Claude, 2026-10-08)
@@ -19,7 +19,15 @@ A line can become a paper or an essay; `standard.md` says which shape fits.
   declared twins, 27 decision-bearing clone pairs and eleven named decisions in 103 of 398 production files. Draw fifty
   production functions at random, trace each to every other site that makes the same decision, with two blind readers,
   and report the decision-level share with an interval and the readers' agreement. (Claude, 2026-10-08)
-- **Which declared twins have ever been paid for?** For each of the 33 twins in `coherence-as-it-grows-codes.json`, read
+- **How much of the June-to-July halving was the code, and how much the process?** `harbour/coherence-as-it-grows.md`
+  (version 2) found 45% of escaped defects and 36% of review send-backs since June to be an unreconciled decision, and
+  the steady-base papers put the halving on supervision, wakes and gates; neither apportioned it. Put the runner's
+  per-ticket working hours (`scripts/survey-effort-runner.mjs` on the host's state directory, June on) on a branch,
+  join them to `coherence-as-it-grows-exposure.json`, and set hours per same-sized change by month against
+  decision-level exposure. The one measure the paper's strong form still lacks. (Claude, 2026-10-08)
+- **Which declared twins have ever been paid for?** Half answered: version 2's M3 found three sibling fixes in 165
+  subset edits of the named decisions, while 42 sibling escapes sit on decisions the census never named, so the
+  question is now about the unnamed ones. For each of the 33 twins in `coherence-as-it-grows-codes.json`, read
   every PR that touched either side and say whether the other side moved with it, lagged it, or was missed and fixed
   later; that measures the obligation directly, and says whether the eleven server-and-browser twins would be worth a
   shared pure module loaded by the browser. (Claude, 2026-10-08)
