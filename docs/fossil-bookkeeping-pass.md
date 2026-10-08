@@ -196,3 +196,27 @@ The stamp is written by `stampBookkeeping` (one row, no notify), and in bulk by
 `closeLineageRows` / `closeIssueRows` (`lib/dispatch-store.js`): select the ids, then a
 guarded `updateMany` that re-asserts the bound (before-dispatched, or no feedback after
 `quietSince`) in the write filter, then notify each closed row.
+
+## Lineage closers and their backfill (LIN-3365)
+
+The live write side of the same stamp. `addFeedback` (`lib/dispatch-store.js`) closes rows at
+two events, best-effort and awaited after the wake is enqueued (failures are logged, never
+thrown; no feedback entry is appended, so `feedbackVersion` is untouched):
+
+* `lineage-terminal`: a `done|complete|failed|aborted` post (`isLineageClosingTerminal`,
+  never `[skipped]`/`[blocked]`/`[pending]`) closes the lineage's other rows that were
+  dispatched **and taken** before it.
+* `handed-on`: a row's first tagged post closes earlier `kind:'wake'` rows only (a non-wake
+  follow-up may be long-polled, LIN-1470).
+
+`lib/lineage-closure.js` (`selectLineageCloses`) is the same rule as pure data, evaluated as
+of the event time; `tests/unit/lineage-closure.test.js` replays events against the live
+closers to keep them equal. Two scripts consume it:
+
+* `scripts/lineage-close-backfill-lin3365.js`: stamps the rows that already exist. **Dry run
+  first; `--execute` only on John's recorded yes** (the LIN-2633/2655 gate). Bounded by the
+  30-day `READ_HORIZON_MS`; older rows in touched lineages are counted, not stamped. It is a
+  separate script from the fossil pass, not an extension of it.
+* `scripts/false-live-rows.js`: read-only instrument. Run it before and after the backfill;
+  the headline leads with the `unknown` ticket-read count so an unreadable run cannot pass for
+  a clean zero.
