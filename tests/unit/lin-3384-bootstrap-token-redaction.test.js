@@ -13,6 +13,7 @@ import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
+import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { buildProxyContextPreamble } from '../../lib/proxy-preamble.js';
 import { buildCollectiveParticipantPrompt } from '../../lib/prompts/collective-participant.js';
 import {
@@ -67,6 +68,38 @@ describe('helper', () => {
     assert.equal(item.bootstrapToken, TOKEN, 'input not mutated');
     // ownerless row + anonymous reader must not count as owner
     assert.ok(!redactSessionItem({ prompt: PROSE, dispatchedBy: null }, null).prompt.includes(TOKEN));
+  });
+});
+
+describe('declaredMint marker (declared-resume rows)', () => {
+  test('the owner is masked too when the marker is set, and the marker never leaves', () => {
+    const item = { id: 'x', prompt: PROSE, bootstrapToken: TOKEN, dispatchedBy: 'a', declaredMint: true };
+    for (const caller of ['a', 'b', null]) {
+      const out = redactSessionItem(item, caller);
+      assert.ok(!out.prompt.includes(TOKEN), `caller ${caller} must not see the token`);
+      assert.equal(out.bootstrapToken, null);
+      assert.equal('declaredMint' in out, false);
+    }
+    assert.equal(item.declaredMint, true, 'input not mutated');
+  });
+
+  test('an ordinary row (no marker) still shows the owner their own prompt', () => {
+    const out = redactSessionItem({ prompt: PROSE, dispatchedBy: 'a', declaredMint: false }, 'a');
+    assert.equal(out.prompt, PROSE);
+    assert.equal('declaredMint' in out, false);
+  });
+
+  test('both formatters set the marker only for a row carrying grantDeclaration, as a boolean never the record', () => {
+    const store = Object.create(DispatchQueueStore.prototype);
+    const base = { _id: 'r1', prompt: PROSE, dispatchedBy: 'a', status: 'queued' };
+    const record = { grants: ['dispatch'], ownerAccountId: 'owner' };
+    for (const fmt of ['_formatItem', '_formatHistoryItem']) {
+      const declared = store[fmt]({ ...base, grantDeclaration: record });
+      assert.strictEqual(declared.declaredMint, true, fmt);
+      assert.equal('grantDeclaration' in declared, false, fmt);
+      const plain = store[fmt](base);
+      assert.equal('declaredMint' in plain, false, `${fmt}: sparse — an undeclared row's key set is unchanged`);
+    }
   });
 });
 
