@@ -154,6 +154,7 @@ import { createTaskCreateRoutes } from './routes/task-create.js'
 import { createTaskPageRoutes } from './routes/task-page.js'
 import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
+import { createLibraryRouter } from './routes/library.js'
 import { TaskShareStore } from './lib/task-share-store.js'
 import { createGuestTaskAccess } from './lib/task-share-access.js'
 import { isTokenRefreshExempt } from './lib/guest-task-path.js'
@@ -2158,6 +2159,16 @@ app.get('/styleguide', (req, res) => {
 app.get('/templates', (req, res) => {
   res.send(renderTemplatesPage({ deployInfo: getDeployInfo() }))
 })
+
+// =============================================================================
+// Harbour Library (public, no auth required; LIN-3344, Part A of LIN-3342)
+// =============================================================================
+// Read-only papers/essays at /library/…, searchable without JS and rendered
+// script-safe (see routes/library.js). Mounted at the root because the router
+// owns full `/library…` paths; its header middleware is scoped to those paths
+// so it cannot touch the rest of the app. `isPublicLibraryPath` (via
+// isTokenRefreshExempt and lib/pat-session.js) exempts these paths from auth.
+app.use(createLibraryRouter())
 
 // =============================================================================
 // KPIs Page (public, no auth required, intentionally unlinked)
