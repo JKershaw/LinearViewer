@@ -98,11 +98,12 @@
           }
         }, function (err) {
           if (err && err.status === 401) { stopped = true; return; }
-          if (err && err.status === 404) {
-            // A revoked (or never-issued) link: stop and say so. Only a guest
-            // page's state URL can 404 this way; an owner page's cannot.
+          if (err && err.status === 404 && o.onGone) {
+            // A revoked (or never-issued) link on a GUEST page: stop and say so.
+            // Owner pages pass no `onGone`, so their 404s fall through and count
+            // as poll failures, exactly as they did before this feature.
             stopped = true;
-            if (o.onGone) o.onGone();
+            o.onGone();
             return;
           }
           failures += 1;
@@ -332,6 +333,17 @@
 
   // ── Page wiring ────────────────────────────────────────────────────────────
 
+  /**
+   * Whether a state URL belongs to a guest share page (LIN-3330 review, ledger 2).
+   * Only a guest page's state endpoint can 404 because the link was revoked or
+   * never issued; an owner page's 404 (e.g. the workspace left the session in
+   * another tab) is an ordinary poll failure and must leave the page intact.
+   * Pure, so the gate is unit-tested.
+   */
+  function isGuestStateUrl(stateUrl) {
+    return typeof stateUrl === 'string' && /^\/t\//.test(stateUrl);
+  }
+
   function init(doc) {
     var main = doc.querySelector('[data-testid="task-page"][data-state-url]');
     if (!main) return null;
@@ -391,10 +403,10 @@
         apply: apply,
         isVisible: function () { return !doc.hidden; },
         initial: initial,
-        onGone: function () {
+        onGone: isGuestStateUrl(main.getAttribute('data-state-url')) ? function () {
           // A guest link that 404s (revoked, or never issued): the page is gone.
           main.innerHTML = '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>';
-        }
+        } : null
       });
       poller.start();
       doc.addEventListener('visibilitychange', function () { poller.onVisibilityChange(doc.hidden); });
@@ -441,6 +453,7 @@
       rememberToggle: rememberToggle,
       applyOpenMemory: applyOpenMemory,
       formatElapsed: formatElapsed,
+      isGuestStateUrl: isGuestStateUrl,
       FAST_MS: FAST_MS,
       SLOW_MS: SLOW_MS,
       MAX_BACKOFF_MS: MAX_BACKOFF_MS

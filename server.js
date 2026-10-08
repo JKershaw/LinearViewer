@@ -156,7 +156,7 @@ import { createTaskPageLoader } from './lib/task-page-loader.js'
 import { createTaskShareRoutes } from './routes/task-share.js'
 import { TaskShareStore } from './lib/task-share-store.js'
 import { createGuestTaskAccess } from './lib/task-share-access.js'
-import { isGuestTaskPath } from './lib/guest-task-path.js'
+import { isTokenRefreshExempt } from './lib/guest-task-path.js'
 import { createNextRunRoutes } from './routes/next-run.js'
 import { createLiveConsoleRoutes } from './routes/live-console.js'
 import { createShipJourneyRoutes } from './routes/ship-journey.js'
@@ -1349,7 +1349,7 @@ async function ensureValidToken(req, res, next) {
 // Apply middleware to all routes except auth and logout
 // Note: workspace routes need token refresh too (they access Linear API)
 app.use((req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path === '/logout' || req.path === '/privacy' || req.path === '/terms' || req.path === '/styleguide' || req.path === '/kpis' || req.path === '/templates' || isGuestTaskPath(req.path)) {
+  if (isTokenRefreshExempt(req.path)) {
     return next();
   }
   ensureValidToken(req, res, next);
@@ -2973,7 +2973,8 @@ app.use(createTaskPageRoutes({
 // and the PUBLIC guest page at `/t/:token` (+ its stored-data `/t/:token/state`).
 // The guest route reads the owner's task through the EXISTING owner-away
 // credential path (`createGuestTaskAccess` → `resolveWorkspaceAccess`); `/t/` is
-// exempt from PAT auto-login and token refresh via the shared `isGuestTaskPath`.
+// exempt from PAT auto-login and token refresh via the shared guest-path predicate
+// (`isGuestTaskPath` / `isTokenRefreshExempt` in `lib/guest-task-path.js`).
 // Mounted right after the task page, before the proxy default/legacy catch-alls.
 const taskShareStore = new TaskShareStore({ collection: db.collection('task_share_links') })
 app.use(createTaskShareRoutes({
