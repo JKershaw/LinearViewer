@@ -2284,7 +2284,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     assert.strictEqual(prefCalls.length, 1, 'exactly one resolveAiOperationModel-backing read per page load');
   });
 
-  test('LIN-3370: catalog models never reach the rendered <select> (curated-only markup), and match a no-catalog render', async () => {
+  test('LIN-3363: the combobox lists curated + catalog models (catalog ones tagged tools-off); an empty or failing catalog degrades to curated-only', async () => {
     const mk = (getModelCatalog) => buildApp({
       observerStateStore: fakeObserverStateStore({ censusDoc: null }),
       workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini', []),
@@ -2296,11 +2296,13 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     const rejecting = await get(mk(async () => { throw new Error('catalog down'); }), '/workspace/acme/flight-companion');
     assert.strictEqual(withCatalog.status, 200);
     assert.strictEqual(rejecting.status, 200, 'a failing loader degrades to curated-only, not the error page');
-    assert.doesNotMatch(withCatalog.text, /catalog-model-two|Catalog Model Two/);
-    const selectOf = (t) => t.match(/<select id="flight-companion-model-select"[\s\S]*?<\/select>/)[0];
-    assert.strictEqual(selectOf(withCatalog.text), selectOf(empty.text));
-    assert.strictEqual(selectOf(rejecting.text), selectOf(empty.text));
-    assert.match(selectOf(empty.text), /anthropic\/claude-opus-5/);
+    const listOf = (t) => t.match(/<ul id="flight-companion-model-list"[\s\S]*?<\/ul>/)[0];
+    const row = listOf(withCatalog.text).match(/<li[^>]*data-id="mock-provider\/catalog-model-two"[^>]*>/)[0];
+    assert.match(row, /data-tools="off"/, 'a catalog-only model is tools-off');
+    assert.doesNotMatch(listOf(empty.text), /catalog-model-two|Catalog Model Two/);
+    assert.strictEqual(listOf(rejecting.text), listOf(empty.text));
+    assert.match(listOf(empty.text), /data-id="anthropic\/claude-opus-5"/);
+    assert.doesNotMatch(listOf(empty.text).match(/<li[^>]*data-id="anthropic\/claude-opus-5"[^>]*>/)[0], /data-tools/);
   });
 
   // LIN-2623 R1 (review, PR #1442) — the mandated red-first case: before the
@@ -2329,7 +2331,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     assert.doesNotMatch(text, /fc-strip-model">model: <code>openai\/gpt-5\.4-mini<\/code><\/span>/);
     assert.match(text, /fc-strip-tools">tools: off</);
     assert.doesNotMatch(text, /fc-strip-tools">tools: on</);
-    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="false">⚠/);
   });
 
   test('the rendered strip reports an uncurated model as tools off', async () => {
@@ -2383,17 +2385,17 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
       flightCompanionEnabled: true,
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
-    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="false">⚠/);
   });
 
-  test('a curated workspace default renders no tools-off warning', async () => {
+  test('a curated workspace default still emits the tools-off warning, hidden (LIN-3363)', async () => {
     const app = buildApp({
       observerStateStore: fakeObserverStateStore({ censusDoc: null }),
       workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
       flightCompanionEnabled: true,
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
-    assert.doesNotMatch(text, /fc-strip-tools-warning/);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="true" hidden>⚠/);
   });
 
   test('the picker renders every curated model as a selectable option', async () => {
@@ -2404,7 +2406,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
     for (const m of AVAILABLE_MODELS) {
-      assert.ok(text.includes(`value="${m.id}"`), `expected an <option> for ${m.id}`);
+      assert.ok(text.includes(`data-id="${m.id}"`), `expected an option row for ${m.id}`);
     }
   });
 
@@ -2416,7 +2418,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
       const { text } = await get(app, '/workspace/acme/flight-companion');
-      assert.match(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled>/);
+      assert.match(text, /<input type="search" id="flight-companion-model-search"[^>]* disabled>/);
       assert.match(text, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">/);
     });
   });
@@ -2429,7 +2431,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: undefined }, async () => {
       const { text } = await get(app, '/workspace/acme/flight-companion');
-      assert.doesNotMatch(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled/);
+      assert.doesNotMatch(text.match(/<input type="search" id="flight-companion-model-search"[^>]*>/)[0], /disabled/);
       assert.doesNotMatch(text, /fc-strip-freetier/);
     });
   });

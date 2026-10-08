@@ -1393,21 +1393,31 @@ test.describe('LIN-2771: a reload mid-window resumes the wake at the remaining t
   });
 });
 
-// LIN-2623 beat 3: the per-turn model picker. Real <select>/<option>
-// semantics (selectedIndex, the selected option's own data-pricing
-// attribute) are exactly what the vm-sandboxed client-unit harness
-// (tests/unit/flight-companion-client.test.js) does NOT model — its fake
-// picker only tracks `.value` — so the round trip through an ACTUAL <select>
-// and the live rate-card update belong here, in a real browser, rather than
-// forcing that fidelity into the fake DOM shim. The markup itself (which
-// options exist, their data-pricing attributes, the tools-off warning) is
-// already covered deterministically by tests/unit/render-flight-companion.test.js.
-test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () => {
+// LIN-2623 beat 3 / LIN-3363 S2: the per-turn model picker — a searchable
+// combobox over curated + catalog models. Real focus/blur, the in-flow list
+// and the live rate card/warning are exactly what the vm-sandboxed client-unit
+// harness (tests/unit/flight-companion-client.test.js) fakes, so the round
+// trip through a REAL browser belongs here. The markup itself is covered
+// deterministically by tests/unit/render-flight-companion.test.js.
+test.describe('Flight Companion — LIN-2623 beat 3 / LIN-3363 S2: per-turn model picker', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`/test/set-session?${featuresParam({ flightCompanion: true })}&urlKey=${URL_KEY}`);
     await page.goto(PAGE_URL);
     await page.waitForLoadState('networkidle');
   });
+
+  const search = (page) => page.locator('#flight-companion-model-search');
+  const row = (page, id) => page.locator(`#flight-companion-model-list [role="option"][data-id="${id}"]`);
+  // LIN-3360: the picker lives in the closed Settings fold.
+  async function openFold(page) {
+    await page.locator('details.fc-settings > summary').click();
+    await expect(search(page)).toBeVisible();
+  }
+  async function pickByClick(page, query, id) {
+    await search(page).click();
+    await search(page).fill(query);
+    await row(page, id).click();
+  }
 
   test('choosing a curated model in the picker sends it as `model` on the turn request', async ({ page }) => {
     let posted = null;
@@ -1417,12 +1427,10 @@ test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () 
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
     });
 
-    const select = page.locator('#flight-companion-model-select');
-    // LIN-3360: the picker lives in the closed Settings fold.
-    await expect(select).toBeHidden();
-    await page.locator('details.fc-settings > summary').click();
-    await expect(select).toBeVisible();
-    await select.selectOption('anthropic/claude-opus-5');
+    await expect(search(page)).toBeHidden();
+    await openFold(page);
+    await pickByClick(page, 'opus', 'anthropic/claude-opus-5');
+    await expect(page.locator('#flight-companion-model')).toHaveValue('anthropic/claude-opus-5');
 
     await page.locator('#flight-companion-question').fill('status please');
     await page.locator('#flight-companion-send').click();
@@ -1446,32 +1454,110 @@ test.describe('Flight Companion — LIN-2623 beat 3: per-turn model picker', () 
     expect(posted.model).toBeUndefined();
   });
 
-  test('choosing a model live-updates the rate card from the selected option\'s own data-pricing attribute', async ({ page }) => {
-    const select = page.locator('#flight-companion-model-select');
-    const priceEl = page.locator('#flight-companion-model-price');
-    await page.locator('details.fc-settings > summary').click();
-
-    const selectedOption = select.locator('option[value="anthropic/claude-opus-5"]');
-    const expectedPrice = await selectedOption.getAttribute('data-pricing');
+  test('choosing a model live-updates the rate card from the picked row\'s own data-pricing attribute', async ({ page }) => {
+    await openFold(page);
+    const expectedPrice = await row(page, 'anthropic/claude-opus-5').getAttribute('data-pricing');
     expect(expectedPrice).toBeTruthy(); // sanity: a real curated model must have a known rate
+    await pickByClick(page, 'opus', 'anthropic/claude-opus-5');
+    await expect(page.locator('#flight-companion-model-price')).toHaveText(expectedPrice);
+  });
 
-    await select.selectOption('anthropic/claude-opus-5');
-    await expect(priceEl).toHaveText(expectedPrice);
+  test('LIN-3363: search finds a catalog model; picking it shows the tools-off warning (fold closed), picking a curated model hides it', async ({ page }) => {
+    const warning = page.locator('#flight-companion-tools-warning');
+    await expect(warning).toBeAttached();
+    await expect(warning).toBeHidden();
+
+    await openFold(page);
+    await search(page).click();
+    await search(page).fill('catalog');
+    await expect(row(page, 'mock-provider/catalog-model-two')).toBeVisible();
+    await expect(row(page, 'anthropic/claude-opus-5')).toBeHidden();
+    await expect(row(page, 'mock-provider/catalog-model-two')).toContainText('tools off');
+    await row(page, 'mock-provider/catalog-model-two').click();
+
+    await page.locator('details.fc-settings > summary').click(); // close the fold
+    await expect(page.locator('details.fc-settings')).not.toHaveAttribute('open', '');
+    await expect(warning).toBeVisible();
+
+    await page.locator('details.fc-settings > summary').click();
+    await pickByClick(page, 'opus', 'anthropic/claude-opus-5');
+    await expect(warning).toBeHidden();
+  });
+
+  // LIN-3371 review ledger: the pick commits on mobile only because the list's
+  // `mousedown` preventDefault stops the input's `blur` closing the list before
+  // `click` lands. Every desktop-mouse test above passes either way; this one
+  // taps like a phone does.
+  test.describe('touch (375x812, hasTouch)', () => {
+    test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
+
+    test('LIN-3371: tapping a catalog row commits it and shows the tools-off warning', async ({ page }) => {
+      await page.locator('details.fc-settings > summary').tap();
+      await expect(search(page)).toBeVisible();
+      await search(page).tap();
+      await row(page, 'mock-provider/catalog-model-two').tap();
+
+      await expect(page.locator('#flight-companion-model')).toHaveValue('mock-provider/catalog-model-two');
+      await expect(search(page)).toHaveValue('Catalog Model Two');
+      await expect(page.locator('#flight-companion-tools-warning')).toBeVisible();
+    });
+  });
+
+  test('keyboard: type, ArrowDown, Enter commits; text matching nothing commits nothing', async ({ page }) => {
+    await openFold(page);
+    await search(page).click();
+    await search(page).fill('catalog-model-two');
+    await search(page).press('ArrowDown');
+    await search(page).press('Enter');
+    await expect(page.locator('#flight-companion-model')).toHaveValue('mock-provider/catalog-model-two');
+
+    await search(page).click();
+    await search(page).fill('zzz-no-such-model');
+    await search(page).blur();
+    await expect(page.locator('#flight-companion-model')).toHaveValue('mock-provider/catalog-model-two');
+    await expect(search(page)).toHaveValue('Catalog Model Two');
   });
 
   test('LIN-3360: the picked model persists across a reload, and the fold is closed again afterwards', async ({ page }) => {
-    const select = page.locator('#flight-companion-model-select');
     const fold = page.locator('details.fc-settings');
     await expect(fold).not.toHaveAttribute('open', '');
     await fold.locator('> summary').click();
-    await select.selectOption('anthropic/claude-opus-5');
+    await pickByClick(page, 'opus', 'anthropic/claude-opus-5');
     await fold.locator('> summary').click();
     await expect(fold).not.toHaveAttribute('open', '');
     await page.reload();
     await page.waitForLoadState('networkidle');
     await expect(fold).not.toHaveAttribute('open', '');
     await fold.locator('> summary').click();
-    await expect(select).toHaveValue('anthropic/claude-opus-5');
+    await expect(page.locator('#flight-companion-model')).toHaveValue('anthropic/claude-opus-5');
+    await expect(search(page)).toHaveValue('Claude Opus 5');
+  });
+
+  test('LIN-3363: a stale stored pick is reset on load (not sent on the next turn) and the stored blob is cleaned', async ({ page }) => {
+    await page.evaluate(() => {
+      const key = Object.keys(sessionStorage).find((k) => k.startsWith('flight-companion-session')) || 'flight-companion-session:' + location.pathname.split('/')[2];
+      const cur = JSON.parse(sessionStorage.getItem(key) || '{"history":[],"tabCheckInCount":0,"tabTotalCost":0}');
+      cur.selectedModel = 'removed/model-gone';
+      sessionStorage.setItem(key, JSON.stringify(cur));
+    });
+    let posted = null;
+    await page.route('**/api/flight-companion/turn', (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      posted = route.request().postDataJSON();
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: renderSSEFrames([['done', {}]]) });
+    });
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#flight-companion-model')).toHaveValue('');
+    const stored = await page.evaluate(() => {
+      const key = Object.keys(sessionStorage).find((k) => k.startsWith('flight-companion-session'));
+      return JSON.parse(sessionStorage.getItem(key)).selectedModel;
+    });
+    expect(stored).toBeNull();
+    await page.locator('#flight-companion-question').fill('hi');
+    await page.locator('#flight-companion-send').click();
+    await expect.poll(() => posted).not.toBeNull();
+    expect(posted.model).toBeUndefined();
   });
 });
 
