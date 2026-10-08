@@ -67,3 +67,34 @@ test.describe('Library — CSP', () => {
     expect(await page.evaluate(() => window.__cspViolations), 'results').toEqual([]);
   });
 });
+
+// LIN-3345 (Part B of LIN-3342): crawler files. Run against the real server so
+// the Archive locs (served by server.js, not the Library router) are exercised
+// too — every sitemap URL must resolve 200 and carry no `noindex`.
+test.describe('Library — crawler files', () => {
+  test('every sitemap <loc> resolves 200 without noindex and without a query', async ({ request }) => {
+    const res = await request.get('/sitemap.xml');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('application/xml');
+    const xml = await res.text();
+    const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    expect(locs.length).toBeGreaterThan(0);
+    expect(locs.some((loc) => new URL(loc).pathname === '/library')).toBe(true);
+    for (const loc of locs) {
+      expect(loc).not.toContain('?');
+      const page = await request.get(loc);
+      expect(page.status(), loc).toBe(200);
+      expect(page.headers()['x-robots-tag'], loc).not.toBe('noindex');
+    }
+  });
+
+  test('robots.txt allows crawling and points at the sitemap', async ({ request }) => {
+    const res = await request.get('/robots.txt');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('text/plain');
+    const body = await res.text();
+    expect(body).toMatch(/^Allow: \/$/m);
+    expect(body).toContain('/sitemap.xml');
+    expect(body).not.toMatch(/Disallow:/);
+  });
+});

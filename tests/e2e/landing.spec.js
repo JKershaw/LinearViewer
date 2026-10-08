@@ -187,6 +187,52 @@ test.describe('Landing Page (bespoke showcase)', () => {
     await page.goto('/');
     await expect(page.locator('a.logout')).not.toBeVisible();
   });
+
+  // LIN-3345 (Part B of LIN-3342): the Library is discoverable from the homepage.
+  test('renders the Library section above the Archive, linking to /library', async ({ page }) => {
+    await page.goto('/');
+    const library = page.locator('[data-testid="landing-library"]');
+    await expect(library).toBeVisible();
+    await expect(library.locator('h2')).toContainText(/work behind harbour/i);
+    await expect(library.locator('[data-testid="landing-library-link"]')).toHaveAttribute('href', '/library');
+
+    // Immediately above the Archive section.
+    const order = await page.evaluate(() => {
+      const lib = document.querySelector('[data-testid="landing-library"]');
+      const archive = document.querySelector('[data-testid="landing-archive"]');
+      return lib && archive ? lib.compareDocumentPosition(archive) : 0;
+    });
+    // DOCUMENT_POSITION_FOLLOWING === 4
+    expect(order & 4).toBe(4);
+  });
+
+  test('every Start-here link resolves (item 1 to the Archive, the rest to the Library)', async ({ page, request }) => {
+    await page.goto('/');
+    const hrefs = await page.locator('[data-testid="landing-library"] a.lx-library__link').evaluateAll(els => els.map(e => e.getAttribute('href')));
+    expect(hrefs).toHaveLength(6);
+    expect(hrefs[0]).toBe('/archive/2');
+    for (const href of hrefs.slice(1)) expect(href).toMatch(/^\/library\//);
+    for (const href of hrefs) {
+      const res = await request.get(href);
+      expect(res.status(), href).toBe(200);
+    }
+  });
+});
+
+// LIN-3345: the footer's Library link reaches the Library from every
+// footer-bearing page.
+test.describe('Footer Library link (LIN-3345)', () => {
+  for (const path of ['/', '/templates']) {
+    test(`from ${path} the footer library link opens /library`, async ({ page }) => {
+      await page.goto(path);
+      const link = page.locator('a.footer-legal[href="/library"]');
+      await expect(link).toBeVisible();
+      await expect(link).toHaveText('library');
+      await link.click();
+      await expect(page).toHaveURL(/\/library$/);
+      await expect(page.locator('[data-testid="library-search-input"]')).toBeVisible();
+    });
+  }
 });
 
 // The landing is dark-safe: it responds to the OS colour scheme via the

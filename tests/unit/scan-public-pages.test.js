@@ -104,6 +104,12 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
             <body>KPIs Page</body>
           </html>
         `);
+      } else if (url.pathname === '/library') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><script>var libraryIndex = true;</script><body>Library</body></html>');
+      } else if (url.pathname === '/library/doc/the-folded-loop') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<html><body>The Folded Loop document</body></html>');
       } else if (url.pathname === '/archive/1') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end('<html><script>var archiveNum = 1;</script><body>Archive 1</body></html>');
@@ -139,7 +145,7 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
     }
   });
 
-  test('discoverPublicPages discovers /, /kpis, and probes /archive/1..2 stopping at /archive/3 (404)', async () => {
+  test('discoverPublicPages discovers /, /kpis, /library, one document page, and probes /archive/1..2 stopping at /archive/3 (404)', async () => {
     let archiveProbeCount = 0;
     const instrumentedFetch = async (url, opts) => {
       if (String(url).includes('/archive/')) {
@@ -149,7 +155,7 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
     };
 
     const pages = await discoverPublicPages(baseUrl, { maxArchive: 5, fetchImpl: instrumentedFetch });
-    assert.deepEqual(pages, ['/', '/kpis', '/archive/1', '/archive/2']);
+    assert.deepEqual(pages, ['/', '/kpis', '/library', '/library/doc/the-folded-loop', '/archive/1', '/archive/2']);
     assert.equal(archiveProbeCount, 3, 'Expected exactly 3 archive probes (stopping at /archive/3 404)');
   });
 
@@ -163,7 +169,7 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
     };
 
     const pages = await discoverPublicPages(baseUrl, { maxArchive: 5, fetchImpl: errorFetch, errors });
-    assert.deepEqual(pages, ['/', '/kpis', '/archive/1']);
+    assert.deepEqual(pages, ['/', '/kpis', '/library', '/library/doc/the-folded-loop', '/archive/1']);
     assert.equal(errors.length, 1);
     assert.equal(errors[0].type, 'archive-probe');
     assert.equal(errors[0].status, 500);
@@ -177,7 +183,7 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
     try {
       const always200Fetch = async () => new Response('<html>Archive</html>', { status: 200 });
       const pages = await discoverPublicPages('http://127.0.0.1:3000', { maxArchive: 3, fetchImpl: always200Fetch });
-      assert.equal(pages.length, 5); // / , /kpis, /archive/1, 2, 3
+      assert.equal(pages.length, 7); // / , /kpis, /library, doc page, /archive/1, 2, 3
       assert.ok(warnings.some(w => w.includes('Reached maxArchive cap of 3')));
     } finally {
       console.warn = origWarn;
@@ -192,6 +198,8 @@ describe('discoverPublicPages and scanPublicPages (Hermetic HTTP Server)', () =>
     assert.equal(result.errors.length, 0);
     assert.ok(result.scannedPages.includes('/'));
     assert.ok(result.scannedPages.includes('/kpis'));
+    assert.ok(result.scannedPages.includes('/library'));
+    assert.ok(result.scannedPages.includes('/library/doc/the-folded-loop'));
     assert.ok(result.scannedPages.includes('/archive/1'));
     assert.ok(result.scannedPages.includes('/archive/2'));
   });

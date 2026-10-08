@@ -2,6 +2,17 @@
 
 > A minimal web app that displays your task tracker's projects and issues as a collapsible tree with a CLI aesthetic. Backed by Linear, GitHub, GitHub Projects, Jira, or a local store.
 
+## Library
+
+The papers and essays behind Harbour are published unauthenticated at `/library` — a searchable index of every document, no session required.
+
+- **Index**: `/library` lists the six "Start here" items, the papers and essays, and the Archive editions
+- **Search**: `/library?q=<terms>` — server-rendered, works without JavaScript; always `X-Robots-Tag: noindex`
+- **A document**: `/library/<slug>` (a paper) or `/library/doc/<slug>` (a listed document); the wrong form 404s
+- **Plain markdown**: append `.md` to any document URL — `/library/<slug>.md` or `/library/doc/<slug>.md`
+- **Start here**: `/archive/2`; `/library/doc/the-folded-loop`; `/library/doc/ladder`; `/library/writing-length`; `/library/review-loops`; `/library/learning-while-the-tools-change`
+- **Crawler files**: `/sitemap.xml` (canonical, query-free URLs) and `/robots.txt`
+
 ## Overview
 
 - Syncs with your workspace's provider (Linear, GitHub, GitHub Projects, Jira, or a local store) via OAuth or token auth
