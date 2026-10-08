@@ -389,8 +389,8 @@ window.renderQueueRow = function renderQueueRow(item, urlKey, { card = false } =
   const snippetHtml = snippet ? `<div class="queue-item-snippet">${esc(snippet)}</div>` : '';
 
   // Consumer poll-recency warning (LIN-2885): the server derives the message
-  // (never/since text) from the item's own `consumerLastSeenAt` stamp so this
-  // renderer never re-implements the staleness threshold.
+  // (never/since text) from the live poll recency, for queued rows only
+  // (LIN-3367), so this renderer never re-implements the staleness threshold.
   const warningHtml = item.consumerPollWarning
     ? `<div class="queue-item-warning">${esc(item.consumerPollWarning)}</div>`
     : '';
