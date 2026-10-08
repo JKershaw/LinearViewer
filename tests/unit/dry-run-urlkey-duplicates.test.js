@@ -24,6 +24,7 @@ const SCRIPT_PATH = fileURLToPath(new URL('../../scripts/dry-run-urlkey-duplicat
 const NOW = new Date('2026-10-08T12:00:00.000Z');
 const T1 = new Date('2026-08-01T00:00:00.000Z');
 const T2 = new Date('2026-09-01T00:00:00.000Z');
+const T3 = new Date('2026-09-15T00:00:00.000Z');
 const FUTURE = new Date(NOW.getTime() + 86400000);
 const PAST = new Date(NOW.getTime() - 86400000);
 
@@ -69,7 +70,9 @@ async function seed(db) {
     { _id: 'e10', accountId: J2, workspaceId: 'jira:person-two-xxxxxxxx' },
     // one account, one key, two workspace ids (informational)
     { _id: 'e11', accountId: D, workspaceId: 'W-multi-1' },
-    { _id: 'e12', accountId: D, workspaceId: 'W-multi-2' }
+    { _id: 'e12', accountId: D, workspaceId: 'W-multi-2' },
+    // owner evidence: A is owner of W-owned (linked to k-owner-evidence); B belongs to another workspace
+    { _id: 'e13', accountId: A, workspaceId: 'W-owned', role: 'owner' }
   ]);
 
   await db.collection('proxy-tokens').insertMany([
@@ -85,14 +88,24 @@ async function seed(db) {
     { _id: 'p10', urlKey: 'k-ownerless', createdBy: null, createdAt: T2, tokenHash: 'SECRET-TOKENHASH' },
     { _id: 'p11', urlKey: 'k-multi', createdBy: D, createdAt: T2, workspaceId: 'W-multi-1', tokenHash: 'SECRET-TOKENHASH' },
     { _id: 'p12', urlKey: 'k-multi', createdBy: D, createdAt: T2, workspaceId: 'W-multi-2', tokenHash: 'SECRET-TOKENHASH' },
-    { _id: 'p13', urlKey: 'k-actor', createdBy: A, createdAt: T2, tokenHash: 'SECRET-TOKENHASH' }
+    { _id: 'p13', urlKey: 'k-actor', createdBy: A, createdAt: T2, tokenHash: 'SECRET-TOKENHASH' },
+    // per-collision evidence: A owns the workspace this key links, B is a plain member of another
+    { _id: 'p14', urlKey: 'k-owner-evidence', createdBy: A, createdAt: T1, workspaceId: 'W-owned', tokenHash: 'SECRET-TOKENHASH' },
+    { _id: 'p15', urlKey: 'k-owner-evidence', createdBy: B, createdAt: T2, tokenHash: 'SECRET-TOKENHASH' },
+    // earliest token: three tokens for one holder, inserted T2, T1, T3
+    { _id: 'p16', urlKey: 'k-earliest', createdBy: A, createdAt: T2, tokenHash: 'SECRET-TOKENHASH' },
+    { _id: 'p17', urlKey: 'k-earliest', createdBy: A, createdAt: T1, tokenHash: 'SECRET-TOKENHASH' },
+    { _id: 'p18', urlKey: 'k-earliest', createdBy: A, createdAt: T3, tokenHash: 'SECRET-TOKENHASH' },
+    { _id: 'p19', urlKey: 'k-earliest', createdBy: B, createdAt: T3, tokenHash: 'SECRET-TOKENHASH' }
   ]);
   await db.collection('dispatch-tokens').insertMany([
     // held only through dispatch-tokens, under an id that was merged away
     { _id: 'd1', urlKey: 'k-merged', createdBy: OLD, createdAt: T1, tokenHash: 'SECRET-TOKENHASH' },
     // lifetime link: no proxy-tokens row, the declaration names the workspace
     { _id: 'd2', urlKey: 'k-decl', createdBy: A, createdAt: T1, tokenHash: 'SECRET-TOKENHASH' },
-    { _id: 'd3', urlKey: 'k-decl-other', createdBy: A, createdAt: T1, tokenHash: 'SECRET-TOKENHASH' }
+    { _id: 'd3', urlKey: 'k-decl-other', createdBy: A, createdAt: T1, tokenHash: 'SECRET-TOKENHASH' },
+    { _id: 'd4', urlKey: 'k-earliest', createdBy: A, createdAt: T3, tokenHash: 'SECRET-TOKENHASH' },
+    { _id: 'd5', urlKey: 'k-earliest', createdBy: A, createdAt: T2, tokenHash: 'SECRET-TOKENHASH' }
   ]);
   await db.collection('owner-credentials').insertMany([
     { _id: `${A}::k-collision::linear`, accountId: A, urlKey: 'k-collision', provider: 'linear', token: 'SECRET-OC-TOKEN', refreshToken: 'SECRET-OC-REFRESH', createdAt: T1 },
@@ -122,8 +135,20 @@ async function seed(db) {
     { _id: 'cp1', urlKey: 'k-data-only' },
     { _id: 'cp2', urlKey: 'slug-0a1b2c3d' },
     { _id: 'cp3', urlKey: 'k-live-only' },
-    { _id: 'cp4', urlKey: 'k-stale-only' }
+    { _id: 'cp4', urlKey: 'k-stale-only' },
+    { _id: 'cp5', urlKey: 'k-actor-prefs' }
   ]);
+  // LIN-3381 review: every class-C shape the no-holder count must reach.
+  await db.collection('run-proposals').insertOne({ _id: 'rp1', urlKey: 'k-src-field' });
+  await db.collection('local-issues').insertOne({ _id: 'li1', scope: 'k-src-scope' });
+  await db.collection('workspace-preferences').insertOne({ _id: 'k-src-id', preferences: {} });
+  await db.collection('harbour-comments').insertOne({ _id: 'k-src-comment::c1' });
+  await db.collection('observer-state').insertMany([{ _id: 'sweep:v1:k-src-observer' }, { _id: 'companion:v1:k-src-companion:proxy' }, { _id: 'unrelated-instance' }]);
+  await db.collection('brief-cache').insertOne({ _id: 'k-src-brief:issue-uuid' });
+  await db.collection('recap-cache').insertOne({ _id: 'github:k-src-recap:issue-uuid' });
+  // class-B actors: close-out-events and the user-preferences maps
+  await db.collection('close-out-events').insertOne({ _id: 'co1', urlKey: 'k-actor-closeout', accountId: X });
+  await db.collection('user-preferences').insertOne({ _id: X, preferences: { selectedTeamByWorkspace: { 'k-actor-prefs': 'team-1' } } });
   await db.collection('workspace-halt').insertOne({ _id: 'k-halt-only' });
 
   await db.collection('sessions').insertMany([
@@ -194,8 +219,25 @@ describe('dry-run-urlkey-duplicates (LIN-3381 S1.1)', () => {
     assert.ok(withCred, 'A holds through an owner-credentials record and a token');
     assert.strictEqual(withCred.ownerCredential, true);
     assert.strictEqual(withCred.ownerOfLinkedWorkspace, false, 'k-collision links no workspace, so no linked owner edge');
+    assert.strictEqual(byAccount['proxy-tokens'].ownerOfLinkedWorkspace, false);
     assert.strictEqual(withCred.earliestTokenAt.proxy, T1.toISOString());
     assert.strictEqual(byAccount['proxy-tokens'].earliestTokenAt.proxy, T2.toISOString());
+  });
+
+  test('ownerOfLinkedWorkspace is true only for a holder with a role:owner edge to a workspace linked to the key', () => {
+    const collision = row(report.collisions.rows, 'k-owner-evidence');
+    assert.ok(collision, 'A (owner of W-owned) and B (member only) share no linked workspace');
+    const a = collision.holders.find(h => h.sources.includes('proxy-tokens') && h.ownerOfLinkedWorkspace);
+    assert.ok(a, 'the owner edge to the linked workspace is recorded');
+    assert.strictEqual(collision.holders.filter(h => h.ownerOfLinkedWorkspace).length, 1, 'the member-only edge is not an owner edge');
+  });
+
+  test('earliestTokenAt picks the earliest createdAt, not the latest or the first inserted', () => {
+    const collision = row(report.collisions.rows, 'k-earliest');
+    assert.ok(collision);
+    const holder = collision.holders.find(h => h.earliestTokenAt.proxy);
+    assert.strictEqual(holder.earliestTokenAt.proxy, T1.toISOString(), 'T2 was inserted first, T3 last, T1 is earliest');
+    assert.strictEqual(holder.earliestTokenAt.dispatch, T2.toISOString());
   });
 
   test('a shared membership is reported separately and is not a collision', () => {
@@ -252,9 +294,14 @@ describe('dry-run-urlkey-duplicates (LIN-3381 S1.1)', () => {
 
   test('no-holder keys are bucketed disjointly, with the S1.2 residual separate', () => {
     const { buckets, s1_2Residual, total } = report.keysWithNoHolder;
-    assert.deepStrictEqual(buckets, { liveSession: 1, staleSession: 1, actorOnly: 1, dataOnly: 4 });
-    assert.strictEqual(total, 7);
-    assert.strictEqual(s1_2Residual.count, 4, 'data-only: k-data-only, slug-0a1b2c3d, k-halt-only, k-ownerless (token with no owner)');
+    // actorOnly: k-actor-only (dispatch-history), k-actor-closeout (close-out-events.accountId), k-actor-prefs (user-preferences map key)
+    assert.deepStrictEqual(buckets, { liveSession: 1, staleSession: 1, actorOnly: 3, dataOnly: 12 });
+    assert.strictEqual(total, 17);
+    // data-only: k-data-only, slug-0a1b2c3d, k-halt-only, k-ownerless (token with no owner), plus one key seeded ONLY in each of
+    // run-proposals (field), local-issues (scope), workspace-preferences (_id), harbour-comments (_id prefix),
+    // observer-state (sweep and companion ids), brief-cache and recap-cache (workspace id prefix of the _id)
+    assert.strictEqual(s1_2Residual.count, 12);
+    assert.deepStrictEqual(report.keysWithNoHolder.unenumeratedSources.map(u => u.collection), ['run-summary-cache', 'session-summary-cache']);
     assert.strictEqual(s1_2Residual.localShapeSubCount, 1);
   });
 

@@ -15,7 +15,7 @@ import { ConnectionStore } from '../../lib/connection-store.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
-import { URLKEY_SOURCES, ACTOR_SOURCES } from '../../scripts/dry-run-urlkey-duplicates.mjs';
+import { URLKEY_SOURCES, ACTOR_SOURCES, UNENUMERATED_SOURCES } from '../../scripts/dry-run-urlkey-duplicates.mjs';
 
 const T1 = new Date('2026-08-01T00:00:00.000Z');
 const T2 = new Date('2026-09-01T00:00:00.000Z');
@@ -152,19 +152,19 @@ describe('source constraints (D6 and the source-scanning censuses)', () => {
 const COLLECTION_CLASSES = {
   'owner-credentials': 'H', 'connections': 'H', 'proxy-tokens': 'H', 'dispatch-tokens': 'H',
   'dispatch-queue': 'B', 'dispatch-history': 'B', 'saved-chats': 'B', 'task-mode-events': 'B',
-  'funnel-events': 'B', 'credential-lifecycle-events': 'B', 'task_share_links': 'B', 'user-preferences': 'B-unread',
+  'funnel-events': 'B', 'credential-lifecycle-events': 'B', 'task_share_links': 'B', 'user-preferences': 'B',
   'sessions': 'B',
-  'close-out-events': 'C', 'foreman-status': 'C', 'llm-call-log': 'C', 'prompt-traces': 'C', 'proxy-events': 'C',
+  'close-out-events': 'BC', 'foreman-status': 'C', 'llm-call-log': 'C', 'prompt-traces': 'C', 'proxy-events': 'C',
   'observation-sessions': 'C', 'observer-shadow-log': 'C', 'wake_shadow': 'C', 'liveness-alarms': 'C',
   'custom-prompts': 'C', 'report-history': 'C', 'task-snapshots': 'C', 'task-decisions': 'C', 'run-paragraph': 'C',
   'workspaces': 'C', 'workspace-halt': 'C',
-  // Composite-_id or workspaceId-keyed caches and per-key documents whose key sits inside a joined string;
-  // not enumerated by the dry-run's no-holder count.
-  'brief-cache': 'C-composite', 'recap-cache': 'C-composite', 'run-summary-cache': 'C-composite',
-  'session-summary-cache': 'C-composite', 'workspace-preferences': 'C-composite', 'harbour-comments': 'C-composite',
-  'observer-state': 'C-unread', 'dismissal-suggestions': 'C-unread', 'dispatch-presets': 'C-unread', 'run-proposals': 'C-unread',
-  'shelved-rulings': 'C-unread', 'ship-biscuit-editions': 'C-unread', 'local-issues': 'C-unread',
-  'collective-characters': 'C-unread', 'collective-presets': 'C-unread',
+  // Key inside `_id` or a non-`urlKey` field: read by the no-holder count through URLKEY_SOURCES.
+  'brief-cache': 'C', 'recap-cache': 'C', 'workspace-preferences': 'C', 'harbour-comments': 'C',
+  'observer-state': 'C', 'local-issues': 'C',
+  'dismissal-suggestions': 'C', 'dispatch-presets': 'C', 'run-proposals': 'C', 'shelved-rulings': 'C',
+  'ship-biscuit-editions': 'C', 'collective-characters': 'C', 'collective-presets': 'C',
+  // The only C members NOT read; the report names them (UNENUMERATED_SOURCES) so the count is never read as complete.
+  'run-summary-cache': 'C-named', 'session-summary-cache': 'C-named',
   // No urlKey at all.
   'account-merge-events': 'N', 'account-workspaces': 'N', 'accounts': 'N', 'free-tier-usage': 'N',
   'harbour-feedback-tokens': 'N', 'scheduler-locks': 'N', 'email-magic-links': 'N', 'shares': 'N'
@@ -200,8 +200,21 @@ describe('class guard: every collection is classified', () => {
     assert.ok(['mystery-store'].filter(c => !(c in COLLECTION_CLASSES)).length > 0);
   });
 
-  test('the dry-run sources agree with the table', () => {
-    for (const s of URLKEY_SOURCES) assert.ok(COLLECTION_CLASSES[s.collection] && COLLECTION_CLASSES[s.collection] !== 'N', s.collection);
-    for (const s of ACTOR_SOURCES) assert.ok(/^[BH]/.test(COLLECTION_CLASSES[s.collection]), s.collection);
+  test('the dry-run sources agree with the table, and every C/B entry is actually wired', () => {
+    // 'sessions' (B) is read by its own walker, 'connections' (H) through the seam.
+    const SEPARATE = new Set(['sessions', 'connections']);
+    const urlKeyCollections = new Set(URLKEY_SOURCES.map(s => s.collection));
+    const actorCollections = new Set(ACTOR_SOURCES.map(s => s.collection));
+    const named = new Set(UNENUMERATED_SOURCES.map(s => s.collection));
+    for (const [collection, cls] of Object.entries(COLLECTION_CLASSES)) {
+      if (SEPARATE.has(collection)) continue;
+      if (cls.includes('C') && cls !== 'C-named') assert.ok(urlKeyCollections.has(collection), `${collection} is class C but not in URLKEY_SOURCES`);
+      if (cls === 'C-named') assert.ok(named.has(collection) && !urlKeyCollections.has(collection), `${collection} must be named in UNENUMERATED_SOURCES`);
+      if (cls.includes('B')) assert.ok(actorCollections.has(collection), `${collection} is class B but not in ACTOR_SOURCES`);
+      assert.ok(/^(H|B|C|BC|C-named|N)$/.test(cls), `${collection}: no escape tags (got ${cls})`);
+    }
+    for (const s of URLKEY_SOURCES) assert.ok(COLLECTION_CLASSES[s.collection] && !['N', 'C-named'].includes(COLLECTION_CLASSES[s.collection]), s.collection);
+    for (const s of ACTOR_SOURCES) assert.ok(/B/.test(COLLECTION_CLASSES[s.collection]) || COLLECTION_CLASSES[s.collection] === 'H', s.collection);
+    for (const u of UNENUMERATED_SOURCES) assert.ok(u.reason.length > 0, u.collection);
   });
 });

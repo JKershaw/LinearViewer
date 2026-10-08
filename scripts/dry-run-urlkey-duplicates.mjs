@@ -20,7 +20,8 @@
  *     more is a collision).
  *   - SUSPECTED COLLISIONS, ACTOR EVIDENCE ONLY: keys where actor stores
  *     (dispatchedBy, saved chats, task-mode and funnel events, credential
- *     lifecycle events, task-share owner, declared-mint owner) name an account
+ *     lifecycle events, task-share owner, close-out events, the user-preferences per-workspace maps,
+ *     declared-mint owner) name an account
  *     that is not a holder. Labelled evidence; it never changes the holder set.
  *   - LIVE SESSIONS: a labelled LOWER BOUND (sessions expire after 30 days,
  *     stale-present rows are counted apart, string-encoded rows are unscannable).
@@ -77,9 +78,36 @@ export const URLKEY_SOURCES = Object.freeze([
     'task-mode-events', 'close-out-events', 'liveness-alarms', 'custom-prompts', 'report-history',
     'task-snapshots', 'task-decisions', 'run-paragraph', 'workspaces', 'task_share_links',
     'observer-shadow-log', 'saved-chats', 'funnel-events', 'credential-lifecycle-events',
-    'owner-credentials'
+    'owner-credentials', 'dismissal-suggestions', 'dispatch-presets', 'run-proposals', 'shelved-rulings',
+    'ship-biscuit-editions', 'collective-characters', 'collective-presets'
   ].map(collection => ({ collection, shape: 'field', field: 'urlKey' })),
-  { collection: 'workspace-halt', shape: 'id' }
+  { collection: 'local-issues', shape: 'field', field: 'scope' },
+  { collection: 'workspace-halt', shape: 'id' },
+  { collection: 'workspace-preferences', shape: 'id' },
+  // `_id` is `${urlKey}::${commentId}`.
+  { collection: 'harbour-comments', shape: 'id', parse: id => id.split('::')[0] },
+  // `_id` is `sweep:v1:${urlKey}` or `companion:v1:${urlKey}[:proxy]`; other ids carry no key.
+  {
+    collection: 'observer-state',
+    shape: 'id',
+    parse: id => {
+      const m = /^(?:sweep|companion):v1:(.+?)(?::proxy)?$/.exec(id)
+      return m ? m[1] : null
+    }
+  },
+  // `_id` is `${workspaceId}:${issueId}`; an issue id carries no colon.
+  { collection: 'brief-cache', shape: 'id', parse: id => id.slice(0, Math.max(id.lastIndexOf(':'), 0)) },
+  { collection: 'recap-cache', shape: 'id', parse: id => id.slice(0, Math.max(id.lastIndexOf(':'), 0)) }
+])
+
+/**
+ * Class C members deliberately NOT read by the no-holder count, with the
+ * reason. The report prints these so `keysWithNoHolder` is never read as a
+ * complete universe.
+ */
+export const UNENUMERATED_SOURCES = Object.freeze([
+  { collection: 'run-summary-cache', reason: '_id is `${workspaceId}:${loopId}`; the loop id format is not guaranteed colon-free, so the key cannot be split safely' },
+  { collection: 'session-summary-cache', reason: '_id is `${workspaceId}:${sessionId}`; the session id format is not guaranteed colon-free, so the key cannot be split safely' }
 ])
 
 /**
@@ -94,7 +122,14 @@ export const ACTOR_SOURCES = Object.freeze([
   { collection: 'task-mode-events', fields: ['accountId'] },
   { collection: 'funnel-events', fields: ['accountId'] },
   { collection: 'credential-lifecycle-events', fields: ['accountId'] },
-  { collection: 'task_share_links', fields: ['ownerAccountId'] }
+  { collection: 'task_share_links', fields: ['ownerAccountId'] },
+  { collection: 'close-out-events', fields: ['accountId'] },
+  // `_id` is the account; the keys of each map are workspace keys.
+  {
+    collection: 'user-preferences',
+    keyedBy: 'prefsMaps',
+    maps: ['selectedTeamByWorkspace', 'northStarByWorkspace', 'northStarDocVersionByWorkspace']
+  }
 ])
 
 /** Every collection this script is allowed to open. */
@@ -240,6 +275,19 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
   // Actor tier (class B) and the declared-mint workspace link (class E).
   const actorsByKey = new Map()
   for (const source of ACTOR_SOURCES) {
+    if (source.keyedBy === 'prefsMaps') {
+      const prefsProjection = { _id: 1 }
+      for (const map of source.maps) prefsProjection[`preferences.${map}`] = 1
+      for (const row of await db.collection(source.collection).find({}, { projection: prefsProjection }).toArray()) {
+        const account = typeof row._id === 'string' ? canon(row._id) : null
+        if (!account) continue
+        for (const map of source.maps) {
+          const value = row.preferences?.[map]
+          if (value && typeof value === 'object') for (const key of Object.keys(value)) if (key) addTo(actorsByKey, key, account)
+        }
+      }
+      continue
+    }
     const projection = { _id: 0, urlKey: 1 }
     for (const field of source.fields) projection[field] = 1
     const wantsDeclaration = source.fields.some(f => f.startsWith('grantDeclaration.'))
@@ -305,7 +353,9 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
       for (const value of await collection.distinct(source.field)) if (typeof value === 'string' && value) universe.add(value)
     } else {
       for (const row of await collection.find({}, { projection: { _id: 1 } }).toArray()) {
-        if (typeof row._id === 'string' && row._id) universe.add(row._id)
+        if (typeof row._id !== 'string' || !row._id) continue
+        const key = source.parse ? source.parse(row._id) : row._id
+        if (typeof key === 'string' && key) universe.add(key)
       }
     }
   }
@@ -349,7 +399,7 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
     sharedMemberships: { count: sharedMemberships.length, actionable: false, rows: sharedMemberships },
     suspectedCollisionsActorOnly: {
       count: suspectedActorOnly.length,
-      caveat: 'evidence only: an actor store names an account that holds no token, credential or referent for the key; never changes the holder set',
+      caveat: 'evidence only (a lower bound: actor stores are read for the accounts they name, and a store that names none adds nothing): an actor store names an account that holds no token, credential or referent for the key; never changes the holder set',
       rows: sortByKey(suspectedActorOnly)
     },
     keysOnMultipleWorkspaceIds: { count: multiWorkspace.length, informational: true, rows: sortByKey(multiWorkspace) },
@@ -365,7 +415,8 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
       total: noHolder.liveSession + noHolder.staleSession + noHolder.actorOnly + noHolder.dataOnly,
       buckets: noHolder,
       s1_2Residual: { count: noHolder.dataOnly, localShapeSubCount: dataOnlyLocalShape },
-      note: 'disjoint buckets, first match wins: liveSession, staleSession, actorOnly, dataOnly. Only dataOnly (data rows and nothing else) sizes the S1.2 residual.'
+      unenumeratedSources: UNENUMERATED_SOURCES,
+      note: 'a lower bound: unenumeratedSources are not read. Disjoint buckets, first match wins: liveSession, staleSession, actorOnly, dataOnly. Only dataOnly (data rows and nothing else) sizes the S1.2 residual.'
     }
   }
 }
@@ -388,6 +439,7 @@ export function formatSummary(report) {
     `  live sessions — ${report.liveSessionHolders.caveat}`,
     `      live keys: ${report.liveSessionHolders.liveKeys}; stale-present keys: ${report.liveSessionHolders.staleKeys}; live (key, account) not in holder set: ${report.liveSessionHolders.liveNotInHolderSet.count}; unscannable string rows: ${t.unscannableSessionRows}`,
     `  keys with no holder: ${n.total} (live session ${n.buckets.liveSession}, stale session ${n.buckets.staleSession}, actor only ${n.buckets.actorOnly}, data only ${n.buckets.dataOnly})`,
+    `      not read (lower bound): ${n.unenumeratedSources.map(u => u.collection).join(', ') || 'none'}`,
     `      S1.2 residual signal = data only: ${n.s1_2Residual.count} (of which local-shape slug-<8 hex>: ${n.s1_2Residual.localShapeSubCount})`,
     `  ownerless tokens (counted, not holders): ${t.ownerlessTokens}; holders with a corrupt mergedInto chain: ${t.unresolvableHolders}`,
     '  Expect Jira teammates on one site to show as collisions (key = tenant host, workspace id = jira:<person>).',
