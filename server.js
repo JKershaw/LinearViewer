@@ -84,6 +84,7 @@ import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
 import { createOnTicketWrite } from './lib/ticket-close-closer.js'
 import { createTicketCloseSweepRun } from './lib/ticket-close-sweep.js'
+import { createReadTicketState } from './lib/ticket-state-reader.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
@@ -935,7 +936,8 @@ scheduler.register({
     agentStatusStore,
     sessionsFeedCache,
     readTicketState,
-    intervalMs: TICKET_CLOSED_SWEEP_INTERVAL_MS
+    intervalMs: TICKET_CLOSED_SWEEP_INTERVAL_MS,
+    leaseMs: TICKET_CLOSED_SWEEP_LEASE_MS
   })
 // Same discipline as the sweeps above: not awaited, with a purpose-written
 // catch so a silent-never-runs state is diagnosable rather than inferred.
@@ -2969,23 +2971,9 @@ const onTicketWrite = createOnTicketWrite({
 })
 // Owner-blind provider read for the unattended sweep (same resolver as the
 // dispatch anchor guard). Returns `{issueId, stateType}` or null for ANY
-// failure or non-`ok` resolution: a null read closes nothing.
-async function readTicketState(urlKey, identifier, { source } = {}) {
-  try {
-    const access = await resolveWorkspaceAccess(urlKey, UNSCOPED, { source })
-    if (!access?.token || access.reason !== 'ok') return null
-    const provider = getProviderForWorkspace({ provider: access.provider })
-    if (!provider?.supports?.('fetchIssueContext')) return null
-    const context = await provider.fetchIssueContext(access.token, identifier)
-    const issue = context?.issue || context || {}
-    const stateType = issue?.state?.type
-    if (typeof stateType !== 'string' || !stateType) return null
-    return { issueId: issue.id || null, stateType }
-  } catch (err) {
-    console.error(`[ticket-closer] ticket read failed for ${urlKey}/${identifier}: ${err?.message || err}`)
-    return null
-  }
-}
+// failure or non-`ok` resolution: a null read closes nothing. Passes the
+// structured scope to the provider (lib/ticket-state-reader.js).
+const readTicketState = createReadTicketState({ resolveWorkspaceAccess, getProviderForWorkspace, unscoped: UNSCOPED })
 
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, livenessAlarmStore, onTicketWrite }))
 

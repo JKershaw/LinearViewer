@@ -141,4 +141,46 @@ describe('ticket-close-sweep (LIN-3366)', () => {
     const empty = harness({ workspaces: {} });
     assert.equal((await empty.run()).workspaces, 0);
   });
+
+  test('counts null reads (null and thrown) and logs one tick line with the totals', async () => {
+    const h = harness({ workspaces: { acme: [{ id: 'BAD' }, { id: 'NULL' }, { id: 'GOOD' }] }, failRead: new Set(['BAD']), states: {
+      NULL: null, GOOD: { issueId: 'iid-GOOD', stateType: 'completed' } } });
+    const totals = await h.run();
+    assert.equal(totals.nullReads, 2);
+    assert.equal(totals.ticketsRead, 3);
+    const lines = h.logs.filter(l => /sweep tick/.test(l));
+    assert.equal(lines.length, 1);
+    const logged = JSON.parse(lines[0].slice(lines[0].indexOf('{')));
+    for (const k of ['workspaces', 'ticketsRead', 'nullReads', 'terminal', 'closedRows', 'withdrawn', 'resolved', 'refused', 'failures']) assert.ok(k in logged, k);
+    assert.equal(logged.nullReads, 2);
+    assert.equal(logged.terminal, 1);
+  });
+
+  describe('lease time budget', () => {
+    const LEASE = 100000;
+    test('stops starting new workspaces once past 0.8 of the lease', async () => {
+      let clock = T0;
+      const h = harness({ workspaces: { a: [{ id: 'A' }], b: [{ id: 'B' }], c: [{ id: 'C' }] }, extra: { leaseMs: LEASE, now: () => clock,
+        readTicketState: async (urlKey, identifier) => { h.reads.push(`${urlKey}/${identifier}`); clock += 90000; return { issueId: 'i', stateType: 'started' }; } } });
+      const totals = await h.run();
+      assert.deepEqual(h.reads, ['a/A'], 'workspaces b and c are not read');
+      assert.equal(totals.workspaces, 1);
+      assert.match(h.logs.find(l => /sweep tick/.test(l)), /"budgetStop":true/);
+    });
+    test('stops starting new tickets inside a workspace', async () => {
+      let clock = T0;
+      const h = harness({ workspaces: { acme: tickets(5) }, extra: { leaseMs: LEASE, now: () => clock,
+        readTicketState: async (urlKey, identifier) => { h.reads.push(identifier); clock += 50000; return { issueId: 'i', stateType: 'started' }; } } });
+      const totals = await h.run();
+      assert.equal(h.reads.length, 2, 'third ticket starts after 100s > 80s budget');
+      assert.equal(totals.ticketsRead, 2);
+    });
+    test('no leaseMs means no budget (all workspaces run)', async () => {
+      let clock = T0;
+      const h = harness({ workspaces: { a: [{ id: 'A' }], b: [{ id: 'B' }] }, extra: { now: () => clock,
+        readTicketState: async (urlKey, identifier) => { h.reads.push(identifier); clock += 1e9; return null; } } });
+      await h.run();
+      assert.deepEqual(h.reads.sort(), ['A', 'B']);
+    });
+  });
 });

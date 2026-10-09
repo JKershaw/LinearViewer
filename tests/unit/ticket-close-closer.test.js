@@ -354,6 +354,56 @@ describe('ticket-close-closer (LIN-3366)', () => {
     });
   });
 
+  describe('legacy key-less digest on a terminal / bookkeeping-stamped content loop (FC call item 2)', () => {
+    const stripKey = async (id) => {
+      const doc = await row(id);
+      delete doc.feedbackDigest.withdrawalReversed;
+      await history.replaceOne({ _id: id }, doc);
+    };
+    // variant: a content loop that raised a decision and then posted [done], or one already bookkeeping-stamped
+    const variants = [
+      ['[done]', () => seedBlocked('a', { extra: [{ message: '[done] finished', timestamp: mins(100) }] })],
+      ['bookkeeping-stamped', async () => { await seedBlocked('a'); await history.updateOne({ _id: 'a' }, { $set: { bookkeeping: { reason: 'handed-on', by: 'lineage-closer', at: mins(90) } } }); }]
+    ];
+    for (const [name, seedIt] of variants) {
+      const reverseIt = async () => { await store.markDecisionWithdrawn('a', URL_KEY, 'dec-a', 'ticket-closed: x'); await reverse('a', 'dec-a'); };
+      test(`${name}, no reversal: the decision is verified and withdrawn in the same run; the row is not stamped (existing bookkeeping unchanged)`, async () => {
+        await seedIt();
+        await loopsOf();
+        await stripKey('a');
+        const before = (await row('a')).bookkeeping;
+        const r = await close();
+        assert.equal(r.withdrawn, 1);
+        assert.equal(r.closedRows, 0);
+        assert.equal(r.failures, 0);
+        const after = await row('a');
+        assert.deepEqual(after.bookkeeping, before, 'row bookkeeping untouched');
+        assert.notEqual(after.bookkeeping?.reason, 'ticket-closed');
+        assert.ok(after.feedback.some(f => f.kind === 'decision-withdrawn'));
+        assert.equal(after.feedbackDigest.withdrawalReversed, false);
+        const again = await close();
+        assert.deepEqual([again.closedRows, again.withdrawn, again.failures], [0, 0, 0], 'second run is a no-op');
+      });
+      test(`${name}, reversed: nothing is written, the loop is settled`, async () => {
+        await seedIt();
+        await reverseIt();
+        await stripKey('a');
+        const feedbackBefore = (await row('a')).feedback.length;
+        const calls = [];
+        const spy = Object.create(store);
+        spy.closeIssueRows = async (...a) => { calls.push('close'); return store.closeIssueRows(...a); };
+        spy.markDecisionWithdrawn = async (...a) => { calls.push('withdraw'); return store.markDecisionWithdrawn(...a); };
+        const r = await close({ dispatchStore: spy });
+        assert.deepEqual(calls, []);
+        assert.equal(r.withdrawn, 0);
+        assert.equal((await row('a')).feedback.length, feedbackBefore, 'no feedback append');
+        const c = await prep();
+        assert.ok(c.settled.some(s => s.loopId === 'a'));
+        assert.deepEqual(c.unverified, []);
+      });
+    }
+  });
+
   describe('write results: refusal vs failure', () => {
     test('a {refused} withdrawal is counted and logged at info level, never as a failure; null is a failure', async () => {
       await seedBlocked('a');

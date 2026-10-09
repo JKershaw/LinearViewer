@@ -148,6 +148,58 @@ describe('false-live-rows (LIN-3365)', () => {
     assert.equal(w(after).falseCloses.reopened.length, 0);
   });
 
+  describe('legacy key-less digest on a [done] / bookkeeping-stamped content loop (LIN-3366 FC call item 2)', () => {
+    const mins = (m) => new Date(Date.now() - m * 60000);
+    const variants = [
+      ['[done]', { feedbackExtra: [{ message: '[done] finished', timestamp: mins(100) }], bookkeeping: null }],
+      ['bookkeeping-stamped', { feedbackExtra: [], bookkeeping: { reason: 'handed-on', by: 'lineage-closer', at: mins(90) } }]
+    ];
+    const seedLegacy = async ({ feedbackExtra, bookkeeping }, { reversed = false } = {}) => {
+      await history.insertOne({ _id: 'a', urlKey: 'acme', issueIdentifier: 'LIN-1', issueId: 'iid-1', rootItemId: 'a', kind: 'implementation', status: 'taken', dispatchedAt: mins(300), resolvedAt: mins(299), bookkeeping, feedback: [
+        { kind: 'decision', message: JSON.stringify({ decision_id: 'dec-a', question: 'q', options: [] }), timestamp: mins(290) },
+        { message: '[blocked] waiting', timestamp: mins(280) },
+        ...feedbackExtra] });
+      const agentStatusStore = new AgentStatusStore({ collection: client.db('fl_status2').collection('s') });
+      await getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore }); // writes the digest
+      if (reversed) {
+        await store.markDecisionWithdrawn('a', 'acme', 'dec-a', 'ticket-closed: x');
+        await store.markDecisionWithdrawalReversed('a', 'acme', 'dec-a');
+      }
+      const doc = await history.findOne({ _id: 'a' });
+      delete doc.feedbackDigest.withdrawalReversed;
+      await history.replaceOne({ _id: 'a' }, doc);
+      return agentStatusStore;
+    };
+    const ticket = { issueId: 'iid-1', identifier: 'LIN-1', stateType: 'completed' };
+    const readTicketState = async () => ({ issueId: 'iid-1', stateType: 'completed' });
+
+    for (const [name, v] of variants) {
+      test(`${name}, no reversal: clause 4 counts the ruling before the run and 0 after`, async () => {
+        const agentStatusStore = await seedLegacy(v);
+        const readLoops = () => getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore });
+        const now = Date.now();
+        const before = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
+        assert.equal(w(before).clause4, 1);
+        assert.equal(w(before).humanReopened, 0);
+        const r = await closeTicketRows({ urlKey: 'acme', ticket, dispatchStore: store, agentStatusStore, now, log: () => {} });
+        assert.equal(r.withdrawn, 1);
+        const after = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
+        assert.equal(w(after).clause4, 0);
+        assert.equal(w(after).falseCloses.reopened.length, 0);
+      });
+      test(`${name}, reversed: counted as humanReopened (not clause 4) and nothing is written`, async () => {
+        const agentStatusStore = await seedLegacy(v, { reversed: true });
+        const readLoops = () => getLoopsForWorkspace('acme', { lean: true, dispatchStore: store, agentStatusStore });
+        const now = Date.now();
+        const snapshot = JSON.stringify(await history.find({}).toArray());
+        const r = await runFalseLiveRows({ dispatchStore: store, urlKeys: ['acme'], now, readLoops, readTicketState });
+        assert.equal(w(r).clause4, 0);
+        assert.ok(w(r).humanReopened >= 1);
+        assert.equal(JSON.stringify(await history.find({}).toArray()), snapshot, 'instrument writes nothing');
+      });
+    }
+  });
+
   test('an unreadable ticket is unknown, never false-live, and leads the headline', async () => {
     const r = await run({
       readLoops: async () => [blockedLoop('l1', 'LIN-X'), decisionLoop('l2', 'LIN-Y')],
