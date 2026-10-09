@@ -8,7 +8,7 @@
  * and after `scripts/lineage-close-backfill-lin3365.js`; both outputs go in the
  * PR. `find` only: there is no `--execute` and nothing here writes.
  *
- * Usage:  node scripts/false-live-rows.js [--ticket-workspace <urlKey>]
+ * Usage:  node scripts/false-live-rows.js [--ticket-workspace <urlKey>] [--sessions <path/to/sessions.json>]
  *          (same MONGODB_URI / HARBOUR_DATA_DIR as server.js)
  *
  * Ticket reads (clauses 3, 4 and the ticket-closed false closes) go through
@@ -47,11 +47,31 @@
  * the same test on decision-withdrawn records whose reason starts with
  * `ticket-closed` and on scan rows whose outcomeBasisHash is the closer's.
  *
+ * Paired measure (LIN-3433, slice I of LIN-3358). c1, c2, c4 and the false-close
+ * lines are unchanged:
+ *   - c3 with C's row stamp disabled (`clause3NoStamp`) REPLACES c3 in the headline and total
+ *     (`clause3`, stamp honoured, stays as a field and an informational line): c3 recomputed after
+ *     nulling `bookkeeping` on loops stamped `ticket-closed` (and only those: B's
+ *     and the fossil stamps stay), so a pass cannot come from stamping. Read-only.
+ *   - posts after the end: feedback entries on a row timestamped after that row's
+ *     OWN latest terminal marker (`isLineageClosingTerminal`) or stamp (`bookkeeping.at`),
+ *     latest wins (a re-posted [done] after a follow-up is not a writer). Harbour-only. Decision-lifecycle stamps Harbour itself appends
+ *     (`isDecisionLifecycleStampEntry`) are not a writer and are not counted.
+ *   - runner-side zombies, from the runner's `sessions.json` (`--sessions <path>`
+ *     or FALSE_LIVE_SESSIONS_PATH; THIS HOST'S FILE ONLY, runner-kit runners on
+ *     other machines are unreadable): (a) active-phase sessions silent past
+ *     RUNNER_ACTIVE_BOUND_MS, (b) parked sessions on a terminal ticket.
+ *     A missing/unreadable file, or a ticket that cannot be read, is `unknown`,
+ *     never 0.
+ *   - report-only: parked sessions with no ticket (count and age). No target; it
+ *     adds nothing to arm (b).
+ *
  * `unknown` (a ticket that could not be read) is NEVER counted as false-live
  * (fail closed) and is the FIRST number in the headline: a run where every
  * ticket read failed reads 0 for clauses 3 and 4 and must not look clean.
  */
 
+import { readFileSync } from 'node:fs';
 import { MongoClient } from 'mongodb';
 import { MangoClient } from '@jkershaw/mangodb';
 import { execFileSync } from 'node:child_process';
@@ -59,7 +79,8 @@ import { DispatchQueueStore } from '../lib/dispatch-store.js';
 import { AgentStatusStore } from '../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
 import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
-import { prepareCloserCandidates, ticketClosedBasisHash } from '../lib/ticket-close-closer.js';
+import { prepareCloserCandidates, ticketClosedBasisHash, TICKET_CLOSED_REASON } from '../lib/ticket-close-closer.js';
+import { isDecisionLifecycleStampEntry } from '../lib/digest-feedback.js';
 import { TERMINAL_TYPES } from '../lib/providers/models.js';
 import { READ_HORIZON_MS } from '../lib/read-horizon.js';
 import { isLineageClosingTerminal } from '../lib/dispatch-terminal.js';
@@ -154,7 +175,7 @@ export function createPacedMemoReader(read, { paceMs = TICKET_READ_PACE_MS, slee
  * legacy digest could not be resolved (never counted as false-live).
  */
 async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket, dispatchStore }) {
-  const out = { clause3: [], clause4: [], humanReopened: [], unverified: 0, unknown: new Set(), checked: new Set() };
+  const out = { clause3: [], clause3NoStamp: [], clause4: [], humanReopened: [], unverified: 0, unknown: new Set(), checked: new Set() };
   const c = await prepareCloserCandidates({ loops, taskDecisions, newestScanByTask, now, dispatchStore, persist: false });
   out.unverified = c.unverified.length;
 
@@ -170,6 +191,12 @@ async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, n
 
   for (const r of c.rows) {
     if (await terminal(r.issueIdentifier)) out.clause3.push({ loopId: r.loopId, issue: r.issueIdentifier });
+  }
+  // c3 with C's row stamp disabled: same selector over the loops as if no `ticket-closed` stamp existed.
+  const cNo = await prepareCloserCandidates({ loops: withoutTicketClosedStamp(loops), taskDecisions, newestScanByTask, now, dispatchStore, persist: false });
+  out.clause3NoStamp = [];
+  for (const r of cNo.rows) {
+    if (await terminal(r.issueIdentifier)) out.clause3NoStamp.push({ loopId: r.loopId, issue: r.issueIdentifier });
   }
   for (const d of c.loopDecisions) {
     if (await terminal(d.issueIdentifier)) out.clause4.push({ issue: d.issueIdentifier, decisionId: d.decisionId });
@@ -258,6 +285,102 @@ function informational(rows, now) {
 }
 
 /**
+ * How long an active-phase (RESUMING / EXECUTING) runner session may go without
+ * activity before it counts as a zombie. Same value and meaning as simple-dispatcher's
+ * STALL_FAILSAFE_MS (config.js:50, `parseInt(process.env.STALL_FAILSAFE_MS, 10) || 3600000`,
+ * SD 954a164): "non-terminal + silent this long -> re-fire the sentinel over resume
+ * (-> FAILED if that yields nothing)". Arm (a) deliberately counts every active-phase
+ * session silent past the bound, including ones SD's selectors exempt (awaitingVerify, a
+ * live subscribed child — the S2 shield LIN-3431 bounds — and opencode sessions, which
+ * have their own liveness check); a shielded or exempt session silent this long is still
+ * a holder nothing will end. Tunable: FALSE_LIVE_ACTIVE_BOUND_MS.
+ */
+export const RUNNER_ACTIVE_BOUND_MS = parseInt(process.env.FALSE_LIVE_ACTIVE_BOUND_MS, 10) || 3600000;
+// SD phases.js: ACTIVE_PHASES = RESUMING, EXECUTING. BLOCKED, AWAITING_EXTERNAL and
+// AWAITING_FOLLOWUP are neither active nor terminal (the parked phases).
+const RUNNER_ACTIVE_PHASES = new Set(['RESUMING', 'EXECUTING']);
+const RUNNER_PARKED_PHASES = new Set(['BLOCKED', 'AWAITING_EXTERNAL', 'AWAITING_FOLLOWUP']);
+
+/**
+ * Reads the runner's `sessions.json` (`{ sessions: { <id>: {phase, updatedAt,
+ * heartbeat, itemMetadata:{issueIdentifier, workspaceKey}} } }`). Read-only.
+ * @returns {{ok: true, sessions: Array<Object>}|{ok: false, reason: string}}
+ */
+export function readRunnerSessions(path, { readFile = readFileSync } = {}) {
+  if (!path) return { ok: false, reason: 'no --sessions path given' };
+  try {
+    const parsed = JSON.parse(readFile(path, 'utf8'));
+    const map = parsed?.sessions;
+    if (!map || typeof map !== 'object' || Array.isArray(map)) return { ok: false, reason: 'no `sessions` object in file' };
+    return { ok: true, sessions: Object.entries(map).map(([id, v]) => ({ id, ...v })) };
+  } catch (err) {
+    return { ok: false, reason: err?.code || err?.message || String(err) };
+  }
+}
+
+/**
+ * Runner-side zombies and the report-only ticketless-parked line, from one
+ * `sessions.json` read joined to ticket state. A session whose ticket cannot be
+ * read counts as `unknown` and is never counted as a zombie (fail closed).
+ */
+export async function runnerMeasure({ read, now, readTicket, boundMs = RUNNER_ACTIVE_BOUND_MS }) {
+  if (!read?.ok) return { read: false, reason: read?.reason || 'not read', activeZombies: 0, parkedOnTerminal: 0, activeOnTerminalTicket: 0, unknown: 0, ticketlessParked: { count: 0, oldestAgeMs: null }, sessions: 0 };
+  const out = { read: true, sessions: read.sessions.length, activeZombies: 0, activeOnTerminalTicket: 0, parkedOnTerminal: 0, unknown: 0, ticketlessParked: { count: 0, oldestAgeMs: null } };
+  const ticketOf = async (sess) => {
+    const issue = sess.itemMetadata?.issueIdentifier;
+    if (!issue) return { none: true };
+    const st = await readTicket(sess.itemMetadata?.workspaceKey, issue).catch(() => null);
+    return st ? { st } : { unknown: true };
+  };
+  for (const sess of read.sessions) {
+    const ageMs = now - Math.max(Number(sess.updatedAt) || 0, Number(sess.heartbeat?.lastActivityAt) || 0);
+    if (RUNNER_ACTIVE_PHASES.has(sess.phase)) {
+      if (ageMs <= boundMs) continue;
+      out.activeZombies += 1; // counted whatever the ticket says: a ticketless orchestrator is a zombie too
+      const t = await ticketOf(sess);
+      if (t.st && TERMINAL_TYPES.includes(t.st.stateType)) out.activeOnTerminalTicket += 1;
+      continue;
+    }
+    if (!RUNNER_PARKED_PHASES.has(sess.phase)) continue;
+    const t = await ticketOf(sess);
+    if (t.none) {
+      out.ticketlessParked.count += 1;
+      out.ticketlessParked.oldestAgeMs = Math.max(out.ticketlessParked.oldestAgeMs ?? 0, ageMs);
+    } else if (t.unknown) out.unknown += 1;
+    else if (TERMINAL_TYPES.includes(t.st.stateType)) out.parkedOnTerminal += 1;
+  }
+  return out;
+}
+
+/**
+ * Feedback entries timestamped after a row's own terminal marker or stamp.
+ * @returns {{rows: string[], entries: number}}
+ */
+export function postsAfterEnd(rows) {
+  const hit = [];
+  let entries = 0;
+  for (const r of rows) {
+    const fb = r.feedback || [];
+    const ends = fb.filter(f => isLineageClosingTerminal(f.message)).map(f => toMs(f.timestamp));
+    if (r.bookkeeping?.at) ends.push(toMs(r.bookkeeping.at));
+    // The LATEST end, not the first: a held session that is followed up posts [done] again, and
+    // that is a session ending twice, not a zombie. Production (30 d, linearviewer): the earliest-end
+    // reading flagged 517 rows, 507 of them repeat [done]s; the latest-end reading flags 13, the
+    // runner-still-writing shape (mostly [stalled?]) this measure exists to find.
+    const endAt = Math.max(...ends.filter(Number.isFinite));
+    if (!Number.isFinite(endAt) || endAt === -Infinity) continue;
+    const after = fb.filter(f => !isDecisionLifecycleStampEntry(f) && toMs(f.timestamp) > endAt);
+    if (after.length) { hit.push(r._id); entries += after.length; }
+  }
+  return { rows: hit, entries };
+}
+
+/** Read-only view of the loops as if C's row stamp had never been written. */
+export function withoutTicketClosedStamp(loops) {
+  return loops.map(l => (l?.bookkeeping?.reason === TICKET_CLOSED_REASON ? { ...l, bookkeeping: null } : l));
+}
+
+/**
  * Runs the instrument. Exported so tests drive it with injected readers.
  *
  * @param {Object} p
@@ -276,6 +399,8 @@ export async function runFalseLiveRows({
   headSha = null,
   readTicketState = defaultReadTicketState,
   readLoops = null,
+  sessionsPath = null,
+  readSessions = readRunnerSessions,
   log = () => {}
 }) {
   // One memo for the whole run, shared by the clause checks and the false-close checks.
@@ -294,9 +419,13 @@ export async function runFalseLiveRows({
         : [[], {}];
       const t = await ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket: readTicketMemo, dispatchStore });
       const fc = await falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket: readTicketMemo });
+      const pae = postsAfterEnd(await dispatchStore.historyCollection.find(
+        { urlKey, dispatchedAt: { $gte: new Date(now - READ_HORIZON_MS) } },
+        { projection: { feedback: 1, bookkeeping: 1 } }).toArray());
       perWorkspace.push({
         urlKey, readFailed: false,
         clause1: clause1.length, clause2: clause2.length, clause3: t.clause3.length, clause4: t.clause4.length,
+        clause3NoStamp: t.clause3NoStamp.length, postsAfterEnd: pae,
         unknown: t.unknown.size + fc.unknown, ticketsChecked: t.checked.size,
         humanReopened: t.humanReopened.length, unverified: t.unverified,
         informational: informational(sel.rows, now), falseCloses: fc
@@ -306,21 +435,29 @@ export async function runFalseLiveRows({
       perWorkspace.push({ urlKey, readFailed: true, error: err?.message || String(err) });
     }
   }
-  const report = buildReport({ perWorkspace, now, headSha });
-  return { report, perWorkspace };
+  // One runner read for the whole run (sessions.json is per host, not per workspace).
+  const runner = await runnerMeasure({ read: readSessions(sessionsPath), now, readTicket: readTicketMemo });
+  const report = buildReport({ perWorkspace, now, headSha, runner });
+  return { report, perWorkspace, runner };
 }
 
-export function buildReport({ perWorkspace, now, headSha }) {
+export function buildReport({ perWorkspace, now, headSha, runner = null }) {
   const ok = perWorkspace.filter(w => !w.readFailed);
   const failed = perWorkspace.filter(w => w.readFailed);
   const sum = (f) => ok.reduce((n, w) => n + f(w), 0);
   const fc = (k) => sum(w => w.falseCloses[k].length);
   const falseCloseTotal = fc('handed-on') + fc('lineage-terminal') + fc('ticket-closed');
-  const total = sum(w => w.clause1 + w.clause2 + w.clause3 + w.clause4);
+  // c3 is the stamp-disabled reading (LIN-3433; plan I and research §5: c3 is recomputed with C's row stamp
+  // disabled). `clause3` (stamp honoured) is kept as a field and a detail line so the writer/measurer tie
+  // (closeTicketRows takes it to 0) stays visible until J deletes the writer; it is not counted.
+  const total = sum(w => w.clause1 + w.clause2 + w.clause3NoStamp + w.clause4);
 
   const L = [];
   // Headline: unknown FIRST, so an all-unreadable run cannot pass for a clean zero.
-  L.push(`# False live rows — unknown: ${sum(w => w.unknown)} | false-live: ${total} (c1 ${sum(w => w.clause1)}, c2 ${sum(w => w.clause2)}, c3 ${sum(w => w.clause3)}, c4 ${sum(w => w.clause4)}) | false closes: ${falseCloseTotal}`);
+  L.push(`# False live rows — unknown: ${sum(w => w.unknown)} | false-live: ${total} (c1 ${sum(w => w.clause1)}, c2 ${sum(w => w.clause2)}, c3 ${sum(w => w.clause3NoStamp)}, c4 ${sum(w => w.clause4)}) | false closes: ${falseCloseTotal}`);
+  if (runner) {
+    L.push(`Paired measure (target 0 each) — runner unknown: ${runner.read ? runner.unknown : 'sessions.json not read'} | runner active zombies: ${runner.read ? runner.activeZombies : 'unknown'} | parked on terminal tickets: ${runner.read ? runner.parkedOnTerminal : 'unknown'} | posts after the end: ${sum(w => w.postsAfterEnd.rows.length)} rows`);
+  }
   L.push('');
   L.push(`Run at: ${new Date(now).toISOString()}`);
   L.push(`HEAD: ${headSha || '(unknown — not a git checkout)'}`);
@@ -334,14 +471,31 @@ export function buildReport({ perWorkspace, now, headSha }) {
   L.push('Clauses (target 0):');
   L.push(`  1 wake row, a later lineage row has posted (B(a))         ${String(sum(w => w.clause1)).padStart(5)}`);
   L.push(`  2 un-terminated row taken before a lineage terminal (B(b)) ${String(sum(w => w.clause2)).padStart(5)}`);
-  L.push(`  3 blocked/silent row on a terminal ticket past grace      ${String(sum(w => w.clause3)).padStart(5)}`);
+  L.push(`  3 blocked/silent row on a terminal ticket past grace, C's stamp disabled ${String(sum(w => w.clause3NoStamp)).padStart(5)}`);
   L.push(`  4 open decision on a terminal ticket                      ${String(sum(w => w.clause4)).padStart(5)}`);
   L.push('');
   L.push(`Human-reopened (a reversed ruling / un-retired scan row on a terminal ticket; a decision, not staleness, not counted): ${sum(w => w.humanReopened)}`);
   L.push(`Unverified (legacy digest not resolvable from raw feedback; held out, not counted): ${sum(w => w.unverified)}`);
   L.push('');
-  L.push('By workspace (c1 c2 c3 c4 unknown):');
-  for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.clause1} ${w.clause2} ${w.clause3} ${w.clause4} ${w.unknown}`);
+  if (runner) {
+    const h = (ms) => (ms == null ? 'n/a' : `${Math.round(ms / 3600000)}h`);
+    L.push('Paired measure (LIN-3433; target 0 each):');
+    L.push(`  5 feedback posted after a row's own terminal/stamp        ${String(sum(w => w.postsAfterEnd.rows.length)).padStart(5)}   [${sum(w => w.postsAfterEnd.entries)} entries]`);
+    if (runner.read) {
+      L.push(`  6 runner: active-phase sessions silent > ${Math.round(RUNNER_ACTIVE_BOUND_MS / 60000)}m           ${String(runner.activeZombies).padStart(5)}   [${runner.activeOnTerminalTicket} on a terminal ticket]`);
+      L.push(`  7 runner: parked sessions on a terminal ticket            ${String(runner.parkedOnTerminal).padStart(5)}`);
+      L.push(`  runner sessions read: ${runner.sessions}; ticket unreadable (unknown, not counted): ${runner.unknown}`);
+      L.push(`  Report-only, no target, not in 7: parked sessions with no ticket: ${runner.ticketlessParked.count} (oldest ${h(runner.ticketlessParked.oldestAgeMs)})`);
+    } else {
+      L.push(`  6, 7 runner: UNKNOWN — sessions.json not read (${runner.reason}); this is not a zero`);
+    }
+    L.push('  Runner scope: only THIS host\'s sessions.json is read; runner-kit runners on other machines are not visible.');
+    L.push('');
+  }
+  L.push(`  (informational, not counted: line 3 with C's row stamp honoured, as before LIN-3433: ${sum(w => w.clause3)})`);
+  L.push('');
+  L.push('By workspace (c1 c2 c3 c4 unknown; c3 = stamp disabled):');
+  for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.clause1} ${w.clause2} ${w.clause3NoStamp} ${w.clause4} ${w.unknown}`);
   L.push('');
   L.push(`Informational (not counted): non-wake row with a later lineage row, no lineage terminal: ${sum(w => w.informational)}`);
   L.push('');
@@ -358,6 +512,11 @@ export function readHeadSha() {
   } catch {
     return null;
   }
+}
+
+export function parseSessionsPath(argv) {
+  const i = argv.indexOf('--sessions');
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : null;
 }
 
 export function parseTicketWorkspace(argv) {
@@ -384,6 +543,7 @@ async function main() {
       agentStatusStore,
       taskDecisionsStore,
       headSha: readHeadSha(),
+      sessionsPath: parseSessionsPath(process.argv) || process.env.FALSE_LIVE_SESSIONS_PATH || null,
       readTicketState: createPacedMemoReader((k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey })),
       log: (m) => console.error(m) });
     console.log(report);
