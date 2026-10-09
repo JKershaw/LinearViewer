@@ -84,7 +84,7 @@ User generates prompt → Dispatches to queue → Consumer polls → Claims atom
 
 **Operator halt** (LIN-2994): `GET/POST/DELETE /api/proxy/dispatch/halt` (proxy token; the
 degraded-mode path) and the matching dashboard trio record a pause/stop request that the
-poll carries as an optional `halt` key. The runner does not yet honor it (pending LIN-2995).
+poll carries as an optional `halt` key, which the runner honors. Setting or clearing a halt is owner-only (LIN-3409): the proxy verb needs a token the owner minted in Settings.
 
 Each dispatched item carries: prompt text, prompt name, issue metadata (id, identifier, title, URL), target (cli/web/dash), and optional repo. Items expire after 24 hours; history retained 30 days.
 

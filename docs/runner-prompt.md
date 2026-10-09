@@ -216,9 +216,7 @@ subagent that comes back to life is cleared, and a second stall is flagged again
 
 ## 6. Halts are binding
 
-Halts ({{HALT_MODES}}) are binding here, with Simple Dispatcher's meaning. The halt entry in
-`/api/proxy/instructions` still says the runner "does not yet honor" halts; that line predates
-this runner, so don't follow it.
+Halts ({{HALT_MODES}}) are binding here, with Simple Dispatcher's meaning.
 
 - `pause`: take no fresh items. Running subagents carry on; follow-ups and wakes for your own
   subagents, and aborts, still flow.

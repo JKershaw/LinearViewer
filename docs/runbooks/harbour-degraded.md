@@ -21,16 +21,18 @@ LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below m
    and `lib/proxy-instructions.js:763` — that correction belongs to **LIN-2998** and is
    not made here; treat a cascade abort as **not safe** while Harbour is degraded,
    whatever those three say.
-3. **Request a workspace halt (LIN-2994); the runner does not yet honor it (pending LIN-2995).**
-   `POST /api/proxy/dispatch/halt` with body `{"mode":"pause"}` (or `"stop"`) records a
-   halt **request** that the next poll carries. It needs a read-write proxy token —
-   **mint one before an incident**, not during it (see *Halt caveats* below). The runner
-   does not yet honor it (pending LIN-2995). The only way to stop the runner
-   right now is **on the host** (stop or kill the dispatcher process directly).
-   `DELETE /api/proxy/dispatch/halt` **clears the request**; clearing it does not by
-   itself change what a running session does. Runner-local halt stays
-   **[unbuilt: LIN-2995]**. Mechanism: `routes/proxy-halt.js:44` (GET), `:75` (POST),
-   `:108` (DELETE). Full contract:
+3. **Request a workspace halt (LIN-2994).** `POST /api/proxy/dispatch/halt` with body
+   `{"mode":"pause"}` (or `"stop"`) records a halt that the next poll carries and the
+   runner honors (`pause` takes no fresh items; `stop` also sweeps). It needs a
+   read-write proxy token **the workspace owner minted in Settings** — **mint one before
+   an incident**, not during it (see *Halt caveats* below). Halt and resume are
+   owner-only (LIN-3409): a member's token gets `403 RUNNER_OWNER_ONLY`, and any other
+   grant-less token (a Settings token minted before the workspace id was stamped on it,
+   a dispatched-session token, a refire-broker token) gets `409 PROXY_TOKEN_UNBOUND`;
+   mint a new Settings token, or use the Dispatch page. An owner-check failure answers
+   `500`, never `503`. `DELETE /api/proxy/dispatch/halt` **clears the halt** (resume),
+   under the same owner-only rule. Mechanism: `routes/proxy-halt.js` (GET, POST,
+   DELETE). Full contract:
    [Operator Halt](../proxy-integration.md#operator-halt-lin-2994-decision-4).
 
 ## Halt caveats
@@ -57,7 +59,7 @@ LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below m
    read.
 3. **Decision 4:** under degradation, use the proxy verb, not the dashboard, with the
    token minted in advance.
-4. **`stop` amplifier:** once LIN-2995 lands, `stop` flows abort → error
+4. **`stop` amplifier:** `stop` flows abort → error
    (`routes/dashboard.js:89`) → Linear hydration. That path is bounded by
    `FEED_HYDRATION_CAP = 5` (`routes/dashboard.js:123`) and by the number of running
    sessions. It is owned by **LIN-2998**: referenced here, not fixed.
