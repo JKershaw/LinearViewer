@@ -342,6 +342,28 @@ describe('observer-pass: runObserverPass', () => {
     assert.ok(doc.state.report.censusGroundedAt, 'the census own updatedAt is carried through as the grounding stamp');
   });
 
+  test('LIN-3362: a hop-text frame is never buffered as the narrative, and the pass does not ask for hop text', async () => {
+    const observerStateStore = freshStore();
+    const urlKey = `ws-real-${randomUUID()}`;
+    await observerStateStore.ensureSeeded(`sweep:v1:${urlKey}`, nonEmptyCensus);
+    let seenOptions = null;
+    await runObserverPass(urlKey, {
+      observerStateStore,
+      workspacePreferencesStore: fakeWorkspacePreferencesStore(),
+      streamChatWithTools: async (messages, options, onEvent) => {
+        seenOptions = options;
+        onEvent('hop-text', { text: 'NOT-THE-NARRATIVE' });
+        onEvent('token', { token: JSON.stringify({ narrative: 'Real narrative.', flags: [] }) });
+        onEvent('done', { finishReason: 'stop' });
+      },
+      getPaidEnvKey: () => 'fake-key',
+      now: Date.now()
+    });
+    assert.ok(!('emitHopText' in seenOptions) && !('concurrentTools' in seenOptions));
+    const doc = await observerStateStore.readCurrent(`${PASS_INSTANCE_PREFIX}${urlKey}`);
+    assert.strictEqual(doc.state.report.narrative, 'Real narrative.');
+  });
+
   test('LIN-2645: the report lifts staleAttentionCount AND staleAttentionThresholdMs off the census doc', async () => {
     // The panel reads `report.*` only (`renderObserverReportPanel`), so these
     // fields must survive the lift or the panel cannot render the summary

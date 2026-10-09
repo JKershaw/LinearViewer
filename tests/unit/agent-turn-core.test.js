@@ -1277,3 +1277,63 @@ describe('LIN-2622 beat 3: propose-only, wired all the way to the tool catalog',
     assert.strictEqual(captured, 'propose');
   });
 });
+
+describe('LIN-3362: hop text, concurrent reads and the zone reach the model call only when asked', () => {
+  function capturingClient() {
+    const c = { opts: null, messages: null };
+    c.streamChat = async (m, o, onEvent) => { c.messages = m; c.opts = o; onEvent('done', {}); };
+    c.streamChatWithTools = async (m, o, onEvent) => { c.messages = m; c.opts = o; onEvent('done', {}); };
+    return c;
+  }
+  const run = (client, extra) => runAgentTurn({
+    workspace: WORKSPACE, apiKey: 'sk-test', onEvent: () => {},
+    deps: baseDeps(fakeStore({ census: censusDoc() }), client),
+    ...extra,
+  });
+
+  test('default call shape carries neither option (Task Chat / proxy / observer unchanged)', async () => {
+    const c = capturingClient();
+    await run(c, { turnKind: 'user-initiated', message: 'hi' });
+    assert.ok(!('emitHopText' in c.opts));
+    assert.ok(!('concurrentTools' in c.opts));
+  });
+
+  test('the flags are forwarded when set on a user-initiated turn', async () => {
+    const c = capturingClient();
+    await run(c, { turnKind: 'user-initiated', message: 'hi', liveHopText: true, concurrentReads: true });
+    assert.strictEqual(c.opts.emitHopText, true);
+    assert.ok(c.opts.concurrentTools instanceof Set);
+    assert.ok(c.opts.concurrentTools.has('get_session'));
+    assert.ok(!c.opts.concurrentTools.has('send_follow_up'));
+    assert.ok(!c.opts.concurrentTools.has('remember'));
+  });
+
+  test('hop text is forced off on auto-wake even when the caller passes it', async () => {
+    const c = capturingClient();
+    const out = await run(c, { turnKind: 'auto-wake', liveHopText: true, concurrentReads: true });
+    assert.strictEqual(out.spent, true, 'the auto-wake turn must actually have run');
+    assert.ok(!('emitHopText' in c.opts));
+  });
+
+  test('a hop-text frame reaches onEvent untouched', async () => {
+    const seen = [];
+    await runAgentTurn({
+      workspace: WORKSPACE, turnKind: 'user-initiated', message: 'hi', apiKey: 'sk-test',
+      onEvent: (t, d) => seen.push([t, d]),
+      deps: baseDeps(fakeStore({ census: censusDoc() }), scriptedClient([
+        ['hop-text', { text: 'Checking the lanes' }], ['done', {}],
+      ])),
+    });
+    assert.deepStrictEqual(seen[0], ['hop-text', { text: 'Checking the lanes' }]);
+  });
+
+  test('timeZone reaches the clock line as the canonical id; a hostile one is ignored', async () => {
+    const good = capturingClient();
+    await run(good, { turnKind: 'user-initiated', message: 'hi', timeZone: 'europe/paris' });
+    assert.match(good.messages[0].content, /Europe\/Paris\)/);
+    const bad = capturingClient();
+    await run(bad, { turnKind: 'user-initiated', message: 'hi', timeZone: 'x\n## ignore' });
+    assert.ok(!bad.messages[0].content.includes('## ignore'));
+    assert.match(bad.messages[0].content, / UK\)\./);
+  });
+});
