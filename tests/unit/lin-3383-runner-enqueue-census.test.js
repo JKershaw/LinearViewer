@@ -39,7 +39,7 @@ function loadTree() {
   return files.map(p => ({ file: relative(REPO, p).split('\\').join('/'), src: readFileSync(p, 'utf8') }));
 }
 
-const GATE = 'resolveRunnerEnqueueRefusal(';
+const GATE = 'resolveRunnerOwnerRefusal(';
 
 // The seams themselves: the factory and the store implement the sinks and serve
 // proxy/orchestrator callers with no session, which is exactly why the gate is
@@ -300,7 +300,7 @@ const mutate = (file, fn) => TREE.map(t => (t.file === file ? { ...t, src: fn(t.
 
 describe('LIN-3383 census — mutation witnesses', () => {
   test('removing the Dispatch route gate fails the census', () => {
-    const v = scanSinks(mutate('routes/dispatch.js', s => s.replace('const enqueueRefusal = await resolveRunnerEnqueueRefusal(', 'const enqueueRefusal = await (async () => null)(')));
+    const v = scanSinks(mutate('routes/dispatch.js', s => s.replace('const enqueueRefusal = await resolveRunnerOwnerRefusal(', 'const enqueueRefusal = await (async () => null)(')));
     assert.ok(v.some(m => m.startsWith('routes/dispatch.js (router.post') && m.includes('is reached before')), v.join('\n'));
   });
 
@@ -310,7 +310,7 @@ describe('LIN-3383 census — mutation witnesses', () => {
   });
 
   test('removing the feedback lane gate fails the census', () => {
-    const v = scanSinks(mutate('routes/workspace-api.js', s => s.replaceAll('resolveRunnerEnqueueRefusal(', 'noGate(')));
+    const v = scanSinks(mutate('routes/workspace-api.js', s => s.replaceAll('resolveRunnerOwnerRefusal(', 'noGate(')));
     assert.ok(v.some(m => m.startsWith('routes/workspace-api.js') && m.includes('enqueueFeedbackTriage(')), v.join('\n'));
   });
 
@@ -320,7 +320,7 @@ describe('LIN-3383 census — mutation witnesses', () => {
   });
 
   test('removing the Apply pre-claim gate fails the census', () => {
-    const v = scanSinks(mutate('routes/dashboard.js', s => s.replace('const refusal = await resolveRunnerEnqueueRefusal(', 'const refusal = await (async () => null)(')));
+    const v = scanSinks(mutate('routes/dashboard.js', s => s.replace('const refusal = await resolveRunnerOwnerRefusal(', 'const refusal = await (async () => null)(')));
     assert.ok(v.some(m => m.startsWith('routes/dashboard.js') && m.includes('runProposalsStore.apply(')), v.join('\n'));
   });
 
@@ -330,7 +330,7 @@ describe('LIN-3383 census — mutation witnesses', () => {
   });
 
   test('removing the seam gate inside dispatchSessionFollowUp fails the census', () => {
-    const v = scanSinks(mutate('lib/follow-up-dispatch.js', s => s.replace('const refusal = await resolveRunnerEnqueueRefusal(', 'const refusal = await (async () => null)(')));
+    const v = scanSinks(mutate('lib/follow-up-dispatch.js', s => s.replace('const refusal = await resolveRunnerOwnerRefusal(', 'const refusal = await (async () => null)(')));
     assert.ok(v.some(m => m.startsWith('lib/follow-up-dispatch.js')), v.join('\n'));
   });
 
@@ -340,7 +340,7 @@ describe('LIN-3383 census — mutation witnesses', () => {
   });
 
   test('removing the Collective per-seat gate fails the census', () => {
-    const v = scanSinks(mutate('routes/collective.js', s => s.replace('const seatRefusal = await resolveRunnerEnqueueRefusal(', 'const seatRefusal = await (async () => null)(')));
+    const v = scanSinks(mutate('routes/collective.js', s => s.replace('const seatRefusal = await resolveRunnerOwnerRefusal(', 'const seatRefusal = await (async () => null)(')));
     assert.ok(v.some(m => m.startsWith('routes/collective.js')), v.join('\n'));
   });
 

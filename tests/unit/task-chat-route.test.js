@@ -378,12 +378,12 @@ describe('LIN-3383: the Task Chat route enqueueGuard consults the owner seam (ex
     return { ...stores, ownerCalls, outcome };
   }
 
-  test('a non-owner: the tool refuses with RUNNER_ENQUEUE_OWNER_ONLY, nothing is enqueued, and the seam saw the route workspace id and session account', async () => {
+  test('a non-owner: the tool refuses with RUNNER_OWNER_ONLY, nothing is enqueued, and the seam saw the route workspace id and session account', async () => {
     const { addItemCalls, ownerCalls, outcome } = await runTurn({ verdict: 'not-owner', history: terminalSession('cli') });
 
     assert.strictEqual(addItemCalls.length, 0, 'a refused follow-up must not enqueue anything');
     assert.ok(outcome.error, 'the tool call must throw for a non-owner');
-    assert.match(outcome.error.message, /send_follow_up refused \(RUNNER_ENQUEUE_OWNER_ONLY\)/);
+    assert.match(outcome.error.message, /send_follow_up refused \(RUNNER_OWNER_ONLY\)/);
     assert.strictEqual(ownerCalls.length, 1);
     assert.deepStrictEqual(ownerCalls[0], { workspaceId: WORKSPACE_ID, accountId: ACCOUNT_ID },
       'the closure must pass the route\'s workspace.id and req.session.accountId to the owner seam');

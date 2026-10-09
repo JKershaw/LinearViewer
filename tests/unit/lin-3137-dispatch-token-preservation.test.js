@@ -86,8 +86,8 @@ describe('LIN-3137 — legacy tokens keep authenticating after the mint gate', (
   }
 });
 
-describe('LIN-3137 — GET list and DELETE revoke are unchanged for a non-owner', () => {
-  test('a non-owner session can list and revoke (only mint is gated)', async () => {
+describe('LIN-3137 — GET list is unchanged for a non-owner; DELETE revoke is owner-only (LIN-3398)', () => {
+  test('a non-owner session can list but not revoke (LIN-3398 reverses "a mint gate, not revocation")', async () => {
     const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
     const { tokenId } = await dispatchTokenStore.createToken('acme', 'existing', 'account-someone-else');
     const app = buildApp({ dispatchTokenStore });
@@ -98,6 +98,17 @@ describe('LIN-3137 — GET list and DELETE revoke are unchanged for a non-owner'
     assert.equal(list.body.tokens[0].tokenId, tokenId);
     assert.equal(list.body.tokens[0].token, undefined, 'no secret in the list');
 
+    const del = await call(app, 'DELETE', `${TOKENS_PATH}/${tokenId}`);
+    assert.equal(del.status, 403, JSON.stringify(del.body));
+    assert.equal(del.body.code, 'RUNNER_OWNER_ONLY');
+    const after = await call(app, 'GET', TOKENS_PATH);
+    assert.equal(after.body.tokens.length, 1, 'the refused revoke deleted nothing');
+  });
+
+  test('the owner can still revoke', async () => {
+    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const { tokenId } = await dispatchTokenStore.createToken('acme', 'existing', 'account-A');
+    const app = buildApp({ dispatchTokenStore, workspaceOwnerCheck: async () => ({ status: 'owner' }) });
     const del = await call(app, 'DELETE', `${TOKENS_PATH}/${tokenId}`);
     assert.equal(del.status, 200, JSON.stringify(del.body));
     assert.deepEqual(del.body, { success: true });

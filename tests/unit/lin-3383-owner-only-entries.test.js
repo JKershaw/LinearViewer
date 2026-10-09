@@ -89,10 +89,10 @@ describe('LIN-3383 — POST /workspace/:urlKey/api/dispatch', () => {
       const res = await call(dispatchApp({ queue, accountId: 'acct-member' }), PATH, body);
       assert.deepEqual(WIRE(res), {
         status: 403,
-        code: 'RUNNER_ENQUEUE_OWNER_ONLY',
+        code: 'RUNNER_OWNER_ONLY',
         category: 'auth',
         retryable: false,
-        error: "Only this workspace's owner can queue work for its runner."
+        error: "Only this workspace's owner can act on its runner."
       });
       assert.equal(queue.calls.addItem.length, 0, 'addItem never called');
       assert.equal(queue.calls.expandCascadeAborts.length, 0, 'expandCascadeAborts never called');
@@ -172,7 +172,7 @@ describe('LIN-3383 — POST /workspace/:urlKey/collective/start', () => {
     const byKey = Object.fromEntries(res.body.dispatched.map(d => [d.urlKey, d]));
     assert.equal(byKey.alpha.ok, true);
     assert.equal(byKey.bravo.ok, false);
-    assert.equal(byKey.bravo.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    assert.equal(byKey.bravo.code, 'RUNNER_OWNER_ONLY');
     assert.deepEqual(queue.calls.addItem.map(c => c.urlKey), ['alpha'], 'nothing enqueued for the unowned workspace');
   });
 
@@ -180,7 +180,7 @@ describe('LIN-3383 — POST /workspace/:urlKey/collective/start', () => {
     const queue = makeQueue();
     const res = await call(collectiveApp({ queue, accountId: 'acct-member' }), START, { channel: '#room', characters, target: 'web' });
     assert.equal(res.status, 201);
-    assert.ok(res.body.dispatched.every(d => d.ok === false && d.code === 'RUNNER_ENQUEUE_OWNER_ONLY'));
+    assert.ok(res.body.dispatched.every(d => d.ok === false && d.code === 'RUNNER_OWNER_ONLY'));
     assert.equal(queue.calls.addItem.length, 0);
   });
 });

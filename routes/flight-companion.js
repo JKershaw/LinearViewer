@@ -73,7 +73,7 @@
  * returns that shape.
  */
 
-import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
+import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { Router } from 'express';
 import { renderFlightCompanionPage } from '../lib/render-flight-companion.js';
 import { renderErrorPage } from '../lib/render.js';
@@ -742,7 +742,7 @@ export function createFlightCompanionRoutes({
           baseUrl: `${req.protocol}://${req.get('host')}`,
           dispatchedBy: req.session?.accountId || null,
           // LIN-3383: the reply's send_follow_up (execute mode) is owner-only.
-          enqueueGuard: ({ target }) => resolveRunnerEnqueueRefusal({
+          enqueueGuard: ({ target }) => resolveRunnerOwnerRefusal({
             ownerCheck: workspaceOwnerCheck,
             workspaceId: workspace.id,
             accountId: req.session?.accountId,

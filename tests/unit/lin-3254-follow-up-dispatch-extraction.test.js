@@ -297,11 +297,11 @@ describe('approve-follow-up behaves identically through the extraction', () => {
 describe('LIN-3383 — dispatchSessionFollowUp is owner-only', () => {
   const anchorHistory = () => [historyItem({ id: 'sess-done', target: 'cli' })];
 
-  test('a non-owner is refused 422 RUNNER_ENQUEUE_OWNER_ONLY (never 403) and nothing is enqueued', async () => {
+  test('a non-owner is refused 422 RUNNER_OWNER_ONLY (never 403) and nothing is enqueued', async () => {
     const stores = makeStores({ history: anchorHistory() });
     const outcome = await dispatchSessionFollowUp(helperOptions(stores, { ownerCheck: async () => ({ status: 'not-owner' }) }));
     assert.strictEqual(outcome.status, 422, '403 would read as flag-off to public/flight-companion.js');
-    assert.strictEqual(outcome.body.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    assert.strictEqual(outcome.body.code, 'RUNNER_OWNER_ONLY');
     assert.strictEqual(outcome.body.retryable, false);
     assert.strictEqual(stores.addItemCalls.length, 0);
   });
@@ -347,7 +347,7 @@ describe('LIN-3383 — dispatchSessionFollowUp is owner-only', () => {
     const refused = makeStores({ history: anchorHistory() });
     const r = await post(mountRoute(refused, { ownerCheck: async () => ({ status: 'not-owner' }) }), { sessionId: 'sess-done', prompt: 'next beat' });
     assert.strictEqual(r.status, 422);
-    assert.strictEqual(r.body.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    assert.strictEqual(r.body.code, 'RUNNER_OWNER_ONLY');
     assert.strictEqual(refused.addItemCalls.length, 0);
 
     const allowed = makeStores({ history: anchorHistory() });

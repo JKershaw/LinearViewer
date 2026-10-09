@@ -933,7 +933,7 @@ describe('feedback submit — owner-only lanes (LIN-3383)', () => {
   afterEach(() => { if (savedTeamEnv === undefined) delete process.env.FEEDBACK_TEAM_ID; else process.env.FEEDBACK_TEAM_ID = savedTeamEnv; });
 
   const notOwner = async () => ({ status: 'not-owner' });
-  const REFUSED = { launched: false, code: 'RUNNER_ENQUEUE_OWNER_ONLY', retryable: false, message: "Only this workspace's owner can queue work for its runner." };
+  const REFUSED = { launched: false, code: 'RUNNER_OWNER_ONLY', retryable: false, message: "Only this workspace's owner can act on its runner." };
 
   for (const [lane, payload, features] of [
     ['autopilot', { message: 'run it', action: 'autopilot' }, {}],

@@ -338,7 +338,7 @@ describe('LIN-3383 — send_follow_up in execute mode is owner-only (threaded th
     const seen = [];
     const guard = async ({ target }) => {
       seen.push(target);
-      return { code: 'RUNNER_ENQUEUE_OWNER_ONLY', status: 403, retryable: false, error: "Only this workspace's owner can queue work for its runner." };
+      return { code: 'RUNNER_OWNER_ONLY', status: 403, retryable: false, error: "Only this workspace's owner can act on its runner." };
     };
     const events = await ordinaryTurn(stores, {
       ...turnDeps(stores, { chatClient: guardedClient('sess-run', 'do the next thing') }),
@@ -346,7 +346,7 @@ describe('LIN-3383 — send_follow_up in execute mode is owner-only (threaded th
     });
     assert.strictEqual(stores.addItemCalls.length, 0, 'nothing enqueued');
     assert.deepEqual(seen, ['cli'], 'the guard is asked about the anchor target');
-    assert.match(JSON.stringify(toolResults()), /send_follow_up refused \(RUNNER_ENQUEUE_OWNER_ONLY\)/);
+    assert.match(JSON.stringify(toolResults()), /send_follow_up refused \(RUNNER_OWNER_ONLY\)/);
   });
 
   test('an owner guard lets the follow-up through', async () => {
@@ -383,7 +383,7 @@ describe('LIN-3383 — send_follow_up in execute mode is owner-only (threaded th
     let consulted = 0;
     const deps = {
       ...turnDeps(stores, { chatClient: followUpClient('sess-run', 'do the next thing') }),
-      enqueueGuard: async () => { consulted++; return { code: 'RUNNER_ENQUEUE_OWNER_ONLY', status: 403, retryable: false, error: 'x' }; },
+      enqueueGuard: async () => { consulted++; return { code: 'RUNNER_OWNER_ONLY', status: 403, retryable: false, error: 'x' }; },
     };
     await ordinaryTurn(stores, deps, { followUpMode: 'propose', onProposal: (p) => proposals.push(p) });
     assert.strictEqual(proposals.length, 1);

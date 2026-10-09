@@ -69,6 +69,9 @@ test.describe('Dispatch Queue', () => {
 
     // Set up test session with dispatch feature enabled
     await page.goto(`/test/set-session?features=${encodeURIComponent(JSON.stringify({ dispatch: true }))}&urlKey=${URL_KEY}`);
+    // LIN-3383/LIN-3398: enqueue, delete and trim are owner-only; state it rather
+    // than rely on the shared account having been the first binder.
+    await seedWorkspaceOwnership(page, URL_KEY);
     await page.goto(WORKSPACE_URL);
     await page.waitForLoadState('networkidle');
   });
@@ -573,6 +576,7 @@ test.describe('Dispatch API', () => {
     // Clear dispatch queue before each test
     await page.goto(`/test/clear-dispatch-queue?urlKey=${URL_KEY}`);
     await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await seedWorkspaceOwnership(page, URL_KEY); // LIN-3398: owner-only enqueue/delete/trim
   });
 
   test('POST /api/dispatch creates queue item', async ({ request }) => {

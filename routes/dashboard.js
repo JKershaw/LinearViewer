@@ -40,7 +40,7 @@
 
 import { Router, json } from 'express';
 import { jsonError } from '../lib/errors.js';
-import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
+import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
 import { renderObservationPage as renderObservationPageImpl } from '../lib/render-observation.js';
@@ -1532,19 +1532,13 @@ export function createDashboardRoutes({
       // inside dispatchSessionFollowUp stays as the fail-closed backstop. The
       // anchor's target is cli or web (dash/local cannot follow up), so the
       // owner verdict is the same for either.
-      const refusal = await resolveRunnerEnqueueRefusal({
+      const refusal = await resolveRunnerOwnerRefusal({
         ownerCheck: workspaceOwnerCheck,
         workspaceId: workspace.id,
         accountId: dispatchedBy,
         target: 'cli'
       });
-      if (refusal) {
-        return jsonError(res, refusal.status, refusal.error, {
-          code: refusal.code,
-          category: refusal.category,
-          retryable: refusal.retryable
-        });
-      }
+      if (refusal) return sendRunnerRefusal(res, refusal);
 
       const claimed = await runProposalsStore.apply(workspace.urlKey, runId, id);
       if (!claimed) return jsonError(res, 409, 'Proposal already decided');

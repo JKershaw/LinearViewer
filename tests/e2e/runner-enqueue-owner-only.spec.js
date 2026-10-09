@@ -41,7 +41,7 @@ test.describe('LIN-3383 — owner-only runner enqueue (e2e)', () => {
     expect(await queued(page)).toBe(before + 1);
   });
 
-  test('foreign owner → 403 RUNNER_ENQUEUE_OWNER_ONLY with the plain message, queue unchanged', async ({ page }) => {
+  test('foreign owner → 403 RUNNER_OWNER_ONLY with the plain message, queue unchanged', async ({ page }) => {
     const before = await queued(page);
     await seedWorkspaceOwnership(page, urlKey, 'foreign');
 
@@ -54,8 +54,8 @@ test.describe('LIN-3383 — owner-only runner enqueue (e2e)', () => {
       const res = await dispatch(page, data);
       expect(res.status(), JSON.stringify(data)).toBe(403);
       const body = await res.json();
-      expect(body.code).toBe('RUNNER_ENQUEUE_OWNER_ONLY');
-      expect(body.error).toBe("Only this workspace's owner can queue work for its runner.");
+      expect(body.code).toBe('RUNNER_OWNER_ONLY');
+      expect(body.error).toBe("Only this workspace's owner can act on its runner.");
       expect(body.retryable).toBe(false);
     }
     expect(await queued(page)).toBe(before);
