@@ -101,6 +101,7 @@ describe('paired measure (LIN-3433)', () => {
       assert.equal(w(r).clause3NoStamp, 1);
       assert.match(head(r), /\(c1 0, c2 0, c3 1, c4 0\)/);
       assert.match(head(r), /false-live: 1 /);
+      assert.match(r.report, /^ {2}acme\s+0 0 1 0 0$/m, 'the By workspace line shows the stamp-disabled c3');
     });
 
     test('only the ticket-closed stamp is disabled: handed-on and lineage-terminal stamps still resolve a row', async () => {

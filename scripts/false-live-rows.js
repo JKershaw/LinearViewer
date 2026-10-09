@@ -289,8 +289,11 @@ function informational(rows, now) {
  * activity before it counts as a zombie. Same value and meaning as simple-dispatcher's
  * STALL_FAILSAFE_MS (config.js:50, `parseInt(process.env.STALL_FAILSAFE_MS, 10) || 3600000`,
  * SD 954a164): "non-terminal + silent this long -> re-fire the sentinel over resume
- * (-> FAILED if that yields nothing)". A session still active past it is one SD's own
- * failsafe should already have ended. Tunable: FALSE_LIVE_ACTIVE_BOUND_MS.
+ * (-> FAILED if that yields nothing)". Arm (a) deliberately counts every active-phase
+ * session silent past the bound, including ones SD's selectors exempt (awaitingVerify, a
+ * live subscribed child — the S2 shield LIN-3431 bounds — and opencode sessions, which
+ * have their own liveness check); a shielded or exempt session silent this long is still
+ * a holder nothing will end. Tunable: FALSE_LIVE_ACTIVE_BOUND_MS.
  */
 export const RUNNER_ACTIVE_BOUND_MS = parseInt(process.env.FALSE_LIVE_ACTIVE_BOUND_MS, 10) || 3600000;
 // SD phases.js: ACTIVE_PHASES = RESUMING, EXECUTING. BLOCKED, AWAITING_EXTERNAL and
