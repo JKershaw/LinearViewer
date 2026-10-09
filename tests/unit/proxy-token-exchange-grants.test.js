@@ -67,6 +67,8 @@ function createLineageCollection() {
 }
 
 const OWNER = async () => ({ status: 'owner' });
+// LIN-3409: the session requesting a revoke (the owner under the OWNER seam).
+const REQUESTER = { workspaceId: 'ws-1', accountId: 'account-A' };
 
 async function seedDoc(collection, {
   plain, kind = 'bootstrap', grants = [], createdBy = 'account-A',
@@ -328,7 +330,7 @@ describe('LIN-3129 — revokeToken lineage semantics', () => {
     const boot = await seedDoc(collection, { plain, grants: ['take'] });
     const working = await store.exchangeBootstrapToken(plain);
 
-    assert.equal(await store.revokeToken('acme', boot._id), true);
+    assert.equal(await store.revokeToken('acme', boot._id, REQUESTER), true);
     assert.equal(docById(collection, boot._id), undefined);
     assert.equal(docById(collection, working.tokenId), undefined, 'the working token is revoked with its root');
     assert.equal(await store.validateToken(working.token), null);
@@ -340,7 +342,7 @@ describe('LIN-3129 — revokeToken lineage semantics', () => {
     const boot = await seedDoc(collection, { plain, grants: ['take'] });
     const working = await store.exchangeBootstrapToken(plain);
 
-    assert.equal(await store.revokeToken('acme', working.tokenId), true);
+    assert.equal(await store.revokeToken('acme', working.tokenId, REQUESTER), true);
     assert.equal(docById(collection, boot._id), undefined, 'the root bootstrap is revoked with its working token');
     assert.equal(docById(collection, working.tokenId), undefined);
   });
@@ -352,7 +354,7 @@ describe('LIN-3129 — revokeToken lineage semantics', () => {
     const working = await store.exchangeBootstrapToken(plain);
     await collection.deleteOne({ _id: boot._id }); // simulate cleanup() of the 1h root
 
-    assert.equal(await store.revokeToken('acme', working.tokenId), true);
+    assert.equal(await store.revokeToken('acme', working.tokenId, REQUESTER), true);
     assert.equal(docById(collection, working.tokenId), undefined);
   });
 
@@ -363,7 +365,7 @@ describe('LIN-3129 — revokeToken lineage semantics', () => {
     const working = await store.exchangeBootstrapToken(plain);
     await collection.deleteOne({ _id: boot._id }); // the root row is gone
 
-    assert.equal(await store.revokeToken('acme', boot._id), true, 'a DELETE naming the cleaned-up root still acts');
+    assert.equal(await store.revokeToken('acme', boot._id, REQUESTER), true, 'a DELETE naming the cleaned-up root still acts');
     assert.equal(docById(collection, working.tokenId), undefined, 'its working token is removed by parentTokenId');
   });
 
@@ -380,8 +382,145 @@ describe('LIN-3129 — revokeToken lineage semantics', () => {
     const boot = await seedDoc(collection, { plain, grants: ['take'] });
     await store.exchangeBootstrapToken(plain);
 
-    assert.equal(await store.revokeToken('other-workspace', boot._id), false);
+    assert.equal(await store.revokeToken('other-workspace', boot._id, REQUESTER), false);
     assert.equal(collection._docs().length, 2, 'both the bootstrap and working token survive');
+  });
+});
+
+describe('LIN-3409 — revokeToken owner gate on grant-bearing lineage', () => {
+  const NOT_OWNER = async () => ({ status: 'not-owner' });
+
+  async function lineage(store, collection) {
+    const plain = 'boot-' + crypto.randomUUID();
+    const boot = await seedDoc(collection, { plain, grants: ['take'] });
+    const working = await store.exchangeBootstrapToken(plain);
+    return { boot, working };
+  }
+
+  const refused = (code, status) => (err) => {
+    assert.equal(err.runnerOwnerRefusal, true);
+    assert.equal(err.code, code);
+    assert.equal(err.status, status);
+    return true;
+  };
+
+  test('(a) not-owner: refused 403 RUNNER_OWNER_ONLY and the whole lineage survives', async () => {
+    const owner = newStore(OWNER);
+    const { boot, working } = await lineage(owner.store, owner.collection);
+    owner.store.setOwnerCheck(NOT_OWNER);
+
+    await assert.rejects(
+      () => owner.store.revokeToken('acme', working.tokenId, REQUESTER),
+      refused('RUNNER_OWNER_ONLY', 403)
+    );
+    assert.ok(docById(owner.collection, boot._id), 'bootstrap survives');
+    assert.ok(docById(owner.collection, working.tokenId), 'working token survives');
+    assert.ok(await owner.store.validateToken(working.token), 'and still authenticates');
+  });
+
+  test('(a) the owner revokes the lineage; the seam is asked about the requester', async () => {
+    const seen = [];
+    const { store, collection } = newStore(async (args) => { seen.push(args); return { status: 'owner' }; });
+    const { boot, working } = await lineage(store, collection);
+    seen.length = 0; // ignore the exchange re-check
+
+    assert.equal(await store.revokeToken('acme', boot._id, REQUESTER), true);
+    assert.deepEqual(seen, [{ workspaceId: 'ws-1', accountId: 'account-A' }]);
+    assert.equal(docById(collection, boot._id), undefined);
+    assert.equal(docById(collection, working.tokenId), undefined);
+  });
+
+  test('(a) a caller that forgets the requester fails closed (GRANT_OWNERLESS) and deletes nothing', async () => {
+    const { store, collection } = newStore(OWNER);
+    const { boot, working } = await lineage(store, collection);
+
+    await assert.rejects(() => store.revokeToken('acme', boot._id), refused('GRANT_OWNERLESS', 503));
+    await assert.rejects(() => store.revokeToken('acme', boot._id, { workspaceId: 'ws-1' }), refused('GRANT_OWNERLESS', 503));
+    assert.ok(docById(collection, boot._id));
+    assert.ok(docById(collection, working.tokenId));
+  });
+
+  test('(a) an unwired, throwing or ownerless-workspace seam fails closed with nothing deleted', async () => {
+    const cases = [
+      [null, 'OWNER_CHECK_UNAVAILABLE', 503],
+      [async () => { throw new Error('mongo down'); }, 'OWNER_CHECK_UNAVAILABLE', 503],
+      [async () => ({ status: 'no-owner' }), 'WORKSPACE_OWNER_UNSET', 409],
+      [async () => ({ status: 'bogus' }), 'OWNER_CHECK_UNAVAILABLE', 503]
+    ];
+    for (const [seam, code, status] of cases) {
+      const { store, collection } = newStore(OWNER);
+      const { boot, working } = await lineage(store, collection);
+      store.setOwnerCheck(seam);
+      await assert.rejects(() => store.revokeToken('acme', boot._id, REQUESTER), refused(code, status));
+      assert.equal(collection._docs().length, 2, `${code}: nothing deleted`);
+      assert.ok(docById(collection, working.tokenId));
+    }
+  });
+
+  test('(b) a member revoking a grant-less token still succeeds, even with a not-owner seam', async () => {
+    const { store, collection } = newStore(NOT_OWNER);
+    const minted = await store.createToken('acme', { createdBy: 'account-B', workspaceId: 'ws-1' });
+    assert.equal(await store.revokeToken('acme', minted.tokenId, { workspaceId: 'ws-1', accountId: 'account-B' }), true);
+    assert.equal(collection._docs().length, 0);
+    // and with no requester at all (grant-less self-revoke needs no identity)
+    const again = await store.createToken('acme', { createdBy: 'account-B' });
+    assert.equal(await store.revokeToken('acme', again.tokenId), true);
+  });
+
+  test('(c) absent root with a grant-bearing child: not-owner is refused and the child survives', async () => {
+    const { store, collection } = newStore(OWNER);
+    const { boot, working } = await lineage(store, collection);
+    await collection.deleteOne({ _id: boot._id });
+    store.setOwnerCheck(NOT_OWNER);
+
+    await assert.rejects(
+      () => store.revokeToken('acme', boot._id, REQUESTER),
+      refused('RUNNER_OWNER_ONLY', 403)
+    );
+    assert.ok(docById(collection, working.tokenId), 'the grant-bearing child survives');
+  });
+
+  test('(c) absent root with a grant-bearing child: the owner revokes it', async () => {
+    const { store, collection } = newStore(OWNER);
+    const { boot, working } = await lineage(store, collection);
+    await collection.deleteOne({ _id: boot._id });
+
+    assert.equal(await store.revokeToken('acme', boot._id, REQUESTER), true);
+    assert.equal(docById(collection, working.tokenId), undefined);
+  });
+
+  test('(c) absent root with no children: false (404) with nothing written, and the seam is never consulted', async () => {
+    let calls = 0;
+    const { store, collection } = newStore(async () => { calls += 1; return { status: 'not-owner' }; });
+    const kept = await seedDoc(collection, { plain: 'x-' + crypto.randomUUID(), kind: 'standard', grants: ['take'] });
+
+    assert.equal(await store.revokeToken('acme', crypto.randomUUID(), REQUESTER), false);
+    assert.equal(calls, 0);
+    assert.ok(docById(collection, kept._id));
+  });
+
+  test('(c) absent root with only grant-less children stays a member-reachable no-op', async () => {
+    let calls = 0;
+    const { store, collection } = newStore(async () => { calls += 1; return { status: 'not-owner' }; });
+    const missingRoot = crypto.randomUUID();
+    const child = await seedDoc(collection, {
+      plain: 'std-' + crypto.randomUUID(), kind: 'standard', grants: [], parentTokenId: missingRoot
+    });
+    assert.equal(await store.revokeToken('acme', missingRoot, REQUESTER), false);
+    assert.equal(calls, 0);
+    assert.ok(docById(collection, child._id));
+  });
+
+  test('a store error is still false with nothing deleted (no allow path, not a refusal)', async () => {
+    const { store, collection } = newStore(OWNER);
+    const { boot } = await lineage(store, collection);
+    const real = collection.deleteMany;
+    collection.deleteMany = async () => { throw new Error('boom'); };
+    const quiet = console.error; console.error = () => {};
+    try {
+      assert.equal(await store.revokeToken('acme', boot._id, REQUESTER), false);
+    } finally { console.error = quiet; collection.deleteMany = real; }
+    assert.equal(collection._docs().length, 2);
   });
 });
 

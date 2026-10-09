@@ -20,6 +20,7 @@ import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { SCOPES, RUNNER_GRANTS } from '../lib/proxy-scopes.js';
 import { ownerMintRefusal } from '../lib/owner-mint-refusals.js';
+import { isRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 
 // LIN-525 #5: the +proxy toggle auto-mints a 'prompt-proxy' readWrite token on
 // every page-load session that dispatches. To stop these standing credentials
@@ -365,12 +366,27 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
     }
 
     try {
-      const revoked = await proxyTokenStore.revokeToken(workspace.urlKey, tokenId);
+      // LIN-3409: the store owner-checks the revoke of a grant-bearing lineage
+      // (it owns the seam and the branch logic); a grant-less self-revoke stays
+      // member-reachable. The refusal arrives as a tagged throw.
+      const revoked = await proxyTokenStore.revokeToken(workspace.urlKey, tokenId, {
+        workspaceId: workspace.id,
+        accountId: req.session?.accountId
+      });
       if (!revoked) {
         return notFound.json(res, 'Token not found');
       }
       res.json({ success: true });
     } catch (err) {
+      if (isRunnerOwnerRefusal(err)) {
+        return sendRunnerRefusal(res, {
+          code: err.code,
+          status: err.status,
+          category: err.category,
+          retryable: err.retryable,
+          error: err.message
+        });
+      }
       console.error('Revoke proxy token error:', err.message);
       jsonError(res, 500, 'Failed to revoke token');
     }
