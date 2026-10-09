@@ -22,6 +22,7 @@ import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { accountHomeSourceCtas } from '../../lib/render-account-home.js';
 import { getHandler, makeRes, makeSession } from '../fixtures/github-install-flow-branches.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
@@ -72,7 +73,7 @@ describe('LIN-1892 S2-1: connecting GitHub from /account (zero workspaces) reuse
   });
 
   test('flow start: accountId with zero workspaces + mode=new does NOT set intent.fresh', async () => {
-    const handler = getHandler(createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...stores() }), 'get', '/auth/github');
+    const handler = getHandler(createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...stores() }), 'get', '/auth/github');
     for (const workspaces of [[], undefined]) {
       const session = makeSession({ accountId: 'acct-email', ...(workspaces ? { workspaces } : {}) });
       await handler({ query: { mode: 'new' }, session }, makeRes());
@@ -82,7 +83,7 @@ describe('LIN-1892 S2-1: connecting GitHub from /account (zero workspaces) reuse
   });
 
   test('flow start: the switcher state (accountId + a workspace) still sets intent.fresh (LIN-2802 unchanged)', async () => {
-    const handler = getHandler(createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...stores() }), 'get', '/auth/github');
+    const handler = getHandler(createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...stores() }), 'get', '/auth/github');
     const session = makeSession({ accountId: 'acct-1', workspaces: [{ id: 'ws-1', urlKey: 'acme' }] });
     await handler({ query: { mode: 'new' }, session }, makeRes());
     assert.strictEqual(session.oauthIntent.fresh, true);
@@ -93,7 +94,7 @@ describe('LIN-1892 S2-1: connecting GitHub from /account (zero workspaces) reuse
     const emailSession = {};
     const emailAccount = await establishAccount(emailSession, deps.accountStore, deps.accountWorkspaceStore, 'email', 'a@x.io', {}, null);
 
-    const handler = getHandler(createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...deps }), 'post', '/auth/github/link');
+    const handler = getHandler(createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...deps }), 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
       accountId: emailAccount.accountId,

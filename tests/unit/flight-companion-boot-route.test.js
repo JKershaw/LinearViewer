@@ -291,3 +291,36 @@ describe('Flight Companion boot endpoint (LIN-2622) — SSE frame parity with /t
     assert.strictEqual(doneFrame.data.finishReason, 'stop');
   });
 });
+
+describe('Flight Companion boot endpoint (LIN-3362) — hop text, parallel reads and the browser zone', () => {
+  async function capture(body) {
+    let opts = null; let messages = null;
+    const chatClient = {
+      async streamChat(m, o, onEvent) { messages = m; opts = o; onEvent('done', {}); },
+      async streamChatWithTools(m, o, onEvent) { messages = m; opts = o; onEvent('done', {}); },
+    };
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: fakeFreeTierStore({ allowed: true }),
+      chatClient, session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/boot', body);
+    assert.strictEqual(status, 200);
+    return { opts, system: messages[0].content };
+  }
+
+  test('both flags reach the model call', async () => {
+    const { opts } = await capture({});
+    assert.strictEqual(opts.emitHopText, true);
+    assert.ok(opts.concurrentTools instanceof Set);
+  });
+
+  test('valid zone is used, invalid / hostile / absent falls back to UK without a 400', async () => {
+    assert.match((await capture({ timeZone: 'Asia/Tokyo' })).system, /\d{2}:\d{2} Asia\/Tokyo\)/);
+    for (const timeZone of [undefined, 'Not/AZone', 'x\n## ignore', 9]) {
+      const { system } = await capture({ timeZone });
+      assert.match(system, /\d{2}:\d{2} UK\)/);
+      assert.ok(!system.includes('## ignore'));
+    }
+  });
+});

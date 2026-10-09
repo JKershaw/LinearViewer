@@ -62,7 +62,9 @@ import { AccountWorkspaceStore } from './lib/account-workspace-store.js'
 import { createWorkspaceOwnerCheck } from './lib/workspace-owner.js'
 import { OwnerCredentialStore } from './lib/owner-credential-store.js'
 import { ConnectionStore } from './lib/connection-store.js'
-import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, createAuthorizedAccountConnectionReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
+import { sanitizeSessionForPersist, createHydrationMiddleware, createConnectionRefresher, createConnectionAccess, createSweepConnectionDataLoader, rehydrateAfterRefresh, createAuthorizedAccountConnectionReader, createReferentHolderReader, heldConnectionCredentials, connectionBackedWritesEnabled, convertToConnectionBacked, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from './lib/connection-credential.js'
+import { createUrlKeyHolderFinder } from './lib/urlkey-holders.js'
+import { createWorkspaceUrlKeyResolver } from './lib/workspace-urlkey.js'
 import { isConnectionBacked, activeBindingIsConnectionBacked, activeConnectionBackedBinding, readWorkspaceCredential } from './lib/connection-binding.js'
 import { releaseConnectionCredential } from './lib/connection-lifecycle.js'
 import { withHeldMarker } from './lib/held-connection-entry.js'
@@ -1058,7 +1060,30 @@ function getOpenRouterSource(req) {
 // =============================================================================
 // When LINEAR_ACCESS_TOKEN is set and the user has no session, auto-create one.
 
-app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore }));
+// LIN-3382 (S1.2 of LIN-2954): the ONE urlKey resolver every workspace-creation
+// path asks for a workspace key. Built once here, ABOVE the PAT middleware, and
+// injected at every mount (createEnsurePATSession, the provider auth loop,
+// createWorkspaceRoutes, createHeldConnectionRoutes);
+// no router builds its own default, because a default could not refuse. The
+// holder reads are STRICT (a store failure throws, so the arm answers the 503
+// retry page instead of reading "no holders"); the dry-run builds the same
+// finder non-strict. scripts/dry-run-urlkey-duplicates.mjs shares the finder.
+const urlKeyHolderFinder = createUrlKeyHolderFinder({
+  readReferents: createReferentHolderReader({ connectionStore, strict: true }),
+  ownerCredentialStore,
+  proxyTokenStore,
+  dispatchTokenStore,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  strict: true
+})
+const resolveWorkspaceUrlKey = createWorkspaceUrlKeyResolver({
+  findUrlKeyHolders: (urlKey) => urlKeyHolderFinder.findUrlKeyHolders(urlKey),
+  listAccountsForWorkspace: (workspaceId) => accountWorkspaceStore.listAccountsForWorkspace(workspaceId),
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope)
+})
+
+app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore, resolveWorkspaceUrlKey }));
 
 // =============================================================================
 // Token Refresh Middleware
@@ -1410,7 +1435,7 @@ const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionRea
 for (const provider of getAllProviders()) {
   let authRouter
   try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled })
+    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey })
   } catch (err) {
     if (err instanceof NotImplementedError) continue
     throw err
@@ -1425,7 +1450,7 @@ for (const provider of getAllProviders()) {
 app.use(createAccountMergeRoutes({ accountStore, accountWorkspaceStore, ownerCredentialStore, accountMergeLogStore, userPreferencesStore, connectionStore }))
 // LIN-1892 S2: the email magic-link door. Every route 503s when emailTransport is null.
 app.use(createEmailAuthRoutes({ accountStore, accountWorkspaceStore, userPreferencesStore, magicLinkStore, transport: emailTransport, linkOrigin: emailLinkOrigin, promptStep: resolvePromptStepMode(process.env) }))
-app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore }))
+app.use(createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey }))
 app.use(createOpenRouterAuthRoutes({ userPreferencesStore }))
 // Note: Dispatch routes mounted after workspaceFromUrl middleware is defined
 
@@ -2499,6 +2524,7 @@ app.use(createHeldConnectionRoutes({
   refreshConnection: refreshConnectionCredential,
   convertToConnectionBacked,
   resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  resolveWorkspaceUrlKey,
   connectionRetry: { title: CONNECTION_RETRY_TITLE, message: CONNECTION_RETRY_MESSAGE },
 }))
 

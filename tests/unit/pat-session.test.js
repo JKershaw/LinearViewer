@@ -17,6 +17,7 @@ import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
+import { createResolverWorld } from './lin-3382-resolver-harness.js';
 
 // A minimal fake Linear provider — the middleware is under test, not the
 // network. Registered under 'linear' so getProvider('linear') resolves it.
@@ -76,6 +77,8 @@ describe('createEnsurePATSession', () => {
     return {
       accountStore: new AccountStore({ collection: db.collection('accounts') }),
       accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
+      // LIN-3382: the PAT path takes its key from the one resolver (no default).
+      resolveWorkspaceUrlKey: createResolverWorld().resolve,
     };
   }
 
@@ -113,6 +116,60 @@ describe('createEnsurePATSession', () => {
     assert.strictEqual(req.session.linearUserId, undefined);
     // LIN-1329: the account seam ran for real.
     assert.ok(req.session.accountId, 'session.accountId set by establishAccount');
+  });
+
+  describe('LIN-3382: the workspace key comes from the one resolver', () => {
+    const run = async stores => {
+      const { req, res } = makeReqRes();
+      let nextCalled = false;
+      await createEnsurePATSession(stores)(req, res, () => { nextCalled = true; });
+      return { req, nextCalled };
+    };
+    const nothingWritten = async (stores, req) => {
+      assert.strictEqual(req.session.workspaces, undefined, 'no workspace in the session');
+      assert.strictEqual(req.session.activeWorkspaceId, undefined);
+      assert.strictEqual(req.session.accountId, undefined);
+      assert.strictEqual(await stores.accountStore.collection.countDocuments({}), 0, 'no account written');
+      assert.strictEqual(await stores.accountWorkspaceStore.collection.countDocuments({}), 0);
+    };
+
+    test('the key is the resolver\'s, asked as the Linear arm with W = org.id', async () => {
+      const calls = [];
+      const stores = { ...freshStores(), resolveWorkspaceUrlKey: async request => { calls.push(request); return { urlKey: 'resolved-key', source: 'derived' }; } };
+      const { req, nextCalled } = await run(stores);
+      assert.strictEqual(nextCalled, true);
+      assert.strictEqual(req.session.workspaces[0].urlKey, 'resolved-key');
+      assert.strictEqual(calls.length, 1);
+      assert.strictEqual(calls[0].arm, 'linear');
+      assert.strictEqual(calls[0].workspaceId, 'org-1');
+      assert.deepStrictEqual(calls[0].ids, { orgKey: 'acme' });
+      assert.deepStrictEqual(calls[0].identity, { provider: 'linear', scope: 'viewer-1' });
+    });
+
+    test('a key another account holds is refused: signed-out next(), nothing written', async () => {
+      const world = createResolverWorld({ dispatchTokens: [{ urlKey: 'acme', createdBy: 'acct-other' }] });
+      const stores = { ...freshStores(), resolveWorkspaceUrlKey: world.resolve };
+      const { req, nextCalled } = await run(stores);
+      assert.strictEqual(nextCalled, true);
+      await nothingWritten(stores, req);
+    });
+
+    test('a throwing resolver fails closed the same way', async () => {
+      const world = createResolverWorld();
+      world.failStores = true;
+      const stores = { ...freshStores(), resolveWorkspaceUrlKey: world.resolve };
+      const { req, nextCalled } = await run(stores);
+      assert.strictEqual(nextCalled, true);
+      await nothingWritten(stores, req);
+    });
+
+    test('no injected resolver fails closed (there is no default)', async () => {
+      const stores = freshStores();
+      delete stores.resolveWorkspaceUrlKey;
+      const { req, nextCalled } = await run(stores);
+      assert.strictEqual(nextCalled, true);
+      await nothingWritten(stores, req);
+    });
   });
 
   test('a second PAT session for the SAME viewer.id reuses the SAME account (returning user)', async () => {

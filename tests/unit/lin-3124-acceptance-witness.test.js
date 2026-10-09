@@ -64,6 +64,7 @@ import { runCredentialInvariantSweep } from '../../lib/credential-invariant-swee
 import { createRefreshOnResolveGate } from '../../lib/refresh-on-resolve-gate.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
 import { getWorkspaceCallScope, normalizeProvider } from '../../lib/workspace.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
@@ -150,7 +151,7 @@ describe('LIN-3124 T15 — acceptance witness: one GitHub connection, two worksp
       name: 'github',
       completeInstallation: async (id) => ({ token: 'ghs_initial', login: 'octo', userId: '42', installationId: String(id), tokenExpiresAt: new Date(Date.now() + 3600_000).toISOString() }),
     };
-    const link = getHandler(createGitHubAuthRoutes({ provider, accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, connectionStore: stores.connectionStore }), 'post', '/auth/github/link');
+    const link = getHandler(createGitHubAuthRoutes({ ...withResolver(), provider, accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, connectionStore: stores.connectionStore }), 'post', '/auth/github/link');
     const session = makeSession();
     for (const repo of [REPO_A, REPO_B]) {
       session.githubHumanId = 'human-42';

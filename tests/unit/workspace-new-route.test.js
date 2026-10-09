@@ -19,6 +19,7 @@ import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { respondToAccountConflict } from '../../lib/account-conflict.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 // Minimal in-memory collection matching the Mango/Mongo surface LocalStore uses.
 function makeCollection() {
@@ -91,7 +92,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
 
   test('creates a local workspace with the exact required session shape', async () => {
     const store = new LocalStore({ collection: makeCollection() });
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, ...freshAccountStores() }));
     const { req, res } = makeReqRes({ body: { name: 'My Notes' } });
 
     await handler(req, res);
@@ -117,7 +118,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
 
   test('derives a valid, slugged, collision-safe urlKey and redirects into it', async () => {
     const store = new LocalStore({ collection: makeCollection() });
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, ...freshAccountStores() }));
     const { req, res } = makeReqRes({ body: { name: 'My Notes' } });
 
     await handler(req, res);
@@ -131,7 +132,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
 
   test('defaults the name to "Local Workspace" when none given', async () => {
     const store = new LocalStore({ collection: makeCollection() });
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, ...freshAccountStores() }));
     const { req } = makeReqRes({ body: {} });
 
     await handler(req, makeReqRes().res);
@@ -142,7 +143,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
 
   test('seeds a starter project + issues into the new partition', async () => {
     const store = new LocalStore({ collection: makeCollection() });
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, ...freshAccountStores() }));
     const { req, res } = makeReqRes({ body: { name: 'Seeded' } });
 
     await handler(req, res);
@@ -158,7 +159,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
 
   test('two creates with the same name get distinct partitions but the same account (no merge, no conflict)', async () => {
     const store = new LocalStore({ collection: makeCollection() });
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, ...freshAccountStores() }));
     const session = {};
 
     const a = makeReqRes({ body: { name: 'Dup' }, session });
@@ -177,7 +178,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
   });
 
   test('still creates the session workspace when no localStore is wired', async () => {
-    const handler = getHandler(createWorkspaceRoutes({ ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), ...freshAccountStores() }));
     const { req, res } = makeReqRes({ body: { name: 'No Store' } });
 
     await handler(req, res);
@@ -187,7 +188,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
   });
 
   test('rejects with 400 when MAX_WORKSPACES is exceeded', async () => {
-    const handler = getHandler(createWorkspaceRoutes({ ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), ...freshAccountStores() }));
     const workspaces = Array.from({ length: 10 }, (_, i) => ({ id: `w${i}`, urlKey: `w${i}` }));
     const { req, res } = makeReqRes({ body: { name: 'Overflow' }, session: { workspaces } });
 
@@ -208,7 +209,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
   // cleanup is new.
   test('clears a stale, unresolvable session.accountId on the unknown-account failure, preserving the existing 500/message (LIN-2300)', async () => {
     const store = new LocalStore({ collection: makeCollection() });
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, ...freshAccountStores() }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, ...freshAccountStores() }));
     const { req, res } = makeReqRes({
       body: { name: 'My Notes' },
       session: {
@@ -235,7 +236,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
   test('self-heals: after an unknown-account failure clears the session, a second attempt on the SAME session succeeds (LIN-2300)', async () => {
     const store = new LocalStore({ collection: makeCollection() });
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, accountStore, accountWorkspaceStore }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, accountStore, accountWorkspaceStore }));
     const session = { accountId: 'acct-DELETED' };
 
     const attempt1 = makeReqRes({ body: { name: 'First Try' }, session });
@@ -270,7 +271,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
   test('LIN-3140: a stale live stamp survives POST /workspace/new exactly (no refresh)', async () => {
     const store = new LocalStore({ collection: makeCollection() });
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, accountStore, accountWorkspaceStore }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, accountStore, accountWorkspaceStore }));
 
     const p = await accountStore.createAccount();
     await accountStore.linkIdentity(p._id, 'linear', 'viewer-P', {});
@@ -305,7 +306,7 @@ describe('POST /workspace/new (local bootstrap)', () => {
   test('LIN-3140: an absent stamp stays absent after POST /workspace/new', async () => {
     const store = new LocalStore({ collection: makeCollection() });
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const handler = getHandler(createWorkspaceRoutes({ localStore: store, accountStore, accountWorkspaceStore }));
+    const handler = getHandler(createWorkspaceRoutes({ ...withResolver(), localStore: store, accountStore, accountWorkspaceStore }));
 
     const p = await accountStore.createAccount();
     await accountStore.linkIdentity(p._id, 'linear', 'viewer-P', {});

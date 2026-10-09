@@ -31,6 +31,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { createJiraAuthRoutes } from '../../routes/jira-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
 let savedEnv;
@@ -101,7 +102,7 @@ function makeApp({ session, store, provider, fetches = {}, accountStore, account
   // canonicalization — the fake `makeAccountStores()` below models no
   // merging at all, so it stays the default for every other test in this file.
   const stores = accountStore ? { accountStore, accountWorkspaceStore } : makeAccountStores();
-  app.use(createJiraAuthRoutes({ provider, ...stores, ownerCredentialStore: store }));
+  app.use(createJiraAuthRoutes({ ...withResolver(), provider, ...stores, ownerCredentialStore: store }));
   return app;
 }
 

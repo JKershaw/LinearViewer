@@ -19,6 +19,7 @@
  *
  * Run with: node --test tests/unit/lin-3125-persist-held.test.js
  */
+import { deriveUrlKey } from '../../lib/workspace-urlkey.js';
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -33,12 +34,15 @@ import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { convertToConnectionBacked, createAuthorizedAccountConnectionReader, heldConnectionCredentials } from '../../lib/connection-credential.js';
 import { renderWorkspaceLimitPage } from '../../lib/render-pages.js';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
 const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG', 'CONNECTION_BACKED_WRITES'];
 const ACCT = 'acct-1';
 const INSTALL = '77';
+// LIN-3382: held-new keys come from the resolver (`gh-<name>-<sha6(provider:scope)>`), no longer the bare repo name.
+const NEW_KEY = deriveUrlKey('github-fresh', { repoName: 'a', provider: 'github', scope: 'octo/a' });
 const CONN_ID = `${ACCT}::github::${INSTALL}`;
 
 function getHandler(router, method, path) {
@@ -99,7 +103,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
   }
 
   function buildRoute(connectionStore, accountWorkspaceStore, { provider = githubProvider(), writes = true, writesFn, convert = convertToConnectionBacked } = {}) {
-    return createHeldConnectionRoutes({
+    return createHeldConnectionRoutes({ ...withResolver(),
       resolveProvider: () => provider,
       connectionStore,
       accountWorkspaceStore,
@@ -151,9 +155,9 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     await runToOffer(route, session);
     const res = await bind(route, session, { repo: 'octo/a' });
 
-    assert.equal(res.redirectedTo, '/workspace/a/');
+    assert.equal(res.redirectedTo, `/workspace/${NEW_KEY}/`);
     assert.equal(session.workspaces.length, 2, 'one new container');
-    const ws = session.workspaces.find(w => w.urlKey === 'a');
+    const ws = session.workspaces.find(w => w.urlKey === NEW_KEY);
     assert.ok(ws, 'new workspace exists');
     assert.equal(ws.provider, 'github', 'provider set on the container (F3)');
     assert.deepEqual(ws.activeBinding, { provider: 'github', scope: 'octo/a' }, 'activeBinding flipped');
@@ -171,7 +175,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(session.heldEntry, undefined, 'heldEntry cleared');
 
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
-    assert.deepEqual(row.referents, [{ urlKey: 'a', provider: 'github', scope: 'octo/a' }]);
+    assert.deepEqual(row.referents, [{ urlKey: NEW_KEY, provider: 'github', scope: 'octo/a' }]);
   });
 
   test('mode=new limit: identical Workspace Limit Reached page, zero writes, no referent', async () => {
@@ -201,7 +205,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /Connection Not Saved/);
     assert.equal(session.workspaces.length, 1, 'the upserted container was restored away');
-    assert.equal(session.workspaces.find(w => w.urlKey === 'a'), undefined);
+    assert.equal(session.workspaces.find(w => w.urlKey === NEW_KEY), undefined);
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'no referent');
   });
@@ -217,7 +221,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /Connection Not Saved/);
     assert.equal(session.workspaces.length, 1, 'new workspace rolled back');
-    assert.equal(session.workspaces.find(w => w.urlKey === 'a'), undefined);
+    assert.equal(session.workspaces.find(w => w.urlKey === NEW_KEY), undefined);
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'referent removed by C2 compensation');
     assert.equal(session.providerAdded, undefined, 'no success flash on rollback');
@@ -236,7 +240,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(res.statusCode, 503, 'a swallowed owner-mark failure is not success');
     assert.match(res.body, /Connection Not Saved/);
     assert.equal(session.workspaces.length, 1, 'new workspace rolled back');
-    assert.equal(session.workspaces.find(w => w.urlKey === 'a'), undefined, 'no bound, ownerless workspace survives');
+    assert.equal(session.workspaces.find(w => w.urlKey === NEW_KEY), undefined, 'no bound, ownerless workspace survives');
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'referent removed by C2 compensation');
     assert.ok(session.heldEntry, 'heldEntry kept for retry');
@@ -271,7 +275,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     assert.equal(res.statusCode, 503);
     assert.match(res.body, /Connection Not Saved/);
     assert.equal(session.workspaces.length, 1, 'the upserted container was restored away');
-    assert.equal(session.workspaces.find(w => w.urlKey === 'a'), undefined);
+    assert.equal(session.workspaces.find(w => w.urlKey === NEW_KEY), undefined);
     const row = await connectionStore.collection.findOne({ _id: CONN_ID });
     assert.deepEqual(row.referents, [], 'no referent');
   });
@@ -285,7 +289,7 @@ describe('LIN-3125 Phase 3 — held new workspace', () => {
     //   const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionReader({ connectionStore })
     const reader = createAuthorizedAccountConnectionReader({ connectionStore });
     const provider = githubProvider();
-    const flow = createGitHubAuthRoutes({ provider, accountStore: fakeAccountStore, accountWorkspaceStore, connectionStore, listAuthorizedAccountConnections: reader, connectionBackedWritesEnabled: () => true });
+    const flow = createGitHubAuthRoutes({ ...withResolver(), provider, accountStore: fakeAccountStore, accountWorkspaceStore, connectionStore, listAuthorizedAccountConnections: reader, connectionBackedWritesEnabled: () => true });
 
     const session = makeSession({ workspaces: [{ id: 'w0', urlKey: 'base', bindings: [] }], heldEntry: undefined });
     const res = makeRes();

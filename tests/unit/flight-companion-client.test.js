@@ -3143,7 +3143,8 @@ describe('flight-companion.js — LIN-2622 boot: endpoint, rendering, and the st
     m.startBoot();
     assert.strictEqual(thread.children.length, 2, 'a user bubble and a thinking assistant bubble, exactly like a typed turn');
     assert.strictEqual(thread.children[0].querySelector('.fc-msg-body').textContent, 'Start');
-    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'thinking…');
+    // LIN-3362: the placeholder row now leads with a static hello on a boot.
+    assert.match(thread.children[1].querySelector('.fc-msg-body').textContent, /^Hello!.*thinking…$/);
   });
 
   test('a successful boot pushes a real {role:"user", content:"Start"} entry into history, matching what the server actually turned', async () => {
@@ -4337,5 +4338,63 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     const ok = loadClient({ pageDataset: { fcReadoutHeadings: '["The big thread"]' } });
     assert.ok(ok.exports);
     assert.doesNotThrow(() => loadClient({ pageDataset: { fcReadoutHeadings: '{oops' } }));
+  });
+});
+
+
+describe('flight-companion.js — LIN-3362: hello, interim hop text, browser zone', () => {
+  test('a boot paints a hello that is display-only: the first token replaces it and history never holds it', async () => {
+    const { exports: m, thread } = loadClient({
+      fetchImpl: () => sseResponse([sseFrame('token', { token: 'orient ready' }), sseFrame('done', {})]),
+    });
+    m.startBoot();
+    assert.match(thread.children[1].querySelector('.fc-msg-body').textContent, /^Hello!/);
+    await flush();
+    assert.strictEqual(thread.children[1].querySelector('.fc-msg-body').textContent, 'orient ready');
+    assert.ok(!JSON.stringify(m.getChatHistory()).includes('Hello!'));
+  });
+
+  test('a hop-text frame renders a muted note before the answer row — not a bubble, not in history', async () => {
+    const { exports: m, thread, questionInput } = loadClient({
+      fetchImpl: () => sseResponse([
+        sseFrame('hop-text', { text: 'Looking at the stalled sessions first' }),
+        sseFrame('token', { token: 'final answer' }),
+        sseFrame('done', {}),
+      ]),
+    });
+    questionInput.value = 'what is stalled?';
+    m.submitQuestion();
+    await flush();
+    const notes = thread.children.filter((li) => li.classList.contains('fc-inline-note'));
+    assert.strictEqual(notes.length, 1);
+    assert.match(notes[0].textContent, /Looking at the stalled sessions first/);
+    // you, note, answer — one assistant bubble only
+    assert.strictEqual(thread.children.length, 3);
+    assert.strictEqual(thread.children[2].querySelector('.fc-msg-body').textContent, 'final answer');
+    assert.ok(!JSON.stringify(m.getChatHistory()).includes('stalled sessions first'));
+  });
+
+  test('timeZone is sent on both /turn and /boot', async () => {
+    const turn = loadClient({ fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    turn.questionInput.value = 'hi';
+    turn.exports.submitQuestion();
+    await flush();
+    assert.strictEqual(typeof turn.fetchCalls[0].body.timeZone, 'string');
+    assert.ok(turn.fetchCalls[0].body.timeZone.length > 0);
+    const boot = loadClient({ fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    boot.exports.startBoot();
+    await flush();
+    assert.strictEqual(typeof boot.fetchCalls[0].body.timeZone, 'string');
+  });
+
+  test('timeZone is sent on an auto-wake /turn too', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const { fetchCalls } = loadClient({
+      fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
+    });
+    t.mock.timers.tick(30000);
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(typeof fetchCalls[0].body.timeZone, 'string');
+    assert.ok(fetchCalls[0].body.timeZone.length > 0);
   });
 });

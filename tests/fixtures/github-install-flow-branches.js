@@ -300,7 +300,7 @@ export function buildBranches(d) {
         session: makeSession({
           githubHumanId: 'human-42',
           [d.pendingKey]: { token: 'tok', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
-          workspaces: [{ id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: d.providerName, bindings: [] }],
+          workspaces: [{ id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: d.providerName, bindings: [] }],
         }),
       }),
       provider: P,

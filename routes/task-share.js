@@ -16,8 +16,14 @@
  * tracker-not-found all answer the SAME 404; a store/owner-check throw, a
  * credential that cannot be used, and a tracker outage all answer the SAME 503.
  * Revoked is deliberately indistinguishable from never-issued. There is no
- * stored-only fallback and no rate limit (John's rulings, LIN-3261 owns
- * public-page secret review).
+ * stored-only fallback and no rate limit (John's rulings).
+ *
+ * Render-time masking (LIN-3389): the page and the three HTML fields of
+ * `/state` pass through `maskSecretsInHtml` (existing secret-scan rules, over
+ * entity-decoded text) at the response boundary. A hit is MASKED and served,
+ * never refused; the log carries rule ids and an 8-hex token-hash prefix only.
+ * A masker throw fails closed with the usual 503. LIN-3261 still owns the
+ * scheduled scan and extra patterns.
  *
  * The 5-second cache holds ONLY the loader's `{model}` result, per
  * `(urlKey, issueIdentifier, source)`, with single-flight so concurrent guests
@@ -30,6 +36,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { jsonError } from '../lib/errors.js';
 import { isValidIssueId } from '../lib/workspace.js';
 import { isWellFormedTaskShareToken } from '../lib/task-share-store.js';
+import { maskSecretsInHtml } from '../lib/mask-secrets-in-html.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import {
   renderTaskPage,
@@ -85,6 +92,7 @@ function unavailablePage(res) {
  * @param {(record: Object) => Promise<{provider: Object, callScope: *}|null>} deps.guestAccess
  * @param {Function} [deps.getDeployInfo]
  * @param {Function} [deps.now]
+ * @param {(html: string) => {html: string, hits: string[]}} [deps.maskHtml]
  * @returns {import('express').Router}
  */
 export function createTaskShareRoutes({
@@ -95,6 +103,7 @@ export function createTaskShareRoutes({
   guestAccess,
   getDeployInfo = () => ({}),
   now = () => new Date(),
+  maskHtml = maskSecretsInHtml,
 } = {}) {
   if (!taskShareStore) throw new Error('task-share routes: taskShareStore is required');
   if (!loader) throw new Error('task-share routes: loader is required');
@@ -144,6 +153,27 @@ export function createTaskShareRoutes({
     return { kind: 'ok', record };
   }
 
+  // ── Render-time masking (LIN-3389) ─────────────────────────────────────────
+  // One log line per (token-hash prefix, surface) per window: a masked running
+  // task would otherwise log on every poll.
+  const MASK_LOG_WINDOW_MS = 60000;
+  const maskLogged = new Map();
+
+  function maskFragment(record, surface, html) {
+    const result = maskHtml(html);
+    if (result.hits.length > 0) {
+      const prefix = String(record.tokenHash || '').slice(0, 8);
+      const key = `${prefix}:${surface}`;
+      const at = now().getTime();
+      const last = maskLogged.get(key);
+      if (last === undefined || at - last >= MASK_LOG_WINDOW_MS) {
+        maskLogged.set(key, at);
+        console.warn(`Task share masked: patterns=${result.hits.join(',')} tokenHash=${prefix} surface=${surface}`);
+      }
+    }
+    return result.html;
+  }
+
   // ── Public guest surface ───────────────────────────────────────────────────
   // Headers on EVERY response under /t/ (200, 404 and 503 alike).
   router.use('/t', (req, res, next) => {
@@ -185,14 +215,22 @@ export function createTaskShareRoutes({
     if (result.unavailable) return unavailablePage(res);
 
     const { model } = result;
-    return res.send(renderTaskPage(model, {
-      viewer: 'guest',
-      urlKey: record.urlKey,
-      binding: { source: record.source },
-      stateUrl: `/t/${encodeURIComponent(token)}/state`,
-      now: now(),
-      pageOptions: { deployInfo: getDeployInfo(), workspaces: [], featureFlags: {}, openRouterSource: null },
-    }));
+    let body;
+    try {
+      body = maskFragment(record, 'page', renderTaskPage(model, {
+        viewer: 'guest',
+        urlKey: record.urlKey,
+        binding: { source: record.source },
+        stateUrl: `/t/${encodeURIComponent(token)}/state`,
+        now: now(),
+        pageOptions: { deployInfo: getDeployInfo(), workspaces: [], featureFlags: {}, openRouterSource: null },
+      }));
+    } catch (error) {
+      // Fail closed: a masker bug is not a false positive and the body is unvouched.
+      console.error('Task share mask error:', error.message);
+      return unavailablePage(res);
+    }
+    return res.send(body);
   });
 
   router.get('/t/:token/state', async (req, res) => {
@@ -216,12 +254,14 @@ export function createTaskShareRoutes({
       const body = {
         status: model.status,
         live: model.live,
-        headerHtml: renderTaskStatus(model),
-        trackHtml: renderTaskTrack(model, { now: now() }),
+        headerHtml: maskFragment(record, 'state', renderTaskStatus(model)),
+        trackHtml: maskFragment(record, 'state', renderTaskTrack(model, { now: now() })),
       };
       if (model.brief || model.recap) {
         const contextHtml = renderTaskContext(model, { urlKey: record.urlKey });
-        body.contextHtml = contextHtml;
+        // The sig is over the UNMASKED fragment, exactly as the page stamps
+        // data-context-sig, so a masked panel is not repainted on every poll.
+        body.contextHtml = maskFragment(record, 'state', contextHtml);
         body.contextSig = contextSignature(contextHtml);
       }
       return res.json(body);

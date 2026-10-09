@@ -49,6 +49,7 @@ import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createGitHubProjectsAuthRoutes } from '../../routes/github-projects-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 import { buildBranches, runBranch } from '../fixtures/github-install-flow-branches.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -179,7 +180,7 @@ describe('GitHub install-flow golden harness (byte-parity, LIN-2397 stage A)', (
             delete process.env.GITHUB_APP_ID;
           }
           try {
-            const router = d.createRoutes({
+            const router = d.createRoutes({ ...withResolver(),
               provider,
               ...freshAccountStores(),
               ...(branch.userPreferencesStore ? { userPreferencesStore: branch.userPreferencesStore } : {}),

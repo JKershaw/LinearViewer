@@ -21,6 +21,7 @@ import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { getHandler, makeRes, makeSession } from '../fixtures/github-install-flow-branches.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
@@ -60,7 +61,7 @@ describe('LIN-3125 Phase 1 — intent.fresh characterization (extraction is beha
 
   function handler() {
     const db = dbClient.db(`intent_${counter++}`);
-    return getHandler(createGitHubAuthRoutes({
+    return getHandler(createGitHubAuthRoutes({ ...withResolver(),
       provider: fakeGithubProvider(),
       accountStore: new AccountStore({ collection: db.collection('accounts') }),
       accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),

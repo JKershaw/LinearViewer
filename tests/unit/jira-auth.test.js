@@ -21,6 +21,7 @@ import { JiraProvider } from '../../lib/providers/jira/index.js'
 import { createFakeJiraClient } from '../../lib/providers/jira/fake-client.js'
 import { AccountStore } from '../../lib/account-store.js'
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js'
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const SITE = 'https://acme.atlassian.net'
 
@@ -84,7 +85,7 @@ describe('routes/jira-auth.js', () => {
 
   describe('GET /auth/jira', () => {
     test('400s with no ?workspace', async () => {
-      const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'get', '/auth/jira')
       const res = makeRes()
       await handler({ query: {}, session: makeSession({ workspaces: [] }) }, res)
@@ -93,7 +94,7 @@ describe('routes/jira-auth.js', () => {
     })
 
     test('400s when the named workspace is not in this session', async () => {
-      const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'get', '/auth/jira')
       const res = makeRes()
       await handler({ query: { workspace: 'acme' }, session: makeSession({ workspaces: [] }) }, res)
@@ -101,7 +102,7 @@ describe('routes/jira-auth.js', () => {
     })
 
     test('renders the link form, carrying the target workspace as a hidden field', async () => {
-      const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'get', '/auth/jira')
       const res = makeRes()
       const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -114,7 +115,7 @@ describe('routes/jira-auth.js', () => {
 
   describe('POST /auth/jira/link', () => {
     test('400s when email/apiToken/site are missing', async () => {
-      const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -128,7 +129,7 @@ describe('routes/jira-auth.js', () => {
       // provider.validateCredential throwing on any call proves the network
       // probe never happens — the site is rejected purely by validation.
       const spyProvider = { validateCredential: () => { throw new Error('must not be called for a rejected site') } }
-      const router = createJiraAuthRoutes({ provider: spyProvider, ...freshAccountStores() })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: spyProvider, ...freshAccountStores() })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -143,7 +144,7 @@ describe('routes/jira-auth.js', () => {
       // BEFORE validateCredential — no network, no durable write.
       const spyProvider = { ui: { displayName: 'Jira' }, validateCredential: () => { throw new Error('must not probe a refused add') } }
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
-      const router = createJiraAuthRoutes({ provider: spyProvider, accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: spyProvider, accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [{
@@ -159,7 +160,7 @@ describe('routes/jira-auth.js', () => {
     })
 
     test('400s when the target workspace is not in this session', async () => {
-      const router = createJiraAuthRoutes({ provider: workingProvider(), ...freshAccountStores() })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), ...freshAccountStores() })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [] })
@@ -170,7 +171,7 @@ describe('routes/jira-auth.js', () => {
 
     test('a failed credential probe 400s and writes NO binding (validate-before-link)', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
-      const router = createJiraAuthRoutes({ provider: badCredentialProvider(), accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: badCredentialProvider(), accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -183,7 +184,7 @@ describe('routes/jira-auth.js', () => {
 
     test('a successful probe links the binding onto the named workspace, stamps MAX_SAFE_INTEGER, and establishes the account', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -233,7 +234,7 @@ describe('routes/jira-auth.js', () => {
     test('LIN-3127: Basic add-source dual-writes a record with NO token (non-secret fields only)', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
       const connectionStore = recordingConnectionStore()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -254,7 +255,7 @@ describe('routes/jira-auth.js', () => {
     test('LIN-3127: Basic add-source over an existing OAuth binding on the same site does NOT leak the Basic token (bypass case)', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
       const connectionStore = recordingConnectionStore()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       // The viewed workspace already holds an OAuth binding on this exact site.
@@ -281,7 +282,7 @@ describe('routes/jira-auth.js', () => {
       await accountStore.linkIdentity(otherAccount._id, 'jira', 'jira-acct-1', {})
       const myAccount = await accountStore.createAccount()
       const connectionStore = recordingConnectionStore()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore, connectionStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ accountId: myAccount._id, workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -294,7 +295,7 @@ describe('routes/jira-auth.js', () => {
 
     test('a returning Jira identity (fresh session, previously-seen accountId) lands on their EXISTING account', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
 
       const firstSession = makeSession({ workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -321,7 +322,7 @@ describe('routes/jira-auth.js', () => {
       await accountStore.linkIdentity(otherAccount._id, 'jira', 'jira-acct-1', {})
       const myAccount = await accountStore.createAccount()
 
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({ accountId: myAccount._id, workspaces: [{ id: 'ws-1', name: 'Acme', urlKey: 'acme' }] })
@@ -340,7 +341,7 @@ describe('routes/jira-auth.js', () => {
     // session, so an uncleared stale id would 409 every retry.
     test('an unknown-account 409 clears the stale session.accountId (LIN-2300)', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const res = makeRes()
       const session = makeSession({
@@ -367,7 +368,7 @@ describe('routes/jira-auth.js', () => {
     // 2, after the stale id is cleared, mints and lands on a fresh account.
     test('self-heals: after an unknown-account 409 clears the session, a second attempt on the SAME session succeeds (LIN-2300)', async () => {
       const { accountStore, accountWorkspaceStore } = freshAccountStores()
-      const router = createJiraAuthRoutes({ provider: workingProvider(), accountStore, accountWorkspaceStore })
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: workingProvider(), accountStore, accountWorkspaceStore })
       const handler = getHandler(router, 'post', '/auth/jira/link')
       const session = makeSession({
         accountId: 'acct-DELETED',

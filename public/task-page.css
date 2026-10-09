@@ -75,6 +75,18 @@
 .task-stage-state,
 .task-stage-time { font-size: 0.8rem; color: var(--muted); }
 .task-stage-time { font-family: var(--font-content); }
+/* LIN-3407: the live timers keep a steady slot. Left-aligned and side by side,
+   a ticking timer whose text changes length (59s -> 1m, 9m -> 10m) used to nudge
+   its neighbour sideways. Tabular figures keep every digit one width; the
+   min-width (in `ch`, sized to the longest usual form, "started 12m 30s ago" /
+   "running 12m 30s") keeps the slot from shrinking when the text does. */
+.task-stage-ago,
+.task-stage-took {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+.task-stage-ago { min-width: 20ch; }
+.task-stage-took { min-width: 16ch; }
 .task-stage-state { margin-left: auto; }
 .task-stage[data-tone="error"] .task-stage-state { color: var(--red-dim, var(--red)); }
 .task-stage[data-tone="waiting"] .task-stage-state { color: var(--amber-dim); }
