@@ -61,8 +61,8 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
-  'lib/prompt-template-defs.js': 109961, // LIN-3378: +34 net, retrospective-audit's whenNot names an approved review merged but not Done (+84), paid by blocked's, context's and recap's route text (-50)
-  'lib/prompt-templates.js': 19963, // LIN-3378: +28, defer's whenNot names plan-review (+44), its requires tightened (-16)
+  'lib/prompt-template-defs.js': 109943, // LIN-3378: +16 net, retrospective-audit's whenNot names merged-and-approved but not Done (+72), paid by blocked's, context's and recap's route text (-56)
+  'lib/prompt-templates.js': 19955, // LIN-3378: +20, defer's whenNot names plan-review (+36), its requires tightened (-16)
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3424,
 };
@@ -104,7 +104,7 @@ export const TEMPLATES_RENDERED_CEILINGS = {
  * the selector; the stage options it lists are each stage's `route`, counted in the
  * template defs.
  */
-export const STAGE_ROUTER_SOURCE_CEILING = 8029; // LIN-3378: -86, Why clauses of rules 1-3 and 8 tightened (rule 6's kept: measured, HAR-697)
+export const STAGE_ROUTER_SOURCE_CEILING = 8069; // LIN-3378: -46, Why clauses of rules 1-3 tightened (rules 6 and 8 keep theirs: measured, HAR-697 and the parent-plan points)
 /**
  * The routing prompt, rendered bytes for the eval baseline's leaf (a leaf with no
  * comments and no plan, its view a placeholder). LIN-3300: the meta-prompt's rendered
@@ -112,7 +112,7 @@ export const STAGE_ROUTER_SOURCE_CEILING = 8029; // LIN-3378: -86, Why clauses o
  * selector sends 9555. It also catches growth in the stage options and the facts code
  * renders (lib/recommendation-facts.js), which no source ceiling covers.
  */
-export const ROUTER_PROMPT_RENDERED_CEILING = 9531; // LIN-3378: -24 net of b and g
+export const ROUTER_PROMPT_RENDERED_CEILING = 9545; // LIN-3378: -10 net of b and g
 
 /**
  * Every stage's Scope and Authority lines, source bytes (lib/prompts/stage-intent.js).
@@ -145,7 +145,7 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15815;
  * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
  * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 342573; // LIN-3378: -48 (342621)
+export const FROZEN_TOTAL_BYTES = 342601; // LIN-3378: -20 (342621)
 
 const BASE_URL = 'https://harbour.example';
 

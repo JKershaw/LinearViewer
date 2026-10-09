@@ -75,7 +75,7 @@ F1 is right; take the narrow revision.
   When: One sharp feasibility question decides the approach, and a small proof against the real code can answer it.
   Not when: The gap is broader understanding (`research`), or the approach is known to work.
 - `context`: Whoever picks this up next needs its state: where it really stands and what should happen next.
-  When: Someone is picking the task up mid-way or after a gap and needs to know where it stands.
+  When: Someone is picking the task up after a gap and needs to know where it stands.
   Not when: The trail already shows the next working stage.
 - `plan-review`: Check the plan with fresh context before it is built: do its claims hold when you re-run them?
   When: No plan-review since the plan last changed, and the gate is met: the plan says "plan-review due: yes", or it needs multiple sessions, routes around a named contract gap, relaxes a validation, contract or guard, or touches credential, merge-rule or dispatch-contract surfaces.
@@ -95,10 +95,10 @@ F1 is right; take the narrow revision.
   Requires: An Approve from a code review; a plan-review Approve is not one.
 - `retrospective-audit`: The work has merged.
   When: The work is merged and Done, with a code review on record.
-  Not when: The work has not merged (`review`), or has merged with an approving review but the task is not Done (`close-out`).
+  Not when: The work has not merged (`review`), or has merged and been approved but the task is not Done (`close-out`).
 - `defer`: Descend into a subtask: the next real work lives in a child, not in this task.
   When: The task has an open, actionable subtask and its subtasks cover its remaining scope.
-  Not when: A leaf; every subtask done (close the parent); or the task needs its own work first (`plan-review` when its own plan is due one, `breakdown` for scope no subtask covers, `triage` if mis-filed).
+  Not when: A leaf; every subtask done (close the parent); or the task needs its own work first (`plan-review` when its plan is due, `breakdown` for scope no subtask covers, `triage` if mis-filed).
   Requires: The child, on the DeferTo line.
 
 ## How to choose
@@ -112,7 +112,7 @@ Take these in order; the first that applies decides. Each stage's own descriptio
 5. **A bug.** Then `bug`, when it applies; a cause that stands goes to its fix, `plan` if the fix spans surfaces. Why: never build on an unconfirmed cause, and never re-investigate a confirmed one.
 6. **Knowledge.** Then `research`, `spike` or `scoping`, when one applies. Why: building on ungathered knowledge or an unsettled goal is expensive to unwind, and a needless research pass is cheap.
 7. **Shape.** Then `design`, when it applies. Why: a plan should not pick the architecture silently.
-8. **Plan.** Then `plan`, `plan-review` if one is due, and `implementation` or `breakdown` on the plan's session fit, in that order. The latest plan-review verdict asked for changes or discussion → `plan` for the revision, then `plan-review` once a revised plan is posted. Why: absent scope resolves down to `plan`, never up to `implementation`; a verdict is answered before the plan is built on.
+8. **Plan.** Then `plan`, `plan-review` if one is due, and `implementation` or `breakdown` on the plan's session fit, in that order. The latest plan-review verdict asked for changes or discussion → `plan` for the revision, then `plan-review` once a revised plan is posted. Why: absent scope resolves down to `plan`, never up to `implementation`; a verdict is answered before the plan is built on; and a settled plan is never re-planned.
 
 ## Reply
 
