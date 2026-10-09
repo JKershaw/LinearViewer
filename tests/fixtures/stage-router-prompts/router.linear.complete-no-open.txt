@@ -39,7 +39,7 @@ Approve — conditional on close-out.
 
 - `blocked`: Work has stalled.
   When: The work cannot proceed: an open blocker relation, a person's hold that nothing later lifted, or a decision only a person can make.
-  Not when: Every blocker is resolved, even if the description still says "blocked until"; a label alone never blocks.
+  Not when: Every blocker is resolved, even if the description still says "blocked until".
 - `bug`: Something behaves wrong.
   When: Unexpected behaviour whose cause is not yet confirmed, or whose cause a later comment refuted or relocated, or whose deciding experiment never ran.
   Not when: An investigation already names a root cause and fix direction that still stand at the end of the trail (`implementation`). The `bug` label alone does not mean investigation is owed.
@@ -58,16 +58,16 @@ Approve — conditional on close-out.
   Not when: Steps that land together as one PR (`implementation`); subtasks already cover the scope (`defer`).
   Requires: A plan or explicit phases, and an Approve from any plan-review that was due.
 - `research`: What this task needs is not known well enough to plan.
-  When: Doing the work well depends on knowledge not yet gathered: how the code behaves, an unpinned external dependency, history or prior art, or every place a change must reach when the ticket names them only by description. Also when the ticket prescribes research as its method. In a close call, prefer research.
+  When: Doing the work well depends on knowledge not yet gathered: how the code behaves today, an unpinned external dependency, history or prior art, or every place a change must reach when the ticket names them only by description. Also when the ticket prescribes research as its method. In a close call, prefer research.
   Not when: The task is small and obvious, or the findings and a chosen approach are already in the description or comments.
 - `scoping`: The ticket is unclear about its goal: settle what it should deliver and what done means.
   When: The goal or its boundaries are in dispute: what to build is a product or intent question that reading the code would not settle.
-  Not when: The gap is knowledge to gather, even when the ticket is terse (`research`); only the solution shape is open (`design`); unexpected behaviour (`bug`).
+  Not when: The gap is knowledge to gather, such as how the code behaves, a platform or dependency, or history, even when the ticket is terse (`research`); only the solution shape is open (`design`); unexpected behaviour (`bug`).
 - `design`: Several shapes could work; choose the one that best serves what the task is for.
   When: Two or more materially different solution shapes are viable and nothing has committed to one.
   Not when: One obvious shape, an approach the ticket or comments already committed to, landed work, or knowledge still ungathered (`research`).
 - `spike`: It is open whether this approach can work here.
-  When: One sharp feasibility question decides the approach, and a small proof can answer it.
+  When: One sharp feasibility question decides the approach, and a small proof against the real code can answer it.
   Not when: The gap is broader understanding (`research`), or the approach is known to work.
 - `context`: Whoever picks this up next needs its state: where it really stands and what should happen next.
   When: Someone is picking the task up mid-way or after a gap and needs to know where it stands.
@@ -90,7 +90,7 @@ Approve — conditional on close-out.
   Requires: An Approve from a code review; a plan-review Approve is not one.
 - `retrospective-audit`: The work has merged.
   When: The work is merged and Done, with a code review on record.
-  Not when: The work has not merged (`review`), or has merged but the task is not Done (`close-out`).
+  Not when: The work has not merged (`review`), or has merged with an approving review but the task is not Done (`close-out`).
 - `defer`: Descend into a subtask: the next real work lives in a child, not in this task.
   When: The task has an open, actionable subtask and its subtasks cover its remaining scope.
   Not when: A leaf; every subtask done (close the parent); or the task needs its own work first (`plan-review` when its own plan is due one, `breakdown` for scope no subtask covers, `triage` if mis-filed).
@@ -105,9 +105,9 @@ Take these in order; the first that applies decides. Each stage's own descriptio
 3. **Blocked.** Then `blocked`, when it applies. Why: nothing else moves blocked work.
 4. **Subtasks.** Then `defer` to the frontier child, when it applies. Why: the work lives in the children, and only you can tell a healthy container from one that needs decomposing.
 5. **A bug.** Then `bug`, when it applies; a cause that stands goes to its fix, `plan` if the fix spans surfaces. Why: never build on an unconfirmed cause, and never re-investigate a confirmed one.
-6. **Knowledge.** Then `research`, `spike` or `scoping`, when one applies. Why: building on ungathered knowledge or an unsettled goal is expensive to unwind.
+6. **Knowledge.** Then `research`, `spike` or `scoping`, when one applies. Why: building on ungathered knowledge or an unsettled goal is expensive to unwind, and a needless research pass is cheap.
 7. **Shape.** Then `design`, when it applies. Why: a plan should not pick the architecture silently.
-8. **Plan.** Then `plan`, `plan-review` if one is due, and `implementation` or `breakdown` on the plan's session fit, in that order. The latest plan-review verdict asked for changes or discussion → `plan` for the revision, then `plan-review` once a revised plan is posted. Why: absent scope resolves down to `plan`, never up to `implementation`; a verdict is answered before the plan is built on; and a settled plan is never re-planned.
+8. **Plan.** Then `plan`, `plan-review` if one is due, and `implementation` or `breakdown` on the plan's session fit, in that order. The latest plan-review verdict asked for changes or discussion → `plan` for the revision, then `plan-review` once a revised plan is posted. Why: absent scope resolves down to `plan`, never up to `implementation`; a verdict is answered before the plan is built on.
 
 ## Reply
 
