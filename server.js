@@ -2988,7 +2988,7 @@ app.use(createRunnerKitRoutes())
 app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
-// yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
+// yapClient falls back to DEFAULT_YAP_BASE_URL (lib/yap-client.js) when YAP_BASE_URL is unset.
 const yapClient = yapClientFromEnv()
 app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, workspaceOwnerCheck }))
 
