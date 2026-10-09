@@ -20,11 +20,12 @@ const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf
 
 function load() {
   const bound = [];
+  const calls = [];
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
-    api: async () => ({}),
+    api: async (...a) => { calls.push(['window.api', ...a]); return {}; },
     ProxyToggle: { bind: (b) => bound.push(b), maybeAppend: async (t) => t },
   };
   const sandbox = {
@@ -32,11 +33,11 @@ function load() {
     requestAnimationFrame: (cb) => { cb(); return 1; },
     setTimeout: () => 1, clearTimeout: () => {},
     navigator: { clipboard: { writeText: async () => {} } },
-    fetch: async () => ({ ok: false, json: async () => ({}) }),
+    fetch: async (...a) => { calls.push(['fetch', ...a]); return { ok: false, json: async () => ({}) }; },
   };
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox);
-  return { PromptSection: window.PromptSection, bound };
+  return { PromptSection: window.PromptSection, bound, calls };
 }
 
 function makeContainer() {
@@ -84,11 +85,21 @@ describe('PromptSection: look-alike controls in rendered markdown (LIN-3401)', (
   });
 
   test('a look-alike prompt-fetch button in a sink starts no request', async () => {
-    const { PromptSection } = load();
+    const { PromptSection, calls } = load();
     const c = makeContainer();
     PromptSection.init(c, opts);
+    calls.length = 0; // init may make its own reads; only the press is under test
     await c.press({ prompt: '__autopilot__' }, true);
+    assert.deepStrictEqual(calls, [], 'the look-alike made no fetch / window.api call');
     assert.ok(!c.innerHTML.includes('generating'), 'did not enter the generating state');
+
+    // Positive control: the same press outside a sink does reach the network
+    // (the task-mode record), so the empty list above is not a vacuous pass.
+    await c.press({ prompt: '__autopilot__' }, false);
+    assert.ok(
+      calls.some((c0) => c0[0] === 'fetch' && /\/api\/task-mode$/.test(String(c0[1]))),
+      'a real press records task-mode via fetch'
+    );
   });
 
   test('every paint binds the +proxy toggle through the header template chain only', () => {

@@ -6,7 +6,9 @@ import { test, expect } from '../fixtures/test-base.js';
 // after load and keeps `class` and `data-*`, so the look-alikes below are put in
 // the DOM AFTER the page's own scripts have run, exactly as a description or
 // comment expanded by the user would be, covering the whole viewport. Every
-// click must be silent; then the page's own controls are shown to still act.
+// click must be silent. That the real controls still act is covered elsewhere:
+// copy/download/dispatch in periodicals.spec.js, queue remove in dispatch.spec.js,
+// +proxy in dispatch-page.spec.js, the settings toggle in feature-toggles.spec.js.
 
 let URL_KEY;
 const PROXY_FEAT = encodeURIComponent(JSON.stringify({ proxy: true }));
