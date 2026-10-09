@@ -97,7 +97,7 @@ test('a v3 doc (pre-LIN-1487) read-misses on both list and point reads so it reb
   // it 13 → 14, LIN-2891/LIN-3034 moved it 14 → 15, LIN-2891 F1 moved it 15 → 16
   // for the decision-aware `withdrawal` derivation); a lingering v3 archive doc
   // from before LIN-1487 must still miss on both reads.
-  assert.equal(BUILDER_VERSION, 16, 'this bump-specific pin tracks the current version');
+  assert.equal(BUILDER_VERSION, 17, 'this bump-specific pin tracks the current version');
   const doc = collection._docs.find(d => d.type === 'session');
   doc.builderVersion = 3;
 

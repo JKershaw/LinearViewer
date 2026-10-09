@@ -68,7 +68,9 @@ export function createProxyWriteRoutes({
   partialWriteFailed,
   logEvent,
   harbourCommentsStore = null,
+  onTicketWrite = null,
 }) {
+  // onTicketWrite (LIN-3366): optional ticket-closed closer seam, fire-and-forget; never changes a response.
   const router = Router();
 
   /**
@@ -343,6 +345,12 @@ export function createProxyWriteRoutes({
       flattenIssue(issueUpdate.issue);
       logEvent(req, '/api/proxy/issues/:id', 200);
       res.json(issueUpdate);
+      // Seam 1 (LIN-3366): a state write may have made the ticket terminal.
+      if (onTicketWrite && input.stateId) {
+        void Promise.resolve()
+          .then(() => onTicketWrite({ urlKey: req.proxyUrlKey, written: issueUpdate.issue, readBack: () => provider.fetchIssueContext(token, issueId) }))
+          .catch(e => console.error('[ticket-closer] seam 1 failure:', e?.message || e));
+      }
     } catch (err) {
       if (refResolutionFailed(req, res, '/api/proxy/issues/:id', err)) return;
       if (partialWriteFailed(req, res, '/api/proxy/issues/:id', err)) return;
@@ -866,6 +874,13 @@ export function createProxyWriteRoutes({
       if (writeRejected(req, res, '/api/proxy/issues/relations', issueRelationCreate, 'Relation was not created')) return;
       logEvent(req, '/api/proxy/issues/relations', 201);
       res.status(201).json(issueRelationCreate);
+      // Seam 4 (LIN-3366): a `duplicate` relation may move the source issue to
+      // Duplicate. Read it back once; a non-terminal result is a no-op.
+      if (onTicketWrite && type === 'duplicate') {
+        void Promise.resolve()
+          .then(() => onTicketWrite({ urlKey: req.proxyUrlKey, written: null, readBack: () => provider.fetchIssueContext(token, issueId) }))
+          .catch(e => console.error('[ticket-closer] seam 4 failure:', e?.message || e));
+      }
     } catch (err) {
       const status = graphqlErrorStatus(err, req);
       logEvent(req, '/api/proxy/issues/relations', status);

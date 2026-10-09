@@ -396,3 +396,49 @@ describe('stage rows: head, clocks and check-ins across a repaint (LIN-3356)', (
     assert.equal(details.opened, true);
   });
 });
+
+describe('repaintHeader keeps the load-time summary (LIN-3373)', () => {
+  const { repaintHeader } = load();
+  const SUMMARY = { id: 'summary' };
+
+  /** Just enough DOM: an answer node whose innerHTML swap drops its children. */
+  function makeAnswer({ withSummary }) {
+    const status = { appended: [], appendChild(n) { this.appended.push(n); } };
+    const answer = {
+      status,
+      fresh: false,
+      _html: '',
+      set innerHTML(html) { this._html = html; this.fresh = true; },
+      get innerHTML() { return this._html; },
+      querySelector(sel) {
+        if (sel === '[data-testid="task-page-summary"]') {
+          if (!this.fresh) return withSummary ? SUMMARY : null;
+          return this._html.includes('task-page-summary') ? SUMMARY : (status.appended.includes(SUMMARY) ? SUMMARY : null);
+        }
+        if (sel === '[data-testid="task-page-status"]') return status;
+        return null;
+      },
+      appendChild() { throw new Error('should append into the status block'); },
+    };
+    return answer;
+  }
+
+  test('a header with no summary does not delete the load-time one', () => {
+    const answer = makeAnswer({ withSummary: true });
+    repaintHeader(answer, '<div data-testid="task-page-status">running</div>');
+    assert.equal(answer.innerHTML, '<div data-testid="task-page-status">running</div>');
+    assert.deepEqual(answer.status.appended, [SUMMARY]);
+  });
+
+  test('a header that carries its own summary replaces it; nothing is re-added', () => {
+    const answer = makeAnswer({ withSummary: true });
+    repaintHeader(answer, '<div data-testid="task-page-status"><p data-testid="task-page-summary">new</p></div>');
+    assert.deepEqual(answer.status.appended, []);
+  });
+
+  test('no load-time summary: nothing is carried', () => {
+    const answer = makeAnswer({ withSummary: false });
+    repaintHeader(answer, '<div data-testid="task-page-status">x</div>');
+    assert.deepEqual(answer.status.appended, []);
+  });
+});

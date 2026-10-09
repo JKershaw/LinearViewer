@@ -1058,6 +1058,7 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
       dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
       sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
       followUpEnabled, dispatchedBy,
+      enqueueGuard: async () => null, // LIN-3383: the owner (these tests exercise the tool, not the gate)
       ...(proxyTokenStore !== undefined ? { proxyTokenStore, baseUrl: 'https://harbour.test' } : {}),
     });
     return { tools, executeTool, dispatchQueueStore };
@@ -1254,6 +1255,7 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
       dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
       sessionIsTerminal: mockSessionIsTerminal,
       followUpEnabled: true,
+      enqueueGuard: async () => null, // LIN-3383: the owner
     });
     return { executeTool, dispatchQueueStore };
   }
@@ -1497,6 +1499,7 @@ describe('LIN-2432 §A.4: send_follow_up followUpMode (execute/propose)', () => 
       dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
       sessionIsTerminal: (session) => (session.loops || []).some(l => l.terminalStatus === 'done'),
       followUpEnabled: true,
+      enqueueGuard: async () => null, // LIN-3383: the owner
       ...(followUpMode !== undefined ? { followUpMode } : {}),
     });
     return { ...catalog, dispatchQueueStore };

@@ -34,7 +34,9 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import express from 'express';
 import { createTaskChatRoutes } from '../../routes/task-chat.js';
+import { registerProvider } from '../../lib/providers/registry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROUTE_SRC = readFileSync(join(__dirname, '../../routes/task-chat.js'), 'utf8');
@@ -267,5 +269,133 @@ describe('task-chat saved-chats wiring (LIN-1008)', () => {
     // It IS wired into the task-chat route factory.
     const taskChatLine = SERVER_SRC.split('\n').find(l => l.includes('createTaskChatRoutes({'));
     assert.ok(taskChatLine && /savedChatStore/.test(taskChatLine), 'savedChatStore must be passed to createTaskChatRoutes');
+  });
+});
+
+// LIN-3383 (review): the route-level `enqueueGuard` closure. The tool's handling
+// of an injected guard is pinned in chat-tools.test.js; the census only sees that
+// the `enqueueGuard` token is present. Neither shows that the closure THIS route
+// builds consults the owner seam with the route's workspace id and the session's
+// account id — a guard that is present but always allows left the whole unit
+// suite green. This drives the real handler → real agent-turn core → real tool
+// catalog, with only the LLM transport (`chatClient`) and the stores faked.
+describe('LIN-3383: the Task Chat route enqueueGuard consults the owner seam (execute-mode send_follow_up)', () => {
+  const URL_KEY = 'acme';
+  const WORKSPACE_ID = 'ws-3383';
+  const ACCOUNT_ID = 'acct-member-1';
+  const PROVIDER_NAME = 'lin3383-task-chat-fake';
+  const T_DISPATCHED = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const T_DONE = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  registerProvider({
+    name: PROVIDER_NAME,
+    supports: () => true,
+    ui: { displayName: 'Fake' },
+    async fetchRecommendationContext(scope, issueId) {
+      return {
+        issue: { id: issueId, identifier: 'LIN-500', title: 'A task', description: '', state: { type: 'started', name: 'In Progress' }, labels: [], url: 'https://x/LIN-500' },
+        parent: null, siblings: [], project: null, children: [], comments: [], focusedChild: null,
+      };
+    },
+  });
+
+  function terminalSession(target) {
+    return [{
+      id: 'sess-done', promptName: 'implementation', kind: 'autopilot', prompt: 'prompt body',
+      issueId: 'uuid-500', issueIdentifier: 'LIN-500', issueTitle: 'A task',
+      issueUrl: 'https://linear.app/x/issue/LIN-500', workspace: { urlKey: URL_KEY },
+      dispatchedAt: T_DISPATCHED, dispatchedBy: 'user-1', target, repo: null, status: 'taken',
+      resolvedAt: T_DONE, feedback: [{ message: '[done] Task completed in 8s', timestamp: T_DONE }],
+    }];
+  }
+
+  function makeStores(history) {
+    const addItemCalls = [];
+    const dispatchQueueStore = {
+      getGrantDeclaration: async () => ({ state: 'none' }),
+      async listItems() { return []; },
+      async listHistory() { return { items: history, total: history.length }; },
+      async getItemStatus() { return null; },
+      async addItem(urlKey, item) {
+        addItemCalls.push({ urlKey, item });
+        return { _id: 'disp-new-1', dispatchedAt: new Date().toISOString(), ...item };
+      },
+    };
+    const agentStatusStore = { async listStatus() { return { items: [], total: 0 }; } };
+    return { dispatchQueueStore, agentStatusStore, addItemCalls };
+  }
+
+  // The "model" calls send_follow_up once and records what the tool returned or threw.
+  function chatClientCallingSendFollowUp(outcome) {
+    return {
+      async streamChat() { throw new Error('streamChat must not be used: the default model is tool-capable'); },
+      async streamChatWithTools(messages, opts, onEvent) {
+        try {
+          outcome.result = await opts.executeTool({ id: 'call-1', name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+        } catch (err) {
+          outcome.error = err;
+        }
+        onEvent('done', {});
+      },
+    };
+  }
+
+  async function runTurn({ verdict, history }) {
+    const stores = makeStores(history);
+    const ownerCalls = [];
+    const outcome = {};
+    const router = createTaskChatRoutes({
+      workspaceFromUrl: (req, res, next) => {
+        req.workspace = { id: WORKSPACE_ID, urlKey: URL_KEY, provider: PROVIDER_NAME, accessToken: 'tok' };
+        next();
+      },
+      dispatchQueueStore: stores.dispatchQueueStore,
+      agentStatusStore: stores.agentStatusStore,
+      chatClient: chatClientCallingSendFollowUp(outcome),
+      workspaceOwnerCheck: async (args) => { ownerCalls.push(args); return { status: verdict }; },
+    });
+    const app = express();
+    app.use(express.json());
+    app.use((req, res, next) => {
+      req.session = { features: { taskChat: true }, accountId: ACCOUNT_ID, openRouterApiKey: 'sk-test-paid-key' };
+      next();
+    });
+    app.use(router);
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server.once('listening', resolve));
+    try {
+      const { port } = server.address();
+      const res = await fetch(`http://127.0.0.1:${port}/workspace/${URL_KEY}/api/task-chat/LIN-500`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: 'please follow up on the run' }),
+      });
+      await res.text();
+      assert.strictEqual(res.status, 200);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    return { ...stores, ownerCalls, outcome };
+  }
+
+  test('a non-owner: the tool refuses with RUNNER_ENQUEUE_OWNER_ONLY, nothing is enqueued, and the seam saw the route workspace id and session account', async () => {
+    const { addItemCalls, ownerCalls, outcome } = await runTurn({ verdict: 'not-owner', history: terminalSession('cli') });
+
+    assert.strictEqual(addItemCalls.length, 0, 'a refused follow-up must not enqueue anything');
+    assert.ok(outcome.error, 'the tool call must throw for a non-owner');
+    assert.match(outcome.error.message, /send_follow_up refused \(RUNNER_ENQUEUE_OWNER_ONLY\)/);
+    assert.strictEqual(ownerCalls.length, 1);
+    assert.deepStrictEqual(ownerCalls[0], { workspaceId: WORKSPACE_ID, accountId: ACCOUNT_ID },
+      'the closure must pass the route\'s workspace.id and req.session.accountId to the owner seam');
+  });
+
+  test('the owner: exactly one item is enqueued for the anchor\'s cli target', async () => {
+    const { addItemCalls, ownerCalls, outcome } = await runTurn({ verdict: 'owner', history: terminalSession('cli') });
+
+    assert.strictEqual(outcome.error, undefined);
+    assert.strictEqual(addItemCalls.length, 1);
+    assert.strictEqual(addItemCalls[0].item.target, 'cli');
+    assert.strictEqual(addItemCalls[0].item.followUpTo, 'sess-done');
+    assert.strictEqual(ownerCalls.length, 1);
   });
 });

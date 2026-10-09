@@ -2284,7 +2284,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     assert.strictEqual(prefCalls.length, 1, 'exactly one resolveAiOperationModel-backing read per page load');
   });
 
-  test('LIN-3370: catalog models never reach the rendered <select> (curated-only markup), and match a no-catalog render', async () => {
+  test('LIN-3363: the combobox lists curated + catalog models (catalog ones tagged tools-off); an empty or failing catalog degrades to curated-only', async () => {
     const mk = (getModelCatalog) => buildApp({
       observerStateStore: fakeObserverStateStore({ censusDoc: null }),
       workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini', []),
@@ -2296,11 +2296,13 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     const rejecting = await get(mk(async () => { throw new Error('catalog down'); }), '/workspace/acme/flight-companion');
     assert.strictEqual(withCatalog.status, 200);
     assert.strictEqual(rejecting.status, 200, 'a failing loader degrades to curated-only, not the error page');
-    assert.doesNotMatch(withCatalog.text, /catalog-model-two|Catalog Model Two/);
-    const selectOf = (t) => t.match(/<select id="flight-companion-model-select"[\s\S]*?<\/select>/)[0];
-    assert.strictEqual(selectOf(withCatalog.text), selectOf(empty.text));
-    assert.strictEqual(selectOf(rejecting.text), selectOf(empty.text));
-    assert.match(selectOf(empty.text), /anthropic\/claude-opus-5/);
+    const listOf = (t) => t.match(/<ul id="flight-companion-model-list"[\s\S]*?<\/ul>/)[0];
+    const row = listOf(withCatalog.text).match(/<li[^>]*data-id="mock-provider\/catalog-model-two"[^>]*>/)[0];
+    assert.match(row, /data-tools="off"/, 'a catalog-only model is tools-off');
+    assert.doesNotMatch(listOf(empty.text), /catalog-model-two|Catalog Model Two/);
+    assert.strictEqual(listOf(rejecting.text), listOf(empty.text));
+    assert.match(listOf(empty.text), /data-id="anthropic\/claude-opus-5"/);
+    assert.doesNotMatch(listOf(empty.text).match(/<li[^>]*data-id="anthropic\/claude-opus-5"[^>]*>/)[0], /data-tools/);
   });
 
   // LIN-2623 R1 (review, PR #1442) — the mandated red-first case: before the
@@ -2329,7 +2331,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     assert.doesNotMatch(text, /fc-strip-model">model: <code>openai\/gpt-5\.4-mini<\/code><\/span>/);
     assert.match(text, /fc-strip-tools">tools: off</);
     assert.doesNotMatch(text, /fc-strip-tools">tools: on</);
-    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="false">⚠/);
   });
 
   test('the rendered strip reports an uncurated model as tools off', async () => {
@@ -2383,17 +2385,17 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
       flightCompanionEnabled: true,
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
-    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="false">⚠/);
   });
 
-  test('a curated workspace default renders no tools-off warning', async () => {
+  test('a curated workspace default still emits the tools-off warning, hidden (LIN-3363)', async () => {
     const app = buildApp({
       observerStateStore: fakeObserverStateStore({ censusDoc: null }),
       workspacePreferencesStore: fakeWorkspacePreferencesStore('openai/gpt-5.4-mini'),
       flightCompanionEnabled: true,
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
-    assert.doesNotMatch(text, /fc-strip-tools-warning/);
+    assert.match(text, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="true" hidden>⚠/);
   });
 
   test('the picker renders every curated model as a selectable option', async () => {
@@ -2404,7 +2406,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     const { text } = await get(app, '/workspace/acme/flight-companion');
     for (const m of AVAILABLE_MODELS) {
-      assert.ok(text.includes(`value="${m.id}"`), `expected an <option> for ${m.id}`);
+      assert.ok(text.includes(`data-id="${m.id}"`), `expected an option row for ${m.id}`);
     }
   });
 
@@ -2416,7 +2418,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: 'free-tier-test-key' }, async () => {
       const { text } = await get(app, '/workspace/acme/flight-companion');
-      assert.match(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled>/);
+      assert.match(text, /<input type="search" id="flight-companion-model-search"[^>]* disabled>/);
       assert.match(text, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">/);
     });
   });
@@ -2429,7 +2431,7 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
     });
     await withEnv({ OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: undefined }, async () => {
       const { text } = await get(app, '/workspace/acme/flight-companion');
-      assert.doesNotMatch(text, /flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled/);
+      assert.doesNotMatch(text.match(/<input type="search" id="flight-companion-model-search"[^>]*>/)[0], /disabled/);
       assert.doesNotMatch(text, /fc-strip-freetier/);
     });
   });
@@ -2469,5 +2471,98 @@ describe('Flight Companion turn endpoint (LIN-3362) — hop text, parallel reads
       assert.match(system, /\d{2}:\d{2} UK\)/, JSON.stringify(timeZone));
       assert.ok(!system.includes('## ignore'));
     }
+  });
+});
+
+// LIN-3383 (review): the route-level `enqueueGuard` closure for a user-initiated
+// reply. The tool's handling of an injected guard is pinned in chat-tools.test.js
+// and the census only sees the `enqueueGuard` token; neither shows that the
+// closure THIS route builds consults the owner seam with the route's workspace
+// id and the session's account id. A guard that is present but always allows
+// left the whole unit suite green. This drives the real handler → real
+// agent-turn core → real tool catalog, faking only the LLM transport
+// (`chatClient`) and the stores.
+describe('LIN-3383: the Flight Companion turn route enqueueGuard consults the owner seam (execute-mode send_follow_up)', () => {
+  const WORKSPACE_ID = 'ws-3383';
+  const ACCOUNT_ID = 'acct-member-1';
+  const T_DISPATCHED = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const T_DONE = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  const terminalCliSession = () => [{
+    id: 'sess-done', promptName: 'implementation', kind: 'autopilot', prompt: 'prompt body',
+    issueId: 'uuid-500', issueIdentifier: 'LIN-500', issueTitle: 'A task',
+    issueUrl: 'https://linear.app/x/issue/LIN-500', workspace: { urlKey: 'acme' },
+    dispatchedAt: T_DISPATCHED, dispatchedBy: 'user-1', target: 'cli', repo: null, status: 'taken',
+    resolvedAt: T_DONE, feedback: [{ message: '[done] Task completed in 8s', timestamp: T_DONE }],
+  }];
+
+  async function runReply(verdict) {
+    const history = terminalCliSession();
+    const addItemCalls = [];
+    const ownerCalls = [];
+    const outcome = {};
+    const dispatchQueueStore = {
+      getGrantDeclaration: async () => ({ state: 'none' }),
+      async listItems() { return []; },
+      async listHistory() { return { items: history, total: history.length }; },
+      async getItemStatus() { return null; },
+      async addItem(urlKey, item) {
+        addItemCalls.push({ urlKey, item });
+        return { _id: 'disp-new-1', dispatchedAt: new Date().toISOString(), ...item };
+      },
+    };
+    const chatClient = {
+      async streamChat() { throw new Error('streamChat must not be used: the default model is tool-capable'); },
+      async streamChatWithTools(messages, opts, onEvent) {
+        try {
+          outcome.result = await opts.executeTool({ id: 'call-1', name: 'send_follow_up', arguments: { sessionId: 'sess-done', prompt: 'ship it' } });
+        } catch (err) {
+          outcome.error = err;
+        }
+        onEvent('done', {});
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    app.use((req, res, next) => {
+      req.session = { features: { flightCompanion: true }, workspaces: [{ urlKey: 'acme' }], accountId: ACCOUNT_ID, openRouterApiKey: 'sk-test-paid-key' };
+      next();
+    });
+    app.use(createFlightCompanionRoutes({
+      workspaceFromUrl: (req, res, next) => { req.workspace = { id: WORKSPACE_ID, urlKey: 'acme' }; next(); },
+      getOpenRouterSource: () => null,
+      getDeployInfo: () => ({}),
+      getModelCatalog: async () => [],
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: { async tryUse() { throw new Error('tryUse must not be called — a paid session key is present'); } },
+      dispatchQueueStore,
+      agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
+      chatClient,
+      workspaceOwnerCheck: async (args) => { ownerCalls.push(args); return { status: verdict }; },
+    }));
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', { message: 'please follow up on the run' });
+    assert.strictEqual(status, 200);
+    return { addItemCalls, ownerCalls, outcome };
+  }
+
+  test('a non-owner: the tool refuses with RUNNER_ENQUEUE_OWNER_ONLY, nothing is enqueued, and the seam saw the route workspace id and session account', async () => {
+    const { addItemCalls, ownerCalls, outcome } = await runReply('not-owner');
+
+    assert.strictEqual(addItemCalls.length, 0, 'a refused follow-up must not enqueue anything');
+    assert.ok(outcome.error, 'the tool call must throw for a non-owner');
+    assert.match(outcome.error.message, /send_follow_up refused \(RUNNER_ENQUEUE_OWNER_ONLY\)/);
+    assert.strictEqual(ownerCalls.length, 1);
+    assert.deepStrictEqual(ownerCalls[0], { workspaceId: WORKSPACE_ID, accountId: ACCOUNT_ID },
+      'the closure must pass the route\'s workspace.id and req.session.accountId to the owner seam');
+  });
+
+  test('the owner: exactly one item is enqueued for the anchor\'s cli target', async () => {
+    const { addItemCalls, ownerCalls, outcome } = await runReply('owner');
+
+    assert.strictEqual(outcome.error, undefined);
+    assert.strictEqual(addItemCalls.length, 1);
+    assert.strictEqual(addItemCalls[0].item.target, 'cli');
+    assert.strictEqual(addItemCalls[0].item.followUpTo, 'sess-done');
+    assert.strictEqual(ownerCalls.length, 1);
   });
 });

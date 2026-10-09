@@ -16,7 +16,7 @@ import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } f
 import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
-import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
 import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
@@ -24,6 +24,7 @@ import { isValidIssueId, UUID_REGEX, dispatchIssueSourceField } from '../lib/wor
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { buildRunGate } from '../lib/chat-request.js';
+import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -57,7 +58,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // row — `{ wouldSkip, reason }` — or null on every non-wake row. It is a
 // READ-ONLY annotation: the shadow is recorded at mint time and nothing here
 // can suppress a wake.
-function formatDispatchWatch(item, meta = null, wakeShadow = null) {
+function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerLastSeenAt = null) {
   // LIN-2079: the REPORTED status is the lifecycle one (terminal, else `blocked`
   // when the lineage is parked on a human). `item.feedback` is already
   // lineage-merged by getItemStatus({includeGroupFeedback:true}).
@@ -107,14 +108,13 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null) {
     // LIN-3364: the closed-row fact (`bookkeeping` stamp), normalised to the documented enum.
     ...closedProjection(item.bookkeeping),
     // Consumer poll-recency stamp + derived warning (LIN-2885): the stamp is
-    // whatever createDispatchItem persisted at enqueue time; the warning is
-    // re-derived against the CURRENT clock each read (via the same pure
-    // buildConsumerPollWarning the 201 responses use), so a queued item that
-    // grows stale while sitting unpolled surfaces that on every subsequent
-    // watch, not just at dispatch time. null when the workspace is (or has
-    // become) actively polled.
+    // whatever createDispatchItem persisted at enqueue time (informational).
+    // LIN-3367: the warning is derived from the LIVE poll recency
+    // (`liveConsumerLastSeenAt`, read by the caller) against the CURRENT clock,
+    // and ONLY while the row is still queued — null once it is taken/terminal/
+    // closed, and null when the workspace is (or has become) actively polled.
     consumerLastSeenAt: item.consumerLastSeenAt || null,
-    consumerPollWarning: buildConsumerPollWarning(item.consumerLastSeenAt || null),
+    consumerPollWarning: buildQueuedPollWarning(terminalStatus || item.status, liveConsumerLastSeenAt),
     feedback: (item.feedback || []).map(f => {
       const entry = {
         message: f.message,
@@ -1664,6 +1664,11 @@ export function createDispatchRoutes({
         return bt - at;
       });
 
+      // LIN-3367: live poll recency, once per list request (async, lists tokens) —
+      // only needed when some returned row is still queued.
+      const liveConsumerLastSeenAt = filtered.slice(0, limit).some(i => i.status === 'queued')
+        ? await getConsumerLastSeenAt(dispatchTokenStore, req.proxyUrlKey, proxyTokenStore)
+        : null;
       const items = filtered.slice(0, limit).map(i => ({
         id: i.id,
         status: i.status,
@@ -1694,8 +1699,9 @@ export function createDispatchRoutes({
         // fields, same pure derivation as the `:id` watch endpoint above, so a
         // lean-list reader doesn't need a second GET to see whether a queued
         // row is sitting unpolled.
+        // LIN-3367: warning from the live stamp (read once above), queued rows only.
         consumerLastSeenAt: i.consumerLastSeenAt || null,
-        consumerPollWarning: buildConsumerPollWarning(i.consumerLastSeenAt || null)
+        consumerPollWarning: buildQueuedPollWarning(i.status, liveConsumerLastSeenAt)
       }));
 
       logEvent(req, '/api/proxy/dispatch', 200);
@@ -1778,6 +1784,11 @@ export function createDispatchRoutes({
       const wakeShadow = item.kind === 'wake'
         ? await dispatchQueueStore.getWakeShadow(req.proxyUrlKey, item.id)
         : null;
+      // LIN-3367: live poll recency for the queued-only warning, read once per
+      // response (at the point the snapshot is final), and only for a queued row.
+      const liveSeen = async (row) => (deriveWireStatus(row) || row.status) === 'queued'
+        ? getConsumerLastSeenAt(dispatchTokenStore, req.proxyUrlKey, proxyTokenStore)
+        : null;
       const alreadyTerminal = deriveWireTerminal(current) !== null;
       if (waitSeconds > 0) {
         // Long-poll path. The response carries `reason`/`waitedMs` so the caller
@@ -1786,7 +1797,7 @@ export function createDispatchRoutes({
         // 'timeout'.
         if (alreadyTerminal) {
           logEvent(req, '/api/proxy/dispatch/:id', 200);
-          return res.json(formatDispatchWatch(current, { reason: 'terminal', waitedMs: 0 }, wakeShadow));
+          return res.json(formatDispatchWatch(current, { reason: 'terminal', waitedMs: 0 }, wakeShadow, await liveSeen(current)));
         }
         // Hold the request open. armKeepalive flushes 200 + JSON whitespace at
         // 25s so the connection survives Heroku's 30s H12 while we wait; the
@@ -1813,11 +1824,11 @@ export function createDispatchRoutes({
           if (dispatchWatchChanged(baseline, current)) { reason = 'change'; break; }
         }
         logEvent(req, '/api/proxy/dispatch/:id', 200);
-        return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }, wakeShadow));
+        return keepalive.send(200, formatDispatchWatch(current, { reason, waitedMs: Date.now() - waitStart }, wakeShadow, await liveSeen(current)));
       }
 
       logEvent(req, '/api/proxy/dispatch/:id', 200);
-      res.json(formatDispatchWatch(current, null, wakeShadow));
+      res.json(formatDispatchWatch(current, null, wakeShadow, await liveSeen(current)));
     } catch (err) {
       logEvent(req, '/api/proxy/dispatch/:id', 500);
       console.error('Proxy dispatch watch error:', err.message);
@@ -1870,7 +1881,8 @@ export function createDispatchRoutes({
         id: item.id,
         promptName: item.promptName,
         kind: item.kind || 'custom',
-        prompt: item.prompt || null,
+        // LIN-3384: only the row's own dispatcher sees its prose unmasked.
+        prompt: redactSessionItem({ prompt: item.prompt, dispatchedBy: item.dispatchedBy }, req.proxyCreatedBy).prompt || null,
         issueIdentifier: item.issueIdentifier || null,
         issueUrl: item.issueUrl || null,
         target: item.target,

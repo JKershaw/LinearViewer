@@ -40,13 +40,15 @@ import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
-import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
+import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { DISPATCH_RUNGS, SURFACES } from '../lib/task-mode-store.js';
 import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
+import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -265,6 +267,28 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
       if (target !== undefined && !VALID_TARGETS.includes(target)) {
         return badRequest.json(res, `target must be one of: ${VALID_TARGETS.join(', ')}`);
+      }
+
+      // LIN-3383 owner-only runner enqueue. Every write below (fresh, followUpTo,
+      // abort and the cascade expansion) is consumed by the owner's runner when
+      // target is cli/web (absent = cli), so only the workspace owner may reach
+      // them. Ahead of every write, provider call and run gate: a refusal spends
+      // nothing. dash/local pass untouched; an abort to dash stays ungated.
+      const enqueueRefusal = await resolveRunnerEnqueueRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: workspace.id,
+        accountId: req.session?.accountId,
+        target: target ?? 'cli'
+      });
+      if (enqueueRefusal) {
+        console.warn(
+          `Dispatch enqueue refused: ${enqueueRefusal.code} (urlKey=${workspace.urlKey}) — LIN-3383`
+        );
+        return jsonError(res, enqueueRefusal.status, enqueueRefusal.error, {
+          code: enqueueRefusal.code,
+          category: enqueueRefusal.category,
+          retryable: enqueueRefusal.retryable
+        });
       }
 
       // Abort eligibility (LIN-743): the abort item's OWN target must be
@@ -957,12 +981,22 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     try {
       const items = await dispatchQueueStore.listItems(workspace.urlKey);
       // Consumer poll-recency warning (LIN-2885), derived fresh against the
-      // current clock from each item's own enqueue-time stamp — same pure
-      // function the proxy watch/list endpoints use — so the dispatch page's
-      // queue list and the nav-badge popover (both rendered off this response
-      // via window.renderQueueRow) can show "no runner has polled..." on a
-      // stale queued row without duplicating the threshold logic client-side.
-      res.json({ items: items.map(item => ({ ...item, consumerPollWarning: buildConsumerPollWarning(item.consumerLastSeenAt) })) });
+      // current clock from the LIVE poll recency (LIN-3367: read once per
+      // request, not per row; queued rows only) — same helper the proxy
+      // watch/list endpoints use — so the dispatch page's queue list and the
+      // nav-badge popover (both rendered off this response via
+      // window.renderQueueRow) can show "no runner has polled..." on a stale
+      // queued row without duplicating the threshold logic client-side. This
+      // collection is the queue itself, so every row here is queued and the
+      // status gate is a no-op; it is routed through the shared helper so the
+      // rule lives in one place.
+      const liveLastSeenAt = items.length
+        ? await getConsumerLastSeenAt(dispatchTokenStore, workspace.urlKey, proxyTokenStore)
+        : null;
+      // LIN-3384: session-readable — the live bootstrap token never leaves on this route
+      // (runner poll/take is the only token-bearing path).
+      const callerId = req.session?.accountId || null;
+      res.json({ items: items.map(item => ({ ...redactSessionItem(item, callerId), consumerPollWarning: buildQueuedPollWarning('queued', liveLastSeenAt) })) });
     } catch (err) {
       console.error('List dispatch items error:', err.message);
       jsonError(res, 500, 'Failed to list dispatch items');
@@ -1026,7 +1060,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
       const result = await dispatchQueueStore.listHistory(workspace.urlKey, { limit, offset });
-      res.json(result);
+      // LIN-3384: mask prose-mode bootstrap lines in non-owned prompts.
+      res.json({ ...result, items: redactSessionItems(result.items, req.session?.accountId || null) });
     } catch (err) {
       console.error('List dispatch history error:', err.message);
       jsonError(res, 500, 'Failed to list dispatch history');
@@ -1364,7 +1399,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       );
 
       if (result.ok) {
-        return res.json({ success: true, item: result.item });
+        return res.json({ success: true, item: redactSessionItem(result.item, req.session?.accountId || null) });
       }
       if (result.reason === 'not-found') {
         return notFound.json(res, 'Run not found');

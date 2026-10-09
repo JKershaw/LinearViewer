@@ -152,13 +152,34 @@ describe('C4 — declared-mint tokens are confined to the mechanism modules', ()
     assert.notDeepEqual(scanC4(mutated), []);
   });
 
-  test('_formatItem / _formatHistoryItem bodies contain no spread and neither token', () => {
+  // Throws on the first violated invariant; the real test and its mutation witness
+  // both go through it, so deleting an assertion here turns the witness red.
+  const checkFormatterBody = (name, body) => {
+    assert.ok(!/\.\.\./.test(body), `${name} must contain no spread`);
+    assert.ok(!body.includes('grantRefusal'), `${name} must not mention grantRefusal`);
+    // LIN-3384: the one permitted mention of grantDeclaration is the sparse
+    // boolean marker — the record itself never rides a projection.
+    const code = body.split('\n').filter(l => !l.trim().startsWith('//')).join('\n');
+    assert.equal((code.match(/grantDeclaration/g) || []).length, 1, `${name}: exactly one grantDeclaration mention`);
+    assert.equal(
+      (code.match(/if \(doc\.grantDeclaration != null\) item\.declaredMint = true;/g) || []).length, 1,
+      `${name}: the one mention is the declaredMint marker assignment`
+    );
+    assert.equal((code.match(/declaredMint/g) || []).length, 1, `${name}: exactly one declaredMint assignment`);
+  };
+
+  test('_formatItem / _formatHistoryItem bodies contain no spread, no grantRefusal, and exactly one declaredMint assignment', () => {
     const storeSrc = readFileSync(join(REPO, 'lib', 'dispatch-store.js'), 'utf8');
     for (const name of ['_formatItem', '_formatHistoryItem']) {
-      const body = extractMethod(storeSrc, name);
-      assert.ok(!/\.\.\./.test(body), `${name} must contain no spread`);
-      assert.ok(!body.includes('grantDeclaration'), `${name} must not mention grantDeclaration`);
-      assert.ok(!body.includes('grantRefusal'), `${name} must not mention grantRefusal`);
+      checkFormatterBody(name, extractMethod(storeSrc, name));
+    }
+  });
+
+  test('mutation: a second grantDeclaration use in a formatter body is caught', () => {
+    const storeSrc = readFileSync(join(REPO, 'lib', 'dispatch-store.js'), 'utf8');
+    for (const name of ['_formatItem', '_formatHistoryItem']) {
+      const mutated = extractMethod(storeSrc, name) + '\n    item.x = doc.grantDeclaration;';
+      assert.throws(() => checkFormatterBody(name, mutated), /exactly one grantDeclaration mention/);
     }
   });
 });

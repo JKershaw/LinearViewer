@@ -82,6 +82,9 @@ import { ReportHistoryStore } from './lib/report-history-store.js'
 import { ShipBiscuitHistoryStore } from './lib/ship-biscuit-history-store.js'
 import { TaskSnapshotStore } from './lib/task-snapshot-store.js'
 import { TaskDecisionsStore } from './lib/task-decisions-store.js'
+import { createOnTicketWrite } from './lib/ticket-close-closer.js'
+import { createTicketCloseSweepRun } from './lib/ticket-close-sweep.js'
+import { createReadTicketState } from './lib/ticket-state-reader.js'
 import { ShelvedRulingsStore } from './lib/shelved-rulings-store.js'
 import { DismissalSuggestionsStore } from './lib/dismissal-suggestions-store.js'
 import { HarbourCommentsStore } from './lib/harbour-comments-store.js'
@@ -914,6 +917,38 @@ scheduler.register({
 // state is diagnosable rather than inferred.
 }).catch((err) => {
   console.error(`[liveness-alarm-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// Owner-blind provider read for the unattended sweep (same resolver as the
+// dispatch anchor guard). Returns `{issueId, stateType}` or null for ANY
+// failure or non-`ok` resolution: a null read closes nothing. Passes the
+// structured scope to the provider (lib/ticket-state-reader.js).
+const readTicketState = createReadTicketState({ resolveWorkspaceAccess, getProviderForWorkspace, unscoped: UNSCOPED })
+
+// Ticket-closed sweep (LIN-3366): every 10 minutes per workspace with dispatch
+// rows. Reads each candidate ticket's state (least-recently-read first, capped
+// per workspace) and, for a terminal one, closes its quiet blocked/silent rows
+// and withdraws its open rulings. Unattended, so it fails closed: an unreadable
+// ticket or an unverifiable legacy digest closes nothing.
+const TICKET_CLOSED_SWEEP_INTERVAL_MS = 10 * 60 * 1000
+const TICKET_CLOSED_SWEEP_LEASE_MS = 5 * 60 * 1000
+scheduler.register({
+  name: 'ticket-closed-sweep',
+  intervalMs: TICKET_CLOSED_SWEEP_INTERVAL_MS,
+  leaseMs: TICKET_CLOSED_SWEEP_LEASE_MS,
+  run: createTicketCloseSweepRun({
+    dispatchStore: dispatchQueueStore,
+    taskDecisionsStore,
+    agentStatusStore,
+    sessionsFeedCache,
+    readTicketState,
+    intervalMs: TICKET_CLOSED_SWEEP_INTERVAL_MS,
+    leaseMs: TICKET_CLOSED_SWEEP_LEASE_MS
+  })
+// Same discipline as the sweeps above: not awaited, with a purpose-written
+// catch so a silent-never-runs state is diagnosable rather than inferred.
+}).catch((err) => {
+  console.error(`[ticket-closed-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
 // =============================================================================
@@ -2930,31 +2965,44 @@ async function getNorthStarDocVersionForWorkspace(urlKey, accountId) {
   return resolveNorthStarDocVersion(userPreferencesStore, urlKey, accountId);
 }
 
-app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, livenessAlarmStore }))
+// Ticket-closed closer (LIN-3366). `onTicketWrite` is the fast path the four
+// ticket-write seams call (fire-and-forget); the `ticket-closed-sweep` below is
+// the load-bearing path (tracker-UI changes have no webhook). Both close rows
+// and withdraw decisions only for a ticket whose state type is terminal.
+const onTicketWrite = createOnTicketWrite({
+  dispatchStore: dispatchQueueStore,
+  taskDecisionsStore,
+  sessionsFeedCache,
+  agentStatusStore
+})
+app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, livenessAlarmStore, onTicketWrite }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
 // runner prompt to fetch and verify against its sha256 pins (routes/runner-kit.js).
 app.use(createRunnerKitRoutes())
 
 // Mount workspace API routes (audit, prompts, recommendations, comments, images)
-app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore }))
+// LIN-3383: workspace-api, collective, dashboard, task-chat and flight-companion
+// all receive the ONE hoisted `workspaceOwnerCheck` (never a second
+// createWorkspaceOwnerCheck) for the owner-only runner enqueue gate.
+app.use(createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore, sessionsFeedCache, ownerCredentialStore, accountStore, adoptConnectionCredential: (args) => connectionAccess.adoptConnectionCredential(args), closeOutEventsStore, workspaceOwnerCheck, onTicketWrite }))
 
 // Mount collective routes (experimental cross-project discussion — LIN-450).
 // yapClient is null when YAP_BASE_URL is unset; the routes degrade gracefully.
 const yapClient = yapClientFromEnv()
-app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo, workspacePreferencesStore }))
+app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyTokenStore, collectiveCharactersStore, collectivePresetsStore, yapClient, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, workspaceOwnerCheck }))
 
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the
 // `list_pending_decisions` chat tool the same way createFlightCompanionRoutes
 // already does below (LIN-2617) — Task Chat now builds its catalog through the
 // same createChatToolCatalog call the turn core makes for every surface.
-app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore }))
+app.use(createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, workspaceOwnerCheck }))
 
 // Mount the task-edit page (LIN-1565) — the dedicated drill-down that replaces
 // the inline edit form formerly hidden inside a tree row's Details panel. No
@@ -2971,7 +3019,7 @@ app.use(createTaskCreateRoutes({ workspaceFromUrl, getOpenRouterSource, getDeplo
 // MUST mount after createTaskCreateRoutes: ISSUE_ID_REGEX accepts `new`, so
 // `/task/:identifier` would otherwise swallow `/task/new`. `enrichLoop` and
 // `deriveSessionWaiting` are injected (a lib/ loader must not import a route).
-const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, enrichLoop, deriveSessionWaiting })
+const taskPageLoader = createTaskPageLoader({ dispatchStore: dispatchQueueStore, agentStatusStore, briefCacheStore, recapCacheStore, readRunEvidence, prStateStore, closeOutEventsStore, enrichLoop, deriveSessionWaiting })
 app.use(createTaskPageRoutes({
   workspaceFromUrl,
   getOpenRouterSource,
@@ -3007,7 +3055,7 @@ app.use(createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspacePreferen
 // `list_pending_decisions` chat tool needs to return the same rows the rulings
 // feed returns. LIN-2966 threads the same pair into createTaskChatRoutes above,
 // so both surfaces' catalogs now answer that tool identically.
-app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore }))
+app.use(createFlightCompanionRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo, observerStateStore, freeTierStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, workspaceOwnerCheck }))
 
 // Mount passage-planner routes (experimental one-click kickoff prompt, Flight Companion parity — LIN-1849).
 app.use(createPassagePlannerRoutes({ workspaceFromUrl, getOpenRouterSource, getDeployInfo }))

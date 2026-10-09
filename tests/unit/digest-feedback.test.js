@@ -950,3 +950,33 @@ describe('digestFeedback: carries withdrawal (LIN-2891/LIN-3034)', () => {
     assert.strictEqual(digest.withdrawal?.decisionId, 'd2', 'the digest withdrawal names the current decision, never the later moot d1');
   });
 });
+
+// ─── withdrawalReversed (LIN-3366) ──────────────────────────────────────────
+import { _findReversedDecisionIds } from '../../lib/digest-feedback.js';
+
+describe('withdrawalReversed digest fact (LIN-3366)', () => {
+  const at = (n) => new Date(Date.UTC(2026, 9, 1, 0, n)).toISOString();
+  const decision = (id) => ({ kind: 'decision', message: JSON.stringify({ decision_id: id, question: 'q', options: [] }), timestamp: at(1) });
+  const withdrawn = (id) => ({ kind: 'decision-withdrawn', message: JSON.stringify({ decision_id: id, reason: 'r' }), timestamp: at(2) });
+  const reversed = (id) => ({ kind: 'decision-withdrawal-reversed', message: JSON.stringify({ decision_id: id }), timestamp: at(3) });
+
+  test('true for a reversed CURRENT decision', () => {
+    assert.equal(deriveLoopFacingFacts([decision('d1'), withdrawn('d1'), reversed('d1')], at(0)).withdrawalReversed, true);
+  });
+  test('false for a reversed MOOT decision, a never-withdrawn one, and a row with no decision', () => {
+    assert.equal(deriveLoopFacingFacts([decision('d1'), withdrawn('d1'), reversed('d1'), decision('d2')], at(0)).withdrawalReversed, false);
+    assert.equal(deriveLoopFacingFacts([decision('d1')], at(0)).withdrawalReversed, false);
+    assert.equal(deriveLoopFacingFacts([], at(0)).withdrawalReversed, false);
+  });
+  test('regardless of whether the reversal entry precedes the withdrawal it cancels', () => {
+    assert.equal(deriveLoopFacingFacts([decision('d1'), reversed('d1'), withdrawn('d1')], at(0)).withdrawalReversed, true);
+  });
+  test('digestFeedback stores the boolean beside withdrawal; _findReversedDecisionIds ignores malformed stamps', () => {
+    const fb = [decision('d1'), withdrawn('d1'), reversed('d1'), { kind: 'decision-withdrawal-reversed', message: 'not json', timestamp: at(4) }];
+    const digest = digestFeedback({ feedback: fb, dispatchedAt: at(0) }, { now: Date.now() });
+    assert.equal(digest.withdrawalReversed, true);
+    assert.equal(digest.withdrawal, null);
+    assert.deepEqual([..._findReversedDecisionIds(fb)], ['d1']);
+    assert.equal(digestFeedback({ feedback: [decision('d1')], dispatchedAt: at(0) }, { now: Date.now() }).withdrawalReversed, false);
+  });
+});

@@ -144,16 +144,20 @@
   // handling below) — the whole point being that a silent tick's cost is
   // otherwise invisible nowhere else on the page.
   var tabTotalEl = document.getElementById('flight-companion-strip-tab-total');
-  // LIN-2623 beat 3: the per-turn model picker + its rate-card mount —
-  // server-rendered (lib/render-flight-companion.js's renderStatusStrip)
-  // with a leading, always-selected-by-default EMPTY-value option ("current
-  // default") followed by the curated options `resolveTurnModelOverride`
-  // (routes/flight-companion.js) accepts. An empty `.value` means "no
-  // override" — never resolved to some other curated id client-side, so an
-  // untouched picker cannot silently swap the workspace's real (possibly
-  // uncurated) default for a curated stand-in. Optional-guarded like every
-  // other strip mount here.
-  var modelSelectEl = document.getElementById('flight-companion-model-select');
+  // LIN-2623 beat 3 / LIN-3363 S2: the per-turn model picker + its rate-card
+  // mount — a server-rendered combobox (lib/render-flight-companion.js's
+  // renderStatusStrip): a visible search input, an in-flow listbox of every
+  // model `resolveTurnModelOverride` (routes/flight-companion.js) accepts
+  // (curated OR in the live catalog), and a hidden input holding the
+  // COMMITTED choice. `modelSelectEl` is that hidden input: an empty `.value`
+  // means "no override" — never resolved to some other id client-side, so an
+  // untouched picker cannot silently swap the workspace's real default for a
+  // stand-in. Only a list pick writes it; typed text commits nothing.
+  // Optional-guarded like every other strip mount here.
+  var modelSelectEl = document.getElementById('flight-companion-model');
+  var modelSearchEl = document.getElementById('flight-companion-model-search');
+  var modelListEl = document.getElementById('flight-companion-model-list');
+  var toolsWarningEl = document.getElementById('flight-companion-tools-warning');
   var modelPriceEl = document.getElementById('flight-companion-model-price');
 
   if (!thread || !questionInput || !sendBtn) return;
@@ -792,30 +796,156 @@
     tabTotalEl.hidden = !(tabCheckInCount > 0);
   }
 
-  // LIN-2623 beat 3: mirrors lib/render-settings.js's own inline model-select
-  // updater byte-for-byte in idiom — the selected <option>'s own `data-
-  // pricing` attribute (server-rendered, never fabricated client-side) is
-  // the ONLY source for this text, so a model with no known rate renders the
-  // SAME `—` fallback the server itself would have rendered for it.
-  function updateModelPriceDisplay() {
-    if (!modelSelectEl || !modelPriceEl) return;
-    var opt = modelSelectEl.options && modelSelectEl.options[modelSelectEl.selectedIndex];
-    modelPriceEl.textContent = (opt && opt.getAttribute && opt.getAttribute('data-pricing')) || '—';
+  function modelOptionEls() {
+    return modelListEl && modelListEl.querySelectorAll ? Array.prototype.slice.call(modelListEl.querySelectorAll('[role="option"]')) : [];
   }
 
-  if (modelSelectEl) {
-    modelSelectEl.addEventListener('change', function () {
-      updateModelPriceDisplay();
-      // Persisted immediately (not only at the next finishTurn) so a pick
-      // survives a reload even before the human sends anything with it —
-      // "the selection persists across a reload" (LIN-2623 beat 3) reads as
-      // a property of the CHOICE, not of having already sent a turn with it.
-      if (urlKey) {
-        saveStoredSession(urlKey, {
-          history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
-          selectedModel: modelSelectEl.value,
-        });
+  function findModelOption(id) {
+    var opts = modelOptionEls();
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].getAttribute('data-id') === id) return opts[i];
+    }
+    return null;
+  }
+
+  // The committed option's own `data-pricing` (server-rendered, never
+  // fabricated client-side) is the ONLY source for this text, so a model with
+  // no known rate renders the SAME `—` fallback the server itself would have.
+  function updateModelPriceDisplay() {
+    if (!modelSelectEl || !modelPriceEl) return;
+    var opt = findModelOption(modelSelectEl.value || '');
+    modelPriceEl.textContent = (opt && opt.getAttribute('data-pricing')) || '—';
+  }
+
+  // LIN-3363 S2: the tools-off warning follows the pick. Hidden iff the model
+  // that will actually run is tools-on: the pick's own `data-tools`, or the
+  // server-resolved default (`data-default-tools-on`) when nothing is picked.
+  // The free tier ignores any stored pick (the clamp makes the default the
+  // only model that runs), so the picker being disabled falls back to default.
+  function updateToolsWarning() {
+    if (!toolsWarningEl) return;
+    var defaultOn = toolsWarningEl.getAttribute('data-default-tools-on') !== 'false';
+    var opt = modelSelectEl && modelSelectEl.value && !(modelSearchEl && modelSearchEl.disabled)
+      ? findModelOption(modelSelectEl.value) : null;
+    toolsWarningEl.hidden = opt ? opt.getAttribute('data-tools') !== 'off' : defaultOn;
+  }
+
+  function persistModelChoice() {
+    // Persisted immediately (not only at the next finishTurn) so a pick
+    // survives a reload even before the human sends anything with it —
+    // "the selection persists across a reload" (LIN-2623 beat 3) reads as
+    // a property of the CHOICE, not of having already sent a turn with it.
+    if (!urlKey || !modelSelectEl) return;
+    saveStoredSession(urlKey, {
+      history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
+      selectedModel: modelSelectEl.value,
+    });
+  }
+
+  var modelActiveIdx = -1;
+
+  function visibleModelOptions() {
+    return modelOptionEls().filter(function (o) { return !o.hidden; });
+  }
+
+  function setActiveModelOption(idx) {
+    var vis = visibleModelOptions();
+    modelOptionEls().forEach(function (o) { o.classList.remove('fc-model-option--active'); });
+    modelActiveIdx = vis.length ? Math.max(0, Math.min(idx, vis.length - 1)) : -1;
+    if (modelActiveIdx < 0) {
+      if (modelSearchEl) modelSearchEl.removeAttribute('aria-activedescendant');
+      return;
+    }
+    var el = vis[modelActiveIdx];
+    el.classList.add('fc-model-option--active');
+    if (modelSearchEl) modelSearchEl.setAttribute('aria-activedescendant', el.id);
+    if (el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+  }
+
+  function setModelListOpen(open) {
+    if (!modelListEl || !modelSearchEl) return;
+    modelListEl.hidden = !open;
+    modelSearchEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!open) modelSearchEl.removeAttribute('aria-activedescendant');
+  }
+
+  // Case-insensitive substring of id or name; the leading "current default"
+  // row (empty data-id) matches an empty query only.
+  function filterModelOptions(query) {
+    var q = String(query || '').trim().toLowerCase();
+    modelOptionEls().forEach(function (o) {
+      var id = o.getAttribute('data-id') || '';
+      var name = o.getAttribute('data-name') || '';
+      o.hidden = q ? (!id || (id.toLowerCase().indexOf(q) < 0 && name.toLowerCase().indexOf(q) < 0)) : false;
+    });
+    setActiveModelOption(0);
+  }
+
+  // The visible text of a committed pick: the option's name, or empty for the
+  // default row (the input's placeholder then reads "— current default —").
+  function syncModelSearchText() {
+    if (!modelSearchEl || !modelSelectEl) return;
+    var opt = modelSelectEl.value ? findModelOption(modelSelectEl.value) : null;
+    modelSearchEl.value = opt ? (opt.getAttribute('data-name') || opt.getAttribute('data-id')) : '';
+  }
+
+  function commitModel(id, opts) {
+    if (!modelSelectEl) return;
+    modelSelectEl.value = id;
+    modelOptionEls().forEach(function (o) {
+      o.setAttribute('aria-selected', o.getAttribute('data-id') === id ? 'true' : 'false');
+    });
+    syncModelSearchText();
+    updateModelPriceDisplay();
+    updateToolsWarning();
+    if (!(opts && opts.persist === false)) persistModelChoice();
+    setModelListOpen(false);
+  }
+
+  if (modelSelectEl && modelSearchEl && modelListEl) {
+    modelSearchEl.addEventListener('focus', function () {
+      // Focus opens the FULL list (the committed pick's own name in the box is
+      // not a query); typing narrows it.
+      filterModelOptions('');
+      setModelListOpen(true);
+    });
+    modelSearchEl.addEventListener('input', function () {
+      filterModelOptions(modelSearchEl.value);
+      setModelListOpen(true);
+    });
+    modelSearchEl.addEventListener('keydown', function (e) {
+      var key = e.key;
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        if (e.preventDefault) e.preventDefault();
+        if (modelListEl.hidden) { filterModelOptions(''); setModelListOpen(true); return; }
+        setActiveModelOption(modelActiveIdx + (key === 'ArrowDown' ? 1 : -1));
+      } else if (key === 'Enter') {
+        if (modelListEl.hidden) return;
+        if (e.preventDefault) e.preventDefault();
+        var vis = visibleModelOptions();
+        if (vis[modelActiveIdx]) commitModel(vis[modelActiveIdx].getAttribute('data-id') || '');
+      } else if (key === 'Escape') {
+        // Abandon the search: restore the committed choice's text.
+        syncModelSearchText();
+        setModelListOpen(false);
       }
+    });
+    modelSearchEl.addEventListener('blur', function () {
+      // A click on a row blurs the input first; the row's own mousedown
+      // handler below prevents that, so a blur here is a real departure.
+      syncModelSearchText();
+      setModelListOpen(false);
+    });
+    // mousedown (not click) + preventDefault keeps focus in the input so the
+    // blur above does not close the list before the pick lands.
+    modelListEl.addEventListener('mousedown', function (e) {
+      if (e.preventDefault) e.preventDefault();
+    });
+    modelListEl.addEventListener('click', function (e) {
+      // Walk up from the click target (it may be the <code>/tag inside a row).
+      var li = e.target;
+      while (li && li !== modelListEl && !(li.getAttribute && li.getAttribute('role') === 'option')) li = li.parentNode;
+      if (li && li !== modelListEl && !li.hidden) commitModel(li.getAttribute('data-id') || '');
     });
   }
 
@@ -1943,14 +2073,25 @@
     tabCheckInCount = restoredSession.tabCheckInCount;
     tabTotalCost = restoredSession.tabTotalCost;
     updateTabTotalDisplay();
-    // LIN-2623 beat 3: restore the picker's own choice. A real <select>
-    // silently ignores an assigned value that matches none of its options
-    // (e.g. a curated id removed from AVAILABLE_MODELS since it was stored),
-    // leaving `.value` at `''` — the same safe "no override" state a fresh
-    // session starts in, so no extra validation is needed here.
+    // LIN-2623 beat 3 / LIN-3363 S2: restore the picker's own choice. The old
+    // native <select> silently ignored a stored value matching none of its
+    // options; a text-backed combobox does not, so the stored id is checked
+    // explicitly against the rendered (offered) list. A stale id (a model since
+    // removed from AVAILABLE_MODELS or the catalog, or a cold catalog on this
+    // load) leaves the committed value '' — the same safe "no override" state
+    // a fresh session starts in — and the session is re-saved so the stale id
+    // does not linger and 400 the next turn.
     if (modelSelectEl && restoredSession.selectedModel) {
-      modelSelectEl.value = restoredSession.selectedModel;
-      updateModelPriceDisplay();
+      if (findModelOption(restoredSession.selectedModel)) {
+        // No persist: the stored blob already holds this id (and its cadence).
+        commitModel(restoredSession.selectedModel, { persist: false });
+      } else if (urlKey) {
+        saveStoredSession(urlKey, {
+          history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
+          selectedModel: '', cadence: restoredSession.cadence,
+          seenIdentifiers: restoredSession.seenIdentifiers,
+        });
+      }
     }
     // LIN-2771: restore the wake cadence from its wall-clock anchor. A stored
     // cadence with a finite nextFireAt means a wake was PENDING when the tab
@@ -2026,6 +2167,7 @@
       updateTabTotalDisplay: updateTabTotalDisplay,
       getTabTotals: function () { return { count: tabCheckInCount, cost: tabTotalCost }; },
       updateModelPriceDisplay: updateModelPriceDisplay,
+      commitModel: commitModel,
       getModelPriceText: function () { return modelPriceEl ? modelPriceEl.textContent : null; },
       CADENCE_BASE_MS: CADENCE_BASE_MS, CADENCE_CAP_MS: CADENCE_CAP_MS, HISTORY_CAP: HISTORY_CAP,
     };

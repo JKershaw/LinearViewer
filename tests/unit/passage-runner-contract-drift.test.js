@@ -126,7 +126,7 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   test('formatDispatchWatch includes sessionId, scoped to its own function body', () => {
     const fnBody = sliceBetween(
       proxyDispatchSource,
-      'function formatDispatchWatch(item, meta = null, wakeShadow = null) {',
+      'function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerLastSeenAt = null) {',
       'function dispatchWatchChanged(baseline, item) {'
     );
     assert.match(fnBody, /\bsessionId:\s*item\.sessionId \|\| null\b/);

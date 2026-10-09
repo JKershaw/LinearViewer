@@ -23,6 +23,7 @@ import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
 import { createChatToolCatalog, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
@@ -243,7 +244,7 @@ function buildMockAnswer(context, question, related) {
  *   route's real (non-mockAi) run-scoped propose path is pinned end to end.
  * @returns {Router}
  */
-export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient }) {
+export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspacePreferencesStore, getOpenRouterSource, getDeployInfo, savedChatStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, runProposalsStore, chatClient, workspaceOwnerCheck = null }) {
   const router = Router();
 
   // ─── HTML page ──────────────────────────────────────────────────────────────
@@ -693,6 +694,15 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           proxyTokenStore,
           baseUrl: `${req.protocol}://${req.get('host')}`,
           dispatchedBy: req.session?.accountId || null,
+          // LIN-3383: an ordinary (not run-scoped) turn runs send_follow_up in
+          // execute mode, which enqueues on the owner's runner: owner-only. A
+          // run-scoped turn proposes and never reaches the guard.
+          enqueueGuard: ({ target }) => resolveRunnerEnqueueRefusal({
+            ownerCheck: workspaceOwnerCheck,
+            workspaceId: workspace.id,
+            accountId: req.session?.accountId,
+            target
+          }),
           buildMessages: buildTaskChatTurnMessages,
         },
       });

@@ -287,23 +287,25 @@ describe('renderFlightCompanionPage — LIN-2621: the status strip', () => {
 // assertion here targets NEW sibling markup only.
 describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card, tools-off warning', () => {
   // Mandated red-first case: the tools-off warning must be VISIBLE on the
-  // strip before the user sends anything, whenever the resolved workspace
-  // default is not tool-capable — exactly one trigger (see the function's
-  // own doc comment).
-  test('an uncurated (not tool-capable) default renders a visible tools-off warning', () => {
+  // strip before the user sends anything whenever the resolved workspace
+  // default is not tool-capable. Since LIN-3363 it is always emitted,
+  // `hidden` while the default is tools-on, and the client toggles it on a pick.
+  test('an uncurated (not tool-capable) default renders a VISIBLE tools-off warning', () => {
     const html = renderFlightCompanionPage(
       { prompt: 'kickoff', strip: { model: 'not-curated', toolsOn: false, mode: 'x' } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status">⚠/);
+    assert.match(html, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="false">⚠/);
   });
 
-  test('a tool-capable default renders NO tools-off warning', () => {
+  // LIN-3363 S2: the warning is ALWAYS in the DOM so the picker has something
+  // to reveal; it is `hidden` iff the resolved default is tools-on.
+  test('a tool-capable default still emits the tools-off warning, `hidden`', () => {
     const html = renderFlightCompanionPage(
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x' } },
       { urlKey: 'ws' }
     );
-    assert.doesNotMatch(html, /fc-strip-tools-warning/);
+    assert.match(html, /<span class="fc-strip-tools-warning" id="flight-companion-tools-warning" role="status" data-default-tools-on="true" hidden>⚠/);
   });
 
   test('the pinned fc-strip-tools span itself is untouched by the warning addition', () => {
@@ -314,59 +316,83 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
     assert.match(html, /fc-strip-tools">tools: off</);
   });
 
-  test('the picker\'s leading option is always the empty-value "current default" entry — an untouched picker sends no override', () => {
+  test('the picker is a combobox: search input, hidden committed input (empty = default), in-flow listbox', () => {
     const html = renderFlightCompanionPage(
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', modelOptions: [] } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override"><option value="">— current default —<\/option>/);
+    assert.match(html, /<input type="search" id="flight-companion-model-search" class="fc-model-search" role="combobox" aria-label="Per-turn model override" aria-expanded="false" aria-controls="flight-companion-model-list"/);
+    assert.match(html, /<input type="hidden" id="flight-companion-model" value="">/);
+    assert.match(html, /<ul id="flight-companion-model-list" class="fc-model-list" role="listbox"[^>]* hidden>/);
+    assert.doesNotMatch(html, /<select|<datalist/);
   });
 
-  test('curated options render with their friendly name and a data-pricing attribute, straight off the supplied modelOptions', () => {
+  test('the leading row is the empty-data-id "current default" entry — an untouched picker sends no override', () => {
+    const html = renderFlightCompanionPage(
+      { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', modelOptions: [] } },
+      { urlKey: 'ws' }
+    );
+    assert.match(html, /<li role="option" id="flight-companion-model-opt-default" class="fc-model-option" aria-selected="true" data-id="">— current default —<\/li>/);
+  });
+
+  test('options render name, id and data-pricing straight off the supplied modelOptions', () => {
     const html = renderFlightCompanionPage(
       {
         prompt: 'kickoff',
         strip: {
           model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x',
-          modelOptions: [{ id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: '$15.00 in / $75.00 out per 1M tokens', curated: true }],
+          modelOptions: [{ id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: '$15.00 in / $75.00 out per 1M tokens', toolsOn: true, curated: true }],
         },
       },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<option value="anthropic\/claude-opus-5" data-pricing="\$15\.00 in \/ \$75\.00 out per 1M tokens">Claude Opus 5<\/option>/);
+    assert.match(html, /data-id="anthropic\/claude-opus-5" data-name="Claude Opus 5" data-pricing="\$15\.00 in \/ \$75\.00 out per 1M tokens">Claude Opus 5 <code>anthropic\/claude-opus-5<\/code><\/li>/);
   });
 
-  test('LIN-3370: only curated options render — catalog entries (curated:false) and entries with no flag are filtered out', () => {
+  test('LIN-3363: catalog options render too, tagged tools-off / free; tool-capable ones carry no data-tools', () => {
     const html = renderFlightCompanionPage(
       {
         prompt: 'kickoff',
         strip: {
           model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x',
           modelOptions: [
-            { id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: null, curated: true },
-            { id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two', pricing: null, curated: false },
-            { id: 'mock-provider/no-flag', name: 'No Flag', pricing: null },
+            { id: 'anthropic/claude-opus-5', name: 'Claude Opus 5', pricing: null, toolsOn: true, free: false, curated: true },
+            { id: 'mock-provider/catalog-model-two', name: 'Catalog Model Two', pricing: null, toolsOn: false, free: true, curated: false },
           ],
         },
       },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<option value="anthropic\/claude-opus-5">Claude Opus 5<\/option>/);
-    assert.doesNotMatch(html, /catalog-model-two|Catalog Model Two|no-flag|No Flag/);
+    const opus = html.match(/<li[^>]*data-id="anthropic\/claude-opus-5"[^>]*>/)[0];
+    assert.doesNotMatch(opus, /data-tools|data-free/);
+    const cat = html.match(/<li[^>]*data-id="mock-provider\/catalog-model-two"[^>]*>[^]*?<\/li>/)[0];
+    assert.match(cat, /data-tools="off"/);
+    assert.match(cat, /data-free="true"/);
+    assert.match(cat, /fc-model-tag--tools-off">tools off</);
+    assert.match(cat, /fc-model-tag--free">free</);
   });
 
-  test('an unpriced curated option renders with no data-pricing attribute at all (never a fabricated price)', () => {
+  test('an unpriced option renders with no data-pricing attribute at all (never a fabricated price)', () => {
     const html = renderFlightCompanionPage(
       {
         prompt: 'kickoff',
         strip: {
           model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x',
-          modelOptions: [{ id: 'some-new-model/id', name: 'Some New Model', pricing: null, curated: true }],
+          modelOptions: [{ id: 'some-new-model/id', name: 'Some New Model', pricing: null, toolsOn: true, curated: true }],
         },
       },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<option value="some-new-model\/id">Some New Model<\/option>/);
+    const li = html.match(/<li[^>]*data-id="some-new-model\/id"[^>]*>/)[0];
+    assert.doesNotMatch(li, /data-pricing/);
+  });
+
+  test('option ids and names are HTML-escaped', () => {
+    const html = renderFlightCompanionPage(
+      { prompt: 'k', strip: { model: 'm', toolsOn: true, mode: 'x', modelOptions: [{ id: 'a"><script>x</script>', name: '<b>n</b>', toolsOn: false }] } },
+      { urlKey: 'ws' }
+    );
+    assert.doesNotMatch(html, /<script>x<\/script>|<b>n<\/b>/);
   });
 
   test('the rate card renders the pricing hint for a model that has one', () => {
@@ -391,7 +417,7 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', isFreeTier: true } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override" disabled>/);
+    assert.match(html, /<input type="search" id="flight-companion-model-search"[^>]* placeholder="— current default —" disabled>/);
     assert.match(html, /<span class="fc-strip-freetier" id="flight-companion-freetier-note">free tier: model selection is not honored — every request runs the clamped default<\/span>/);
   });
 
@@ -400,13 +426,13 @@ describe('renderFlightCompanionPage — LIN-2623 beat 3: model picker, rate card
       { prompt: 'kickoff', strip: { model: 'openai/gpt-5.4-mini', toolsOn: true, mode: 'x', isFreeTier: false } },
       { urlKey: 'ws' }
     );
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override">/);
+    assert.doesNotMatch(html.match(/<input type="search"[^>]*>/)[0], /disabled/);
     assert.doesNotMatch(html, /fc-strip-freetier/);
   });
 
   test('a missing strip altogether still renders a (default-only) picker, never crashing', () => {
     const html = renderFlightCompanionPage({ prompt: 'kickoff' }, { urlKey: 'ws' });
-    assert.match(html, /<select id="flight-companion-model-select" class="fc-model-select" aria-label="Per-turn model override">/);
+    assert.match(html, /<input type="search" id="flight-companion-model-search"/);
     assert.match(html, /<span class="fc-strip-price" id="flight-companion-model-price">—<\/span>/);
   });
 });
@@ -491,7 +517,7 @@ describe('renderFlightCompanionPage — LIN-3360: calmer shell', () => {
     assert.doesNotMatch(html.slice(open, html.indexOf('>', open) + 1), /\bopen\b/);
     assert.match(html.slice(open), /^[^]*?<span class="disclosure__label">settings<\/span>/);
     const close = html.indexOf('</details>', open);
-    for (const id of ['flight-companion-strip"', 'flight-companion-strip-next', 'flight-companion-model-select', 'flight-companion-model-price']) {
+    for (const id of ['flight-companion-strip"', 'flight-companion-strip-next', 'flight-companion-model-search', 'flight-companion-model-list', 'flight-companion-model-price']) {
       const i = html.indexOf(`id="${id}`);
       assert.ok(i > open && i < close, `${id} must be inside the Settings fold`);
     }
@@ -507,7 +533,7 @@ describe('renderFlightCompanionPage — LIN-3360: calmer shell', () => {
       assert.ok(!(i > open && i < close));
     }
     const clean = renderFlightCompanionPage({ prompt: 'k', strip: { ...strip, toolsOn: true, isFreeTier: false } }, { urlKey: 'ws' });
-    assert.match(clean, /id="flight-companion-strip-notices"><\/div>/, 'slot is always emitted');
+    assert.match(clean, /id="flight-companion-strip-notices"><span class="fc-strip-tools-warning"[^>]* hidden>[^]*?<\/span>\s*<\/div>/, 'slot is always emitted and holds the hidden warning');
   });
 
   test('the tab total is a hidden sibling of the check-in line in #flight-companion-checkin-row, not nested in it', () => {

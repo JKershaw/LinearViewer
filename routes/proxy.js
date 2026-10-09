@@ -508,7 +508,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, livenessAlarmStore = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, livenessAlarmStore = null, onTicketWrite = null }) {
   const router = Router();
 
   /**
@@ -1476,7 +1476,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group E writes (LIN-679 Stage 3b / LIN-2537): extracted to
   // routes/proxy-writes.js, mounted at its original position.
-  router.use(createProxyWriteRoutes({ proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
+  router.use(createProxyWriteRoutes({ onTicketWrite, proxyLimiter, commentDedupe, commentDedupeGenerations, authenticateProxyToken, requireWriteScope, resolveProviderAccess, denyIfUnsupported, denyIfMissingRead, workspaceUnavailable, graphqlErrorStatus, writeRejected, resolveTeamInput, resolveStateInput, resolveProjectInput, resolveLabelInput, refResolutionFailed, partialWriteFailed, logEvent, harbourCommentsStore }));
 
   // Charge one free-tier unit for a proxy LLM request about to generate. Returns
   // null when the request may proceed, or a { status, body } rejection carrying

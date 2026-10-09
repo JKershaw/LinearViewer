@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { localSeedId } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-3248 (P3 of LIN-2949): the close-out box on a finished stop-at-PR run.
 // Ready (standard and stepped, for N2), the "or merge it yourself" link, the
@@ -66,6 +67,9 @@ async function seedLocalWorkspaceWithEvidence(page) {
     },
   });
   expect(resp.ok(), `local seed failed: ${resp.status()} ${await resp.text()}`).toBeTruthy();
+  // LIN-3383: queueing work for a runner is owner-only; state the owner explicitly
+  // rather than inheriting it from first-binder order.
+  await seedWorkspaceOwnership(page, URL_KEY, 'owner');
 }
 
 // Seed a finished stop-at-PR run on LOCAL-CO1. The variant is the row's own

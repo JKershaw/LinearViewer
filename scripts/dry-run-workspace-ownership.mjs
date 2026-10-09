@@ -78,7 +78,7 @@ export function inferWorkspaceKind(workspaceId) {
 // Same walk as AccountStore.resolveCanonicalAccountId, over a pre-read
 // `mergedInto` map. A corrupt chain (cycle, or deeper than 8 hops) resolves
 // to null and is counted, rather than aborting the whole report.
-function canonicalise(accountId, mergedInto) {
+export function canonicalise(accountId, mergedInto) {
   let current = accountId
   const visited = new Set([current])
   for (let hop = 0; hop < 8; hop++) {
@@ -102,7 +102,7 @@ function byCreatedAtThenId(a, b) {
  * @param {Object} row - one projected `sessions` row
  * @returns {{id: string, urlKey: (string|null)}[]}
  */
-function sessionWorkspaceRefs(row) {
+export function sessionWorkspaceRefs(row) {
   const workspaces = row?.session?.workspaces
   if (!Array.isArray(workspaces)) return []
   const refs = []

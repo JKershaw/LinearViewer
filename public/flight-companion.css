@@ -153,9 +153,10 @@
   color: var(--text);
 }
 
-/* LIN-2623 beat 3: the tools-off warning — visible before the user sends
-   anything, exactly one trigger (the resolved workspace default is not
-   tool-capable). Reuses the same --red token as the sweep-not-seen relabel
+/* LIN-2623 beat 3 / LIN-3363 S2: the tools-off warning — always in the DOM,
+   `hidden` while the model that will run is tools-on. Visible before the user
+   sends anything when the resolved workspace default is not tool-capable, and
+   toggled by the model picker when a tools-off model is picked. Reuses the same --red token as the sweep-not-seen relabel
    above (.fc-checkin--warning) rather than inventing a second warning
    color for this page. */
 .fc-strip-tools-warning {
@@ -163,7 +164,7 @@
 }
 
 /* LIN-2623 beat 3: the per-turn model picker + its rate card, and the
-   free-tier legibility note. Inline-flex so the label/select/price group
+   free-tier legibility note. Inline-flex so the label/combobox/price group
    stays together as one strip item while the strip's own flex-wrap still
    wraps the WHOLE group onto its own line on narrow viewports. */
 .fc-strip-model-picker {
@@ -173,7 +174,17 @@
   flex-wrap: wrap;
 }
 
-.fc-model-select {
+/* LIN-3363 S2: the model combobox. The results list is IN FLOW (never an
+   absolutely-positioned popup — the Settings fold's overflow would clip it)
+   and self-scrolls, so an open list stays inside the fold's 40dvh cap. */
+.fc-model-combo {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fc-model-search {
   font-family: var(--font-content);
   font-size: 1em;
   color: var(--text);
@@ -181,11 +192,64 @@
   border: 1px solid var(--line);
   border-radius: 3px;
   padding: 0.1rem 0.3rem;
+  min-width: 0;
+  width: 14rem;
+  max-width: 100%;
 }
 
-.fc-model-select:disabled {
+.fc-model-search:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.fc-model-list {
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+  max-height: 9rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--text);
+}
+
+.fc-model-list[hidden],
+.fc-model-option[hidden] {
+  display: none;
+}
+
+.fc-model-option {
+  padding: 0.15rem 0.4rem;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.fc-model-option code {
+  font-family: var(--font-structural);
+  color: var(--muted);
+}
+
+.fc-model-option:hover,
+.fc-model-option--active {
+  background: var(--line);
+}
+
+.fc-model-option[aria-selected="true"] {
+  font-weight: 600;
+}
+
+.fc-model-tag {
+  font-family: var(--font-structural);
+  font-size: 0.8em;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 0.25rem;
+  color: var(--muted);
+}
+
+.fc-model-tag--tools-off {
+  color: var(--red);
 }
 
 .fc-strip-price {

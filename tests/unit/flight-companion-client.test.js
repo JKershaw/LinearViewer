@@ -222,6 +222,15 @@ class FakeElement {
   // runs against this shim (`wrap.setAttribute('data-disposition', ...)`).
   setAttribute(name, value) { (this._attrs = this._attrs || {})[name] = String(value); }
   getAttribute(name) { return (this._attrs && this._attrs[name]) ?? null; }
+  removeAttribute(name) { if (this._attrs) delete this._attrs[name]; }
+  // LIN-3363 S2: just enough for the model listbox — `[role="option"]` descendants.
+  querySelectorAll(sel) {
+    const out = [];
+    const m = /^\[role="(\w+)"\]$/.exec(sel);
+    const walk = (n) => n.children.forEach((c) => { if (m && c.getAttribute('role') === m[1]) out.push(c); walk(c); });
+    walk(this);
+    return out;
+  }
   // LIN-2717 S4-a: `evt` is optional and backward-compatible — every
   // pre-existing `.dispatch(type)` caller in this file passes the type only,
   // and their handlers already receive `undefined` today. Without this,
@@ -499,17 +508,33 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   // spent nothing).
   const stripTabTotalEl = new FakeElement('span');
   stripTabTotalEl.textContent = '0 check-ins · $0.00 this tab';
-  // LIN-2623 beat 3: the model picker + its rate-card mount. `.value`
-  // mirrors a real <select>'s reported value — this fake does not model
-  // `<option>`/`selectedIndex` (unneeded here: every test in this file
-  // drives the picker by writing `.value` directly, the same way a real
-  // <select>'s value changes when an option is picked; `.options` stays
-  // undefined, so `updateModelPriceDisplay`'s real-DOM `data-pricing` read
-  // safely no-ops — that live-DOM behavior is covered by
-  // tests/unit/render-flight-companion.test.js's markup assertions and
-  // tests/e2e/flight-companion.spec.js's real-browser round trip instead).
-  const modelSelectEl = new FakeElement('select');
+  // LIN-2623 beat 3 / LIN-3363 S2: the model combobox. `modelSelectEl` is the
+  // HIDDEN committed input (`.value` = committed id, '' = current default);
+  // the list holds option rows shaped like the server render (data-id,
+  // data-name, data-pricing, data-tools="off"). Tests drive a pick through
+  // the list's click handler (or `commitModel`), the way a real click does.
+  const modelSelectEl = new FakeElement('input');
   modelSelectEl.value = '';
+  const modelSearchEl = new FakeElement('input');
+  const modelListEl = new FakeElement('ul');
+  modelListEl.hidden = true;
+  const addModelRow = (id, attrs = {}) => {
+    const li = new FakeElement('li');
+    li.setAttribute('role', 'option');
+    li.setAttribute('id', 'opt-' + (id || 'default'));
+    li.setAttribute('data-id', id);
+    li.setAttribute('data-name', attrs.name || id);
+    if (attrs.pricing) li.setAttribute('data-pricing', attrs.pricing);
+    if (attrs.toolsOff) li.setAttribute('data-tools', 'off');
+    modelListEl.appendChild(li);
+    return li;
+  };
+  addModelRow('', { name: '— current default —' });
+  addModelRow('anthropic/claude-opus-5', { name: 'Claude Opus 5', pricing: '$15 in / $75 out' });
+  addModelRow('mock-provider/catalog-model-two', { name: 'Catalog Model Two', toolsOff: true });
+  const toolsWarningEl = new FakeElement('span');
+  toolsWarningEl.setAttribute('data-default-tools-on', 'true');
+  toolsWarningEl.hidden = true;
   const modelPriceEl = new FakeElement('span');
   modelPriceEl.textContent = '—';
   doc._byId['flight-companion-thread'] = thread;
@@ -521,7 +546,10 @@ function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl
   doc._byId['flight-companion-reorient'] = reorientBtn;
   doc._byId['flight-companion-strip-next'] = stripNextEl;
   doc._byId['flight-companion-strip-tab-total'] = stripTabTotalEl;
-  doc._byId['flight-companion-model-select'] = modelSelectEl;
+  doc._byId['flight-companion-model'] = modelSelectEl;
+  doc._byId['flight-companion-model-search'] = modelSearchEl;
+  doc._byId['flight-companion-model-list'] = modelListEl;
+  doc._byId['flight-companion-tools-warning'] = toolsWarningEl;
   doc._byId['flight-companion-model-price'] = modelPriceEl;
   // LIN-2718: only the composer's own input is ever focused/blurred by this
   // module — wiring the owner document lets FakeElement#focus() and the
@@ -3428,7 +3456,7 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     const { exports: m, fetchCalls, questionInput, doc } = loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
-    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    doc._byId['flight-companion-model'].value = 'anthropic/claude-opus-5';
     questionInput.value = 'status please';
     m.submitQuestion();
     await flush();
@@ -3440,7 +3468,7 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     const { exports: m, fetchCalls, doc } = loadClient({
       fetchImpl: () => jsonResponse(200, { turnKind: 'auto-wake', spent: false, reason: 'no-census' }),
     });
-    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    doc._byId['flight-companion-model'].value = 'anthropic/claude-opus-5';
     m.autoWakeTick();
     await flush();
     assert.strictEqual(fetchCalls.length, 1);
@@ -3451,7 +3479,7 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     const { exports: m, fetchCalls, doc } = loadClient({
       fetchImpl: () => sseResponse([sseFrame('done', {})]),
     });
-    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
+    doc._byId['flight-companion-model'].value = 'anthropic/claude-opus-5';
     m.startBoot();
     await flush();
     assert.strictEqual(fetchCalls.length, 1);
@@ -3459,48 +3487,140 @@ describe('flight-companion.js — LIN-2623 beat 3: per-turn model picker sends t
     assert.strictEqual(Object.prototype.hasOwnProperty.call(fetchCalls[0].body, 'model'), false);
   });
 
-  test('a change on the picker updates the rate-card mount via the exported updateModelPriceDisplay', () => {
+  // Click a row the way the list's click handler sees it: target = the row
+  // (or a child of it).
+  const pick = (doc, id) => {
+    const list = doc._byId['flight-companion-model-list'];
+    const row = list.querySelectorAll('[role="option"]').find((o) => o.getAttribute('data-id') === id);
+    list.dispatch('click', { target: row });
+  };
+
+  test('picking a row commits the hidden input, shows its name, updates the rate card from data-pricing', () => {
     const { exports: m, doc } = loadClient();
-    const select = doc._byId['flight-companion-model-select'];
-    // This fake models `.value` only (see its own construction comment) —
-    // `.options`/`selectedIndex` are real-DOM-only, so the real data-pricing
-    // read safely falls through to the honest '—' fallback here; the REAL
-    // attribute read is covered by render-flight-companion.test.js (markup)
-    // and the e2e round trip (a real <select>).
-    select.value = 'anthropic/claude-opus-5';
-    select.dispatch('change');
-    assert.strictEqual(m.getModelPriceText(), '—');
+    pick(doc, 'anthropic/claude-opus-5');
+    assert.strictEqual(doc._byId['flight-companion-model'].value, 'anthropic/claude-opus-5');
+    assert.strictEqual(doc._byId['flight-companion-model-search'].value, 'Claude Opus 5');
+    assert.strictEqual(m.getModelPriceText(), '$15 in / $75 out');
+    assert.strictEqual(doc._byId['flight-companion-model-list'].hidden, true, 'the list closes on a pick');
   });
 
-  test('a change on the picker persists the choice immediately — before any turn is sent', () => {
+  test('a model with no data-pricing shows the honest — fallback, and picking the default row clears the commit', () => {
+    const { exports: m, doc } = loadClient();
+    pick(doc, 'mock-provider/catalog-model-two');
+    assert.strictEqual(m.getModelPriceText(), '—');
+    pick(doc, '');
+    assert.strictEqual(doc._byId['flight-companion-model'].value, '');
+    assert.strictEqual(doc._byId['flight-companion-model-search'].value, '');
+  });
+
+  test('filtering: case-insensitive substring of id OR name; the default row only matches an empty query', () => {
+    const { doc } = loadClient();
+    const search = doc._byId['flight-companion-model-search'];
+    const visible = () => doc._byId['flight-companion-model-list'].querySelectorAll('[role="option"]').filter((o) => !o.hidden).map((o) => o.getAttribute('data-id'));
+    search.value = 'CATALOG';
+    search.dispatch('input');
+    assert.deepStrictEqual(visible(), ['mock-provider/catalog-model-two'], 'matches id/name, case-insensitively');
+    search.value = 'opus 5';
+    search.dispatch('input');
+    assert.deepStrictEqual(visible(), ['anthropic/claude-opus-5'], 'matches the display NAME, not only the id');
+    search.value = 'zzz-nothing';
+    search.dispatch('input');
+    assert.deepStrictEqual(visible(), []);
+    assert.strictEqual(doc._byId['flight-companion-model'].value, '', 'typing text that matches nothing commits nothing');
+    search.value = '';
+    search.dispatch('input');
+    assert.strictEqual(visible().length, 3);
+  });
+
+  test('keyboard: ArrowDown opens, Enter commits the active row, Escape abandons without committing', () => {
+    const { doc } = loadClient();
+    const search = doc._byId['flight-companion-model-search'];
+    const list = doc._byId['flight-companion-model-list'];
+    const key = (k) => search.dispatch('keydown', { key: k, preventDefault() {} });
+    key('ArrowDown');
+    assert.strictEqual(list.hidden, false);
+    key('ArrowDown'); // default row -> opus
+    key('Enter');
+    assert.strictEqual(doc._byId['flight-companion-model'].value, 'anthropic/claude-opus-5');
+    search.value = 'cata';
+    search.dispatch('input');
+    key('Escape');
+    assert.strictEqual(list.hidden, true);
+    assert.strictEqual(doc._byId['flight-companion-model'].value, 'anthropic/claude-opus-5', 'Escape commits nothing');
+    assert.strictEqual(search.value, 'Claude Opus 5', 'and restores the committed name');
+  });
+
+  // LIN-3363 S2: the warning is always in the DOM; the pick toggles `hidden`.
+  test('warning: a tools-off pick reveals it, a tools-on pick hides it again (tool-capable default)', () => {
+    const { doc } = loadClient();
+    const warn = doc._byId['flight-companion-tools-warning'];
+    assert.strictEqual(warn.hidden, true);
+    pick(doc, 'mock-provider/catalog-model-two');
+    assert.strictEqual(warn.hidden, false, 'a tools-off catalog pick shows the warning');
+    pick(doc, 'anthropic/claude-opus-5');
+    assert.strictEqual(warn.hidden, true, 'a curated pick hides it');
+  });
+
+  test('warning: with a tools-off DEFAULT it stays visible on "current default" and hides on a tools-on pick', () => {
+    const { doc } = loadClient();
+    const warn = doc._byId['flight-companion-tools-warning'];
+    warn.setAttribute('data-default-tools-on', 'false');
+    warn.hidden = false;
+    pick(doc, 'anthropic/claude-opus-5');
+    assert.strictEqual(warn.hidden, true);
+    pick(doc, '');
+    assert.strictEqual(warn.hidden, false);
+  });
+
+  test('warning: a disabled (free-tier) picker ignores a stored pick — the clamped default decides', () => {
+    const { exports: m, doc } = loadClient();
+    doc._byId['flight-companion-model-search'].disabled = true;
+    m.commitModel('mock-provider/catalog-model-two', { persist: false });
+    assert.strictEqual(doc._byId['flight-companion-tools-warning'].hidden, true);
+  });
+
+  test('a pick persists the choice immediately — before any turn is sent', () => {
     const storage = makeFakeStorage();
     const { doc } = loadClient({ storageImpl: storage });
-    doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
-    doc._byId['flight-companion-model-select'].dispatch('change');
+    pick(doc, 'anthropic/claude-opus-5');
     const raw = storage.getItem('flight-companion-session:acme');
-    assert.ok(raw, 'expected a write to sessionStorage on change, not just at turn completion');
+    assert.ok(raw, 'expected a write to sessionStorage on pick, not just at turn completion');
     assert.strictEqual(JSON.parse(raw).selectedModel, 'anthropic/claude-opus-5');
   });
 
-  test('the selection persists across a reload: a fresh loadClient() restores it from storage into the picker', async () => {
+  test('the selection persists across a reload: a fresh loadClient() restores it (committed value, name, warning)', async () => {
     const storage = makeFakeStorage();
     const first = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
-    first.doc._byId['flight-companion-model-select'].value = 'anthropic/claude-opus-5';
-    first.doc._byId['flight-companion-model-select'].dispatch('change');
+    pick(first.doc, 'mock-provider/catalog-model-two');
 
-    // A fresh loadClient() call is a fresh page load (a new vm context, a
-    // new picker element defaulted back to '') — sharing only `storage`,
-    // exactly mirroring a real reload.
     const second = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
-    assert.strictEqual(second.doc._byId['flight-companion-model-select'].value, 'anthropic/claude-opus-5',
-      'the reloaded page must restore the picker to the previously-chosen model, not the empty "current default"');
+    assert.strictEqual(second.doc._byId['flight-companion-model'].value, 'mock-provider/catalog-model-two',
+      'the reloaded page must restore the previously-chosen model, not the empty "current default"');
+    assert.strictEqual(second.doc._byId['flight-companion-model-search'].value, 'Catalog Model Two');
+    assert.strictEqual(second.doc._byId['flight-companion-tools-warning'].hidden, false, 'restoring a tools-off pick shows the warning');
 
-    // And the restored choice is honored on the very next send, with no
-    // further interaction needed.
     second.doc._byId['flight-companion-question'].value = 'still there?';
     second.exports.submitQuestion();
     await flush();
-    assert.strictEqual(second.fetchCalls[second.fetchCalls.length - 1].body.model, 'anthropic/claude-opus-5');
+    assert.strictEqual(second.fetchCalls[second.fetchCalls.length - 1].body.model, 'mock-provider/catalog-model-two');
+  });
+
+  test('a STALE stored id (no longer offered) is reset to "current default" and the session is re-saved clean', async () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({ history: [], tabCheckInCount: 0, tabTotalCost: 0, selectedModel: 'removed/model-gone', cadence: null }),
+    });
+    const { doc, fetchCalls } = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    assert.strictEqual(doc._byId['flight-companion-model'].value, '', 'a stale id never becomes the committed value');
+    assert.strictEqual(doc._byId['flight-companion-model-search'].value, '');
+    assert.strictEqual(JSON.parse(storage.getItem('flight-companion-session:acme')).selectedModel, null, 're-saved without the stale id');
+    doc._byId['flight-companion-question'].value = 'hello';
+    // A turn after the reset must not carry the stale id (it would 400).
+    const m = loadClient({ storageImpl: storage, fetchImpl: () => sseResponse([sseFrame('done', {})]) });
+    m.doc._byId['flight-companion-question'].value = 'hello';
+    m.exports.submitQuestion();
+    await flush();
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(m.fetchCalls[0].body, 'model'), false);
+    assert.strictEqual(fetchCalls.length, 0);
   });
 });
 

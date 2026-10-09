@@ -8,6 +8,7 @@
  * - Comments: Fetch issue comments
  * - Images: Proxy Linear-hosted images with auth
  */
+import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
 import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized, classifyUpstreamError } from '../lib/errors.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
@@ -339,7 +340,7 @@ function connectionBackedId(workspace) {
  * @param {Object} [options.closeOut] - LIN-3248 test seam for the check/press routes: optional `{ resolveProvider, readPrStatus, githubFetch, isStopAtRun, runnerReady, markDone }` overrides
  * @returns {Router} Express router
  */
-export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null }) {
+export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null }) {
   const router = Router();
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
@@ -4024,7 +4025,27 @@ ${goal}`
       const runGate = buildRunGate({ isFreeTier: feedbackIsFreeTier, freeTierStore, accountId: req.session?.accountId, accountStore });
       let autopilot = null;
       let triage = null;
-      if (action === 'triage') {
+      // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only
+      // the workspace owner may start one. Checked only when a lane will
+      // actually run: a plain filed ticket reports no refusal, and a non-owner's
+      // feedback still saves. A refusal skips the enqueue and rides the existing
+      // `{launched:false, code, retryable, message}` response block below.
+      const lane = action === 'triage' ? 'triage'
+        : action === 'autopilot' ? 'autopilot'
+        : (!action && getFeatureFlags(req.session).feedbackTriage) ? 'triage'
+        : null;
+      const laneRefusal = lane
+        ? await resolveRunnerEnqueueRefusal({
+          ownerCheck: workspaceOwnerCheck,
+          workspaceId: workspace.id,
+          accountId: req.session?.accountId,
+          target: 'cli'
+        })
+        : null;
+      if (laneRefusal) {
+        const refused = { launched: false, code: laneRefusal.code, retryable: laneRefusal.retryable, message: laneRefusal.error };
+        if (lane === 'triage') triage = refused; else autopilot = refused;
+      } else if (action === 'triage') {
         triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
       } else if (action === 'autopilot') {
         autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
@@ -4320,7 +4341,14 @@ ${goal}`
       if (!result.success || !result.issue) {
         return jsonError(res, 502, 'Issue was not updated', { detail: result || null });
       }
-      return res.json({ success: true, issue: result.issue });
+      res.json({ success: true, issue: result.issue });
+      // Seam 2 (LIN-3366): a state write may have made the ticket terminal.
+      if (onTicketWrite && stateId) {
+        void Promise.resolve()
+          .then(() => onTicketWrite({ urlKey: workspace.urlKey, written: result.issue, readBack: () => provider.fetchIssueContext(token, issueId) }))
+          .catch(e => console.error('[ticket-closer] seam 2 failure:', e?.message || e));
+      }
+      return;
     } catch (err) {
       if (issueRefResolutionFailed(res, err)) return;
       if (partialWriteFailed(res, err)) return;
@@ -4585,9 +4613,17 @@ ${goal}`
           } else {
             try {
               const markDone = seam.markDone || defaultMarkDone;
-              await markDone({ provider, callScope, issueIdentifier });
+              const written = await markDone({ provider, callScope, issueIdentifier });
               done = true;
               doneNow = true;
+              // Seam 3 (LIN-3366): only here, never on the `mergedEvent.doneAt`
+              // branch above, so a merge that already carries `doneAt` never re-fires.
+              // `defaultMarkDone` returns `{success, issue}`; the helper unwraps it.
+              if (onTicketWrite) {
+                void Promise.resolve()
+                  .then(() => onTicketWrite({ urlKey: workspace.urlKey, written, readBack: () => provider.fetchIssueContext(callScope, issueIdentifier) }))
+                  .catch(e => console.error('[ticket-closer] seam 3 failure:', e?.message || e));
+              }
               if (mergedEvent && closeOutEventsStore) {
                 mergedEvent = await closeOutEventsStore.stampDone({
                   urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: new Date(), doneError: null,

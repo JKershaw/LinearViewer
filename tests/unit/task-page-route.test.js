@@ -173,13 +173,13 @@ describe('GET /workspace/:urlKey/api/task/:identifier/state', () => {
     const res = await call(makeRouter(makeLoader()), STATE, { provider: name, params: { identifier: 'LIN-50' }, query: { issueId: UUID } });
     assert.equal(res.statusCode, 200);
     assert.deepEqual(calls, [], 'the state endpoint never touches the provider');
-    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['contextHtml', 'contextSig', 'headerHtml', 'live', 'status', 'trackHtml']);
+    // LIN-3373: the state read holds no verified brief/recap, so it sends no context.
+    assert.deepEqual(Object.keys(res.jsonBody).sort(), ['headerHtml', 'live', 'status', 'trackHtml']);
     assert.equal(res.jsonBody.status, 'running');
     assert.equal(res.jsonBody.live, true);
     assert.match(res.jsonBody.headerHtml, /data-testid="task-page-status"/);
     assert.match(res.jsonBody.trackHtml, /data-loop-id="l1"/);
-    assert.equal(typeof res.jsonBody.contextSig, 'string');
-    assert.doesNotMatch(res.jsonBody.contextHtml, /task-page-ask|task-page-owner-widgets/, 'viewer-blind: no owner control is re-sent');
+    assert.doesNotMatch(res.jsonBody.headerHtml, /task-page-ask|task-page-owner-widgets/, 'viewer-blind: no owner control is re-sent');
     assert.equal(res.headers['Cache-Control'], 'no-store');
   });
 
