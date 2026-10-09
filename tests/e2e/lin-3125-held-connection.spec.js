@@ -82,7 +82,9 @@ test.describe('Held connection picker (LIN-3125 Phase 3)', () => {
     await page.waitForURL('**/connect/github/held');
     await page.locator(`input[name="repo"][value="${REPO_C}"]`).check();
     await page.locator('[data-testid="github-repo-submit"]').click();
-    await page.waitForURL(/\/workspace\/repo-c\/$/);
+    // LIN-3382: the new workspace's key is the resolver's `gh-<name>-<installationId>`
+    // (the seeded installation is 4242), no longer the bare repo name.
+    await page.waitForURL(/\/workspace\/gh-repo-c-4242\/$/);
     await expect(page.locator('.project-header:has-text("octocat/repo-c")')).toBeVisible();
 
     // ---- 3. one connection, all bindings share it, no credentials ----

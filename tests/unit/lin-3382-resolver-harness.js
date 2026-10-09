@@ -12,6 +12,7 @@
  */
 import { createWorkspaceUrlKeyResolver } from '../../lib/workspace-urlkey.js';
 import { createUrlKeyHolderFinder } from '../../lib/urlkey-holders.js';
+import { createReferentHolderReader } from '../../lib/connection-credential.js';
 
 const touches = (value, wanted) => (Array.isArray(wanted) ? wanted.includes(value) : value === wanted);
 
@@ -130,4 +131,39 @@ export function sessionWorkspace({ id, urlKey, bindings = [] }) {
  */
 export function withResolver(world = createResolverWorld()) {
   return { resolveWorkspaceUrlKey: world.resolve };
+}
+
+/**
+ * The resolver exactly as server.js builds it, over REAL stores (MangoDB-backed
+ * in the tests that use it): the strict holder finder plus the account stores.
+ * Use this when a test must prove "no new rows in the holder stores" on a real
+ * bind, instead of the in-memory world above.
+ *
+ * @param {Object} stores
+ * @param {Object} stores.connectionStore
+ * @param {Object} stores.ownerCredentialStore
+ * @param {Object} stores.accountStore
+ * @param {Object} stores.accountWorkspaceStore
+ * @param {Object} stores.proxyTokenStore
+ * @param {Object} stores.dispatchTokenStore
+ * @returns {function(Object): Promise<Object>} `resolveWorkspaceUrlKey`
+ */
+export function createStoreBackedResolver({
+  connectionStore, ownerCredentialStore, accountStore, accountWorkspaceStore, proxyTokenStore, dispatchTokenStore
+}) {
+  const finder = createUrlKeyHolderFinder({
+    readReferents: createReferentHolderReader({ connectionStore, strict: true }),
+    ownerCredentialStore,
+    proxyTokenStore,
+    dispatchTokenStore,
+    resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+    strict: true
+  });
+  return createWorkspaceUrlKeyResolver({
+    findEvidence: (urlKeys) => finder.findEvidence(urlKeys),
+    listAccountsForWorkspace: (workspaceId) => accountWorkspaceStore.listAccountsForWorkspace(workspaceId),
+    resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+    findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope),
+    listHolderRowsByWorkspaceId: (workspaceId) => proxyTokenStore.listHolderRowsByWorkspaceId(workspaceId, { strict: true })
+  });
 }

@@ -393,7 +393,7 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // this flow's own cookie jar. That isolation is cheap hygiene, not a fix
     // for a urlKey collision: the seeding call's own seeded workspace uses the
     // fixture's fixed `jira-workspace` urlKey, which never collides with this
-    // flow's derived `acme` (deriveJiraUrlKey, routes/jira-auth.js) — the
+    // flow's resolved `acme` (resolveWorkspaceUrlKey, lib/workspace-urlkey.js) — the
     // fake's only load-bearing effect is the process-level `clientFactory`
     // registration, and the response/session it creates is discarded.
     const seedContext = await browser.newContext();
@@ -418,9 +418,15 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // The `mode:'new'` single-site bootstrap lands IN the workspace, no query
     // string (`completeJiraNewLogin`'s `finish()`, routes/jira-auth.js) — this
     // is the add-source arm's `?provider_ok=jira`, not this one.
-    // `deriveJiraUrlKey` derives `acme` from the fake accessible-resources
-    // site (`https://acme.atlassian.net`) against this flow's own empty
-    // `existingWorkspaces` (the seeding call never touched this session).
+    // LIN-3382: the key is `acme`, the site tenant of the fake accessible-
+    // resources site (`https://acme.atlassian.net`), and NOT the id-bearing
+    // `jira-<cloudId>` a never-seen identity gets. The seeding call above made
+    // the SAME Atlassian identity's `jira:<accountId>` workspace and its durable
+    // account-workspace edge (the stores are server-wide, only the cookie jar is
+    // isolated), so this bind reads as a RETURNING workspace with an expired
+    // session and no key record: it gets today's base key, holder-tested
+    // (tests/unit/workspace-urlkey.test.js "(ii)"). A first-time identity's
+    // `jira-<cloudId>` is pinned in tests/unit/lin-1890-jira-entry-layer.test.js.
     expect(callbackRes.headers()['location']).toBe('/workspace/acme/');
 
     // Dashboard: the post-redirect read resolves through the SAME seeded

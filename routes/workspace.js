@@ -96,7 +96,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     const workspace = {
       id: randomUUID(),
       name,
-      urlKey,
+      urlKey: resolved.urlKey,
       addedAt: Date.now(),
     }
     linkProvider(workspace, 'local', urlKey, {
