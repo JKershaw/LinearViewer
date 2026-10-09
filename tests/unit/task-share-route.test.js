@@ -416,20 +416,44 @@ describe('render-time secret masking (LIN-3389)', () => {
     }
   });
 
-  test('a secret in a session (agent) message is masked', async () => {
-    const model = guestModel();
-    const probe = renderTaskPage({ ...model, sessions: [{ state: 'running', message: 'zzz', startedAt: NOW.toISOString() }] }, { viewer: 'guest', urlKey: 'acme', binding: {}, stateUrl: '/s', now: NOW, pageOptions: { deployInfo: {}, workspaces: [], featureFlags: {}, openRouterSource: null } });
-    if (!probe.includes('zzz')) return; // model shape renders no session text; covered by the generic cases
+  test('secrets in an agent (stage-session) message and a ledger row are masked', async () => {
+    const startedAt = NOW.toISOString();
+    const model = {
+      ...guestModel(),
+      stages: [{
+        id: 'l1', kind: 'review', label: 'review', state: 'done', open: true, attempts: 1,
+        startedAt, durationMs: 1000,
+        sessions: [{ state: 'done', message: `agent ${F.githubPat}`, endedAt: startedAt, links: [], loopId: 'l1' }],
+        checkIns: [],
+      }],
+      evidence: {
+        state: { pr: null },
+        ledger: { ledger: { present: true, empty: false, items: [{ id: 'L1', scope: 'inside', claim: `ledger ${F.awsAccessKey}`, discharged: false }] } },
+      },
+    };
     const { base, close } = await build({
       store: withRecord(),
-      loader: fakeLoader({ loadTaskPage: async () => ({ model: { ...model, sessions: [{ state: 'running', message: F.githubPat, startedAt: NOW.toISOString() }] } }) }),
+      loader: fakeLoader({ loadTaskPage: async () => ({ model }) }),
     });
     try {
       await withLogs(async () => {
         const res = await get(base, `/t/${TOKEN}`);
-        assert.ok(!res.text.includes(F.githubPat));
+        assert.equal(res.status, 200);
+        assert.ok((res.text.match(/\[redacted\]/g) || []).length >= 2, 'agent message and ledger row both redacted');
+        assert.ok(!res.text.includes(F.githubPat), 'agent message secret reached the body');
+        assert.ok(!res.text.includes(F.awsAccessKey), 'ledger row secret reached the body');
       });
     } finally { await close(); }
+  });
+
+  test('the guest page has exactly one inline <script> (masker skips script bodies)', () => {
+    const html = renderTaskPage(guestModel(), {
+      viewer: 'guest', urlKey: 'acme', binding: {}, stateUrl: '/s', now: NOW,
+      pageOptions: { deployInfo: {}, workspaces: [], featureFlags: {}, openRouterSource: null },
+    });
+    const inline = (html.match(/<script\b(?![^>]*\bsrc=)[^>]*>/gi) || []);
+    assert.equal(inline.length, 1,
+      'maskSecretsInHtml skips <script> bodies because the only inline script is the static theme pre-paint; a new inline script or embeddedData carrying runtime text forces a masking decision');
   });
 
   test('a clean page is byte-identical to the unmasked render', async () => {
