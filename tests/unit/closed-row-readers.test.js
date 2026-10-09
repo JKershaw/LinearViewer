@@ -7,7 +7,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { isLoopActive } from '../../lib/live-console.js';
+import { isLoopActive, deriveLoopLanes, buildTimeline, packTimelineRows } from '../../lib/live-console.js';
 import { sweepOneWorkspace } from '../../lib/liveness-alarm-sweep.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { renderTaskTrack } from '../../lib/render-task-page.js';
@@ -123,5 +123,45 @@ describe('LIN-3364 readers honour the stamp', () => {
     const l = loops.find(x => x.loopId === doc._id);
     assert.ok(l, 'loop present');
     assert.ok(l.bookkeeping, 'lean loop carries bookkeeping');
+  });
+
+  // LIN-3368: the two Live Console wake paths are KEPT as presentation (LIN-2905),
+  // not as stale-row hides. These pin that they stay correct on closed rows, so
+  // nobody re-adds a fold to compensate. Mutation: drop the `isLoopActive`
+  // check in deriveLoopLanes, or the freshness check in buildTimeline, and the
+  // matching test below goes red.
+  describe('LIN-3368 kept wake presentation is correct on closed rows', () => {
+    const wake = (over = {}) => loop({
+      loopId: 'w1', lineageId: 'w1', kind: 'wake', followUpTo: 'l1', issueIdentifier: 'LIN-51',
+      agentAction: 'wake-action', agentTokenId: 'wake-tok', ...over
+    });
+    const target = (over = {}) => loop({ agentAction: 'target-action', agentTokenId: 'target-tok', ...over });
+
+    test('a stamped wake produces no lane, and does not surface under its target', () => {
+      assert.deepEqual(deriveLoopLanes([target(), closed({ ...wake(), bookkeeping: STAMP })]).map(l => l.task), ['LIN-50']);
+      assert.deepEqual(deriveLoopLanes([closed({ loopId: 'l1' }), closed({ ...wake(), bookkeeping: STAMP })]), []);
+    });
+
+    test('a stamped target does not donate its action to a live wake', () => {
+      const lanes = deriveLoopLanes([target({ bookkeeping: STAMP }), wake()]);
+      assert.equal(lanes.length, 1);
+      assert.equal(lanes[0].task, 'LIN-50', 'grouped under the target, not a mislabeled LIN-51 lane');
+      assert.equal(lanes[0].action, 'wake-action', 'action comes from the live wake, not the closed target');
+      const live = deriveLoopLanes([target(), wake()]);
+      assert.equal(live[0].action, 'target-action', 'control: an active target still donates');
+    });
+
+    test('a stamped wake marker folded into its target is not stillRunning', () => {
+      const now = Date.parse('2026-10-06T10:30:00.000Z');
+      const markerOf = (w) => {
+        const { runs } = buildTimeline([target(), w], { now });
+        const bar = packTimelineRows(runs).rows.flat().find(r => r.id === 'l1');
+        assert.ok(bar, 'the target keeps its bar; the wake has none of its own');
+        assert.equal(runs.length, 2, 'control: buildTimeline emits both runs');
+        return bar.wakeMarkers.find(m => m.id === 'w1');
+      };
+      assert.equal(markerOf(wake()).stillRunning, true, 'control: a live wake marker is running');
+      assert.notEqual(markerOf(closed({ ...wake(), bookkeeping: STAMP })).stillRunning, true);
+    });
   });
 });
