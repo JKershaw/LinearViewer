@@ -445,7 +445,7 @@ export function buildReport({ perWorkspace, now, headSha, runner = null }) {
   // Headline: unknown FIRST, so an all-unreadable run cannot pass for a clean zero.
   L.push(`# False live rows — unknown: ${sum(w => w.unknown)} | false-live: ${total} (c1 ${sum(w => w.clause1)}, c2 ${sum(w => w.clause2)}, c3 ${sum(w => w.clause3)}, c4 ${sum(w => w.clause4)}) | false closes: ${falseCloseTotal}`);
   if (runner) {
-    L.push(`Paired measure (target 0 each) — runner unknown: ${runner.read ? runner.unknown : 'sessions.json not read'} | runner active zombies: ${runner.activeZombies} | parked on terminal tickets: ${runner.parkedOnTerminal} | posts after the end: ${sum(w => w.postsAfterEnd.rows.length)} rows | c3 with C's stamp disabled: ${sum(w => w.clause3NoStamp)}`);
+    L.push(`Paired measure (target 0 each) — runner unknown: ${runner.read ? runner.unknown : 'sessions.json not read'} | runner active zombies: ${runner.read ? runner.activeZombies : 'unknown'} | parked on terminal tickets: ${runner.read ? runner.parkedOnTerminal : 'unknown'} | posts after the end: ${sum(w => w.postsAfterEnd.rows.length)} rows | c3 with C's stamp disabled: ${sum(w => w.clause3NoStamp)}`);
   }
   L.push('');
   L.push(`Run at: ${new Date(now).toISOString()}`);
