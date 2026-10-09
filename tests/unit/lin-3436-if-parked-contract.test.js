@@ -173,6 +173,37 @@ describe('LIN-3436 — GET /api/dispatch/poll reads X-Harbour-Consumer-Caps', ()
   });
 });
 
+describe('LIN-3436 — POST /workspace/:urlKey/api/dispatch persists ifParked', () => {
+  function workspaceApp(store) {
+    const app = express();
+    app.use(express.json());
+    app.use(createDispatchRoutes({
+      workspaceOwnerCheck: async () => ({ status: 'owner' }),
+      dispatchQueueStore: store,
+      dispatchTokenStore: {},
+      workspaceFromUrl: (req, res, next) => {
+        req.workspace = { urlKey: req.params.urlKey };
+        req.session = { accountId: 'u1', linearUserId: 'u1' };
+        next();
+      },
+      userPreferencesStore: {},
+      workspaceHaltStore: null
+    }));
+    return app;
+  }
+
+  test('an ifParked abort is stored as ifParked, delivered only to an advertising poller', async () => {
+    const store = makeStore();
+    const res = await call(workspaceApp(store), 'post', '/workspace/acme/api/dispatch', { body: { abort: true, abortTo: TARGET, ifParked: true, target: 'cli' } });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
+
+    const [item] = await store.pollAvailable('acme', { caps: ['if-parked'] });
+    assert.equal(item.abort, true);
+    assert.equal(item.ifParked, true, 'the route must persist ifParked, or the row is stored as a plain abort');
+    assert.deepEqual(await store.pollAvailable('acme'), [], 'a poll without caps does not see it');
+  });
+});
+
 describe('LIN-3436 — the runner poll route and POST /api/proxy/dispatch', () => {
   const runnerToken = { tokenId: 't1', urlKey: ACME, label: 'runner', scope: 'readWrite', createdBy: 'u1', grants: ['take', 'dispatch'], workspaceId: 'ws-acme' };
   function proxyApp() {
