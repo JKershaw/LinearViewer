@@ -460,8 +460,8 @@ function initDispatchPagePrompt() {
 
   // Single delegated handler on the dispatch section
   section.addEventListener('click', async (e) => {
-    // Handle proxy toggle clicks (window.ProxyToggle in common.js handles these
-    // via document delegation; bail here so this section's other handlers don't fire)
+    // Handle proxy toggle clicks (window.ProxyToggle in common.js binds the
+    // button itself; bail here so this section's other handlers don't fire)
     if (e.target.closest('.prompt-proxy-toggle')) return
 
     // Handle "load Autopilot" clicks: fetch the general (stack-walk) kickoff,

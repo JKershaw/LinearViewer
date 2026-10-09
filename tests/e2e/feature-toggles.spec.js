@@ -70,11 +70,22 @@ test.describe('Feature Toggle Settings', () => {
     // linearMcp should start ON
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('● on');
 
+    // LIN-3401: the bound click handler must be what saves, not the button's native
+    // form submit (which also persists the toggle and would mask a missing handler).
+    // Prove the AJAX path ran: an XHR-flagged POST, and no main-frame navigation.
+    let navigated = false;
+    page.on('framenavigated', (f) => { if (f === page.mainFrame()) navigated = true; });
+    const ajaxPost = page.waitForRequest((r) =>
+      r.method() === 'POST' && r.headers()['x-requested-with'] === 'XMLHttpRequest' && /\/settings\//.test(r.url())
+    );
+
     // Click the toggle button to turn it off (AJAX — no page reload)
     await page.locator('[data-feature="linearMcp"] .toggle-btn').click();
+    await ajaxPost;
 
     // Should update inline via AJAX
     await expect(page.locator('[data-feature="linearMcp"] .toggle-state')).toHaveText('○ off');
+    expect(navigated, 'the toggle saved in place, not by a full-page form submit').toBe(false);
 
     // Reload page — state should persist (stored in session)
     await page.reload();

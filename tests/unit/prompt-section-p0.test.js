@@ -117,7 +117,7 @@ function makeContainer() {
         dataset: { ...match },
         disabled: false,
         textContent: '',
-        closest: () => btn,
+        closest: (sel) => (/^button/.test(sel) ? btn : null),
       };
       await this._clickHandler({ target: btn });
       return btn;
@@ -962,7 +962,7 @@ describe('LIN-3211: the run-step rung sends the card panel\'s harness, else clau
       dataset: { action: 'run-step', target: 'cli' },
       disabled: false,
       textContent: '',
-      closest: (selector) => (selector.includes('swipe-prompt-options') ? null : btn),
+      closest: (selector) => (/^button/.test(selector) ? btn : null),
     };
     await container._clickHandler({ target: btn });
     await flush();
@@ -1031,7 +1031,7 @@ describe('LIN-2944 P1 F9: the picker and the primary under the flag states', () 
 
     // A disabled button never fires a click (the browser guarantee); the guard in
     // handleClick is the load-bearing half, so press with a disabled synthetic button.
-    const btn = { dataset: { prompt: '__ai__' }, disabled: true, textContent: '', closest: () => btn };
+    const btn = { dataset: { prompt: '__ai__' }, disabled: true, textContent: '', closest: (sel) => (/^button/.test(sel) ? btn : null) };
     await container._clickHandler({ target: btn });
     await flush();
     assert.equal(calls.fetch.length, 0, 'no recommend request from a disabled primary');

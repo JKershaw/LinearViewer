@@ -74,10 +74,6 @@
   var copyBtn = document.getElementById('flight-companion-copy');
   var copyFeedback = document.getElementById('flight-companion-copy-feedback');
   if (copyBtn) copyBtn.addEventListener('click', copyPrompt);
-  // This page has no real +proxy toggle; keep ProxyToggle's delegated handler
-  // from answering a look-alike one in the thread. Set before common.js's
-  // DOMContentLoaded `init`.
-  if (window.ProxyToggle && window.ProxyToggle.disableDelegation) window.ProxyToggle.disableDelegation();
 
   async function copyPrompt() {
     var pre = copyPre;
