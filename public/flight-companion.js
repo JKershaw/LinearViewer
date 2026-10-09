@@ -66,10 +66,23 @@
 
   // ─── Existing behaviour (LIN-1764), unchanged ──────────────────────────────
 
+  // LIN-3385: the copy control is captured ONCE here, at top level, before this
+  // script renders any restored chat markdown, and bound directly. The press
+  // reads these references, never `getElementById` again: ticket-derived text
+  // in the thread can carry the same ids.
+  var copyPre = document.getElementById('flight-companion-prompt');
+  var copyBtn = document.getElementById('flight-companion-copy');
+  var copyFeedback = document.getElementById('flight-companion-copy-feedback');
+  if (copyBtn) copyBtn.addEventListener('click', copyPrompt);
+  // This page has no real +proxy toggle; keep ProxyToggle's delegated handler
+  // from answering a look-alike one in the thread. Set before common.js's
+  // DOMContentLoaded `init`.
+  if (window.ProxyToggle && window.ProxyToggle.disableDelegation) window.ProxyToggle.disableDelegation();
+
   async function copyPrompt() {
-    var pre = document.getElementById('flight-companion-prompt');
-    var btn = document.getElementById('flight-companion-copy');
-    var feedback = document.getElementById('flight-companion-copy-feedback');
+    var pre = copyPre;
+    var btn = copyBtn;
+    var feedback = copyFeedback;
     if (!pre || !btn) return;
     var text = pre.textContent || '';
     try {
@@ -93,8 +106,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    var btn = document.getElementById('flight-companion-copy');
-    if (btn) btn.addEventListener('click', copyPrompt);
     loadPlaybookEmptyState();
   });
 
@@ -1478,7 +1489,6 @@
       scheduleAutoWake(remaining !== null ? remaining : cadence.delayMs);
     }
   }
-  document.addEventListener('visibilitychange', onVisibilityChange);
 
   // ─── Turn send/receive ───────────────────────────────────────────────────
 
@@ -2020,100 +2030,123 @@
   // turn's own usage payload.
   var resumeAnchorMs = null;
   var keepStopped = false;
-  if (urlKey) {
-    var restoredSession = loadStoredSession(urlKey);
-    restoredSession.seenIdentifiers.forEach(function (id) { seenIdentifiers.add(id); });
-    if (restoredSession.history.length) {
-      chatHistory = restoredSession.history;
-      restoredSession.history.forEach(function (turn) {
-        if (turn.role === 'user') {
-          appendUserBubble(turn.content);
-        } else if (turn.role === 'assistant') {
-          var restoredBody = appendAssistantBubble();
-          window.ChatUI.renderMarkdownText(restoredBody, turn.content);
-          foldReadout(restoredBody);
-          setBubbleState(restoredBody.closest('li'), 'done');
-        } else if (turn.kind === 'proposal') {
-          // LIN-2772: re-render through the SAME renderProposal the live
-          // stream uses (no second rendering path for restored proposals),
-          // immediately forced into its read-only resolved state — the
-          // approve path cannot reach a live id after reload, so the card
-          // must never be interactive.
-          renderProposal(JSON.stringify({ sessionId: turn.sessionId, prompt: turn.prompt }), null, { restored: true });
-        }
-      });
-    }
-    tabCheckInCount = restoredSession.tabCheckInCount;
-    tabTotalCost = restoredSession.tabTotalCost;
-    updateTabTotalDisplay();
-    // LIN-2623 beat 3 / LIN-3363 S2: restore the picker's own choice. The old
-    // native <select> silently ignored a stored value matching none of its
-    // options; a text-backed combobox does not, so the stored id is checked
-    // explicitly against the rendered (offered) list. A stale id (a model since
-    // removed from AVAILABLE_MODELS or the catalog, or a cold catalog on this
-    // load) leaves the committed value '' — the same safe "no override" state
-    // a fresh session starts in — and the session is re-saved so the stale id
-    // does not linger and 400 the next turn.
-    if (modelSelectEl && restoredSession.selectedModel) {
-      if (findModelOption(restoredSession.selectedModel)) {
-        // No persist: the stored blob already holds this id (and its cadence).
-        commitModel(restoredSession.selectedModel, { persist: false });
-      } else if (urlKey) {
-        saveStoredSession(urlKey, {
-          history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
-          selectedModel: '', cadence: restoredSession.cadence,
-          seenIdentifiers: restoredSession.seenIdentifiers,
+
+  // LIN-3385: the restore-through-wake block runs from `startSession()`, on a
+  // DOMContentLoaded handler registered LAST (below), not at script top level.
+  // At top level it rendered restored chat markdown (ticket-derived text that
+  // keeps `data-*`/`id`/`class`) BEFORE common.js's DOMContentLoaded auto-init
+  // and the footer widget's lookups, so a look-alike control in a restored turn
+  // could be matched by label. Run late, every Harbour lookup has already
+  // happened on a markdown-free page. The block moves as ONE unit and keeps its
+  // internal order, which LIN-2716 / LIN-2771 pin: restore, THEN `beforeunload`,
+  // THEN `scheduleAutoWake`, with the resume anchor consumed once. The
+  // `visibilitychange` registration moved in with it so a hide/reveal between
+  // parse and DOMContentLoaded cannot arm a wake before the restore.
+  function startSession() {
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    if (urlKey) {
+      var restoredSession = loadStoredSession(urlKey);
+      restoredSession.seenIdentifiers.forEach(function (id) { seenIdentifiers.add(id); });
+      if (restoredSession.history.length) {
+        chatHistory = restoredSession.history;
+        restoredSession.history.forEach(function (turn) {
+          if (turn.role === 'user') {
+            appendUserBubble(turn.content);
+          } else if (turn.role === 'assistant') {
+            var restoredBody = appendAssistantBubble();
+            window.ChatUI.renderMarkdownText(restoredBody, turn.content);
+            foldReadout(restoredBody);
+            setBubbleState(restoredBody.closest('li'), 'done');
+          } else if (turn.kind === 'proposal') {
+            // LIN-2772: re-render through the SAME renderProposal the live
+            // stream uses (no second rendering path for restored proposals),
+            // immediately forced into its read-only resolved state — the
+            // approve path cannot reach a live id after reload, so the card
+            // must never be interactive.
+            renderProposal(JSON.stringify({ sessionId: turn.sessionId, prompt: turn.prompt }), null, { restored: true });
+          }
         });
       }
-    }
-    // LIN-2771: restore the wake cadence from its wall-clock anchor. A stored
-    // cadence with a finite nextFireAt means a wake was PENDING when the tab
-    // left — restore its backoff length and let the first auto-wake fire at
-    // the ORIGINAL anchor (remaining time), not a fresh full wait. A record
-    // with nextFireAt: null and no stoppedReason (timer was not armed — just
-    // hidden, or an old blob) leaves cadence at today's default. LIN-2771
-    // beat 3: a record with nextFireAt: null AND a stoppedReason means the
-    // cadence was deliberately stopped — re-arm it (at CADENCE_BASE_MS, the
-    // cheap path) unless the page can still show the reason holds.
-    if (restoredSession.cadence && typeof restoredSession.cadence.nextFireAt === 'number') {
-      cadence = { delayMs: restoredSession.cadence.delayMs, stopped: false, stoppedReason: null };
-      resumeAnchorMs = restoredSession.cadence.nextFireAt;
-    } else if (restoredSession.cadence && restoredSession.cadence.stoppedReason) {
-      // The page's own AI-config attribute (server-rendered) is the one
-      // reason signal the page can still show holds; everything else is
-      // either provably cleared or uncheckable → re-arm.
-      var aiConfigured = page && page.dataset ? page.dataset.fcAiConfigured : undefined;
-      if (shouldReArmOnLoad(restoredSession.cadence.stoppedReason, aiConfigured)) {
-        cadence = { delayMs: CADENCE_BASE_MS, stopped: false, stoppedReason: null };
-      } else {
-        cadence = { delayMs: restoredSession.cadence.delayMs, stopped: true, stoppedReason: restoredSession.cadence.stoppedReason };
-        keepStopped = true;
+      tabCheckInCount = restoredSession.tabCheckInCount;
+      tabTotalCost = restoredSession.tabTotalCost;
+      updateTabTotalDisplay();
+      // LIN-2623 beat 3 / LIN-3363 S2: restore the picker's own choice. The old
+      // native <select> silently ignored a stored value matching none of its
+      // options; a text-backed combobox does not, so the stored id is checked
+      // explicitly against the rendered (offered) list. A stale id (a model since
+      // removed from AVAILABLE_MODELS or the catalog, or a cold catalog on this
+      // load) leaves the committed value '' — the same safe "no override" state
+      // a fresh session starts in — and the session is re-saved so the stale id
+      // does not linger and 400 the next turn.
+      if (modelSelectEl && restoredSession.selectedModel) {
+        if (findModelOption(restoredSession.selectedModel)) {
+          // No persist: the stored blob already holds this id (and its cadence).
+          commitModel(restoredSession.selectedModel, { persist: false });
+        } else if (urlKey) {
+          saveStoredSession(urlKey, {
+            history: chatHistory, tabCheckInCount: tabCheckInCount, tabTotalCost: tabTotalCost,
+            selectedModel: '', cadence: restoredSession.cadence,
+            seenIdentifiers: restoredSession.seenIdentifiers,
+          });
+        }
       }
+      // LIN-2771: restore the wake cadence from its wall-clock anchor. A stored
+      // cadence with a finite nextFireAt means a wake was PENDING when the tab
+      // left — restore its backoff length and let the first auto-wake fire at
+      // the ORIGINAL anchor (remaining time), not a fresh full wait. A record
+      // with nextFireAt: null and no stoppedReason (timer was not armed — just
+      // hidden, or an old blob) leaves cadence at today's default. LIN-2771
+      // beat 3: a record with nextFireAt: null AND a stoppedReason means the
+      // cadence was deliberately stopped — re-arm it (at CADENCE_BASE_MS, the
+      // cheap path) unless the page can still show the reason holds.
+      if (restoredSession.cadence && typeof restoredSession.cadence.nextFireAt === 'number') {
+        cadence = { delayMs: restoredSession.cadence.delayMs, stopped: false, stoppedReason: null };
+        resumeAnchorMs = restoredSession.cadence.nextFireAt;
+      } else if (restoredSession.cadence && restoredSession.cadence.stoppedReason) {
+        // The page's own AI-config attribute (server-rendered) is the one
+        // reason signal the page can still show holds; everything else is
+        // either provably cleared or uncheckable → re-arm.
+        var aiConfigured = page && page.dataset ? page.dataset.fcAiConfigured : undefined;
+        if (shouldReArmOnLoad(restoredSession.cadence.stoppedReason, aiConfigured)) {
+          cadence = { delayMs: CADENCE_BASE_MS, stopped: false, stoppedReason: null };
+        } else {
+          cadence = { delayMs: restoredSession.cadence.delayMs, stopped: true, stoppedReason: restoredSession.cadence.stoppedReason };
+          keepStopped = true;
+        }
+      }
+    }
+
+    window.addEventListener('beforeunload', function () {
+      if (timerId) { clearTimeout(timerId); timerId = null; timerDelayMs = null; }
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    });
+
+    // First attempt at t=30s (deliberately unlike observation.js's free
+    // poll — this call is billable, so there is no call at t=0). If the tab
+    // starts hidden, onVisibilityChange schedules the first attempt once it
+    // becomes visible instead. LIN-2771: with a restored wall-clock anchor the
+    // first attempt is at the ORIGINAL fire time's remaining duration
+    // (Math.max(0, ...) — an anchor already past fires on the next tick),
+    // never a fresh full wait. LIN-2771 beat 3: a cadence kept stopped (the
+    // page can still show the stop reason holds) schedules nothing and shows
+    // the stopped placeholder, exactly as a live stop does today.
+    if (keepStopped) {
+      if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
+    } else if (!document.hidden) {
+      // LIN-2771 (review ledger): consume (and clear) the pending resume anchor
+      // here too — when the tab is visible at load the anchor is used now, so
+      // a later visibility change must not re-fire the stale remaining time.
+      var initialDelayMs = consumeResumeAnchorDelay();
+      scheduleAutoWake(initialDelayMs !== null ? initialDelayMs : cadence.delayMs);
     }
   }
 
-  window.addEventListener('beforeunload', function () {
-    if (timerId) { clearTimeout(timerId); timerId = null; timerDelayMs = null; }
-    document.removeEventListener('visibilitychange', onVisibilityChange);
-  });
-
-  // First attempt at t=30s (deliberately unlike observation.js's free
-  // poll — this call is billable, so there is no call at t=0). If the tab
-  // starts hidden, onVisibilityChange schedules the first attempt once it
-  // becomes visible instead. LIN-2771: with a restored wall-clock anchor the
-  // first attempt is at the ORIGINAL fire time's remaining duration
-  // (Math.max(0, ...) — an anchor already past fires on the next tick),
-  // never a fresh full wait. LIN-2771 beat 3: a cadence kept stopped (the
-  // page can still show the stop reason holds) schedules nothing and shows
-  // the stopped placeholder, exactly as a live stop does today.
-  if (keepStopped) {
-    if (nextCheckInEl) nextCheckInEl.textContent = 'next check-in: —';
-  } else if (!document.hidden) {
-    // LIN-2771 (review ledger): consume (and clear) the pending resume anchor
-    // here too — when the tab is visible at load the anchor is used now, so
-    // a later visibility change must not re-fire the stale remaining time.
-    var initialDelayMs = consumeResumeAnchorDelay();
-    scheduleAutoWake(initialDelayMs !== null ? initialDelayMs : cadence.delayMs);
+  // Single call site. The node:vm unit seam has no `readyState` and runs it now.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startSession);
+  } else {
+    startSession();
   }
 
   // Test-only seam (inert in the browser, where `module` is undefined):

@@ -611,9 +611,9 @@
    * and `rawText` are both present AND `window.renderMarkdown` is a function
    * AND `DOMPurify` is available AND `marked` is available. The DOMPurify
    * guard is stronger than the `render-session.js` precedent this mirrors:
-   * `window.renderMarkdown` returns marked's UNSANITIZED output when
-   * DOMPurify alone is missing (common.js), so this is the one `html:` sink
-   * for model-authored chat text and it must never fire on that fallback.
+   * `window.renderMarkdown` returns escaped plain text when DOMPurify is
+   * missing (common.js, LIN-3385), so this guard keeps the chat bubble on its
+   * plain-text rendering rather than showing escaped markdown source.
    *
    * The `marked` guard (LIN-2670 close-out, ledger L2) is a behaviour
    * guard, not a security one — with marked absent `window.renderMarkdown`

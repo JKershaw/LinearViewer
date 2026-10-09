@@ -192,6 +192,8 @@
     }).catch(function () { return null; });
   }
 
+  const wired = new WeakSet();
+
   // Debounce tab-return so one return fires one check (the run page's N-a fix).
   let checkTimer = null;
   function scheduleCheck(box, doc) {
@@ -214,12 +216,20 @@
     if (!doc) return null;
     const box = doc.querySelector('[data-testid="run-evidence-closeout"]');
     if (!box) return null;
-    doc.addEventListener('click', function (e) {
-      const btn = e.target && e.target.closest ? e.target.closest('[data-action="closeout-press"]') : null;
-      if (!btn) return;
-      e.preventDefault();
-      pressCloseOut(box, btn);
-    });
+    // Once per box: the task page calls init itself (before it renders any
+    // markdown) and this script's own DOMContentLoaded call follows.
+    if (wired.has(box)) return box;
+    wired.add(box);
+    // LIN-3385: the press listens on the button Harbour rendered inside the
+    // captured box, never on the document by label. Ticket text formatted onto
+    // the page can carry `data-action="closeout-press"` but is not this element.
+    const btn = box.querySelector('[data-action="closeout-press"]');
+    if (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        pressCloseOut(box, btn);
+      });
+    }
     runCheck(box, doc);
     window.addEventListener('focus', function () { scheduleCheck(box, doc); });
     doc.addEventListener('visibilitychange', function () { if (!doc.hidden) scheduleCheck(box, doc); });

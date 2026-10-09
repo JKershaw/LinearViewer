@@ -33,6 +33,10 @@
 (function () {
   'use strict';
 
+  // LIN-3385: this page has no real +proxy toggle, so ProxyToggle's delegated
+  // click handler (common.js) must not answer a look-alike in ticket text.
+  if (typeof window !== 'undefined' && window.ProxyToggle && window.ProxyToggle.disableDelegation) window.ProxyToggle.disableDelegation();
+
   var FAST_MS = 10000;
   var SLOW_MS = 45000;
   var MAX_BACKOFF_MS = 5 * 60 * 1000;
@@ -497,6 +501,13 @@
     var rows = function () { return trackMount ? trackMount.querySelectorAll('.task-step') : []; };
     var memory = createOpenMemory(rows());
 
+    // LIN-3385: wire every Harbour control BEFORE the first markdown render
+    // (`enhanceContextMarkdown` below is the first). Ticket-derived markdown
+    // keeps `data-*`/`id`/`class`, so a control looked up after it lands could
+    // resolve to look-alike ticket text. The close-out box is captured here and
+    // its press button is bound directly (close-out.js is idempotent per box).
+    var closeOutBox = window.CloseOut && typeof window.CloseOut.init === 'function' ? window.CloseOut.init(doc) : null;
+
     // Owner's live widgets (if the libs loaded). Once mounted, the context
     // mount is never repainted; the widgets own their refresh.
     var widgetsMounted = mountWidgets(doc, main);
@@ -524,7 +535,7 @@
     // merge-ready attribute needs to track it: a check (or a poll) that moves
     // the box off `ready` clears the load-time answer's retention.
     function syncMergeReady() {
-      var box = doc.querySelector('[data-testid="run-evidence-closeout"]');
+      var box = closeOutBox;
       if (box && box.getAttribute('data-state') !== 'ready') main.setAttribute('data-merge-ready', 'false');
     }
 

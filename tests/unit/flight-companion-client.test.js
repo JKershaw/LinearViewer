@@ -267,7 +267,7 @@ class FakeElement {
   }
 }
 
-function makeDocument({ hiddenInitial = false } = {}) {
+function makeDocument({ hiddenInitial = false, readyState } = {}) {
   const byId = {};
   const listeners = {};
   let page = null;
@@ -275,6 +275,8 @@ function makeDocument({ hiddenInitial = false } = {}) {
     get hidden() { return doc._hidden; },
     set hidden(v) { doc._hidden = v; },
     _hidden: hiddenInitial,
+    // LIN-3385: set only by the lifecycle pin; the other harnesses have none.
+    ...(readyState ? { readyState } : {}),
     // LIN-2718: real document.activeElement, read by sendTurn (captured
     // BEFORE the composer lock, so a regression that reads it after would
     // see it already cleared by the disabled-setter's blur simulation
@@ -468,8 +470,8 @@ function sseResponse(frames) {
   };
 }
 
-function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl, pageDataset } = {}) {
-  const doc = makeDocument({ hiddenInitial });
+function loadClient({ hiddenInitial = false, fetchImpl, apiImpl, postCommentImpl, storageImpl, pageDataset, readyState } = {}) {
+  const doc = makeDocument({ hiddenInitial, readyState });
   const page = new FakeElement('main');
   page.dataset.urlKey = 'acme';
   // LIN-2771 beat 3: the real renderer emits `data-fc-ai-configured` on the
@@ -4337,5 +4339,64 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     const ok = loadClient({ pageDataset: { fcReadoutHeadings: '["The big thread"]' } });
     assert.ok(ok.exports);
     assert.doesNotThrow(() => loadClient({ pageDataset: { fcReadoutHeadings: '{oops' } }));
+  });
+});
+
+// LIN-3385: the restore-through-wake block runs from a DOMContentLoaded
+// handler registered last, so restored (ticket-derived) chat markdown reaches
+// the page only after common.js's auto-init and the footer widget have done
+// their label lookups. The block's internal order is the LIN-2716 / LIN-2771
+// pin: restore, THEN beforeunload, THEN scheduleAutoWake.
+describe('flight-companion.js — restore runs late, in order (LIN-3385)', () => {
+  const stored = () => makeFakeStorage({
+    'flight-companion-session:acme': JSON.stringify({
+      history: [
+        { role: 'user', content: 'is there a proposal?' },
+        { role: 'assistant', content: 'a <button data-action="closeout-press">x</button> reply' },
+        { kind: 'proposal', sessionId: 'sess-1', prompt: 'approve me?' },
+      ],
+      tabCheckInCount: 1,
+      tabTotalCost: 0,
+      selectedModel: null,
+    }),
+  });
+
+  test('while the document is loading, nothing is restored and nothing is armed; DOMContentLoaded then runs the block once, in order', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const c = loadClient({ readyState: 'loading', storageImpl: stored() });
+    const { exports: m, thread, doc, windowShim, fetchCalls } = c;
+
+    assert.strictEqual(c.chatUICalls.appendMessage.length, 0, 'no restored bubble before DOMContentLoaded');
+    assert.strictEqual(findByClass(thread, 'fc-proposal'), null, 'no restored proposal before DOMContentLoaded');
+    assert.strictEqual(m.getChatHistory().length, 0, 'history is not rehydrated yet');
+    assert.strictEqual(doc._listenerCount('visibilitychange'), 0, 'visibilitychange is not registered before the restore');
+    assert.strictEqual((windowShim._listeners.beforeunload || []).length, 0);
+    t.mock.timers.tick(120000);
+    assert.strictEqual(fetchCalls.length, 0, 'no cadence timer is armed before the restore');
+
+    // Record what is on the page at the instant beforeunload is wired.
+    let atBeforeUnload = null;
+    const origAdd = windowShim.addEventListener;
+    windowShim.addEventListener = function (type, fn) {
+      if (type === 'beforeunload') atBeforeUnload = { proposal: findByClass(thread, 'fc-proposal') !== null, history: m.getChatHistory().length };
+      return origAdd.call(windowShim, type, fn);
+    };
+
+    doc.dispatch('DOMContentLoaded');
+
+    assert.strictEqual(m.getChatHistory().length, 3, 'the stored turns are restored');
+    assert.notStrictEqual(findByClass(thread, 'fc-proposal'), null, 'the proposal is restored (read-only)');
+    assert.deepStrictEqual(atBeforeUnload, { proposal: true, history: 3 }, 'beforeunload is wired AFTER the restore');
+    assert.strictEqual(doc._listenerCount('visibilitychange'), 1);
+    assert.strictEqual((windowShim._listeners.beforeunload || []).length, 1);
+    t.mock.timers.tick(31000);
+    assert.ok(fetchCalls.length >= 1, 'the cadence timer is armed after the restore, at the first-attempt delay');
+  });
+
+  test('the block is not run at script top level: the only call sites are the readyState guard', () => {
+    const calls = CLIENT_CODE_ONLY.match(/\bstartSession\(\)/g) || [];
+    // one definition `function startSession()` + one immediate-run branch
+    assert.strictEqual(calls.length, 2, 'startSession is defined once and called once (immediate branch)');
+    assert.match(CLIENT_CODE_ONLY, /addEventListener\('DOMContentLoaded', startSession\)/);
   });
 });
