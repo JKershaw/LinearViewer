@@ -280,7 +280,7 @@ describe('GitHub account container (stable id github:<userId>), shared with /aut
     delete ok.githubPending;
     const res = await linkGithub(world, { session: ok, repo: 'octocat/7', projects: true });
     assert.equal(res.statusCode, 200);
-    assert.equal(ok.workspaces[0].urlKey, 'octocat');
+    assert.equal(ok.workspaces[0].urlKey, 'gh-42');
 
     const bare = containerSession(me, { githubProjectsPending: freshPending({ fresh: false }) });
     delete bare.githubPending;

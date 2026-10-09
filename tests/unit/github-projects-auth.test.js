@@ -529,14 +529,14 @@ describe('GitHub Projects auth routes', () => {
     assert.equal(session.workspaces.length, 1);
     const ws = session.workspaces[0];
     assert.equal(ws.id, 'github:42');
-    assert.equal(ws.urlKey, 'octocat');
+    assert.equal(ws.urlKey, 'gh-42');
     assert.equal(ws.provider, 'github-projects');
     const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
     assert.deepEqual(ws.bindings, [{ provider: 'github-projects', scope: 'octocat/5', credentials: { installationId: '99', token: 'ghs_inst', tokenExpiresAt: expectedExpiry } }]);
     assert.notEqual(ws.tokenExpiresAt, Number.MAX_SAFE_INTEGER);
     assert.equal(session.activeWorkspaceId, 'github:42');
     assert.equal(session.githubProjectsPending, undefined, 'pending cleared');
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
 
     // LIN-1329: the 5th sign-in path's actual deliverable — session.accountId
     // set, exactly one durable account minted, the sign-up provider (`github`,
@@ -633,7 +633,7 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     await handler({ body: { board: 'octofriend/7' }, session }, res);
 
-    assert.equal(res.redirectedTo, '/workspace/octofriend/');
+    assert.equal(res.redirectedTo, '/workspace/gh-99/');
     assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
     assert.equal(session.workspaces.length, 2, 'both workspace containers present (existingWorkspaces carried across regenerate too)');
     const account = await accountStore.getAccount(accountIdAfterA);
@@ -961,11 +961,11 @@ describe('GitHub Projects auth routes', () => {
     // Persisted credential is an INSTALLATION token for the board's resolved installation (77).
     assert.equal(ws.bindings.length, 1);
     await assertConnectionBackedLin711(stores.connectionStore, session, ws.bindings[0], {
-      urlKey: 'octocat', scope: 'octocat/5', installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry,
+      urlKey: 'gh-42', scope: 'octocat/5', installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry,
     });
     assert.ok(!JSON.stringify(session.workspaces).includes('gho_user'), 'discovery user token is never persisted');
     assert.equal(session.githubProjectsPending, undefined, 'pending cleared');
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
   });
 
   test('POST link (re-bind, add-source) mints + binds onto the viewed workspace without clobbering its primary (LIN-735)', async () => {
@@ -1330,11 +1330,11 @@ describe('GitHub Projects auth routes', () => {
     });
     const res1 = makeRes();
     await handler({ body: { board: 'octocat/5' }, session }, res1);
-    assert.equal(res1.redirectedTo, '/workspace/octocat/');
+    assert.equal(res1.redirectedTo, '/workspace/gh-42/');
     const accountId = session.accountId;
     assert.ok(accountId, 'the fresh account was established');
 
-    const ws = session.workspaces.find(w => w.urlKey === 'octocat');
+    const ws = session.workspaces.find(w => w.urlKey === 'gh-42');
 
     const afterStep1 = await connectionStore.collection.find({ accountId, provider: 'github-projects', unitId: '99' }).toArray();
     assert.equal(afterStep1.length, 1, 'new-container seam #6 wrote after step 1');
@@ -1343,11 +1343,11 @@ describe('GitHub Projects auth routes', () => {
     // Step 2 — re-link the SAME board 5 on the SAME installation (99), fresh token.
     // LIN-3334: a second board is refused, so the second beat is a same-source re-link.
     session.githubHumanId = 'human-42';
-    session.githubProjectsPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
+    session.githubProjectsPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'gh-42' };
     session.activeWorkspaceId = 'github:42';
     const res2 = makeRes();
     await handler({ body: { board: 'octocat/5' }, session }, res2);
-    assert.equal(res2.redirectedTo, '/workspace/octocat/settings?provider_ok=github-projects');
+    assert.equal(res2.redirectedTo, '/workspace/gh-42/settings?provider_ok=github-projects');
 
     const all = await connectionStore.collection.find({ accountId, provider: 'github-projects', unitId: '99' }).toArray();
     assert.equal(all.length, 1, 'exactly one Connection record for the installation');

@@ -786,11 +786,11 @@ describe('GitHub auth routes', () => {
     // repo's resolved installation (77), never the discovery user token.
     assert.equal(ws.bindings.length, 1);
     await assertConnectionBackedLin711(stores.connectionStore, session, ws.bindings[0], {
-      urlKey: 'octocat', scope: 'octocat/hello-world', installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry,
+      urlKey: 'gh-42', scope: 'octocat/hello-world', installationId: '77', token: 'ghs_inst', tokenExpiresAt: expectedExpiry,
     });
     assert.ok(!JSON.stringify(session.workspaces).includes('gho_user'), 'discovery user token is never persisted');
     assert.equal(session.githubPending, undefined, 'pending cleared');
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
   });
 
   test('POST link (re-bind, add-source) mints + binds onto the active workspace without clobbering its primary (LIN-717 + LIN-728)', async () => {
@@ -849,14 +849,14 @@ describe('GitHub auth routes', () => {
     assert.equal(session.workspaces.length, 1);
     const ws = session.workspaces[0];
     assert.equal(ws.id, 'github:42');
-    assert.equal(ws.urlKey, 'octocat');
+    assert.equal(ws.urlKey, 'gh-42');
     assert.equal(ws.provider, 'github');
     // GitHub App binding shape (LIN-711): installationId persisted (re-mint key) and
     // a REAL ms expiry from expires_at, not the old never-expires MAX.
     const expectedExpiry = Date.parse('2026-06-25T20:00:00Z');
     assert.equal(ws.bindings.length, 1);
     await assertConnectionBackedLin711(stores.connectionStore, session, ws.bindings[0], {
-      urlKey: 'octocat', scope: 'octocat/hello-world', installationId: '99', token: 'gho_token', tokenExpiresAt: expectedExpiry,
+      urlKey: 'gh-42', scope: 'octocat/hello-world', installationId: '99', token: 'gho_token', tokenExpiresAt: expectedExpiry,
     });
     // The active binding is connection-backed: the D2 marker names it and the
     // scalar mirror (and its expiry stamp) is stripped, never a MAX stamp.
@@ -865,7 +865,7 @@ describe('GitHub auth routes', () => {
     assert.equal(ws.accessToken, undefined);
     assert.equal(session.activeWorkspaceId, 'github:42');
     assert.equal(session.githubPending, undefined, 'pending cleared');
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
   });
 
   test('POST link (new) with CONNECTION_BACKED_WRITES=off writes the legacy LIN-711 binding, byte-identical (D11)', async () => {
@@ -887,7 +887,7 @@ describe('GitHub auth routes', () => {
       assert.equal(ws.activeBinding, undefined);
       const [row] = await stores.connectionStore.collection.find({}).toArray();
       assert.equal(row.referents, undefined, 'the LIN-3127 dual-write row, never connection-managed');
-      assert.equal(res.redirectedTo, '/workspace/octocat/');
+      assert.equal(res.redirectedTo, '/workspace/gh-42/');
     });
   });
 
@@ -1106,7 +1106,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     await handler({ body: { repo: 'octofriend/other-repo' }, session }, res);
 
-    assert.equal(res.redirectedTo, '/workspace/octofriend/');
+    assert.equal(res.redirectedTo, '/workspace/gh-99/');
     assert.strictEqual(session.accountId, accountIdAfterA, 'session.accountId unchanged across the second front-door login — no fork');
     assert.equal(session.workspaces.length, 2, 'both workspace containers present (existingWorkspaces carried across regenerate too)');
     const account = await accountStore.getAccount(accountIdAfterA);
@@ -1304,7 +1304,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     await confirmHandler({ session }, res);
 
-    assert.strictEqual(res.redirectedTo, '/workspace/octocat/');
+    assert.strictEqual(res.redirectedTo, '/workspace/gh-42/');
     assert.strictEqual(session.pendingMerge, undefined);
     assert.strictEqual((await accountStore.getAccount(otherAccount._id)).mergedInto, canonicalAccount._id, 'mergeAccounts actually ran');
     assert.strictEqual(session.activeWorkspaceId, 'github:42', 'uniform completion: activeWorkspaceId set');
@@ -1865,11 +1865,11 @@ describe('GitHub auth routes', () => {
     });
     const res1 = makeRes();
     await handler({ body: { repo: 'octocat/repo-a' }, session }, res1);
-    assert.equal(res1.redirectedTo, '/workspace/octocat/');
+    assert.equal(res1.redirectedTo, '/workspace/gh-42/');
     const accountId = session.accountId;
     assert.ok(accountId, 'the fresh account was established');
 
-    const ws = session.workspaces.find(w => w.urlKey === 'octocat');
+    const ws = session.workspaces.find(w => w.urlKey === 'gh-42');
 
     const afterStep1 = await connectionStore.collection.find({ accountId, provider: 'github', unitId: '99' }).toArray();
     assert.equal(afterStep1.length, 1, 'new-container seam #6 wrote after step 1');
@@ -1877,11 +1877,11 @@ describe('GitHub auth routes', () => {
 
     // Step 2 — re-link the SAME repo A on the SAME installation (99) with a fresh token.
     session.githubHumanId = 'human-42';
-    session.githubPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'octocat' };
+    session.githubPending = { token: 'gho_b', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T21:00:00Z', workspaceUrlKey: 'gh-42' };
     session.activeWorkspaceId = 'github:42';
     const res2 = makeRes();
     await handler({ body: { repo: 'octocat/repo-a' }, session }, res2);
-    assert.equal(res2.redirectedTo, '/workspace/octocat/settings?provider_ok=github');
+    assert.equal(res2.redirectedTo, '/workspace/gh-42/settings?provider_ok=github');
 
     // Exactly ONE durable Connection record for (account, github, installationId),
     // carrying the MOST RECENTLY written binding's credentials — a rebind mints a
@@ -2033,7 +2033,7 @@ describe('GitHub auth routes', () => {
 
     await handler({ body: { repo: 'octocat/repo-a' }, session }, res);
 
-    assert.equal(res.redirectedTo, '/workspace/octocat/', 'the link completes despite the Connection write failing');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/', 'the link completes despite the Connection write failing');
     assert.ok(session.workspaces[0].bindings.some(b => b.scope === 'octocat/repo-a'), 'the binding still lands');
   });
 

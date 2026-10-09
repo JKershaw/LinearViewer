@@ -56,7 +56,7 @@ const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHU
 
 const INSTALLATION = '77';
 const REPOS = ['octo/repo-a', 'octo/repo-b', 'octo/repo-c'];
-const WORKSPACE = 'octo';
+const WORKSPACE = 'gh-42';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);

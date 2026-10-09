@@ -150,7 +150,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
 
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
     assert.strictEqual(session.accountId, established.accountId, 'same human → same account, found by identity lookup');
     // The whole point of S9: the durable connection survived the regenerate.
     assert.strictEqual(session.openRouterApiKey, 'sk-or-v1-github-survive');
@@ -180,7 +180,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
 
     await handler({ body: { board: 'octocat/1' }, session }, res);
 
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-99/');
     assert.strictEqual(session.accountId, established.accountId);
     assert.strictEqual(session.openRouterApiKey, 'sk-or-v1-projects-survive');
     assert.deepStrictEqual(session.northStarByWorkspace, { acme: 'Ship the roadmap' });
@@ -199,7 +199,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
 
     await handler({ body: { repo: 'octocat/hello-world' }, session }, res);
 
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
     assert.strictEqual(session.openRouterApiKey, undefined);
   });
 

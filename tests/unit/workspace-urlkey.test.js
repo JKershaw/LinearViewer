@@ -98,6 +98,16 @@ describe('GitHub fresh (random id)', () => {
     assert.equal(live.urlKey, 'gh-foo-300');
   });
 
+  test('review F1: foo.bar then foo-bar on one installation, expired session -> distinct keys', async () => {
+    const world = createResolverWorld({
+      referents: [{ _id: 'c1', accountId: ALICE, referents: [{ urlKey: 'gh-foo-bar-42', provider: 'github', scope: 'alice/foo.bar' }] }]
+    });
+    const r = await fresh(world, { slug: 'alice/foo-bar', installationId: '42' });
+    assert.notEqual(r.urlKey, 'gh-foo-bar-42', 'a derived key tied to another scope is never reused');
+    assert.match(r.urlKey, /^gh-foo-bar-42-[0-9a-f]{6}$/);
+    assert.equal(r.source, 'derived');
+  });
+
   test('the same repo re-added after the session expired keeps its own key (referent, same {provider, full scope})', async () => {
     const world = createResolverWorld({
       referents: [{ _id: 'c1', accountId: ALICE, referents: [{ urlKey: 'foo', provider: 'github', scope: 'alice/foo' }] }]
@@ -157,9 +167,14 @@ describe('GitHub fresh (random id)', () => {
 });
 
 describe('GitHub account container (stable id)', () => {
-  test('a first-time bind gets the login key', async () => {
+  test('review F2: a first-time bind gets gh-<userId>, never the bare login key', async () => {
     const world = createResolverWorld();
-    assert.equal((await container(world)).urlKey, 'alice');
+    assert.equal((await container(world)).urlKey, 'gh-77');
+  });
+
+  test('review F2/F3: a login key held only by ownerless tokens is not taken by a first-time container', async () => {
+    const world = createResolverWorld({ dispatchTokens: [{ urlKey: 'alice', createdBy: null }] });
+    assert.equal((await container(world)).urlKey, 'gh-77');
   });
 
   test('expired-session return keeps its key', async () => {
