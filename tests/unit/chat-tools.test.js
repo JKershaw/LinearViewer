@@ -2098,24 +2098,34 @@ function makeFleetCatalog(history) {
 }
 
 describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
-  test('folds a bare wake loop into noise instead of emitting it as a session row', async () => {
+  test('a bare wake loop is its own row, classified by its own lane (LIN-3368)', async () => {
     const { executeTool } = makeFleetCatalog(fleetHistory());
     const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
 
-    // The wake loop DID reconstruct into its own standalone session (that is
-    // `_buildSessions`' pass-3 behaviour, not something this tool controls) —
-    // the tool is what must decline to report it as work.
-    assert.strictEqual(
-      result.sessions.some(r => r.sessionId === 'wake-loose'), false,
-      'a wake loop must never be its own row'
-    );
-    assert.strictEqual(result.noise.wakeLoopsFolded, 1);
-    // ...and the fold is not achieved by dropping the fleet: the three real
-    // sessions all survive it.
+    // B closes stale wake rows at the source, so nothing here hides one: a wake
+    // that is still live IS the session's work and must be visible.
+    const wake = result.sessions.find(r => r.sessionId === 'wake-loose');
+    assert.ok(wake, 'a bare wake session is reported, not folded away');
+    assert.strictEqual(wake.runCount, 1);
+    assert.notStrictEqual(wake.lifecycle, 'unknown', 'it classifies on its own loop');
+    assert.strictEqual('wakeLoopsFolded' in result.noise, false, 'the retired noise field is gone');
     assert.deepStrictEqual(
       result.sessions.map(r => r.sessionId).sort(),
-      ['sess-blocked', 'sess-finished', 'sess-working']
+      ['sess-blocked', 'sess-finished', 'sess-working', 'wake-loose']
     );
+  });
+
+  test('a stamped (closed) bare wake is absent from lane:working', async () => {
+    const history = [sessionHistoryItem({
+      id: 'wake-closed', kind: 'wake', issueIdentifier: 'LIN-704', target: 'cli',
+      dispatchedAt: T_FLEET_MID, resolvedAt: T_FLEET_MID, status: 'taken',
+      feedback: [{ message: '[done] re-woke', timestamp: T_FLEET_MID }],
+    })];
+    const { executeTool } = makeFleetCatalog(history);
+    const working = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'working' } });
+    assert.strictEqual(working.sessions.some(r => r.sessionId === 'wake-closed'), false);
+    const all = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
+    assert.strictEqual(all.sessions.some(r => r.sessionId === 'wake-closed'), true, 'history stays visible under lane:all');
   });
 
   test('session lanes agree with classifyLoop on the same fixture — a hand-rolled classifier diverges', async () => {
@@ -2143,7 +2153,7 @@ describe('pass-4 fleet read — list_active_sessions (LIN-2617)', () => {
     let sawMultiLoop = false;
     for (const row of result.sessions) {
       const session = sessions.find(s => s.sessionId === row.sessionId);
-      const workLoops = (session.loops || []).filter(l => l.kind !== 'wake');
+      const workLoops = session.loops || [];
       if (workLoops.length > 1) sawMultiLoop = true;
       // The lineage tail is the latest-DISPATCHED loop, which is not the same
       // as the last one in any array order.
@@ -2790,7 +2800,7 @@ describe('pass-4 fleet reads — partial lists say so (LIN-2617)', () => {
     const { executeTool } = makeFleetCatalog(fleetHistory());
     const capped = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all', limit: 1 } });
     // Quoting `count` must stay safe: it is the fleet total, not the row count.
-    assert.strictEqual(capped.count, 3);
+    assert.strictEqual(capped.count, 4);
     assert.strictEqual(capped.sessions.length, 1);
     assert.strictEqual(capped.truncated, true);
 
@@ -3230,26 +3240,24 @@ describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-
     assert.strictEqual(row.optionsTotal, 9, 'and the true count still rides, computed before the slice');
   });
 
-  test('a wake loop INSIDE a real session is not counted as a suppressed row', async () => {
-    // `wakeLoopsFolded` claims rows suppressed. A wake loop stitched into a real
-    // session produced no row of its own to suppress, so counting it would
-    // overstate the noise.
+  test('a live wake INSIDE a real session is the tail and decides the lane (LIN-3368)', async () => {
     const history = [
       sessionHistoryItem({
         id: 'sess-wk', kind: 'autopilot', issueIdentifier: 'LIN-940', target: 'cli',
-        dispatchedAt: T_FLEET_OLD, resolvedAt: null, status: 'taken',
-        feedback: [{ message: '[working] going', timestamp: T_FLEET_OLD }],
+        dispatchedAt: T_FLEET_OLD, resolvedAt: T_FLEET_MID, status: 'taken',
+        feedback: [{ message: '[done] Task completed in 9s', timestamp: T_FLEET_MID }],
       }),
       sessionHistoryItem({
         id: 'inner-wake', kind: 'wake', sessionId: 'sess-wk', issueIdentifier: 'LIN-940', target: 'cli',
-        dispatchedAt: T_FLEET_MID, resolvedAt: null, status: 'taken', feedback: [],
+        dispatchedAt: T_FLEET_FRESH, resolvedAt: null, status: 'taken',
+        feedback: [{ message: '[working] re-waking', timestamp: T_FLEET_FRESH }],
       }),
     ];
     const { executeTool } = makeFleetCatalog(history);
     const result = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'all' } });
     assert.strictEqual(result.sessions.length, 1);
-    assert.strictEqual(result.noise.wakeLoopsFolded, 0, 'nothing was suppressed');
-    assert.strictEqual(result.sessions[0].runCount, 2, 'but the wake run still counts as a run');
+    assert.strictEqual(result.sessions[0].lifecycle, 'working', 'the in-flight wake is the session\'s live work');
+    assert.strictEqual(result.sessions[0].runCount, 2);
   });
 
   test('noise reports everything the filter withheld, not only the finished rows', async () => {
@@ -3257,9 +3265,10 @@ describe('pass-4 — bounds that must hold on real data, not just fixtures (LIN-
     const blocked = await executeTool({ name: 'list_active_sessions', arguments: { lane: 'blocked' } });
     assert.strictEqual(blocked.sessions.length, 1);
     assert.strictEqual(blocked.noise.terminalOmitted, 1);
-    // Two more were withheld by the lane filter itself; terminalOmitted alone
-    // would have the model under-report the fleet.
-    assert.strictEqual(blocked.noise.omittedByFilter, 2);
+    // Three more were withheld by the lane filter itself (the bare wake session
+    // is a row since LIN-3368); terminalOmitted alone would have the model
+    // under-report the fleet.
+    assert.strictEqual(blocked.noise.omittedByFilter, 3);
   });
 
   test('both lists are actually ordered, not merely non-reversed', async () => {
