@@ -39,11 +39,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 
-import { createJiraAuthRoutes, deriveJiraUrlKey } from '../../routes/jira-auth.js';
+import { createJiraAuthRoutes } from '../../routes/jira-auth.js';
+import { deriveUrlKey } from '../../lib/workspace-urlkey.js';
 import { createAccountMergeRoutes } from '../../routes/account-merge.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { getWorkspaceCallScope, getBindingCallScope, getWorkspaceToken } from '../../lib/workspace.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
 let savedEnv;
@@ -172,7 +174,7 @@ function makeApp({ session, store, provider, prefsStore, stores = makeAccountSto
     }
     throw new Error(`unstubbed fetch: ${url}`);
   };
-  app.use(createJiraAuthRoutes({
+  app.use(createJiraAuthRoutes({ ...withResolver(),
     provider,
     accountStore: stores.accountStore,
     accountWorkspaceStore: stores.accountWorkspaceStore,
@@ -286,12 +288,12 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
 
     assert.equal(callback.status, 302);
     // Lands IN the workspace, not on settings — this is a login, not an add.
-    assert.equal(callback.location, '/workspace/acme/');
+    assert.equal(callback.location, '/workspace/jira-cid-1/'); // LIN-3382: id-bearing, not the tenant
 
     assert.equal(session.workspaces.length, 1, 'a Jira-only login must produce a workspace, not zero');
     const ws = session.workspaces[0];
     assert.equal(ws.id, `jira:${MYSELF.accountId}`, 'the container is keyed on the HUMAN, never the site (LIN-1329 Q1)');
-    assert.equal(ws.urlKey, 'acme');
+    assert.equal(ws.urlKey, 'jira-cid-1');
     assert.equal(session.activeWorkspaceId, ws.id, 'the new workspace must be the active one, or the user lands nowhere');
     assert.equal(ws.provider, 'jira');
   });
@@ -313,11 +315,11 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
   test('the rotating refresh token reaches the durable store, in the JIRA partition', async () => {
     const session = jiraOnlySession();
     const { store } = await signInWithJira({ session });
-    const record = await store.get('acct-new', 'acme', 'jira');
+    const record = await store.get('acct-new', 'jira-cid-1', 'jira');
     assert.ok(record, 'without this the workspace cannot survive its first expiry');
     assert.equal(record.refreshToken, 'atlassian-refresh-ROTATING');
     assert.equal(record.provider, 'jira');
-    assert.equal(await store.get('acct-new', 'acme', 'linear'), null, 'never Linear\'s partition (LIN-1887 F1)');
+    assert.equal(await store.get('acct-new', 'jira-cid-1', 'linear'), null, 'never Linear\'s partition (LIN-1887 F1)');
   });
 
   test('the refresh token is never left behind in the session', async () => {
@@ -335,7 +337,7 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
     await signInWithJira({ session });
 
     const keys = session.workspaces.map(w => w.urlKey).sort();
-    assert.deepEqual(keys, ['acme', 'acme-linear']);
+    assert.deepEqual(keys, ['acme-linear', 'jira-cid-1']);
     assert.equal(session.activeWorkspaceId, `jira:${MYSELF.accountId}`);
   });
 
@@ -383,11 +385,11 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
 
     const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
     assert.equal(picked.status, 302);
-    assert.equal(picked.location, '/workspace/other/', 'the urlKey follows the PICKED site');
+    assert.equal(picked.location, '/workspace/jira-cid-2/', 'the urlKey follows the PICKED site');
     assert.equal(session.workspaces[0].bindings[0].credentials.cloudId, 'cid-2');
     assert.ok(!session.jiraPending, 'pending state — including the carried refresh token — is cleared');
 
-    const record = await store.get('acct-new', 'other', 'jira');
+    const record = await store.get('acct-new', 'jira-cid-2', 'jira');
     assert.equal(record.refreshToken, 'atlassian-refresh-ROTATING', 'the durable write still happens on the pick path');
   });
 
@@ -928,33 +930,22 @@ describe('LIN-1890 E6a — bootstrap → projection (composed)', () => {
 // The urlKey derivation (plan finding N2).
 // ---------------------------------------------------------------------------
 
-describe('LIN-1890 — deriveJiraUrlKey', () => {
-  test('derives from the site tenant', () => {
-    assert.equal(deriveJiraUrlKey({ url: 'https://acme.atlassian.net' }), 'acme');
+describe('LIN-1890 — the Jira container urlKey (LIN-3382: `deriveJiraUrlKey` is gone; the resolver derives it)', () => {
+  test('a first-time bind is id-bearing: jira-<cloudId>, not the site tenant', () => {
+    assert.equal(deriveUrlKey('jira', { cloudId: 'cloud-1' }), 'jira-cloud-1');
   });
 
   test('an Atlassian accountId could never have been used — it fails URL_KEY_REGEX', () => {
-    // The finding this function exists for: `557058:<uuid>` contains a colon.
+    // The finding this derivation exists for: `557058:<uuid>` contains a colon.
     assert.match(MYSELF.accountId, /:/);
-    assert.equal(deriveJiraUrlKey({ url: 'https://acme.atlassian.net' }).includes(':'), false);
+    assert.equal(deriveUrlKey('jira', { cloudId: 'cloud-1' }).includes(':'), false);
   });
 
-  test('collides safely against an existing workspace — tenant names are company names', () => {
-    const existing = [{ urlKey: 'acme' }];
-    assert.equal(deriveJiraUrlKey({ url: 'https://acme.atlassian.net' }, existing), 'acme-2');
-    assert.equal(deriveJiraUrlKey({ url: 'https://acme.atlassian.net' }, [...existing, { urlKey: 'acme-2' }]), 'acme-3');
-  });
-
-  test('falls back to a valid key when the tenant is unusable', () => {
-    for (const url of ['not a url', 'https://.atlassian.net', '']) {
-      const key = deriveJiraUrlKey({ url });
-      assert.match(key, /^[a-z0-9-]{1,50}$/i, `unusable tenant must still yield a legal urlKey (got ${key})`);
+  test('the derived key is always a legal urlKey, however odd the cloud id', () => {
+    for (const cloudId of ['cloud-1', 'CLOUD_ID.with/odd chars', 'x'.repeat(80)]) {
+      const key = deriveUrlKey('jira', { cloudId });
+      assert.match(key, /^[a-z0-9-]{1,50}$/, `legal urlKey (got ${key})`);
     }
-  });
-
-  test('the derived key is always a legal urlKey', () => {
-    const key = deriveJiraUrlKey({ url: 'https://ACME-Corp.atlassian.net' });
-    assert.match(key, /^[a-z0-9-]{1,50}$/);
   });
 });
 

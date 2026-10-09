@@ -23,6 +23,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -46,7 +47,7 @@ function makeSession(initial = {}) {
 }
 
 function makeLogoutHandler(evictWorkspaceToken) {
-  const router = createAuthRoutes({ sessionStore: { cleanup: async () => {} }, evictWorkspaceToken });
+  const router = createAuthRoutes({ ...withResolver(), sessionStore: { cleanup: async () => {} }, evictWorkspaceToken });
   return getHandler(router, 'get', '/logout');
 }
 
@@ -73,7 +74,7 @@ describe('routes/auth.js — /logout eviction (LIN-1507, witness D(i))', () => {
 
   test('captures accountId + workspaces BEFORE destroy() — survives a destroy() that wipes session data first', () => {
     const evicted = [];
-    const router = createAuthRoutes({ sessionStore: { cleanup: async () => {} }, evictWorkspaceToken: (key) => evicted.push(key) });
+    const router = createAuthRoutes({ ...withResolver(), sessionStore: { cleanup: async () => {} }, evictWorkspaceToken: (key) => evicted.push(key) });
     const handler = getHandler(router, 'get', '/logout');
     // A destroy() that synchronously clears session fields BEFORE invoking its
     // callback, mirroring a real store's post-destroy state — this would
@@ -158,7 +159,7 @@ describe('routes/auth.js — /logout is explicitly NOT a durable-deletion site (
     await ownerCredentialStore.put('acct-1', 'acme', { provider: 'linear', scope: 'org-1', token: 't', refreshToken: 'r', tokenExpiresAt: 123 });
 
     const evicted = [];
-    const router = createAuthRoutes({
+    const router = createAuthRoutes({ ...withResolver(),
       sessionStore: { cleanup: async () => {} },
       evictWorkspaceToken: (key) => evicted.push(key),
       ownerCredentialStore, // deliberately unused by /logout — passed to prove it's ignored, not merely absent

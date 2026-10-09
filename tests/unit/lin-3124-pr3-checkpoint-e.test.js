@@ -43,6 +43,7 @@ import { convertToConnectionBacked, connectionBackedWritesEnabled, bindingShapeA
 import { linkProvider, getWorkspaceToken } from '../../lib/workspace.js';
 import { createAuthRoutes } from '../../routes/auth.js';
 import { createAccountMergeRoutes } from '../../routes/account-merge.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const LINK_SPY = ['link', 'readConnectionOutcome', 'put', 'readConnectionById'];
 const OWNER_SPY = ['getByConnection', 'putByConnection', 'copyToConnection', 'finalizePromotion', 'deleteByConnection', 'put', 'get'];
@@ -449,7 +450,7 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
   }
 
   async function linearLogin(s, session, provider = linearProvider()) {
-    const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...s });
+    const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...s });
     const res = makeRes();
     session.oauthState = 'st';
     await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);

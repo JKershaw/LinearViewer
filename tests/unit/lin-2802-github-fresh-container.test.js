@@ -29,9 +29,10 @@ import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createGitHubProjectsAuthRoutes } from '../../routes/github-projects-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
-import { deriveGithubFreshUrlKey } from '../../lib/github-install-flow.js';
+import { deriveUrlKey } from '../../lib/workspace-urlkey.js';
 import { getHandler, makeRes, makeSession } from '../fixtures/github-install-flow-branches.js';
 import { MAX_WORKSPACES } from '../../lib/workspace.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey: RSA_PRIVATE_KEY } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = RSA_PRIVATE_KEY.export({ type: 'pkcs1', format: 'pem' });
@@ -55,37 +56,27 @@ function fakeGithubProjectsProvider() {
   return { ...fakeGithubProvider(), name: 'github-projects' };
 }
 
-describe('deriveGithubFreshUrlKey (pure, F3)', () => {
-  test('a plain repo name slugifies to itself', () => {
-    assert.equal(deriveGithubFreshUrlKey('hello-world', []), 'hello-world');
+// LIN-3382: `deriveGithubFreshUrlKey` (a session-local collision loop) is gone;
+// the key is now `gh-<name>-<installationId>` from `deriveUrlKey`, held-tested by
+// the resolver. The slugify fixtures (F3) stay as the name segment of that key.
+describe('GitHub fresh-container key name segment (LIN-2802 F3 fixtures, via deriveUrlKey)', () => {
+  const key = (repoName) => deriveUrlKey('github-fresh', { repoName, installationId: '99', scope: `octocat/${repoName}` });
+
+  test('a plain repo name slugifies into the key', () => {
+    assert.equal(key('hello-world'), 'gh-hello-world-99');
   });
 
   test('underscore repo name (LIN-2802 F3 fixture): my_repo -> my-repo', () => {
-    assert.equal(deriveGithubFreshUrlKey('my_repo', []), 'my-repo');
+    assert.equal(key('my_repo'), 'gh-my-repo-99');
   });
 
   test('dotted repo name (LIN-2802 F3 fixture): foo.js -> foo-js', () => {
-    assert.equal(deriveGithubFreshUrlKey('foo.js', []), 'foo-js');
+    assert.equal(key('foo.js'), 'gh-foo-js-99');
   });
 
   test('an unslugifiable name falls back to the github literal, not a silent empty string', () => {
-    assert.equal(deriveGithubFreshUrlKey('___', []), 'github');
-    assert.equal(deriveGithubFreshUrlKey('', []), 'github');
-  });
-
-  test('collides against existing urlKeys with a -<n> suffix, mirroring deriveJiraUrlKey', () => {
-    const existing = [{ urlKey: 'my-repo' }];
-    assert.equal(deriveGithubFreshUrlKey('my_repo', existing), 'my-repo-2');
-  });
-
-  test('two consecutive collisions advance to -3', () => {
-    const existing = [{ urlKey: 'my-repo' }, { urlKey: 'my-repo-2' }];
-    assert.equal(deriveGithubFreshUrlKey('my_repo', existing), 'my-repo-3');
-  });
-
-  test('a distinct repo name never collides even with unrelated existing urlKeys', () => {
-    const existing = [{ urlKey: 'my-repo' }];
-    assert.equal(deriveGithubFreshUrlKey('other-repo', existing), 'other-repo');
+    assert.equal(key('___'), 'gh-github-99');
+    assert.equal(key(''), 'gh-github-99');
   });
 });
 
@@ -119,7 +110,7 @@ describe('LIN-2802 — GET /auth/github captures intent.fresh at flow start', ()
   }
 
   test('github descriptor: signed-in (accountId present) + mode=new sets intent.fresh = true', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     // LIN-1892 S2-1 (stated setup change, assertion unchanged): the switcher
@@ -132,7 +123,7 @@ describe('LIN-2802 — GET /auth/github captures intent.fresh at flow start', ()
   });
 
   test('github descriptor: signed-OUT (no accountId) + mode=new never sets intent.fresh — byte-identical re-login', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -141,7 +132,7 @@ describe('LIN-2802 — GET /auth/github captures intent.fresh at flow start', ()
   });
 
   test('github descriptor: signed-in add-source never sets intent.fresh (mode gate, not just accountId)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession({ accountId: 'acct-1' });
@@ -150,7 +141,7 @@ describe('LIN-2802 — GET /auth/github captures intent.fresh at flow start', ()
   });
 
   test('F4 — github-projects descriptor never sets intent.fresh, signed-in mode=new, byte-identical to pre-ticket behavior', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeGithubProjectsProvider(), ...freshAccountStores() });
+    const router = createGitHubProjectsAuthRoutes({ ...withResolver(), provider: fakeGithubProjectsProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github-projects');
     const res = makeRes();
     const session = makeSession({ accountId: 'acct-1' });
@@ -189,7 +180,7 @@ describe('LIN-2802 — POST /auth/github/link, pending.fresh branch', () => {
   }
 
   test('(b) mints a NEW random-id container even though github:<userId> already exists; existing workspace survives the regenerate', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -206,13 +197,13 @@ describe('LIN-2802 — POST /auth/github/link, pending.fresh branch', () => {
     assert.ok(fresh, 'a second, distinct workspace was minted');
     assert.notEqual(fresh.id, 'github:42', 'the fresh container is never keyed github:<userId>');
     assert.match(fresh.id, /^[0-9a-f-]{36}$/, 'fresh id is a random UUID, the /workspace/new idiom');
-    assert.equal(fresh.urlKey, 'hello-world', 'urlKey derives from the repo slug\'s name segment');
+    assert.equal(fresh.urlKey, 'gh-hello-world-99', 'urlKey is the resolver\'s id-bearing key (name segment + installation id)');
     assert.equal(session.activeWorkspaceId, fresh.id, 'activeWorkspaceId points at the new container');
     assert.equal(res.redirectedTo, `/workspace/${fresh.urlKey}/`);
   });
 
-  test('(c) two consecutive fresh invocations with the SAME repo name collide on urlKey with a -2 suffix', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+  test('(c) LIN-3382 (changed on purpose): picking the SAME repo twice in one session lands on the existing workspace instead of minting `<name>-2`', async () => {
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
 
     const session1 = makeSession({
@@ -222,7 +213,7 @@ describe('LIN-2802 — POST /auth/github/link, pending.fresh branch', () => {
     });
     await handler({ body: { repo: 'octocat/my_repo' } , session: session1 }, makeRes());
     assert.equal(session1.workspaces.length, 1);
-    assert.equal(session1.workspaces[0].urlKey, 'my-repo');
+    assert.equal(session1.workspaces[0].urlKey, 'gh-my-repo-99');
 
     // Second invocation reads the FIRST invocation's resulting workspace list
     // as its own pre-existing state (mirrors two real, sequential clicks).
@@ -231,14 +222,31 @@ describe('LIN-2802 — POST /auth/github/link, pending.fresh branch', () => {
       githubPending: { token: 'gho_token', mode: 'new', fresh: true, login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
       workspaces: session1.workspaces,
     });
-    await handler({ body: { repo: 'octocat/my_repo' }, session: session2 }, makeRes());
-    assert.equal(session2.workspaces.length, 2);
-    const second = session2.workspaces.find(w => w.urlKey !== 'my-repo');
-    assert.equal(second.urlKey, 'my-repo-2');
+    const res2 = makeRes();
+    await handler({ body: { repo: 'octocat/my_repo' }, session: session2 }, res2);
+    assert.equal(session2.workspaces.length, 1, 'no second workspace on the same {provider, scope}');
+    assert.equal(session2.activeWorkspaceId, session1.workspaces[0].id, 'lands on the existing workspace');
+    assert.equal(res2.redirectedTo, '/workspace/gh-my-repo-99/');
+    assert.equal(session2.githubPending, undefined, 'the pending pick is consumed');
+  });
+
+  test('(c) a different repo whose derived key is already live under another workspace gets a distinct, valid key', async () => {
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'post', '/auth/github/link');
+    const session = makeSession({
+      githubHumanId: 'human-42',
+      githubPending: { token: 'gho_token', mode: 'new', fresh: true, login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' },
+      workspaces: [{ id: 'other', name: 'other', urlKey: 'gh-my-repo-99', bindings: [{ provider: 'github', scope: 'someone/else' }] }],
+    });
+    await handler({ body: { repo: 'octocat/my_repo' }, session }, makeRes());
+    const minted = session.workspaces.find(w => w.id !== 'other');
+    assert.ok(minted);
+    assert.notEqual(minted.urlKey, 'gh-my-repo-99', 'never a key live under another workspace id');
+    assert.match(minted.urlKey, /^[a-z0-9-]{1,50}$/);
   });
 
   test('(c) dotted repo name fixture: foo.js -> foo-js', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       githubHumanId: 'human-42',
@@ -246,11 +254,11 @@ describe('LIN-2802 — POST /auth/github/link, pending.fresh branch', () => {
       workspaces: [],
     });
     await handler({ body: { repo: 'octocat/foo.js' }, session }, makeRes());
-    assert.equal(session.workspaces[0].urlKey, 'foo-js');
+    assert.equal(session.workspaces[0].urlKey, 'gh-foo-js-99');
   });
 
   test('(d) two consecutive fresh invocations with DIFFERENT repo names never collide', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
 
     const session1 = makeSession({
@@ -269,11 +277,11 @@ describe('LIN-2802 — POST /auth/github/link, pending.fresh branch', () => {
 
     assert.equal(session2.workspaces.length, 2);
     const urlKeys = session2.workspaces.map(w => w.urlKey).sort();
-    assert.deepEqual(urlKeys, ['hello-world', 'other-project']);
+    assert.deepEqual(urlKeys, ['gh-hello-world-99', 'gh-other-project-99']);
   });
 
   test('(e) at MAX_WORKSPACES, a fresh invocation renders the limit page; regenerate has already occurred; no establishAccount/prefs/activeWorkspaceId side effect follows', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGithubProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGithubProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const preexistingWorkspaces = Array.from({ length: MAX_WORKSPACES }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}` }));

@@ -39,7 +39,7 @@ import { getProvider } from '../lib/providers/registry.js'
 import { getWorkspaceByUrlKey, upsertWorkspace, sameKindSourceBound, oneSourcePerKindMessage } from '../lib/workspace.js'
 import { persistBinding } from '../lib/persist-binding.js'
 import { TOKEN_REFRESH_BUFFER_MS } from '../lib/workspace-token-resolver.js'
-import { deriveGithubFreshUrlKey } from '../lib/github-install-flow.js'
+import { resolveKeyOrRespond } from '../lib/workspace-urlkey.js'
 
 /**
  * The two held-capable surfaces (the only providers declaring
@@ -106,6 +106,7 @@ function renderHeldState(res, { provider, heldEntry, title, message, status = 20
  * @param {Function} [deps.refreshConnection] - the single connection refresher `(connectionId, accountId) => Promise<{token, expiresAt}|null>`
  * @param {Function} [deps.convertToConnectionBacked] - injected converter for `persistBinding`
  * @param {Function} [deps.resolveCanonicalAccountId]
+ * @param {Function} [deps.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: held-new fails closed (503, nothing written) without it.
  * @param {{title: string, message: string}} [deps.connectionRetry] - the canonical retry copy
  * @param {Function} [deps.now]
  * @returns {Router} Express router
@@ -120,6 +121,7 @@ export function createHeldConnectionRoutes({
   refreshConnection,
   convertToConnectionBacked,
   resolveCanonicalAccountId = (id) => id,
+  resolveWorkspaceUrlKey,
   connectionRetry = { title: 'Connection Not Saved', message: 'We could not finish saving this connection. Anything already connected is unchanged. Please try again in a moment.' },
   now = () => Date.now(),
 } = {}) {
@@ -284,14 +286,39 @@ export function createHeldConnectionRoutes({
     // `intent.fresh` predicate requires `supportsFreshContainer`, which
     // github-projects does not declare, so `resolveHeldEntry` never returns a
     // `mode=new` target for it.
-    const connectionId = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
-    if (typeof connectionId !== 'string') return // response already sent
+    const connection = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
+    if (!connection) return // response already sent
+    const connectionId = connection._id
 
     const repoName = String(scope).split('/').pop()
+    // LIN-3382: the key comes from the one resolver, BEFORE upsertWorkspace, so a
+    // refusal (another account holds this repo's key) or a resolver failure
+    // answers here with nothing written. The installation id is the connection's
+    // (read through the seam reader, never a raw `.credentials` access), so
+    // held-new derives the same `gh-<name>-<installationId>` as the credentials-
+    // mode fresh arm for the same repo. The binder is the session account only: a
+    // held add proves no identity (F8).
+    const installationId = (typeof heldConnectionCredentials === 'function' ? heldConnectionCredentials(connection) : {}).installationId ?? connection.unitId
+    const resolved = await resolveKeyOrRespond({
+      resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'github-held-new',
+      retry: { action: `Back to ${displayNameOf(provider)}`, actionUrl: pickerUrl },
+      request: {
+        arm: 'github-fresh', provider: provider.name, scope,
+        ids: { repoName, installationId },
+        session: req.session, binderAccountIds: [accountId]
+      }
+    })
+    if (!resolved) return
+    if (resolved.landOnWorkspaceId) {
+      // Already open in this session: land on it, exactly as held add-source
+      // treats an already-bound scope (idempotent, no second workspace).
+      const landed = (req.session.workspaces || []).find(w => w.id === resolved.landOnWorkspaceId)
+      return finishAdd(req, res, { provider, surface, workspace: landed, scope })
+    }
     const container = {
       id: crypto.randomUUID(),
       name: repoName,
-      urlKey: deriveGithubFreshUrlKey(repoName, req.session.workspaces),
+      urlKey: resolved.urlKey,
       addedAt: Date.now(),
       // F3: provider is set so `rewriteAsConnectionBacked` flips the active
       // binding (linkProvider's first-link rule is bypassed — it is never called).
@@ -357,7 +384,8 @@ export function createHeldConnectionRoutes({
 
   /**
    * Validate the POST'd scope against the server-side offer map and re-read +
-   * authorize the holding Connection. Returns the connectionId, or sends the
+   * authorize the holding Connection. Returns the connection row (LIN-3382:
+   * held-new reads its installation id through the seam reader), or sends the
    * 409 page and returns null. Shared by add-source and mode=new.
    */
   async function authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res }) {
@@ -378,13 +406,14 @@ export function createHeldConnectionRoutes({
       res.status(409).send(renderErrorPage('Connection Unavailable', 'That connection is no longer available. Please start again.', { action: `Back to ${displayNameOf(provider)}`, actionUrl }))
       return null
     }
-    return connection._id
+    return connection
   }
 
   /** Add-source held binding onto an EXISTING workspace (beat 3). */
   async function bindAddSource(req, res, { provider, surface, heldEntry, workspace, scope, accountId, pickerUrl, retryPage }) {
-    const connectionId = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
-    if (typeof connectionId !== 'string') return
+    const offered = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
+    if (!offered) return
+    const connectionId = offered._id
 
     const snapshot = [...(req.session.workspaces || [])]
     let conversion

@@ -4,27 +4,13 @@
  */
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
-import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, URL_KEY_REGEX, linkProvider } from '../lib/workspace.js'
+import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider } from '../lib/workspace.js'
 import { badRequest, notFound, serverError } from '../lib/errors.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 import { releaseConnectionCredential } from '../lib/connection-lifecycle.js'
-
-/**
- * Slugify a workspace name into the urlKey body (alphanumeric + hyphens).
- * Empty/blank names fall back to 'local'. Capped to leave room for the
- * uniqueness suffix appended by the caller (urlKey must stay ≤ 50 chars).
- * @param {string} name
- * @returns {string}
- */
-function slugifyName(name) {
-  const base = String(name || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40)
-  return base || 'local'
-}
+import { resolveKeyOrRespond } from '../lib/workspace-urlkey.js'
+import { renderErrorPage } from '../lib/render-pages.js'
 
 /**
  * Starter content seeded into a fresh local workspace so it is not a dead-end.
@@ -67,9 +53,10 @@ export function starterSeedIssueIds(urlKey) {
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [deps.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [deps.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`).
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [deps.ownerCredentialStore] - LIN-1523: durable owner-credential store. Deleted alongside the LIN-1507 cache eviction on disconnect — a cache is not a grant, but a disconnected workspace's durable credential must not outlive the disconnect either.
+ * @param {function(Object): Promise<Object>} [deps.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: `POST /workspace/new` fails closed (503 retry page, nothing written) without it.
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey } = {}) {
   const router = Router()
 
   /**
@@ -87,13 +74,17 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
 
     // urlKey is BOTH the session workspace key AND the LocalStore partition
     // scope, so it must be globally unique — reusing a key would merge the seed
-    // into another workspace's data. A random suffix guarantees a fresh
-    // partition; the in-session guard is belt-and-braces.
-    const existing = new Set((req.session.workspaces || []).map(w => w.urlKey))
-    let urlKey
-    do {
-      urlKey = `${slugifyName(name)}-${randomUUID().slice(0, 8)}`
-    } while (existing.has(urlKey) || !URL_KEY_REGEX.test(urlKey))
+    // into another workspace's data. LIN-3382: the resolver mints `<slug>-<8 hex>`
+    // and re-rolls while the key is live in this session OR has any durable
+    // holder, so a random collision with another account's key can never land
+    // here. It runs before the first session write.
+    const resolved = await resolveKeyOrRespond({
+      resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'local',
+      retry: { action: 'Try again', actionUrl: '/' },
+      request: { arm: 'local', provider: 'local', ids: { name }, session: req.session }
+    })
+    if (!resolved) return
+    const urlKey = resolved.urlKey
 
     // Local is the non-OAuth credential-acquisition strategy: its credential is
     // the urlKey used as a store-partition key, acquired synchronously (no

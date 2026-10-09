@@ -29,6 +29,7 @@ import { AccountMergeLogStore } from '../../lib/account-merge-log.js';
 import { createAccountMergeRoutes } from '../../routes/account-merge.js';
 import { ConnectionStore } from '../../lib/connection-store.js';
 import { getWorkspaceCallScope, resolveIssueBinding } from '../../lib/workspace.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 // Ephemeral RSA keypair so completeInstallation's App-JWT signing (mintAppJwt)
 // runs for real against a valid PEM — generated, never on disk.
@@ -466,7 +467,7 @@ describe('GitHub auth routes', () => {
 
   test('GET /auth/github 503s when GitHub App env is not configured', async () => {
     delete process.env.GITHUB_APP_ID;
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
@@ -480,7 +481,7 @@ describe('GitHub auth routes', () => {
   // cannot complete.
   test('GET /auth/github 503s when GITHUB_APP_PRIVATE_KEY is set but not a valid PEM (LIN-2081 finding 4)', async () => {
     process.env.GITHUB_APP_PRIVATE_KEY = 'not-a-pem';
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     await handler({ query: {}, session: makeSession() }, res);
@@ -495,7 +496,7 @@ describe('GitHub auth routes', () => {
   // (getMissingGitHubConfig over the full set) now returns a clean 503 up front.
   test('GET /auth/github 503s (never hangs) on a partial config: App vars set, GITHUB_CLIENT_ID absent (LIN-761)', async () => {
     delete process.env.GITHUB_CLIENT_ID;
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -518,7 +519,7 @@ describe('GitHub auth routes', () => {
       ...fakeProvider(),
       beginAuth: () => { throw new Error('boom from beginAuth'); },
     };
-    const router = createGitHubAuthRoutes({ provider: throwingProvider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: throwingProvider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -533,7 +534,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github mints state, stores intent server-side, and redirects', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -547,7 +548,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback rejects a mismatched state (CSRF guard)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '42', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -556,7 +557,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback 400s when installation_id is missing (setup_action=request)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { setup_action: 'request', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -566,7 +567,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github (add-source) carries a validated viewed-workspace urlKey in the intent', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -577,7 +578,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github (add-source) ignores a malformed workspace query param', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -586,7 +587,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback mints from installation_id and renders the repo picker, holding the token in session', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -604,7 +605,7 @@ describe('GitHub auth routes', () => {
   // from the query's `installation_id`). Closes the gap the LIN-2820 research
   // flagged: this path was otherwise unproven end-to-end.
   test('GET callback (install path) threads installationId into the rendered picker (LIN-2820)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -621,7 +622,7 @@ describe('GitHub auth routes', () => {
     const truncatedRepos = [{ slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false }];
     truncatedRepos.truncated = true;
     const provider = { ...fakeProvider(), listRepos: async () => truncatedRepos };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -630,7 +631,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
@@ -645,7 +646,7 @@ describe('GitHub auth routes', () => {
   // driving the callback directly with a signed-in-fresh intent rather than
   // injecting `fresh` onto a link-handler fixture.
   test('GET callback carries `intent.fresh` into pending as `pending.fresh` (LIN-2802)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', fresh: true } });
@@ -654,7 +655,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback surfaces a clean 400 when the installation-token mint fails', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -670,7 +671,7 @@ describe('GitHub auth routes', () => {
   // ---------------------------------------------------------------------------
 
   test('GET callback (re-bind) exchanges the code, enumerates repos, and stashes a rebind pending WITHOUT the user token (LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -687,7 +688,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) carries the viewed-workspace urlKey from intent into the rebind pending (LIN-541 + LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
@@ -699,7 +700,7 @@ describe('GitHub auth routes', () => {
   // branch (lib/github-install-flow.js:370). Mirrors the workspaceUrlKey
   // carry test above for this branch.
   test('GET callback (re-bind) carries `intent.fresh` into the rebind pending as `pending.fresh` (LIN-2802)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', fresh: true } });
@@ -708,7 +709,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) keeps the CSRF state guard (mismatched state rejected before code exchange)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { code: 'oauth-code', state: 'attacker' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -717,7 +718,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) surfaces a clean 400 when the code exchange fails', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { code: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
@@ -730,7 +731,7 @@ describe('GitHub auth routes', () => {
     // the App, so enumeration is empty. Rather than the old dead-end empty picker,
     // send them to installations/new (reusing the CSRF nonce) to install + pick.
     const provider = { ...fakeProvider(), listReboundableRepos: async () => [] };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -753,7 +754,7 @@ describe('GitHub auth routes', () => {
       listReboundableRepos: async () => [],
       beginInstall: () => { throw new Error("GitHub App auth: GITHUB_APP_PRIVATE_KEY ends with stray characters after the END line: '%'") },
     };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
@@ -766,7 +767,7 @@ describe('GitHub auth routes', () => {
 
   test('POST link (re-bind, new) mints the installation token for the chosen repo and writes the LIN-711 binding (LIN-728)', async () => {
     const stores = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -794,7 +795,7 @@ describe('GitHub auth routes', () => {
 
   test('POST link (re-bind, add-source) mints + binds onto the active workspace without clobbering its primary (LIN-717 + LIN-728)', async () => {
     const stores = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -818,7 +819,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (re-bind) rejects a repo that is not in the enumerated installation map (LIN-728)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -835,7 +836,7 @@ describe('GitHub auth routes', () => {
 
   test('POST link (new) find-or-creates the GitHub account container and writes the binding', async () => {
     const stores = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -870,7 +871,7 @@ describe('GitHub auth routes', () => {
   test('POST link (new) with CONNECTION_BACKED_WRITES=off writes the legacy LIN-711 binding, byte-identical (D11)', async () => {
     await withWritesOff(async () => {
       const stores = freshAccountStores();
-      const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+      const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
       const handler = getHandler(router, 'post', '/auth/github/link');
       const res = makeRes();
       const session = makeSession({
@@ -895,7 +896,7 @@ describe('GitHub auth routes', () => {
   // account↔workspace binding written for it.
   test('POST link (new), at the workspace limit, is rejected 400 and writes NO account↔workspace binding (LIN-1349)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}` }));
@@ -915,7 +916,7 @@ describe('GitHub auth routes', () => {
 
   test('POST link (new) REFUSES a second repo on the existing account container with the plain message (LIN-3334 R1)', async () => {
     const stores = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
@@ -943,7 +944,7 @@ describe('GitHub auth routes', () => {
 
   test('POST link (add-source) REFUSES a second repo on the viewed workspace with the plain message (LIN-3334 R1)', async () => {
     const stores = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const viewed = {
@@ -973,7 +974,7 @@ describe('GitHub auth routes', () => {
   // subsequent attempt for as long as the session lives.
   test('POST link (new, existing container) clears a stale, unresolvable session.accountId on an unknown-account 409 (LIN-2300)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
@@ -1011,7 +1012,7 @@ describe('GitHub auth routes', () => {
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
     const myAccount = await accountStore.createAccount();
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
@@ -1041,7 +1042,7 @@ describe('GitHub auth routes', () => {
   // after the stale id is cleared, mints and lands on a fresh account.
   test('POST link (new, existing container) self-heals: after an unknown-account 409 clears the session, a second attempt on the SAME session succeeds (LIN-2300)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const existing = {
       id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
@@ -1083,7 +1084,7 @@ describe('GitHub auth routes', () => {
   // tests/unit/account-identity.test.js's "L6 test 1 — fork-prevention".
   test('POST link (new) carries session.accountId across the fixation-preventing regenerate — a brand-new GitHub identity links onto the LIVE account instead of forking a second one (LIN-2267)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
 
     // First front-door login mints account A.
@@ -1125,7 +1126,7 @@ describe('GitHub auth routes', () => {
   // its pre-login snapshot.
   test('POST link (new) clears the stale accountId and restores session.workspaces on an unknown-account 409, so the retry is not a permanent lockout (LIN-2267 F1/F2)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -1172,7 +1173,7 @@ describe('GitHub auth routes', () => {
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       // A LIVE session for a DIFFERENT, already-canonical account, freshly
@@ -1204,7 +1205,7 @@ describe('GitHub auth routes', () => {
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       accountId: canonicalAccount._id,
@@ -1233,7 +1234,7 @@ describe('GitHub auth routes', () => {
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       accountId: canonicalAccount._id,
@@ -1258,7 +1259,7 @@ describe('GitHub auth routes', () => {
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       accountId: canonicalAccount._id,
@@ -1281,7 +1282,7 @@ describe('GitHub auth routes', () => {
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       accountId: canonicalAccount._id,
@@ -1335,7 +1336,7 @@ describe('GitHub auth routes', () => {
     const thirdAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(thirdAccount._id, 'github', 'human-third', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       // A live session for the CORRUPTED account (degrades to itself, never
@@ -1366,7 +1367,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) links onto the active workspace without creating a new one', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -1394,7 +1395,7 @@ describe('GitHub auth routes', () => {
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-42', {});
     const myAccount = await accountStore.createAccount();
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -1427,7 +1428,7 @@ describe('GitHub auth routes', () => {
   // for as long as the session lives.
   test('POST link (add-source) clears a stale, unresolvable session.accountId on an unknown-account 409 (LIN-2300)', async () => {
     const { accountStore, accountWorkspaceStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -1453,7 +1454,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) binds onto the VIEWED workspace, not the active one (LIN-541)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     // User is viewing workspace A (acme) but B (globex) is the active one.
@@ -1474,7 +1475,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) falls back to the active workspace when no target urlKey was carried', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
@@ -1491,7 +1492,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link (add-source) falls back to active when the carried urlKey no longer resolves', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const activeWs = { id: 'org-b', name: 'Globex', urlKey: 'globex', provider: 'linear', accessToken: 'lin_b' };
@@ -1508,7 +1509,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link rejects when there is no pending GitHub session', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     await handler({ body: { repo: 'octocat/hello-world' }, session: makeSession() }, res);
@@ -1518,7 +1519,7 @@ describe('GitHub auth routes', () => {
 
   test('POST link (add-source) writes the LIN-711 binding shape: installationId + real ms expiry', async () => {
     const stores = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };
@@ -1540,7 +1541,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link surfaces a clean error when the installation expiry is missing/unparseable (LIN-711)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     // No tokenExpiresAt carried — must NOT silently fall back to a never-expires stamp.
@@ -1557,7 +1558,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('POST link rejects a malformed repo slug', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({ githubHumanId: 'human-42', githubPending: { token: 'gho_token', mode: 'new', login: 'octocat', userId: '42' }, workspaces: [] });
@@ -1577,7 +1578,7 @@ describe('GitHub auth routes', () => {
     const err = new Error('GitHub API POST /app/installations/99/access_tokens failed: Resource not accessible by integration');
     err.status = 403;
     const provider = { ...fakeProvider(), completeInstallation: async () => { throw err; } };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -1589,7 +1590,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind) surfaces the OAuth error detail in the diagnostic (LIN-746)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     // fakeProvider.completeAuth('bad') throws AuthExchangeError('bad_verification_code').
@@ -1605,7 +1606,7 @@ describe('GitHub auth routes', () => {
   // `catch` arm must render this route's own 500 page (with the GitHub
   // diagnostic threaded in) instead of hanging.
   test('POST link: a throw inside the post-regenerate callback (prefs store down) responds 500, not a hang (LIN-1350)', async () => {
-    const router = createGitHubAuthRoutes({
+    const router = createGitHubAuthRoutes({ ...withResolver(),
       provider: fakeProvider(),
       userPreferencesStore: { getUserPreferences: async () => { throw new Error('prefs store down') } },
       ...freshAccountStores(),
@@ -1631,7 +1632,7 @@ describe('GitHub auth routes', () => {
   // ---------------------------------------------------------------------------
 
   test('GET callback 400s Session Expired when state is missing entirely (not just mismatched) [LIN-2397 gap: missing state]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '42' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -1640,7 +1641,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback 400s Installation Cancelled with the cancellation copy when error=access_denied [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { error: 'access_denied' }, session: makeSession() }, res);
@@ -1651,7 +1652,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback 400s Installation Cancelled with the raw error value interpolated for a non-access_denied error [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { error: 'server_error' }, session: makeSession() }, res);
@@ -1662,7 +1663,7 @@ describe('GitHub auth routes', () => {
 
   test('GET callback (install path) 500s Connection Error when listRepos fails [LIN-2397 gap]', async () => {
     const provider = { ...fakeProvider(), listRepos: async () => { throw new Error('boom') } };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
@@ -1673,7 +1674,7 @@ describe('GitHub auth routes', () => {
 
   test('GET callback (re-bind) 400s "Could not verify your GitHub account" when fetchViewer fails [LIN-2397 gap]', async () => {
     const provider = { ...fakeProvider(), fetchViewer: async () => { throw new Error('viewer lookup failed') } };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     await handler({ query: { code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new' } }) }, res);
@@ -1683,7 +1684,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (install path) 500s Something Went Wrong from the outer catch on an unexpected post-mint failure [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real' });
@@ -1695,7 +1696,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github defaults mode to "new" in the session intent when ?mode is absent [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -1704,7 +1705,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET /auth/github defaults mode to "new" in the session intent when ?mode is garbage [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github');
     const res = makeRes();
     const session = makeSession();
@@ -1713,7 +1714,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback defaults pending.mode to "new" when oauthIntent.mode is absent [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { provider: 'github' } });
@@ -1722,7 +1723,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback defaults pending.mode to "new" when oauthIntent.mode is garbage [LIN-2397 gap]', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'nonsense', provider: 'github' } });
@@ -1746,7 +1747,7 @@ describe('GitHub auth routes', () => {
     const otherAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const session = makeSession({
       accountId: canonicalAccount._id,
@@ -1779,7 +1780,7 @@ describe('GitHub auth routes', () => {
   // router since LIN-2397 stage B), at the callback's TERMINAL exits only.
 
   test('GET callback (install path) consumes oauthState/oauthIntent once the picker renders (LIN-2499)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
     const res = makeRes();
@@ -1794,7 +1795,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('GET callback (re-bind path) consumes oauthState/oauthIntent once the picker renders (LIN-2499)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
     const res = makeRes();
@@ -1808,7 +1809,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('a replayed callback with the already-consumed nonce gets the 400 Session Expired page, not a second picker (LIN-2499)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
 
@@ -1831,7 +1832,7 @@ describe('GitHub auth routes', () => {
   // Clearing on that arm would 400 every first-time connect.
   test('GET callback KEEPS the nonce on the no-installations beginInstall hop (LIN-2499 boundary)', async () => {
     const provider = { ...fakeProvider(), listReboundableRepos: async () => [] };
-    const router = createGitHubAuthRoutes({ provider, ...freshAccountStores() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
     const res = makeRes();
@@ -1853,7 +1854,7 @@ describe('GitHub auth routes', () => {
   // re-link refreshes that record's credentials.
   test('LIN-3127 witness: one install + a same-source re-link writes exactly one Connection record; reads are store-independent', async () => {
     const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
 
     // Step 1 — fresh account, new-container login, repo A on installation 99.
@@ -1913,7 +1914,7 @@ describe('GitHub auth routes', () => {
   // seam). A second repo is refused (LIN-3334), so the re-link is same-scope.
   test('LIN-3127: a same-source re-link on an existing container upserts the same single Connection record', async () => {
     const { accountStore, accountWorkspaceStore, connectionStore } = freshAccountStores();
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
 
     const existing = {
@@ -1954,7 +1955,7 @@ describe('GitHub auth routes', () => {
     const myAccount = await accountStore.createAccount();
     const connectionStore = recordingConnectionStore();
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -1978,7 +1979,7 @@ describe('GitHub auth routes', () => {
     const myAccount = await accountStore.createAccount();
     const connectionStore = recordingConnectionStore();
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = { id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github', bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { token: 'gho_a' } }] };
@@ -2002,7 +2003,7 @@ describe('GitHub auth routes', () => {
     await accountStore.linkIdentity(otherAccount._id, 'github', 'human-other', {});
     const connectionStore = recordingConnectionStore();
 
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -2021,7 +2022,7 @@ describe('GitHub auth routes', () => {
   });
 
   test('LIN-3127 best-effort: a throwing Connection store put does not fail the GitHub link (redirect still happens)', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...freshAccountStores(), connectionStore: { put: async () => { throw new Error('connection store down'); } } });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores(), connectionStore: { put: async () => { throw new Error('connection store down'); } } });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -2050,7 +2051,7 @@ describe('GitHub auth routes', () => {
     // route: `link` cannot commit and the ambiguous re-read finds no row.
     stores.connectionStore.link = async () => false;
     stores.connectionStore.readConnectionOutcome = async () => null;
-    const router = createGitHubAuthRoutes({ provider: fakeProvider(), ...stores });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...stores });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const linearWs = { id: 'org-1', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' };

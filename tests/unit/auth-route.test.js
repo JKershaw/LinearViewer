@@ -19,6 +19,7 @@ import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { getWorkspaceByUrlKey } from '../../lib/workspace.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { respondToAccountConflict } from '../../lib/account-conflict.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 function fakeProvider(overrides = {}) {
   return {
@@ -95,7 +96,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   }
 
   test('callback establishes a durable account and sets session.accountId', async () => {
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real' });
@@ -110,7 +111,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
   test('a returning user (fresh session, previously-seen viewer.id) lands on their EXISTING account, not a new one', async () => {
     const stores = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...stores });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...stores });
     const handler = getHandler(router, 'get', '/auth/callback');
 
     const firstSession = makeSession({ oauthState: 'real' });
@@ -138,7 +139,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // mode can reach it).
 
   test('rejects a mismatched OAuth state (CSRF guard) before any account work', async () => {
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real' });
@@ -155,7 +156,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // binding in place even though the user was shown a 400).
   test('at the workspace limit, sign-in is rejected 400 and writes NO account↔workspace binding (LIN-1349)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
@@ -180,7 +181,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // response ever sent, surfacing only as an unhandledRejection. The new
   // `catch` arm must render this route's own 500 page instead of hanging.
   test('a throw inside the post-regenerate callback (prefs store down) responds 500, not a hang (LIN-1350)', async () => {
-    const router = createAuthRoutes({
+    const router = createAuthRoutes({ ...withResolver(),
       provider: fakeProvider(),
       sessionStore: { cleanup: async () => {} },
       userPreferencesStore: { getUserPreferences: async () => { throw new Error('prefs store down') } },
@@ -228,7 +229,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {}); // the user's FIRST org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
 
@@ -249,7 +250,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
     let regenCount = 0;
@@ -273,7 +274,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `Workspace ${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
@@ -298,7 +299,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});    // X owns only its first org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -359,7 +360,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {}); // P owns only its first org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id, { identityAuthenticatedAt: 0 }); // stale P
 
@@ -377,7 +378,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     // A normal front-door login whose arriving identity (viewer-2) is new while
     // P is live: the carry restores accountId + a stale stamp across regenerate,
@@ -412,7 +413,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});    // X owns only its first org
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -441,7 +442,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
     await accountWorkspaceStore.bindAccountToWorkspace(myAccount._id, 'org-1'); // first org already bound
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
 
@@ -462,7 +463,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -485,7 +486,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // protection intact) even though the carried value changes what happens next.
   test('login-path fence: normal mode:new login still regenerates the session (session-fixation protection intact) even with a carried accountId (LIN-2233)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     // A bogus/stale accountId (never a real account in this fresh store) is now
@@ -511,7 +512,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
   test('mode:new unknown-account 409 clears the stale session.accountId (and its freshness stamp) so a retry self-heals instead of sticking (LIN-2266)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = makeSession({ oauthState: 'real', accountId: 'ghost-account', identityAuthenticatedAt: 12345 });
 
@@ -533,7 +534,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
   test('add-source unknown-account 409 clears oauthState/oauthIntent (LIN-1351 hygiene) AND the stale accountId (LIN-2266), preserving the session.workspaces restore', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     // A live add-source session whose signed-in accountId is itself a ghost
@@ -567,7 +568,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // the third test isolates the new line itself.
 
   test('mode:"new" success consumes oauthState/oauthIntent — outcome, however produced (LIN-2499)', async () => {
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
@@ -580,7 +581,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   });
 
   test('a replayed callback with the consumed nonce hits the 400 Session Expired guard, not a second sign-in (LIN-2499)', async () => {
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
 
@@ -605,7 +606,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   // (as the add-source arm already has), cannot silently resurrect the
   // replayable nonce this ticket exists to remove.
   test('mode:"new" success clears the nonce WITHOUT relying on regenerate() to wipe it (LIN-2499)', async () => {
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'linear' } });
@@ -633,7 +634,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const other = await accountStore.createAccount();
     await accountStore.linkIdentity(other._id, 'linear', 'viewer-1', {}); // the arriving identity is elsewhere
 
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({
@@ -657,7 +658,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const other = await accountStore.createAccount();
     await accountStore.linkIdentity(other._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({
@@ -677,7 +678,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     const myAccount = await accountStore.createAccount();
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -709,7 +710,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   test('LIN-3127: new-login callback dual-writes one Connection record keyed (account, linear, org.id)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const connectionStore = recordingConnectionStore();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real' });
@@ -730,7 +731,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
     const connectionStore = recordingConnectionStore();
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const session = addSourceSession(myAccount._id);
 
@@ -751,7 +752,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
     const connectionStore = recordingConnectionStore();
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `W${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
@@ -772,7 +773,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     await accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
     const connectionStore = recordingConnectionStore();
 
-    const router = createAuthRoutes({ provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: org2Provider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = addSourceSession(myAccount._id);
@@ -786,7 +787,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   test('LIN-3127 refusal: Linear new-login at the workspace limit writes NO Connection record', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const connectionStore = recordingConnectionStore();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const existingWorkspaces = Array.from({ length: 10 }, (_, i) => ({ id: `ws-${i}`, name: `W${i}`, urlKey: `ws-${i}`, addedAt: Date.now() }));
@@ -803,7 +804,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
   test('LIN-3127 best-effort: a throwing Connection store put does not fail the Linear login (redirect + owner credential still land)', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
     const connectionStore = { put: async () => { throw new Error('connection store down'); } };
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore, connectionStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real' });
@@ -816,7 +817,7 @@ describe('routes/auth.js — Linear OAuth callback', () => {
 
   test('LIN-3127 missing dependency: a Linear router without a connectionStore still completes', async () => {
     const { accountStore, accountWorkspaceStore, ownerCredentialStore } = freshAccountStores();
-    const router = createAuthRoutes({ provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore: { cleanup: async () => {} }, accountStore, accountWorkspaceStore, ownerCredentialStore });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
 

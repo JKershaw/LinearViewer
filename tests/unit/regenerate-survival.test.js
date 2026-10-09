@@ -29,6 +29,7 @@ import { createEmailAuthRoutes } from '../../routes/email-auth.js';
 import { MagicLinkStore, MAGIC_LINK_COLLECTION } from '../../lib/email-auth.js';
 import { createCaptureTransport } from '../../lib/email-transport.js';
 import { establishAccount } from '../../lib/account-session.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -138,7 +139,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
     });
 
     // 2. Fresh GitHub App install/login (the ONE session.regenerate() branch).
-    const router = createGitHubAuthRoutes({ provider: fakeGitHubProvider(), ...deps });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGitHubProvider(), ...deps });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -168,7 +169,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
       northStarByWorkspace: { acme: 'Ship the roadmap' },
     });
 
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeGitHubProjectsProvider(), ...deps });
+    const router = createGitHubProjectsAuthRoutes({ ...withResolver(), provider: fakeGitHubProjectsProvider(), ...deps });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const session = makeSession({
@@ -187,7 +188,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
 
   test('GitHub App install: no stored preferences → rehydrate is a clean no-op (no thrown error, no fabricated fields)', async () => {
     const deps = freshDeps();
-    const router = createGitHubAuthRoutes({ provider: fakeGitHubProvider(), ...deps });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGitHubProvider(), ...deps });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const session = makeSession({
@@ -209,7 +210,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
   // ---------------------------------------------------------------------------
 
   test('Linear OAuth callback: workspace config survives regenerate', async () => {
-    const router = createAuthRoutes({ provider: fakeLinearProvider(), sessionStore: { cleanup: async () => {} }, ...freshDeps() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeLinearProvider(), sessionStore: { cleanup: async () => {} }, ...freshDeps() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const priorWs = { id: 'prior-1', name: 'Prior', urlKey: 'prior', accessToken: 'tok' };
@@ -222,7 +223,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
   });
 
   test('GitHub App install: workspace config survives regenerate', async () => {
-    const router = createGitHubAuthRoutes({ provider: fakeGitHubProvider(), ...freshDeps() });
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeGitHubProvider(), ...freshDeps() });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const priorWs = { id: 'prior-2', name: 'Prior', urlKey: 'prior', accessToken: 'tok' };
@@ -239,7 +240,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
   });
 
   test('GitHub Projects install: workspace config survives regenerate', async () => {
-    const router = createGitHubProjectsAuthRoutes({ provider: fakeGitHubProjectsProvider(), ...freshDeps() });
+    const router = createGitHubProjectsAuthRoutes({ ...withResolver(), provider: fakeGitHubProjectsProvider(), ...freshDeps() });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const priorWs = { id: 'prior-3', name: 'Prior', urlKey: 'prior', accessToken: 'tok' };

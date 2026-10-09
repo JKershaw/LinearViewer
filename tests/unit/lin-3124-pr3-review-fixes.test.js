@@ -47,6 +47,7 @@ import { createAuthRoutes } from '../../routes/auth.js';
 import { createJiraAuthRoutes } from '../../routes/jira-auth.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { runRevert } from '../../scripts/revert-connection-backed.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const SERVER_SRC = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
 const ACCT = 'acct-review';
@@ -413,7 +414,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
           accountId: acct._id, workspaces: [container], activeWorkspaceId: 'org-a', oauthState: 'st',
           save(cb) { cb && cb(); }, regenerate(cb) { for (const k of Object.keys(this)) if (typeof this[k] !== 'function') delete this[k]; cb(); },
         };
-        const router = createAuthRoutes({ provider: linearProvider(), sessionStore: { cleanup: async () => {} }, ...s });
+        const router = createAuthRoutes({ ...withResolver(), provider: linearProvider(), sessionStore: { cleanup: async () => {} }, ...s });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);
         assert.equal(res.redirectedTo, '/workspace/org-a/');
@@ -512,7 +513,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
           save(cb) { cb && cb(); },
         };
         const provider = { name: 'linear', completeAuth: async () => ({ access_token: 'B-new', refresh_token: 'RB', expires_in: 86400 }), fetchOrganization: async () => ({ id: 'org-b', name: 'Org B', urlKey: 'org-b' }), fetchViewer: async () => ({ id: 'viewer-b' }) };
-        const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
+        const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);
         assert.equal(res.redirectedTo, '/workspace/org-a/settings?provider_ok=linear');
@@ -539,7 +540,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
         await s.accountStore.linkIdentity(acct._id, 'jira', 'atl-human', {});
         const container = { id: 'jira:atl-human', urlKey: 'acme-jira', provider: 'jira', accessToken: 'at-old', bindings: [{ provider: 'jira', scope: site.url, credentials: { token: 'at-old', authType: 'oauth', cloudId: 'cid-b', tokenExpiresAt: 1 } }] };
         const session = { accountId: acct._id, workspaces: [container], activeWorkspaceId: container.id, oauthState: 'n', oauthIntent: { mode: 'new', provider: 'jira' }, save(cb) { cb && cb(null); } };
-        const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
+        const router = createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'n' }, session }, res);
         assert.equal(res.redirectedTo, '/workspace/acme-jira/');
@@ -564,7 +565,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       const legacyGithub = { provider: 'github', scope: 'o/r', credentials: { installationId: '9', token: 'ghs-old', tokenExpiresAt: 1 } };
 
       async function link(s, log, session) {
-        const router = createGitHubAuthRoutes({ provider: { name: 'github' }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, connectionStore: spiedStores(s, log).connectionStore });
+        const router = createGitHubAuthRoutes({ ...withResolver(), provider: { name: 'github' }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, connectionStore: spiedStores(s, log).connectionStore });
         const res = makeRes();
         await getHandler(router, 'post', '/auth/github/link')({ body: { repo: 'o/r' }, session }, res);
         return res;
