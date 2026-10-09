@@ -823,7 +823,7 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   // dispatch), and every other launcher sends nothing and is unchanged.
   if (stopAt) payload.stopAt = stopAt;
   // LIN-3248 (N2): the authoritative run variant the run page reads for the
-  // "never merges on its own" promise. Only the ladder's own autopilot run
+  // "stops this run at the PR" promise. Only the ladder's own autopilot run
   // sends it; the server validates it and every other launcher omits it.
   if (variant) payload.variant = variant;
   // LIN-2944 P1 (handover d610edd0): the opened-task surface the ladder press

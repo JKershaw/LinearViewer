@@ -167,7 +167,7 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toContainText('close out & merge');
     await expect(page.locator('[data-testid="run-evidence-closeout-merge-yourself"]')).toContainText('or merge it yourself on GitHub');
     // N2, standard direction: the promise is shown.
-    await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('Harbour never merges on its own');
+    await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('leaves the merge to a person');
   });
 
   test('N2, stepped direction: the promise is omitted on a stepped run', async ({ page }) => {

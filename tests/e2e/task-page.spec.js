@@ -462,7 +462,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toBeVisible();
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toHaveText('Merge PR #41');
     await expect(page.locator('[data-testid="task-page-pr-lead"]')).toHaveText('PR #41 is approved and ready to merge.');
-    await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('Harbour never merges on its own');
+    await expect(page.locator('[data-testid="run-evidence-closeout-promise"]')).toContainText('leaves the merge to a person');
     // The header says waiting on the person, and the page says it is merge-ready.
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Approved. PR #41 is ready to merge.');
     await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-merge-ready', 'true');
