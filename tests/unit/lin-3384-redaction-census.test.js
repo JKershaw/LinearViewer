@@ -106,7 +106,7 @@ const TABLE = {
   // routes — session / proxy readable
   'routes/dispatch.js :: /workspace/:urlKey/api/dispatch': [R, 1],
   'routes/dispatch.js :: /workspace/:urlKey/api/dispatch/history': [R, 1],
-  'routes/dispatch.js :: /workspace/:urlKey/api/dispatch/:sessionId/trim': [R, 1],
+  'routes/dispatch.js :: /workspace/:urlKey/api/dispatch/:sessionId/trim': [R, 2], // LIN-3398: the owner gate's getItemStatus read + trimSessionBudget
   'routes/proxy-dispatch.js :: /api/proxy/dispatch/:id/prompt': [R, 1],
   // routes — runner (must keep the token)
   'routes/dispatch.js :: /api/dispatch/poll': [RUN, 1],
@@ -114,6 +114,8 @@ const TABLE = {
   'routes/proxy-runner.js :: POLL_ROUTE': [RUN, 1],
   'routes/proxy-runner.js :: TAKE_ROUTE': [RUN, 1],
   // routes — in-process only
+  // LIN-3398: the delete handler's owner-gate read (target only; the row is never sent)
+  'routes/dispatch.js :: /workspace/:urlKey/api/dispatch/:itemId': [SRV, 1],
   'routes/dispatch.js :: host': [SRV, 1],
   'routes/dispatch.js :: refuse': [SRV, 1],
   'routes/proxy-kickoff.js :: parentRun': [SRV, 1],

@@ -767,10 +767,11 @@ function initQueueList() {
 // =============================================================================
 // Workspace Halt (LIN-2994 Surface 4 / LIN-3026)
 //
-// Decision-4 best-effort surface: this is a REQUEST only. The runner does not
-// yet honor it (pending LIN-2995), so the status copy must always say
-// "requested", never "paused"/"stopped". Its own small client-side read; no
-// server-render-path involvement (server.js is untouched).
+// Decision-4 best-effort surface: this is a REQUEST only. The runner honours a
+// stored halt (LIN-2995, `lib/runner-kit/runner.mjs` `haltAction`) but only on
+// its next poll, so the status copy always says "requested", never
+// "paused"/"stopped". Its own small client-side read; no server-render-path
+// involvement (server.js is untouched).
 // =============================================================================
 
 // The degraded-mode disclosure has exactly one source: the server-rendered
@@ -799,7 +800,7 @@ function formatHaltStatusHtml(halt) {
   const verb = halt.mode === 'stop' ? 'Stop' : 'Pause'
   const time = escapeHtml(new Date(halt.setAt).toLocaleString())
   const by = halt.setBy ? ` by ${escapeHtml(halt.setBy)}` : ''
-  return `${verb} requested — ${time}${by}. The runner does not yet honor this (pending LIN-2995).`
+  return `${verb} requested — ${time}${by}. The runner applies it on its next poll.`
 }
 
 function renderHaltStatus(halt) {

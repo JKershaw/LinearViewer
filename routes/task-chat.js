@@ -23,7 +23,7 @@ import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
 import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
 import { createChatToolCatalog, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
-import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
+import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
@@ -697,7 +697,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
           // LIN-3383: an ordinary (not run-scoped) turn runs send_follow_up in
           // execute mode, which enqueues on the owner's runner: owner-only. A
           // run-scoped turn proposes and never reaches the guard.
-          enqueueGuard: ({ target }) => resolveRunnerEnqueueRefusal({
+          enqueueGuard: ({ target }) => resolveRunnerOwnerRefusal({
             ownerCheck: workspaceOwnerCheck,
             workspaceId: workspace.id,
             accountId: req.session?.accountId,

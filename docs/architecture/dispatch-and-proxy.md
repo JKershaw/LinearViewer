@@ -7,39 +7,42 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
 **User-facing endpoints** (session auth, workspace-prefixed):
 - `POST /workspace/:urlKey/api/dispatch` - Queue a prompt
 - `GET /workspace/:urlKey/api/dispatch` - List queued items
-- `DELETE /workspace/:urlKey/api/dispatch/:itemId` - Remove item
-- `PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim` - Graceful trim (LIN-2147): amend a live run's `maxTasks` bound downward. Body `{ maxTasks }` (positive integer, strictly less than the run's current bound — 409 otherwise). Invents no new termination path: the existing `maxTasks`/`countDistinctTasksForSession` guard (LIN-1751, `lib/dispatch-factory.js`) already refuses a genuinely NEW task past the bound while admitting a dispatch for a task already inside it (`alreadyCounted`) regardless of count — so lowering the bound here is sufficient on its own to make a run wind down (finish the current ticket, refuse the next new one) without interrupting any beat already in progress. Idempotent (an absolute set, not a relative decrement) and auditable (`by`/`at`/`maxTasks` appended to the run's own `trimHistory`, readable via `getItemStatus`). Distinct from abort (LIN-553/743): abort is a hard stop mid-work; trim is "finish what you're on, start nothing new."
+- `DELETE /workspace/:urlKey/api/dispatch/:itemId` - Remove item. **Owner-only** for a runner row (LIN-3398): the row is read first for its `target`; `dash`/`local` rows stay member-reachable
+- `PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim` - Graceful trim (LIN-2147; **owner-only** for a runner row, LIN-3398, with the same row-first `target` rule as delete): amend a live run's `maxTasks` bound downward. Body `{ maxTasks }` (positive integer, strictly less than the run's current bound — 409 otherwise). Invents no new termination path: the existing `maxTasks`/`countDistinctTasksForSession` guard (LIN-1751, `lib/dispatch-factory.js`) already refuses a genuinely NEW task past the bound while admitting a dispatch for a task already inside it (`alreadyCounted`) regardless of count — so lowering the bound here is sufficient on its own to make a run wind down (finish the current ticket, refuse the next new one) without interrupting any beat already in progress. Idempotent (an absolute set, not a relative decrement) and auditable (`by`/`at`/`maxTasks` appended to the run's own `trimHistory`, readable via `getItemStatus`). Distinct from abort (LIN-553/743): abort is a hard stop mid-work; trim is "finish what you're on, start nothing new."
 - Token management at `/workspace/:urlKey/api/dispatch/tokens` — minting is **owner-only**
   (LIN-3137): a non-owner gets `403 GRANT_OWNER_ONLY`, an ownerless workspace
-  `409 WORKSPACE_OWNER_UNSET`; listing/revoking are unchanged (a mint gate, not revocation)
-- **Queueing work for a runner is owner-only** (LIN-3383, `lib/runner-enqueue-gate.js`): for a
-  runner-consumed target (`cli`, `web`; an absent target is `cli`) only the workspace's owner can
-  enqueue from a session. A non-owner gets `403 RUNNER_ENQUEUE_OWNER_ONLY` ("Only this workspace's
-  owner can queue work for its runner."); an ownerless workspace `409 WORKSPACE_OWNER_UNSET`; a
+  `409 WORKSPACE_OWNER_UNSET`; listing is unchanged. Revoking
+  (`DELETE …/dispatch/tokens/:tokenId`) is owner-only too since LIN-3398 (`403 RUNNER_OWNER_ONLY`):
+  a dispatch token is a take path, so disconnecting it is a runner action
+- **Acting on a runner is owner-only** (LIN-3383 enqueue; widened by LIN-3398, `lib/runner-owner-gate.js`):
+  for a runner-consumed target (`cli`, `web`; an absent target is `cli`) only the workspace's owner can
+  enqueue, halt/resume, delete a queued item, trim a run or revoke a dispatch token from a session. A non-owner gets `403 RUNNER_OWNER_ONLY` ("Only this workspace's
+  owner can act on its runner."); an ownerless workspace `409 WORKSPACE_OWNER_UNSET`; a
   session with no account `503 GRANT_OWNERLESS`; an absent/failing owner seam `503
   OWNER_CHECK_UNAVAILABLE` (fail closed). `dash`/`local` are unchanged. The one hoisted
   `workspaceOwnerCheck` is the only owner source (`role:'owner'` edge); the gate is a call at each
   session-side entry, not inside `createDispatchItem` (which also serves token-scoped proxy and
-  orchestrator callers). Gated entries: `POST /api/dispatch` (fresh, follow-up, abort and cascade
+  orchestrator callers). Every refusal is answered by `sendRunnerRefusal` where the route has a plain JSON error shape. Session mutations gated by LIN-3398 (all before any store write): `POST`/`DELETE …/dispatch/halt`, `DELETE …/dispatch/:itemId`, `PATCH …/dispatch/:sessionId/trim` (delete and trim read the row first for its `target`; the 403 never echoes it) and `DELETE …/dispatch/tokens/:tokenId`. Gated enqueue entries: `POST /api/dispatch` (fresh, follow-up, abort and cascade
   abort), both feedback lanes (the issue still files; the lane returns `launched:false` + code),
   run-proposal Apply (checked before the CAS claim), Flight Companion approve (a not-owner is `422`,
   because the client reads a `403` there as flag-off) and reply, Task Chat's execute-mode
   `send_follow_up`, and Collective (per participant workspace: an unowned seat is `ok:false`). The
   proxy routes stay `requireGrant('dispatch')`-scoped. `tests/unit/lin-3383-runner-enqueue-census.test.js`
-  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink. Residuals: an invitee
+  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink. Residual: an invitee
   who owns a workspace with their own runner can still start a no-`stopAt` run that merges without
-  the press (stated in the close-out box line and `docs/v1.md` step 7); halting the runner is not
-  an enqueue (LIN-3398).
+  the press (stated in the close-out box line and `docs/v1.md` step 7). The proxy-side halt and runner-credential
+  revoke are not yet covered (LIN-3409).
 - `GET /workspace/:urlKey/api/dispatch/halt` - Read the workspace's halt request
 - `POST /workspace/:urlKey/api/dispatch/halt` - Request a pause or stop (LIN-2994)
 - `DELETE /workspace/:urlKey/api/dispatch/halt` - Clear the halt request
 
-Stores a request only: the runner does not yet honor it (pending LIN-2995). This path is
-best-effort under degradation; the degraded-mode path is the proxy verb (below).
+The runner honours a stored halt (`lib/runner-kit/runner.mjs` `haltAction`: pause leaves fresh
+items, stop sweeps). Set and clear are owner-only (LIN-3398); reading is member-reachable. This
+path is best-effort under degradation; the degraded-mode path is the proxy verb (below).
 
 **Consumer endpoints** (Bearer token auth):
 - `GET /api/dispatch/poll` - Poll for available items (may carry an additive `halt` request
-  key, omitted when unset; the runner does not yet honor it (pending LIN-2995))
+  key, omitted when unset; the runner honours it)
 - `POST /api/dispatch/take/:itemId` - Atomically claim an item
 - `POST /api/dispatch/feedback/:itemId` - Post feedback on a taken item
 

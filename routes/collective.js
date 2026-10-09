@@ -23,7 +23,7 @@ import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { normalizeYapChannel, nickFromWorkspaceName, randomChannelName } from '../lib/yap-client.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
+import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { jsonError, notFound } from '../lib/errors.js';
@@ -285,7 +285,7 @@ export function createCollectiveRoutes({
       // anchor): a seat in a workspace this session does not own is marked
       // ok:false and nothing is enqueued for it; the owned seats still launch.
       // Ahead of the factory, the token mint and the character bookkeeping.
-      const seatRefusal = await resolveRunnerEnqueueRefusal({
+      const seatRefusal = await resolveRunnerOwnerRefusal({
         ownerCheck: workspaceOwnerCheck,
         workspaceId: ws.id,
         accountId: req.session?.accountId,

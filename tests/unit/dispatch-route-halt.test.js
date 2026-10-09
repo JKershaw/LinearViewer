@@ -10,9 +10,8 @@
  * `DELETE /workspace/:urlKey/api/dispatch/:itemId`), not a handler in a
  * vacuum.
  *
- * This is a REQUEST-only surface (Decision 4, best-effort): setting a halt
- * does not itself pause or stop anything — the runner does not yet honor it
- * (pending LIN-2995). These tests only pin the route's own
+ * Setting a halt stores a request the runner honours (LIN-2995); set and clear
+ * are owner-only (LIN-3398). These tests only pin the route's own
  * auth/validation/attribution/error/ordering contract.
  */
 process.env.NODE_ENV = 'test';
@@ -54,7 +53,7 @@ function buildApp({ workspaceHaltStore, accountId = 'acct-1', removeItem, urlKey
     },
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey };
+      req.workspace = { urlKey: req.params.urlKey, id: 'ws-halt' };
       // `accountId: null` means "session present, but no accountId" (the
       // no-owner case) — distinct from the default param filling in
       // 'acct-1' for an *omitted* option.
@@ -65,6 +64,8 @@ function buildApp({ workspaceHaltStore, accountId = 'acct-1', removeItem, urlKey
     harbourFeedbackTokenStore: null,
     workspacePreferencesStore: null,
     workspaceHaltStore: workspaceHaltStore ?? null,
+    // LIN-3398: halt set/clear are owner-only; every account in this fixture owns ws-halt.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
   }));
   return app;
 }
@@ -155,11 +156,15 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
       assert.equal(body.halt.setBy, 'acct-42');
     });
 
-    test('session without accountId -> setBy is null', async () => {
+    // LIN-3398: a halt needs a checkable owner, so a session with no accountId
+    // is refused (fail closed) instead of recording `setBy: null`.
+    test('session without accountId -> refused 503 GRANT_OWNERLESS, no halt written', async () => {
       const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
       const app = buildApp({ workspaceHaltStore, accountId: null });
-      const { body } = await call(app, 'POST', PATH, { mode: 'pause' });
-      assert.equal(body.halt.setBy, null);
+      const { status, body } = await call(app, 'POST', PATH, { mode: 'pause' });
+      assert.equal(status, 503);
+      assert.equal(body.code, 'GRANT_OWNERLESS');
+      assert.equal(workspaceHaltStore.getLastKnownHalt(URL_KEY), null);
     });
   });
 

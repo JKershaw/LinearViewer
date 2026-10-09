@@ -44,7 +44,7 @@ import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
-import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
+import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { DISPATCH_RUNGS, SURFACES } from '../lib/task-mode-store.js';
 import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
@@ -274,22 +274,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // target is cli/web (absent = cli), so only the workspace owner may reach
       // them. Ahead of every write, provider call and run gate: a refusal spends
       // nothing. dash/local pass untouched; an abort to dash stays ungated.
-      const enqueueRefusal = await resolveRunnerEnqueueRefusal({
+      const enqueueRefusal = await resolveRunnerOwnerRefusal({
         ownerCheck: workspaceOwnerCheck,
         workspaceId: workspace.id,
         accountId: req.session?.accountId,
         target: target ?? 'cli'
       });
-      if (enqueueRefusal) {
-        console.warn(
-          `Dispatch enqueue refused: ${enqueueRefusal.code} (urlKey=${workspace.urlKey}) — LIN-3383`
-        );
-        return jsonError(res, enqueueRefusal.status, enqueueRefusal.error, {
-          code: enqueueRefusal.code,
-          category: enqueueRefusal.category,
-          retryable: enqueueRefusal.retryable
-        });
-      }
+      if (enqueueRefusal) return sendRunnerRefusal(res, enqueueRefusal);
 
       // Abort eligibility (LIN-743): the abort item's OWN target must be
       // poll-eligible (cli/web/dash) — eligibility is NOT derived from the aborted
@@ -1259,9 +1250,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   // tests/unit/task-chat-route.test.js:177-192 for the precedent witness
   // pattern this file's own DELETE-not-captured test follows.
   //
-  // This is a REQUEST-only surface (Decision 4, best-effort): setting a halt
-  // does not itself pause or stop anything — the runner does not yet honor it
-  // (pending LIN-2995). No per-write audit log is added here; the halt
+  // Setting a halt is a REQUEST the runner honours (lib/runner-kit/runner.mjs
+  // haltAction: pause leaves fresh items, stop sweeps), so set/clear are
+  // owner-only (LIN-3398). No per-write audit log is added here; the halt
   // document's own `setAt`/`setBy` is its audit trail.
   // =========================================================================
 
@@ -1285,6 +1276,26 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
   });
 
+  // LIN-3398: owner-only gate for the session-side runner mutations below (halt
+  // POST/DELETE, delete, trim, dispatch-token revoke). One call shape for all
+  // five: resolve through the shared runner-owner gate, answer through
+  // `sendRunnerRefusal`, and return true when the caller must stop. Always runs
+  // BEFORE the route's first store write. `target` is the queue row's own target
+  // for delete/trim (dash/local stay member-reachable); halt and revoke pass
+  // none, which means `cli` and is always checked. The refusal carries only the
+  // envelope: never the row read to find `target` (it holds `bootstrapToken`).
+  async function refuseNonOwner(req, res, target) {
+    const refusal = await resolveRunnerOwnerRefusal({
+      ownerCheck: workspaceOwnerCheck,
+      workspaceId: req.workspace.id,
+      accountId: req.session?.accountId,
+      target
+    });
+    if (!refusal) return false;
+    sendRunnerRefusal(res, refusal);
+    return true;
+  }
+
   /**
    * POST /workspace/:urlKey/api/dispatch/halt
    * Body `{ mode }` with `mode` one of `HALT_MODES`; anything else is a 400,
@@ -1296,6 +1307,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     if (!HALT_MODES.includes(mode)) {
       return badRequest.json(res, HALT_MODE_ERROR);
     }
+
+    if (await refuseNonOwner(req, res)) return;
 
     if (!workspaceHaltStore) {
       return serviceUnavailable.json(res, 'Failed to set halt');
@@ -1319,6 +1332,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * nothing is set (the store's own `deleteOne` semantics).
    */
   router.delete('/workspace/:urlKey/api/dispatch/halt', workspaceFromUrl, async (req, res) => {
+    if (await refuseNonOwner(req, res)) return;
+
     if (!workspaceHaltStore) {
       return serviceUnavailable.json(res, 'Failed to clear halt');
     }
@@ -1346,6 +1361,12 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
+      // LIN-3398: read the row (writes nothing) for its `target`, gate, then
+      // write. An absent row is gated as `cli` and, for the owner, falls through
+      // to the 404 below.
+      const row = await dispatchQueueStore.getItemStatus(workspace.urlKey, itemId);
+      if (await refuseNonOwner(req, res, row?.target)) return;
+
       const removed = await dispatchQueueStore.removeItem(workspace.urlKey, itemId);
 
       if (!removed) {
@@ -1394,6 +1415,10 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
+      // LIN-3398: same read-then-gate-then-write shape as delete above.
+      const row = await dispatchQueueStore.getItemStatus(workspace.urlKey, sessionId);
+      if (await refuseNonOwner(req, res, row?.target)) return;
+
       const result = await dispatchQueueStore.trimSessionBudget(
         workspace.urlKey, sessionId, { maxTasks, maxSessionsPerTask }, { by: req.session?.accountId || null }
       );
@@ -1503,6 +1528,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     if (!UUID_REGEX.test(tokenId)) {
       return badRequest.json(res, 'Invalid token ID format');
     }
+
+    if (await refuseNonOwner(req, res)) return;
 
     try {
       const revoked = await dispatchTokenStore.revokeToken(workspace.urlKey, tokenId);

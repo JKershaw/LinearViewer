@@ -39,15 +39,18 @@ test('escapes dispatch default values in the rendered attributes', () => {
   assert.ok(html.includes('&lt;script&gt;'));
 });
 
-// LIN-3027 L1 — the Integration Guide's halt note must stay request-only:
-// exact approved phrasing, never "paused"/"stopped" (LIN-2995 owns enforcement).
-test('the guide-halt-note states the halt is a request only, never paused/stopped', () => {
+// LIN-3027 L1 / LIN-3398 — the Integration Guide's halt note: LIN-2995 shipped
+// the runner's halt, so the old "does not yet honor it (pending LIN-2995)"
+// phrase is gone; the note still never claims a state ("paused"/"stopped").
+test('the guide-halt-note says the runner honors the halt, never claims paused/stopped', () => {
   const html = renderDispatchPage('WS', { featureFlags: { dispatch: true } });
   const match = html.match(/<p class="guide-halt-note">([\s\S]*?)<\/p>/);
   assert.ok(match, 'guide-halt-note paragraph is present');
   const noteText = match[1];
-  assert.ok(noteText.includes('does not yet honor it (pending LIN-2995)'),
-    'guide-halt-note states the exact approved honesty phrase');
+  assert.ok(noteText.includes('The runner honors it: pause leaves fresh items, stop sweeps.'),
+    'guide-halt-note states what the runner does with a halt');
+  assert.ok(!/does not yet honor|pending LIN-2995/.test(noteText),
+    'guide-halt-note no longer carries the stale pending-LIN-2995 claim');
   assert.ok(!/\b(paused|stopped)\b/i.test(noteText),
     'guide-halt-note never claims the runner is paused or stopped');
 });

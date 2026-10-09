@@ -321,12 +321,12 @@ describe('LIN-3383 — Apply is owner-only, refused before the CAS claim', () =>
     return { res, addItemCalls, applyCalls, row };
   }
 
-  test('a non-owner is refused 403 RUNNER_ENQUEUE_OWNER_ONLY: applyCalls === 0, nothing enqueued, still proposed', async () => {
+  test('a non-owner is refused 403 RUNNER_OWNER_ONLY: applyCalls === 0, nothing enqueued, still proposed', async () => {
     const seen = [];
     const { res, addItemCalls, applyCalls, row } = await applyAs(async (a) => { seen.push(a); return { status: 'not-owner' }; });
     assert.strictEqual(res.status, 403);
-    assert.strictEqual(res.body.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
-    assert.strictEqual(res.body.error, "Only this workspace's owner can queue work for its runner.");
+    assert.strictEqual(res.body.code, 'RUNNER_OWNER_ONLY');
+    assert.strictEqual(res.body.error, "Only this workspace's owner can act on its runner.");
     assert.strictEqual(applyCalls, 0, 'refused before the proposal is claimed (never flips to applied)');
     assert.strictEqual(addItemCalls.length, 0);
     assert.strictEqual(row.status, 'proposed');

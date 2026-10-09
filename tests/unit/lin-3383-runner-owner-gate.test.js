@@ -1,7 +1,7 @@
 /**
  * LIN-3383 — the owner-only runner enqueue gate: verdict matrix.
  *
- * lib/runner-enqueue-gate.js decides, from the one hoisted owner seam, whether a
+ * lib/runner-owner-gate.js decides, from the one hoisted owner seam, whether a
  * session may enqueue for a runner target (cli/web). dash/local never consult the
  * seam. Every non-owner outcome is a refusal (fail closed).
  */
@@ -10,10 +10,10 @@ import assert from 'node:assert/strict';
 import {
   RUNNER_TARGETS,
   isRunnerTarget,
-  resolveRunnerEnqueueRefusal,
-  assertRunnerEnqueueAllowed,
-  isRunnerEnqueueRefusal
-} from '../../lib/runner-enqueue-gate.js';
+  resolveRunnerOwnerRefusal,
+  assertRunnerOwnerAllowed,
+  isRunnerOwnerRefusal
+} from '../../lib/runner-owner-gate.js';
 import { resolveOwnerMintRefusal, ownerMintRefusal } from '../../lib/owner-mint-refusals.js';
 
 const verdict = (status) => async () => ({ status });
@@ -33,35 +33,35 @@ describe('LIN-3383 — runner targets', () => {
 
 describe('LIN-3383 — verdict matrix', () => {
   test('owner → allowed (null refusal, assert resolves)', async () => {
-    assert.equal(await resolveRunnerEnqueueRefusal(args()), null);
-    await assertRunnerEnqueueAllowed(args({ target: 'web' }));
+    assert.equal(await resolveRunnerOwnerRefusal(args()), null);
+    await assertRunnerOwnerAllowed(args({ target: 'web' }));
   });
 
-  test('not-owner → RUNNER_ENQUEUE_OWNER_ONLY 403, the plain message, not GRANT_OWNER_ONLY', async () => {
-    const r = await resolveRunnerEnqueueRefusal(args({ ownerCheck: verdict('not-owner') }));
+  test('not-owner → RUNNER_OWNER_ONLY 403, the plain message, not GRANT_OWNER_ONLY', async () => {
+    const r = await resolveRunnerOwnerRefusal(args({ ownerCheck: verdict('not-owner') }));
     assert.deepEqual(r, {
-      code: 'RUNNER_ENQUEUE_OWNER_ONLY',
+      code: 'RUNNER_OWNER_ONLY',
       status: 403,
       category: 'auth',
       retryable: false,
-      error: "Only this workspace's owner can queue work for its runner."
+      error: "Only this workspace's owner can act on its runner."
     });
   });
 
   test('absent target is treated as cli (a non-owner is refused)', async () => {
-    const r = await resolveRunnerEnqueueRefusal(args({ ownerCheck: verdict('not-owner'), target: undefined }));
-    assert.equal(r.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+    const r = await resolveRunnerOwnerRefusal(args({ ownerCheck: verdict('not-owner'), target: undefined }));
+    assert.equal(r.code, 'RUNNER_OWNER_ONLY');
   });
 
   test('no-owner workspace → WORKSPACE_OWNER_UNSET 409', async () => {
-    const r = await resolveRunnerEnqueueRefusal(args({ ownerCheck: verdict('no-owner') }));
+    const r = await resolveRunnerOwnerRefusal(args({ ownerCheck: verdict('no-owner') }));
     assert.equal(r.code, 'WORKSPACE_OWNER_UNSET');
     assert.equal(r.status, 409);
   });
 
   test('missing accountId → GRANT_OWNERLESS 503 WITHOUT consulting the seam', async () => {
     let calls = 0;
-    const r = await resolveRunnerEnqueueRefusal(args({ accountId: undefined, ownerCheck: async () => { calls++; return { status: 'owner' }; } }));
+    const r = await resolveRunnerOwnerRefusal(args({ accountId: undefined, ownerCheck: async () => { calls++; return { status: 'owner' }; } }));
     assert.equal(r.code, 'GRANT_OWNERLESS');
     assert.equal(r.status, 503);
     assert.equal(calls, 0);
@@ -69,7 +69,7 @@ describe('LIN-3383 — verdict matrix', () => {
 
   test('absent / non-function seam → OWNER_CHECK_UNAVAILABLE 503 retryable (fail closed)', async () => {
     for (const ownerCheck of [null, undefined, 'owner', {}]) {
-      const r = await resolveRunnerEnqueueRefusal(args({ ownerCheck }));
+      const r = await resolveRunnerOwnerRefusal(args({ ownerCheck }));
       assert.equal(r.code, 'OWNER_CHECK_UNAVAILABLE');
       assert.equal(r.status, 503);
       assert.equal(r.retryable, true);
@@ -77,10 +77,10 @@ describe('LIN-3383 — verdict matrix', () => {
   });
 
   test('throwing seam and an unexpected verdict → OWNER_CHECK_UNAVAILABLE', async () => {
-    const thrown = await resolveRunnerEnqueueRefusal(args({ ownerCheck: async () => { throw new Error('db down'); } }));
+    const thrown = await resolveRunnerOwnerRefusal(args({ ownerCheck: async () => { throw new Error('db down'); } }));
     assert.equal(thrown.code, 'OWNER_CHECK_UNAVAILABLE');
     for (const status of [undefined, 'maybe', '', null]) {
-      const r = await resolveRunnerEnqueueRefusal(args({ ownerCheck: verdict(status) }));
+      const r = await resolveRunnerOwnerRefusal(args({ ownerCheck: verdict(status) }));
       assert.equal(r.code, 'OWNER_CHECK_UNAVAILABLE', `status ${status}`);
     }
   });
@@ -89,31 +89,31 @@ describe('LIN-3383 — verdict matrix', () => {
     let calls = 0;
     const spy = async () => { calls++; return { status: 'not-owner' }; };
     for (const target of ['dash', 'local']) {
-      assert.equal(await resolveRunnerEnqueueRefusal({ ownerCheck: spy, workspaceId: 'w', accountId: 'a', target }), null);
-      assert.equal(await resolveRunnerEnqueueRefusal({ target }), null);
+      assert.equal(await resolveRunnerOwnerRefusal({ ownerCheck: spy, workspaceId: 'w', accountId: 'a', target }), null);
+      assert.equal(await resolveRunnerOwnerRefusal({ target }), null);
     }
     assert.equal(calls, 0);
   });
 
   test('the throwing form carries code/status/category/retryable and is recognised', async () => {
     await assert.rejects(
-      () => assertRunnerEnqueueAllowed(args({ ownerCheck: verdict('not-owner') })),
+      () => assertRunnerOwnerAllowed(args({ ownerCheck: verdict('not-owner') })),
       (err) => {
-        assert.equal(isRunnerEnqueueRefusal(err), true);
-        assert.equal(err.code, 'RUNNER_ENQUEUE_OWNER_ONLY');
+        assert.equal(isRunnerOwnerRefusal(err), true);
+        assert.equal(err.code, 'RUNNER_OWNER_ONLY');
         assert.equal(err.status, 403);
         assert.equal(err.category, 'auth');
         assert.equal(err.retryable, false);
         return true;
       }
     );
-    assert.equal(isRunnerEnqueueRefusal(new Error('x')), false);
-    assert.equal(isRunnerEnqueueRefusal(null), false);
+    assert.equal(isRunnerOwnerRefusal(new Error('x')), false);
+    assert.equal(isRunnerOwnerRefusal(null), false);
   });
 
   test('the seam is keyed on the given workspaceId and accountId', async () => {
     let seen;
-    await resolveRunnerEnqueueRefusal(args({ ownerCheck: async (a) => { seen = a; return { status: 'owner' }; } }));
+    await resolveRunnerOwnerRefusal(args({ ownerCheck: async (a) => { seen = a; return { status: 'owner' }; } }));
     assert.deepEqual(seen, { workspaceId: 'ws-1', accountId: 'acct-1' });
   });
 });
@@ -126,8 +126,8 @@ describe('LIN-3383 — the mint callers of resolveOwnerMintRefusal are unchanged
   });
 
   test('the new code is in the shared vocabulary and ownerMintRefusal resolves it', () => {
-    const r = ownerMintRefusal('RUNNER_ENQUEUE_OWNER_ONLY');
+    const r = ownerMintRefusal('RUNNER_OWNER_ONLY');
     assert.equal(r.status, 403);
-    assert.equal(r.error, "Only this workspace's owner can queue work for its runner.");
+    assert.equal(r.error, "Only this workspace's owner can act on its runner.");
   });
 });

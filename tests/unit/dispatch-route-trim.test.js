@@ -25,8 +25,10 @@ function buildApp({ dispatchQueueStore, accountId = 'account-1' } = {}) {
   app.use(createDispatchRoutes({
     dispatchQueueStore,
     dispatchTokenStore: {},
+    // LIN-3398: trim is owner-only; every account in this fixture owns ws-trim.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey };
+      req.workspace = { urlKey: req.params.urlKey, id: 'ws-trim' };
       req.session = { linearUserId: 'u1', accountId };
       next();
     },

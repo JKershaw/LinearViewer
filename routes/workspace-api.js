@@ -8,7 +8,7 @@
  * - Comments: Fetch issue comments
  * - Images: Proxy Linear-hosted images with auth
  */
-import { resolveRunnerEnqueueRefusal } from '../lib/runner-enqueue-gate.js';
+import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { Router, json } from 'express';
 import { badRequest, jsonError, notFound, unauthorized, classifyUpstreamError } from '../lib/errors.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
@@ -4035,7 +4035,7 @@ ${goal}`
         : (!action && getFeatureFlags(req.session).feedbackTriage) ? 'triage'
         : null;
       const laneRefusal = lane
-        ? await resolveRunnerEnqueueRefusal({
+        ? await resolveRunnerOwnerRefusal({
           ownerCheck: workspaceOwnerCheck,
           workspaceId: workspace.id,
           accountId: req.session?.accountId,

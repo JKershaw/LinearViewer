@@ -109,8 +109,10 @@ function buildApp(store, accountId) {
   app.use(createDispatchRoutes({
     dispatchQueueStore: store,
     dispatchTokenStore: {},
+    // LIN-3398: trim is owner-only; the fixture account owns its workspace.
+    workspaceOwnerCheck: async () => ({ status: 'owner' }),
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey };
+      req.workspace = { urlKey: req.params.urlKey, id: 'ws-redact' };
       req.session = { linearUserId: 'u1', accountId };
       next();
     },
@@ -140,6 +142,7 @@ const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const store = {
   listItems: async () => [row()],
   listHistory: async () => ({ items: [row({ bootstrapToken: null })], total: 1 }),
+  getItemStatus: async () => row(), // LIN-3398: the trim owner gate reads the row for its target
   trimSessionBudget: async () => ({ ok: true, item: row() }),
   pollAvailable: async () => [row()]
 };

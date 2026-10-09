@@ -7,8 +7,8 @@
  * `data-testid` selection (tests/helpers.js) rather than `:has-text()` or
  * CSS classes.
  *
- * This is a REQUEST-only surface (Decision 4, best-effort): the runner does
- * not yet honor a dashboard halt (pending LIN-2995). These specs only pin
+ * This is a REQUEST-only surface (Decision 4, best-effort): the runner
+ * honours a dashboard halt on its next poll (LIN-2995). These specs only pin
  * the user-visible control flow, the requested-not-effective copy, the
  * poll-delivery contract, and the section's own periodic refresh/failure
  * behavior — never that anything is actually paused/stopped.
@@ -124,7 +124,8 @@ test.describe('Workspace Halt (LIN-2994 Surface 4 / LIN-3026)', () => {
 
     await halt.stop().click();
     await expect(halt.status()).toContainText('Stop requested', { timeout: 5000 });
-    await expect(halt.status()).toContainText('LIN-2995');
+    await expect(halt.status()).toContainText('The runner applies it on its next poll');
+    await expect(halt.status()).not.toContainText('does not yet honor');
 
     // Scoped to the halt section's own status/disclaimer nodes ONLY (plan-
     // review CF3): a page-wide `/\b(paused|stopped)\b/i` would also match
