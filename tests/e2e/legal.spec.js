@@ -11,12 +11,14 @@ test.describe('Legal Pages', () => {
 
     test('contains required sections', async ({ page }) => {
       await page.goto('/privacy');
-      await expect(page.locator('h3:has-text("Data We Collect")')).toBeVisible();
-      await expect(page.locator('h3:has-text("How We Store Data")')).toBeVisible();
+      await expect(page.locator('h3:has-text("What Harbour stores")')).toBeVisible();
+      await expect(page.locator('h3:has-text("Sign-in tokens")')).toBeVisible();
       await expect(page.locator('h3:has-text("Cookies")')).toBeVisible();
-      await expect(page.locator('h3:has-text("Third-Party Services")')).toBeVisible();
-      await expect(page.locator('h3:has-text("Data Sharing")')).toBeVisible();
-      await expect(page.locator('h3:has-text("Contact")')).toBeVisible();
+      await expect(page.locator('h3:has-text("Who processes it")')).toBeVisible();
+      await expect(page.locator('h3:has-text("Who can see it")')).toBeVisible();
+      await expect(page.locator('h3:has-text("How long it is kept")')).toBeVisible();
+      await expect(page.locator('h3:has-text("Getting your data deleted")')).toBeVisible();
+      await expect(page.locator('a[href*="github.com/JKershaw/LinearViewer/issues"]')).toHaveCount(0);
     });
 
     test('has footer with current page highlighted', async ({ page }) => {
