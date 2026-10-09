@@ -31,11 +31,11 @@ import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owne
 
 const HALT_ROUTE = '/api/proxy/dispatch/halt';
 
-// One message, true for every unbound population (pre-stamp Settings tokens,
+// One message, true for every unbound population (pre-stamp Proxy-page tokens,
 // dispatched-session tokens, refire-broker tokens).
 export const PROXY_TOKEN_UNBOUND_MESSAGE =
   'This token is not bound to a workspace, so it cannot halt the runner. ' +
-  'Mint a new token in Settings, or use the Dispatch page.';
+  'Mint a new token on the Proxy page, or use the Dispatch page.';
 
 /**
  * @param {Object} deps

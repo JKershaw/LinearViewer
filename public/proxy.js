@@ -341,7 +341,8 @@ This will return all available endpoints with examples. Your token scope is: ${s
   // grant-bearing bootstrap. Revoking one revokes its whole lineage
   // (lib/proxy-tokens.js `revokeToken`), including a running autopilot's live
   // working token — the runner group hides its spent bootstraps for the same
-  // reason. Display-only: the revoke route and who may call it are unchanged.
+  // reason. Display-only, but revoking a grant-bearing lineage is owner-only since LIN-3409 (checked inside
+  // `ProxyTokenStore.revokeToken`).
   function isOrdinaryListed(t) {
     if (isRunnerToken(t)) return false;
     const grantBearing = Array.isArray(t.grants) && t.grants.length > 0;

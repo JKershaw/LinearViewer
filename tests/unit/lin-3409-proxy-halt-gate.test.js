@@ -2,7 +2,7 @@
  * LIN-3409 item 8 — POST/DELETE /api/proxy/dispatch/halt are owner-only, through
  * the REAL composed proxy router (createProxyRoutes) and the real halt handlers.
  *
- *  - an owner's token (a Settings token minted after the workspace-id stamp, or an
+ *  - an owner's token (a Proxy-page token minted after the workspace-id stamp, or an
  *    owner runner copy) halts and resumes;
  *  - a member's token gets 403 RUNNER_OWNER_ONLY and nothing is written;
  *  - a token with `workspaceId: null` gets 409 PROXY_TOKEN_UNBOUND with one true
@@ -21,7 +21,7 @@ import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
 const PATH = '/api/proxy/dispatch/halt';
 const UNBOUND_MESSAGE =
   'This token is not bound to a workspace, so it cannot halt the runner. ' +
-  'Mint a new token in Settings, or use the Dispatch page.';
+  'Mint a new token on the Proxy page, or use the Dispatch page.';
 
 function haltStoreSpy() {
   const writes = [];

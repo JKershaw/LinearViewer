@@ -3,8 +3,8 @@
 For when harbour.cat's database-backed reads (dispatch list, rulings, `/kpis`, the live
 and observation views) start hanging or timing out. Written after the 2026-09-22
 incident (LIN-2993; incident record: `docs/incidents/2026-09-22-harbour-db-reads-hang.md`).
-A workspace halt request exists (LIN-2994), but the runner does not yet honor it (pending
-LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below marked
+A workspace halt exists (LIN-2994) and the runner honors it on its next poll; setting or
+clearing one is owner-only (LIN-3409). There is still no deep-health endpoint (LIN-2999). Every step below marked
 **[unbuilt]** is a placeholder until its ticket lands.
 
 ## First moves
@@ -24,12 +24,12 @@ LIN-2995); there is still no deep-health endpoint (LIN-2999). Every step below m
 3. **Request a workspace halt (LIN-2994).** `POST /api/proxy/dispatch/halt` with body
    `{"mode":"pause"}` (or `"stop"`) records a halt that the next poll carries and the
    runner honors (`pause` takes no fresh items; `stop` also sweeps). It needs a
-   read-write proxy token **the workspace owner minted in Settings** — **mint one before
+   read-write proxy token **the workspace owner minted on the Proxy page** — **mint one before
    an incident**, not during it (see *Halt caveats* below). Halt and resume are
    owner-only (LIN-3409): a member's token gets `403 RUNNER_OWNER_ONLY`, and any other
-   grant-less token (a Settings token minted before the workspace id was stamped on it,
+   grant-less token (a Proxy-page token minted before the workspace id was stamped on it,
    a dispatched-session token, a refire-broker token) gets `409 PROXY_TOKEN_UNBOUND`;
-   mint a new Settings token, or use the Dispatch page. An owner-check failure answers
+   mint a new token on the Proxy page, or use the Dispatch page. An owner-check failure answers
    `500`, never `503`. `DELETE /api/proxy/dispatch/halt` **clears the halt** (resume),
    under the same owner-only rule. Mechanism: `routes/proxy-halt.js` (GET, POST,
    DELETE). Full contract:
@@ -202,11 +202,10 @@ in-system artefact) — there is no documented rollback procedure to follow here
 
 Health and halt mechanisms this runbook wants to point to:
 
-- **Workspace halt (shipped, LIN-2994)** — a pause/stop *request*, which the runner does
-  not yet honor (pending LIN-2995). See
+- **Workspace halt (shipped, LIN-2994)** — a pause/stop *request* the runner honors on
+  its next poll; owner-only to set or clear (LIN-3409). See
   [Operator Halt](../proxy-integration.md#operator-halt-lin-2994-decision-4) and *Halt
   caveats* above.
-- **[unbuilt: LIN-2995]** — runner-local halt / auto-pause, independent of Harbour.
 - **[unbuilt: LIN-2999]** — deep health read + early warning.
 - **[unbuilt: LIN-1756]** — Railway deploy settings (healthcheck path, draining,
   overlap) not yet applied.
