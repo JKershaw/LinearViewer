@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 // fixture:LIN-3136
 import { mintDriverWriter } from '../fixtures/driver-writer.js';
 // /fixture:LIN-3136
@@ -75,6 +76,8 @@ async function watch(request, id) {
 test.beforeEach(async ({ page, request }) => {
   const seeded = await seedLocalWorkspace(page, null, { urlKey: 'runner-kit-loop', append: true, features: { proxy: true } });
   urlKey = seeded.urlKey;
+  // LIN-3409: the stop-halt test below halts through the proxy, which is owner-only.
+  await seedWorkspaceOwnership(page, urlKey, 'owner');
   await page.goto(`/test/clear-proxy-tokens?urlKey=${urlKey}`);
   await page.goto(`/test/clear-dispatch-queue?urlKey=${urlKey}`);
   await page.goto(`/test/clear-dispatch-tokens?urlKey=${urlKey}`);

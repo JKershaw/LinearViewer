@@ -47,6 +47,11 @@ describe('privacy page', () => {
     assert.doesNotMatch(text, /only the (workspace's|workspace&rsquo;s|owner)[^.]* can (drive|start)/i);
     assert.doesNotMatch(text, /deleted after 30 days/i);
     assert.match(text, /not yet airtight/);
+    // LIN-3409: the runner sentence names what is now owner-only, and still the residual.
+    assert.match(text, /halting and resuming, deleting or trimming queued work, and creating or revoking runner credentials/);
+    assert.match(text, /runner tokens issued before these checks keep working until they expire or are revoked/);
+    assert.match(text, /not swept every path|have not swept every path/);
+    assert.doesNotMatch(text, /some controls such as halt and resume, are not covered/);
     assert.match(text, /does not revoke/);
   });
 

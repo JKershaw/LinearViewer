@@ -45,7 +45,7 @@ curl -X POST -H "Authorization: Bearer YOUR_TOKEN" \
 > (`{ "runner": true }`) is an owner-only bootstrap too; see
 > [Runner credentials](#runner-credentials-lin-3131). The **legacy dispatch token**
 > (`POST /workspace/:urlKey/api/dispatch/tokens`) is also owner-only as of LIN-3137: a
-> non-owner is refused `403 GRANT_OWNER_ONLY`, and it is a mint gate, not revocation.
+> non-owner is refused `403 GRANT_OWNER_ONLY`. As of LIN-3409 revocation of a runner credential is owner-only too: revoking a grant-bearing lineage (or an absent root that still has a grant-bearing child) through `DELETE /workspace/:urlKey/api/proxy/tokens/:tokenId` is checked inside `ProxyTokenStore.revokeToken` and a non-owner gets `403 RUNNER_OWNER_ONLY`; a member can still revoke their own grant-less token.
 
 ## Authentication
 
@@ -2554,7 +2554,7 @@ GET /api/proxy/wake-shadow?days=30
 
 #### Operator Halt (LIN-2994 Decision 4)
 
-The **degraded-mode operator path** — proxy-token auth only, no Linear, no heavy render path in front of it. It stores an operator's pause/stop **request**; the runner does not yet honor it (pending LIN-2995). Treat a successful `POST`/read-back `{ halt: {...} }` as "a halt/stop has been requested", never as "the runner is actually paused or stopped."
+The **degraded-mode operator path** — proxy-token auth only, no Linear, no heavy render path in front of it. It stores an operator's pause/stop **request**, which the runner honors on its next poll (`pause` takes no fresh items; `stop` also sweeps). Treat a successful `POST`/read-back `{ halt: {...} }` as "a halt/stop has been requested", never as "the runner is actually paused or stopped." **`POST` and `DELETE` are owner-only (LIN-3409):** the token must be one the workspace owner minted on the Proxy page, which stamps the workspace id on it. A member's token gets `403 RUNNER_OWNER_ONLY`; any other grant-less token (an older Proxy-page token, a dispatched-session or refire-broker token) is not bound to a workspace and gets `409 PROXY_TOKEN_UNBOUND`, so re-mint on the Proxy page or use the Dispatch page. An owner-check failure answers `500`, never `503` (a 503 here would trip the credential-rejection trail). `GET` stays read-only for any token.
 
 ```
 GET /api/proxy/dispatch/halt
@@ -2569,7 +2569,7 @@ Read scope is enough (like the agent-status read above).
 { "halt": { "mode": "pause", "setAt": "2026-06-06T11:32:25.111Z", "setBy": "user_123" } }
 ```
 
-`setBy` is the creator recorded on the token that made the request — `null` for a legacy token with no recorded creator (still a valid, accepted halt).
+`setBy` is the creator recorded on the token that made the request, which is the workspace owner (halting is owner-only). Halts set before LIN-3409 may carry `null`.
 
 ```
 POST /api/proxy/dispatch/halt
@@ -2593,7 +2593,7 @@ Returns:
 DELETE /api/proxy/dispatch/halt
 ```
 
-**Requires `readWrite`.** Clears the stored halt request. Like `POST`, this changes only the stored request: the runner does not yet honor it (pending LIN-2995), so clearing it does not by itself change what a running session does. Harmless when nothing is set.
+**Requires `readWrite`.** Clears the stored halt request. Like `POST`, it is owner-only (`403`/`409`/`500` as above). The runner resumes on its next poll. Harmless when nothing is set.
 
 ```json
 { "success": true }

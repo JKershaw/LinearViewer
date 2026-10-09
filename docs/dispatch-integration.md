@@ -133,9 +133,8 @@ is never `halt: null` here, unlike the operator GET responses described below, w
 are unaffected (simple-dispatcher `queue.js:168-172`), so the example client and the
 `jq '.items[].id'` loop below stay correct as written.
 
-**A halt is a request, not enforcement.** The runner does not yet honor it (pending
-LIN-2995), and Harbour does not enforce it either: `POST /api/dispatch/take` does not check
-it. It is per-workspace, and under degradation it can be silently absent from a poll — see
+**A halt is a request, not enforcement by Harbour.** The runner honors it, but Harbour does not enforce it itself: `POST /api/dispatch/take` does not check
+it. Setting and clearing a halt is owner-only. It is per-workspace, and under degradation it can be silently absent from a poll — see
 the [degraded-mode runbook](runbooks/harbour-degraded.md#halt-caveats) for the caveats. A
 halt is set and cleared through the [Workspace API Proxy](proxy-integration.md#operator-halt-lin-2994-decision-4)
 or the dashboard; the request/response shape for those surfaces is not repeated here.

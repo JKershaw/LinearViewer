@@ -106,8 +106,8 @@ describe('the honesty copy', () => {
     assert.match(prompt, /live broker/i);
   });
 
-  test('halts: the stale /instructions line is named and not to be followed', () => {
-    assert.match(prompt, /does not yet honor/);
+  test('halts are binding; the stale "does not yet honor" claim is gone from /instructions and the prompt', () => {
+    assert.doesNotMatch(prompt, /does not yet honor/);
     assert.doesNotMatch(prompt, /halts are advisory/i);
   });
 });

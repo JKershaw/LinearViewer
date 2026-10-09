@@ -400,6 +400,28 @@ describe('Half B: reach probes through the real composer', () => {
     assert.deepEqual(calls, [ACME], 'handler did not reach the injected workspaceHaltStore.getWorkspaceHalt');
   });
 
+  test('LIN-3409/halt: POST /api/proxy/dispatch/halt must land in createProxyHaltRoutes and dereference the injected workspaceOwnerCheck (a dropped mount key fails closed, not open)', async () => {
+    const seen = [];
+    const setCalls = [];
+    const app = buildApp({
+      workspaceOwnerCheck: async (args) => { seen.push(args); return { status: 'not-owner' }; },
+      workspaceHaltStore: {
+        ...BASE_DEPS().workspaceHaltStore,
+        setWorkspaceHalt: async (...a) => { setCalls.push(a); },
+      },
+    });
+
+    const { status, body } = await call(app, 'POST', '/api/proxy/dispatch/halt', { body: { mode: 'pause' } });
+
+    // 403 proves the injected seam was reached and its verdict honoured; a
+    // dropped createProxyRoutes -> createProxyHaltRoutes key would answer 500
+    // (seam absent, fail closed), and an ungated route would answer 200.
+    assert.equal(status, 403);
+    assert.equal(body.code, 'RUNNER_OWNER_ONLY');
+    assert.deepEqual(seen, [{ workspaceId: 'ws-acme', accountId: 'u1' }]);
+    assert.deepEqual(setCalls, [], 'a refused halt must not reach setWorkspaceHalt');
+  });
+
   // G/agent-status — NO new probe here. tests/unit/lin-2533-agent-status-extraction.test.js:153-206
   // ("LIN-2533 close-out: agentStatusStore is injected into the mounted
   // sub-router") already witnesses agentStatusStore through the real

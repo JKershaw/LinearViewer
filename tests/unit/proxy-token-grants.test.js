@@ -150,15 +150,26 @@ describe('LIN-3129 — createToken structurally refuses grants', () => {
     assert.deepEqual(docs.map(d => d.grants), [[], []]);
   });
 
-  test('createToken forces parentTokenId and workspaceId to null (lineage is internal-only)', async () => {
+  test('createToken forces parentTokenId and lifetimeProfile; a public mint may stamp only a workspace id', async () => {
     // LIN-3129 beat-3 carry-in: the wrapper spreads ...options into #mint, so
     // without this a public caller could stamp lineage that revoke then follows.
+    // LIN-3409 relaxes A3 narrowly: the workspace id (identity, no authority).
     await store.createToken('acme', {
-      createdBy: 'account-A', parentTokenId: 'a-root-id', workspaceId: 'ws-9'
+      createdBy: 'account-A', parentTokenId: 'a-root-id', workspaceId: 'ws-9',
+      lifetimeProfile: 'worker'
     });
     const doc = collection._docs()[0];
     assert.equal(doc.parentTokenId, null, 'a public mint may not stamp a lineage parent');
-    assert.equal(doc.workspaceId, null, 'a public mint may not stamp a workspace');
+    assert.equal(doc.lifetimeProfile, null, 'a public mint may not stamp a lifetime profile');
+    assert.deepEqual(doc.grants, [], 'a public mint never carries grants');
+    assert.equal(doc.workspaceId, 'ws-9', 'a public mint may stamp the workspace id');
+  });
+
+  test('createToken stores null for an absent or non-string workspaceId', async () => {
+    await store.createToken('acme', { createdBy: 'account-A' });
+    await store.createToken('acme', { createdBy: 'account-A', workspaceId: { $ne: null } });
+    await store.createToken('acme', { createdBy: 'account-A', workspaceId: '' });
+    assert.deepEqual(collection._docs().map(d => d.workspaceId), [null, null, null]);
   });
 });
 

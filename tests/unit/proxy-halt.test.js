@@ -7,18 +7,24 @@
  * — the same discipline the C1 DI-witness corpus uses, so this file proves
  * the mounted behavior rather than the sub-router's own logic in a vacuum.
  *
- * This is a REQUEST-only surface: setting a halt does not itself pause or
- * stop anything (the runner does not yet honor it, pending LIN-2995) —
- * these tests only pin the store-write/read contract and the route's own
- * auth/validation/attribution/error behavior.
+ * The runner honours a stored halt, so POST/DELETE are owner-only (LIN-3409);
+ * the gate's own cases live in lin-3409-proxy-halt-gate.test.js. This file pins
+ * the store-write/read contract and the route's own auth/validation/
+ * attribution/error behavior with the owner seam answering `owner`.
  */
 process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
+import { ACME, BASE_DEPS, buildApp as buildBaseApp, call } from './lib/proxy-fake-deps.js';
 
 const PATH = '/api/proxy/dispatch/halt';
+
+// LIN-3409: POST/DELETE are owner-gated through `workspaceOwnerCheck`. The
+// suite's default seam answers `owner`; a test that exercises the gate passes
+// its own (including `null`, the seam-absent fail-closed case).
+const OWNER = async () => ({ status: 'owner' });
+const buildApp = (overrides = {}) => buildBaseApp({ workspaceOwnerCheck: OWNER, ...overrides });
 
 /** A minimal in-memory stand-in for lib/workspace-halt.js's WorkspaceHaltStore
  * contract: get returns `_id` (stripped by the route), set resolves nothing
@@ -55,14 +61,14 @@ function makeNeverCalledSpy(label) {
 function readScopeToken({ createdBy = 'u1' } = {}) {
   return {
     ...BASE_DEPS().proxyTokenStore,
-    validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'read', createdBy }),
+    validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'read', createdBy, workspaceId: 'ws-acme' }),
   };
 }
 
 function writeScopeToken({ createdBy = 'u1' } = {}) {
   return {
     ...BASE_DEPS().proxyTokenStore,
-    validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'readWrite', createdBy }),
+    validateToken: async () => ({ tokenId: 't1', urlKey: ACME, label: 'test', scope: 'readWrite', createdBy, workspaceId: 'ws-acme' }),
   };
 }
 
@@ -153,14 +159,14 @@ describe('LIN-3025: GET/POST/DELETE /api/proxy/dispatch/halt (composed router)',
     assert.equal(status, 403);
   });
 
-  test('setBy is attributed from the token creator, and an ownerless (createdBy: null) token yields setBy: null', async () => {
+  test('setBy is attributed from the token creator (the owner the gate just proved)', async () => {
     const app = buildApp({
       workspaceHaltStore: makeFakeHaltStore(),
-      proxyTokenStore: writeScopeToken({ createdBy: null }),
+      proxyTokenStore: writeScopeToken({ createdBy: 'owner-1' }),
     });
     const { status, body } = await call(app, 'POST', PATH, { body: { mode: 'pause' } });
     assert.equal(status, 200);
-    assert.equal(body.halt.setBy, null);
+    assert.equal(body.halt.setBy, 'owner-1');
   });
 
   test('logEvent is recorded on every handled branch, including a 200 GET (middleware 401/403 are not logged)', async () => {

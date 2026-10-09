@@ -510,7 +510,7 @@ const ROWS = [
   {
     group: 'K', method: 'DELETE', url: '/api/proxy/dispatch/halt', expect: 200,
     note: 'clears an already-unset halt — BASE_DEPS() default workspaceHaltStore.clearWorkspaceHalt is a harmless no-op',
-    run: () => call(buildApp(), 'DELETE', '/api/proxy/dispatch/halt'),
+    run: () => call(buildApp({ workspaceOwnerCheck: async () => ({ status: 'owner' }) }), 'DELETE', '/api/proxy/dispatch/halt'),  // LIN-3409: owner-gated
   },
   {
     group: 'K', method: 'GET', url: '/api/proxy/alarms', expect: 200,

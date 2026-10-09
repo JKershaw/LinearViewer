@@ -10,6 +10,15 @@
  *
  * Sinks scanned: createDispatchItem( · dispatchSessionFollowUp( ·
  * expandCascadeAborts( · addFeedback( · _mintWake( · .addItem(.
+ * LIN-3398/LIN-3409 widen the class from "enqueue" to "any runner-state
+ * mutation" with the five store methods .removeItem( · .trimSessionBudget( ·
+ * .setWorkspaceHalt( · .clearWorkspaceHalt( · .revokeToken(. Verdicts:
+ * `gated | token-scoped | store-gated | test-only`. `store-gated` (a row only for
+ * routes/proxy-tokens-admin.js `.revokeToken(`): the owner check lives inside
+ * ProxyTokenStore.revokeToken, so the row asserts the call passes the requester
+ * `{ workspaceId, accountId }`; the store-level tests back the check itself.
+ * `test-only` (a row only for routes/test.js): the /test cleanup route. There is
+ * no `pending` verdict.
  * Execute-mode callers scanned: runAgentTurn(. A caller's mode comes from its
  * TABLE ROW, never from a literal in the call: Task Chat's call contains
  * `followUpMode: 'propose'` inside a conditional spread, so a text rule would
@@ -40,13 +49,18 @@ function loadTree() {
 }
 
 const GATE = 'resolveRunnerOwnerRefusal(';
+const VERDICTS = ['gated', 'token-scoped', 'store-gated', 'test-only'];
 
 // The seams themselves: the factory and the store implement the sinks and serve
 // proxy/orchestrator callers with no session, which is exactly why the gate is
 // not inside them (plan, "Do not place the gate inside createDispatchItem").
-const IMPLEMENTATION_FILES = new Set(['lib/dispatch-factory.js', 'lib/dispatch-store.js']);
+const IMPLEMENTATION_FILES = new Set([
+  'lib/dispatch-factory.js', 'lib/dispatch-store.js',
+  // LIN-3409: the halt store and the two token stores implement the new sinks.
+  'lib/workspace-halt.js', 'lib/proxy-tokens.js', 'lib/dispatch-tokens.js'
+]);
 
-const SINK_RE = /\b(createDispatchItem|dispatchSessionFollowUp|expandCascadeAborts|addFeedback|_mintWake)\(|\.addItem\(/g;
+const SINK_RE = /\b(createDispatchItem|dispatchSessionFollowUp|expandCascadeAborts|addFeedback|_mintWake)\(|\.(addItem|removeItem|trimSessionBudget|setWorkspaceHalt|clearWorkspaceHalt|revokeToken)\(/g;
 
 /** Non-comment, non-import, non-definition sink hits: [{file, line, sink}]. */
 function findSinks(tree) {
@@ -57,7 +71,7 @@ function findSinks(tree) {
       if (/^\s*(\/\/|\*|\/\*)/.test(text) || /^\s*import\b/.test(text)) return;
       if (/\b(?:export\s+)?(?:async\s+)?function\s+\w+\s*\(/.test(text)) return; // a definition, not a call
       for (const m of text.matchAll(SINK_RE)) {
-        hits.push({ file, line: i + 1, sink: m[1] || 'addItem' });
+        hits.push({ file, line: i + 1, sink: m[1] || m[2] });
       }
     });
   }
@@ -107,7 +121,35 @@ const MEMBERS = [
   { id: 9, file: 'routes/dispatch.js', sink: 'addFeedback', count: 1, verdict: 'token-scoped',
     reason: 'runner/feedback-token write; comes from the runner itself, not a session' },
   { id: 9, file: 'routes/proxy-runner.js', sink: 'addFeedback', count: 1, verdict: 'token-scoped',
-    reason: 'runner token write; comes from the runner itself, not a session' }
+    reason: 'runner token write; comes from the runner itself, not a session' },
+  // LIN-3398 / LIN-3409: runner-state mutations other than enqueue.
+  { id: 10, file: 'routes/dispatch.js', sink: 'setWorkspaceHalt', count: 1, verdict: 'gated',
+    reason: 'session halt POST: owner-only (LIN-3408), gate after mode validation and before the write',
+    handler: "router.post('/workspace/:urlKey/api/dispatch/halt'", before: ['setWorkspaceHalt('], gateToken: 'refuseNonOwner(' },
+  { id: 10, file: 'routes/dispatch.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'gated',
+    reason: 'session halt DELETE (resume): owner-only (LIN-3408)',
+    handler: "router.delete('/workspace/:urlKey/api/dispatch/halt'", before: ['clearWorkspaceHalt('], gateToken: 'refuseNonOwner(' },
+  { id: 11, file: 'routes/dispatch.js', sink: 'removeItem', count: 1, verdict: 'gated',
+    reason: 'session queue-item delete: owner-only for runner targets (LIN-3408); the gate reads the row for its target first, which writes nothing',
+    handler: "router.delete('/workspace/:urlKey/api/dispatch/:itemId'", before: ['removeItem('], gateToken: 'refuseNonOwner(' },
+  { id: 12, file: 'routes/dispatch.js', sink: 'trimSessionBudget', count: 1, verdict: 'gated',
+    reason: 'session trim: owner-only for runner targets (LIN-3408)',
+    handler: "router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim'", before: ['trimSessionBudget('], gateToken: 'refuseNonOwner(' },
+  { id: 13, file: 'routes/dispatch.js', sink: 'revokeToken', count: 1, verdict: 'gated',
+    reason: 'dispatch-token revoke (the dispatch-token store has no owner seam and one branch, so it is gated at its route; LIN-3408)',
+    handler: "router.delete('/workspace/:urlKey/api/dispatch/tokens/:tokenId'", before: ['revokeToken('], gateToken: 'refuseNonOwner(' },
+  { id: 14, file: 'routes/proxy-halt.js', sink: 'setWorkspaceHalt', count: 1, verdict: 'gated',
+    reason: 'proxy halt POST: owner-only on the token\'s own workspace id and creator, 409 for an unbound token (LIN-3409)',
+    handler: 'router.post(HALT_ROUTE', before: ['setWorkspaceHalt('], gateToken: 'refuseUnlessOwner(',
+    helper: { fn: 'async function refuseUnlessOwner(', contains: ['resolveRunnerOwnerRefusal(', 'req.proxyWorkspaceId', 'req.proxyCreatedBy', "code: 'PROXY_TOKEN_UNBOUND'", 'refusal.status === 503 ? 500'] } },
+  { id: 14, file: 'routes/proxy-halt.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'gated',
+    reason: 'proxy halt DELETE (resume): the same gate as POST (LIN-3409)',
+    handler: 'router.delete(HALT_ROUTE', before: ['clearWorkspaceHalt('], gateToken: 'refuseUnlessOwner(' },
+  { id: 15, file: 'routes/proxy-tokens-admin.js', sink: 'revokeToken', count: 1, verdict: 'store-gated',
+    reason: 'ProxyTokenStore.revokeToken owner-checks a grant-bearing lineage itself (it owns the seam and the branch logic); the route must pass the requester',
+    handler: "router.delete('/workspace/:urlKey/api/proxy/tokens/:tokenId'", passes: ['workspaceId:', 'accountId:'] },
+  { id: 16, file: 'routes/test.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'test-only',
+    reason: '/test cleanup route, mounted only under the test harness; no session, no member identity' }
 ];
 
 /** Execute-mode caller table. `mode` is authoritative (see header). */
@@ -187,7 +229,10 @@ function scanSinks(tree) {
     if (listed.has(k)) v.push(`table lists ${k} twice`);
     listed.add(k);
     if (!m.reason) v.push(`${k}: a row needs a recorded reason`);
-    if (!['gated', 'token-scoped'].includes(m.verdict)) v.push(`${k}: verdict must be gated | token-scoped`);
+    if (!VERDICTS.includes(m.verdict)) v.push(`${k}: verdict must be one of ${VERDICTS.join(' | ')}`);
+    // Each new verdict is bounded to its one file (and, for store-gated, one sink).
+    if (m.verdict === 'test-only' && m.file !== 'routes/test.js') v.push(`${k}: test-only is only for routes/test.js`);
+    if (m.verdict === 'store-gated' && !(m.file === 'routes/proxy-tokens-admin.js' && m.sink === 'revokeToken')) v.push(`${k}: store-gated is only for routes/proxy-tokens-admin.js .revokeToken(`);
     if ((counts[k] || 0) !== m.count) v.push(`${k}: expected ${m.count} sink(s), found ${counts[k] || 0}`);
   }
   for (const k of Object.keys(counts)) {
@@ -197,14 +242,21 @@ function scanSinks(tree) {
     }
   }
 
-  for (const m of MEMBERS.filter(x => x.verdict === 'gated')) {
+  for (const m of MEMBERS.filter(x => x.verdict === 'gated' || x.verdict === 'store-gated')) {
     const f = tree.find(t => t.file === m.file);
     if (!f) { v.push(`${m.file}: missing`); continue; }
     const where = m.handler || m.fn;
     const text = m.handler ? handlerText(f.src, m.handler) : functionText(f.src, m.fn);
     if (text === null) { v.push(`${m.file}: ${where} not found`); continue; }
     const gate = m.gateToken || GATE;
-    for (const msg of gatedBefore(text, m.before, gate)) v.push(`${m.file} (${where}): ${msg}`);
+    for (const msg of gatedBefore(text, m.before || [], gate)) v.push(`${m.file} (${where}): ${msg}`);
+    if (m.helper) {
+      const helperText = functionText(f.src, m.helper.fn);
+      if (helperText === null) v.push(`${m.file}: gate helper ${m.helper.fn} not found`);
+      else for (const token of m.helper.contains) {
+        if (!helperText.slice(0, helperText.indexOf('\n  }\n') + 1 || undefined).includes(token)) v.push(`${m.file}: gate helper ${m.helper.fn} lost ${token}`);
+      }
+    }
     if (m.failClosed && !text.includes(m.failClosed)) v.push(`${m.file} (${where}): missing the fail-closed branch ${m.failClosed}`);
     for (const token of m.passes || []) {
       const block = callBlock(text, text.indexOf(`${m.sink}(`));
@@ -286,10 +338,11 @@ describe('LIN-3383 census — every session-reachable runner enqueue sink is gat
     assert.deepEqual(scanAgentTurnCallers(TREE), []);
   });
 
-  test('the table records a reason for every row and only the two verdicts', () => {
+  test('the table records a reason for every row and only the closed verdict set', () => {
     for (const m of MEMBERS) {
       assert.ok(m.reason && m.reason.length > 10, `${m.file}|${m.sink}`);
-      assert.ok(['gated', 'token-scoped'].includes(m.verdict));
+      assert.ok(VERDICTS.includes(m.verdict));
+      assert.notEqual(m.verdict, 'pending', 'no interim pending verdict (LIN-3398 revision 4)');
     }
   });
 });
@@ -377,5 +430,87 @@ describe('LIN-3383 census — mutation witnesses', () => {
   test("a propose caller that drops followUpMode: 'propose' fails the census", () => {
     const v = scanAgentTurnCallers(mutate('routes/proxy-flight-companion.js', s => s.replace("followUpMode: 'propose'", "followUpMode: 'execute'")));
     assert.ok(v.some(m => m.startsWith('routes/proxy-flight-companion.js') && m.includes("followUpMode: 'propose'")), v.join('\n'));
+  });
+});
+
+describe('LIN-3409 census — mutation witnesses for the runner-state sinks', () => {
+  test('removing a session-route gate fails the census (halt POST/DELETE, delete, trim, dispatch-token revoke)', () => {
+    const cases = [
+      ["router.post('/workspace/:urlKey/api/dispatch/halt'", 'setWorkspaceHalt('],
+      ["router.delete('/workspace/:urlKey/api/dispatch/halt'", 'clearWorkspaceHalt('],
+      ["router.delete('/workspace/:urlKey/api/dispatch/:itemId'", 'removeItem('],
+      ["router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim'", 'trimSessionBudget('],
+      ["router.delete('/workspace/:urlKey/api/dispatch/tokens/:tokenId'", 'revokeToken(']
+    ];
+    for (const [handler, sink] of cases) {
+      const v = scanSinks(mutate('routes/dispatch.js', s => {
+        const at = s.indexOf(handler);
+        const end = at + (handlerText(s, handler) || '').length;
+        return s.slice(0, at) + s.slice(at, end).replace(/await refuseNonOwner\(/g, 'await (async () => false)(') + s.slice(end);
+      }));
+      assert.ok(v.some(m => m.startsWith('routes/dispatch.js') && m.includes(sink) && m.includes('is reached before')), `${sink}: ${v.join('\n')}`);
+    }
+  });
+
+  test('moving a session store write above its gate fails the census', () => {
+    const v = scanSinks(mutate('routes/dispatch.js', s => s.replace('      if (await refuseNonOwner(req, res, row?.target)) return;\n', '      await dispatchQueueStore.removeItem(workspace.urlKey, itemId);\n      if (await refuseNonOwner(req, res, row?.target)) return;\n')));
+    assert.ok(v.length > 0, 'a second removeItem( above the gate must not pass');
+  });
+
+  test('removing the proxy-halt gate call fails the census (POST and DELETE)', () => {
+    for (const [handler, sink] of [['router.post(HALT_ROUTE', 'setWorkspaceHalt('], ['router.delete(HALT_ROUTE', 'clearWorkspaceHalt(']]) {
+      const v = scanSinks(mutate('routes/proxy-halt.js', s => {
+        const at = s.indexOf(handler);
+        const end = at + (handlerText(s, handler) || '').length;
+        return s.slice(0, at) + s.slice(at, end).replace('await refuseUnlessOwner(', 'await (async () => false)(') + s.slice(end);
+      }));
+      assert.ok(v.some(m => m.startsWith('routes/proxy-halt.js') && m.includes(sink) && m.includes('is reached before')), `${sink}: ${v.join('\n')}`);
+    }
+  });
+
+  test('a proxy-halt gate helper that loses the resolver, the unbound 409 or the 503-to-500 map fails the census', () => {
+    for (const [from, to] of [
+      ['await resolveRunnerOwnerRefusal(', 'await (async () => null)('],
+      ["code: 'PROXY_TOKEN_UNBOUND'", "code: 'X'"],
+      ['refusal.status === 503 ? 500', 'refusal.status === 503 ? 503']
+    ]) {
+      const v = scanSinks(mutate('routes/proxy-halt.js', s => s.replace(from, to)));
+      assert.ok(v.some(m => m.includes('gate helper') && m.includes('lost')), `${from}: ${v.join('\n')}`);
+    }
+  });
+
+  test('the proxy-token revoke route that stops passing the requester fails the census (store-gated)', () => {
+    const v = scanSinks(mutate('routes/proxy-tokens-admin.js', s => s.replace('        workspaceId: workspace.id,\n        accountId: req.session?.accountId\n', '')));
+    assert.ok(v.some(m => m.startsWith('routes/proxy-tokens-admin.js') && m.includes('does not pass')), v.join('\n'));
+  });
+
+  test('a new, unlisted runner-state sink fails the census', () => {
+    for (const call of ['store.removeItem(1, 2)', 'store.trimSessionBudget(1)', 'store.setWorkspaceHalt(1, {})', 'store.clearWorkspaceHalt(1)', 'tokens.revokeToken(1, 2)']) {
+      const planted = [...TREE, { file: 'routes/new-feature.js', src: `export function r(store, tokens) {\n  return ${call};\n}\n` }];
+      assert.ok(scanSinks(planted).some(m => m.startsWith('routes/new-feature.js|') && m.includes('unlisted')), call);
+    }
+  });
+
+  test('a new sink added to a listed file (count drift) fails the census', () => {
+    const v = scanSinks(mutate('routes/proxy-halt.js', s => s + '\nawait workspaceHaltStore.setWorkspaceHalt(1, {});\n'));
+    assert.ok(v.some(m => m.startsWith('routes/proxy-halt.js|setWorkspaceHalt: expected 1')), v.join('\n'));
+  });
+
+  test('the new verdicts stay bounded to their one file', () => {
+    const saved = MEMBERS.slice();
+    try {
+      MEMBERS.push({ id: 'x', file: 'routes/dispatch.js', sink: 'addFeedback2', count: 0, verdict: 'test-only', reason: 'moved out of routes/test.js' });
+      MEMBERS.push({ id: 'y', file: 'routes/dispatch.js', sink: 'revokeToken2', count: 0, verdict: 'store-gated', reason: 'moved out of the proxy revoke route' });
+      const v = scanSinks(TREE);
+      assert.ok(v.some(m => m.includes('test-only is only for routes/test.js')), v.join('\n'));
+      assert.ok(v.some(m => m.includes('store-gated is only for routes/proxy-tokens-admin.js')), v.join('\n'));
+    } finally {
+      MEMBERS.length = 0; MEMBERS.push(...saved);
+    }
+    assert.deepEqual(scanSinks(TREE), [], 'the live table is restored');
+  });
+
+  test('there is no pending verdict, and the closed set is exactly the four named', () => {
+    assert.deepEqual(VERDICTS, ['gated', 'token-scoped', 'store-gated', 'test-only']);
   });
 });

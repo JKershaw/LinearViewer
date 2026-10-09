@@ -74,14 +74,15 @@ The proxy allows authenticated users to generate secure tokens for external AI a
 **User-facing endpoints** (session auth, workspace-prefixed):
 - `POST /workspace/:urlKey/api/proxy/tokens` - Create a proxy token
 - `GET /workspace/:urlKey/api/proxy/tokens` - List tokens
-- `DELETE /workspace/:urlKey/api/proxy/tokens/:tokenId` - Revoke token
+- `DELETE /workspace/:urlKey/api/proxy/tokens/:tokenId` - Revoke token (a grant-bearing runner credential lineage is owner-only: `ProxyTokenStore.revokeToken` owner-checks it, LIN-3409)
 - `GET /workspace/:urlKey/api/proxy/events` - View audit log
 
 Consumer endpoints are Bearer-token authenticated and fall into three groups: **read** (issues, teams, projects, cycles, labels, search, relations), **write** (`readWrite` scope — create/update issues, comments, relations, labels), and **task automation** (stack, prompt, recommend, recap, brief, status). The full endpoint catalog, request/response shapes, and scope rules are the consumer contract and live in the integration guide — that's the source of truth, not this file. (Issue IDs accept both UUIDs and identifiers like `LIN-123`.) `GET /api/proxy/issues` is cursor-paged (LIN-1511): it accepts an opaque `after` request cursor (alias `cursor`) passed verbatim through the existing `provider.issues({ first, after })` seam, and returns `pageInfo.{hasNextPage,endCursor}` — loop `endCursor` back as `after` until `hasNextPage` is false to enumerate a workspace past the 250-per-page cap. `/api/proxy/search` is deliberately **not** paged (relevance-capped; tracked separately). A cursor the provider rejects is a **400**, not a 500: Linear signals a caller error *inside an HTTP 200 GraphQL envelope* (`extensions.userError: true`, no `statusCode`), which the four status branches of `graphqlErrorStatus()` cannot see, so before LIN-1511's follow-up every one fell through to 500. The `userError → 400` branch is evaluated **last**, after those branches, so it can only refine a would-be 500 — it applies to every proxy route, not just `/issues` (a caller error is a caller error wherever it lands), and `graphqlErrorDetail()` prefers Linear's `extensions.userPresentableMessage` over the generic top-level `message` so the caller is told *which* input was wrong.
 
 `GET/POST/DELETE /api/proxy/dispatch/halt` is the operator trio (LIN-2994 Decision 4) — the
-degraded-mode path for a workspace halt. It stores a request the runner does not yet honor
-(pending LIN-2995); the full contract lives in the [Operator Halt section of the integration
+degraded-mode path for a workspace halt. The runner honors a set halt on its next poll. POST and DELETE are
+owner-only (LIN-3409): they need a token the owner minted on the Proxy page after LIN-3409 (other
+grant-less tokens get `409 PROXY_TOKEN_UNBOUND`); the Dispatch page is the other route. The full contract lives in the [Operator Halt section of the integration
 guide](../proxy-integration.md#operator-halt-lin-2994-decision-4), not here. For incident use,
 see the [degraded-mode runbook](../runbooks/harbour-degraded.md).
 

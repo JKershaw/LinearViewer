@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/test-base.js';
 import { seedLocalWorkspace } from '../fixtures/local-harness.js';
+import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 /**
  * LIN-3131 — the runner credential surface, end to end (S2b.3 Settings +
@@ -28,6 +29,10 @@ test.beforeEach(async ({ page }) => {
     features: { proxy: true }
   });
   urlKey = seeded.urlKey;
+  // LIN-3409: halt and runner-credential revoke are owner-only; state the ownership
+  // this spec needs rather than relying on binder order (the probes below then
+  // flip it to ownerless / foreign / corrupt on purpose).
+  await seedWorkspaceOwnership(page, urlKey, 'owner');
   apiPrefix = `/workspace/${urlKey}/api/proxy`;
   proxyUrl = `/workspace/${urlKey}/proxy`;
   await page.goto(`/test/clear-proxy-tokens?urlKey=${urlKey}`);
@@ -271,5 +276,85 @@ test.describe('LIN-2394 expiry witness (LIN-3131 S2b.5)', () => {
     const body = await res.json();
     expect(body.proxyTokenState).toBe('expired');
     expect(body.proxyTokenExpiredAt).toBe(expired.expiresAt);
+  });
+});
+
+test.describe('Owner-only proxy halt and runner-credential revoke - real server (LIN-3409)', () => {
+  const HALT = '/api/proxy/dispatch/halt';
+  const bearer = (token) => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
+
+  /** A Settings-minted (grant-less, readWrite) token: the session's own mint route stamps the workspace id. */
+  async function mintSettingsToken(request, header) {
+    const res = await request.post(`${apiPrefix}/tokens`, {
+      headers: { Cookie: header, 'Content-Type': 'application/json' },
+      data: { label: 'ops', scope: 'readWrite' }
+    });
+    expect(res.status()).toBe(201);
+    return (await res.json()).token;
+  }
+
+  test("the owner's Settings token halts and resumes the runner", async ({ page, request }) => {
+    const token = await mintSettingsToken(request, await cookieHeader(page));
+    const set = await request.post(HALT, { headers: bearer(token), data: { mode: 'pause' } });
+    expect(set.status()).toBe(200);
+    expect((await (await request.get(HALT, { headers: bearer(token) })).json()).halt.mode).toBe('pause');
+    const cleared = await request.delete(HALT, { headers: bearer(token) });
+    expect(cleared.status()).toBe(200);
+    expect((await (await request.get(HALT, { headers: bearer(token) })).json()).halt).toBeNull();
+  });
+
+  test("a member's Settings token is refused 403 RUNNER_OWNER_ONLY on halt and resume, and nothing is set", async ({ page, request }) => {
+    const header = await cookieHeader(page);
+    const ownerToken = await mintSettingsToken(request, header);
+    await seedWorkspaceOwnership(page, urlKey, 'foreign');
+    const memberToken = await mintSettingsToken(request, header); // a member may still mint a grant-less token
+
+    for (const call of [
+      () => request.post(HALT, { headers: bearer(memberToken), data: { mode: 'stop' } }),
+      () => request.delete(HALT, { headers: bearer(memberToken) })
+    ]) {
+      const res = await call();
+      expect(res.status()).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('RUNNER_OWNER_ONLY');
+      expect(body.error).toBe("Only this workspace's owner can act on its runner.");
+    }
+    // the halt read stays open to the member, and nothing was set
+    expect((await (await request.get(HALT, { headers: bearer(memberToken) })).json()).halt).toBeNull();
+    // the owner's earlier token is a creator-checked token too: owner ownership flipped, so it is refused as well
+    expect((await request.post(HALT, { headers: bearer(ownerToken), data: { mode: 'pause' } })).status()).toBe(403);
+  });
+
+  test('a token with no workspace id gets 409 PROXY_TOKEN_UNBOUND with the true copy', async ({ page, request }) => {
+    const header = await cookieHeader(page);
+    const unbound = (await (await request.get(`/test/create-proxy-token?urlKey=${urlKey}&scope=readWrite&label=unbound`, { headers: { Cookie: header } })).json()).token;
+    const res = await request.post(HALT, { headers: bearer(unbound), data: { mode: 'pause' } });
+    expect(res.status()).toBe(409);
+    const body = await res.json();
+    expect(body.code).toBe('PROXY_TOKEN_UNBOUND');
+    expect(body.error).toContain('not bound to a workspace');
+    expect(body.error).toContain('Mint a new token on the Proxy page, or use the Dispatch page.');
+  });
+
+  test("a member cannot revoke the owner's runner credential (403) but can revoke their own grant-less token", async ({ page, request }) => {
+    const header = await cookieHeader(page);
+    const { bootstrap, working } = await exchangeRunner(request, header);
+    await seedWorkspaceOwnership(page, urlKey, 'foreign');
+
+    const refused = await request.delete(`${apiPrefix}/tokens/${working.tokenId ?? bootstrap.tokenId}`, { headers: { Cookie: header } });
+    expect(refused.status()).toBe(403);
+    expect((await refused.json()).code).toBe('RUNNER_OWNER_ONLY');
+    const alive = await request.get('/api/proxy/runner/poll', { headers: { Authorization: `Bearer ${working.token}` } });
+    expect(alive.status()).toBe(200);
+
+    const own = await mintSettingsToken(request, header);
+    const list = await (await request.get(`${apiPrefix}/tokens`, { headers: { Cookie: header } })).json();
+    const ownRow = list.tokens.find(t => t.grants.length === 0);
+    expect(ownRow, own && 'a grant-less row is listed').toBeTruthy();
+    expect((await request.delete(`${apiPrefix}/tokens/${ownRow.tokenId}`, { headers: { Cookie: header } })).status()).toBe(200);
+
+    await seedWorkspaceOwnership(page, urlKey, 'owner');
+    const ok = await request.delete(`${apiPrefix}/tokens/${bootstrap.tokenId}`, { headers: { Cookie: header } });
+    expect(ok.status()).toBe(200);
   });
 });
