@@ -37,6 +37,7 @@ import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
+import { parseConsumerCaps, recordConsumerCaps, CONSUMER_CAPS_HEADER } from '../lib/consumer-caps.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -91,7 +92,11 @@ export function createProxyRunnerRoutes({
    */
   router.get(POLL_ROUTE, async (req, res) => {
     try {
-      const itemsPromise = dispatchQueueStore.pollAvailable(req.proxyUrlKey);
+      // Capability advertisement (LIN-3436): recorded per workspace (last poller
+      // wins, an absent header clears it) and passed to the delivery gate.
+      const caps = parseConsumerCaps(req.headers[CONSUMER_CAPS_HEADER]);
+      recordConsumerCaps(req.proxyUrlKey, caps);
+      const itemsPromise = dispatchQueueStore.pollAvailable(req.proxyUrlKey, { caps });
       // Mark the promise handled immediately so a pollAvailable rejection
       // arriving while the (independently bounded) halt read is still in
       // flight never surfaces as an unhandledRejection. `await itemsPromise`

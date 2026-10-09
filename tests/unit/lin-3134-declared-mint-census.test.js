@@ -333,12 +333,13 @@ const FOLLOWUP_SITES = [
   { name: 'chat-tools send_follow_up', key: 'lib/chat-tools.js | tool send_follow_up | (none)', predicate: null, hasAttachArm: false }
 ];
 
-// The four calls with no follow-up (launch or leaf only).
+// The five calls with no follow-up (launch or leaf only; LIN-3436 adds the ifParked abort helper).
 const NON_FOLLOWUP_CALLS = [
   "routes/collective.js | POST /workspace/:urlKey/collective/start | kind: 'custom'",
   "routes/proxy-kickoff.js | POST /api/proxy/autopilot/kickoff | kind: 'autopilot'",
   "routes/workspace-api.js | function enqueueFeedbackTriage | kind: 'triage'",
-  "routes/workspace-api.js | function enqueueFeedbackAutopilot | kind: 'autopilot'"
+  "routes/workspace-api.js | function enqueueFeedbackAutopilot | kind: 'autopilot'",
+  'lib/ticket-close-abort.js | function enqueueIfParkedAbort | (none)'
 ];
 
 function indicesOf(masked, token, from, to) {
@@ -527,9 +528,10 @@ const replaceOnce = (needle, replacement) => (src) => {
 const POST_DISPATCH_GATE = "          if (isFollowUp) {\n            return provisionResumeCredential({";
 
 describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields, no spread', () => {
-  test('10 calls; the 6 follow-up-carrying ones are exactly the Class F set; every fields is inline, spread-free', () => {
+  test('11 calls; the 6 follow-up-carrying ones are exactly the Class F set; every fields is inline, spread-free', () => {
     const calls = scanDispatchCalls(PRODUCTION);
-    assert.equal(calls.length, 10);
+    // LIN-3436: 10 -> 11 for lib/ticket-close-abort.js (an ifParked abort: no followUpTo, no mint).
+    assert.equal(calls.length, 11);
     assert.deepEqual(calls.filter(c => c.carriesFollowUpTo).map(callKey).sort(), FOLLOWUP_SITES.map(s => s.key).sort());
     assert.deepEqual(censusC2(PRODUCTION), []);
   });
