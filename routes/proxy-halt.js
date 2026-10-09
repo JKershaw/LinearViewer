@@ -5,9 +5,15 @@
  * (proxyLimiter + authenticateProxyToken for reads, + requireWriteScope for
  * writes, logEvent on every handled branch including a 200 GET).
  *
- * This stores an operator REQUEST only — the runner does not yet honor it
- * (pending LIN-2995). Never say "paused"/"stopped" as if enforced. No
- * Linear, no resolveProviderAccess, no session enumeration in this file, and
+ * The runner honours the stored halt (lib/runner-kit/runner.mjs `haltAction`:
+ * pause leaves fresh items, stop sweeps), so setting or clearing one is a
+ * runner-state mutation and is OWNER-ONLY (LIN-3409, LIN-3398): POST/DELETE are
+ * gated through the one hoisted `workspaceOwnerCheck` on the token's own
+ * workspace id and creator (`req.proxyWorkspaceId` / `req.proxyCreatedBy`).
+ * A token that carries no workspace id (every grant-less token minted before
+ * LIN-3409 stamped one, and every dispatched-session / refire-broker token) cannot
+ * be checked and gets `409 PROXY_TOKEN_UNBOUND`. GET stays read-only and ungated.
+ * No Linear, no resolveProviderAccess, no session enumeration in this file, and
  * no cache/seam code: LIN-3024 owns the shared last-known-halt cache on
  * WorkspaceHaltStore, so these handlers only call its existing
  * getWorkspaceHalt/setWorkspaceHalt/clearWorkspaceHalt methods.
@@ -21,8 +27,15 @@
 import { Router } from 'express';
 import { badRequest, jsonError } from '../lib/errors.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
+import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 
 const HALT_ROUTE = '/api/proxy/dispatch/halt';
+
+// One message, true for every unbound population (pre-stamp Settings tokens,
+// dispatched-session tokens, refire-broker tokens).
+export const PROXY_TOKEN_UNBOUND_MESSAGE =
+  'This token is not bound to a workspace, so it cannot halt the runner. ' +
+  'Mint a new token in Settings, or use the Dispatch page.';
 
 /**
  * @param {Object} deps
@@ -31,9 +44,47 @@ const HALT_ROUTE = '/api/proxy/dispatch/halt';
  * @param {Function} deps.authenticateProxyToken - Proxy bearer-token auth middleware
  * @param {Function} deps.requireWriteScope - Middleware requiring a readWrite-scoped token
  * @param {Function} deps.logEvent - Proxy event/audit logger
+ * @param {Function|null} deps.workspaceOwnerCheck - the ONE hoisted owner seam
+ *   (server.js); deliberately undefaulted like `workspaceHaltStore`. Absent or
+ *   null fails closed (500) on POST/DELETE.
  */
-export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }) {
+export function createProxyHaltRoutes({ workspaceHaltStore, workspaceOwnerCheck, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }) {
   const router = Router();
+
+  /**
+   * Owner gate for POST/DELETE. Resolves true when the request was REFUSED (the
+   * response is already sent), false when the owner may proceed. Runs before any
+   * store write.
+   *
+   * Never 503 on this route (LIN-3025): `logEvent(..., 503)` runs
+   * `logCredentialRejection` + `markSuspect` (routes/proxy.js) and would log a
+   * false `[credential-rejected]` for what is an owner-check failure, not a bad
+   * credential. So every 503 refusal (GRANT_OWNERLESS, OWNER_CHECK_UNAVAILABLE)
+   * is mapped to 500 for BOTH logEvent and the wire (envelope code/category/
+   * retryable kept); 403/409 pass through. The shared responder stays free of
+   * logEvent on purpose.
+   */
+  async function refuseUnlessOwner(req, res) {
+    if (!req.proxyWorkspaceId) {
+      logEvent(req, HALT_ROUTE, 409);
+      jsonError(res, 409, PROXY_TOKEN_UNBOUND_MESSAGE, {
+        code: 'PROXY_TOKEN_UNBOUND',
+        category: 'config',
+        retryable: false
+      });
+      return true;
+    }
+    const refusal = await resolveRunnerOwnerRefusal({
+      ownerCheck: workspaceOwnerCheck,
+      workspaceId: req.proxyWorkspaceId,
+      accountId: req.proxyCreatedBy
+    });
+    if (!refusal) return false;
+    const status = refusal.status === 503 ? 500 : refusal.status;
+    logEvent(req, HALT_ROUTE, status);
+    sendRunnerRefusal(res, { ...refusal, status });
+    return true;
+  }
 
   /**
    * GET /api/proxy/dispatch/halt
@@ -68,9 +119,9 @@ export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authen
   /**
    * POST /api/proxy/dispatch/halt
    * Body `{ mode }` with `mode` one of `HALT_MODES`; anything else is a 400.
-   * `setBy` is attributed from the token creator (`null` for a legacy ownerless
-   * token — the proxy-dispatch.js:354 precedent — rather than rejecting the
-   * halt outright).
+   * Owner-only (LIN-3409): the gate runs after mode validation and before any
+   * write. `setBy` is attributed from the token creator, which the gate has
+   * just proven is the workspace owner (an ownerless token is refused).
    */
   router.post(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
     const { mode } = req.body || {};
@@ -79,12 +130,14 @@ export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authen
       return badRequest.json(res, HALT_MODE_ERROR);
     }
 
+    if (await refuseUnlessOwner(req, res)) return;
+
     if (!workspaceHaltStore) {
       logEvent(req, HALT_ROUTE, 500);
       return jsonError(res, 500, 'Failed to set halt');
     }
 
-    const setBy = req.proxyCreatedBy || null;
+    const setBy = req.proxyCreatedBy;
     const now = new Date();
 
     try {
@@ -100,12 +153,13 @@ export function createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authen
 
   /**
    * DELETE /api/proxy/dispatch/halt
-   * Same auth as POST. Clears the stored halt request only; like POST, the
-   * runner does not yet honor it (pending LIN-2995), so no runner effect is
-   * claimed. Harmless when nothing is set (the store's own `deleteOne`
-   * semantics).
+   * Same auth and the same owner-only gate as POST. Clears the stored halt
+   * (the runner then resumes). Harmless when nothing is set (the store's own
+   * `deleteOne` semantics).
    */
   router.delete(HALT_ROUTE, proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {
+    if (await refuseUnlessOwner(req, res)) return;
+
     if (!workspaceHaltStore) {
       logEvent(req, HALT_ROUTE, 500);
       return jsonError(res, 500, 'Failed to clear halt');

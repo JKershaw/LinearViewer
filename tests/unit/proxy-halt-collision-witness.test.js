@@ -25,7 +25,11 @@ process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACME, buildApp, call } from './lib/proxy-fake-deps.js';
+import { ACME, buildApp as buildBaseApp, call } from './lib/proxy-fake-deps.js';
+
+// LIN-3409: halt POST/DELETE are owner-gated; this witness is about routing, so
+// the seam answers `owner` (the gate's own cases: lin-3409-proxy-halt-gate.test.js).
+const buildApp = (overrides = {}) => buildBaseApp({ workspaceOwnerCheck: async () => ({ status: 'owner' }), ...overrides });
 
 function makeDispatchQueueSpy() {
   const getItemStatusCalls = [];

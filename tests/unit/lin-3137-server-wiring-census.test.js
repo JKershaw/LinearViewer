@@ -71,3 +71,26 @@ describe('server.js: LIN-3383 owner-only enqueue wiring (the five new mounts)', 
     });
   }
 });
+
+// LIN-3398 / LIN-3409: proxy halt POST/DELETE are owner-gated through the SAME
+// hoisted seam, threaded createProxyRoutes -> createProxyHaltRoutes. A mount
+// missing it fails closed (500) in production, which a unit harness injecting
+// the dep directly cannot see.
+describe('server.js: LIN-3409 owner-only proxy halt wiring', () => {
+  test('workspaceOwnerCheck is passed into createProxyRoutes({ ... })', () => {
+    const start = src.indexOf('createProxyRoutes({');
+    assert.notEqual(start, -1, 'createProxyRoutes mount literal must exist');
+    const end = src.indexOf('}))', start);
+    assert.notEqual(end, -1, 'the mount literal must close');
+    assert.match(src.slice(start, end), /\bworkspaceOwnerCheck\b/,
+      'the proxy router must receive the hoisted owner check so proxy halt can gate');
+  });
+
+  test('createProxyRoutes forwards workspaceOwnerCheck into createProxyHaltRoutes', () => {
+    const proxySrc = readFileSync(fileURLToPath(new URL('../../routes/proxy.js', import.meta.url)), 'utf8');
+    const start = proxySrc.indexOf('createProxyHaltRoutes({');
+    assert.notEqual(start, -1, 'createProxyHaltRoutes mount must exist');
+    const end = proxySrc.indexOf('}))', start);
+    assert.match(proxySrc.slice(start, end), /\bworkspaceOwnerCheck\b/);
+  });
+});

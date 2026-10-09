@@ -508,7 +508,7 @@ async function fetchWithTimeout(workFn, ms) {
  *   workspace selects it, and via this injection.
  * @returns {Router} Express router with proxy routes
  */
-export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, livenessAlarmStore = null, onTicketWrite = null }) {
+export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore = null, llmCallLogStore, taskDecisionsStore = null, shelvedRulingsStore = null, dismissalSuggestionsStore = null, harbourCommentsStore = null, sessionsFeedCache = null, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace = null, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore = null, provider: injectedProvider = null, rejectedCredentialRegistry = null, observerStateStore, flightCompanionChatClient = undefined, flightCompanionCreateToolCatalog = undefined, savedChatStore = null, workspaceHaltStore = null, workspaceOwnerCheck = null, livenessAlarmStore = null, onTicketWrite = null }) {
   const router = Router();
 
   /**
@@ -1699,7 +1699,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // lets the literal "halt" through) would otherwise capture
   // /dispatch/halt and answer with dispatch's wrong-shaped 404 instead of
   // this router's own halt response.
-  router.use(createProxyHaltRoutes({ workspaceHaltStore, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }));
+  router.use(createProxyHaltRoutes({ workspaceHaltStore, workspaceOwnerCheck, proxyLimiter, authenticateProxyToken, requireWriteScope, logEvent }));
 
   // LIN-3258: the liveness-alarm read path (GET /api/proxy/alarms),
   // routes/proxy-alarms.js. Read-only: it exposes the dispatcher-silent and
