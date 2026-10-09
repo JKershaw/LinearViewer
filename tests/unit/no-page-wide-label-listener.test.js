@@ -19,8 +19,9 @@
  * Rule C — ordering: the captures happen before the first markdown render,
  *   and the shared scripts load before it.
  *
- * LIN-3401 owns the dashboard/swipe/prompt-family entries below and deletes
- * them as it wires those controls to themselves.
+ * LIN-3401 wired the dashboard / swipe / prompt-family controls to themselves
+ * and deleted their entries: the action allow-list below holds only UI-only
+ * listeners (no request, no setting write).
  *
  * Run with: node --test tests/unit/no-page-wide-label-listener.test.js
  */
@@ -43,12 +44,6 @@ const PUBLIC_JS = readdirSync(join(ROOT, 'public'))
 // `file:first-label-selector` -> reason. Selectors are the first
 // `closest(`/`matches(` literal in the handler.
 const DELEGATED_ALLOW = {
-  // LIN-3401 (dashboard / prompt family): still delegated, wired in the next piece.
-  'app.js:.prompt-copy': 'LIN-3401',
-  'app.js:.prompt-download': 'LIN-3401',
-  'app.js:.prompt-dispatch': 'LIN-3401',
-  'app.js:.queue-item-remove': 'LIN-3401',
-  'app.js:.settings-section .toggle-btn': 'LIN-3401',
   // UI-only or off the three pages: no request, no setting write.
   'app.js:.desc-toggle': 'UI-only: expands a description',
   'app.js:[data-queue-badge]': 'UI-only: opens the queue panel (dashboard)',
@@ -91,10 +86,16 @@ describe('Rule A: no unlisted delegated label listener in public/*.js', () => {
     assert.ok(!has('close-out.js', "doc.addEventListener('click'"), 'close-out.js press is bound on its button');
     assert.ok(!has('session.js', "document.addEventListener('click'"), 'session.js press is bound on its button');
     assert.ok(!has('feedback-widget.js', "document.addEventListener('click'"), 'feedback toggle is bound on itself');
-    // ProxyToggle keeps its delegated handler only for LIN-3401's pages, behind disableDelegation.
+    // LIN-3401: ProxyToggle has no delegated handler at all; it binds each toggle.
     const common = stripComments(read('public/common.js'));
-    assert.match(common, /delegationDisabled/);
+    assert.ok(!common.includes('delegatedClick') && !common.includes('disableDelegation'));
+    assert.ok(!common.includes("closest('.prompt-proxy-toggle')"), 'no label-keyed lookup of the +proxy toggle');
     assert.deepStrictEqual(sites.filter((s) => ['close-out.js', 'session.js', 'feedback-widget.js', 'task-page.js', 'flight-companion.js'].includes(s.file)), []);
+  });
+
+  test('the action allow-list is empty of controls: every entry is UI-only', () => {
+    const acting = Object.entries(DELEGATED_ALLOW).filter(([, why]) => !/^UI-only|^settings page form|^asks confirm/.test(why));
+    assert.deepStrictEqual(acting, []);
   });
 
   test('every delegated click/submit/change listener that selects by label is allow-listed', () => {
@@ -109,8 +110,6 @@ describe('Rule A: no unlisted delegated label listener in public/*.js', () => {
 
   test('the allow-list has no stale entries', () => {
     const live = new Set(delegatedSites().filter((s) => s.selector).map((s) => `${s.file}:${s.selector}`));
-    // ProxyToggle's `.prompt-proxy-toggle` handler is installed via a named
-    // `delegatedClick` (disableable), not an inline listener, so it is not here.
     const stale = Object.keys(DELEGATED_ALLOW).filter((k) => !live.has(k));
     assert.deepStrictEqual(stale, []);
   });

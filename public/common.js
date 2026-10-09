@@ -2270,37 +2270,33 @@ window.ProxyToggle = (function () {
     return isActive() && isFeatureEnabled();
   }
 
-  // LIN-3385: a page that renders ticket text and has no real +proxy toggle
-  // (task page, run page, Flight Companion) turns the delegated handler off, so
-  // a look-alike `.prompt-proxy-toggle` in that text cannot write the setting.
-  // Order-independent: honoured whether it is called before or after `init`.
-  // LIN-3401 removes the delegation for the remaining pages.
-  let delegationDisabled = false;
-  let delegatedClick = null;
-  function disableDelegation() {
-    delegationDisabled = true;
-    if (delegatedClick) {
-      document.removeEventListener('click', delegatedClick);
-      delegatedClick = null;
-    }
+  // LIN-3401: the +proxy toggle answers only the button Harbour created. There is
+  // no page-wide `closest('.prompt-proxy-toggle')` listener, so a look-alike in
+  // ticket text (descriptions and comments keep `class`) cannot write the setting.
+  // `bind` attaches to one element; it is idempotent. Every place that inserts a
+  // toggle calls it: `init` for the server-rendered ones (dashboard prompt rows,
+  // the dispatch page's options) and PromptSection for the one it renders.
+  const boundToggles = new WeakSet();
+  function bind(btn) {
+    if (!btn || boundToggles.has(btn)) return;
+    boundToggles.add(btn);
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActive(!isActive());
+    });
   }
 
   /**
-   * Wire a single delegated click handler for every +proxy button on the page
-   * (current and future-injected). The rendered active look comes from the
-   * server-emitted `data-proxy-active` body attribute, so there is nothing to
-   * restore here (LIN-2944 P3).
+   * Bind the server-rendered +proxy buttons (current page load only). The parent
+   * chain is the one the server template emits (render.js, render-dispatch.js);
+   * this runs at DOMContentLoaded, before any ticket text is formatted onto the
+   * page. Pages that render none (task, run, Flight Companion) bind nothing.
+   * The active look comes from the body[data-proxy-active] CSS rule (LIN-2944 P3).
    */
   function init() {
-    if (!delegationDisabled && !delegatedClick) {
-      delegatedClick = (e) => {
-        const btn = e.target.closest('.prompt-proxy-toggle');
-        if (!btn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setActive(!isActive());
-      };
-      document.addEventListener('click', delegatedClick);
+    if (typeof document.querySelectorAll === 'function') {
+      document.querySelectorAll('.prompt-actions > .prompt-proxy-toggle, .dispatch-options > .prompt-proxy-toggle').forEach(bind);
     }
     // R1: a toggle-path 429 skip is announced on every surface (the opened-task
     // component also renders an inline notice beside the toggle).
@@ -2313,7 +2309,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, disableDelegation, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
+  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, bind, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

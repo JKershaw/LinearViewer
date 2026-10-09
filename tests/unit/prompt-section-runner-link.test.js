@@ -116,7 +116,7 @@ function makeContainer() {
         dataset: { ...match },
         disabled: false,
         textContent: '',
-        closest: () => btn,
+        closest: (sel) => (/^button/.test(sel) ? btn : null),
       };
       await this._clickHandler({ target: btn });
       return btn;
