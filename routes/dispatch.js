@@ -455,7 +455,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
 
       // Run variant (LIN-3248 N2): the authoritative standard/stepper fact the
-      // run page reads to decide whether the "Harbour never merges on its own"
+      // run page reads to decide whether the "Harbour stops this run at the PR"
       // promise is backed. A DEDICATED, validated body field (never sniffed
       // from promptName), only on a fresh autopilot dispatch for a task; absent
       // stays null, which the page reads as unknown and fails the promise
