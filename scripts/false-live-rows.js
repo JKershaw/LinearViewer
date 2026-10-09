@@ -47,9 +47,10 @@
  * the same test on decision-withdrawn records whose reason starts with
  * `ticket-closed` and on scan rows whose outcomeBasisHash is the closer's.
  *
- * Paired measure (LIN-3433, slice I of LIN-3358). Added beside c1..c4, which are
- * unchanged (the headline line and the c1/c2/c4/false-close lines keep their shape):
- *   - c3 with C's row stamp disabled (`clause3NoStamp`): c3 recomputed after
+ * Paired measure (LIN-3433, slice I of LIN-3358). c1, c2, c4 and the false-close
+ * lines are unchanged:
+ *   - c3 with C's row stamp disabled (`clause3NoStamp`) REPLACES c3 in the headline and total
+ *     (`clause3`, stamp honoured, stays as a field and an informational line): c3 recomputed after
  *     nulling `bookkeeping` on loops stamped `ticket-closed` (and only those: B's
  *     and the fossil stamps stay), so a pass cannot come from stamping. Read-only.
  *   - posts after the end: feedback entries on a row timestamped after that row's
@@ -439,13 +440,16 @@ export function buildReport({ perWorkspace, now, headSha, runner = null }) {
   const sum = (f) => ok.reduce((n, w) => n + f(w), 0);
   const fc = (k) => sum(w => w.falseCloses[k].length);
   const falseCloseTotal = fc('handed-on') + fc('lineage-terminal') + fc('ticket-closed');
-  const total = sum(w => w.clause1 + w.clause2 + w.clause3 + w.clause4);
+  // c3 is the stamp-disabled reading (LIN-3433; plan I and research §5: c3 is recomputed with C's row stamp
+  // disabled). `clause3` (stamp honoured) is kept as a field and a detail line so the writer/measurer tie
+  // (closeTicketRows takes it to 0) stays visible until J deletes the writer; it is not counted.
+  const total = sum(w => w.clause1 + w.clause2 + w.clause3NoStamp + w.clause4);
 
   const L = [];
   // Headline: unknown FIRST, so an all-unreadable run cannot pass for a clean zero.
-  L.push(`# False live rows — unknown: ${sum(w => w.unknown)} | false-live: ${total} (c1 ${sum(w => w.clause1)}, c2 ${sum(w => w.clause2)}, c3 ${sum(w => w.clause3)}, c4 ${sum(w => w.clause4)}) | false closes: ${falseCloseTotal}`);
+  L.push(`# False live rows — unknown: ${sum(w => w.unknown)} | false-live: ${total} (c1 ${sum(w => w.clause1)}, c2 ${sum(w => w.clause2)}, c3 ${sum(w => w.clause3NoStamp)}, c4 ${sum(w => w.clause4)}) | false closes: ${falseCloseTotal}`);
   if (runner) {
-    L.push(`Paired measure (target 0 each) — runner unknown: ${runner.read ? runner.unknown : 'sessions.json not read'} | runner active zombies: ${runner.read ? runner.activeZombies : 'unknown'} | parked on terminal tickets: ${runner.read ? runner.parkedOnTerminal : 'unknown'} | posts after the end: ${sum(w => w.postsAfterEnd.rows.length)} rows | c3 with C's stamp disabled: ${sum(w => w.clause3NoStamp)}`);
+    L.push(`Paired measure (target 0 each) — runner unknown: ${runner.read ? runner.unknown : 'sessions.json not read'} | runner active zombies: ${runner.read ? runner.activeZombies : 'unknown'} | parked on terminal tickets: ${runner.read ? runner.parkedOnTerminal : 'unknown'} | posts after the end: ${sum(w => w.postsAfterEnd.rows.length)} rows`);
   }
   L.push('');
   L.push(`Run at: ${new Date(now).toISOString()}`);
@@ -460,7 +464,7 @@ export function buildReport({ perWorkspace, now, headSha, runner = null }) {
   L.push('Clauses (target 0):');
   L.push(`  1 wake row, a later lineage row has posted (B(a))         ${String(sum(w => w.clause1)).padStart(5)}`);
   L.push(`  2 un-terminated row taken before a lineage terminal (B(b)) ${String(sum(w => w.clause2)).padStart(5)}`);
-  L.push(`  3 blocked/silent row on a terminal ticket past grace      ${String(sum(w => w.clause3)).padStart(5)}`);
+  L.push(`  3 blocked/silent row on a terminal ticket past grace, C's stamp disabled ${String(sum(w => w.clause3NoStamp)).padStart(5)}`);
   L.push(`  4 open decision on a terminal ticket                      ${String(sum(w => w.clause4)).padStart(5)}`);
   L.push('');
   L.push(`Human-reopened (a reversed ruling / un-retired scan row on a terminal ticket; a decision, not staleness, not counted): ${sum(w => w.humanReopened)}`);
@@ -469,7 +473,6 @@ export function buildReport({ perWorkspace, now, headSha, runner = null }) {
   if (runner) {
     const h = (ms) => (ms == null ? 'n/a' : `${Math.round(ms / 3600000)}h`);
     L.push('Paired measure (LIN-3433; target 0 each):');
-    L.push(`  3b c3 recomputed with C's row stamp disabled (read-only)  ${String(sum(w => w.clause3NoStamp)).padStart(5)}   [as 3 above, ticket-closed stamps ignored]`);
     L.push(`  5 feedback posted after a row's own terminal/stamp        ${String(sum(w => w.postsAfterEnd.rows.length)).padStart(5)}   [${sum(w => w.postsAfterEnd.entries)} entries]`);
     if (runner.read) {
       L.push(`  6 runner: active-phase sessions silent > ${Math.round(RUNNER_ACTIVE_BOUND_MS / 60000)}m           ${String(runner.activeZombies).padStart(5)}   [${runner.activeOnTerminalTicket} on a terminal ticket]`);
@@ -482,8 +485,10 @@ export function buildReport({ perWorkspace, now, headSha, runner = null }) {
     L.push('  Runner scope: only THIS host\'s sessions.json is read; runner-kit runners on other machines are not visible.');
     L.push('');
   }
-  L.push('By workspace (c1 c2 c3 c4 unknown):');
-  for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.clause1} ${w.clause2} ${w.clause3} ${w.clause4} ${w.unknown}`);
+  L.push(`  (informational, not counted: line 3 with C's row stamp honoured, as before LIN-3433: ${sum(w => w.clause3)})`);
+  L.push('');
+  L.push('By workspace (c1 c2 c3 c4 unknown; c3 = stamp disabled):');
+  for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.clause1} ${w.clause2} ${w.clause3NoStamp} ${w.clause4} ${w.unknown}`);
   L.push('');
   L.push(`Informational (not counted): non-wake row with a later lineage row, no lineage terminal: ${sum(w => w.informational)}`);
   L.push('');
