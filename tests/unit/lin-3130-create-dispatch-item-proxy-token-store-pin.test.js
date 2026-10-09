@@ -174,6 +174,7 @@ describe('LIN-3130 L2 — every createDispatchItem call threads proxyTokenStore 
 
     const missing = calls.filter((c) => !c.hasProxyTokenStore).map((c) => c.file);
     assert.deepEqual(missing, [], `createDispatchItem call sites missing a depth-1 proxyTokenStore key: ${missing.join(', ')}`);
-    assert.equal(calls.length, 10, `expected 10 createDispatchItem call sites (definition excluded), found ${calls.length}`);
+    // LIN-3436: 10 -> 11 for lib/ticket-close-abort.js (the one ifParked enqueue helper).
+    assert.equal(calls.length, 11, `expected 11 createDispatchItem call sites (definition excluded), found ${calls.length}`);
   });
 });

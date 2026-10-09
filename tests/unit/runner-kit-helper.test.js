@@ -41,6 +41,9 @@ import {
   FRESH_TAKE_MIN_TOKEN_LIFE_MS,
   WATCHDOG_STALL_MIN,
   WATCHDOG_FAIL_MIN,
+  WATCHDOG_STALL_PREFIX,
+  NOT_PARKED_ACK,
+  RUNNER_CONSUMER_CAPS,
   WAIT_CAP_MS,
   RUNNER_HARNESS,
   attributeItem,
@@ -579,6 +582,73 @@ describe('abortAction (B5)', () => {
   });
 });
 
+describe('abortAction: ifParked (LIN-3436)', () => {
+  const ABORT = '66666666-6666-4666-8666-666666666666';
+  const parkedAbort = (to) => item({ id: ABORT, abort: true, abortTo: to, ifParked: true, prompt: null });
+  const parkedAt = '2026-09-29T11:00:00.000Z';
+
+  test('a running row WITH parkedAt is stopped exactly as a plain abort', () => {
+    const ledger = ledgerWith([{ itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running', parkedAt }]);
+    const r = abortAction(parkedAbort(K), ledger);
+    const line = `[aborted] Cancelled running session ${K.slice(0, 8)} (running).`;
+    assert.equal(r.ack, line);
+    assert.deepEqual(r.childPost, { itemId: K, message: line, rootItemId: K });
+    assert.equal(r.stopAgent, 'agent-k');
+    assert.equal(r.ledger.items[K].state, 'stopped');
+  });
+
+  test('a running row with NO parkedAt acks [skipped] not parked and stops nothing', () => {
+    const ledger = ledgerWith([{ itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running' }]);
+    const r = abortAction(parkedAbort(K), ledger);
+    assert.equal(r.ack, NOT_PARKED_ACK);
+    assert.equal(r.ack, '[skipped] not parked');
+    assert.equal(r.childPost, null);
+    assert.equal(r.unpostedChild, null);
+    assert.equal(r.stopAgent, null);
+    assert.equal(r.ledger.items[K].state, 'running', 'the row is left running');
+    // terminal but benign on Harbour: not an [aborted], so it closes no lineage
+    assert.equal(findTerminalFeedback(fb(r.ack)).status, 'skipped');
+  });
+
+  test('Minor A: a lineage with no running row (done, stopped, lost) acks [skipped] not parked, never [aborted]', () => {
+    for (const state of ['done', 'stopped', 'lost']) {
+      const ledger = ledgerWith([{ itemId: K, agentId: 'agent-k', rootItemId: K, state, parkedAt }]);
+      const r = abortAction(parkedAbort(K), ledger);
+      assert.equal(r.ack, NOT_PARKED_ACK, state);
+      assert.equal(r.childPost, null, state);
+      assert.equal(r.stopAgent, null, state);
+      assert.equal(r.ledger.items[K].state, state, state);
+    }
+  });
+
+  test('a continued follow-up that is working again vetoes: any running row without parkedAt skips', () => {
+    const ledger = ledgerWith([
+      { itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running', parkedAt },
+      { itemId: W1, agentId: 'agent-k', rootItemId: K, state: 'running' }
+    ]);
+    const r = abortAction(parkedAbort(K), ledger);
+    assert.equal(r.ack, NOT_PARKED_ACK);
+    assert.equal(r.stopAgent, null);
+  });
+
+  test('an unknown target is still the failed ack; a plain abort of an unparked row is unchanged', () => {
+    assert.equal(abortAction(parkedAbort(X), ledgerWith([])).ack, `[failed] No session to abort (${X}).`);
+    const ledger = ledgerWith([{ itemId: K, agentId: 'agent-k', rootItemId: K, state: 'running' }]);
+    const plain = abortAction(item({ id: ABORT, abort: true, abortTo: K, prompt: null }), ledger);
+    assert.equal(plain.ack, `[aborted] Cancelled running session ${K.slice(0, 8)} (running).`);
+  });
+
+  test('the runner advertises if-parked', () => {
+    assert.deepEqual(RUNNER_CONSUMER_CAPS, ['if-parked']);
+  });
+
+  test('postTakeCheck: an ifParked flag that differs between poll and take is a refusal', () => {
+    const polled = { id: ABORT, promptSha256: 'x', followUpTo: null, abort: true, abortTo: K, ifParked: true, dispatchedBy: OWNER };
+    const taken = { id: ABORT, prompt: null, followUpTo: null, abort: true, abortTo: K, ifParked: false, dispatchedBy: OWNER };
+    assert.match(postTakeCheck(polled, taken) || '', /ifParked/);
+  });
+});
+
 describe('recoverAction (B4, NB3)', () => {
   const ledger = ledgerWith([
     { itemId: K, agentId: 'a1', rootItemId: K, state: 'running', tokenId: 'tok-A', session: 's-old' },
@@ -633,9 +703,18 @@ describe('watchdogAction', () => {
   test('silent past the stall threshold: [blocked] stalled, which wakes but is not terminal', () => {
     const r = watchdogAction(inflight, NOW, opts(WATCHDOG_STALL_MIN + 1));
     assert.equal(r.action, 'block');
-    assert.equal(r.message, `[blocked] stalled: subagent agent-k silent for ${WATCHDOG_STALL_MIN + 1} min`);
+    assert.equal(r.message, `${WATCHDOG_STALL_PREFIX} subagent agent-k silent for ${WATCHDOG_STALL_MIN + 1} min`);
     assert.equal(findWakeEvent(fb(r.message)).marker, 'blocked');
     assert.equal(findTerminalFeedback(fb(r.message)), null);
+  });
+  test('LIN-3436: WATCHDOG_STALL_PREFIX is the exported prefix of every block message', () => {
+    assert.equal(WATCHDOG_STALL_PREFIX, '[blocked] stalled:');
+    const withAgent = watchdogAction(inflight, NOW, opts(WATCHDOG_STALL_MIN + 1));
+    const noAgent = watchdogAction({ itemId: K, agentId: null, takenAt: new Date(NOW - (WATCHDOG_STALL_MIN + 1) * 60_000).toISOString() }, NOW, opts(WATCHDOG_STALL_MIN + 1));
+    for (const r of [withAgent, noAgent]) {
+      assert.equal(r.action, 'block');
+      assert.ok(r.message.startsWith(WATCHDOG_STALL_PREFIX), r.message);
+    }
   });
   test('already blocked: no second [blocked]', () => {
     assert.equal(watchdogAction({ ...inflight, blockedAt: new Date(NOW - 60_000).toISOString() }, NOW, opts(WATCHDOG_STALL_MIN + 1)), null);
@@ -1040,6 +1119,9 @@ async function fakeHarbour() {
     halt: null,
     otherConsumerLastSeenAt: null,
     takes: [],
+    pollHeaders: [],
+    holdFeedback: null,
+    onFeedback: null,
     watch: new Map(),
     promptOverride: new Map()
   };
@@ -1067,6 +1149,7 @@ async function fakeHarbour() {
     const isItemWorker = [...state.history.values()].some((h) => h.workerToken && auth === `Bearer ${h.workerToken}`);
     if (!isRunner && !isItemWorker) return json(res, 401, { error: 'unauthorized' });
     if (req.method === 'GET' && url.pathname === '/api/proxy/runner/poll') {
+      state.pollHeaders.push(req.headers['x-harbour-consumer-caps'] ?? null);
       return json(res, 200, { items: state.queue, ...(state.halt ? { halt: state.halt } : {}), otherConsumerLastSeenAt: state.otherConsumerLastSeenAt });
     }
     let m;
@@ -1082,6 +1165,8 @@ async function fakeHarbour() {
     if (req.method === 'POST' && (m = url.pathname.match(/^\/api\/proxy\/runner\/feedback\/(.+)$/))) {
       if (!state.history.has(m[1])) return json(res, 404, { error: 'not taken' });
       state.feedback.push({ itemId: m[1], body: JSON.parse(raw) });
+      if (state.onFeedback) state.onFeedback(m[1]);
+      if (state.holdFeedback) await state.holdFeedback;
       return json(res, 200, { success: true });
     }
     if (req.method === 'GET' && (m = url.pathname.match(/^\/api\/proxy\/dispatch\/([^/]+)\/prompt$/))) {
@@ -1284,6 +1369,123 @@ describe('commands (against a fake Harbour)', () => {
     const line = `[aborted] Cancelled running session ${target.id.slice(0, 8)} (running).`;
     const posts = harbour.state.feedback.slice(-2);
     assert.deepEqual(posts.map((p) => [p.itemId, p.body.message]), [[abortRow.id, line], [target.id, line]]);
+  });
+
+  test('LIN-3436: the poll advertises if-parked in X-Harbour-Consumer-Caps', TIMEOUT, async () => {
+    harbour.state.pollHeaders.length = 0;
+    await run(['poll']);
+    assert.deepEqual(harbour.state.pollHeaders, ['if-parked']);
+  });
+
+  // Takes a fresh item through poll/take/handoff and returns its id.
+  const takeFresh = async (agentId, over = {}) => {
+    const it = harbour.enqueue(over);
+    await run(['poll']);
+    await run(['take', it.id]);
+    await run(['handoff', it.id, agentId]);
+    return it;
+  };
+  const abortParked = async (targetId) => {
+    const row = harbour.enqueue({ abort: true, abortTo: targetId, ifParked: true, prompt: null, bootstrapToken: null });
+    await run(['poll']);
+    await run(['take', row.id]);
+    return row;
+  };
+
+  test('LIN-3436 (N1): feedback [blocked] sets parkedAt BEFORE the post returns, and an ifParked abort then stops the row', TIMEOUT, async () => {
+    const it = await takeFresh('agent-p1');
+    assert.equal(ledgerNow().items[it.id].parkedAt, undefined, 'not parked after take/handoff');
+    let release;
+    harbour.state.holdFeedback = new Promise((resolve) => { release = resolve; });
+    const seen = new Promise((resolve) => { harbour.state.onFeedback = (id) => { if (id === it.id) resolve(); }; });
+    const posting = run(['feedback', it.id, 'status', '[blocked] need a ruling']);
+    try {
+      await seen; // Harbour has the post and is holding the response open
+      assert.ok(ledgerNow().items[it.id].parkedAt, 'parkedAt is already saved while the post is still in flight');
+    } finally {
+      harbour.state.holdFeedback = null;
+      harbour.state.onFeedback = null;
+      release();
+    }
+    await posting;
+    assert.equal(ledgerNow().items[it.id].state, 'running', 'a park is not a terminal');
+    const row = await abortParked(it.id);
+    const posts = harbour.state.feedback.filter((f) => f.itemId === row.id);
+    assert.match(posts.at(-1).body.message, /^\[aborted\] Cancelled running session /);
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+  });
+
+  test('LIN-3436: feedback [pending] parks too; a post that fails leaves parkedAt set', TIMEOUT, async () => {
+    const it = await takeFresh('agent-p2');
+    await run(['feedback', it.id, 'status', '[pending] waiting on CI']);
+    assert.ok(ledgerNow().items[it.id].parkedAt);
+    const it2 = await takeFresh('agent-p2b');
+    harbour.state.history.delete(it2.id); // the fake now 404s this id: the post throws
+    await assert.rejects(run(['feedback', it2.id, 'status', '[blocked] stuck']));
+    assert.ok(ledgerNow().items[it2.id].parkedAt, 'the agent did park, so the flag stays');
+    // Retire the row: Harbour 404s this id, and a later halt sweep would try to post on it.
+    const file = join(home, 'acme', 'ledger.json');
+    const ledger = ledgerNow();
+    ledger.items[it2.id].state = 'done';
+    writeFileSync(file, JSON.stringify(ledger));
+  });
+
+  test('LIN-3436: other markers do not park (working, status, done)', TIMEOUT, async () => {
+    const it = await takeFresh('agent-p3');
+    await run(['feedback', it.id, 'status', '[working] on it']);
+    await run(['feedback', it.id, 'status', 'a note mentioning [blocked] mid-line']);
+    assert.equal(ledgerNow().items[it.id].parkedAt, undefined);
+  });
+
+  test('LIN-3436: the watchdog sequence — a stall block and a silent clear leave parkedAt unset, so an ifParked abort skips; a real [blocked] sets it and the abort stops the row', TIMEOUT, async () => {
+    const it = await takeFresh('agent-p4');
+    const file = join(home, 'acme', 'ledger.json');
+    // 1. the watchdog posts [blocked] stalled on a running row (a pure sweep over the saved ledger)
+    const sweep = watchdogSweep(ledgerNow(), Date.now() + (WATCHDOG_STALL_MIN + 1) * 60_000, { currentTokenId: ledgerNow().items[it.id].tokenId, transcriptMtimeFor: () => null });
+    const block = sweep.actions.find((a) => a.itemId === it.id);
+    assert.equal(block.action, 'block');
+    assert.ok(block.message.startsWith(WATCHDOG_STALL_PREFIX));
+    writeFileSync(file, JSON.stringify(sweep.ledger));
+    assert.ok(ledgerNow().items[it.id].blockedAt, 'the watchdog records blockedAt');
+    assert.equal(ledgerNow().items[it.id].parkedAt, undefined, 'a stall is not a park: that subagent is still running');
+    // 2. the subagent recovers: a silent clear
+    const clear = watchdogSweep(ledgerNow(), Date.now() + (WATCHDOG_STALL_MIN + 2) * 60_000, { currentTokenId: ledgerNow().items[it.id].tokenId, transcriptMtimeFor: () => Date.now() + (WATCHDOG_STALL_MIN + 2) * 60_000 });
+    assert.equal(clear.actions.find((a) => a.itemId === it.id).action, 'clear');
+    writeFileSync(file, JSON.stringify(clear.ledger));
+    assert.equal(ledgerNow().items[it.id].parkedAt, undefined);
+    // 3. an ifParked abort skips while unset and stops nothing
+    const skipRow = await abortParked(it.id);
+    assert.equal(harbour.state.feedback.filter((f) => f.itemId === skipRow.id).at(-1).body.message, '[skipped] not parked');
+    assert.equal(ledgerNow().items[it.id].state, 'running');
+    // 4. a real feedback [blocked] sets it; the next ifParked abort stops the row
+    await run(['feedback', it.id, 'status', '[blocked] genuinely waiting']);
+    assert.ok(ledgerNow().items[it.id].parkedAt);
+    const stopRow = await abortParked(it.id);
+    assert.match(harbour.state.feedback.filter((f) => f.itemId === stopRow.id).at(-1).body.message, /^\[aborted\] Cancelled running session /);
+    assert.equal(ledgerNow().items[it.id].state, 'stopped');
+  });
+
+  test('LIN-3436: a continued follow-up clears parkedAt on the lineage', TIMEOUT, async () => {
+    const it = await takeFresh('agent-p5');
+    await run(['feedback', it.id, 'status', '[blocked] waiting on a human']);
+    assert.ok(ledgerNow().items[it.id].parkedAt);
+    const fu = harbour.enqueue({ followUpTo: it.id });
+    await run(['poll']);
+    const t = await run(['take', fu.id]);
+    assert.equal(t.handoff.mode, 'continue');
+    assert.equal(ledgerNow().items[it.id].parkedAt, undefined, 'the parked row is un-parked');
+    assert.equal(ledgerNow().items[fu.id].parkedAt, undefined);
+    const row = await abortParked(it.id);
+    assert.equal(harbour.state.feedback.filter((f) => f.itemId === row.id).at(-1).body.message, '[skipped] not parked');
+    assert.equal(ledgerNow().items[fu.id].state, 'running', 'the working follow-up row is not stopped');
+  });
+
+  test('LIN-3436 (Minor A): an ifParked abort on a finished lineage acks [skipped] not parked, never [aborted]', TIMEOUT, async () => {
+    const it = await takeFresh('agent-p6');
+    await run(['feedback', it.id, 'status', '[done]']);
+    const row = await abortParked(it.id);
+    assert.equal(harbour.state.feedback.filter((f) => f.itemId === row.id).at(-1).body.message, '[skipped] not parked');
+    assert.ok(!harbour.state.feedback.some((f) => f.itemId === it.id && /^\[aborted\]/.test(f.body.message)));
   });
 
   test('NB2: poll aborts when another consumer polled recently', TIMEOUT, async () => {

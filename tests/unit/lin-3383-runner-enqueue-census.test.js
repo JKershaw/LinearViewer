@@ -9,16 +9,23 @@
  * the handler/function whose text must hold the gate before the sink.
  *
  * Sinks scanned: createDispatchItem( · dispatchSessionFollowUp( ·
- * expandCascadeAborts( · addFeedback( · _mintWake( · .addItem(.
+ * enqueueIfParkedAbort( · expandCascadeAborts( · addFeedback( · _mintWake( · .addItem(.
  * LIN-3398/LIN-3409 widen the class from "enqueue" to "any runner-state
  * mutation" with the five store methods .removeItem( · .trimSessionBudget( ·
  * .setWorkspaceHalt( · .clearWorkspaceHalt( · .revokeToken(. Verdicts:
- * `gated | token-scoped | store-gated | test-only`. `store-gated` (a row only for
+ * `gated | token-scoped | store-gated | test-only | system-derived`. `store-gated` (a row only for
  * routes/proxy-tokens-admin.js `.revokeToken(`): the owner check lives inside
  * ProxyTokenStore.revokeToken, so the row asserts the call passes the requester
  * `{ workspaceId, accountId }`; the store-level tests back the check itself.
- * `test-only` (a row only for routes/test.js): the /test cleanup route. There is
- * no `pending` verdict.
+ * `test-only` (a row only for routes/test.js): the /test cleanup route.
+ * LIN-3436 (H0 of LIN-3358) adds a FIFTH verdict, `system-derived` (a row only for
+ * lib/ticket-close-abort.js, the one `ifParked` enqueue helper): the sink is
+ * neither gated nor token-scoped because its authority is "the caller moved the
+ * ticket terminal", and its recorded bound (`SYSTEM_DERIVED_BOUND`) is what makes
+ * that sufficient. A dedicated scan holds the bound: the helper's
+ * `createDispatchItem(` always carries `ifParked: true`, and the helper is called
+ * only from the ticket-write and park-time paths (`SYSTEM_DERIVED_CALLERS`).
+ * There is no `pending` verdict.
  * Execute-mode callers scanned: runAgentTurn(. A caller's mode comes from its
  * TABLE ROW, never from a literal in the call: Task Chat's call contains
  * `followUpMode: 'propose'` inside a conditional spread, so a text rule would
@@ -49,7 +56,18 @@ function loadTree() {
 }
 
 const GATE = 'resolveRunnerOwnerRefusal(';
-const VERDICTS = ['gated', 'token-scoped', 'store-gated', 'test-only'];
+const VERDICTS = ['gated', 'token-scoped', 'store-gated', 'test-only', 'system-derived'];
+
+// LIN-3436: the `system-derived` verdict and its recorded bound. It is limited to
+// the one helper file; the bound is what makes "authority to move the ticket
+// terminal" sufficient authority (see the helper's header and the LIN-3358 ruling
+// `lin3358-retire-parked-on-ticket-close`).
+const SYSTEM_DERIVED_FILE = 'lib/ticket-close-abort.js';
+const SYSTEM_DERIVED_SINK = 'enqueueIfParkedAbort';
+const SYSTEM_DERIVED_BOUND = 'an `ifParked` abort can end only a session that is already parked, which has nothing running; its target is derived from the ticket\'s own lineages, never caller-supplied; it fires only after a provider write moved the ticket to a terminal state, or when a runner\'s own [blocked]/[pending] lands on a ticket with a recorded terminal fact';
+// The only files allowed to call the helper: the ticket-write path (closer) and
+// the two runner feedback routes (park time).
+const SYSTEM_DERIVED_CALLERS = new Set(['lib/ticket-close-closer.js', 'routes/dispatch.js', 'routes/proxy-runner.js']);
 
 // The seams themselves: the factory and the store implement the sinks and serve
 // proxy/orchestrator callers with no session, which is exactly why the gate is
@@ -60,7 +78,7 @@ const IMPLEMENTATION_FILES = new Set([
   'lib/workspace-halt.js', 'lib/proxy-tokens.js', 'lib/dispatch-tokens.js'
 ]);
 
-const SINK_RE = /\b(createDispatchItem|dispatchSessionFollowUp|expandCascadeAborts|addFeedback|_mintWake)\(|\.(addItem|removeItem|trimSessionBudget|setWorkspaceHalt|clearWorkspaceHalt|revokeToken)\(/g;
+const SINK_RE = /\b(createDispatchItem|dispatchSessionFollowUp|enqueueIfParkedAbort|expandCascadeAborts|addFeedback|_mintWake)\(|\.(addItem|removeItem|trimSessionBudget|setWorkspaceHalt|clearWorkspaceHalt|revokeToken)\(/g;
 
 /** Non-comment, non-import, non-definition sink hits: [{file, line, sink}]. */
 function findSinks(tree) {
@@ -112,6 +130,9 @@ const MEMBERS = [
   { id: 7, file: 'routes/collective.js', sink: 'createDispatchItem', count: 1, verdict: 'gated',
     reason: 'Collective start: per participant workspace, a seat the session does not own is ok:false',
     handler: "router.post('/workspace/:urlKey/collective/start'", before: ['createDispatchItem('] },
+  { id: 17, file: SYSTEM_DERIVED_FILE, sink: 'createDispatchItem', count: 1, verdict: 'system-derived',
+    reason: 'the one ifParked abort enqueue helper (LIN-3436): authority to move the ticket terminal is sufficient because the abort can only end a parked session',
+    bound: SYSTEM_DERIVED_BOUND },
   { id: 8, file: 'routes/proxy-dispatch.js', sink: 'createDispatchItem', count: 3, verdict: 'token-scoped',
     reason: "proxy token routes behind requireGrant('dispatch') (LIN-3136); pinned by lin-3136-enqueue-census C1; the grant is minted owner-checked only" },
   { id: 8, file: 'routes/proxy-dispatch.js', sink: 'expandCascadeAborts', count: 1, verdict: 'token-scoped',
@@ -220,7 +241,10 @@ function gatedBefore(text, tokens, gate) {
 
 function scanSinks(tree) {
   const v = [];
-  const hits = findSinks(tree);
+  // The helper's callers are bounded by scanSystemDerived (an allow-list of
+  // files), not by per-file rows; a call from any OTHER file stays a hit and
+  // fails below as an unlisted sink.
+  const hits = findSinks(tree).filter(h => !(h.sink === SYSTEM_DERIVED_SINK && SYSTEM_DERIVED_CALLERS.has(h.file)));
   const counts = {};
   for (const h of hits) { const k = `${h.file}|${h.sink}`; counts[k] = (counts[k] || 0) + 1; }
   const listed = new Set();
@@ -233,6 +257,11 @@ function scanSinks(tree) {
     // Each new verdict is bounded to its one file (and, for store-gated, one sink).
     if (m.verdict === 'test-only' && m.file !== 'routes/test.js') v.push(`${k}: test-only is only for routes/test.js`);
     if (m.verdict === 'store-gated' && !(m.file === 'routes/proxy-tokens-admin.js' && m.sink === 'revokeToken')) v.push(`${k}: store-gated is only for routes/proxy-tokens-admin.js .revokeToken(`);
+    // LIN-3436: the fifth verdict is bounded to the one helper file and must record its bound.
+    if (m.verdict === 'system-derived') {
+      if (m.file !== SYSTEM_DERIVED_FILE) v.push(`${k}: system-derived is only for ${SYSTEM_DERIVED_FILE}`);
+      if (!m.bound || m.bound.length < 20) v.push(`${k}: a system-derived row needs a recorded bound`);
+    }
     if ((counts[k] || 0) !== m.count) v.push(`${k}: expected ${m.count} sink(s), found ${counts[k] || 0}`);
   }
   for (const k of Object.keys(counts)) {
@@ -275,6 +304,44 @@ function scanSinks(tree) {
         from = at + helper.length;
       }
     }
+  }
+  return v;
+}
+
+/**
+ * The system-derived bound, held as text: the helper's `createDispatchItem(`
+ * call always carries `ifParked: true` (and `abort: true`), and the helper is
+ * called only from the ticket-write and park-time paths.
+ */
+function scanSystemDerived(tree) {
+  const v = [];
+  const helper = tree.find(t => t.file === SYSTEM_DERIVED_FILE);
+  if (!helper) {
+    v.push(`${SYSTEM_DERIVED_FILE}: missing`);
+  } else {
+    let from = 0; let calls = 0;
+    for (;;) {
+      const at = helper.src.indexOf('createDispatchItem(', from);
+      if (at === -1) break;
+      from = at + 'createDispatchItem('.length;
+      const lineStart = helper.src.lastIndexOf('\n', at) + 1;
+      const prefix = helper.src.slice(lineStart, at);
+      if (/^\s*(\/\/|\*)/.test(prefix) || /\bimport\b/.test(prefix) || /function\s+$/.test(prefix)) continue;
+      calls++;
+      const block = callBlock(helper.src, at);
+      if (!/ifParked:\s*true\b/.test(block)) v.push(`${SYSTEM_DERIVED_FILE}: a createDispatchItem( call does not carry ifParked: true`);
+      if (!/\babort:\s*true\b/.test(block)) v.push(`${SYSTEM_DERIVED_FILE}: a createDispatchItem( call does not carry abort: true`);
+    }
+    if (calls !== 1) v.push(`${SYSTEM_DERIVED_FILE}: expected exactly 1 createDispatchItem( call, found ${calls}`);
+  }
+  for (const { file, src } of tree) {
+    if (file === SYSTEM_DERIVED_FILE || IMPLEMENTATION_FILES.has(file)) continue;
+    src.split('\n').forEach((text, i) => {
+      if (/^\s*(\/\/|\*|\/\*)/.test(text) || /^\s*import\b/.test(text)) return;
+      if (!text.includes(`${SYSTEM_DERIVED_SINK}(`)) return;
+      if (/function\s+\w+\s*\(/.test(text)) return;
+      if (!SYSTEM_DERIVED_CALLERS.has(file)) v.push(`${file}:${i + 1}: ${SYSTEM_DERIVED_SINK}( may only be called from ${[...SYSTEM_DERIVED_CALLERS].join(', ')} (ticket-write and park-time paths)`);
+    });
   }
   return v;
 }
@@ -332,6 +399,10 @@ const TREE = loadTree();
 describe('LIN-3383 census — every session-reachable runner enqueue sink is gated or token-scoped', () => {
   test('the live tree: every sink is in the table, every gated sink is behind its gate', () => {
     assert.deepEqual(scanSinks(TREE), []);
+  });
+
+  test('the live tree: the system-derived helper always carries ifParked: true and is called only from the ticket-write and park-time paths', () => {
+    assert.deepEqual(scanSystemDerived(TREE), []);
   });
 
   test('the live tree: every runAgentTurn( caller is in the table; execute callers carry the guard', () => {
@@ -510,7 +581,61 @@ describe('LIN-3409 census — mutation witnesses for the runner-state sinks', ()
     assert.deepEqual(scanSinks(TREE), [], 'the live table is restored');
   });
 
-  test('there is no pending verdict, and the closed set is exactly the four named', () => {
-    assert.deepEqual(VERDICTS, ['gated', 'token-scoped', 'store-gated', 'test-only']);
+  test('there is no pending verdict, and the closed set is exactly the five named', () => {
+    assert.deepEqual(VERDICTS, ['gated', 'token-scoped', 'store-gated', 'test-only', 'system-derived']);
+  });
+});
+
+describe('LIN-3436 census — mutation witnesses for the system-derived verdict', () => {
+  test('a helper createDispatchItem( call without ifParked: true fails the census', () => {
+    const v = scanSystemDerived(mutate(SYSTEM_DERIVED_FILE, s => s.replace('      ifParked: true,\n', '')));
+    assert.ok(v.some(m => m.includes('does not carry ifParked: true')), v.join('\n'));
+  });
+
+  test('a helper call that is no longer an abort fails the census', () => {
+    const v = scanSystemDerived(mutate(SYSTEM_DERIVED_FILE, s => s.replace('      abort: true,\n', '')));
+    assert.ok(v.some(m => m.includes('does not carry abort: true')), v.join('\n'));
+  });
+
+  test('a second createDispatchItem( call in the helper fails the census', () => {
+    const v = scanSystemDerived(mutate(SYSTEM_DERIVED_FILE, s => s + '\nawait createDispatchItem({ fields: { ifParked: true, abort: true } });\n'));
+    assert.ok(v.some(m => m.includes('expected exactly 1 createDispatchItem( call')), v.join('\n'));
+  });
+
+  test('an unlisted caller of the helper fails the census (both scans)', () => {
+    for (const file of ['routes/proxy-writes.js', 'routes/workspace-api.js', 'lib/new-helper.js']) {
+      const planted = [...TREE.filter(t => t.file !== file), { file, src: (TREE.find(t => t.file === file)?.src || '') + '\nawait enqueueIfParkedAbort({});\n' }];
+      assert.ok(scanSystemDerived(planted).some(m => m.startsWith(`${file}:`) && m.includes('may only be called from')), file);
+      assert.ok(scanSinks(planted).some(m => m.startsWith(`${file}|enqueueIfParkedAbort`) && m.includes('unlisted')), file);
+    }
+  });
+
+  test('an allowed caller of the helper passes both scans', () => {
+    const planted = mutate('lib/ticket-close-closer.js', s => s + '\nawait enqueueIfParkedAbort({});\n');
+    assert.deepEqual(scanSystemDerived(planted), []);
+    assert.deepEqual(scanSinks(planted), []);
+  });
+
+  test('a system-derived row on any file but the helper fails the census', () => {
+    const saved = MEMBERS.slice();
+    try {
+      MEMBERS.push({ id: 'z', file: 'routes/dispatch.js', sink: 'addFeedback2', count: 0, verdict: 'system-derived', reason: 'moved out of the helper', bound: SYSTEM_DERIVED_BOUND });
+      const v = scanSinks(TREE);
+      assert.ok(v.some(m => m.includes(`system-derived is only for ${SYSTEM_DERIVED_FILE}`)), v.join('\n'));
+    } finally {
+      MEMBERS.length = 0; MEMBERS.push(...saved);
+    }
+    assert.deepEqual(scanSinks(TREE), [], 'the live table is restored');
+  });
+
+  test('a system-derived row with no recorded bound fails the census', () => {
+    const saved = MEMBERS.slice();
+    try {
+      MEMBERS.length = 0;
+      MEMBERS.push(...saved.map(m => (m.verdict === 'system-derived' ? { ...m, bound: undefined } : m)));
+      assert.ok(scanSinks(TREE).some(m => m.includes('needs a recorded bound')));
+    } finally {
+      MEMBERS.length = 0; MEMBERS.push(...saved);
+    }
   });
 });

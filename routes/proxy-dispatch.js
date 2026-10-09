@@ -85,6 +85,7 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerL
     abort: item.abort === true,
     abortTo: item.abortTo || null,
     cascade: item.cascade === true,
+    ...(item.ifParked === true ? { ifParked: true } : {}),
     sessionId: item.sessionId || null,
     // Scope bound (LIN-1751): visible on the poll/watch response like every
     // other stored field, so a caller inspecting its own run can see the
@@ -237,7 +238,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks, maxSessionsPerTask } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, ifParked, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks, maxSessionsPerTask } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -605,6 +606,7 @@ export function createDispatchRoutes({
           abort: isAbort,
           abortTo: isAbort ? abortTo : null,
           cascade: cascade === true,
+          ifParked: ifParked === true,
           sessionId: sessionId || null,
           periodicalId: periodicalId || null,
           waitForFollowUps: waitForFollowUps === true,
@@ -639,6 +641,7 @@ export function createDispatchRoutes({
         abort: item.abort === true,
         abortTo: item.abortTo || null,
         cascade: item.cascade === true,
+        ...(item.ifParked === true ? { ifParked: true } : {}),
         sessionId: item.sessionId || null,
         maxTasks: item.maxTasks ?? null,
         maxSessionsPerTask: item.maxSessionsPerTask ?? null,
