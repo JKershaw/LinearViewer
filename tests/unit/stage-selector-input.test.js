@@ -266,7 +266,9 @@ describe('trail facts: the misroute fixes (LIN-3378)', () => {
 
   test('d: under an approving review the open ledger items are left for close-out; otherwise not discharged', () => {
     assert.match(ledgerLine('Approve.'), /1 left for close-out to discharge\)/);
-    assert.match(ledgerLine('Approve, with conditions.'), /1 left for close-out to discharge\)/);
+    const conditional = 'Approve — conditional on close-out discharging the ledger';
+    assert.equal(assembleTrailFacts([review(conditional, 1)], '').review.verdict, 'approve-conditional', 'the measured P11 verdict, not plain approve');
+    assert.match(ledgerLine(conditional), /approve-conditional .*1 left for close-out to discharge\)/);
     assert.match(ledgerLine('Request Changes.'), /1 not discharged\)/);
     assert.doesNotMatch(ledgerLine('Approve.'), /not discharged/);
   });
