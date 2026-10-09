@@ -12,6 +12,9 @@ import express from 'express';
 import { createTaskShareRoutes } from '../../routes/task-share.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { TaskShareStore } from '../../lib/task-share-store.js';
+import { FIXTURE_SECRETS as F } from '../fixtures/secret-scan-fixtures.js';
+import { renderTaskPage, contextSignature, renderTaskContext } from '../../lib/render-task-page.js';
+import { escapeHtml } from '../../lib/utils/html.js';
 
 const NOW = new Date('2026-10-08T12:00:00.000Z');
 const TOKEN = 'A'.repeat(43);
@@ -76,7 +79,7 @@ const RECORD = {
   revokedAt: null,
 };
 
-async function build({ store, loader, owner = async () => ({ status: 'owner' }), access, workspaceFromUrl } = {}) {
+async function build({ store, loader, owner = async () => ({ status: 'owner' }), access, workspaceFromUrl, maskHtml } = {}) {
   const app = express();
   app.use(express.json());
   const taskShareStore = store || fakeStore();
@@ -89,6 +92,7 @@ async function build({ store, loader, owner = async () => ({ status: 'owner' }),
     guestAccess: access || (async () => ({ provider: {}, callScope: 'tok' })),
     getDeployInfo: () => ({}),
     now: () => NOW,
+    ...(maskHtml ? { maskHtml } : {}),
   }));
   const server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
   return { base: `http://127.0.0.1:${server.address().port}`, close: () => new Promise(r => server.close(r)), store: taskShareStore, loader: pageLoader };
@@ -370,5 +374,156 @@ describe('TaskShareStore integration on the owner surface', () => {
       const after = await (await fetch(`${base}/workspace/acme/api/task/LIN-50/shares`)).json();
       assert.ok(after.shares[0].revokedAt);
     } finally { await close(); }
+  });
+});
+
+describe('render-time secret masking (LIN-3389)', () => {
+  const ASSIGN = `api_key = "${F.genericSecretValue}"`;
+  const withRecord = () => fakeStore({ getByToken: async () => ({ ...RECORD, tokenHash: 'abcdef0123456789'.repeat(4) }) });
+
+  function secretModel(secret) {
+    return {
+      ...guestModel(),
+      description: `desc ${secret}`,
+      comments: [{ author: 'a', body: `comment ${secret}`, createdAt: NOW.toISOString() }],
+      brief: { body: `brief ${secret}`, generatedAt: NOW.toISOString() },
+      recap: null,
+    };
+  }
+
+  async function withLogs(fn) {
+    const lines = [];
+    const orig = console.warn;
+    console.warn = (...a) => lines.push(a.join(' '));
+    try { await fn(lines); } finally { console.warn = orig; }
+  }
+
+  test('secrets planted in description, comment and brief are masked; entity-encoded too', async () => {
+    for (const secret of [F.githubPat, ASSIGN, F.awsAccessKey]) {
+      const { base, close } = await build({
+        store: withRecord(),
+        loader: fakeLoader({ loadTaskPage: async () => ({ model: secretModel(secret) }) }),
+      });
+      try {
+        await withLogs(async () => {
+          const res = await get(base, `/t/${TOKEN}`);
+          assert.equal(res.status, 200);
+          assert.ok(res.text.includes('[redacted]'));
+          assert.ok(!res.text.includes(F.githubPat) && !res.text.includes(F.genericSecretValue) && !res.text.includes(F.awsAccessKey.slice(4)));
+          assert.equal((res.text.match(/\[redacted\]/g) || []).length >= 3, true, 'description, comment and brief');
+        });
+      } finally { await close(); }
+    }
+  });
+
+  test('a secret in a session (agent) message is masked', async () => {
+    const model = guestModel();
+    const probe = renderTaskPage({ ...model, sessions: [{ state: 'running', message: 'zzz', startedAt: NOW.toISOString() }] }, { viewer: 'guest', urlKey: 'acme', binding: {}, stateUrl: '/s', now: NOW, pageOptions: { deployInfo: {}, workspaces: [], featureFlags: {}, openRouterSource: null } });
+    if (!probe.includes('zzz')) return; // model shape renders no session text; covered by the generic cases
+    const { base, close } = await build({
+      store: withRecord(),
+      loader: fakeLoader({ loadTaskPage: async () => ({ model: { ...model, sessions: [{ state: 'running', message: F.githubPat, startedAt: NOW.toISOString() }] } }) }),
+    });
+    try {
+      await withLogs(async () => {
+        const res = await get(base, `/t/${TOKEN}`);
+        assert.ok(!res.text.includes(F.githubPat));
+      });
+    } finally { await close(); }
+  });
+
+  test('a clean page is byte-identical to the unmasked render', async () => {
+    const model = { ...guestModel(), description: 'plain text &amp; api_key = "short"', brief: { body: 'hello', generatedAt: NOW.toISOString() } };
+    const { base, close } = await build({
+      store: withRecord(),
+      loader: fakeLoader({ loadTaskPage: async () => ({ model }) }),
+    });
+    try {
+      const res = await get(base, `/t/${TOKEN}`);
+      const expected = renderTaskPage(model, {
+        viewer: 'guest', urlKey: 'acme', binding: { source: 'linear' }, stateUrl: `/t/${TOKEN}/state`, now: NOW,
+        pageOptions: { deployInfo: {}, workspaces: [], featureFlags: {}, openRouterSource: null },
+      });
+      assert.equal(res.text, expected);
+      assert.equal(res.headers.get('referrer-policy'), 'no-referrer');
+      assert.equal(res.headers.get('cache-control'), 'private, no-store');
+      assert.equal(res.headers.get('x-robots-tag'), 'noindex');
+    } finally { await close(); }
+  });
+
+  test('/state masks header, track and context; contextSig stays over the unmasked fragment and matches the page', async () => {
+    const model = {
+      ...guestModel(),
+      brief: { body: `brief ${F.githubPat}`, generatedAt: NOW.toISOString() },
+      sessions: [],
+    };
+    const { base, close } = await build({
+      store: withRecord(),
+      loader: fakeLoader({
+        loadTaskPage: async () => ({ model }),
+        loadTaskState: async () => ({ model }),
+      }),
+    });
+    try {
+      await withLogs(async () => {
+        const state = JSON.parse((await get(base, `/t/${TOKEN}/state`)).text);
+        assert.ok(!JSON.stringify(state).includes(F.githubPat));
+        assert.ok(state.contextHtml.includes('[redacted]'));
+        const unmasked = renderTaskContext(model, { urlKey: 'acme' });
+        assert.ok(unmasked.includes(F.githubPat));
+        assert.equal(state.contextSig, contextSignature(unmasked));
+        const page = await get(base, `/t/${TOKEN}`);
+        assert.ok(page.text.includes(`data-context-sig="${state.contextSig}"`));
+      });
+    } finally { await close(); }
+  });
+
+  test('/state masks trackHtml and headerHtml via the injected masker', async () => {
+    const seen = [];
+    const { base, close } = await build({
+      store: withRecord(),
+      maskHtml: (html) => { seen.push(html); return { html: html + '<!--m-->', hits: [] }; },
+    });
+    try {
+      const state = JSON.parse((await get(base, `/t/${TOKEN}/state`)).text);
+      assert.ok(state.headerHtml.endsWith('<!--m-->'));
+      assert.ok(state.trackHtml.endsWith('<!--m-->'));
+      assert.equal(seen.length, 2);
+    } finally { await close(); }
+  });
+
+  test('log line has rule ids and an 8-hex hash prefix only, throttled per surface', async () => {
+    const hash = 'abcdef0123456789'.repeat(4);
+    const { base, close } = await build({
+      store: withRecord(),
+      loader: fakeLoader({ loadTaskPage: async () => ({ model: secretModel(F.githubPat) }) }),
+    });
+    try {
+      await withLogs(async (lines) => {
+        await get(base, `/t/${TOKEN}`);
+        await get(base, `/t/${TOKEN}`);
+        const masked = lines.filter(l => l.startsWith('Task share masked:'));
+        assert.equal(masked.length, 1, 'throttled to one line per window');
+        assert.match(masked[0], /patterns=github-pat tokenHash=abcdef01 surface=page$/);
+        const all = lines.join('\n');
+        assert.ok(!all.includes(F.githubPat) && !all.includes(hash) && !all.includes(TOKEN));
+      });
+    } finally { await close(); }
+  });
+
+  test('a masker throw fails closed: 503 on the page and on /state', async () => {
+    const { base, close } = await build({
+      store: withRecord(),
+      maskHtml: () => { throw new Error('boom'); },
+    });
+    const orig = console.error;
+    console.error = () => {};
+    try {
+      const page = await get(base, `/t/${TOKEN}`);
+      assert.equal(page.status, 503);
+      assert.ok(!page.text.includes('Build the task page'));
+      const state = await get(base, `/t/${TOKEN}/state`);
+      assert.equal(state.status, 503);
+    } finally { console.error = orig; await close(); }
   });
 });

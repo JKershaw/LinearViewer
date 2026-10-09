@@ -25,5 +25,9 @@ export const FIXTURE_SECRETS = {
     'QRSTUVWXYZ0123456789+/abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP',
     '-----END RSA PRIVATE KEY-----'
   ].join('\n'),
+  githubAppToken: ['ghs_', '0123456789abcdef0123456789abcdef0123'].join(''),
+  bearerToken: ['aB3dE5gH7jK9mN1pQ3sT5vW7yZ9bD1fH3', 'xYz0aB3dE5'].join(''),
+  genericSecretValue: ['Zx9Qm4Tk7Wp2Rv8Bn5Cd3Fg6Hj1Ls0Yu'].join(''),
+  secondAwsAccessKey: ['AKIA', 'JQWERTYUIOPASDFG'].join(''),
   bootstrapToken: ['HB', 'FIXTURE-not-a-real-token-x9Q4mZ7kT2pW3vR8'].join('')
 };
