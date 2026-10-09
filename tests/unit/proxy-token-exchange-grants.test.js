@@ -251,6 +251,25 @@ describe('LIN-3129 — exchange records lineage uniformly', () => {
   });
 });
 
+describe('LIN-3409 — a Settings-minted (stamped, grant-less) bootstrap', () => {
+  test('exchange copies the workspace id and never runs the owner re-check', async () => {
+    let ownerCalls = 0;
+    const { store, collection } = newStore(async () => { ownerCalls += 1; return { status: 'not-owner' }; });
+    const minted = await store.createToken('acme', {
+      createdBy: 'account-A', kind: 'bootstrap', scope: 'readWrite', workspaceId: 'ws-77'
+    });
+    assert.equal(docById(collection, minted.tokenId).workspaceId, 'ws-77');
+
+    const working = await store.exchangeBootstrapToken(minted.token);
+    assert.ok(working?.token, 'a grant-less exchange succeeds even when the seam would say not-owner');
+    assert.equal(ownerCalls, 0, 'the exchange owner re-check is gated on grantBearer (pins LIN-3409 decision 5)');
+    const workingDoc = docById(collection, working.tokenId);
+    assert.equal(workingDoc.workspaceId, 'ws-77', 'the working token copies the stamped id');
+    assert.deepEqual(workingDoc.grants, []);
+    assert.equal(workingDoc.createdBy, 'account-A');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Revoke race
 // ---------------------------------------------------------------------------

@@ -280,6 +280,9 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
         label: label || 'default',
         scope: scope || 'read',
         createdBy: req.session?.accountId || null,
+        // LIN-3409: identity only (no authority) so proxy halt can owner-check
+        // this token's creator. From workspaceFromUrl, never the request body.
+        workspaceId: workspace.id,
         ...(wantBootstrap
           ? { kind: 'bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS }
           : {
