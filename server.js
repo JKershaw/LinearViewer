@@ -1060,7 +1060,30 @@ function getOpenRouterSource(req) {
 // =============================================================================
 // When LINEAR_ACCESS_TOKEN is set and the user has no session, auto-create one.
 
-app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore }));
+// LIN-3382 (S1.2 of LIN-2954): the ONE urlKey resolver every workspace-creation
+// path asks for a workspace key. Built once here, ABOVE the PAT middleware, and
+// injected at every mount (createEnsurePATSession, the provider auth loop,
+// createWorkspaceRoutes, createHeldConnectionRoutes);
+// no router builds its own default, because a default could not refuse. The
+// holder reads are STRICT (a store failure throws, so the arm answers the 503
+// retry page instead of reading "no holders"); the dry-run builds the same
+// finder non-strict. scripts/dry-run-urlkey-duplicates.mjs shares the finder.
+const urlKeyHolderFinder = createUrlKeyHolderFinder({
+  readReferents: createReferentHolderReader({ connectionStore, strict: true }),
+  ownerCredentialStore,
+  proxyTokenStore,
+  dispatchTokenStore,
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  strict: true
+})
+const resolveWorkspaceUrlKey = createWorkspaceUrlKeyResolver({
+  findUrlKeyHolders: (urlKey) => urlKeyHolderFinder.findUrlKeyHolders(urlKey),
+  listAccountsForWorkspace: (workspaceId) => accountWorkspaceStore.listAccountsForWorkspace(workspaceId),
+  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
+  findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope)
+})
+
+app.use(createEnsurePATSession({ accountStore, accountWorkspaceStore, resolveWorkspaceUrlKey }));
 
 // =============================================================================
 // Token Refresh Middleware
@@ -1408,29 +1431,6 @@ app.use((req, res, next) => {
 // and the picker route receive only this function). The shared factory keeps
 // the production wiring and the tests on the exact same construction.
 const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionReader({ connectionStore })
-
-// LIN-3382 (S1.2 of LIN-2954): the ONE urlKey resolver every bind arm asks for a
-// workspace key. Built once here and injected at every bind-arm mount (the
-// provider auth loop below, createWorkspaceRoutes, createHeldConnectionRoutes);
-// no router builds its own default, because a default could not refuse. The
-// holder reads are STRICT (a store failure throws, so the arm answers the 503
-// retry page instead of reading "no holders"); the dry-run builds the same
-// finder non-strict. scripts/dry-run-urlkey-duplicates.mjs shares the finder.
-const urlKeyHolderFinder = createUrlKeyHolderFinder({
-  readReferents: createReferentHolderReader({ connectionStore, strict: true }),
-  ownerCredentialStore,
-  proxyTokenStore,
-  dispatchTokenStore,
-  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
-  strict: true
-})
-const resolveWorkspaceUrlKey = createWorkspaceUrlKeyResolver({
-  findEvidence: (urlKeys) => urlKeyHolderFinder.findEvidence(urlKeys),
-  listAccountsForWorkspace: (workspaceId) => accountWorkspaceStore.listAccountsForWorkspace(workspaceId),
-  resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
-  findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope),
-  listHolderRowsByWorkspaceId: (workspaceId) => proxyTokenStore.listHolderRowsByWorkspaceId(workspaceId, { strict: true })
-})
 
 for (const provider of getAllProviders()) {
   let authRouter

@@ -27,6 +27,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { ConnectionStore } from '../../lib/connection-store.js';
+import { deriveUrlKey } from '../../lib/workspace-urlkey.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
@@ -538,12 +539,14 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       try {
         const acct = await s.accountStore.createAccount();
         await s.accountStore.linkIdentity(acct._id, 'jira', 'atl-human', {});
-        const container = { id: 'jira:atl-human', urlKey: 'acme-jira', provider: 'jira', accessToken: 'at-old', bindings: [{ provider: 'jira', scope: site.url, credentials: { token: 'at-old', authType: 'oauth', cloudId: 'cid-b', tokenExpiresAt: 1 } }] };
+        // LIN-3382: an existing container is kept only under exactly the key the one rule derives.
+        const jiraKey = deriveUrlKey('jira', { cloudId: 'cid-b', workspaceId: 'jira:atl-human' });
+        const container = { id: 'jira:atl-human', urlKey: jiraKey, provider: 'jira', accessToken: 'at-old', bindings: [{ provider: 'jira', scope: site.url, credentials: { token: 'at-old', authType: 'oauth', cloudId: 'cid-b', tokenExpiresAt: 1 } }] };
         const session = { accountId: acct._id, workspaces: [container], activeWorkspaceId: container.id, oauthState: 'n', oauthIntent: { mode: 'new', provider: 'jira' }, save(cb) { cb && cb(null); } };
         const router = createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'n' }, session }, res);
-        assert.equal(res.redirectedTo, '/workspace/acme-jira/');
+        assert.equal(res.redirectedTo, `/workspace/${jiraKey}/`);
         await assertStayedLegacy(s, log, container.bindings[0], { provider: 'jira', unitId: site.url, accountId: acct._id });
       } finally {
         globalThis.fetch = realFetch;
@@ -586,10 +589,10 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
         const s = stores();
         const log = [];
         const acct = await s.accountStore.createAccount();
-        const container = { id: 'github:42', urlKey: 'octo', provider: 'github', accessToken: 'ghs-old', bindings: [structuredClone(legacyGithub)] };
+        const container = { id: 'github:42', urlKey: 'gh-42', provider: 'github', accessToken: 'ghs-old', bindings: [structuredClone(legacyGithub)] };
         const session = { accountId: acct._id, githubHumanId: 'h', githubPending: pending('new'), workspaces: [container], activeWorkspaceId: 'github:42', save(cb) { cb && cb(); } };
         const res = await link(s, log, session);
-        assert.equal(res.redirectedTo, '/workspace/octo/');
+        assert.equal(res.redirectedTo, '/workspace/gh-42/');
         await assertStayedLegacy(s, log, container.bindings[0], { provider: 'github', unitId: '9', accountId: acct._id });
       });
 
@@ -602,7 +605,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
         const s = stores();
         const log = [];
         const acct = await s.accountStore.createAccount();
-        const container = { id: 'github:42', urlKey: 'octo', provider: 'github', accessToken: 'ghs-old', bindings: [structuredClone(legacyGithub)] };
+        const container = { id: 'github:42', urlKey: 'gh-42', provider: 'github', accessToken: 'ghs-old', bindings: [structuredClone(legacyGithub)] };
         const session = {
           accountId: acct._id, githubHumanId: 'h', githubPending: pending('new'), workspaces: [container], activeWorkspaceId: 'github:42',
           save(cb) { cb && cb(); }, regenerate() { throw new Error('the new-container seam (regenerate) must not be reached'); },
@@ -610,7 +613,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
         await link(s, log, session);
         assert.equal(session.workspaces.length, 1);
         const src = readFileSync(new URL('../../lib/github-install-flow.js', import.meta.url), 'utf8');
-        assert.match(src, /const existing = \(req\.session\.workspaces \|\| \[\]\)\.find\(w => w\.id === workspaceId\)\n\s*if \(existing\) \{/);
+        assert.match(src, /const existing = resolved\.source === 'session' \? live : null\n\s*if \(existing\) \{/);
         assert.match(src, /prior: bindingShapeAt\(workspacesBeforeLogin\.find\(w => w\.id === workspace\.id\), provider\.name, slug\),/);
       });
     });

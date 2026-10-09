@@ -19,6 +19,7 @@
  *
  * Run with: node --test tests/unit/lin-3125-persist-held.test.js
  */
+import { deriveUrlKey } from '../../lib/workspace-urlkey.js';
 import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
@@ -40,8 +41,8 @@ const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
 const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_APP_SLUG', 'CONNECTION_BACKED_WRITES'];
 const ACCT = 'acct-1';
 const INSTALL = '77';
-// LIN-3382: held-new keys come from the resolver (`gh-<name>-<installationId>`), no longer the bare repo name.
-const NEW_KEY = `gh-a-${INSTALL}`;
+// LIN-3382: held-new keys come from the resolver (`gh-<name>-<sha6(provider:scope)>`), no longer the bare repo name.
+const NEW_KEY = deriveUrlKey('github-fresh', { repoName: 'a', provider: 'github', scope: 'octo/a' });
 const CONN_ID = `${ACCT}::github::${INSTALL}`;
 
 function getHandler(router, method, path) {

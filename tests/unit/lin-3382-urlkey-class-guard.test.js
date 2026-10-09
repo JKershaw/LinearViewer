@@ -14,9 +14,9 @@
  *        the verdict table below, and any table entry that does not use the
  *        resolver where its verdict says it must.
  *
- * Allow-listed BY NAME (never by pattern): lib/pat-session.js (dev-only PAT
- * session; its key is the operator's own) and routes/test.js (the e2e harness
- * mints fixed keys on purpose).
+ * Allow-listed BY NAME (never by pattern): routes/test.js only (the e2e harness
+ * mints fixed keys on purpose). lib/pat-session.js creates a workspace too, so it
+ * is a resolver caller like the arms (the middleware variant: no response page).
  *
  * MUTATION WITNESS: the scanners are pure functions of `{file, text}`; the last
  * describe feeds them an inline derivation and asserts they FAIL, so the guard
@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const RESOLVER_MODULE = 'lib/workspace-urlkey.js';
-const ALLOW_LISTED = Object.freeze(['lib/pat-session.js', 'routes/test.js']);
+const ALLOW_LISTED = Object.freeze(['routes/test.js']);
 
 function walk(dir) {
   const out = [];
@@ -141,6 +141,7 @@ export function scanBindWriters({ file, text }) {
 /**
  * Every file with a K1 writer, and what it must do about the key.
  *   arm            - a bind arm: must resolve its key through `resolveKeyOrRespond`
+ *   middleware-arm - a creation path with no response page (PAT): must call the injected resolver itself
  *   definition     - the writer itself (`upsertWorkspace`'s definition and its in-file helper use)
  *   merge-confirm  - lands a workspace an arm already resolved: the arm refuses BEFORE `pendingMerge` exists
  *   allow-listed   - by name, see ALLOW_LISTED
@@ -153,7 +154,7 @@ const K1_VERDICTS = Object.freeze({
   'routes/workspace.js': 'arm',
   'routes/account-merge.js': 'merge-confirm',
   'lib/workspace.js': 'definition',
-  'lib/pat-session.js': 'allow-listed',
+  'lib/pat-session.js': 'middleware-arm',
   'routes/test.js': 'allow-listed'
 });
 
@@ -188,6 +189,17 @@ describe('C2 class guard over the real tree', () => {
     }
   });
 
+  test('K1: the PAT middleware takes its key from the injected resolver, like the arms (it is not allow-listed)', () => {
+    assert.ok(!ALLOW_LISTED.includes('lib/pat-session.js'));
+    for (const [file, verdict] of Object.entries(K1_VERDICTS)) {
+      if (verdict !== 'middleware-arm') continue;
+      const code = stripComments(read(file));
+      assert.match(code, /\bresolveWorkspaceUrlKey\s*\(/, `${file} must call the one resolver`);
+      assert.match(code, /urlKey:\s*resolved\.urlKey/, `${file} must use the resolver's key`);
+      assert.ok(!/org\.urlKey\s*\|\|\s*org\.name\s*,\s*\n\s*addedAt/.test(code), `${file} must not carry its own key literal`);
+    }
+  });
+
   test('K1: merge-confirm lands only a workspace an arm already resolved (it builds no key)', () => {
     const code = stripComments(read('routes/account-merge.js'));
     assert.ok(!/urlKey\s*:/.test(code), 'routes/account-merge.js builds no urlKey of its own');
@@ -198,6 +210,7 @@ describe('C2 class guard over the real tree', () => {
     const mentions = SOURCE_FILES.filter(file => /\bresolveWorkspaceUrlKey\b/.test(stripComments(read(file)))).sort();
     assert.deepEqual(mentions, [
       'lib/github-install-flow.js',
+      'lib/pat-session.js',
       'lib/workspace-urlkey.js',
       'routes/auth.js',
       'routes/github-auth.js',
@@ -223,7 +236,8 @@ describe('mutation witness: the guard fails on a reintroduced derivation', () =>
     const found = scanDerivations({ file: 'routes/some-new-arm.js', text: inline });
     assert.ok(found.length >= 2, `expected the definition and the call to be flagged, got ${JSON.stringify(found)}`);
     assert.deepEqual(scanDerivations({ file: RESOLVER_MODULE, text: inline }), [], 'the resolver module itself is exempt');
-    assert.deepEqual(scanDerivations({ file: 'lib/pat-session.js', text: inline }), [], 'allow-listed by name');
+    assert.ok(scanDerivations({ file: 'lib/pat-session.js', text: inline }).length >= 2, 'lib/pat-session.js is no longer exempt');
+    assert.deepEqual(scanDerivations({ file: 'routes/test.js', text: inline }), [], 'allow-listed by name');
   });
 
   test('C2b fails on a workspace literal whose urlKey is derived inline, passes when it is the resolver\'s result', () => {

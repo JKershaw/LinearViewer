@@ -58,10 +58,6 @@ export function createResolverWorld(seed = {}) {
     async listHolderRows(urlKey, { strict } = {}) {
       if (fail(strict)) return [];
       return world.proxyTokens.filter(r => touches(r.urlKey, urlKey));
-    },
-    async listHolderRowsByWorkspaceId(workspaceId, { strict } = {}) {
-      if (fail(strict)) return [];
-      return world.proxyTokens.filter(r => r.workspaceId === workspaceId);
     }
   };
   const dispatchTokenStore = {
@@ -101,11 +97,10 @@ export function createResolverWorld(seed = {}) {
   world.accountWorkspaceStore = accountWorkspaceStore;
   world.accountStore = accountStore;
   world.resolve = createWorkspaceUrlKeyResolver({
-    findEvidence: async keys => { world.evidenceReads.push([...keys]); return finder.findEvidence(keys); },
+    findUrlKeyHolders: async key => { world.evidenceReads.push([key]); return finder.findUrlKeyHolders(key); },
     listAccountsForWorkspace: id => accountWorkspaceStore.listAccountsForWorkspace(id),
     resolveCanonicalAccountId: canonical,
-    findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope),
-    listHolderRowsByWorkspaceId: id => proxyTokenStore.listHolderRowsByWorkspaceId(id, { strict: true })
+    findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope)
   });
 
   /** What a successful bind leaves behind in the holder stores (for a later bind in one test). */
@@ -160,10 +155,9 @@ export function createStoreBackedResolver({
     strict: true
   });
   return createWorkspaceUrlKeyResolver({
-    findEvidence: (urlKeys) => finder.findEvidence(urlKeys),
+    findUrlKeyHolders: (urlKey) => finder.findUrlKeyHolders(urlKey),
     listAccountsForWorkspace: (workspaceId) => accountWorkspaceStore.listAccountsForWorkspace(workspaceId),
     resolveCanonicalAccountId: (id) => accountStore.resolveCanonicalAccountId(id),
-    findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope),
-    listHolderRowsByWorkspaceId: (workspaceId) => proxyTokenStore.listHolderRowsByWorkspaceId(workspaceId, { strict: true })
+    findAccountByIdentity: (provider, scope) => accountStore.findAccountByIdentity(provider, scope)
   });
 }

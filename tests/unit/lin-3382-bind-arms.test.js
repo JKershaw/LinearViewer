@@ -42,6 +42,7 @@ import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { convertToConnectionBacked, createAuthorizedAccountConnectionReader, heldConnectionCredentials } from '../../lib/connection-credential.js';
 import { createStoreBackedResolver } from './lin-3382-resolver-harness.js';
+import { deriveUrlKey } from '../../lib/workspace-urlkey.js';
 import { getHandler, makeRes, makeSession } from '../fixtures/github-install-flow-branches.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -126,6 +127,9 @@ async function edge(world, accountId, workspaceId) {
   await world.accountWorkspaceStore.collection.insertOne({ _id: crypto.randomUUID(), accountId, workspaceId, createdAt: new Date() });
 }
 
+/** The one rule's key for a GitHub repo bound on a random-id workspace (fresh and held-new). */
+const repoKey = (scope, provider = 'github') => deriveUrlKey('github-fresh', { repoName: scope.split('/').pop(), provider, scope });
+
 const REFUSAL = /can(?:'|&#0?39;)t be connected/;
 const SUPPORT = /contact support/;
 const RETRY = /Connection Not Saved/;
@@ -167,7 +171,7 @@ describe('GitHub fresh (random id)', () => {
   test('a different account binding the same repo is refused: 409, holder not named, NOTHING written, session unchanged', async () => {
     const world = makeWorld();
     const alice = await newAccount(world, { provider: 'github', scope: 'human-alice' });
-    await holdByReferent(world, alice, 'gh-hello-world-99', 'github', 'octocat/hello-world');
+    await holdByReferent(world, alice, repoKey('octocat/hello-world'), 'github', 'octocat/hello-world');
     const bob = await newAccount(world, { provider: 'github', scope: 'human-42' });
     const session = githubSession(bob);
     const beforeCounts = await counts(world);
@@ -178,18 +182,18 @@ describe('GitHub fresh (random id)', () => {
     assert.equal(res.statusCode, 409);
     assert.match(res.body, REFUSAL);
     assert.match(res.body, SUPPORT);
-    assert.ok(!res.body.includes(alice) && !res.body.includes('gh-hello-world-99'), 'neither the holder nor the key is named');
+    assert.ok(!res.body.includes(alice) && !res.body.includes(repoKey('octocat/hello-world')), 'neither the holder nor the key is named');
     assert.deepEqual(await counts(world), beforeCounts, 'no new rows in the three holder stores, accounts or edges');
     assert.deepEqual(sessionState(session), beforeSession, 'the session is exactly as it was (no regenerate, no workspace, pending intact)');
   });
 
-  test('a binder never refuses its own key: re-adding its own repo after the workspace was removed', async () => {
+  test('a binder never refuses its own key: re-adding its own repo after the workspace was removed (unbind, expire, rebind: the same key)', async () => {
     const world = makeWorld();
     const me = await newAccount(world, { provider: 'github', scope: 'human-42' });
-    await holdByToken(world, me, 'gh-hello-world-99'); // what a removed workspace leaves behind
+    await holdByToken(world, me, repoKey('octocat/hello-world')); // what a removed workspace leaves behind
     const res = await linkGithub(world, { session: githubSession(me), repo: 'octocat/hello-world' });
     assert.equal(res.statusCode, 200);
-    assert.equal(res.redirectedTo, '/workspace/gh-hello-world-99/');
+    assert.equal(res.redirectedTo, `/workspace/${repoKey('octocat/hello-world')}/`);
   });
 
   test('the key resolved once is the key persistBinding writes into connections.referents', async () => {
@@ -210,14 +214,14 @@ describe('GitHub fresh (random id)', () => {
       const me = await newAccount(world, { provider: 'github', scope: 'human-42' });
       await holdByReferent(world, me, 'foo', 'github', 'alice/foo');
       const session = githubSession(me, {
-        githubPending: freshPending({ installationId: '300' }),
+        githubPending: freshPending(),
         workspaces: live ? [{ id: 'w-foo', urlKey: 'foo', bindings: [{ provider: 'github', scope: 'alice/foo' }] }] : []
       });
       const res = await linkGithub(world, { session, repo: 'alice-org/foo' });
       assert.equal(res.statusCode, 200);
       const minted = session.workspaces.find(w => w.id !== 'w-foo');
       assert.notEqual(minted.urlKey, 'foo');
-      assert.equal(minted.urlKey, 'gh-foo-300');
+      assert.equal(minted.urlKey, repoKey('alice-org/foo'));
       if (live) assert.ok(session.workspaces.some(w => w.urlKey === 'foo'), 'the live `foo` workspace is untouched');
     });
   }
@@ -263,6 +267,16 @@ describe('GitHub account container (stable id github:<userId>), shared with /aut
     assert.equal(session.workspaces[0].urlKey, 'gh-42');
   });
 
+  test('LIN-3382 (no option C): a container live under an old name is re-keyed to gh-<userId> by the rule, not kept because it is "old"', async () => {
+    const world = makeWorld();
+    const me = await newAccount(world, { provider: 'github', scope: 'human-42' });
+    const session = containerSession(me, { workspaces: [{ id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github', bindings: [] }] });
+    const res = await linkGithub(world, { session, repo: 'octocat/hello-world' });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
+    assert.deepEqual(session.workspaces.map(w => w.urlKey), ['gh-42']);
+  });
+
   test('a first-time container never lands on a login key another account holds (falls to gh-<userId>)', async () => {
     const world = makeWorld();
     const other = await newAccount(world);
@@ -299,7 +313,7 @@ describe('held-new (routes/held-connection.js)', () => {
   const ACCT = 'acct-held';
   const INSTALL = '77';
   const CONN_ID = `${ACCT}::github::${INSTALL}`;
-  const NEW_KEY = `gh-a-${INSTALL}`;
+  const NEW_KEY = repoKey('octo/a');
 
   const githubProvider = () => ({
     name: 'github', scopeType: 'repository', ui: { displayName: 'GitHub Issues' },
@@ -405,7 +419,7 @@ describe('held-new (routes/held-connection.js)', () => {
       const minted = session.workspaces.find(w => w.id !== 'w-foo');
       assert.ok(minted, 'a workspace was minted');
       assert.notEqual(minted.urlKey, 'foo');
-      assert.equal(minted.urlKey, `gh-foo-${INSTALL}`);
+      assert.equal(minted.urlKey, repoKey('other/foo'));
     });
   }
 
@@ -443,6 +457,9 @@ describe('Jira (stable id jira:<atlassianAccountId>)', () => {
   const MYSELF = { accountId: '557058:abc', emailAddress: 'j@example.com', displayName: 'J' };
   const SITE = { cloudId: 'cid-1', url: 'https://acme.atlassian.net', name: 'Acme' };
   const provider = { validateCredential: async () => MYSELF };
+  // The one rule: jira-<cloudId>-<sha6(W)>, W = the Atlassian identity's container id.
+  const JIRA_W = `jira:${MYSELF.accountId}`;
+  const JIRA_KEY = deriveUrlKey('jira', { cloudId: SITE.cloudId, workspaceId: JIRA_W });
 
   const jiraSession = (over = {}) => makeSession({
     workspaces: [],
@@ -463,7 +480,7 @@ describe('Jira (stable id jira:<atlassianAccountId>)', () => {
   test('a different account binding the same site is refused: 409, nothing written, the carried refresh token dropped', async () => {
     const world = makeWorld();
     const alice = await newAccount(world);
-    await holdByReferent(world, alice, 'jira-cid-1', 'jira', SITE.url);
+    await holdByReferent(world, alice, JIRA_KEY, 'jira', SITE.url);
     await edge(world, alice, 'jira:alice');
     const session = jiraSession();
     const beforeCounts = await counts(world);
@@ -473,7 +490,7 @@ describe('Jira (stable id jira:<atlassianAccountId>)', () => {
     assert.equal(res.statusCode, 409);
     assert.match(res.body, REFUSAL);
     assert.match(res.body, SUPPORT);
-    assert.ok(!res.body.includes(alice) && !res.body.includes('jira-cid-1'));
+    assert.ok(!res.body.includes(alice) && !res.body.includes(JIRA_KEY));
     assert.deepEqual(await counts(world), beforeCounts);
     assert.deepEqual(session.workspaces, [], 'no workspace, no regenerate');
     assert.equal(session.accountId, undefined);
@@ -500,26 +517,43 @@ describe('Jira (stable id jira:<atlassianAccountId>)', () => {
     assert.equal(session.jiraPending.refreshToken, undefined);
   });
 
-  test('a first-time bind gets jira-<cloudId>, and that key is what the connection referent carries', async () => {
+  test('a first-time bind gets jira-<cloudId>-<sha6(W)>, and that key is what the connection referent carries', async () => {
     const world = makeWorld();
     const session = jiraSession();
     const res = await pick(world, { session });
-    assert.equal(res.redirectedTo, '/workspace/jira-cid-1/');
+    assert.equal(res.redirectedTo, `/workspace/${JIRA_KEY}/`);
     const rows = await world.connectionStore.collection.find({}).toArray();
     assert.equal(rows.length, 1);
-    assert.equal(rows[0].referents[0].urlKey, 'jira-cid-1');
+    assert.equal(rows[0].referents[0].urlKey, JIRA_KEY);
   });
 
-  test('expired session, same identity: a returning workspace keeps its legacy key', async () => {
+  test('LIN-3382 (no option C): a container live under an old tenant name (`immersify`) is re-keyed by the rule', async () => {
+    const world = makeWorld();
+    const session = jiraSession({ workspaces: [{ id: JIRA_W, name: 'Acme', urlKey: 'immersify', provider: 'jira', bindings: [] }] });
+    const res = await pick(world, { session });
+    assert.equal(res.redirectedTo, `/workspace/${JIRA_KEY}/`);
+    assert.deepEqual(session.workspaces.map(w => w.urlKey), [JIRA_KEY]);
+  });
+
+  test('unbind, expire the session, rebind: the same key (the key is a function of the identity, nothing is recovered)', async () => {
+    const world = makeWorld();
+    const me = await newAccount(world, { provider: 'jira', scope: MYSELF.accountId });
+    await holdByReferent(world, me, JIRA_KEY, 'jira', SITE.url);
+    await edge(world, me, JIRA_W);
+    const session = jiraSession();
+    const res = await pick(world, { session });
+    assert.equal(res.redirectedTo, `/workspace/${JIRA_KEY}/`);
+    assert.equal(session.workspaces[0].urlKey, JIRA_KEY);
+  });
+
+  test('a legacy-shaped holder row (`acme-2`) is not recovered: the rule derives the new key', async () => {
     const world = makeWorld();
     const me = await newAccount(world, { provider: 'jira', scope: MYSELF.accountId });
     await holdByReferent(world, me, 'acme-2', 'jira', SITE.url);
-    await holdByCredential(world, me, 'acme', 'linear');
-    await edge(world, me, `jira:${MYSELF.accountId}`);
+    await edge(world, me, JIRA_W);
     const session = jiraSession();
     const res = await pick(world, { session });
-    assert.equal(res.redirectedTo, '/workspace/acme-2/');
-    assert.equal(session.workspaces[0].urlKey, 'acme-2');
+    assert.equal(res.redirectedTo, `/workspace/${JIRA_KEY}/`);
   });
 });
 
@@ -619,16 +653,13 @@ describe('Linear (stable id = org id; key stays org.urlKey || org.name)', () => 
     assert.deepEqual(sessionState(session), beforeSession, 'add-source is refused before the workspaces snapshot, so nothing needs restoring');
   });
 
-  test('reverse order, EXPIRED session: the binder holds `acme` only through its Jira credential -> own-conflict', async () => {
+  test('EXPIRED session: the binder\'s own durable Jira credential on `acme` does not refuse Linear (the same-account tie check is dropped by ruling; the live-session version above still refuses; LIN-3394)', async () => {
     const world = makeWorld();
     const me = await newAccount(world, { provider: 'linear', scope: 'v1' });
     await holdByCredential(world, me, 'acme', 'jira');
-    const session = makeSession({ oauthState: 'real', workspaces: [] });
-    const beforeCounts = await counts(world);
-    const res = await callback(mountAuth(world, provider(ACME, { id: 'v1' })), session);
-    assert.equal(res.statusCode, 409);
-    assert.match(res.body, OWN_CONFLICT);
-    assert.deepEqual(await counts(world), beforeCounts);
+    const res = await callback(mountAuth(world, provider(ACME, { id: 'v1' })), makeSession({ oauthState: 'real', workspaces: [] }));
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.redirectedTo, '/workspace/acme/');
   });
 
   test('F2(a): the binder holds Linear `acme` AND Jira `acme`, session expired -> `acme`, the returning workspace is not refused', async () => {
@@ -641,7 +672,7 @@ describe('Linear (stable id = org id; key stays org.urlKey || org.name)', () => 
     assert.equal(res.redirectedTo, '/workspace/acme/');
   });
 
-  test('forward order: Linear `acme` first, then Jira, still gets jira-<cloudId> (never the Linear key)', async () => {
+  test('forward order: Linear `acme` first, then Jira, still gets the Jira key (never the Linear key)', async () => {
     const world = makeWorld();
     const me = await newAccount(world, { provider: 'jira', scope: '557058:abc' });
     const linearWs = { id: 'org-1', urlKey: 'acme', provider: 'linear', bindings: [{ provider: 'linear', scope: 'org-1' }] };
@@ -657,8 +688,9 @@ describe('Linear (stable id = org id; key stays org.urlKey || org.name)', () => 
     });
     const res = makeRes();
     await getHandler(router, 'post', '/auth/jira/oauth/link')({ body: { cloudId: 'cid-1' }, session }, res);
-    assert.equal(res.redirectedTo, '/workspace/jira-cid-1/');
-    assert.deepEqual(session.workspaces.map(w => w.urlKey).sort(), ['acme', 'jira-cid-1']);
+    const jiraKey = deriveUrlKey('jira', { cloudId: 'cid-1', workspaceId: 'jira:557058:abc' });
+    assert.equal(res.redirectedTo, `/workspace/${jiraKey}/`);
+    assert.deepEqual(session.workspaces.map(w => w.urlKey).sort(), ['acme', jiraKey].sort());
   });
 
   test('fails closed with no resolver (503, nothing written)', async () => {

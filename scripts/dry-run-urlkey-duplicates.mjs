@@ -205,106 +205,6 @@ function groupAccounts(accounts, linked, edgesOf) {
 }
 
 /**
- * LIN-3382 sizing buckets, additive and read-only. Pure over rows already read.
- *
- * Each is a LOWER BOUND (Jira links come only through edges and tokens, and a
- * record without a scope or provider cannot be placed). They exist so John's
- * recorded yes on the refusals S1.2 makes reachable is given against a count:
- *
- *   referentlessHeld         keys held ONLY by tokens: no connection referent and
- *                            no owner credential. S1.1's `s1_2Residual` misses
- *                            these (random-id GitHub workspaces bound 12-29 Sep
- *                            have tokens but no referent, so they read as "held").
- *                            The resolver cannot tell such a workspace from an
- *                            unbound key by a durable record of its scope.
- *   jira                     F1: an account with edges to two or more `jira:*`
- *                            workspace ids, and the accounts holding two or more
- *                            keys on ONE {jira, site}. Where the resolver cannot
- *                            tell which key is a workspace's own after the session
- *                            expires, it refuses (never re-keys, never swaps).
- *   linear                   F2: keys one account holds for a Linear org AND for
- *                            another provider (the pre-existing collided pair),
- *                            and keys linked to two or more workspace ids that
- *                            include a Linear one (`keysOnMultipleWorkspaceIds`
- *                            restricted to pairs with a Linear workspace). The
- *                            resolver's live-session `own-conflict` refusal can
- *                            reach these.
- *
- * @param {Object} input
- * @param {Map<string, Object[]>} input.holdersByKey - from the holder finder
- * @param {Object[]} input.referentRows - `{_id, accountId, referents}` (every connection-managed row)
- * @param {Object[]} input.ownerRows - key-bearing `{accountId, urlKey, provider?}` owner-credential rows
- * @param {Map<string, Set<string>>} input.edgesOf - canonical account -> workspace ids
- * @param {Object[]} input.multiWorkspace - the `keysOnMultipleWorkspaceIds` rows (unshortened ids not needed)
- * @param {function(string): (string|null)} input.canon
- * @returns {Object}
- */
-export function sizeResolverBuckets({ holdersByKey, referentRows, ownerRows, edgesOf, multiWorkspace, canon }) {
-  const referentless = []
-  for (const [urlKey, holders] of holdersByKey) {
-    const credentialed = holders.some(h => h.sources.includes('connections') || h.ownerCredential || h.sources.includes('owner-credentials'))
-    if (!credentialed) referentless.push({ urlKey, holders: holders.length, sources: [...new Set(holders.flatMap(h => h.sources))].sort() })
-  }
-
-  const jiraKeysBySite = new Map()
-  const linearOrgIds = new Set()
-  const providersByAccountKey = new Map()
-  const note = (account, urlKey, provider) => {
-    if (!account || !urlKey || !provider) return
-    addTo(providersByAccountKey, `${account}\u0000${urlKey}`, provider)
-  }
-  for (const conn of referentRows) {
-    const account = conn.accountId ? canon(conn.accountId) : null
-    if (!account) continue
-    for (const referent of Array.isArray(conn.referents) ? conn.referents : []) {
-      note(account, referent?.urlKey, referent?.provider)
-      if (referent?.provider === 'linear' && typeof referent.scope === 'string') linearOrgIds.add(referent.scope)
-      if (referent?.provider === 'jira' && referent.scope && referent.urlKey) addTo(jiraKeysBySite, `${account}\u0000${referent.scope}`, referent.urlKey)
-    }
-  }
-  for (const row of ownerRows) {
-    const account = row.accountId ? canon(row.accountId) : null
-    note(account, row.urlKey, row.provider)
-  }
-
-  const jiraSameSiteMultiKey = []
-  for (const [composite, keys] of jiraKeysBySite) {
-    if (keys.size > 1) jiraSameSiteMultiKey.push({ account: short(composite.split('\u0000')[0]), keys: [...keys].sort() })
-  }
-  const jiraMultiIdentity = []
-  for (const [account, workspaces] of edgesOf) {
-    const jira = [...workspaces].filter(ws => ws.startsWith('jira:'))
-    if (jira.length > 1) jiraMultiIdentity.push({ account: short(account), workspaces: jira.map(shortWorkspace).sort() })
-  }
-
-  const linearAlsoOther = []
-  for (const [composite, providers] of providersByAccountKey) {
-    if (providers.has('linear') && providers.size > 1) {
-      const [account, urlKey] = composite.split('\u0000')
-      linearAlsoOther.push({ urlKey, account: short(account), providers: [...providers].sort() })
-    }
-  }
-  const linearMulti = multiWorkspace.filter(row => (row.rawWorkspaces || []).some(ws => linearOrgIds.has(ws)))
-
-  const byKey = rows => rows.sort((a, b) => byString(a.urlKey ?? a.account, b.urlKey ?? b.account))
-  return {
-    referentlessHeld: {
-      count: referentless.length,
-      caveat: 'keys with a holder but no connection referent and no owner credential (token-only). Includes any provider; an upper-ish bound on random-id GitHub workspaces with no referent',
-      rows: byKey(referentless)
-    },
-    jira: {
-      sameSiteMultiKey: { count: jiraSameSiteMultiKey.length, caveat: 'lower bound: accounts holding 2+ keys on one {jira, site} via referents only (legacy owner-credentials carry no scope)', rows: byKey(jiraSameSiteMultiKey) },
-      multiIdentityAccounts: { count: jiraMultiIdentity.length, caveat: 'lower bound: accounts with account-workspaces edges to 2+ jira:* workspace ids', rows: byKey(jiraMultiIdentity) }
-    },
-    linear: {
-      keyAlsoHeldByOtherProvider: { count: linearAlsoOther.length, caveat: 'lower bound: one account, one key, a Linear referent plus another provider\'s referent or credential', rows: byKey(linearAlsoOther) },
-      keysOnMultipleWorkspaceIds: { count: linearMulti.length, caveat: 'keysOnMultipleWorkspaceIds restricted to keys with a Linear org id among the linked workspace ids; a lower bound', rows: byKey(linearMulti.map(({ rawWorkspaces, ...row }) => row)) }
-    }
-  }
-}
-
-/**
  * Compute the report.
  * @param {Object} options
  * @param {Object} options.db - MongoDB/MangoDB db handle
@@ -318,11 +218,9 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
   const mergedInto = new Map(mergedRows.map(r => [r._id, r.mergedInto]))
   const canon = accountId => canonicalise(accountId, mergedInto)
 
-  const readReferents = createReferentHolderReader({ connectionStore: new ConnectionStore({ collection: db.collection('connections') }) })
-  const ownerCredentialStore = new OwnerCredentialStore({ collection: db.collection('owner-credentials') })
   const { holdersByKey, ownerlessTokens, unresolvableHolders } = await createUrlKeyHolderFinder({
-    readReferents,
-    ownerCredentialStore,
+    readReferents: createReferentHolderReader({ connectionStore: new ConnectionStore({ collection: db.collection('connections') }) }),
+    ownerCredentialStore: new OwnerCredentialStore({ collection: db.collection('owner-credentials') }),
     proxyTokenStore: new ProxyTokenStore({ collection: db.collection('proxy-tokens') }),
     dispatchTokenStore: new DispatchTokenStore({ collection: db.collection('dispatch-tokens') }),
     resolveCanonicalAccountId: async id => canon(id)
@@ -425,7 +323,7 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
     const accounts = holders.map(h => h.accountId)
     for (const holder of holders) {
       const own = [...(edgesOf.get(holder.accountId) || [])].filter(ws => linked.has(ws))
-      if (own.length > 1) multiWorkspace.push({ urlKey, account: short(holder.accountId), workspaces: own.map(shortWorkspace).sort(), rawWorkspaces: own })
+      if (own.length > 1) multiWorkspace.push({ urlKey, account: short(holder.accountId), workspaces: own.map(shortWorkspace).sort() })
     }
     if (holders.length === 1) {
       singleHolderKeys++
@@ -487,15 +385,6 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
   }
 
   const sortByKey = rows => rows.sort((a, b) => byString(a.urlKey, b.urlKey))
-  // LIN-3382: additive, read-only. Two more reads of stores already read above.
-  const resolverSizing = sizeResolverBuckets({
-    holdersByKey,
-    referentRows: await readReferents(),
-    ownerRows: await ownerCredentialStore.listUrlKeyRecords(),
-    edgesOf,
-    multiWorkspace,
-    canon
-  })
   return {
     generatedAt: now.toISOString(),
     totals: {
@@ -514,7 +403,7 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
       caveat: 'evidence only (a lower bound: actor stores are read for the accounts they name, and a store that names none adds nothing): an actor store names an account that holds no token, credential or referent for the key; never changes the holder set',
       rows: sortByKey(suspectedActorOnly)
     },
-    keysOnMultipleWorkspaceIds: { count: multiWorkspace.length, informational: true, rows: sortByKey(multiWorkspace.map(({ rawWorkspaces, ...row }) => row)) },
+    keysOnMultipleWorkspaceIds: { count: multiWorkspace.length, informational: true, rows: sortByKey(multiWorkspace) },
     liveSessionHolders: {
       caveat: LIVE_SESSION_TTL_NOTE,
       liveKeys: liveKeys.size,
@@ -522,12 +411,6 @@ export async function computeUrlKeyDuplicateReport({ db, now = new Date() } = {}
       liveKeyAccountPairs: livePairs,
       liveNotInHolderSet: { count: liveNotHolders.length, rows: sortByKey(liveNotHolders) },
       unscannableSessionRows
-    },
-    referentlessHeld: resolverSizing.referentlessHeld,
-    resolverRefusalSizing: {
-      heldForJohn: 'Whichever PR first makes the F1 (jira) or F2(b) (linear own-conflict) refusal reachable for an existing workspace in production is held pre-merge for John\'s recorded yes on LIN-2954, with these counts. Both are lower bounds; 0 does not prove the refusal unreachable.',
-      jira: resolverSizing.jira,
-      linear: resolverSizing.linear
     },
     keysWithNoHolder: {
       total: noHolder.liveSession + noHolder.staleSession + noHolder.actorOnly + noHolder.dataOnly,
@@ -559,7 +442,6 @@ export function formatSummary(report) {
     `  keys with no holder: ${n.total} (live session ${n.buckets.liveSession}, stale session ${n.buckets.staleSession}, actor only ${n.buckets.actorOnly}, data only ${n.buckets.dataOnly})`,
     `      not read (lower bound): ${n.unenumeratedSources.map(u => u.collection).join(', ') || 'none'}`,
     `      S1.2 residual signal = data only: ${n.s1_2Residual.count} (of which local-shape slug-<8 hex>: ${n.s1_2Residual.localShapeSubCount})`,
-    `  LIN-3382 sizing (lower bounds; held for John): referentless token-only keys ${report.referentlessHeld.count}; jira same-site multi-key accounts ${report.resolverRefusalSizing.jira.sameSiteMultiKey.count}; jira multi-identity accounts ${report.resolverRefusalSizing.jira.multiIdentityAccounts.count}; linear key also held for another provider ${report.resolverRefusalSizing.linear.keyAlsoHeldByOtherProvider.count}; linear keys on multiple workspace ids ${report.resolverRefusalSizing.linear.keysOnMultipleWorkspaceIds.count}`,
     `  ownerless tokens (counted, not holders): ${t.ownerlessTokens}; holders with a corrupt mergedInto chain: ${t.unresolvableHolders}`,
     '  Expect Jira teammates on one site to show as collisions (key = tenant host, workspace id = jira:<person>).',
     '  Ids are cut to 8 chars; urlKeys are printed in full. This script changes nothing; the S1.7 proposal goes to John.'

@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { MangoClient } from '@jkershaw/mangodb';
 import {
   runDryRun, computeUrlKeyDuplicateReport, parseArgs, URLKEY_SOURCES, ACTOR_SOURCES, READ_COLLECTIONS,
-  SESSIONS_URLKEY_PROJECTION, sizeResolverBuckets
+  SESSIONS_URLKEY_PROJECTION
 } from '../../scripts/dry-run-urlkey-duplicates.mjs';
 
 const SCRIPT_PATH = fileURLToPath(new URL('../../scripts/dry-run-urlkey-duplicates.mjs', import.meta.url));
@@ -404,28 +404,6 @@ describe('dry-run-urlkey-duplicates (LIN-3381 S1.1)', () => {
     assert.deepStrictEqual(parseArgs([]), {});
     assert.throws(() => parseArgs(['--x']), /unexpected argument/);
   });
-
-  // LIN-3382: additive read-only sizing buckets.
-  test('referentlessHeld counts token-only keys and not keys with a referent or credential', () => {
-    const rows = report.referentlessHeld.rows;
-    assert.ok(row(rows, 'k-clean'), 'token-only key is counted');
-    assert.ok(row(rows, 'k-actor'), 'token-only key is counted');
-    assert.ok(!row(rows, 'k-jira'), 'a referent-held key is not');
-    assert.ok(!row(rows, 'k-connkey'), 'a key held through a connection referent is not');
-    assert.ok(!row(rows, 'k-collision'), 'a key with an owner credential is not');
-    assert.strictEqual(report.referentlessHeld.count, rows.length);
-    assert.match(report.referentlessHeld.caveat, /token-only/);
-  });
-
-  test('the report carries the F1 / F2 sizing buckets, labelled as lower bounds and held for John', () => {
-    const sizing = report.resolverRefusalSizing;
-    assert.match(sizing.heldForJohn, /John/);
-    for (const bucket of [sizing.jira.sameSiteMultiKey, sizing.jira.multiIdentityAccounts, sizing.linear.keyAlsoHeldByOtherProvider, sizing.linear.keysOnMultipleWorkspaceIds]) {
-      assert.strictEqual(typeof bucket.count, 'number');
-      assert.match(bucket.caveat, /lower bound|restricted/);
-    }
-    assert.ok(!JSON.stringify(report).includes('rawWorkspaces'), 'internal raw ids never reach the report');
-  });
 });
 
 function snapshot(dir) {
@@ -440,51 +418,3 @@ function snapshot(dir) {
   walk(dir, '');
   return out;
 }
-
-describe('sizeResolverBuckets (LIN-3382, pure)', () => {
-  const canon = id => id;
-  const base = { holdersByKey: new Map(), referentRows: [], ownerRows: [], edgesOf: new Map(), multiWorkspace: [], canon };
-
-  test('F1: one account with two keys on one {jira, site} and edges to two jira workspaces', () => {
-    const out = sizeResolverBuckets({
-      ...base,
-      referentRows: [
-        { accountId: 'acct-1-long-id', referents: [{ urlKey: 'acme', provider: 'jira', scope: 'https://s' }] },
-        { accountId: 'acct-1-long-id', referents: [{ urlKey: 'acme-2', provider: 'jira', scope: 'https://s' }] },
-        { accountId: 'acct-2-long-id', referents: [{ urlKey: 'solo', provider: 'jira', scope: 'https://s' }] }
-      ],
-      edgesOf: new Map([['acct-1-long-id', new Set(['jira:a', 'jira:b'])], ['acct-2-long-id', new Set(['jira:c'])]])
-    });
-    assert.strictEqual(out.jira.sameSiteMultiKey.count, 1);
-    assert.deepStrictEqual(out.jira.sameSiteMultiKey.rows[0].keys, ['acme', 'acme-2']);
-    assert.strictEqual(out.jira.multiIdentityAccounts.count, 1);
-  });
-
-  test('F2: a Linear key the same account also holds for Jira; multi-workspace keys that include a Linear org', () => {
-    const out = sizeResolverBuckets({
-      ...base,
-      referentRows: [{ accountId: 'acct-1-long-id', referents: [{ urlKey: 'acme', provider: 'linear', scope: 'org-1' }] }],
-      ownerRows: [{ accountId: 'acct-1-long-id', urlKey: 'acme', provider: 'jira' }, { accountId: 'acct-1-long-id', urlKey: 'solo', provider: 'linear' }],
-      multiWorkspace: [
-        { urlKey: 'acme', account: 'acct-1-…', workspaces: ['org-1', 'jira:x'], rawWorkspaces: ['org-1', 'jira:x'] },
-        { urlKey: 'other', account: 'acct-1-…', workspaces: ['w1', 'w2'], rawWorkspaces: ['w1', 'w2'] }
-      ]
-    });
-    assert.strictEqual(out.linear.keyAlsoHeldByOtherProvider.count, 1);
-    assert.deepStrictEqual(out.linear.keyAlsoHeldByOtherProvider.rows[0].providers, ['jira', 'linear']);
-    assert.deepStrictEqual(out.linear.keysOnMultipleWorkspaceIds.rows.map(r => r.urlKey), ['acme']);
-  });
-
-  test('token-only keys are referentless; a credentialed holder is not', () => {
-    const holder = (sources, ownerCredential = false) => ({ accountId: 'a', sources, ownerCredential });
-    const out = sizeResolverBuckets({
-      ...base,
-      holdersByKey: new Map([
-        ['t', [holder(['proxy-tokens', 'dispatch-tokens'])]],
-        ['c', [holder(['connections'])]],
-        ['o', [holder(['owner-credentials'], true)]]
-      ])
-    });
-    assert.deepStrictEqual(out.referentlessHeld.rows.map(r => r.urlKey), ['t']);
-  });
-});

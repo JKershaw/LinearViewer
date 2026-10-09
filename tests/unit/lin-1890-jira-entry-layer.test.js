@@ -204,6 +204,8 @@ const fakeProvider = (myself = MYSELF) => ({
 const TOKEN_BAG = { access_token: 'jira-access-1', refresh_token: 'atlassian-refresh-ROTATING', expires_in: 3600 };
 const ONE_SITE = [{ id: 'cid-1', url: 'https://acme.atlassian.net', name: 'Acme' }];
 const TWO_SITES = [...ONE_SITE, { id: 'cid-2', url: 'https://other.atlassian.net', name: 'Other' }];
+// LIN-3382: the one rule's Jira key for the Atlassian identity's container on a site.
+const jiraKeyFor = cloudId => deriveUrlKey('jira', { cloudId, workspaceId: `jira:${MYSELF.accountId}` });
 
 const stubs = (sites = ONE_SITE, bag = TOKEN_BAG) => ({
   'accessible-resources': async () => ({ ok: true, status: 200, json: async () => sites }),
@@ -288,12 +290,12 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
 
     assert.equal(callback.status, 302);
     // Lands IN the workspace, not on settings — this is a login, not an add.
-    assert.equal(callback.location, '/workspace/jira-cid-1/'); // LIN-3382: id-bearing, not the tenant
+    assert.equal(callback.location, `/workspace/${jiraKeyFor('cid-1')}/`); // LIN-3382: id-bearing, not the tenant
 
     assert.equal(session.workspaces.length, 1, 'a Jira-only login must produce a workspace, not zero');
     const ws = session.workspaces[0];
     assert.equal(ws.id, `jira:${MYSELF.accountId}`, 'the container is keyed on the HUMAN, never the site (LIN-1329 Q1)');
-    assert.equal(ws.urlKey, 'jira-cid-1');
+    assert.equal(ws.urlKey, jiraKeyFor('cid-1'));
     assert.equal(session.activeWorkspaceId, ws.id, 'the new workspace must be the active one, or the user lands nowhere');
     assert.equal(ws.provider, 'jira');
   });
@@ -315,11 +317,11 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
   test('the rotating refresh token reaches the durable store, in the JIRA partition', async () => {
     const session = jiraOnlySession();
     const { store } = await signInWithJira({ session });
-    const record = await store.get('acct-new', 'jira-cid-1', 'jira');
+    const record = await store.get('acct-new', jiraKeyFor('cid-1'), 'jira');
     assert.ok(record, 'without this the workspace cannot survive its first expiry');
     assert.equal(record.refreshToken, 'atlassian-refresh-ROTATING');
     assert.equal(record.provider, 'jira');
-    assert.equal(await store.get('acct-new', 'jira-cid-1', 'linear'), null, 'never Linear\'s partition (LIN-1887 F1)');
+    assert.equal(await store.get('acct-new', jiraKeyFor('cid-1'), 'linear'), null, 'never Linear\'s partition (LIN-1887 F1)');
   });
 
   test('the refresh token is never left behind in the session', async () => {
@@ -337,7 +339,7 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
     await signInWithJira({ session });
 
     const keys = session.workspaces.map(w => w.urlKey).sort();
-    assert.deepEqual(keys, ['acme-linear', 'jira-cid-1']);
+    assert.deepEqual(keys, ['acme-linear', jiraKeyFor('cid-1')].sort());
     assert.equal(session.activeWorkspaceId, `jira:${MYSELF.accountId}`);
   });
 
@@ -385,11 +387,11 @@ describe('LIN-1890 E2 — a Jira-only sign-in lands in a working workspace', () 
 
     const picked = await request(app, { method: 'POST', path: '/auth/jira/oauth/link', body: { cloudId: 'cid-2' } });
     assert.equal(picked.status, 302);
-    assert.equal(picked.location, '/workspace/jira-cid-2/', 'the urlKey follows the PICKED site');
+    assert.equal(picked.location, `/workspace/${jiraKeyFor('cid-2')}/`, 'the urlKey follows the PICKED site');
     assert.equal(session.workspaces[0].bindings[0].credentials.cloudId, 'cid-2');
     assert.ok(!session.jiraPending, 'pending state — including the carried refresh token — is cleared');
 
-    const record = await store.get('acct-new', 'jira-cid-2', 'jira');
+    const record = await store.get('acct-new', jiraKeyFor('cid-2'), 'jira');
     assert.equal(record.refreshToken, 'atlassian-refresh-ROTATING', 'the durable write still happens on the pick path');
   });
 
@@ -745,7 +747,7 @@ describe('LIN-1890 close-out (F3) — the carried refresh token is dropped on ev
     // would actually persist.
     const session = makeSession({
       accountId: 'acct-A',
-      workspaces: [{ id: `jira:${MYSELF.accountId}`, urlKey: 'acme', provider: 'jira', bindings: [] }],
+      workspaces: [{ id: `jira:${MYSELF.accountId}`, urlKey: jiraKeyFor('cid-2'), provider: 'jira', bindings: [] }],
     });
     const stores = makeAccountStores();
     stores.accountStore.findAccountByIdentity = async () => ({ _id: 'acct-B' });
@@ -801,7 +803,7 @@ describe('LIN-2300 — OAuth add-source and existing-container unknown-account 4
     const session = makeSession({
       accountId: 'acct-DELETED',
       identityAuthenticatedAt: Date.now(),
-      workspaces: [{ id: `jira:${MYSELF.accountId}`, urlKey: 'acme', provider: 'jira', bindings: [] }],
+      workspaces: [{ id: `jira:${MYSELF.accountId}`, urlKey: jiraKeyFor('cid-2'), provider: 'jira', bindings: [] }],
     });
     const stores = makeUnknownAccountStores();
     // TWO_SITES, mirroring "the returning-container 409" above, so the
@@ -931,19 +933,19 @@ describe('LIN-1890 E6a — bootstrap → projection (composed)', () => {
 // ---------------------------------------------------------------------------
 
 describe('LIN-1890 — the Jira container urlKey (LIN-3382: `deriveJiraUrlKey` is gone; the resolver derives it)', () => {
-  test('a first-time bind is id-bearing: jira-<cloudId>, not the site tenant', () => {
-    assert.equal(deriveUrlKey('jira', { cloudId: 'cloud-1' }), 'jira-cloud-1');
+  test('a first-time bind is id-bearing: jira-<cloudId>-<sha6(W)>, not the site tenant', () => {
+    assert.match(deriveUrlKey('jira', { cloudId: 'cloud-1', workspaceId: 'jira:A' }), /^jira-cloud-1-[0-9a-f]{6}$/);
   });
 
   test('an Atlassian accountId could never have been used — it fails URL_KEY_REGEX', () => {
     // The finding this derivation exists for: `557058:<uuid>` contains a colon.
     assert.match(MYSELF.accountId, /:/);
-    assert.equal(deriveUrlKey('jira', { cloudId: 'cloud-1' }).includes(':'), false);
+    assert.equal(jiraKeyFor('cloud-1').includes(':'), false);
   });
 
   test('the derived key is always a legal urlKey, however odd the cloud id', () => {
     for (const cloudId of ['cloud-1', 'CLOUD_ID.with/odd chars', 'x'.repeat(80)]) {
-      const key = deriveUrlKey('jira', { cloudId });
+      const key = deriveUrlKey('jira', { cloudId, workspaceId: `jira:${MYSELF.accountId}` });
       assert.match(key, /^[a-z0-9-]{1,50}$/, `legal urlKey (got ${key})`);
     }
   });
@@ -1111,7 +1113,7 @@ describe('LIN-3127 — Jira OAuth Connection dual-write', () => {
     const containerId = `jira:${MYSELF.accountId}`;
     const session = makeSession({
       accountId: 'acct-1',
-      workspaces: [{ id: containerId, name: 'Acme', urlKey: 'jira-acme', provider: 'jira' }],
+      workspaces: [{ id: containerId, name: 'Acme', urlKey: jiraKeyFor('cid-1'), provider: 'jira' }],
       activeWorkspaceId: containerId,
     });
     const app = makeApp({ session, store: makeStore(), provider: fakeProvider(), stores: makeAccountStores(), fetches: stubs(ONE_SITE), connectionStore });
@@ -1120,7 +1122,7 @@ describe('LIN-3127 — Jira OAuth Connection dual-write', () => {
     const callback = await request(app, { path: `/auth/jira/oauth/callback?code=c&state=${encodeURIComponent(session.oauthState)}` });
 
     assert.equal(callback.status, 302, 'the existing-container arm completes — no TDZ ReferenceError/hang');
-    assert.equal(callback.location, '/workspace/jira-acme/');
+    assert.equal(callback.location, `/workspace/${jiraKeyFor('cid-1')}/`);
     assert.equal(connectionStore.calls.length, 1);
     assert.equal(connectionStore.calls[0].unitId, SITE_URL);
     assert.equal(connectionStore.calls[0].credentials.token, 'jira-access-1');
@@ -1187,7 +1189,7 @@ describe('LIN-3127 — Jira OAuth Connection dual-write', () => {
     const containerId = `jira:${MYSELF.accountId}`;
     const session = makeSession({
       accountId: 'acct-1',
-      workspaces: [{ id: containerId, name: 'Acme', urlKey: 'jira-acme', provider: 'jira' }],
+      workspaces: [{ id: containerId, name: 'Acme', urlKey: jiraKeyFor('cid-1'), provider: 'jira' }],
       activeWorkspaceId: containerId,
     });
     const stores = makeAccountStores();

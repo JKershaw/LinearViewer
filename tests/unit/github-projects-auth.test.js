@@ -808,7 +808,7 @@ describe('GitHub Projects auth routes', () => {
     const res = makeRes();
     // A container already created by the GitHub Issues login for the same account.
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho' } }],
     };
     const session = makeSession({
@@ -832,7 +832,7 @@ describe('GitHub Projects auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho' } }],
     };
     const session = makeSession({
@@ -868,7 +868,7 @@ describe('GitHub Projects auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const res = makeRes();
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho' } }],
     };
     const session = makeSession({
@@ -895,7 +895,7 @@ describe('GitHub Projects auth routes', () => {
     const router = createGitHubProjectsAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github-projects/link');
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho' } }],
     };
     const session = makeSession({
@@ -914,7 +914,7 @@ describe('GitHub Projects auth routes', () => {
     const attempt2 = makeRes();
     await handler({ body: { board: 'octocat/6' }, session }, attempt2);
 
-    assert.equal(attempt2.redirectedTo, '/workspace/octocat/', 'attempt 2: succeeds and redirects');
+    assert.equal(attempt2.redirectedTo, '/workspace/gh-42/', 'attempt 2: succeeds and redirects');
     assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
     const account = await accountStore.getAccount(session.accountId);
     assert.ok(account, 'attempt 2: the newly established account is real and durable');

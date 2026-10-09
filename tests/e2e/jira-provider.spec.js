@@ -393,7 +393,7 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // this flow's own cookie jar. That isolation is cheap hygiene, not a fix
     // for a urlKey collision: the seeding call's own seeded workspace uses the
     // fixture's fixed `jira-workspace` urlKey, which never collides with this
-    // flow's resolved `acme` (resolveWorkspaceUrlKey, lib/workspace-urlkey.js) — the
+    // flow's resolved `jira-<cloudId>-<hash>` (resolveWorkspaceUrlKey, lib/workspace-urlkey.js) — the
     // fake's only load-bearing effect is the process-level `clientFactory`
     // registration, and the response/session it creates is discarded.
     const seedContext = await browser.newContext();
@@ -418,15 +418,13 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // The `mode:'new'` single-site bootstrap lands IN the workspace, no query
     // string (`completeJiraNewLogin`'s `finish()`, routes/jira-auth.js) — this
     // is the add-source arm's `?provider_ok=jira`, not this one.
-    // LIN-3382: the key comes from the resolver and depends on durable state this
-    // spec does not own. A never-seen identity gets the id-bearing
-    // `jira-<cloudId>` (here `jira-test-oauth-cloud-id`); the same Atlassian
-    // identity seeded by an earlier spec in the same server's stores (an
-    // account-workspace edge, shared across cookie jars) reads as a RETURNING
-    // workspace with no key record and gets its legacy tenant key `acme`. Both
-    // are correct; each is pinned exactly in tests/unit/workspace-urlkey.test.js.
+    // LIN-3382: the key is the one rule's pure function of the stable ids,
+    // `jira-<cloudId>-<6 hex of sha256(W)>` (here cloud `test-oauth-cloud-id`),
+    // whatever durable state earlier specs left in this server's stores; there is
+    // no legacy tenant key (`acme`) any more. The exact shape is pinned in
+    // tests/unit/workspace-urlkey.test.js.
     const landed = callbackRes.headers()['location'];
-    expect(landed).toMatch(/^\/workspace\/(acme|jira-test-oauth-cloud-id)\/$/);
+    expect(landed).toMatch(/^\/workspace\/jira-test-oauth-cloud-id-[0-9a-f]{6}\/$/);
 
     // Dashboard: the post-redirect read resolves through the SAME seeded
     // `clientFactory` fake (JiraProvider._clientFor's OAuth arm), proving the

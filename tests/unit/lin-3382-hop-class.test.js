@@ -151,7 +151,8 @@ describe('H1 hops: the resolver is reached through each real factory path', () =
     const withSpy = await run(s.resolve);
     assert.equal(s.calls.length, 1);
     assert.equal(s.calls[0].arm, 'github-fresh');
-    assert.equal(s.calls[0].ids.installationId, INSTALL, 'held-new derives from the connection\'s installation id');
+    assert.deepEqual(s.calls[0].ids, { repoName: 'a' }, 'held-new asks with the repo name alone: the key is a function of {provider, scope}');
+    assert.equal(s.calls[0].scope, 'octo/a');
     assert.equal(withSpy.session.workspaces[0]?.urlKey, SPY_KEY);
 
     const bare = await run(null);
@@ -253,7 +254,14 @@ describe('server.js wiring (source pin; complements the behavioural hops above)'
     assert.equal((server.match(/createWorkspaceUrlKeyResolver\(/g) || []).length, 1, 'built exactly once');
     assert.match(server, /createUrlKeyHolderFinder\(\{[\s\S]*?strict: true[\s\S]*?\}\)/);
     assert.match(server, /createReferentHolderReader\(\{ connectionStore, strict: true \}\)/);
-    assert.match(server, /listHolderRowsByWorkspaceId\(workspaceId, \{ strict: true \}\)/);
+    assert.match(server, /findUrlKeyHolders: \(urlKey\) => urlKeyHolderFinder\.findUrlKeyHolders\(urlKey\)/);
+  });
+
+  test('the resolver is built before the PAT middleware mounts, and reaches it (the eighth hop)', () => {
+    const built = server.indexOf('createWorkspaceUrlKeyResolver(');
+    const mounted = server.indexOf('createEnsurePATSession({');
+    assert.ok(built > 0 && mounted > 0 && built < mounted, 'resolver construction sits above the PAT mount');
+    assert.match(server, /createEnsurePATSession\(\{[^}]*\bresolveWorkspaceUrlKey\b[^}]*\}\)/);
   });
 
   test('the resolver reaches all three bind-arm mounts', () => {

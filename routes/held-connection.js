@@ -293,18 +293,16 @@ export function createHeldConnectionRoutes({
     const repoName = String(scope).split('/').pop()
     // LIN-3382: the key comes from the one resolver, BEFORE upsertWorkspace, so a
     // refusal (another account holds this repo's key) or a resolver failure
-    // answers here with nothing written. The installation id is the connection's
-    // (read through the seam reader, never a raw `.credentials` access), so
-    // held-new derives the same `gh-<name>-<installationId>` as the credentials-
-    // mode fresh arm for the same repo. The binder is the session account only: a
-    // held add proves no identity (F8).
-    const installationId = (typeof heldConnectionCredentials === 'function' ? heldConnectionCredentials(connection) : {}).installationId ?? connection.unitId
+    // answers here with nothing written. The key is a function of `{provider,
+    // scope}` alone, so held-new derives the same `gh-<name>-<sha6(provider:scope)>`
+    // as the credentials-mode fresh arm for the same repo. The binder is the
+    // session account only: a held add proves no identity (F8).
     const resolved = await resolveKeyOrRespond({
       resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'github-held-new',
       retry: { action: `Back to ${displayNameOf(provider)}`, actionUrl: pickerUrl },
       request: {
         arm: 'github-fresh', provider: provider.name, scope,
-        ids: { repoName, installationId },
+        ids: { repoName },
         session: req.session, binderAccountIds: [accountId]
       }
     })

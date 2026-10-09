@@ -920,7 +920,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
     };
     const session = makeSession({
@@ -978,7 +978,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
     };
     const session = makeSession({
@@ -1016,7 +1016,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
     };
     const session = makeSession({
@@ -1045,7 +1045,7 @@ describe('GitHub auth routes', () => {
     const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/hello-world', credentials: { token: 'gho_token' } }],
     };
     const session = makeSession({
@@ -1067,7 +1067,7 @@ describe('GitHub auth routes', () => {
     const attempt2 = makeRes();
     await handler({ body: { repo: 'octocat/hello-world' }, session }, attempt2);
 
-    assert.equal(attempt2.redirectedTo, '/workspace/octocat/', 'attempt 2: succeeds and redirects');
+    assert.equal(attempt2.redirectedTo, '/workspace/gh-42/', 'attempt 2: succeeds and redirects');
     assert.ok(session.accountId, 'attempt 2: a fresh accountId is established on the same session');
     const account = await accountStore.getAccount(session.accountId);
     assert.ok(account, 'attempt 2: the newly established account is real and durable');
@@ -1918,7 +1918,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'post', '/auth/github/link');
 
     const existing = {
-      id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github',
+      id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github',
       bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { installationId: '99', token: 'gho_a' } }],
     };
     const session = makeSession({
@@ -1928,7 +1928,7 @@ describe('GitHub auth routes', () => {
     });
     const res = makeRes();
     await handler({ body: { repo: 'octocat/repo-a' }, session }, res);
-    assert.equal(res.redirectedTo, '/workspace/octocat/');
+    assert.equal(res.redirectedTo, '/workspace/gh-42/');
 
     const all = await connectionStore.collection.find({ accountId: session.accountId, provider: 'github', unitId: '99' }).toArray();
     assert.equal(all.length, 1, 'still exactly one Connection record for the installation');
@@ -1982,7 +1982,7 @@ describe('GitHub auth routes', () => {
     const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), accountStore, accountWorkspaceStore, connectionStore });
     const handler = getHandler(router, 'post', '/auth/github/link');
     const res = makeRes();
-    const existing = { id: 'github:42', name: 'octocat', urlKey: 'octocat', provider: 'github', bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { token: 'gho_a' } }] };
+    const existing = { id: 'github:42', name: 'octocat', urlKey: 'gh-42', provider: 'github', bindings: [{ provider: 'github', scope: 'octocat/repo-a', credentials: { token: 'gho_a' } }] };
     const session = makeSession({
       accountId: myAccount._id,
       githubHumanId: 'human-42',

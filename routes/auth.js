@@ -199,11 +199,11 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       // attached through the single linkProvider seam — same path local/PAT use —
       // which also writes the legacy scalar mirror byte-identically.
       //
-      // LIN-3382: the key is still `org.urlKey || org.name` (the Linear deep-link
-      // path, lib/providers/linear/index.js getCreateTaskUrl), but it now goes
-      // through the one resolver, which refuses a key another account holds and
-      // a key this account's OWN different connection holds or has open (Linear
-      // has no other key to fall to). It runs before either arm's first session
+      // LIN-3382: the key is still the org's own `org.urlKey || org.name` (moving
+      // the production Linear keys is expensive: they hold the data and the live
+      // refresh tokens), but it now goes through the one resolver, which refuses
+      // a key another account holds and a key live in this session under
+      // another workspace id. It runs before either arm's first session
       // or durable write (add-source's snapshot, new's regenerate), so a refusal
       // or a resolver failure writes nothing. Two members of one Linear org still
       // share their workspace: the holder test passes on an edge to org.id.

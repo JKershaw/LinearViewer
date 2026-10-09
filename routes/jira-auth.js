@@ -803,13 +803,38 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // Returning user, same session: the container already exists, so this is a
     // binding add — no regenerate (the session is already theirs, and wiping it
     // would drop the workspaces we are adding to).
-    const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
+    //
+    // LIN-3382: the key comes from the one resolver, which runs BEFORE
+    // regenerate / upsertWorkspace / establishAccount / convert / persistRefresh
+    // (it reads the CURRENT session workspaces, which regenerate() wipes), so a
+    // refusal (another account holds the site's key) or a resolver failure
+    // writes nothing. Both exits drop the carried refresh token, like every other
+    // Jira exit that answers instead of reaching `finish()`. `source ===
+    // 'session'` means the container is already live under exactly the key the
+    // rule derives; a live container under any other name is not kept (it is
+    // re-derived and re-created below).
+    //
+    // LIN-3334 (R1): a returning user picking a second Jira site on the existing
+    // `jira:<accountId>` container is refused with the plain message, before
+    // anything below and before the durable refresh-token write. It runs on the
+    // live container whatever its key, because the Jira key now names the site:
+    // a second site would otherwise derive a different key and re-create the
+    // container instead of being refused. Same-site re-link is allowed.
+    const live = (req.session.workspaces || []).find(w => w.id === workspaceId)
+    if (live && refuseSecondJiraSource(req, res, provider, live, site.url)) return
+    const resolved = await resolveKeyOrRespond({
+      resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'jira',
+      retry: { action: 'Try again', actionUrl: '/auth/jira/oauth?mode=new' },
+      beforeRespond: () => dropCarriedRefreshToken(req),
+      request: {
+        arm: 'jira', provider: 'jira', scope: site.url, workspaceId,
+        ids: { cloudId: site.cloudId },
+        session: req.session, identity: { provider: 'jira', scope: String(myself.accountId) }
+      }
+    })
+    if (!resolved) return
+    const existing = resolved.source === 'session' ? live : null
     if (existing) {
-      // LIN-3334 (R1): a returning user picking a second Jira site on the
-      // existing `jira:<accountId>` container is refused with the plain message,
-      // before establishAccount and before the durable refresh-token write
-      // (`persistRefresh`/`convert`) below. Same-site re-link is allowed.
-      if (refuseSecondJiraSource(req, res, provider, existing, site.url)) return
       const established = await establishAccount(
         req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
         { email: myself.emailAddress, displayName: myself.displayName }, existing.id
@@ -836,25 +861,6 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       return finish(existing, conversion)
     }
 
-    // Fresh container. The resolver reads the CURRENT session workspaces, so it
-    // must run before regenerate() wipes them. LIN-3382: it runs BEFORE
-    // regenerate / upsertWorkspace / establishAccount / convert / persistRefresh,
-    // so a refusal (another account holds the site's key) or a resolver failure
-    // writes nothing. Both exits drop the carried refresh token, like every
-    // other Jira exit that answers instead of reaching `finish()`.
-    let tenant = ''
-    try { tenant = new URL(String(site?.url)).hostname.split('.')[0] } catch { tenant = '' }
-    const resolved = await resolveKeyOrRespond({
-      resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'jira',
-      retry: { action: 'Try again', actionUrl: '/auth/jira/oauth?mode=new' },
-      beforeRespond: () => dropCarriedRefreshToken(req),
-      request: {
-        arm: 'jira', provider: 'jira', scope: site.url, workspaceId,
-        ids: { tenant, cloudId: site.cloudId },
-        session: req.session, identity: { provider: 'jira', scope: String(myself.accountId) }
-      }
-    })
-    if (!resolved) return
     const workspace = {
       id: workspaceId,
       name: site.name || site.url,
