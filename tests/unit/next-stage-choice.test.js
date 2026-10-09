@@ -116,7 +116,7 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     assert.equal(facts.latestAt, '2026-01-04T00:00:00Z');
   });
 
-  test('only an Approve resets the count; a revision alone does not', () => {
+  test('an Approve or landed work resets the count; a revision alone does not', () => {
     const c = (verdict, d) => ({ createdAt: `2026-01-0${d}T00:00:00Z`, body: `### Plan Review Verdict\n\n**Verdict: ${verdict}.**` });
     const count = (...vs) => assemblePlanReviewFacts(vs.map((v, i) => c(v, i + 1))).count;
     assert.equal(count('Request Changes'), 1);
@@ -125,6 +125,16 @@ describe('plan-review verdict facts (LIN-3309 S2)', () => {
     assert.equal(count('Request Changes', 'Needs Discussion'), 2);
     assert.equal(count('Request Changes', 'Approve'), 0);
     assert.equal(assemblePlanReviewFacts([]).count, 0);
+    // LIN-3358: the loop that landed work ended is behind it (FC 10c608df), so only
+    // verdicts after the landing count; a planner note citing a PR is not a landing.
+    const landed = { createdAt: '2026-01-04T12:00:00Z', body: '## Implementation\n\nPR https://github.com/o/r/pull/7 merged.' };
+    const review = { createdAt: '2026-01-04T12:00:00Z', body: '## Review — T-9\n\n### Verdict\nApprove' };
+    const plannerCites = { createdAt: '2026-01-04T12:00:00Z', body: '**Plan posted**, grounded on https://github.com/o/r/pull/7.' };
+    const trail = (mid) => [c('Request Changes', 1), c('Request Changes', 2), c('Request Changes', 3), mid, c('Request Changes', 5)];
+    assert.equal(assemblePlanReviewFacts(trail(landed)).count, 1);
+    assert.equal(assemblePlanReviewFacts(trail(review)).count, 1);
+    assert.equal(assemblePlanReviewFacts(trail(plannerCites)).count, 4);
+    assert.equal(assemblePlanReviewFacts(trail(landed)).verdicts, 4, 'the landing resets the count, not the verdict tally');
   });
 
   test('shuffled input order yields the same facts (the reader sorts by createdAt)', () => {
@@ -258,6 +268,16 @@ describe('the review loop bound: the one route code settles (LIN-3309)', () => {
     assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), after('Implementation landed: https://github.com/o/r/pull/7')]), false);
     assert.equal(reviewLoopExhausted(leaf({ state: { name: 'Canceled', type: 'canceled' } }), rcs(3)), false);
     assert.equal(reviewLoopExhausted(leaf({ state: { name: 'Done', type: 'completed' } }), rcs(3)), false);
+  });
+
+  test('verdicts before landed work do not count toward a later plan\'s loop (LIN-3358)', () => {
+    // Three verdicts on the first plan, that plan built and merged, a new plan, and its
+    // first verdict: one round of a new loop, not the fourth of the old one.
+    const merged = { createdAt: '2026-01-05T00:00:00Z', body: '## Close-out — T-9: merged https://github.com/o/r/pull/7' };
+    const newPlan = { createdAt: '2026-01-06T00:00:00Z', body: '## Plan posted (T-9, revision)' };
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), merged, newPlan, RC('2026-01-07T00:00:00Z')]), false);
+    const threeMore = ['2026-01-07', '2026-01-08', '2026-01-09'].map(d => RC(`${d}T00:00:00Z`));
+    assert.equal(reviewLoopExhausted(leaf(), [...rcs(3), merged, newPlan, ...threeMore]), true, 'the new loop has its own bound');
   });
 
   test('getRecommendation stops at blocked without a routing call, with the blocked stage prompt', async () => {
