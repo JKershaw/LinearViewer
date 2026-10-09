@@ -137,7 +137,7 @@ const TABLE = {
   'lib/observation-sessions-materializer.js :: _collectSessionIssues': [SRV, 7],
   'lib/observation-sessions-materializer.js :: _sessionsTouchingIssue': [SRV, 2],
   'lib/pipeline-loops.js :: timed': [SRV, 2],
-  'lib/pipeline-loops.js :: _selfHealLeanHistory': [SRV, 1], // raw historyCollection.find (round-3 N3)
+  'lib/pipeline-loops.js :: redigestHistoryRows': [SRV, 1], // raw historyCollection.find (round-3 N3)
   'lib/recent-runs.js :: read': [SRV, 2],
   'lib/task-run-facts.js :: readTaskRunFacts': [SRV, 3]
 };

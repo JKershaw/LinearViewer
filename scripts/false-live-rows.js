@@ -16,8 +16,11 @@
  * workspace named by `--ticket-workspace` (or FALSE_LIVE_TICKET_URLKEY); every
  * other workspace's tickets read `unknown`, never another workspace's
  * same-identifier issue. Run once per workspace with that workspace's proxy base.
- * Canceled and duplicate tickets also read `unknown` for clause 3: the proxy
- * issue payload carries no `canceledAt`, so they have no terminal timestamp.
+ * Clauses 3 and 4 take their candidates from the closer's own selector
+ * (`prepareCloserCandidates`, lib/ticket-close-closer.js, persist:false so this
+ * script writes nothing), so the instrument and the writer cannot disagree.
+ * Items a human chose to keep live (a reversed withdrawal, an un-retired scan
+ * row) are reported separately as `humanReopened`, not as false-live.
  *
  * Definition (the LIN-3358 plan, B section, revisions 2 and 3):
  *   1. a taken `kind:'wake'` row, unstamped, no own terminal, with a later
@@ -27,11 +30,13 @@
  *      -- clauses 1 and 2 come from `selectLineageCloses`, the very rule the
  *      closers and the backfill use, so they inherit the take-time and
  *      member-at-time rules and cannot disagree with them.
- *   3. a row `classifyLoop` reads blocked/silent, past TICKET_CLOSED_GRACE_MS,
- *      whose ticket state type is in TERMINAL_TYPES (imported, never re-listed)
- *   4. an open decision (collectUnansweredDecisions already drops read-time
- *      superseded ones) whose ticket type is in TERMINAL_TYPES. NO "a newer
- *      decision supersedes" half (revision 3).
+ *   3. a row `classifyLoop` reads blocked/silent whose lineage has been quiet
+ *      past TICKET_CLOSED_GRACE_MS (a quiet bound on the lineage, not a
+ *      ticket-terminal age), whose ticket state type is in TERMINAL_TYPES
+ *      (imported, never re-listed). Canceled and duplicate tickets count.
+ *   4. an open decision (loop-backed, quiet past the grace; or a scan row)
+ *      whose ticket type is in TERMINAL_TYPES. NO "a newer decision
+ *      supersedes" half (revision 3).
  * Informational, not counted: a non-wake row with a later lineage row, no
  * lineage terminal (the ticket's state is not consulted here).
  * False closes (target 0): `handed-on` with no later tagged lineage row;
@@ -39,8 +44,8 @@
  * ticket that is not terminal now (reported as "non-terminal now (reopened or
  * false close)", unsplit, because Linear clears completedAt on reopen: it only
  * counts toward target 0 once the issue read can show it was never terminal);
- * the same test on decision-withdrawn / self-resolved records written with
- * reason `ticket-closed`.
+ * the same test on decision-withdrawn records whose reason starts with
+ * `ticket-closed` and on scan rows whose outcomeBasisHash is the closer's.
  *
  * `unknown` (a ticket that could not be read) is NEVER counted as false-live
  * (fail closed) and is the FIRST number in the headline: a run where every
@@ -53,10 +58,8 @@ import { execFileSync } from 'node:child_process';
 import { DispatchQueueStore } from '../lib/dispatch-store.js';
 import { AgentStatusStore } from '../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
-import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
-import { classifyLoop } from '../lib/observer-sweep.js';
-import { DEFAULT_LANE_STALE_MS } from '../lib/live-console.js';
-import { collectUnansweredDecisions, answeredDecisionIdsByLineage } from '../lib/unanswered-decisions.js';
+import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
+import { prepareCloserCandidates, ticketClosedBasisHash } from '../lib/ticket-close-closer.js';
 import { TERMINAL_TYPES } from '../lib/providers/models.js';
 import { READ_HORIZON_MS } from '../lib/read-horizon.js';
 import { isLineageClosingTerminal } from '../lib/dispatch-terminal.js';
@@ -70,7 +73,7 @@ const toMs = (v) => (v == null ? NaN : (v instanceof Date ? v.getTime() : new Da
  * so the script holds no provider credentials of its own. Any failure -> null
  * (the caller buckets it as `unknown`).
  *
- * @returns {Promise<{stateType: string|null, terminalAtMs: number|null}|null>}
+ * @returns {Promise<{issueId: string|null, stateType: string}|null>}
  */
 export async function defaultReadTicketState(urlKey, issueIdentifier, {
   base = process.env.HARBOUR_LOCAL_BASE,
@@ -87,51 +90,55 @@ export async function defaultReadTicketState(urlKey, issueIdentifier, {
     const issue = await res.json();
     const stateType = issue?.state?.type || null;
     if (!stateType) return null;
-    const t = toMs(issue.completedAt || issue.canceledAt);
-    return { stateType, terminalAtMs: Number.isFinite(t) ? t : null };
+    return { issueId: issue.id || null, stateType };
   } catch {
     return null;
   }
 }
 
-/** Clause 3/4 over one workspace's loops. Ticket reads are memoised per issue. */
-async function ticketClauses({ urlKey, loops, now, readTicket, collectDecisions }) {
-  const out = { clause3: [], clause4: [], unknown: new Set(), checked: new Set() };
-  const superseded = computeSupersededLoopIds(loops);
-  const answeredByLineage = answeredDecisionIdsByLineage(loops);
-
-  const candidates3 = loops.filter(l => ['blocked', 'silent'].includes(
-    classifyLoop(l, { superseded, now, staleMs: DEFAULT_LANE_STALE_MS, answeredByLineage })) && l.issueIdentifier);
-  const decisions = collectDecisions({ loops }, { now: new Date(now) });
-  const candidates4 = decisions.filter(d => d?.anchor?.issueIdentifier);
+/**
+ * Clause 3/4 over one workspace, from the closer's own selector. Ticket reads
+ * are memoised per identifier. `humanReopened` counts settled items on a
+ * terminal ticket (a decision, not staleness); `unverified` counts loops whose
+ * legacy digest could not be resolved (never counted as false-live).
+ */
+async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket, dispatchStore }) {
+  const out = { clause3: [], clause4: [], humanReopened: [], unverified: 0, unknown: new Set(), checked: new Set() };
+  const c = await prepareCloserCandidates({ loops, taskDecisions, newestScanByTask, now, dispatchStore, persist: false });
+  out.unverified = c.unverified.length;
 
   const cache = new Map();
   const state = async (issue) => {
     if (!cache.has(issue)) cache.set(issue, await readTicket(urlKey, issue).catch(() => null));
     return cache.get(issue);
   };
-
-  for (const l of candidates3) {
-    const st = await state(l.issueIdentifier);
-    out.checked.add(l.issueIdentifier);
-    if (!st) { out.unknown.add(l.issueIdentifier); continue; }
-    if (!TERMINAL_TYPES.includes(st.stateType)) continue;
-    // A terminal ticket with no usable timestamp cannot be placed past the grace window: unknown, not a count.
-    if (st.terminalAtMs == null) { out.unknown.add(l.issueIdentifier); continue; }
-    if (now - st.terminalAtMs > TICKET_CLOSED_GRACE_MS) out.clause3.push({ loopId: l.loopId, issue: l.issueIdentifier });
-  }
-  for (const d of candidates4) {
-    const issue = d.anchor.issueIdentifier;
+  // null = unreadable (bucketed unknown), false = readable but not terminal.
+  const terminal = async (issue) => {
     const st = await state(issue);
     out.checked.add(issue);
-    if (!st) { out.unknown.add(issue); continue; }
-    if (TERMINAL_TYPES.includes(st.stateType)) out.clause4.push({ issue, decisionId: d.decision?.id || d.decision?.decisionId || null });
+    if (!st) { out.unknown.add(issue); return null; }
+    return TERMINAL_TYPES.includes(st.stateType) ? st : false;
+  };
+
+  for (const r of c.rows) {
+    if (await terminal(r.issueIdentifier)) out.clause3.push({ loopId: r.loopId, issue: r.issueIdentifier });
+  }
+  for (const d of c.loopDecisions) {
+    if (await terminal(d.issueIdentifier)) out.clause4.push({ issue: d.issueIdentifier, decisionId: d.decisionId });
+  }
+  for (const s of c.scanDecisions) {
+    const st = await terminal(s.issueIdentifier);
+    // The scan join is on issueId equality with the ticket that was read.
+    if (st && st.issueId && st.issueId === s.issueId) out.clause4.push({ issue: s.issueIdentifier, decisionId: s.id });
+  }
+  for (const s of c.settled) {
+    if (await terminal(s.issueIdentifier)) out.humanReopened.push({ type: s.type, issue: s.issueIdentifier });
   }
   return out;
 }
 
 /** False closes among rows already stamped / decision records already written. */
-async function falseCloses({ dispatchStore, urlKey, now, readTicket }) {
+async function falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket }) {
   const history = dispatchStore.historyCollection;
   const horizon = new Date(now - READ_HORIZON_MS);
   const stamped = await history.find({ urlKey, 'bookkeeping.reason': { $in: ['handed-on', 'lineage-terminal', 'ticket-closed'] }, dispatchedAt: { $gte: horizon } }).toArray();
@@ -161,16 +168,26 @@ async function falseCloses({ dispatchStore, urlKey, now, readTicket }) {
       if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(r._id);
     }
   }
-  // decision-withdrawn / self-resolved records written with reason ticket-closed.
-  const withdrawals = await history.find({ urlKey, dispatchedAt: { $gte: horizon }, feedback: { $elemMatch: { kind: { $in: ['decision-withdrawn', 'self-resolved'] } } } }).toArray();
+  // decision-withdrawn records written with a `ticket-closed` reason (prefix, not equality).
+  const withdrawals = await history.find({ urlKey, dispatchedAt: { $gte: horizon }, feedback: { $elemMatch: { kind: 'decision-withdrawn' } } }).toArray();
   for (const r of withdrawals) {
     for (const f of r.feedback || []) {
-      if (!['decision-withdrawn', 'self-resolved'].includes(f.kind)) continue;
+      if (f.kind !== 'decision-withdrawn') continue;
       let reason = f.reason;
       if (!reason) { try { reason = JSON.parse(f.message)?.reason; } catch { /* free text */ } }
-      if (reason !== 'ticket-closed') continue;
+      if (typeof reason !== 'string' || !reason.startsWith('ticket-closed')) continue;
       const st = await ticketOutcome(r.issueIdentifier);
       if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(`${r._id}:${f.kind}`);
+    }
+  }
+  // Scan rows the closer self-resolved: a basis hash equal to the closer's for ANY terminal type.
+  if (taskDecisionsStore?.collection) {
+    const scans = await taskDecisionsStore.collection.find({ urlKey, outcome: 'self-resolved' }).toArray();
+    for (const r of scans) {
+      const closerWritten = TERMINAL_TYPES.some(t => r.outcomeBasisHash === ticketClosedBasisHash(r.issueId, t));
+      if (!closerWritten) continue;
+      const st = await ticketOutcome(r.issueIdentifier);
+      if (st && !TERMINAL_TYPES.includes(st.stateType)) found.reopened.push(`${r._id}:self-resolved`);
     }
   }
   return found;
@@ -198,18 +215,19 @@ function informational(rows, now) {
  * @param {Object} p
  * @param {Object} p.dispatchStore
  * @param {Object} [p.agentStatusStore]
- * @param {(urlKey:string, issue:string)=>Promise<{stateType:string, terminalAtMs:number|null}|null>} [p.readTicketState]
+ * @param {(urlKey:string, issue:string)=>Promise<{issueId:string|null, stateType:string}|null>} [p.readTicketState]
+ * @param {Object} [p.taskDecisionsStore] - for scan decisions (clause 4) and the scan-row false-close check
  * @param {(urlKey:string)=>Promise<Array<Object>>} [p.readLoops] - defaults to getLoopsForWorkspace (lean)
  */
 export async function runFalseLiveRows({
   dispatchStore,
   agentStatusStore = null,
+  taskDecisionsStore = null,
   urlKeys = null,
   now = Date.now(),
   headSha = null,
   readTicketState = defaultReadTicketState,
   readLoops = null,
-  collectDecisions = collectUnansweredDecisions,
   log = () => {}
 }) {
   const keys = urlKeys || await dispatchStore.listObservedWorkspaceKeys();
@@ -221,12 +239,16 @@ export async function runFalseLiveRows({
       const clause1 = sel.writable.filter(c => c.reason === 'handed-on');
       const clause2 = sel.writable.filter(c => c.reason === 'lineage-terminal');
       const loops = await loopsOf(urlKey);
-      const t = await ticketClauses({ urlKey, loops, now, readTicket: readTicketState, collectDecisions });
-      const fc = await falseCloses({ dispatchStore, urlKey, now, readTicket: readTicketState });
+      const [taskDecisions, newestScanByTask] = taskDecisionsStore
+        ? await Promise.all([taskDecisionsStore.listUnansweredForWorkspaces([urlKey]), taskDecisionsStore.listNewestScanPerTask([urlKey])])
+        : [[], {}];
+      const t = await ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket: readTicketState, dispatchStore });
+      const fc = await falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket: readTicketState });
       perWorkspace.push({
         urlKey, readFailed: false,
         clause1: clause1.length, clause2: clause2.length, clause3: t.clause3.length, clause4: t.clause4.length,
         unknown: t.unknown.size + fc.unknown, ticketsChecked: t.checked.size,
+        humanReopened: t.humanReopened.length, unverified: t.unverified,
         informational: informational(sel.rows, now), falseCloses: fc
       });
     } catch (err) {
@@ -253,16 +275,19 @@ export function buildReport({ perWorkspace, now, headSha }) {
   L.push(`Run at: ${new Date(now).toISOString()}`);
   L.push(`HEAD: ${headSha || '(unknown — not a git checkout)'}`);
   L.push(`Workspaces read: ${ok.length}${failed.length ? ` (${failed.length} FAILED: ${failed.map(w => w.urlKey).join(', ')})` : ''}`);
-  L.push(`Horizon: dispatchedAt >= ${new Date(now - READ_HORIZON_MS).toISOString()} (READ_HORIZON_MS); ticket grace ${TICKET_CLOSED_GRACE_MS / 60000}m (provisional)`);
+  L.push(`Horizon: dispatchedAt >= ${new Date(now - READ_HORIZON_MS).toISOString()} (READ_HORIZON_MS); ticket grace ${TICKET_CLOSED_GRACE_MS / 60000}m`);
   L.push('');
   L.push(`unknown (ticket unreadable; never counted as false-live): ${sum(w => w.unknown)}  [tickets checked: ${sum(w => w.ticketsChecked)}]`);
-  L.push('  includes: tickets of any workspace other than --ticket-workspace; canceled/duplicate tickets (clause 3: the proxy payload has no canceledAt)');
+  L.push('  includes: tickets of any workspace other than --ticket-workspace');
   L.push('');
   L.push('Clauses (target 0):');
   L.push(`  1 wake row, a later lineage row has posted (B(a))         ${String(sum(w => w.clause1)).padStart(5)}`);
   L.push(`  2 un-terminated row taken before a lineage terminal (B(b)) ${String(sum(w => w.clause2)).padStart(5)}`);
   L.push(`  3 blocked/silent row on a terminal ticket past grace      ${String(sum(w => w.clause3)).padStart(5)}`);
   L.push(`  4 open decision on a terminal ticket                      ${String(sum(w => w.clause4)).padStart(5)}`);
+  L.push('');
+  L.push(`Human-reopened (a reversed ruling / un-retired scan row on a terminal ticket; a decision, not staleness, not counted): ${sum(w => w.humanReopened)}`);
+  L.push(`Unverified (legacy digest not resolvable from raw feedback; held out, not counted): ${sum(w => w.unverified)}`);
   L.push('');
   L.push('By workspace (c1 c2 c3 c4 unknown):');
   for (const w of ok) L.push(`  ${w.urlKey.padEnd(28)} ${w.clause1} ${w.clause2} ${w.clause3} ${w.clause4} ${w.unknown}`);
@@ -302,9 +327,11 @@ async function main() {
       historyCollection: db.collection('dispatch-history')
     });
     const agentStatusStore = new AgentStatusStore({ collection: db.collection('foreman-status') });
+    const taskDecisionsStore = new TaskDecisionsStore({ collection: db.collection('task-decisions') });
     const { report } = await runFalseLiveRows({
       dispatchStore,
       agentStatusStore,
+      taskDecisionsStore,
       headSha: readHeadSha(),
       readTicketState: (k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey }),
       log: (m) => console.error(m) });
