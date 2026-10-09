@@ -137,6 +137,18 @@ describe('LocalProvider reads', () => {
     assert.equal(childCtx.parentChildCount, 1);
   });
 
+  test('fetchIssueContext carries the parent description (LIN-3378)', async () => {
+    await store.seed(SCOPE, {
+      projects: [{ id: 'p1', name: 'Alpha', sortOrder: 1 }],
+      issues: [
+        { id: 'i1', identifier: 'LOCAL-1', title: 'Parent', projectId: 'p1', description: '## Implementation Plan\n\nSteps.' },
+        { id: 'i2', identifier: 'LOCAL-2', title: 'Child', projectId: 'p1', parentId: 'i1' },
+      ],
+    });
+    const ctx = await provider.fetchIssueContext(SCOPE, 'i2');
+    assert.equal(ctx.parent.description, '## Implementation Plan\n\nSteps.');
+  });
+
   test('fetchIssueContext throws for a missing issue', async () => {
     await assert.rejects(() => provider.fetchIssueContext(SCOPE, 'nope'), /Issue not found/);
   });

@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import {
   assembleTrailFacts, formatTrailFactsBlock, condensePlan, RULING_MARK, isRuling
 } from '../../lib/recommendation-facts.js';
-import { formatSelectorView, formatIssueContext } from '../../lib/openrouter.js';
+import { formatSelectorView, formatIssueContext, buildSelectorArgs } from '../../lib/openrouter.js';
 
 const at = (d) => `2026-10-0${d}T10:00:00.000Z`;
 const PR = 'https://github.com/JKershaw/LinearViewer/pull/1747';
@@ -257,5 +257,52 @@ describe('the selector view (LIN-3300)', () => {
     assert.doesNotMatch(view, /Latest ruling recorded via Harbour/, 'not repeated above the comments');
     assert.match(view, /\*\*Agent, the latest person's comment\*\*/, 'the latest person\'s comment is marked where it sits');
     assert.equal(view.split('Ruling: plan first.').length, 2, 'shown once');
+  });
+});
+
+describe('trail facts: the misroute fixes (LIN-3378)', () => {
+  const ledgerLine = (verdict) => formatTrailFactsBlock(assembleTrailFacts([review(verdict, 1)], ''), 1)
+    .split('\n').find(l => l.startsWith('- Latest code review'));
+
+  test('d: under an approving review the open ledger items are left for close-out; otherwise not discharged', () => {
+    assert.match(ledgerLine('Approve.'), /1 left for close-out to discharge\)/);
+    assert.match(ledgerLine('Approve, with conditions.'), /1 left for close-out to discharge\)/);
+    assert.match(ledgerLine('Request Changes.'), /1 not discharged\)/);
+    assert.doesNotMatch(ledgerLine('Approve.'), /not discharged/);
+  });
+
+  const PARENT = { identifier: 'LIN-9', description: 'Epic.\n\n## Implementation Plan\n\nDo the steps.' };
+
+  test('c: a leaf with no plan of its own names the plan in its parent description', () => {
+    const facts = assembleTrailFacts([], 'Do step 2.', { leaf: true, parentPlan: PARENT });
+    assert.equal(facts.plan.parent, 'LIN-9');
+    assert.match(formatTrailFactsBlock(facts, 0), /- Implementation plan: none on this task; it is part of the plan in its parent LIN-9's description/);
+  });
+
+  test('c: a leaf\'s own plan wins over the parent\'s', () => {
+    const own = assembleTrailFacts([], 'Goal.\n\n## Implementation Plan\n\nMine.', { leaf: true, parentPlan: PARENT });
+    assert.equal(own.plan.parent, undefined);
+    assert.match(formatTrailFactsBlock(own, 0), /- Implementation plan: in the description/);
+    const comment = assembleTrailFacts([{ createdAt: at(1), body: '**Plan — mine.**\n\nSteps.' }], 'Goal.', { leaf: true, parentPlan: PARENT });
+    assert.equal(comment.plan.parent, undefined);
+    assert.match(formatTrailFactsBlock(comment, 1), /in a comment/);
+  });
+
+  test('c: a parent without a plan section adds nothing; a node ignores the parent', () => {
+    const none = assembleTrailFacts([], 'Goal.', { leaf: true, parentPlan: { identifier: 'LIN-9', description: 'Just prose.' } });
+    assert.equal(none.plan.parent, undefined);
+    assert.match(formatTrailFactsBlock(none, 0), /- Implementation plan: none$/m);
+    assert.equal(assembleTrailFacts([], 'Goal.', { leaf: false, parentPlan: PARENT }).plan, null);
+  });
+
+  test('c: buildSelectorArgs passes the parent plan for a leaf and not for a node', () => {
+    const issue = { identifier: 'LIN-10', title: 'Step', description: 'Do step 2.', state: { name: 'Todo', type: 'unstarted' }, labels: [] };
+    const parent = { identifier: 'LIN-9', title: 'Epic', description: PARENT.description };
+    const leaf = buildSelectorArgs(issue, { parent, children: [], comments: [] });
+    assert.match(leaf.facts, /part of the plan in its parent LIN-9's description/);
+    const node = buildSelectorArgs(issue, { parent, children: [{ identifier: 'LIN-11', title: 'c', state: { type: 'unstarted' } }], comments: [] });
+    assert.doesNotMatch(node.facts, /parent LIN-9/);
+    const bare = buildSelectorArgs(issue, { parent: { identifier: 'LIN-9', title: 'Epic' }, children: [], comments: [] });
+    assert.doesNotMatch(bare.facts, /parent LIN-9/);
   });
 });
