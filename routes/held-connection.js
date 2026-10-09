@@ -286,9 +286,8 @@ export function createHeldConnectionRoutes({
     // `intent.fresh` predicate requires `supportsFreshContainer`, which
     // github-projects does not declare, so `resolveHeldEntry` never returns a
     // `mode=new` target for it.
-    const connection = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
-    if (!connection) return // response already sent
-    const connectionId = connection._id
+    const connectionId = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
+    if (typeof connectionId !== 'string') return // response already sent
 
     const repoName = String(scope).split('/').pop()
     // LIN-3382: the key comes from the one resolver, BEFORE upsertWorkspace, so a
@@ -382,8 +381,7 @@ export function createHeldConnectionRoutes({
 
   /**
    * Validate the POST'd scope against the server-side offer map and re-read +
-   * authorize the holding Connection. Returns the connection row (LIN-3382:
-   * held-new reads its installation id through the seam reader), or sends the
+   * authorize the holding Connection. Returns the connectionId, or sends the
    * 409 page and returns null. Shared by add-source and mode=new.
    */
   async function authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res }) {
@@ -404,14 +402,13 @@ export function createHeldConnectionRoutes({
       res.status(409).send(renderErrorPage('Connection Unavailable', 'That connection is no longer available. Please start again.', { action: `Back to ${displayNameOf(provider)}`, actionUrl }))
       return null
     }
-    return connection
+    return connection._id
   }
 
   /** Add-source held binding onto an EXISTING workspace (beat 3). */
   async function bindAddSource(req, res, { provider, surface, heldEntry, workspace, scope, accountId, pickerUrl, retryPage }) {
-    const offered = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
-    if (!offered) return
-    const connectionId = offered._id
+    const connectionId = await authorizedOfferedConnection({ req, accountId, provider, heldEntry, scope, pickerUrl, res })
+    if (typeof connectionId !== 'string') return
 
     const snapshot = [...(req.session.workspaces || [])]
     let conversion

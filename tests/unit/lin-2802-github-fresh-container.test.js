@@ -10,8 +10,8 @@
  *   1. `intent.fresh` is captured at flow START (`GET /auth/github`), gated on
  *      `mode === 'new' && session.accountId && supportsFreshContainer` — never
  *      inferred later at the link step.
- *   2. `deriveGithubFreshUrlKey`, the pure urlKey-collision helper (mirrors
- *      `deriveJiraUrlKey`'s shape), including the underscore/dot fixture cases.
+ *   2. The fresh container's urlKey, now the LIN-3382 resolver's
+ *      (`gh-<name>-<sha6(provider:scope)>`, covered in `workspace-urlkey.test.js`).
  *   3. `POST .../link` branches on `pending.fresh`: a fresh invocation mints a
  *      brand-new random-id container (never `github:<userId>`), even when the
  *      account already holds one; the MAX_WORKSPACES cap still applies.

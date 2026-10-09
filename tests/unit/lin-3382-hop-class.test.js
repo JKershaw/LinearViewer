@@ -252,7 +252,8 @@ describe('server.js wiring (source pin; complements the behavioural hops above)'
 
   test('the resolver is built once, strict, over the real stores', () => {
     assert.equal((server.match(/createWorkspaceUrlKeyResolver\(/g) || []).length, 1, 'built exactly once');
-    assert.match(server, /createUrlKeyHolderFinder\(\{[\s\S]*?strict: true[\s\S]*?\}\)/);
+    // anchored on the finder's own closing line, so the nested createReferentHolderReader({ strict: true }) cannot satisfy it
+    assert.match(server, /createUrlKeyHolderFinder\(\{[\s\S]*?\n  strict: true\n\}\)\nconst resolveWorkspaceUrlKey = createWorkspaceUrlKeyResolver\(/);
     assert.match(server, /createReferentHolderReader\(\{ connectionStore, strict: true \}\)/);
     assert.match(server, /findUrlKeyHolders: \(urlKey\) => urlKeyHolderFinder\.findUrlKeyHolders\(urlKey\)/);
   });
