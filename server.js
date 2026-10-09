@@ -919,6 +919,12 @@ scheduler.register({
   console.error(`[liveness-alarm-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
+// Owner-blind provider read for the unattended sweep (same resolver as the
+// dispatch anchor guard). Returns `{issueId, stateType}` or null for ANY
+// failure or non-`ok` resolution: a null read closes nothing. Passes the
+// structured scope to the provider (lib/ticket-state-reader.js).
+const readTicketState = createReadTicketState({ resolveWorkspaceAccess, getProviderForWorkspace, unscoped: UNSCOPED })
+
 // Ticket-closed sweep (LIN-3366): every 10 minutes per workspace with dispatch
 // rows. Reads each candidate ticket's state (least-recently-read first, capped
 // per workspace) and, for a terminal one, closes its quiet blocked/silent rows
@@ -2969,12 +2975,6 @@ const onTicketWrite = createOnTicketWrite({
   sessionsFeedCache,
   agentStatusStore
 })
-// Owner-blind provider read for the unattended sweep (same resolver as the
-// dispatch anchor guard). Returns `{issueId, stateType}` or null for ANY
-// failure or non-`ok` resolution: a null read closes nothing. Passes the
-// structured scope to the provider (lib/ticket-state-reader.js).
-const readTicketState = createReadTicketState({ resolveWorkspaceAccess, getProviderForWorkspace, unscoped: UNSCOPED })
-
 app.use(createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatusStore, recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, dispatchTokenStore, llmCallLogStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, harbourCommentsStore, sessionsFeedCache, workspaceFromUrl, resolveWorkspaceAccess, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, dispatchPresetsStore, freeTierStore, accountStore, rejectedCredentialRegistry, observerStateStore, savedChatStore, workspaceHaltStore, livenessAlarmStore, onTicketWrite }))
 
 // LIN-3098 S3: the runner kit (lib/runner-kit/*.mjs), public, for the served
