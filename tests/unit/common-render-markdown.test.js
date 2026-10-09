@@ -158,3 +158,14 @@ describe('ProxyToggle.disableDelegation (LIN-3385)', () => {
     assert.strictEqual(listeners.length, 1);
   });
 });
+
+describe('window.renderMarkdown forbids <form> (LIN-3385)', () => {
+  test('the sanitizer is called with FORBID_TAGS including form, so rendered ticket text cannot carry a native form', () => {
+    const sandbox = makeSandbox();
+    const seen = [];
+    sandbox.DOMPurify = { sanitize: (html, cfg) => { seen.push(cfg); return html; } };
+    sandbox.window.renderMarkdown('<form action="/settings/features" method="post"><button>go</button></form>');
+    assert.strictEqual(seen.length, 1);
+    assert.ok(seen[0] && Array.isArray(seen[0].FORBID_TAGS) && seen[0].FORBID_TAGS.includes('form'));
+  });
+});

@@ -12,9 +12,9 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 // document order) into ticket-derived text, clicks it, and asserts that no
 // Harbour request fires. Then the real controls are clicked and still act.
 //
-// Out of this piece, on purpose (John, 9 Oct; LIN-3391 / LIN-3400): a native
-// <form> in rendered markdown. Ticket text can still render a real same-origin
-// form post; that is a cleaner-config gap, so no form is used here.
+// A native <form> in rendered text is closed too (FORBID_TAGS: ['form'] in
+// common.js's sanitize call; FC ruling, 9 Oct): the hostile markup carries one
+// and each test asserts it never reaches the DOM.
 
 const REPO = 'acme/widget';
 const PR = `https://github.com/${REPO}/pull/12`;
@@ -36,6 +36,7 @@ const HOSTILE = [
   '<footer class="page-footer"><a href="#" class="footer-feedback-toggle" data-url-key="__URLKEY__" data-enabled="false">feedback</a></footer>',
   '<div class="sess-ctx-panel brief-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div><div class="sess-ctx-panel recap-section" data-url-key="__URLKEY__" data-identifier="FAKE-1"></div>',
   `<div data-testid="session-pr-state" data-pr-state-url="${FAKE_PR_STATE}" data-run-live="true"><span data-testid="session-pr-line"></span></div>`,
+  '<form action="/workspace/__URLKEY__/settings/features" method="post" data-testid="hostile-form"><input name="feature" value="feedbackWidget"><button type="submit">submit</button></form>',
   '</div>',
 ].join('');
 const hostileFor = (urlKey) => HOSTILE.replaceAll('__URLKEY__', urlKey);
@@ -158,6 +159,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
     await expect(page.locator('[data-testid="task-page-description-body"] [data-action="closeout-press"]').first()).toBeAttached();
     await expect(page.locator('[data-testid="hostile-cover"]').first()).toBeVisible();
 
+    await expect(page.locator('[data-testid="hostile-form"], form[action*="/settings/"]')).toHaveCount(0);
     const seen = watchForbidden(page);
     await clickAround(page);
     await page.waitForTimeout(500);
@@ -185,6 +187,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
     await page.evaluate(() => document.querySelectorAll('.sess-run').forEach((r) => r.classList.add('sess-run--expanded')));
     await expect(page.locator('[data-testid="hostile-cover"]').first()).toBeVisible();
 
+    await expect(page.locator('[data-testid="hostile-form"], form[action*="/settings/"]')).toHaveCount(0);
     const seen = watchForbidden(page);
     await clickAround(page);
     await page.waitForTimeout(500);
@@ -221,6 +224,7 @@ test.describe('Look-alike controls in ticket text answer nothing (LIN-3385)', ()
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="hostile-cover"]').first()).toBeVisible();
 
+    await expect(page.locator('[data-testid="hostile-form"], form[action*="/settings/"]')).toHaveCount(0);
     const seen = watchForbidden(page);
     await page.evaluate(() => navigator.clipboard.writeText('__SENTINEL__'));
     await clickAround(page);

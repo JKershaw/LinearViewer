@@ -476,7 +476,9 @@ window.renderMarkdown = function(text, opts, keepWholeFence) {
   // returned unsanitized.
   if (typeof DOMPurify === 'undefined') return window.escapeHtml(cleaned);
   const html = typeof marked !== 'undefined' ? marked.parse(cleaned, opts) : window.escapeHtml(cleaned);
-  return DOMPurify.sanitize(html);
+  // Ticket text must not render a control that does something: a native <form>
+  // submits same-origin without any of our script (LIN-3385).
+  return DOMPurify.sanitize(html, { FORBID_TAGS: ['form'] });
 };
 
 // =============================================================================
