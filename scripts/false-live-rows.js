@@ -54,8 +54,8 @@
  *     nulling `bookkeeping` on loops stamped `ticket-closed` (and only those: B's
  *     and the fossil stamps stay), so a pass cannot come from stamping. Read-only.
  *   - posts after the end: feedback entries on a row timestamped after that row's
- *     OWN terminal marker (`isLineageClosingTerminal`) or stamp (`bookkeeping.at`),
- *     earliest wins. Harbour-only. Decision-lifecycle stamps Harbour itself appends
+ *     OWN latest terminal marker (`isLineageClosingTerminal`) or stamp (`bookkeeping.at`),
+ *     latest wins (a re-posted [done] after a follow-up is not a writer). Harbour-only. Decision-lifecycle stamps Harbour itself appends
  *     (`isDecisionLifecycleStampEntry`) are not a writer and are not counted.
  *   - runner-side zombies, from the runner's `sessions.json` (`--sessions <path>`
  *     or FALSE_LIVE_SESSIONS_PATH; THIS HOST'S FILE ONLY, runner-kit runners on
@@ -360,8 +360,12 @@ export function postsAfterEnd(rows) {
     const fb = r.feedback || [];
     const ends = fb.filter(f => isLineageClosingTerminal(f.message)).map(f => toMs(f.timestamp));
     if (r.bookkeeping?.at) ends.push(toMs(r.bookkeeping.at));
-    const endAt = Math.min(...ends.filter(Number.isFinite));
-    if (!Number.isFinite(endAt)) continue;
+    // The LATEST end, not the first: a held session that is followed up posts [done] again, and
+    // that is a session ending twice, not a zombie. Production (30 d, linearviewer): the earliest-end
+    // reading flagged 517 rows, 507 of them repeat [done]s; the latest-end reading flags 13, the
+    // runner-still-writing shape (mostly [stalled?]) this measure exists to find.
+    const endAt = Math.max(...ends.filter(Number.isFinite));
+    if (!Number.isFinite(endAt) || endAt === -Infinity) continue;
     const after = fb.filter(f => !isDecisionLifecycleStampEntry(f) && toMs(f.timestamp) > endAt);
     if (after.length) { hit.push(r._id); entries += after.length; }
   }

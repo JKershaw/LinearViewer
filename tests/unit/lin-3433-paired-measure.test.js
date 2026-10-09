@@ -82,6 +82,12 @@ describe('paired measure (LIN-3433)', () => {
       assert.deepEqual(postsAfterEnd(rows), { rows: ['a'], entries: 1 });
     });
 
+    test('a second [done] after a follow-up is a session ending twice, not a writer; entries after the LATEST end are', () => {
+      const fb = [{ message: '[done] first', timestamp: ago(3) }, { message: '[working] Session resumed', timestamp: ago(2) }, { message: '[done] second', timestamp: ago(1) }];
+      assert.deepEqual(postsAfterEnd([{ _id: 'a', feedback: fb }]), { rows: [], entries: 0 });
+      assert.deepEqual(postsAfterEnd([{ _id: 'a', feedback: [...fb, { message: '[stalled?] x', timestamp: ago(0, 5) }] }]), { rows: ['a'], entries: 1 });
+    });
+
     test('a [skipped] marker is not an end (isLineageClosingTerminal)', () => {
       assert.deepEqual(postsAfterEnd([{ _id: 'a', feedback: [{ message: '[skipped] no', timestamp: ago(2) }, { message: 'hb', timestamp: ago(1) }] }]), { rows: [], entries: 0 });
     });
