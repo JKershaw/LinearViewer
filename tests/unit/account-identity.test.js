@@ -30,6 +30,7 @@ import { establishAccount } from '../../lib/account-session.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { AccountMergeLogStore } from '../../lib/account-merge-log.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -113,7 +114,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     const provider = twoIdentityProvider(idx,
       [{ id: 'org-a', name: 'Org A', urlKey: 'org-a' }, { id: 'org-b', name: 'Org B', urlKey: 'org-b' }],
       [{ id: 'viewer-a' }, { id: 'viewer-b' }]);
-    const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+    const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
     const handler = getHandler(router, 'get', '/auth/callback');
 
     const session = makeSession({ oauthState: 'real' });
@@ -158,7 +159,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     const provider = twoIdentityProvider(idx,
       [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
       [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
-    const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+    const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
     const handler = getHandler(router, 'get', '/auth/callback');
     const mergeRouter = createAccountMergeRoutes({ ...stores });
     const declineHandler = getHandler(mergeRouter, 'post', '/auth/merge/decline');
@@ -206,7 +207,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     const provider = twoIdentityProvider(idx,
       [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
       [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
-    const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+    const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
     const callbackHandler = getHandler(router, 'get', '/auth/callback');
     // LIN-2304: confirm-completion is now uniform across every provider,
     // including Linear — the confirm handler applies activeWorkspaceId and
@@ -433,7 +434,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
     const provider = twoIdentityProvider(idx,
       [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
       [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
-    const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+    const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
     const handler = getHandler(router, 'get', '/auth/callback');
 
     // A session that is LIVE (accountId set) but whose last proven identity
@@ -455,7 +456,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
 
   test('POST /auth/merge/confirm with no pending merge in session is refused (400), writes nothing', async () => {
     const stores = freshStores();
-    const router = createAuthRoutes({ provider: {}, sessionStore: { cleanup: async () => {} }, ...stores });
+    const router = createAuthRoutes({ ...withResolver(), provider: {}, sessionStore: { cleanup: async () => {} }, ...stores });
     const mergeRouter = createAccountMergeRoutes({ ...stores });
     const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
     const session = makeSession({});
@@ -590,7 +591,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       const provider = twoIdentityProvider(idx,
         [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
         [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
-      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const callbackHandler = getHandler(router, 'get', '/auth/callback');
       const mergeRouter = createAccountMergeRoutes({ ...stores });
       const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
@@ -663,7 +664,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       const provider = twoIdentityProvider(idx,
         [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
         [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
-      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const callbackHandler = getHandler(router, 'get', '/auth/callback');
       const mergeRouter = createAccountMergeRoutes({ ...stores });
       const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
@@ -826,7 +827,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       const provider = twoIdentityProvider(idx,
         [{ id: 'org-mine', name: 'Mine', urlKey: 'mine' }, { id: 'org-other', name: 'Other', urlKey: 'other' }],
         [{ id: 'viewer-mine' }, { id: 'viewer-other' }]);
-      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const handler = getHandler(router, 'get', '/auth/callback');
 
       const session = makeSession({ oauthState: 'real', accountId: a._id });
@@ -872,7 +873,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       const provider = twoIdentityProvider(idx,
         [{ id: 'org-c1', name: 'C1', urlKey: 'c1' }, { id: 'org-b1', name: 'B1', urlKey: 'b1' }],
         [{ id: 'viewer-c1' }, { id: 'viewer-b1' }]);
-      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const callbackHandler = getHandler(router, 'get', '/auth/callback');
       const mergeRouter = createAccountMergeRoutes({ ...stores });
       const confirmHandler = getHandler(mergeRouter, 'post', '/auth/merge/confirm');
@@ -920,7 +921,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       // the fully-resolved canonical account with 200, no conflict.
       const idx2 = { index: 0 };
       const laterProvider = twoIdentityProvider(idx2, [{ id: 'org-b1', name: 'B1', urlKey: 'b1' }], [{ id: 'viewer-b1' }]);
-      const laterRouter = createAuthRoutes({ provider: laterProvider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const laterRouter = createAuthRoutes({ ...withResolver(), provider: laterProvider, sessionStore: { cleanup: async () => {} }, ...stores });
       const laterHandler = getHandler(laterRouter, 'get', '/auth/callback');
       const laterSession = makeSession({ oauthState: 'later' });
       const laterRes = makeRes();
@@ -941,7 +942,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
       const provider = twoIdentityProvider(idx,
         [{ id: 'org-a3', name: 'A3', urlKey: 'a3' }, { id: 'org-b3', name: 'B3', urlKey: 'b3' }],
         [{ id: 'viewer-a3' }, { id: 'viewer-b3' }]);
-      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const handler = getHandler(router, 'get', '/auth/callback');
 
       const session = makeSession({ oauthState: 'real' });
@@ -967,7 +968,7 @@ describe('LIN-2233 — account identity carry-and-link, confirmed merge', () => 
 
       const idx = { index: 0 };
       const provider = twoIdentityProvider(idx, [{ id: 'org-b4', name: 'B4', urlKey: 'b4' }], [{ id: 'viewer-b4' }]);
-      const router = createAuthRoutes({ provider, sessionStore: { cleanup: async () => {} }, ...stores });
+      const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...stores });
       const handler = getHandler(router, 'get', '/auth/callback');
 
       const session = makeSession({ oauthState: 'real' });

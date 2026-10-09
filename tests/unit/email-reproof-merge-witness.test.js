@@ -18,6 +18,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { startEmailAuthHarness, tokenFromOutbox, hiddenField } from '../fixtures/email-auth-harness.js';
 import { createAuthRoutes } from '../../routes/auth.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 function fakeProvider() {
   return {
@@ -39,7 +40,7 @@ describe('S3-4 end-to-end witness (D3): stale email-only P re-proofs, then the L
     savedEnv = Object.fromEntries(OAUTH_ENV.map(k => [k, process.env[k]]));
     for (const k of OAUTH_ENV) process.env[k] = 'set';
     harness = await startEmailAuthHarness({
-      mount: (app, stores) => app.use(createAuthRoutes({
+      mount: (app, stores) => app.use(createAuthRoutes({ ...withResolver(),
         provider: fakeProvider(),
         sessionStore: { cleanup: async () => {} },
         accountStore: stores.accountStore,

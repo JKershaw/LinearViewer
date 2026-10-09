@@ -22,6 +22,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { createWorkspaceRoutes } from '../../routes/workspace.js';
 import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 function getHandler(router) {
   const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/remove' && l.route.methods.post);
@@ -50,7 +51,7 @@ function makeSession(initial = {}) {
 }
 
 function makeHandler(evictWorkspaceToken, extraDeps = {}) {
-  const router = createWorkspaceRoutes({ evictWorkspaceToken, ...extraDeps });
+  const router = createWorkspaceRoutes({ ...withResolver(), evictWorkspaceToken, ...extraDeps });
   return getHandler(router);
 }
 

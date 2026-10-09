@@ -26,6 +26,7 @@ import { renderAccountHomePage, accountHomeSourceCtas } from '../../lib/render-a
 import { renderNavBar } from '../../lib/components/navbar.js';
 import { getProvider } from '../../lib/providers/registry.js';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
@@ -68,7 +69,7 @@ function flowProvider(over = {}) {
 }
 
 function buildFlow({ listAuthorizedAccountConnections, connectionBackedWritesEnabled, provider = flowProvider() } = {}) {
-  return createGitHubAuthRoutes({
+  return createGitHubAuthRoutes({ ...withResolver(),
     provider,
     accountStore: { resolveCanonicalAccountId: async (id) => id },
     accountWorkspaceStore: {},
@@ -79,7 +80,7 @@ function buildFlow({ listAuthorizedAccountConnections, connectionBackedWritesEna
 
 /** The github-projects consumer of the SAME shared flow (D2 cross-surface check). */
 function buildProjectsFlow({ listAuthorizedAccountConnections, connectionBackedWritesEnabled, provider = flowProvider({ name: 'github-projects' }) } = {}) {
-  return createGitHubProjectsAuthRoutes({
+  return createGitHubProjectsAuthRoutes({ ...withResolver(),
     provider,
     accountStore: { resolveCanonicalAccountId: async (id) => id },
     accountWorkspaceStore: {},
@@ -450,7 +451,7 @@ describe('LIN-3125 Phase 3 — held-connection entry', () => {
   // lin-3125-picker-route.test.js; beat 3 replaced the 501 stub).
   // -------------------------------------------------------------------------
   describe('held picker route is provider-gated', () => {
-    const routes = createHeldConnectionRoutes({
+    const routes = createHeldConnectionRoutes({ ...withResolver(),
       resolveProvider: (n) => (n === 'github' ? { name: 'github', supports: (m) => m === 'listConnectionScopes' } : null),
     });
     const handler = getHandler(routes, 'get', '/connect/:provider/held');

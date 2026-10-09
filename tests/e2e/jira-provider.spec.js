@@ -393,7 +393,7 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // this flow's own cookie jar. That isolation is cheap hygiene, not a fix
     // for a urlKey collision: the seeding call's own seeded workspace uses the
     // fixture's fixed `jira-workspace` urlKey, which never collides with this
-    // flow's derived `acme` (deriveJiraUrlKey, routes/jira-auth.js) — the
+    // flow's resolved `jira-<cloudId>-<hash>` (resolveWorkspaceUrlKey, lib/workspace-urlkey.js) — the
     // fake's only load-bearing effect is the process-level `clientFactory`
     // registration, and the response/session it creates is discarded.
     const seedContext = await browser.newContext();
@@ -418,16 +418,19 @@ test.describe('LIN-2001 — Jira OAuth callback driven as real HTTP', () => {
     // The `mode:'new'` single-site bootstrap lands IN the workspace, no query
     // string (`completeJiraNewLogin`'s `finish()`, routes/jira-auth.js) — this
     // is the add-source arm's `?provider_ok=jira`, not this one.
-    // `deriveJiraUrlKey` derives `acme` from the fake accessible-resources
-    // site (`https://acme.atlassian.net`) against this flow's own empty
-    // `existingWorkspaces` (the seeding call never touched this session).
-    expect(callbackRes.headers()['location']).toBe('/workspace/acme/');
+    // LIN-3382: the key is the one rule's pure function of the stable ids,
+    // `jira-<cloudId>-<6 hex of sha256(W)>` (here cloud `test-oauth-cloud-id`),
+    // whatever durable state earlier specs left in this server's stores; there is
+    // no legacy tenant key (`acme`) any more. The exact shape is pinned in
+    // tests/unit/workspace-urlkey.test.js.
+    const landed = callbackRes.headers()['location'];
+    expect(landed).toMatch(/^\/workspace\/jira-test-oauth-cloud-id-[0-9a-f]{6}\/$/);
 
     // Dashboard: the post-redirect read resolves through the SAME seeded
     // `clientFactory` fake (JiraProvider._clientFor's OAuth arm), proving the
     // seeding call in step 1 covers both the identity probe and this read —
     // no third fake HTTP endpoint required.
-    await page.goto(callbackRes.headers()['location']);
+    await page.goto(landed);
     await page.waitForLoadState('networkidle');
     await expect(page.locator('.project-header:has-text("Engineering")')).toBeVisible();
 

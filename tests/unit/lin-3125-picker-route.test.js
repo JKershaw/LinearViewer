@@ -26,6 +26,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { createHeldConnectionRoutes } from '../../routes/held-connection.js';
 import { ConnectionStore } from '../../lib/connection-store.js';
 import { convertToConnectionBacked, listAuthorizedAccountConnections, heldConnectionCredentials } from '../../lib/connection-credential.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const ACCT = 'acct-1';
 const INSTALL = '77';
@@ -111,7 +112,7 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
   }
 
   function buildRoute(connectionStore, { provider, writes = true, writesFn, refreshConnection, convert = convertToConnectionBacked, reader } = {}) {
-    return createHeldConnectionRoutes({
+    return createHeldConnectionRoutes({ ...withResolver(),
       resolveProvider: () => provider,
       connectionStore,
       listAuthorizedAccountConnections: reader || ((args) => listAuthorizedAccountConnections({ connectionStore, ...args })),
@@ -461,7 +462,7 @@ describe('LIN-3125 Phase 3 — held picker route', () => {
   // -------------------------------------------------------------------------
   test('declining provider => 404 (GET and POST)', async () => {
     const { connectionStore } = await store();
-    const route = createHeldConnectionRoutes({ resolveProvider: () => ({ name: 'jira', supports: () => false }), connectionStore });
+    const route = createHeldConnectionRoutes({ ...withResolver(), resolveProvider: () => ({ name: 'jira', supports: () => false }), connectionStore });
     const session = makeSession({ heldEntry: { provider: 'jira', mode: 'add-source', workspaceUrlKey: 'acme', beginUrl: '/auth/jira/oauth?mode=new' } });
     const g = await getHandler(route, 'get', '/connect/:provider/held')({ params: { provider: 'jira' }, session }, makeRes());
     assert.equal(g.statusCode, 404);
