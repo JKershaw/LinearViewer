@@ -333,7 +333,7 @@ test.describe('Owner-only proxy halt and runner-credential revoke - real server 
     const body = await res.json();
     expect(body.code).toBe('PROXY_TOKEN_UNBOUND');
     expect(body.error).toContain('not bound to a workspace');
-    expect(body.error).toContain('Mint a new token in Settings, or use the Dispatch page.');
+    expect(body.error).toContain('Mint a new token on the Proxy page, or use the Dispatch page.');
   });
 
   test("a member cannot revoke the owner's runner credential (403) but can revoke their own grant-less token", async ({ page, request }) => {
