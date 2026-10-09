@@ -334,6 +334,13 @@
   font-family: var(--font-structural);
   font-size: 0.75rem;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+/* LIN-3407: the live "in progress · 12m 30s" clock keeps a steady slot so the
+   cost chip beside it does not shift as the text changes length. */
+.sess-run-times [data-testid="session-run-elapsed"] {
+  display: inline-block;
+  min-width: 21ch;
 }
 
 .sess-chips {
