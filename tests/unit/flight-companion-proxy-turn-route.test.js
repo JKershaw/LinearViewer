@@ -294,6 +294,24 @@ describe('LIN-3359: the proxy /turn requests the sized bare cap', () => {
   });
 });
 
+describe('LIN-3362: the proxy /turn keeps today\'s call shape', () => {
+  test('no hop-text / concurrency options, UK clock even if the body carries a timeZone', async () => {
+    let captured = null; let messages = null;
+    const chatClient = {
+      async streamChat(m, o, onEvent) { messages = m; captured = o; onEvent('done', {}); },
+      async streamChatWithTools(m, o, onEvent) { messages = m; captured = o; onEvent('done', {}); },
+    };
+    const { status } = await postTurn(
+      { dispatchQueueStore: makeDispatchQueueStore(), flightCompanionChatClient: chatClient },
+      { message: 'hi', timeZone: 'Asia/Tokyo' }
+    );
+    assert.equal(status, 200);
+    assert.ok(!('emitHopText' in captured));
+    assert.ok(!('concurrentTools' in captured));
+    assert.match(messages[0].content, /\d{2}:\d{2} UK\)/);
+  });
+});
+
 describe('LIN-2620: no response ever carries a token', () => {
   test('the bearer token and the resolved OpenRouter key never appear in a JSON response', async () => {
     const dispatchQueueStore = makeDispatchQueueStore();

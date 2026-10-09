@@ -640,6 +640,23 @@ describe('JiraProvider reads (fake client)', () => {
     assert.equal(ctx.comments[0].user, 'Ada Lovelace')
   })
 
+  test('fetchIssueContext carries the parent description for a leaf; a failed parent fetch leaves it off (LIN-3378)', async () => {
+    const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
+    const leaf = await provider.fetchIssueContext(scope, 'ENG-2')
+    assert.equal(leaf.parent.identifier, 'ENG-1')
+    assert.equal(leaf.parent.description, 'A parent issue.')
+
+    const { provider: failing, client } = seededProvider()
+    const getIssue = client.getIssue.bind(client)
+    client.getIssue = async key => {
+      if (key === 'ENG-1') throw new Error('parent fetch failed')
+      return getIssue(key)
+    }
+    const ctx = await failing.fetchIssueContext(scope, 'ENG-2')
+    assert.equal(ctx.parent.identifier, 'ENG-1')
+    assert.equal('description' in ctx.parent, false, 'best-effort: the description is absent, the context still returns')
+  })
+
   test('fetchIssueFields returns the same canonical shape fetchProjects emits per node (dashboard lazy detail load, LIN-442)', async () => {
     const scope = { email: 'a@b.com', apiToken: 't', site: SITE }
     const issue = await provider.fetchIssueFields(scope, 'ENG-2')

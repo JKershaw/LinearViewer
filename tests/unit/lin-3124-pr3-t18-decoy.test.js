@@ -46,6 +46,7 @@ import { workspaceTokenCacheKey } from '../../lib/workspace-token-cache.js';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const SERVER_SRC = readFileSync(new URL('../../server.js', import.meta.url), 'utf8');
 const ACCT = 'acct-decoy';
@@ -212,7 +213,7 @@ describe('LIN-3124 T18 — decoy-token across every lane', () => {
     try {
       const db = client.db(`t18_pending_${n++}`);
       const connectionStore = new ConnectionStore({ collection: db.collection('connections') });
-      const router = createGitHubAuthRoutes({
+      const router = createGitHubAuthRoutes({ ...withResolver(),
         provider: { name: 'github' },
         accountStore: new AccountStore({ collection: db.collection('accounts') }),
         accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),

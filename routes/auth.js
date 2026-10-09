@@ -10,6 +10,7 @@ import { Router } from 'express'
 import { getProvider } from '../lib/providers/registry.js'
 import { AuthExchangeError } from '../lib/providers/interface.js'
 import { renderErrorPage } from '../lib/render.js'
+import { resolveKeyOrRespond } from '../lib/workspace-urlkey.js'
 import { upsertWorkspace, saveSession, linkProvider, getActiveWorkspace, validateWorkspaceUrlKey, persistOwnerCredential } from '../lib/workspace.js'
 import { writeConnection } from '../lib/connection-store.js'
 import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
@@ -31,9 +32,10 @@ import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-c
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
  * @param {(key: string) => void} [options.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`). Called at /logout for every workspace the session referenced, before the session is destroyed.
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [options.ownerCredentialStore] - LIN-1523: durable owner-credential store. Linear-only; other providers' auth routers receive this option too (shared mount loop) but ignore it.
+ * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the callback fails closed (503 retry page, nothing written) without it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore }) {
+export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -196,10 +198,29 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
       // upsertWorkspace below is the find-or-create by id. The credential is
       // attached through the single linkProvider seam — same path local/PAT use —
       // which also writes the legacy scalar mirror byte-identically.
+      //
+      // LIN-3382: the key is still the org's own `org.urlKey || org.name` (moving
+      // the production Linear keys is expensive: they hold the data and the live
+      // refresh tokens), but it now goes through the one resolver, which refuses
+      // a key another account holds and a key live in this session under
+      // another workspace id. It runs before either arm's first session
+      // or durable write (add-source's snapshot, new's regenerate), so a refusal
+      // or a resolver failure writes nothing. Two members of one Linear org still
+      // share their workspace: the holder test passes on an edge to org.id.
+      const resolved = await resolveKeyOrRespond({
+        resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'linear',
+        retry: { action: 'Try again', actionUrl: '/auth/linear' },
+        request: {
+          arm: 'linear', provider: 'linear', scope: org.id, workspaceId: org.id,
+          ids: { orgKey: org.urlKey || org.name },
+          session: req.session, identity: { provider: 'linear', scope: String(viewer.id) }
+        }
+      })
+      if (!resolved) return
       const workspace = {
         id: org.id,
         name: org.name,
-        urlKey: org.urlKey || org.name,
+        urlKey: resolved.urlKey,
         addedAt: Date.now()
       }
       // Linear documents expires_in as 86399 — one second off the 86400 fallback

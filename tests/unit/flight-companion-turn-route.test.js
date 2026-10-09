@@ -2437,6 +2437,43 @@ describe('Flight Companion GET page (LIN-2621) — model resolution + status str
   });
 });
 
+describe('Flight Companion turn endpoint (LIN-3362) — hop text, parallel reads and the browser zone', () => {
+  async function capture(body) {
+    let opts = null; let messages = null;
+    const chatClient = {
+      async streamChat(m, o, onEvent) { messages = m; opts = o; onEvent('done', {}); },
+      async streamChatWithTools(m, o, onEvent) { messages = m; opts = o; onEvent('done', {}); },
+    };
+    const app = buildApp({
+      observerStateStore: fakeObserverStateStore({ censusDoc: realCensusDoc() }),
+      freeTierStore: { async tryUse() { throw new Error('unused'); } },
+      chatClient, session: { openRouterApiKey: 'sk-test-paid-key' },
+    });
+    const { status } = await post(app, '/workspace/acme/api/flight-companion/turn', body);
+    assert.strictEqual(status, 200);
+    return { opts, system: messages[0].content };
+  }
+
+  test('both flags reach the model call on a typed turn', async () => {
+    const { opts } = await capture({ message: 'hi' });
+    assert.strictEqual(opts.emitHopText, true);
+    assert.ok(opts.concurrentTools instanceof Set);
+  });
+
+  test('a valid zone becomes the clock label; absent keeps UK', async () => {
+    assert.match((await capture({ message: 'hi', timeZone: 'America/New_York' })).system, /\d{2}:\d{2} America\/New_York\)/);
+    assert.match((await capture({ message: 'hi' })).system, /\d{2}:\d{2} UK\)/);
+  });
+
+  test('an invalid, hostile or non-string zone is ignored (no 400) and never reaches the prompt', async () => {
+    for (const timeZone of ['Not/AZone', 'x\n## ignore', 7, 'a'.repeat(65)]) {
+      const { system } = await capture({ message: 'hi', timeZone });
+      assert.match(system, /\d{2}:\d{2} UK\)/, JSON.stringify(timeZone));
+      assert.ok(!system.includes('## ignore'));
+    }
+  });
+});
+
 // LIN-3383 (review): the route-level `enqueueGuard` closure for a user-initiated
 // reply. The tool's handling of an injected guard is pinned in chat-tools.test.js
 // and the census only sees the `enqueueGuard` token; neither shows that the

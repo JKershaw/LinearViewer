@@ -48,6 +48,7 @@ import {
   CONNECTION_RETRY_TITLE,
   CONNECTION_RETRY_MESSAGE,
 } from '../../lib/connection-credential.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const RSA_PEM = privateKey.export({ type: 'pkcs1', format: 'pem' });
@@ -55,7 +56,7 @@ const ENV = ['GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET', 'GITHUB_APP_ID', 'GITHU
 
 const INSTALLATION = '77';
 const REPOS = ['octo/repo-a', 'octo/repo-b', 'octo/repo-c'];
-const WORKSPACE = 'octo';
+const WORKSPACE = 'gh-42';
 
 function getHandler(router, method, path) {
   const layer = router.stack.find(l => l.route?.path === path && l.route.methods[method]);
@@ -123,12 +124,12 @@ async function harness(client) {
   const resolveProvider = () => provider;
   const refreshConnection = createConnectionRefresher({ connectionStore, ownerCredentialStore, resolveProvider });
 
-  const flow = createGitHubAuthRoutes({
+  const flow = createGitHubAuthRoutes({ ...withResolver(),
     provider, accountStore, accountWorkspaceStore, connectionStore,
     listAuthorizedAccountConnections: reader,
     connectionBackedWritesEnabled: () => true,
   });
-  const picker = createHeldConnectionRoutes({
+  const picker = createHeldConnectionRoutes({ ...withResolver(),
     resolveProvider,
     connectionStore, accountWorkspaceStore,
     listAuthorizedAccountConnections: reader,

@@ -38,6 +38,7 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createGitHubAuthRoutes } from '../../routes/github-auth.js';
 import { createGitHubProjectsAuthRoutes } from '../../routes/github-projects-auth.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import {
@@ -189,7 +190,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     for (const [shape, query] of Object.entries(UPDATE_RETURNS)) {
       test(`${callbackPath} [${shape}], no state: completes — picker lists the new grant, link binds it`, async () => {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         // The reporter's session: the picker already rendered once, so the
         // nonce is consumed (LIN-2499); nothing GitHub sends carries state.
         const session = makeSession();
@@ -211,7 +212,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
       test(`${callbackPath} [${shape}], no state: never exchanges the code or mints from installation_id unauthenticated`, async () => {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         await get(router, callbackPath, { ...query }, makeSession());
         const unauthenticated = provider.calls.filter(c => c === `completeAuth:${query.code}` || c === `completeInstallation:${INSTALLATION_ID}`);
         assert.deepEqual(unauthenticated, [], 'no GitHub call is made on the strength of the stateless parameters');
@@ -220,7 +221,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${s.basePath}: harness sanity — the SAME follow/link driver completes a Harbour-initiated connect (passes at HEAD)`, async () => {
       const provider = spyProvider(s.providerName);
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const session = makeSession();
       const begin = await get(router, s.basePath, {}, session);
       const { res: picker } = await follow(router, s.basePath, session, begin);
@@ -234,7 +235,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${callbackPath}: a PRESENT but wrong state is still rejected (CSRF guard intact)`, async () => {
       const provider = spyProvider(s.providerName);
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const res = await get(router, callbackPath, { ...UPDATE_RETURNS['code+installation_id+setup_action=update'], state: 'attacker' }, makeSession({ oauthState: 'real' }));
       assert.equal(res.statusCode, 400);
       assert.equal(errorTitle(res), 'Session Expired');
@@ -243,7 +244,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${callbackPath}: control — the same update query with a live matching state reaches the picker`, async () => {
       const provider = spyProvider(s.providerName);
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const session = makeSession({ oauthState: 'live', oauthIntent: { mode: 'add-source', provider: s.providerName } });
       const res = await get(router, callbackPath, { installation_id: INSTALLATION_ID, setup_action: 'update', state: 'live' }, session);
       assert.equal(res.statusCode, 200);
@@ -279,7 +280,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     for (const [shape, query] of Object.entries(STATELESS_RETURN_SHAPES)) {
       test(`${callbackPath} stateless [${shape}]: 302 restart to this surface's begin, no exchange`, async () => {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         const res = await get(router, callbackPath, { ...query }, makeSession());
         assert.equal(res.redirectedTo, s.basePath, `expected a restart, got ${res.statusCode} ${errorTitle(res)}`);
         assert.equal(res.body, null, 'a restart renders no error page');
@@ -290,7 +291,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     for (const [shape, query] of Object.entries(STATELESS_REQUEST_SHAPES)) {
       test(`${callbackPath} stateless [${shape}]: existing admin-approval response, no exchange`, async () => {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         const res = await get(router, callbackPath, { ...query }, makeSession());
         assert.equal(errorTitle(res), 'Installation Incomplete', `expected admin-approval, got ${res.statusCode} ${errorTitle(res)}`);
         assert.match(res.body, /organization admin to approve/);
@@ -313,7 +314,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
       ];
       for (const [session, expected] of cases) {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         const res = await get(router, callbackPath, {
           installation_id: INSTALLATION_ID, setup_action: 'update',
           workspace: 'HOSTILE-WORKSPACE', mode: 'HOSTILE-MODE',
@@ -325,7 +326,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${callbackPath} state='' is treated as absent (restart and request-bypass alike)`, async () => {
       const provider = spyProvider(s.providerName);
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const restart = await get(router, callbackPath, { installation_id: INSTALLATION_ID, setup_action: 'update', state: '' }, makeSession());
       assert.equal(restart.redirectedTo, s.basePath);
       const request = await get(router, callbackPath, { setup_action: 'request', code: 'github-initiated-code', state: '' }, makeSession());
@@ -336,7 +337,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     for (const [shape, query] of Object.entries(STATELESS_STILL_400_SHAPES)) {
       test(`${callbackPath} stateless [${shape}] still 400s (classifier boundary)`, async () => {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         const res = await get(router, callbackPath, { ...query }, makeSession({ oauthState: 'real' }));
         assert.equal(res.statusCode, 400);
         assert.equal(errorTitle(res), 'Session Expired');
@@ -351,7 +352,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
         { setup_action: 'request', state: 'attacker' },
       ]) {
         const provider = spyProvider(s.providerName);
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         const res = await get(router, callbackPath, query, makeSession({ oauthState: 'real' }));
         assert.equal(res.statusCode, 400, JSON.stringify(query));
         assert.equal(errorTitle(res), 'Session Expired');
@@ -368,7 +369,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${callbackPath} a stale add-source pendingKey does not hijack an unrelated mode=new retry`, async () => {
       const provider = { ...spyProvider(s.providerName), completeAuth: async () => { throw new Error('exchange boom'); } };
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const session = makeSession({
         [s.pendingKey]: { ...addSourceKey, workspaceUrlKey: 'stale-acme' },
       });
@@ -381,7 +382,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
 
     test(`${callbackPath} retry-site actionUrl carries the add-source intent (restartUrl swap)`, async () => {
       const provider = { ...spyProvider(s.providerName), completeAuth: async () => { throw new Error('exchange boom'); } };
-      const router = s.createRoutes({ provider, ...freshAccountStores() });
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const session = makeSession({
         oauthState: 'live',
         oauthIntent: { mode: 'add-source', provider: s.providerName, workspaceUrlKey: 'acme' },
@@ -397,7 +398,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
       // session.accountId with no matching account, so the fixture must mint one.
       const stores = freshAccountStores();
       const signedInAccount = await stores.accountStore.createAccount();
-      const router = s.createRoutes({ provider, ...stores });
+      const router = s.createRoutes({ ...withResolver(), provider, ...stores });
       const session = makeSession({
         accountId: signedInAccount._id,
         workspaces: [
@@ -507,7 +508,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
   test('/auth/github signed-in mode=new restart re-derives fresh at the begin handler (LIN-2802)', async () => {
     const s = SURFACES[0];
     const provider = spyProvider(s.providerName);
-    const router = s.createRoutes({ provider, ...freshAccountStores() });
+    const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     // LIN-1892 S2-1 (stated setup change, assertions unchanged): a signed-in
     // "new" flow that mints a fresh container is the switcher click, from a
     // session that holds a workspace; accountId with zero workspaces (email-
@@ -565,7 +566,7 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
     for (const [site, overrides, verb, input, session] of SITES) {
       test(`${s.basePath} retry site ${site}: actionUrl carries the add-source intent`, async () => {
         const provider = { ...spyProvider(s.providerName), ...overrides };
-        const router = s.createRoutes({ provider, ...freshAccountStores() });
+        const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
         const path = verb() === post ? linkPath : callbackPath;
         const res = await verb()(router, path, input, session());
         assert.ok(res.body, `expected an error page, got ${res.statusCode} redirect=${res.redirectedTo}`);

@@ -31,6 +31,7 @@ import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { convertToConnectionBacked, createConnectionRefresher } from '../../lib/connection-credential.js';
 import { refreshOwnerCredential } from '../../lib/workspace-token-refresh.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
+import { withResolver } from './lin-3382-resolver-harness.js';
 
 const ENV_KEYS = ['JIRA_CLIENT_ID', 'JIRA_CLIENT_SECRET', 'JIRA_REDIRECT_URI'];
 const SITE_A = { id: 'cid-a', url: 'https://a.atlassian.net', name: 'A' };
@@ -168,7 +169,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     const faults = { owner: { ...ownerFaults }, conn: { ...connFaults } };
     const ownerCredentialStore = spied(real.ownerStore, OWNER_SPY, log, faults.owner);
     const connectionStore = spied(real.connectionStore, CONN_SPY, log, faults.conn, 'conn.');
-    const router = createJiraAuthRoutes({
+    const router = createJiraAuthRoutes({ ...withResolver(),
       provider: { validateCredential: async () => ({ accountId: 'atl-human', emailAddress: 'a@b.c', displayName: 'A' }) },
       accountStore: real.accountStore, accountWorkspaceStore: real.accountWorkspaceStore,
       ownerCredentialStore, connectionStore,
@@ -314,7 +315,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
           retry.jiraPending = beforePickClone.jiraPending;
           retry.oauthIntent = beforePickClone.oauthIntent;
           const res2 = makeRes();
-          await getHandler(createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore }), 'post', '/auth/jira/oauth/link')({ body: { cloudId: SITE_B.id }, session: retry }, res2);
+          await getHandler(createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore }), 'post', '/auth/jira/oauth/link')({ body: { cloudId: SITE_B.id }, session: retry }, res2);
           assert.equal(res2.redirectedTo, '/workspace/acme/settings?provider_ok=jira');
         } else {
           retry.workspaces = persisted.workspaces;
@@ -639,7 +640,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     globalThis.fetch = async (url) => String(url).includes('accessible-resources')
       ? { ok: true, status: 200, json: async () => [SITE_B] }
       : { ok: true, status: 200, json: async () => ({ access_token: 'at-RB', refresh_token: 'RB', expires_in: 3600 }) };
-    const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
+    const router = createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
     const res = makeRes();
     await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, res);
     assert.equal(res.statusCode, 409);
@@ -667,7 +668,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
     globalThis.fetch = async (url) => String(url).includes('accessible-resources')
       ? { ok: true, status: 200, json: async () => [SITE_A, SITE_B] }
       : { ok: true, status: 200, json: async () => ({ access_token: 'at-RB', refresh_token: 'RB', expires_in: 3600 }) };
-    const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
+    const router = createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-human' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
     const first = makeRes();
     await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, first);
     assert.equal(first.statusCode, 200, 'the multi-site picker renders');
@@ -701,7 +702,7 @@ describe('LIN-3124 PR3 checkpoint E — Jira add-source pick seam (D8/D18, T20/T
       globalThis.fetch = async (url) => String(url).includes('accessible-resources')
         ? { ok: true, status: 200, json: async () => [SITE_B] }
         : { ok: true, status: 200, json: async () => ({ access_token: 'at-RN', refresh_token: 'RN', expires_in: 3600 }) };
-      const router = createJiraAuthRoutes({ provider: { validateCredential: async () => ({ accountId: 'atl-new' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
+      const router = createJiraAuthRoutes({ ...withResolver(), provider: { validateCredential: async () => ({ accountId: 'atl-new' }) }, accountStore: w.real.accountStore, accountWorkspaceStore: w.real.accountWorkspaceStore, ownerCredentialStore: w.real.ownerStore, connectionStore: w.real.connectionStore });
       const res = makeRes();
       await getHandler(router, 'get', '/auth/jira/oauth/callback')({ query: { code: 'c', state: 'nonce' }, session: s }, res);
       const ws = s.workspaces[0];

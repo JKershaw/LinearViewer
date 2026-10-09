@@ -67,6 +67,7 @@ import { isConnectionBacked } from '../lib/connection-binding.js'
 import { convertToConnectionBacked, bindingShapeAt, CONNECTION_RETRY_TITLE, CONNECTION_RETRY_MESSAGE } from '../lib/connection-credential.js'
 import { applyUserPreferencesToSession } from '../lib/user-preferences.js'
 import { calculateExpiresAt } from '../lib/token-refresh.js'
+import { resolveKeyOrRespond } from '../lib/workspace-urlkey.js'
 import {
   getMissingJiraOAuthConfig,
   buildJiraAuthorizeUrl,
@@ -110,53 +111,15 @@ export function normalizeJiraSite(site) {
 }
 
 /**
- * Derive a workspace `urlKey` for a Jira-only login container from the SITE
- * tenant (LIN-1890 N2).
- *
- * The identity cannot supply it: an Atlassian `accountId` is commonly
- * `557058:<uuid>`, and the colon fails `URL_KEY_REGEX` (`lib/workspace.js`), so
- * `jira:${accountId}` is a legal workspace *id* but never a legal urlKey. The
- * tenant label of `https://<tenant>.atlassian.net` is the only human-meaningful
- * value in hand at pick time.
- *
- * The collision fallback is load-bearing rather than defensive: tenant names are
- * company names, so two humans connecting `acme.atlassian.net` and an unrelated
- * `acme` Linear workspace in the SAME session is an ordinary case, not a freak
- * one. A urlKey collision would make `getWorkspaceByUrlKey` resolve the wrong
- * workspace for every subsequent request.
- *
- * @param {{url: string}} site - the picked site (its `url` is the tenant base).
- * @param {Array<{urlKey?: string}>} [existingWorkspaces] - the session's current workspaces.
- * @returns {string} a urlKey that passes `validateWorkspaceUrlKey` and is unused in this session.
- */
-export function deriveJiraUrlKey(site, existingWorkspaces = []) {
-  let tenant = ''
-  try {
-    tenant = new URL(String(site?.url)).hostname.split('.')[0]
-  } catch {
-    tenant = ''
-  }
-  const base = validateWorkspaceUrlKey(tenant) ? tenant.toLowerCase() : 'jira'
-  const taken = new Set((existingWorkspaces || []).map(w => w?.urlKey).filter(Boolean))
-  if (!taken.has(base)) return base
-  // Bounded by MAX_WORKSPACES-worth of headroom; `upsertWorkspace` refuses long
-  // before this loop could exhaust, so it cannot spin.
-  for (let n = 2; n <= 100; n++) {
-    const candidate = `${base}-${n}`.slice(0, 50)
-    if (!taken.has(candidate)) return candidate
-  }
-  return `jira-${Date.now()}`.slice(0, 50)
-}
-
-/**
  * @param {Object} options
  * @param {import('../lib/providers/jira/index.js').JiraProvider} options.provider - injected by JiraProvider.getAuthRouter().
  * @param {import('../lib/account-store.js').AccountStore} [options.accountStore] - LIN-1329: find-or-create the durable account for the signing-in Jira identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [options.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
  * @param {Object} [options.userPreferencesStore] - LIN-1890 N1: rehydrates durable preferences onto the regenerated session of a `mode: 'new'` Jira login, mirroring routes/github-auth.js. `server.js`'s auth-mount loop has always passed this and `getAuthRouter` has always spread it through — this router simply dropped it on the floor until the bootstrap needed it.
+ * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the fresh-container arm fails closed (503 retry page, nothing written, carried refresh token dropped) without it.
  * @returns {import('express').Router}
  */
-export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore, connectionStore } = {}) {
+export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceStore, ownerCredentialStore, userPreferencesStore, connectionStore, resolveWorkspaceUrlKey } = {}) {
   const router = Router()
 
   const notConfigured = (res) => res.status(503).send(renderErrorPage(
@@ -778,8 +741,9 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
    * SITE for the same human adds a binding rather than minting a second
    * workspace — bindings are keyed `(provider, scope)` and the scope is the site
    * (LIN-1329 Q1: identity is the human, never the site, which is a resource
-   * address). The urlKey cannot come from that same id and is derived from the
-   * tenant instead — see {@link deriveJiraUrlKey}.
+   * address). The urlKey cannot come from that same id (the colon fails
+   * `URL_KEY_REGEX`), so it comes from the LIN-3382 resolver, which reads the
+   * durable holders as well as the session and can refuse.
    *
    * `regenerate()` is the session-fixation defence every fresh-login path runs.
    * It wipes the session, which is why `existingWorkspaces` — and, since
@@ -839,13 +803,38 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
     // Returning user, same session: the container already exists, so this is a
     // binding add — no regenerate (the session is already theirs, and wiping it
     // would drop the workspaces we are adding to).
-    const existing = (req.session.workspaces || []).find(w => w.id === workspaceId)
+    //
+    // LIN-3382: the key comes from the one resolver, which runs BEFORE
+    // regenerate / upsertWorkspace / establishAccount / convert / persistRefresh
+    // (it reads the CURRENT session workspaces, which regenerate() wipes), so a
+    // refusal (another account holds the site's key) or a resolver failure
+    // writes nothing. Both exits drop the carried refresh token, like every other
+    // Jira exit that answers instead of reaching `finish()`. `source ===
+    // 'session'` means the container is already live under exactly the key the
+    // rule derives; a live container under any other name is not kept (it is
+    // re-derived and re-created below).
+    //
+    // LIN-3334 (R1): a returning user picking a second Jira site on the existing
+    // `jira:<accountId>` container is refused with the plain message, before
+    // anything below and before the durable refresh-token write. It runs on the
+    // live container whatever its key, because the Jira key now names the site:
+    // a second site would otherwise derive a different key and re-create the
+    // container instead of being refused. Same-site re-link is allowed.
+    const live = (req.session.workspaces || []).find(w => w.id === workspaceId)
+    if (live && refuseSecondJiraSource(req, res, provider, live, site.url)) return
+    const resolved = await resolveKeyOrRespond({
+      resolve: resolveWorkspaceUrlKey, res, renderPage: renderErrorPage, arm: 'jira',
+      retry: { action: 'Try again', actionUrl: '/auth/jira/oauth?mode=new' },
+      beforeRespond: () => dropCarriedRefreshToken(req),
+      request: {
+        arm: 'jira', provider: 'jira', scope: site.url, workspaceId,
+        ids: { cloudId: site.cloudId },
+        session: req.session, identity: { provider: 'jira', scope: String(myself.accountId) }
+      }
+    })
+    if (!resolved) return
+    const existing = resolved.source === 'session' ? live : null
     if (existing) {
-      // LIN-3334 (R1): a returning user picking a second Jira site on the
-      // existing `jira:<accountId>` container is refused with the plain message,
-      // before establishAccount and before the durable refresh-token write
-      // (`persistRefresh`/`convert`) below. Same-site re-link is allowed.
-      if (refuseSecondJiraSource(req, res, provider, existing, site.url)) return
       const established = await establishAccount(
         req.session, accountStore, accountWorkspaceStore, 'jira', myself.accountId,
         { email: myself.emailAddress, displayName: myself.displayName }, existing.id
@@ -872,12 +861,10 @@ export function createJiraAuthRoutes({ provider, accountStore, accountWorkspaceS
       return finish(existing, conversion)
     }
 
-    // Fresh container. `deriveJiraUrlKey` reads the CURRENT session workspaces,
-    // so it must run before regenerate() wipes them.
     const workspace = {
       id: workspaceId,
       name: site.name || site.url,
-      urlKey: deriveJiraUrlKey(site, req.session.workspaces),
+      urlKey: resolved.urlKey,
       addedAt: Date.now(),
       // Stamp the real expiry explicitly so the workspace is never momentarily
       // marked never-expires; linkProvider's active-binding mirror overwrites it
