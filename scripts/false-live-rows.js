@@ -68,37 +68,88 @@ import { selectForWorkspace } from './lineage-close-backfill-lin3365.js';
 
 const toMs = (v) => (v == null ? NaN : (v instanceof Date ? v.getTime() : new Date(v).getTime()));
 
+const sleepMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** The proxy allows 60 reads/min; one read per 1.1s stays under it. */
+export const TICKET_READ_PACE_MS = 1100;
+export const TICKET_READ_MAX_RETRIES = 6;
+const TICKET_READ_RETRY_BASE_MS = 2000;
+const TICKET_READ_RETRY_CAP_MS = 30000;
+
 /**
  * Default ticket-state read: the workspace API (`GET /api/proxy/issues/:id`),
  * so the script holds no provider credentials of its own. Any failure -> null
  * (the caller buckets it as `unknown`).
+ *
+ * Only a 429 is retried (LIN-3399: unpaced, ~200 of 261 tickets read `unknown`
+ * against the proxy's 60/min limit). It waits `Retry-After` when the proxy
+ * sends one, else an exponential backoff, up to `maxRetries`; exhausted retries
+ * still return null. A 404, any other non-ok status, or a thrown error is NOT
+ * retried: those are answers, not rate limits.
  *
  * @returns {Promise<{issueId: string|null, stateType: string}|null>}
  */
 export async function defaultReadTicketState(urlKey, issueIdentifier, {
   base = process.env.HARBOUR_LOCAL_BASE,
   fetchImpl = globalThis.fetch,
-  ticketUrlKey = process.env.FALSE_LIVE_TICKET_URLKEY
+  ticketUrlKey = process.env.FALSE_LIVE_TICKET_URLKEY,
+  sleep = sleepMs,
+  maxRetries = TICKET_READ_MAX_RETRIES
 } = {}) {
   // The base is one workspace's proxy: a read for any other workspace would
   // return a same-identifier issue from the wrong one (team keys collide).
   if (!ticketUrlKey || urlKey !== ticketUrlKey) return null;
   if (!base || !issueIdentifier || typeof fetchImpl !== 'function') return null;
   try {
-    const res = await fetchImpl(`${base}/api/proxy/issues/${encodeURIComponent(issueIdentifier)}`);
-    if (!res.ok) return null;
-    const issue = await res.json();
-    const stateType = issue?.state?.type || null;
-    if (!stateType) return null;
-    return { issueId: issue.id || null, stateType };
+    for (let attempt = 0; ; attempt += 1) {
+      const res = await fetchImpl(`${base}/api/proxy/issues/${encodeURIComponent(issueIdentifier)}`);
+      if (res.status === 429) {
+        if (attempt >= maxRetries) return null;
+        const retryAfterS = Number(res.headers?.get?.('retry-after'));
+        const waitMs = Number.isFinite(retryAfterS) && retryAfterS > 0
+          ? retryAfterS * 1000
+          : TICKET_READ_RETRY_BASE_MS * 2 ** attempt;
+        await sleep(Math.min(waitMs, TICKET_READ_RETRY_CAP_MS));
+        continue;
+      }
+      if (!res.ok) return null;
+      const issue = await res.json();
+      const stateType = issue?.state?.type || null;
+      if (!stateType) return null;
+      return { issueId: issue.id || null, stateType };
+    }
   } catch {
     return null;
   }
 }
 
 /**
+ * Wraps a ticket reader with a minimum gap between underlying reads and a
+ * per-run memo keyed by workspace + identifier, so the clause checks and the
+ * false-close checks share one read per ticket. The memo holds the promise,
+ * so concurrent callers also share it; an `unknown` (null) is memoised too.
+ */
+export function createPacedMemoReader(read, { paceMs = TICKET_READ_PACE_MS, sleep = sleepMs, clock = Date.now } = {}) {
+  const memo = new Map();
+  let lastAt = -Infinity;
+  return (urlKey, issue) => {
+    const key = `${urlKey}\u0000${issue}`;
+    if (!memo.has(key)) {
+      memo.set(key, (async () => {
+        // lastAt is the scheduled start of the previous read, so concurrent callers queue.
+        const wait = Math.max(0, lastAt + paceMs - clock());
+        lastAt = clock() + wait;
+        if (wait > 0) await sleep(wait);
+        return read(urlKey, issue);
+      })());
+    }
+    return memo.get(key);
+  };
+}
+
+/**
  * Clause 3/4 over one workspace, from the closer's own selector. Ticket reads
- * are memoised per identifier. `humanReopened` counts settled items on a
+ * are memoised per run (by the caller). `humanReopened` counts settled items on a
  * terminal ticket (a decision, not staleness); `unverified` counts loops whose
  * legacy digest could not be resolved (never counted as false-live).
  */
@@ -107,11 +158,8 @@ async function ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, n
   const c = await prepareCloserCandidates({ loops, taskDecisions, newestScanByTask, now, dispatchStore, persist: false });
   out.unverified = c.unverified.length;
 
-  const cache = new Map();
-  const state = async (issue) => {
-    if (!cache.has(issue)) cache.set(issue, await readTicket(urlKey, issue).catch(() => null));
-    return cache.get(issue);
-  };
+  // `readTicket` is memoised per run by `runFalseLiveRows`, shared with `falseCloses`.
+  const state = (issue) => readTicket(urlKey, issue).catch(() => null);
   // null = unreadable (bucketed unknown), false = readable but not terminal.
   const terminal = async (issue) => {
     const st = await state(issue);
@@ -230,6 +278,8 @@ export async function runFalseLiveRows({
   readLoops = null,
   log = () => {}
 }) {
+  // One memo for the whole run, shared by the clause checks and the false-close checks.
+  const readTicketMemo = createPacedMemoReader(readTicketState, { paceMs: 0 });
   const keys = urlKeys || await dispatchStore.listObservedWorkspaceKeys();
   const loopsOf = readLoops || ((urlKey) => getLoopsForWorkspace(urlKey, { lean: true, dispatchStore, agentStatusStore }));
   const perWorkspace = [];
@@ -242,8 +292,8 @@ export async function runFalseLiveRows({
       const [taskDecisions, newestScanByTask] = taskDecisionsStore
         ? await Promise.all([taskDecisionsStore.listUnansweredForWorkspaces([urlKey]), taskDecisionsStore.listNewestScanPerTask([urlKey])])
         : [[], {}];
-      const t = await ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket: readTicketState, dispatchStore });
-      const fc = await falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket: readTicketState });
+      const t = await ticketClauses({ urlKey, loops, taskDecisions, newestScanByTask, now, readTicket: readTicketMemo, dispatchStore });
+      const fc = await falseCloses({ dispatchStore, taskDecisionsStore, urlKey, now, readTicket: readTicketMemo });
       perWorkspace.push({
         urlKey, readFailed: false,
         clause1: clause1.length, clause2: clause2.length, clause3: t.clause3.length, clause4: t.clause4.length,
@@ -333,7 +383,7 @@ async function main() {
       agentStatusStore,
       taskDecisionsStore,
       headSha: readHeadSha(),
-      readTicketState: (k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey }),
+      readTicketState: createPacedMemoReader((k, issue) => defaultReadTicketState(k, issue, { ticketUrlKey })),
       log: (m) => console.error(m) });
     console.log(report);
   } finally {
