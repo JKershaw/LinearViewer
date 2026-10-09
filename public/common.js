@@ -455,7 +455,8 @@ window.stripCodeBlockWrapper = function(text) {
  * Canonical superset hoisted from prompt-section.js (LIN-421): strips a
  * whole-string fence wrapper, renders with `marked.parse(cleaned, opts)` when
  * marked is available (falling back to escaped text when it isn't), then
- * sanitizes with DOMPurify when available. Returns '' for falsy input.
+ * sanitizes with DOMPurify. Without DOMPurify the result is the escaped source
+ * text, never marked's raw HTML (LIN-3385). Returns '' for falsy input.
  *
  * @global
  * @param {string} text            Markdown source
@@ -465,13 +466,19 @@ window.stripCodeBlockWrapper = function(text) {
  *   fence there is a deliberate snippet, not packaging around a document, so stripping it
  *   would let its contents be re-interpreted as Markdown. Additive; falsy default preserves
  *   every other caller's behaviour unchanged.
- * @returns {string} Sanitized HTML (or escaped text when marked is absent).
+ * @returns {string} Sanitized HTML (or escaped text when marked or DOMPurify is absent).
  */
 window.renderMarkdown = function(text, opts, keepWholeFence) {
   if (!text) return '';
   const cleaned = keepWholeFence ? text : window.stripCodeBlockWrapper(text);
+  // LIN-3385: with no sanitizer, show the source as plain escaped text. marked's
+  // own output is raw HTML (it passes tags through), so it must never be
+  // returned unsanitized.
+  if (typeof DOMPurify === 'undefined') return window.escapeHtml(cleaned);
   const html = typeof marked !== 'undefined' ? marked.parse(cleaned, opts) : window.escapeHtml(cleaned);
-  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
+  // Ticket text must not render a control that does something: a native <form>
+  // submits same-origin without any of our script (LIN-3385).
+  return DOMPurify.sanitize(html, { FORBID_TAGS: ['form'] });
 };
 
 // =============================================================================
@@ -2263,6 +2270,21 @@ window.ProxyToggle = (function () {
     return isActive() && isFeatureEnabled();
   }
 
+  // LIN-3385: a page that renders ticket text and has no real +proxy toggle
+  // (task page, run page, Flight Companion) turns the delegated handler off, so
+  // a look-alike `.prompt-proxy-toggle` in that text cannot write the setting.
+  // Order-independent: honoured whether it is called before or after `init`.
+  // LIN-3401 removes the delegation for the remaining pages.
+  let delegationDisabled = false;
+  let delegatedClick = null;
+  function disableDelegation() {
+    delegationDisabled = true;
+    if (delegatedClick) {
+      document.removeEventListener('click', delegatedClick);
+      delegatedClick = null;
+    }
+  }
+
   /**
    * Wire a single delegated click handler for every +proxy button on the page
    * (current and future-injected). The rendered active look comes from the
@@ -2270,13 +2292,16 @@ window.ProxyToggle = (function () {
    * restore here (LIN-2944 P3).
    */
   function init() {
-    document.addEventListener('click', (e) => {
-      const btn = e.target.closest('.prompt-proxy-toggle');
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      setActive(!isActive());
-    });
+    if (!delegationDisabled && !delegatedClick) {
+      delegatedClick = (e) => {
+        const btn = e.target.closest('.prompt-proxy-toggle');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setActive(!isActive());
+      };
+      document.addEventListener('click', delegatedClick);
+    }
     // R1: a toggle-path 429 skip is announced on every surface (the opened-task
     // component also renders an inline notice beside the toggle).
     document.addEventListener('harbour:proxy-rate-limited', () => {
@@ -2288,7 +2313,7 @@ window.ProxyToggle = (function () {
     });
   }
 
-  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
+  return { isActive, isFeatureEnabled, getOrCreateToken, getRunnerBootstrap, RUNNER_BOOTSTRAP_ERROR_COPY, DRIVER_COPY_ERROR_COPY, buildBlock, maybeAppend, shouldAppend, init, disableDelegation, setActive, takeRateLimitNotice, RATE_LIMIT_SKIP_NOTICE };
 })();
 
 // Back-compat global consumed by app.js / dispatch.js call sites

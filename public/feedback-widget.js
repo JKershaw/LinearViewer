@@ -92,11 +92,14 @@
     const urlKey = root.dataset.urlKey;
 
     // The footer toggle persists the flag through the shared /settings/features
-    // path, then reloads so the widget appears/disappears. Delegated so it works
-    // regardless of where the toggle lives in the footer.
-    document.addEventListener('click', async (e) => {
-      const toggle = e.target.closest('.footer-feedback-toggle');
-      if (!toggle) return;
+    // path, then reloads so the widget appears/disappears. LIN-3385: bound on
+    // the toggle inside the footer Harbour rendered, not delegated on the
+    // document by class, so a look-alike `.footer-feedback-toggle` in ticket
+    // text cannot write the setting. `init` runs before any page markdown
+    // renders (this script is deferred; the Flight Companion restores its
+    // thread only on DOMContentLoaded), so this lookup is Harbour's own.
+    const toggle = document.querySelector('footer.page-footer .footer-feedback-toggle');
+    if (toggle) toggle.addEventListener('click', async (e) => {
       e.preventDefault();
       if (toggle.dataset.busy === 'true') return;
       toggle.dataset.busy = 'true';

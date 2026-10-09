@@ -15,6 +15,11 @@
 (function () {
   'use strict';
 
+  // LIN-3385: this page has no real +proxy toggle, so ProxyToggle's delegated
+  // click handler (common.js) must not answer a look-alike in ticket text.
+  // Top level, so it is set before common.js's DOMContentLoaded `init`.
+  if (typeof window !== 'undefined' && window.ProxyToggle && window.ProxyToggle.disableDelegation) window.ProxyToggle.disableDelegation();
+
   // ── Conversational "you" echo (LIN-1298) ─────────────────────────────────
   // The shared ChatUI helper (public/chat.js) builds the "you" turn so the
   // reply reads as a chat message, not a vanished textarea. UI-only — the real
@@ -729,10 +734,15 @@
   // the close-out prompt and calls window.dispatchPrompt (no new dispatch
   // route) — then records the press through beat 2's route. Detection calls
   // the check route on load and on tab focus, only while the state is ready.
-  function closeOutContext() {
-    var box = document.querySelector('[data-testid="run-evidence-closeout"]');
+  //
+  // LIN-3385: production callers pass the box and reply box captured by
+  // `initCloseOut` before any transcript markdown rendered. The no-argument
+  // form (a document lookup by label) is a unit-test seam only; the
+  // no-page-wide-label-listener guard rejects any production call of it.
+  function closeOutContext(capturedBox, capturedReply) {
+    var box = capturedBox || document.querySelector('[data-testid="run-evidence-closeout"]');
     if (!box) return null;
-    var reply = document.querySelector('[data-testid="session-inline-reply"][data-issue-id]');
+    var reply = capturedBox ? (capturedReply || null) : document.querySelector('[data-testid="session-inline-reply"][data-issue-id]');
     var urlKey = (reply && reply.getAttribute('data-url-key')) || box.getAttribute('data-url-key') || '';
     var issueId = reply ? (reply.getAttribute('data-issue-id') || '') : '';
     var issueIdentifier = (reply && reply.getAttribute('data-issue-identifier'))
@@ -779,8 +789,12 @@
     }
   }
 
+  // The captured close-out box and reply box (set once by `initCloseOut`).
+  var closeOutBox = null;
+  var closeOutReply = null;
+
   function runCloseOutCheck() {
-    var ctx = closeOutContext();
+    var ctx = closeOutContext(closeOutBox, closeOutReply);
     if (!ctx || !ctx.urlKey || !ctx.issueIdentifier) return;
     var state = ctx.box.getAttribute('data-state');
     // Stop-at-PR runs only (LIN-3248 review F1): an ordinary run's merged page
@@ -811,7 +825,7 @@
   }
 
   function pressCloseOut(btn) {
-    var ctx = closeOutContext();
+    var ctx = closeOutContext(closeOutBox, closeOutReply);
     if (!ctx || !ctx.urlKey || !ctx.issueId || !ctx.issueIdentifier) return;
     var original = btn.textContent;
     btn.disabled = true;
@@ -853,13 +867,19 @@
   }
 
   function initCloseOut() {
-    if (!document.querySelector('[data-testid="run-evidence-closeout"]')) return;
-    document.addEventListener('click', function (e) {
-      var btn = e.target && e.target.closest ? e.target.closest('[data-action="closeout-press"]') : null;
-      if (!btn) return;
-      e.preventDefault();
-      pressCloseOut(btn);
-    });
+    var box = document.querySelector('[data-testid="run-evidence-closeout"]');
+    if (!box) return;
+    closeOutBox = box;
+    closeOutReply = document.querySelector('[data-testid="session-inline-reply"][data-issue-id]');
+    // LIN-3385: bind the press on the button Harbour rendered in the captured
+    // box, not on the document by label (ticket text could carry the label).
+    var pressBtn = box.querySelector('[data-action="closeout-press"]');
+    if (pressBtn) {
+      pressBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        pressCloseOut(pressBtn);
+      });
+    }
     runCloseOutCheck();
     // Tab return only: `window` focus plus visible `visibilitychange`, debounced
     // (LIN-3248 review N-a) — never the capture-phase document focus that fired
@@ -872,15 +892,20 @@
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
-    // Per-run transcripts must render before toggle init so content is visible.
-    renderRunTranscripts();
-    initRunToggles();
+    // LIN-3385: every init that looks a Harbour control up by label runs BEFORE
+    // `renderRunTranscripts()`, the first place ticket-derived markdown reaches
+    // the page. Looked up after, a look-alike in a transcript message could be
+    // matched (or matched first). Only `initRunToggles` (UI-only: it expands
+    // run rows) stays after, because it needs the rendered transcripts.
     initQuestionCards();
     initInlineReplies();
     initProposals();
     initContextWidgets();
     initPrState();
     initCloseOut();
+    // Per-run transcripts must render before toggle init so content is visible.
+    renderRunTranscripts();
+    initRunToggles();
     tickClocks();
     setInterval(tickClocks, 1000);
   });

@@ -103,3 +103,69 @@ describe('window.renderMarkdown keepWholeFence opt-out (LIN-2670)', () => {
     assert.equal(window.renderMarkdown(WHOLE_FENCE, { breaks: true }, undefined), base);
   });
 });
+
+describe('window.renderMarkdown with no sanitizer (LIN-3385)', () => {
+  test('DOMPurify missing, marked present: ticket HTML comes back as escaped text, never raw markup', () => {
+    const sandbox = makeSandbox();
+    delete sandbox.DOMPurify;
+    const html = sandbox.window.renderMarkdown('<button data-action="closeout-press">x</button>');
+    assert.ok(!html.includes('<button'), 'no live <button> element: ' + html);
+    assert.ok(html.includes('&lt;button'), 'the tag is shown as text: ' + html);
+  });
+
+  test('DOMPurify present: unchanged (marked output through the sanitizer)', () => {
+    const { window } = makeSandbox();
+    assert.match(window.renderMarkdown('**b**'), /<strong>b<\/strong>/);
+  });
+});
+
+describe('ProxyToggle.disableDelegation (LIN-3385)', () => {
+  function sandboxWithDocument() {
+    const listeners = [];
+    const sandbox = {
+      console,
+      document: {
+        addEventListener(type, fn) { if (type === 'click') listeners.push(fn); },
+        removeEventListener(type, fn) { const i = listeners.indexOf(fn); if (type === 'click' && i >= 0) listeners.splice(i, 1); },
+      },
+    };
+    sandbox.window = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(MARKED_SRC, sandbox, { filename: 'marked.min.js' });
+    sandbox.DOMPurify = { sanitize: (h) => h };
+    vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
+    return { sandbox, listeners };
+  }
+
+  test('disable before init: init installs no delegated click handler', () => {
+    const { sandbox, listeners } = sandboxWithDocument();
+    sandbox.ProxyToggle.disableDelegation();
+    sandbox.ProxyToggle.init();
+    assert.strictEqual(listeners.length, 0);
+  });
+
+  test('disable after init: the installed delegated click handler is removed', () => {
+    const { sandbox, listeners } = sandboxWithDocument();
+    sandbox.ProxyToggle.init();
+    assert.strictEqual(listeners.length, 1);
+    sandbox.ProxyToggle.disableDelegation();
+    assert.strictEqual(listeners.length, 0);
+  });
+
+  test('without disable, init still installs the delegated handler (dashboard pages, LIN-3401)', () => {
+    const { sandbox, listeners } = sandboxWithDocument();
+    sandbox.ProxyToggle.init();
+    assert.strictEqual(listeners.length, 1);
+  });
+});
+
+describe('window.renderMarkdown forbids <form> (LIN-3385)', () => {
+  test('the sanitizer is called with FORBID_TAGS including form, so rendered ticket text cannot carry a native form', () => {
+    const sandbox = makeSandbox();
+    const seen = [];
+    sandbox.DOMPurify = { sanitize: (html, cfg) => { seen.push(cfg); return html; } };
+    sandbox.window.renderMarkdown('<form action="/settings/features" method="post"><button>go</button></form>');
+    assert.strictEqual(seen.length, 1);
+    assert.ok(seen[0] && Array.isArray(seen[0].FORBID_TAGS) && seen[0].FORBID_TAGS.includes('form'));
+  });
+});
