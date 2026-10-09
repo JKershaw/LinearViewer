@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { runFalseLiveRows, defaultReadTicketState } from '../../scripts/false-live-rows.js';
+import { runFalseLiveRows, defaultReadTicketState, createPacedMemoReader } from '../../scripts/false-live-rows.js';
 import { runLineageBackfill } from '../../scripts/lineage-close-backfill-lin3365.js';
 import { TICKET_CLOSED_GRACE_MS } from '../../lib/lineage-closure.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
@@ -269,5 +269,69 @@ describe('false-live-rows (LIN-3365)', () => {
   test('report says other-workspace tickets read unknown', async () => {
     const r = await run();
     assert.match(r.report, /includes: tickets of any workspace other than --ticket-workspace/);
+  });
+  describe('paced, retrying ticket reader (LIN-3399)', () => {
+    const okRes = { status: 200, ok: true, json: async () => ({ id: 'iid', state: { type: 'completed' } }) };
+    const res429 = (retryAfter) => ({ status: 429, ok: false, headers: { get: (h) => (h === 'retry-after' ? retryAfter ?? null : null) }, json: async () => ({}) });
+    const opts = (fetchImpl, extra = {}) => ({ base: 'http://x', fetchImpl, ticketUrlKey: 'acme', sleep: async (ms) => { opts.slept.push(ms); }, ...extra });
+    beforeEach(() => { opts.slept = []; });
+
+    test('a 429 is retried (honouring Retry-After, else backing off) and then reads the state', async () => {
+      const seq = [res429('3'), res429(), okRes];
+      let calls = 0;
+      const r = await defaultReadTicketState('acme', 'LIN-1', opts(async () => seq[calls++]));
+      assert.equal(r.stateType, 'completed');
+      assert.equal(calls, 3);
+      assert.deepEqual(opts.slept, [3000, 4000]);
+    });
+
+    test('exhausted 429 retries still return null (unknown), after maxRetries + 1 fetches', async () => {
+      let calls = 0;
+      const r = await defaultReadTicketState('acme', 'LIN-1', opts(async () => { calls += 1; return res429(); }, { maxRetries: 2 }));
+      assert.equal(r, null);
+      assert.equal(calls, 3);
+    });
+
+    test('a 404, another non-ok status and a thrown error are NOT retried', async () => {
+      for (const impl of [
+        async () => ({ status: 404, ok: false }),
+        async () => ({ status: 500, ok: false }),
+        async () => { throw new Error('down'); }
+      ]) {
+        let calls = 0;
+        const r = await defaultReadTicketState('acme', 'LIN-1', opts(async () => { calls += 1; return impl(); }));
+        assert.equal(r, null);
+        assert.equal(calls, 1);
+      }
+      assert.deepEqual(opts.slept, []);
+    });
+
+    test('the ticketUrlKey guard still holds with retries enabled', async () => {
+      let calls = 0;
+      assert.equal(await defaultReadTicketState('other', 'LIN-1', opts(async () => { calls += 1; return okRes; })), null);
+      assert.equal(calls, 0);
+    });
+
+    test('the paced memo reader reads each ticket once, spaces underlying reads, and memoises null', async () => {
+      const reads = [];
+      let t = 1000;
+      const slept = [];
+      const read = createPacedMemoReader(async (k, i) => { reads.push(i); return i === 'LIN-N' ? null : { stateType: 'completed' }; },
+        { paceMs: 1100, clock: () => t, sleep: async (ms) => { slept.push(ms); t += ms; } });
+      await read('acme', 'LIN-1'); await read('acme', 'LIN-1'); await read('acme', 'LIN-N'); await read('acme', 'LIN-N'); await read('acme', 'LIN-2');
+      assert.deepEqual(reads, ['LIN-1', 'LIN-N', 'LIN-2']);
+      assert.equal(slept.length, 2);
+      assert.ok(slept.every(ms => ms === 1100));
+    });
+
+    test('one run reads a ticket once across the clause checks and the false-close checks', async () => {
+      await seed('closed', { bookkeeping: { at: ago(1), by: 'ticket-closer', reason: 'ticket-closed' } });
+      const seen = [];
+      await run({
+        readLoops: async () => [blockedLoop('l1', 'LIN-1')],
+        readTicketState: async (_k, issue) => { seen.push(issue); return termTicket; }
+      });
+      assert.deepEqual(seen, ['LIN-1']);
+    });
   });
 });
