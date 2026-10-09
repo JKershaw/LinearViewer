@@ -66,6 +66,22 @@ describe('ticket-closed-clear (LIN-3399)', () => {
     assert.match(r.report, /blocked\/silent rows \(clause 3\)\s+1/);
   });
 
+  test('a dry run never writes a healed digest back (persist:false), even for a legacy unverified row', async () => {
+    await seedBlocked('legacy');
+    // A legacy digest: a current decision but no `withdrawalReversed` key, so the row is `unverified` and `redigest` runs.
+    const legacyLoop = {
+      loopId: 'legacy', issueIdentifier: 'LIN-1', terminalStatus: null, wakeMarker: 'blocked', agentState: null,
+      historyStatus: 'taken', source: 'history', bookkeeping: null, dispatchedAt: mins(300).toISOString(),
+      decision: { decision_id: 'dec-legacy', question: 'q', options: [] }, decisionCase: [], answeredDecisions: [],
+      withdrawal: null, withdrawalReversed: undefined, workspaceUrlKey: 'acme'
+    };
+    const whole = async () => JSON.stringify(await history.find({}).toArray()); // includes feedbackDigest
+    const before = await whole();
+    const r = await run({ readLoops: async () => [legacyLoop] });
+    assert.equal(r.execute, false);
+    assert.equal(await whole(), before, 'a dry run leaves feedbackDigest byte-identical');
+  });
+
   test('--execute takes clauses 3 and 4 from N to 0, stamps the clear\'s own actor, and is idempotent', async () => {
     await seedBlocked();
     const before = (await live()).perWorkspace[0];

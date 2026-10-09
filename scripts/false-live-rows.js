@@ -324,6 +324,7 @@ export function buildReport({ perWorkspace, now, headSha }) {
   L.push('');
   L.push(`Run at: ${new Date(now).toISOString()}`);
   L.push(`HEAD: ${headSha || '(unknown — not a git checkout)'}`);
+  L.push(`Ticket reads: paced ${TICKET_READ_PACE_MS}ms, up to ${TICKET_READ_MAX_RETRIES} retries on 429 (LIN-3399; runs before this were unpaced)`);
   L.push(`Workspaces read: ${ok.length}${failed.length ? ` (${failed.length} FAILED: ${failed.map(w => w.urlKey).join(', ')})` : ''}`);
   L.push(`Horizon: dispatchedAt >= ${new Date(now - READ_HORIZON_MS).toISOString()} (READ_HORIZON_MS); ticket grace ${TICKET_CLOSED_GRACE_MS / 60000}m`);
   L.push('');
