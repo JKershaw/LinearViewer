@@ -163,15 +163,24 @@ describe('render-run-evidence: P3 close-out box states (LIN-3248)', () => {
     assert.match(html, /data-testid="run-evidence-closeout-ready">✓ PR ready for close-out/);
     assert.match(html, /data-testid="run-evidence-closeout-press"[^>]*>\[ close out &amp; merge \]/);
     assert.match(html, /data-testid="run-evidence-closeout-merge-yourself"[^>]*>or merge it yourself on GitHub ›/);
-    assert.match(html, /data-testid="run-evidence-closeout-promise">Harbour never merges on its own\./);
+    assert.match(html, /data-testid="run-evidence-closeout-promise">Harbour stops this run at the PR and leaves the merge to a person\./);
     assert.match(html, /data-variant="standard"/);
     assert.match(html, /data-stop-at="pr"/);
+  });
+
+  test('the promise copy is viewer-true: no second person, advises branch protection, claims no enforcement', () => {
+    const html = renderCloseOutBox(readyState());
+    const m = /data-testid="run-evidence-closeout-promise">([^<]*)</.exec(html);
+    assert.ok(m, 'promise paragraph present');
+    assert.ok(!/\b(you|your|yours)\b/i.test(m[1]), 'shown to non-owner viewers: no you/your');
+    assert.match(m[1], /protect the default branch on GitHub/);
+    assert.ok(!/never merges/i.test(m[1]));
   });
 
   test('N2: a stepped run omits the promise and preserves the stepper variant', () => {
     const html = renderCloseOutBox(readyState({ variant: 'stepper' }));
     assert.match(html, /data-variant="stepper"/);
-    assert.ok(!html.includes('Harbour never merges on its own'));
+    assert.ok(!html.includes('Harbour stops this run at the PR'));
     assert.ok(!html.includes('data-testid="run-evidence-closeout-promise"'));
     // The press itself is still offered.
     assert.match(html, /data-testid="run-evidence-closeout-press"/);
@@ -180,7 +189,7 @@ describe('render-run-evidence: P3 close-out box states (LIN-3248)', () => {
   test('M9: an unknown variant (missing/legacy row) withholds the promise — never coerced to standard', () => {
     const html = renderCloseOutBox(readyState({ variant: 'unknown' }));
     assert.match(html, /data-variant="unknown"/);
-    assert.ok(!html.includes('Harbour never merges on its own'));
+    assert.ok(!html.includes('Harbour stops this run at the PR'));
     assert.ok(!html.includes('data-testid="run-evidence-closeout-promise"'));
     assert.match(html, /data-testid="run-evidence-closeout-press"/);
   });

@@ -79,11 +79,11 @@ function makeContainer() {
     addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
     removeEventListener() {},
     async clickPrompt(label) {
-      const btn = { dataset: { prompt: label }, closest: () => btn };
+      const btn = { dataset: { prompt: label }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
       await this._clickHandler({ target: btn });
     },
     async clickAction(action) {
-      const btn = { dataset: { action }, closest: () => btn };
+      const btn = { dataset: { action }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
       await this._clickHandler({ target: btn });
     },
   };

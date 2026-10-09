@@ -33,10 +33,6 @@
 (function () {
   'use strict';
 
-  // LIN-3385: this page has no real +proxy toggle, so ProxyToggle's delegated
-  // click handler (common.js) must not answer a look-alike in ticket text.
-  if (typeof window !== 'undefined' && window.ProxyToggle && window.ProxyToggle.disableDelegation) window.ProxyToggle.disableDelegation();
-
   var FAST_MS = 10000;
   var SLOW_MS = 45000;
   var MAX_BACKOFF_MS = 5 * 60 * 1000;

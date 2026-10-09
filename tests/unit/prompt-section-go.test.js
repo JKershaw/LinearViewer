@@ -73,7 +73,7 @@ function makeContainer() {
       return null;
     },
     async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: () => btn };
+      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
       await this._clickHandler({ target: btn });
       return btn;
     },

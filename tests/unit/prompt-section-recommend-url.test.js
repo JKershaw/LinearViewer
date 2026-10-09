@@ -46,7 +46,7 @@ function makeContainer() {
     // target.closest(...) resolves to a button carrying data-prompt=<label>,
     // mirroring the real button markup renderPicker() emits.
     async clickPrompt(label) {
-      const btn = { dataset: { prompt: label }, closest: () => btn };
+      const btn = { dataset: { prompt: label }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
       await this._clickHandler({ target: btn });
     },
   };

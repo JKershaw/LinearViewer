@@ -119,14 +119,15 @@ describe('window.renderMarkdown with no sanitizer (LIN-3385)', () => {
   });
 });
 
-describe('ProxyToggle.disableDelegation (LIN-3385)', () => {
-  function sandboxWithDocument() {
-    const listeners = [];
+describe('ProxyToggle binds the button itself (LIN-3401)', () => {
+  function sandboxWithDocument(toggles = []) {
+    const docListeners = [];
     const sandbox = {
       console,
       document: {
-        addEventListener(type, fn) { if (type === 'click') listeners.push(fn); },
-        removeEventListener(type, fn) { const i = listeners.indexOf(fn); if (type === 'click' && i >= 0) listeners.splice(i, 1); },
+        body: { dataset: { proxyActive: 'false' } },
+        addEventListener(type, fn) { docListeners.push([type, fn]); },
+        querySelectorAll() { return toggles; },
       },
     };
     sandbox.window = sandbox;
@@ -134,28 +135,38 @@ describe('ProxyToggle.disableDelegation (LIN-3385)', () => {
     vm.runInContext(MARKED_SRC, sandbox, { filename: 'marked.min.js' });
     sandbox.DOMPurify = { sanitize: (h) => h };
     vm.runInContext(COMMON_SRC, sandbox, { filename: 'common.js' });
-    return { sandbox, listeners };
+    return { sandbox, docListeners };
   }
+  const fakeBtn = () => {
+    const handlers = [];
+    return { handlers, addEventListener(t, fn) { if (t === 'click') handlers.push(fn); } };
+  };
+  const click = (btn) => btn.handlers.forEach((fn) => fn({ preventDefault() {}, stopPropagation() {} }));
 
-  test('disable before init: init installs no delegated click handler', () => {
-    const { sandbox, listeners } = sandboxWithDocument();
-    sandbox.ProxyToggle.disableDelegation();
+  test('init installs no document-level click listener', () => {
+    const { sandbox, docListeners } = sandboxWithDocument();
     sandbox.ProxyToggle.init();
-    assert.strictEqual(listeners.length, 0);
+    assert.deepStrictEqual(docListeners.filter(([t]) => t === 'click'), []);
   });
 
-  test('disable after init: the installed delegated click handler is removed', () => {
-    const { sandbox, listeners } = sandboxWithDocument();
+  test('init binds the server-rendered toggles; clicking one flips the persisted mode', () => {
+    const btn = fakeBtn();
+    const { sandbox } = sandboxWithDocument([btn]);
     sandbox.ProxyToggle.init();
-    assert.strictEqual(listeners.length, 1);
-    sandbox.ProxyToggle.disableDelegation();
-    assert.strictEqual(listeners.length, 0);
+    assert.strictEqual(btn.handlers.length, 1);
+    click(btn);
+    assert.strictEqual(sandbox.document.body.dataset.proxyActive, 'true');
   });
 
-  test('without disable, init still installs the delegated handler (dashboard pages, LIN-3401)', () => {
-    const { sandbox, listeners } = sandboxWithDocument();
-    sandbox.ProxyToggle.init();
-    assert.strictEqual(listeners.length, 1);
+  test('bind is idempotent and an unbound look-alike does nothing', () => {
+    const real = fakeBtn();
+    const lookAlike = fakeBtn();
+    const { sandbox } = sandboxWithDocument();
+    sandbox.ProxyToggle.bind(real);
+    sandbox.ProxyToggle.bind(real);
+    assert.strictEqual(real.handlers.length, 1);
+    assert.strictEqual(lookAlike.handlers.length, 0);
+    sandbox.ProxyToggle.bind(null);
   });
 });
 

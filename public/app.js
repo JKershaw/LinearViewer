@@ -1013,211 +1013,239 @@ function init() {
  * (LIN-2944 P1 F1); the opened-task surface is now the shared PromptSection.
  */
 function initPrompts() {
-  // Handle copy button clicks
-  document.addEventListener('click', async (e) => {
-    const copyBtn = e.target.closest('.prompt-copy')
-    if (!copyBtn) return
+  bindPromptControls(document)
+}
 
-    e.preventDefault()
-    e.stopPropagation()
+// LIN-3401: ticket text is rendered into this same document (descriptions,
+// comments) and keeps `class`, so a page-wide `closest('.prompt-copy')` listener
+// would let a look-alike act as the control. Each control is instead bound
+// directly to the button Harbour created. Prompt containers are server-rendered
+// (periodical rows, Setup Prompt) or arrive inside a lazy `.details` fragment
+// (loadDetails), so this runs at load and again on every injected fragment. A
+// container inside a markdown sink is ticket text, never Harbour's: skipped.
+const MARKDOWN_SINK = '.desc-full, .desc-truncated, .comment-body'
+const boundControls = new WeakSet()
 
-    // LIN-191: Ignore clicks on disabled buttons
-    if (copyBtn.disabled) return
-
-    const promptContainer = copyBtn.closest('.prompt-container')
-    const promptText = promptContainer?.querySelector('.prompt-text')
-    if (!promptText) return
-
-    // Use raw markdown from data attribute, fall back to textContent
-    // Strip any backtick code fences the AI may have wrapped the prompt in
-    let textToCopy = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
-    const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
-
-    try {
-      // Append the proxy block (if +proxy is on) inside the try so a failed
-      // token mint surfaces as "failed" instead of silently copying a bare prompt.
-      // LIN-3079: a container marked data-proxy-force (home/Autopilot, periodical
-      // Mint+Autopilot) forces the append regardless of the +proxy toggle.
-      const forceProxy = promptContainer.dataset.proxyForce === 'true'
-      textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey, { force: forceProxy })
-      await navigator.clipboard.writeText(textToCopy)
-      const originalText = copyBtn.textContent
-      copyBtn.textContent = 'copied!'
-      setTimeout(() => {
-        copyBtn.textContent = originalText
-      }, 1500)
-    } catch (error) {
-      console.error('Failed to copy:', error)
-      // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
-      if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
-      copyBtn.textContent = 'failed'
-      setTimeout(() => {
-        copyBtn.textContent = 'copy'
-      }, 1500)
-    }
-  })
-
-  // Handle download button clicks — mirrors copy, but writes the prompt to a
-  // .md file instead of the clipboard (LIN-316). Retro/epic prompts can exceed
-  // clipboard practicality, so a download is the escape hatch. The file MUST
-  // byte-match what copy yields, so we apply the same fence-strip + +proxy block.
-  document.addEventListener('click', async (e) => {
-    const downloadBtn = e.target.closest('.prompt-download')
-    if (!downloadBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (downloadBtn.disabled) return
-
-    const promptContainer = downloadBtn.closest('.prompt-container')
-    const promptText = promptContainer?.querySelector('.prompt-text')
-    if (!promptText) return
-
-    let textToDownload = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
-    const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
-    const promptName = promptContainer.querySelector('.prompt-name')?.textContent || 'prompt'
-    // Identifier lives on the issue's tree line, not the prompt container.
-    const identifier = promptContainer.closest('.node')?.querySelector('.line')?.dataset.identifier || ''
-
-    try {
-      // Append the proxy block (if +proxy is on) inside the try so a failed
-      // token mint surfaces as "failed" instead of silently saving a bare prompt.
-      // LIN-3079: honour data-proxy-force (home/Autopilot, periodical
-      // Mint+Autopilot) so the downloaded .md always carries the forced block.
-      const forceProxy = promptContainer.dataset.proxyForce === 'true'
-      textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey, { force: forceProxy })
-      downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
-      const originalText = downloadBtn.textContent
-      downloadBtn.textContent = 'saved!'
-      setTimeout(() => {
-        downloadBtn.textContent = originalText
-      }, 1500)
-    } catch (error) {
-      console.error('Failed to download:', error)
-      // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
-      if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
-      downloadBtn.textContent = 'failed'
-      setTimeout(() => {
-        downloadBtn.textContent = 'download'
-      }, 1500)
-    }
-  })
-
-  // Handle dispatch button clicks
-  document.addEventListener('click', async (e) => {
-    const dispatchBtn = e.target.closest('.prompt-dispatch')
-    if (!dispatchBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    // LIN-191: Ignore clicks on disabled buttons
-    if (dispatchBtn.disabled) return
-
-    const promptContainer = dispatchBtn.closest('.prompt-container')
-    const promptText = promptContainer?.querySelector('.prompt-text')
-    const promptNameEl = promptContainer?.querySelector('.prompt-name')
-    if (!promptText) return
-
-    // Get the prompt content, stripping any backtick code fences
-    let prompt = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
-    const promptName = promptNameEl?.textContent || 'Prompt'
-
-    // Read target from button's data-target attribute (defaults to 'cli')
-    const target = dispatchBtn.dataset.target || 'cli'
-    const originalLabel = dispatchBtn.textContent
-
-    // Get issue ID and workspace URL key. The surviving page-wide containers
-    // are the periodical Mint / Mint+Autopilot and Setup Prompt rows, which are
-    // issue-less (`renderPromptContainer` emits no `data-prompt-for`), so a
-    // missing id resolves to `issueless: true` below.
-    const issueId = promptContainer.dataset.promptFor
-    const urlKey = promptContainer.dataset.urlKey ||
-      promptContainer.closest('[data-url-key]')?.dataset.urlKey
-
-    if (!urlKey) {
-      console.error('No workspace URL key found for dispatch')
-      dispatchBtn.textContent = 'failed'
-      setTimeout(() => { dispatchBtn.textContent = originalLabel }, 1500)
-      return
-    }
-
-    // Get issue context from the DOM. The .line carries data-id and
-    // data-identifier; the surrounding .node wrapper shares data-id, so query
-    // the line specifically to read the identifier (the pipeline-loops join key).
-    const lineEl = issueId ? document.querySelector(`.line[data-id="${issueId}"]`) : null
-    const issueTitle = lineEl?.querySelector('.title, .title-dim')?.textContent || null
-    const issueIdentifier = lineEl?.dataset.identifier || null
-
-    // LIN-3242 (LIN-3126 §4): read the row's own provider stamp so the dispatch
-    // is resolved against the provider it came from. The lazy `.details` wrapper
-    // carries `data-source` (render.js), present in the DOM even before expansion.
-    const detailsEl = promptContainer.closest('.details')
-    const issueSource = detailsEl?.dataset.source || undefined
-
-    // Explicit kind for meta-loops (e.g. Autopilot) — set on the container by
-    // its fetch handler; absent for ordinary prompts, where the server derives
-    // kind from promptName.
-    const kind = promptContainer.dataset.kind || undefined
-    // Periodical-template join key (LIN-1825): set on the container by
-    // renderPeriodicalNode's data-periodical-id, absent for ordinary prompts.
-    const periodicalId = promptContainer.dataset.periodicalId || undefined
-
-    // LIN-1279: surfaces whose prompt REQUIRES workspace-API proxy context (the
-    // Mint + Autopilot periodical variant, whose tail calls the kickoff endpoint)
-    // mark their container with data-proxy-force. It forces attachProxy on regardless
-    // of the +proxy toggle, so the dispatched agent always receives a proxy token.
-    const proxyForce = promptContainer.dataset.proxyForce === 'true'
-
-    // LIN-345: some rows that share this handler are issue-less by design — the
-    // synthetic Periodicals group (kind=periodical) dispatches a template prompt
-    // with no Linear issue behind it, so no data-prompt-for / data-identifier is
-    // present and issueId resolves to undefined. Opt out of the issue-link
-    // contract explicitly (mirroring the custom-prompt page) rather than passing
-    // an `issue` object full of null fields, which dispatchPrompt rejects.
-    const issueless = !issueId
-
-    try {
-      dispatchBtn.textContent = 'sending...'
-
-      // Proxy-context appending is now handled internally by dispatchPrompt()
-      // (LIN-1137). The exec controls still live in the dispatch options panel.
-
-      const { model, harness } = window.readDispatchExecControls(dispatchBtn.closest('.prompt-options'))
-
-      await dispatchPrompt({
-        urlKey,
-        prompt,
-        promptName,
-        ...(issueless
-          ? { issueless: true }
-          : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle, source: issueSource } }),
-        target,
-        kind,
-        periodicalId,
-        model,
-        harness,
-        proxyForce
+function bindPromptControls(root) {
+  const controls = [
+    ['.prompt-copy', handleCopyClick],
+    ['.prompt-download', handleDownloadClick],
+    ['.prompt-dispatch', handleDispatchClick]
+  ]
+  root.querySelectorAll('.prompt-container').forEach((container) => {
+    if (container.parentElement?.closest(MARKDOWN_SINK)) return
+    for (const [selector, handler] of controls) {
+      container.querySelectorAll(`.prompt-actions ${selector}`).forEach((btn) => {
+        // Only a button whose nearest container is this one (no nesting tricks).
+        if (btn.closest('.prompt-container') !== container || boundControls.has(btn)) return
+        boundControls.add(btn)
+        btn.addEventListener('click', handler)
       })
-
-      dispatchBtn.textContent = 'dispatched!'
-      dispatchBtn.classList.add('dispatched')
-
-      setTimeout(() => {
-        dispatchBtn.textContent = originalLabel
-        dispatchBtn.classList.remove('dispatched')
-      }, 1500)
-    } catch (error) {
-      console.error('Failed to dispatch:', error)
-      // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
-      if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
-      dispatchBtn.textContent = 'failed'
-      setTimeout(() => {
-        dispatchBtn.textContent = originalLabel
-      }, 1500)
     }
   })
+}
+
+// Copy button click
+async function handleCopyClick(e) {
+  const copyBtn = e.currentTarget
+
+  e.preventDefault()
+  e.stopPropagation()
+
+  // LIN-191: Ignore clicks on disabled buttons
+  if (copyBtn.disabled) return
+
+  const promptContainer = copyBtn.closest('.prompt-container')
+  const promptText = promptContainer?.querySelector('.prompt-text')
+  if (!promptText) return
+
+  // Use raw markdown from data attribute, fall back to textContent
+  // Strip any backtick code fences the AI may have wrapped the prompt in
+  let textToCopy = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+  const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
+
+  try {
+    // Append the proxy block (if +proxy is on) inside the try so a failed
+    // token mint surfaces as "failed" instead of silently copying a bare prompt.
+    // LIN-3079: a container marked data-proxy-force (home/Autopilot, periodical
+    // Mint+Autopilot) forces the append regardless of the +proxy toggle.
+    const forceProxy = promptContainer.dataset.proxyForce === 'true'
+    textToCopy = await maybeAppendProxyBlock(textToCopy, urlKey, { force: forceProxy })
+    await navigator.clipboard.writeText(textToCopy)
+    const originalText = copyBtn.textContent
+    copyBtn.textContent = 'copied!'
+    setTimeout(() => {
+      copyBtn.textContent = originalText
+    }, 1500)
+  } catch (error) {
+    console.error('Failed to copy:', error)
+    // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+    if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
+    copyBtn.textContent = 'failed'
+    setTimeout(() => {
+      copyBtn.textContent = 'copy'
+    }, 1500)
+  }
+}
+
+// Handle download button clicks — mirrors copy, but writes the prompt to a
+// .md file instead of the clipboard (LIN-316). Retro/epic prompts can exceed
+// clipboard practicality, so a download is the escape hatch. The file MUST
+// byte-match what copy yields, so we apply the same fence-strip + +proxy block.
+async function handleDownloadClick(e) {
+  const downloadBtn = e.currentTarget
+
+  e.preventDefault()
+  e.stopPropagation()
+
+  if (downloadBtn.disabled) return
+
+  const promptContainer = downloadBtn.closest('.prompt-container')
+  const promptText = promptContainer?.querySelector('.prompt-text')
+  if (!promptText) return
+
+  let textToDownload = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+  const urlKey = promptContainer.dataset.urlKey || promptContainer.closest('[data-url-key]')?.dataset.urlKey
+  const promptName = promptContainer.querySelector('.prompt-name')?.textContent || 'prompt'
+  // Identifier lives on the issue's tree line, not the prompt container.
+  const identifier = promptContainer.closest('.node')?.querySelector('.line')?.dataset.identifier || ''
+
+  try {
+    // Append the proxy block (if +proxy is on) inside the try so a failed
+    // token mint surfaces as "failed" instead of silently saving a bare prompt.
+    // LIN-3079: honour data-proxy-force (home/Autopilot, periodical
+    // Mint+Autopilot) so the downloaded .md always carries the forced block.
+    const forceProxy = promptContainer.dataset.proxyForce === 'true'
+    textToDownload = await maybeAppendProxyBlock(textToDownload, urlKey, { force: forceProxy })
+    downloadMarkdown(textToDownload, buildPromptFilename(identifier, promptName))
+    const originalText = downloadBtn.textContent
+    downloadBtn.textContent = 'saved!'
+    setTimeout(() => {
+      downloadBtn.textContent = originalText
+    }, 1500)
+  } catch (error) {
+    console.error('Failed to download:', error)
+    // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+    if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
+    downloadBtn.textContent = 'failed'
+    setTimeout(() => {
+      downloadBtn.textContent = 'download'
+    }, 1500)
+  }
+}
+
+// Dispatch button click
+async function handleDispatchClick(e) {
+  const dispatchBtn = e.currentTarget
+
+  e.preventDefault()
+  e.stopPropagation()
+
+  // LIN-191: Ignore clicks on disabled buttons
+  if (dispatchBtn.disabled) return
+
+  const promptContainer = dispatchBtn.closest('.prompt-container')
+  const promptText = promptContainer?.querySelector('.prompt-text')
+  const promptNameEl = promptContainer?.querySelector('.prompt-name')
+  if (!promptText) return
+
+  // Get the prompt content, stripping any backtick code fences
+  let prompt = stripCodeBlockFences(promptText.dataset.rawPrompt || promptText.textContent)
+  const promptName = promptNameEl?.textContent || 'Prompt'
+
+  // Read target from button's data-target attribute (defaults to 'cli')
+  const target = dispatchBtn.dataset.target || 'cli'
+  const originalLabel = dispatchBtn.textContent
+
+  // Get issue ID and workspace URL key. The surviving page-wide containers
+  // are the periodical Mint / Mint+Autopilot and Setup Prompt rows, which are
+  // issue-less (`renderPromptContainer` emits no `data-prompt-for`), so a
+  // missing id resolves to `issueless: true` below.
+  const issueId = promptContainer.dataset.promptFor
+  const urlKey = promptContainer.dataset.urlKey ||
+    promptContainer.closest('[data-url-key]')?.dataset.urlKey
+
+  if (!urlKey) {
+    console.error('No workspace URL key found for dispatch')
+    dispatchBtn.textContent = 'failed'
+    setTimeout(() => { dispatchBtn.textContent = originalLabel }, 1500)
+    return
+  }
+
+  // Get issue context from the DOM. The .line carries data-id and
+  // data-identifier; the surrounding .node wrapper shares data-id, so query
+  // the line specifically to read the identifier (the pipeline-loops join key).
+  const lineEl = issueId ? document.querySelector(`.line[data-id="${issueId}"]`) : null
+  const issueTitle = lineEl?.querySelector('.title, .title-dim')?.textContent || null
+  const issueIdentifier = lineEl?.dataset.identifier || null
+
+  // LIN-3242 (LIN-3126 §4): read the row's own provider stamp so the dispatch
+  // is resolved against the provider it came from. The lazy `.details` wrapper
+  // carries `data-source` (render.js), present in the DOM even before expansion.
+  const detailsEl = promptContainer.closest('.details')
+  const issueSource = detailsEl?.dataset.source || undefined
+
+  // Explicit kind for meta-loops (e.g. Autopilot) — set on the container by
+  // its fetch handler; absent for ordinary prompts, where the server derives
+  // kind from promptName.
+  const kind = promptContainer.dataset.kind || undefined
+  // Periodical-template join key (LIN-1825): set on the container by
+  // renderPeriodicalNode's data-periodical-id, absent for ordinary prompts.
+  const periodicalId = promptContainer.dataset.periodicalId || undefined
+
+  // LIN-1279: surfaces whose prompt REQUIRES workspace-API proxy context (the
+  // Mint + Autopilot periodical variant, whose tail calls the kickoff endpoint)
+  // mark their container with data-proxy-force. It forces attachProxy on regardless
+  // of the +proxy toggle, so the dispatched agent always receives a proxy token.
+  const proxyForce = promptContainer.dataset.proxyForce === 'true'
+
+  // LIN-345: some rows that share this handler are issue-less by design — the
+  // synthetic Periodicals group (kind=periodical) dispatches a template prompt
+  // with no Linear issue behind it, so no data-prompt-for / data-identifier is
+  // present and issueId resolves to undefined. Opt out of the issue-link
+  // contract explicitly (mirroring the custom-prompt page) rather than passing
+  // an `issue` object full of null fields, which dispatchPrompt rejects.
+  const issueless = !issueId
+
+  try {
+    dispatchBtn.textContent = 'sending...'
+
+    // Proxy-context appending is now handled internally by dispatchPrompt()
+    // (LIN-1137). The exec controls still live in the dispatch options panel.
+
+    const { model, harness } = window.readDispatchExecControls(dispatchBtn.closest('.prompt-options'))
+
+    await dispatchPrompt({
+      urlKey,
+      prompt,
+      promptName,
+      ...(issueless
+        ? { issueless: true }
+        : { issue: { id: issueId, identifier: issueIdentifier, title: issueTitle, source: issueSource } }),
+      target,
+      kind,
+      periodicalId,
+      model,
+      harness,
+      proxyForce
+    })
+
+    dispatchBtn.textContent = 'dispatched!'
+    dispatchBtn.classList.add('dispatched')
+
+    setTimeout(() => {
+      dispatchBtn.textContent = originalLabel
+      dispatchBtn.classList.remove('dispatched')
+    }, 1500)
+  } catch (error) {
+    console.error('Failed to dispatch:', error)
+    // LIN-3136: say why (e.g. a driver copy refused for a non-owner), not just 'failed'.
+    if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' })
+    dispatchBtn.textContent = 'failed'
+    setTimeout(() => {
+      dispatchBtn.textContent = originalLabel
+    }, 1500)
+  }
 }
 
 // =============================================================================
@@ -1252,6 +1280,8 @@ function initDispatchDisclosures(root) {
     placeholder.insertAdjacentHTML('afterend', window.renderDispatchDisclosure({ idPrefix, isLocalhost }));
     placeholder.remove();
   });
+  // The dispatch buttons were just created here: bind them (LIN-3401).
+  bindPromptControls(root || document);
 }
 
 // =============================================================================
@@ -1342,19 +1372,6 @@ function initQueuePanel() {
     }
   })
 
-  // Handle remove button clicks
-  document.addEventListener('click', async (e) => {
-    const removeBtn = e.target.closest('.queue-item-remove')
-    if (!removeBtn) return
-
-    e.preventDefault()
-    e.stopPropagation()
-
-    const itemId = removeBtn.dataset.itemId
-    const urlKey = removeBtn.dataset.urlKey
-    await removeQueueItem(urlKey, itemId)
-  })
-
   // Close on escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -1416,6 +1433,16 @@ function renderQueueItems(panel, items, urlKey) {
   // list render identical `.queue-item*` rows via window.renderQueueRow so the
   // two twin renderers cannot drift. The popover omits the `.card` wrapper.
   container.innerHTML = items.map(item => window.renderQueueRow(item, urlKey)).join('')
+
+  // LIN-3401: bind each remove button to itself as the rows are inserted; the
+  // child chain below is Harbour's row template, which row text (escaped) cannot forge.
+  container.querySelectorAll(':scope > .queue-item > .queue-item-header > .queue-item-remove').forEach((removeBtn) => {
+    removeBtn.addEventListener('click', async (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      await removeQueueItem(removeBtn.dataset.urlKey, removeBtn.dataset.itemId)
+    })
+  })
 }
 
 
@@ -1473,10 +1500,8 @@ function initFeatureToggles() {
   const toggleBtns = document.querySelectorAll('.settings-section .toggle-btn')
   if (!toggleBtns.length) return // Not on settings page
 
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('.settings-section .toggle-btn')
-    if (!btn) return
-
+  // LIN-3401: bound to the buttons the settings page rendered, at load.
+  toggleBtns.forEach((btn) => btn.addEventListener('click', async (e) => {
     e.preventDefault()
     const form = btn.closest('form')
     if (!form) return
@@ -1566,7 +1591,7 @@ function initFeatureToggles() {
     } finally {
       btn.disabled = false
     }
-  })
+  }))
 }
 
 // ==========================================================================

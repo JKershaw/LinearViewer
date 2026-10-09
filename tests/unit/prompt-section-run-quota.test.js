@@ -31,7 +31,7 @@ function makeContainer() {
     addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
     removeEventListener() {},
     async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: () => btn };
+      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
       await this._clickHandler({ target: btn });
       return btn;
     },

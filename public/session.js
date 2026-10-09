@@ -15,11 +15,6 @@
 (function () {
   'use strict';
 
-  // LIN-3385: this page has no real +proxy toggle, so ProxyToggle's delegated
-  // click handler (common.js) must not answer a look-alike in ticket text.
-  // Top level, so it is set before common.js's DOMContentLoaded `init`.
-  if (typeof window !== 'undefined' && window.ProxyToggle && window.ProxyToggle.disableDelegation) window.ProxyToggle.disableDelegation();
-
   // ── Conversational "you" echo (LIN-1298) ─────────────────────────────────
   // The shared ChatUI helper (public/chat.js) builds the "you" turn so the
   // reply reads as a chat message, not a vanished textarea. UI-only — the real

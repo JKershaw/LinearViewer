@@ -28,9 +28,10 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
   because the client reads a `403` there as flag-off) and reply, Task Chat's execute-mode
   `send_follow_up`, and Collective (per participant workspace: an unowned seat is `ok:false`). The
   proxy routes stay `requireGrant('dispatch')`-scoped. `tests/unit/lin-3383-runner-enqueue-census.test.js`
-  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink. Residual (filed to
-  LIN-3391): an invitee who owns a workspace with their own runner can still start a no-`stopAt`
-  run that merges without the press. The proxy-side halt and runner-credential revoke are not yet covered (LIN-3409).
+  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink. Residual: an invitee
+  who owns a workspace with their own runner can still start a no-`stopAt` run that merges without
+  the press (stated in the close-out box line and `docs/v1.md` step 7). The proxy-side halt and runner-credential
+  revoke are not yet covered (LIN-3409).
 - `GET /workspace/:urlKey/api/dispatch/halt` - Read the workspace's halt request
 - `POST /workspace/:urlKey/api/dispatch/halt` - Request a pause or stop (LIN-2994)
 - `DELETE /workspace/:urlKey/api/dispatch/halt` - Clear the halt request

@@ -152,6 +152,27 @@ describe('bulk close (real MangoDB tmpdir, LIN-3364)', () => {
       assert.notEqual(await stamped('quiet'), null);
     });
 
+    test('a fresh [stalled?] heartbeat is not activity: the row closes (LIN-3358)', async () => {
+      await seed('stalled', { feedback: [
+        { kind: 'heartbeat', message: '[stalled?] no tool activity for 9551m in RESUMING', timestamp: T(15) },
+        { kind: 'heartbeat', message: '[stalled?] the opencode runner may have died', timestamp: T(16) }
+      ] });
+      const r = await store.closeIssueRows(URL_KEY, 'LIN-1', { ids: ['stalled'], quietSince: T(10), reason: 'ticket-closed' });
+      assert.deepEqual(r.closedIds, ['stalled']);
+      assert.notEqual(await stamped('stalled'), null);
+    });
+
+    test('a fresh [working] heartbeat, or any non-heartbeat entry, still refuses (LIN-3358)', async () => {
+      await seed('working', { feedback: [{ kind: 'heartbeat', message: '[working] 12 tools', timestamp: T(15) }] });
+      await seed('plain-stalled-text', { feedback: [{ message: '[stalled?] typed by a person', timestamp: T(15) }] });
+      await seed('stalled-then-working', { feedback: [
+        { kind: 'heartbeat', message: '[stalled?] no tool activity', timestamp: T(14) },
+        { kind: 'status', message: '[working] Session resumed.', timestamp: T(16) }
+      ] });
+      const r = await store.closeIssueRows(URL_KEY, 'LIN-1', { ids: ['working', 'plain-stalled-text', 'stalled-then-working'], quietSince: T(10), reason: 'ticket-closed' });
+      assert.deepEqual(r.closedIds, []);
+    });
+
     test('a row with its own terminal marker is skipped; wrong issue is not reached', async () => {
       await seed('done', { feedback: [{ message: '[done] ok', timestamp: T(2) }] });
       await seed('other-issue', { issueIdentifier: 'LIN-2' });

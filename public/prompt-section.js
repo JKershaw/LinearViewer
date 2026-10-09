@@ -130,7 +130,7 @@
 
   // Proxy-toggle logic is shared via window.ProxyToggle (common.js, LIN-525 #7).
   // handleCopy/handleDownload/handleDispatch call ProxyToggle.maybeAppend; the
-  // +proxy button's click is handled by ProxyToggle's delegated listener and its
+  // +proxy button's click is bound by applyState (ProxyToggle.bind) and its
   // active look is driven by the body[data-proxy-active] CSS rule, so this
   // module no longer carries its own copy of the toggle state/mint/append.
 
@@ -494,7 +494,7 @@
     if (proxyEnabled) {
       // Active look is driven by the body[data-proxy-active] CSS rule (LIN-525
       // #1), so no per-button class is rendered here. data-action is kept off
-      // the button: ProxyToggle's delegated listener (common.js) owns the click.
+      // the button: applyState binds ProxyToggle to it after insertion.
       // LIN-2944 P3: a plain-words label sits beside it, with a "what's this?"
       // disclosure that explains what turning the proxy on does and how to turn
       // it off. Native <details> matches the settings-page disclosure pattern.
@@ -602,7 +602,21 @@
   function applyState(container, html, phase) {
     container.innerHTML = html;
     container.setAttribute('data-phase', phase);
+    // LIN-3401: the +proxy toggle is bound to itself at the moment it is inserted
+    // (there is no delegated listener). The direct-child chain is the header
+    // template above; the markdown sinks sit elsewhere, so a look-alike in them
+    // is never bound. Every state paint goes through here (expand, poll, swipe
+    // card change, setup/error), so no insertion site misses it.
+    if (window.ProxyToggle && typeof window.ProxyToggle.bind === 'function' && typeof container.querySelectorAll === 'function') {
+      container.querySelectorAll(':scope > .swipe-prompt-header > .swipe-prompt-actions > .prompt-proxy-toggle')
+        .forEach((btn) => window.ProxyToggle.bind(btn));
+    }
   }
+
+  // LIN-3401: rendered markdown (the prompt body and the reasoning) sits inside
+  // this container, so the container-level click handler must not treat a button
+  // in it as a control. Ticket text can carry `data-action`/`data-prompt`.
+  const MARKDOWN_SINK = '[data-prompt-body], .swipe-reasoning';
 
   /**
    * Initialise a prompt section inside the given container.
@@ -1113,6 +1127,7 @@
     function handleClick(e) {
       const btn = e.target.closest('button, .swipe-reasoning-toggle');
       if (!btn || !container.contains(btn)) return;
+      if (btn.closest(MARKDOWN_SINK)) return;
       // A disabled primary (AI off/unconfigured/quota-exhausted) must never fire
       // a recommend request, even on a synthetic click (addendum 5).
       if (btn.disabled) return;
@@ -1204,8 +1219,8 @@
         return;
       }
 
-      // +proxy toggle clicks are handled by ProxyToggle's delegated listener in
-      // common.js (LIN-525 #7) — no per-section handling needed here.
+      // +proxy toggle clicks are bound on the button itself (applyState ->
+      // ProxyToggle.bind, LIN-3401) — no per-section handling needed here.
     }
 
     // LIN-2944 P3 R1: after a copy/download, surface the token-limit skip beside
