@@ -70,6 +70,22 @@ describe('render-run-evidence: the checked row is two labelled lines', () => {
     assert.match(html, /data-testid="run-evidence-not-checked">not checked</);
     assert.ok(!html.includes('data-testid="run-evidence-checks-link"'));
   });
+
+  test('a readable PR with no checks (read: true) says "no checks set up", not "not checked" (LIN-3443)', () => {
+    const m = model();
+    m.evidence.checked.now = { state: 'unknown', read: true, checks: [], headSha: 'deadbeef', prUrl: null, checksUrl: 'https://github.com/acme/widget/pull/12/checks', headMoved: false };
+    const html = renderEvidence(m);
+    assert.match(html, /data-testid="run-evidence-checked-now-state">no checks set up</);
+    assert.match(html, /data-testid="run-evidence-checked-now-sha">head deadbeef/);
+    assert.match(html, /data-testid="run-evidence-checks-link"/);
+    assert.ok(!html.includes('data-testid="run-evidence-not-checked"'));
+  });
+
+  test('read: false keeps "not checked" (LIN-3443)', () => {
+    const m = model();
+    m.evidence.checked.now = { state: 'unknown', read: false, checks: [], headSha: null, prUrl: null, checksUrl: null, headMoved: false };
+    assert.match(renderEvidence(m), /data-testid="run-evidence-not-checked">not checked</);
+  });
 });
 
 describe('render-run-evidence: the collapsed ledger', () => {
