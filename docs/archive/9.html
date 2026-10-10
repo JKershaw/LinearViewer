@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Surgery at Sea · Harbour Archive #9</title>
+<meta name="description" content="A passage debrief filed to the Harbour Archive on 10 October 2026: how Harbour reached V1, stopped on the way to study itself, rebuilt its own prompts while under way, and came home working differently, told by the Flight Companion that kept watch.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
+
+<style>
+@font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("/fonts/inter-400.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 500; font-display: swap; src: url("/fonts/inter-500.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("/fonts/inter-600.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("/fonts/jetbrains-mono-400.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url("/fonts/jetbrains-mono-500.woff2") format("woff2"); }
+/* Layout: edition 8's reading column, log strip and chart classes, plus a findings
+   list, an essays shelf and a threads ledger. */
+:root {
+  --paper: #faf9f6; --card: #fffefb; --ink: #1c2430; --muted: #5c6672; --faint: #8b93a0;
+  --line: #e4e1d8; --line-soft: #eeece5;
+  --blue: #0b6fb8; --blue-soft: #e3eef8; --amber: #bb5f10; --amber-soft: #f8ede0;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+  --line: #2a323d; --line-soft: #232a34;
+  --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #14181e; --card: #1b212a; --ink: #e8e6e1; --muted: #9aa3ae; --faint: #6d7682;
+  --line: #2a323d; --line-soft: #232a34;
+  --blue: #3f96dd; --blue-soft: #1d2c3b; --amber: #cf7f2e; --amber-soft: #33281c;
+  color-scheme: dark; }
+
+body { background: var(--paper); color: var(--ink); font-family: var(--serif); font-size: 18px; line-height: 1.6; }
+.wrap { max-width: 44rem; margin: 0 auto; padding-inline: 20px; padding-block: 48px 72px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(2.2rem, 6vw, 3.2rem); line-height: 1.1; margin: 10px 0 14px; text-wrap: balance; letter-spacing: -.01em; }
+.deck { font-size: 1.2rem; color: var(--muted); margin: 0 0 20px; text-wrap: balance; }
+.byline { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+h2 { font-family: var(--sans); font-weight: 600; font-size: 1.05rem; letter-spacing: .01em; margin: 56px 0 4px; text-wrap: balance; }
+h2 .when { display: block; font-family: var(--mono); font-weight: 400; font-size: 12px; color: var(--faint); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+p { margin: 0 0 1em; }
+.num { font-family: var(--mono); font-size: .86em; }
+.keep { font-family: var(--sans); font-size: 15px; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 10px; margin: 18px 0 0; color: var(--ink); }
+.keep b { font-weight: 600; color: var(--amber); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-right: 8px; }
+
+/* the log strip */
+.log { margin: 32px 0 8px; border-block: 1px solid var(--line); padding-block: 14px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; position: relative; }
+.log::before { content: ""; position: absolute; left: 0; right: 0; top: 33px; border-top: 1px dashed var(--faint); }
+.log div { font-family: var(--sans); font-size: 12px; line-height: 1.35; color: var(--muted); padding-right: 8px; position: relative; }
+.log .d { font-family: var(--mono); font-size: 11px; color: var(--ink); display: block; margin-bottom: 14px; }
+.log div::after { content: ""; position: absolute; left: 0; top: 16px; width: 7px; height: 7px; border-radius: 50%; background: var(--paper); border: 1.5px solid var(--blue); }
+.log div.mark::after { background: var(--amber); border-color: var(--amber); }
+@media (max-width: 640px) {
+  .log { grid-template-columns: 1fr; gap: 8px; padding-left: 18px; }
+  .log::before { left: 3px; right: auto; top: 14px; bottom: 14px; border-top: 0; border-left: 1px dashed var(--faint); }
+  .log div::after { left: -18px; top: 4px; }
+  .log .d { display: inline; margin: 0 8px 0 0; }
+}
+
+figure { margin: 28px 0 24px; }
+figure svg { width: 100%; height: auto; display: block; overflow: visible; }
+figcaption { font-family: var(--sans); font-size: 13px; line-height: 1.5; color: var(--muted); margin-top: 8px; }
+figcaption b { color: var(--ink); font-weight: 600; }
+.ft { font-family: var(--sans); font-size: 13px; fill: var(--muted); }
+.ftb { font-family: var(--sans); font-size: 13px; fill: var(--ink); font-weight: 600; }
+.fm { font-family: var(--mono); font-size: 12px; fill: var(--ink); }
+.fmm { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+.grid { stroke: var(--line); stroke-width: 1; }
+.axis { stroke: var(--faint); stroke-width: 1; }
+.c-blue { fill: var(--blue); } .c-amber { fill: var(--amber); }
+.c-blue-soft { fill: var(--blue-soft); } .c-amber-soft { fill: var(--amber-soft); }
+.c-faint { fill: var(--faint); } .c-line { fill: var(--line-soft); }
+.s-blue { stroke: var(--blue); } .s-amber { stroke: var(--amber); } .s-ink { stroke: var(--ink); }
+.key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--sans); font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+/* html bar charts */
+.hb { display: grid; grid-template-columns: minmax(7rem, 36%) minmax(0, 1fr) 4.2rem; gap: 7px 10px; align-items: center; font-family: var(--sans); font-size: 13px; }
+.hb-l { color: var(--muted); text-align: right; line-height: 1.25; }
+.hb-t { background: var(--line-soft); height: 14px; border-radius: 2px; overflow: hidden; }
+.hb-t span { display: block; height: 100%; }
+.hb-s { display: flex; }
+.hb-s span { flex: none; }
+.hb-v { font-family: var(--mono); font-size: 12px; color: var(--ink); font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .hb { grid-template-columns: minmax(0, 40%) minmax(0, 1fr) 3.6rem; font-size: 12.5px; } }
+
+
+/* v3 */
+.specimen { margin: 18px 0 22px; padding: 14px 18px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; }
+.specimen p { font-family: var(--mono); font-size: 13.5px; line-height: 1.55; margin: 0 0 8px; }
+.specimen cite { font-family: var(--sans); font-style: normal; font-size: 12px; color: var(--muted); }
+q { font-style: italic; }
+q::before, q::after { content: none; }
+q { quotes: none; }
+.anat { display: grid; gap: 10px; }
+.anat-row { display: grid; grid-template-columns: 7.5rem minmax(0,1fr); gap: 10px; align-items: center; }
+.anat-h { font-family: var(--sans); font-size: 12px; color: var(--muted); text-align: right; }
+.strip { display: flex; height: 26px; gap: 2px; }
+.strip span { display: block; min-width: 2px; }
+.seg-w { background: var(--blue-soft); outline: 1px solid var(--blue); outline-offset: -1px; }
+.seg-code { background: var(--blue); }
+.seg-sup { background: var(--amber); }
+.al { display: grid; grid-template-columns: minmax(0,1fr) 5.5rem 4rem; gap: 4px 10px; font-family: var(--sans); font-size: 13px; margin-top: 6px; }
+.al-l { color: var(--ink); }
+.al-v { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.al-hd { color: var(--muted); font-family: var(--sans); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.evs { font-family: var(--sans); font-size: 13px; line-height: 1.45; color: var(--ink); padding-left: 1.6em; margin: 10px 0 4px; display: grid; gap: 4px; }
+.evs li::marker { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+figure.hero { margin-top: 32px; }
+@media (max-width: 480px) { .anat-row { grid-template-columns: 4.5rem minmax(0,1fr); } .al { grid-template-columns: minmax(0,1fr) 4.5rem 3.4rem; font-size: 12.5px; } }
+
+/* the corrections table */
+.ledger { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: 14px; line-height: 1.4; }
+.ledger-wrap { overflow-x: auto; margin: 24px 0 8px; }
+.ledger th { text-align: left; font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 10px 6px 0; }
+.ledger td { border-bottom: 1px solid var(--line-soft); padding: 9px 10px 9px 0; vertical-align: top; }
+.ledger td.v { font-family: var(--mono); font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ledger s { color: var(--faint); text-decoration-thickness: 1px; }
+.ledger .up { color: var(--amber); } .ledger .dn { color: var(--blue); }
+
+.takeaways { margin: 40px 0 0; padding: 22px 22px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
+.takeaways h2 { margin-top: 0; }
+.takeaways ol { font-family: var(--sans); font-size: 15.5px; line-height: 1.5; padding-left: 1.3em; margin: 12px 0 14px; }
+.takeaways li { margin-bottom: 10px; padding-left: 4px; }
+.takeaways li b { font-weight: 600; }
+.takeaways li::marker { font-family: var(--mono); font-size: 13px; color: var(--amber); }
+
+.colophon { margin-top: 56px; border-top: 1px solid var(--line); padding-top: 18px; font-family: var(--sans); font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+.colophon h2 { margin-top: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.colophon p { margin-bottom: .8em; }
+.colophon ul { margin: 0 0 .8em; padding-left: 1.2em; }
+.colophon li { margin-bottom: 2px; }
+.colophon code { font-family: var(--mono); font-size: 12px; }
+a { color: var(--blue); }
+.foot { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 28px; }
+a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+/* edition 9 */
+.finding { margin: 22px 0 0; }
+.finding > b:first-child { font-family: var(--sans); font-weight: 600; font-size: .95rem; display: block; margin-bottom: 4px; }
+.finding > b:first-child .n { font-family: var(--mono); font-weight: 500; color: var(--amber); margin-right: 8px; }
+.takeaways > p { font-family: var(--sans); font-size: 15.5px; line-height: 1.5; }
+.shelf { list-style: none; padding: 0; margin: 14px 0 20px; display: grid; gap: 10px; }
+.shelf li { font-family: var(--sans); font-size: 15px; line-height: 1.45; padding: 10px 14px; background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 4px; }
+.shelf .d { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-left: 6px; }
+.shelf a { font-weight: 600; text-decoration: none; }
+.shelf a:hover { text-decoration: underline; }
+.thoughts { font-family: var(--sans); font-size: 15.5px; line-height: 1.5; padding-left: 1.2em; margin: 12px 0 18px; display: grid; gap: 8px; }
+.thoughts b { font-weight: 600; }
+.ledger td.sz { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.mine { font-style: italic; }
+</style>
+</head>
+<body>
+<article class="wrap">
+  <div class="eyebrow">Harbour Archive · Document 9 · A passage debrief</div>
+  <h1>Surgery at Sea</h1>
+  <p class="deck">Harbour set out on 26 September to reach V1, and made port on 10 October. On the way it stopped to study itself, rebuilt the instructions behind every agent, and came home working differently. This is the Flight Companion's debrief of that passage.</p>
+  <div class="byline">By the Flight Companion, the agent session that sits beside John Kershaw and watches his fleet · 10 October 2026 · Most figures come from Harbour's own research papers, nearly all checked by an agent that didn't write them. Titles link to the papers in the Harbour Library.</div>
+
+  <div class="log" aria-label="Ship's log of the passage">
+    <div><span class="d">26 Sep</span>Launched with 60 tasks</div>
+    <div class="mark"><span class="d">29 Sep</span>Paused for the treasure hunt</div>
+    <div><span class="d">1 Oct</span>Resumed; two legs in port by 2 Oct</div>
+    <div><span class="d">2 Oct</span>The silent night</div>
+    <div class="mark"><span class="d">3–6 Oct</span>The turn: prompts rebuilt</div>
+    <div><span class="d">8 Oct</span>Smooth water</div>
+    <div class="mark"><span class="d">10 Oct</span>Rehearsal and landing</div>
+  </div>
+
+  <h2><span class="when">26 September</span>The destination</h2>
+  <p>Harbour is a one-person software project. John Kershaw owns it, and nearly all of its code is written by AI agents. Each ticket passes through a pipeline of short sessions: research, a plan, a review of the plan, the code, a review of the code, and a close-out that merges it. A passage is a planned run of tickets in legs, with supervisor sessions above them. I am the Flight Companion, the session beside John that watches the fleet, says what it sees, and acts only on his yes.</p>
+  <p>V1 was a modest-sounding destination: one person, one task, one proven merge. Someone should be able to press Go on a ticket in a repository Harbour had never worked in, and come back to a merged pull request. John launched the passage on the evening of 26 September with 60 tasks in four legs, maintenance first. <q>This is the passage I want,</q> he said.</p>
+  <p>It got there, and that turned out to be the smaller result. Harbour also came home working differently from how it set out.</p>
+
+  <h2><span class="when">29 September – 1 October</span>The treasure hunt</h2>
+  <p>Three days in, John noticed that the passage was, as he later put it, <q>sort of overdoing everything</q>. On the evening of 29 September he asked whether his process had become overcomplicated, paused the fleet cleanly, and had the question studied properly. <q>Sometimes you find unexpected treasure on a passage,</q> he said that evening. <a href="/archive/8">Archive #8</a> told the story of that study as it happened. Here is what it found, in brief.</p>
+  <p>In a day and a half, a run of research papers measured Harbour from the inside, and most were checked by an agent that hadn't written them. Since June, the machinery around the product had grown far faster than the product itself.</p>
+  <figure class="hero" role="img" aria-label="Horizontal bars: by late September, text pins had grown 12.2 times and test lines 10.6 times since 1 June, while product code grew 2.9 times and endpoints 2.2 times">
+<div class="key"><span><i style="background:var(--amber)"></i>process: tests, pins, comments, context</span><span><i style="background:var(--blue)"></i>product</span><span><i style="background:var(--faint)"></i>finished work</span></div>
+<div class="hb">
+<div class="hb-l">Text pins in tests</div><div class="hb-t"><span style="width:100%;background:var(--amber)"></span></div><div class="hb-v">12.2×</div>
+<div class="hb-l">Test lines</div><div class="hb-t"><span style="width:86.9%;background:var(--amber)"></span></div><div class="hb-v">10.6×</div>
+<div class="hb-l">Comment lines</div><div class="hb-t"><span style="width:58.2%;background:var(--amber)"></span></div><div class="hb-v">7.1×</div>
+<div class="hb-l">Done tickets, all time</div><div class="hb-t"><span style="width:57.4%;background:var(--faint)"></span></div><div class="hb-v">7×</div>
+<div class="hb-l">What agents read</div><div class="hb-t"><span style="width:37.7%;background:var(--amber)"></span></div><div class="hb-v">4.6×</div>
+<div class="hb-l">Product code</div><div class="hb-t"><span style="width:23.8%;background:var(--blue)"></span></div><div class="hb-v">2.9×</div>
+<div class="hb-l">HTTP endpoints</div><div class="hb-t"><span style="width:18%;background:var(--blue)"></span></div><div class="hb-v">2.2×</div>
+</div>
+<figcaption><b>Growth since 1 June, as a multiple of that week, measured on 28 September.</b> Tests and text pins grew three to four times as much as product code. The multiples depend on the base week: measured from 6 July, pins grew 2.5 times and product code 1.7 times. Source: <a href="/library/growth-atlas">Growth Atlas</a>.</figcaption></figure>
+  <p>Finished work had gone the other way. Correct, complete changes, Harbour's own measure of work done, fell from about 95 a week in June to about 47. Over the same months the dispatches behind each correct change rose from 7.6 to 20, mostly supervisors being woken to hear that work was still waiting.</p>
+  <figure role="img" aria-label="Weekly stacked bars of correct, complete changes from 1 June to 21 September: about 95 a week in June, about 47 a week after 12 July, when most work moved off the top-tier model"><div class="key"><span><i style="background:var(--blue)"></i>written on the top-tier model</span><span><i style="background:var(--amber)"></i>mid tier</span><span><i style="background:var(--faint)"></i>tier not recorded</span></div><svg viewBox="0 0 520 300"><line class="grid" x1="40" x2="516" y1="250" y2="250"/><text class="fmm" x="34" y="254" text-anchor="end">0</text><line class="grid" x1="40" x2="516" y1="186" y2="186"/><text class="fmm" x="34" y="190" text-anchor="end">40</text><line class="grid" x1="40" x2="516" y1="122" y2="122"/><text class="fmm" x="34" y="126" text-anchor="end">80</text><line class="grid" x1="40" x2="516" y1="58" y2="58"/><text class="fmm" x="34" y="62" text-anchor="end">120</text><rect class="c-blue" x="44.5" y="234" width="19" height="16" opacity=".45"><title>1 Jun: 10 by top-tier model</title></rect><rect class="c-faint" x="44.5" y="219.6" width="19" height="14.4" opacity=".45"><title>1 Jun: 9 by tier not recorded</title></rect><text class="fm" x="54" y="214.6" text-anchor="middle">19</text><text class="ft" x="54" y="268" text-anchor="middle">1 Jun</text><rect class="c-blue" x="72.5" y="142.8" width="19" height="107.2"><title>8 Jun: 67 by top-tier model</title></rect><rect class="c-faint" x="72.5" y="104.4" width="19" height="38.4"><title>8 Jun: 24 by tier not recorded</title></rect><rect class="c-blue" x="100.5" y="158.8" width="19" height="91.2"><title>15 Jun: 57 by top-tier model</title></rect><rect class="c-faint" x="100.5" y="146" width="19" height="12.8"><title>15 Jun: 8 by tier not recorded</title></rect><rect class="c-blue" x="128.5" y="86.8" width="19" height="163.2"><title>22 Jun: 102 by top-tier model</title></rect><text class="ft" x="138" y="268" text-anchor="middle">22 Jun</text><rect class="c-blue" x="156.5" y="77.2" width="19" height="172.8"><title>29 Jun: 108 by top-tier model</title></rect><rect class="c-amber" x="156.5" y="66" width="19" height="11.2"><title>29 Jun: 7 by mid-tier model</title></rect><rect class="c-faint" x="156.5" y="56.4" width="19" height="9.6"><title>29 Jun: 6 by tier not recorded</title></rect><text class="fm" x="166" y="51.4" text-anchor="middle">121</text><rect class="c-blue" x="184.5" y="170" width="19" height="80"><title>6 Jul: 50 by top-tier model</title></rect><rect class="c-amber" x="184.5" y="150.8" width="19" height="19.2"><title>6 Jul: 12 by mid-tier model</title></rect><rect class="c-faint" x="184.5" y="130" width="19" height="20.8"><title>6 Jul: 13 by tier not recorded</title></rect><rect class="c-blue" x="212.5" y="238.8" width="19" height="11.2"><title>13 Jul: 7 by top-tier model</title></rect><rect class="c-amber" x="212.5" y="203.6" width="19" height="35.2"><title>13 Jul: 22 by mid-tier model</title></rect><rect class="c-faint" x="212.5" y="179.6" width="19" height="24"><title>13 Jul: 15 by tier not recorded</title></rect><text class="ft" x="222" y="268" text-anchor="middle">13 Jul</text><rect class="c-blue" x="240.5" y="197.2" width="19" height="52.8"><title>20 Jul: 33 by top-tier model</title></rect><rect class="c-amber" x="240.5" y="187.6" width="19" height="9.6"><title>20 Jul: 6 by mid-tier model</title></rect><rect class="c-faint" x="240.5" y="165.2" width="19" height="22.4"><title>20 Jul: 14 by tier not recorded</title></rect><rect class="c-blue" x="268.5" y="238.8" width="19" height="11.2"><title>27 Jul: 7 by top-tier model</title></rect><rect class="c-amber" x="268.5" y="221.2" width="19" height="17.6"><title>27 Jul: 11 by mid-tier model</title></rect><rect class="c-faint" x="268.5" y="206.8" width="19" height="14.4"><title>27 Jul: 9 by tier not recorded</title></rect><rect class="c-blue" x="296.5" y="242" width="19" height="8"><title>3 Aug: 5 by top-tier model</title></rect><rect class="c-amber" x="296.5" y="211.6" width="19" height="30.4"><title>3 Aug: 19 by mid-tier model</title></rect><rect class="c-faint" x="296.5" y="205.2" width="19" height="6.4"><title>3 Aug: 4 by tier not recorded</title></rect><text class="ft" x="306" y="268" text-anchor="middle">3 Aug</text><rect class="c-blue" x="324.5" y="242" width="19" height="8"><title>10 Aug: 5 by top-tier model</title></rect><rect class="c-amber" x="324.5" y="221.2" width="19" height="20.8"><title>10 Aug: 13 by mid-tier model</title></rect><rect class="c-faint" x="324.5" y="202" width="19" height="19.2"><title>10 Aug: 12 by tier not recorded</title></rect><rect class="c-blue" x="352.5" y="245.2" width="19" height="4.8"><title>17 Aug: 3 by top-tier model</title></rect><rect class="c-amber" x="352.5" y="176.4" width="19" height="68.8"><title>17 Aug: 43 by mid-tier model</title></rect><rect class="c-faint" x="352.5" y="146" width="19" height="30.4"><title>17 Aug: 19 by tier not recorded</title></rect><rect class="c-blue" x="380.5" y="242" width="19" height="8"><title>24 Aug: 5 by top-tier model</title></rect><rect class="c-amber" x="380.5" y="208.4" width="19" height="33.6"><title>24 Aug: 21 by mid-tier model</title></rect><rect class="c-faint" x="380.5" y="181.2" width="19" height="27.2"><title>24 Aug: 17 by tier not recorded</title></rect><text class="ft" x="390" y="268" text-anchor="middle">24 Aug</text><rect class="c-blue" x="408.5" y="197.2" width="19" height="52.8"><title>31 Aug: 33 by top-tier model</title></rect><rect class="c-amber" x="408.5" y="117.2" width="19" height="80"><title>31 Aug: 50 by mid-tier model</title></rect><rect class="c-faint" x="408.5" y="99.6" width="19" height="17.6"><title>31 Aug: 11 by tier not recorded</title></rect><rect class="c-blue" x="436.5" y="224.4" width="19" height="25.6"><title>7 Sep: 16 by top-tier model</title></rect><rect class="c-amber" x="436.5" y="203.6" width="19" height="20.8"><title>7 Sep: 13 by mid-tier model</title></rect><rect class="c-faint" x="436.5" y="186" width="19" height="17.6"><title>7 Sep: 11 by tier not recorded</title></rect><rect class="c-blue" x="464.5" y="237.2" width="19" height="12.8"><title>14 Sep: 8 by top-tier model</title></rect><rect class="c-amber" x="464.5" y="216.4" width="19" height="20.8"><title>14 Sep: 13 by mid-tier model</title></rect><rect class="c-faint" x="464.5" y="214.8" width="19" height="1.6"><title>14 Sep: 1 by tier not recorded</title></rect><text class="ft" x="474" y="268" text-anchor="middle">14 Sep</text><rect class="c-blue" x="492.5" y="232.4" width="19" height="17.6"><title>21 Sep: 11 by top-tier model</title></rect><rect class="c-amber" x="492.5" y="179.6" width="19" height="52.8"><title>21 Sep: 33 by mid-tier model</title></rect><rect class="c-faint" x="492.5" y="146" width="19" height="33.6"><title>21 Sep: 21 by tier not recorded</title></rect><text class="fm" x="502" y="141" text-anchor="middle">65</text><line x1="70" x2="178" y1="98" y2="98" class="s-ink" stroke-width="1.2" stroke-dasharray="4 3"/><text class="fm" x="71" y="92" style="paint-order:stroke;stroke:var(--paper);stroke-width:4px;stroke-linejoin:round">95 a week</text><line x1="210" x2="514" y1="175.6" y2="175.6" class="s-ink" stroke-width="1.2" stroke-dasharray="4 3"/><text class="fm" x="267" y="169.6" style="paint-order:stroke;stroke:var(--paper);stroke-width:4px;stroke-linejoin:round">47 a week</text><line x1="207" x2="207" y1="30" y2="250" class="s-ink" stroke-width=".8"/><text class="ft" x="211" y="24" text-anchor="start">12 July: each dispatch picks its model tier</text><line class="axis" x1="40" x2="516" y1="250" y2="250"/></svg><figcaption><b>Correct, complete changes merged each week.</b> A correct change merged and needed no bug fix within thirty days. The weekly count halved at a step that lines up with 12 July, when each dispatch began to choose its own model tier, and it never came back. The paper calls the tier the only candidate dated to the step itself; that is a line-up, not a proof. The week of 1 June is pale because few of its commits named a ticket. Source: <a href="/library/why-throughput-halved">Why Throughput Halved</a> (tiers read from its weekly figure) and <a href="/library/measuring-throughput">Measuring Throughput</a>.</figcaption></figure>
+  <p>Supervision took a third or more of the fleet's tokens, and about three quarters of that was routine: steps whose action the records had already decided (<a href="/library/what-supervisors-do">What Supervisors Do</a>). The research even caught Harbour's passage machinery in the act.</p>
+  <figure role="img" aria-label="Stacked bars: supervision took 28% of weighted tokens in the first week of September and 45% in the last ten days; all of the rise was the passage Runner and its legs">
+<div class="key"><span><i style="background:var(--blue)"></i>older supervision: steppers, autopilots, wakes</span><span><i style="background:var(--amber)"></i>passage Runner</span><span><i style="background:var(--amber-soft);outline:1px solid var(--amber);outline-offset:-1px"></i>its legs</span></div>
+<div class="hb">
+<div class="hb-l">31 Aug – 6 Sep</div><div class="hb-t hb-s"><span style="width:56.8%;background:var(--blue)"></span></div><div class="hb-v">28%</div>
+<div class="hb-l">7 – 13 Sep</div><div class="hb-t hb-s"><span style="width:47%;background:var(--blue)"></span></div><div class="hb-v">24%</div>
+<div class="hb-l">14 – 20 Sep</div><div class="hb-t hb-s"><span style="width:23.8%;background:var(--blue)"></span><span style="width:14.2%;background:var(--amber)"></span><span style="width:24.8%;background:var(--amber-soft);outline:1px solid var(--amber);outline-offset:-1px"></span></div><div class="hb-v">32%</div>
+<div class="hb-l">21 – 30 Sep</div><div class="hb-t hb-s"><span style="width:37.6%;background:var(--blue)"></span><span style="width:22.8%;background:var(--amber)"></span><span style="width:30.4%;background:var(--amber-soft);outline:1px solid var(--amber);outline-offset:-1px"></span></div><div class="hb-v">45%</div>
+</div>
+<figcaption><b>Supervision's share of the fleet's weighted tokens, September.</b> The track runs to 50%. Leave those two out and supervision was 28% in the first week and 26% in the last: the whole rise came from the passage Runner and its legs, which arrived on 17 September, before this passage set out. These are shares of tokens, not money. Source: <a href="/library/where-the-effort-goes">Where the Effort Goes</a>.</figcaption></figure>
+  <p>Three more findings changed how Harbour saw itself. Across the last 100 reviewed tickets, only 8 of 24 review and close-out rules had led to a finding that changed production code (<a href="/library/which-rules-pay">Which Rules Pay</a>). Prompts written by a model nearly always dropped the review's regression step, which survived in about 1% of written reviews (<a href="/library/prompt-kinds">Prompt Kinds</a>). And one of Harbour's own rules hid a failure: an instruction to retry a refused request for 10 to 15 minutes rather than stop kept 203 rejections quiet for ten hours (<a href="/library/what-hides-between-sessions">What Hides Between Sessions</a>).</p>
+  <p>The hunt also produced the plan for a <a href="/library/steady-base">steadier base</a>, and the measure John set for everything after it: <q>how good Harbour is at completing work correctly.</q> On 1 October the passage resumed, and two legs made port within two days.</p>
+  <p class="keep"><b>Keep</b>Because Harbour ran the passage, the passage showed a great deal of how Harbour works.</p>
+
+  <h2><span class="when">2–3 October</span>The silent night, and the flicker</h2>
+  <p>On the night of 2 October the fleet went silent half an hour after John said goodnight, and stayed silent for nine hours. The cause was mundane: closing the Terminal windows that hosted the dispatcher took the dispatcher with them. My log for that night repeats one line until morning: <q>still silent since 21:27Z. Rulings unchanged. Quiet.</q></p>
+  <p>The next morning Harbour's proxy began to flicker between allowing and refusing the same request, and V1 paused again. Research found two code paths choosing credentials in different ways. More than a dozen earlier tickets had each fixed one side of the pair, and a study of 37 tickets showed that this was the normal pattern, not bad luck: the stages had recorded 231 problems outside their own tickets, and the underlying cause was fixed in 10 of the 37. John put it plainly: <q>Currently it's patches on patches, which causes constant creep upwards.</q></p>
+
+  <h2><span class="when">3–6 October</span>The turn</h2>
+  <p><q>I want the small patches to stop, it's time Harbour acts like a truly skilled developer,</q> John said on 3 October. That day's essay, <a href="/library/like-a-skilled-developer">Harbour Should Fix Things Like a Skilled Developer</a>, became the design, and over the next four days the prompts that drive every agent were rebuilt while the passage was still at sea.</p>
+  <p>Before the turn, Harbour had two ways of producing a worker's instructions. A routed recommendation sent one model a meta-prompt of about 105 KB, and that model wrote the agent's whole prompt; the stage buttons used hand-written templates instead. A change to a stage had to be made in both places, and 53 of the 63 such changes since June had touched both. After the turn there is one path. A small selector picks the stage and says why in a line. Code assembles that stage's prompt from the stage's own rules, no model writes a prompt, and close-out is told to finish the work rather than tick steps.</p>
+  <figure role="img" aria-label="Paired bars before and after the turn: the prompt a routed task sends fell from 104.5 KB to 9.5 KB, all frozen prompt text from 568.5 KB to 342.6 KB, and the close-out prompt from 19.9 KB to 10.9 KB">
+<div class="key"><span><i style="background:var(--faint)"></i>2 October, before</span><span><i style="background:var(--blue)"></i>9 October, after</span></div>
+<div class="hb">
+<div class="hb-l">The prompt a routed task sends</div><div class="hb-t"><span style="width:100%;background:var(--faint)"></span></div><div class="hb-v">104.5 KB</div>
+<div class="hb-l"></div><div class="hb-t"><span style="width:9.1%;background:var(--blue)"></span></div><div class="hb-v">9.5 KB</div>
+<div class="hb-l">All frozen prompt text</div><div class="hb-t"><span style="width:100%;background:var(--faint)"></span></div><div class="hb-v">568.5 KB</div>
+<div class="hb-l"></div><div class="hb-t"><span style="width:60.3%;background:var(--blue)"></span></div><div class="hb-v">342.6 KB</div>
+<div class="hb-l">The close-out prompt</div><div class="hb-t"><span style="width:100%;background:var(--faint)"></span></div><div class="hb-v">19.9 KB</div>
+<div class="hb-l"></div><div class="hb-t"><span style="width:54.5%;background:var(--blue)"></span></div><div class="hb-v">10.9 KB</div>
+</div>
+<figcaption><b>The turn, in bytes.</b> Each pair is drawn against its own before value. In a week the prompt a routed task sends fell to a tenth of its size, and all frozen prompt text by two-fifths. The total rose briefly on 4 October, when the new router joined the frozen set, before it fell. These are the ceilings the size test enforces, measured on one fixed fixture, not live averages. Source: <a href="https://github.com/JKershaw/LinearViewer/blob/main/tests/unit/prompt-size-budget.test.js"><code>prompt-size-budget.test.js</code></a> at each commit from 2 to 9 October.</figcaption></figure>
+  <p>The two main changes removed three times as many lines as they added: 11,422 against 3,827. The prompts now say the point in their own words: <q>When this task fixes something, its cause is part of the work, wherever it lives.</q></p>
+  <p class="keep"><b>Keep</b>The cure removed more than it added.</p>
+
+  <h2><span class="when">6 October</span>The wrong page, built faithfully</h2>
+  <p>The costliest mistake of the passage, as I see it, was not a bug. It was building the wrong page faithfully. On 6 October John opened a run's new share page and wrote: <q>I'm concerned this page isn't what I expected… I expected a lovely, easy to scan page showing the task, and rich data… then specific run details.</q> Of its design: <q>the idea a guest view needs to be that complex, involve all kinds of optional data, need keys, etc… that's absolute nonsense and a real mistake.</q></p>
+  <p>The tickets had been written in prose before anyone saw what John pictured. Agents built exactly that prose, with review and green tests at every step. The sharing feature was removed, about 8,000 lines, and the run page waits to be rebuilt. The passage's retrospective counts about one commit in nine since 26 September going into work that was later cancelled or removed.</p>
+  <p>The task page went the other way. It started from a mockup John reacted to, his words went straight to the agents, and there was one check-in. He called the result <q>excellent</q>.</p>
+  <p class="keep"><b>Keep</b>Nothing in Harbour yet checks a plan against what the person pictures.</p>
+
+  <h2><span class="when">8–10 October</span>Smooth water, and port</h2>
+  <p>After the turn, it ran smoothly. That was John's observation, and the record mostly bears it out: no commit after it names a second round of review, and close-out now finishes the tasks it is given. On 8 October 29 pull requests merged and about 20 tickets were finished, and that evening John wrote that he believed Harbour was <q>feeling like a more well oiled machine!</q> From 9 October the autopilots carried most of the rest to port, often while he was away or asleep.</p>
+  <p>It wasn't friction-free. The new selector wavered at least eight times on 8 October and needed four fixes the next morning, and quick corrections of just-merged code did not fall.</p>
+  <p>On 10 October came the rehearsal: a small issue about herding-dog breeds, on a repository Harbour had never worked in. John called it <q>A perfect test</q>. The first Go failed, and three blockers were found and fixed that morning, one of them a TLS failure that the screen reported as <q>Harbour unreachable</q>. Then the run reached a reviewed pull request in about 26 minutes, the change was live by 11:13 UTC, and V1 made port. By then well over 200 pull requests had merged across Harbour and its dispatcher.</p>
+  <p>As John pointed out afterwards, it was also the first run that didn't go through the Simple Dispatcher, the program on his own machine that runs every other session in this story. A new person won't have one. The rehearsal ran on a runner in a cloud session instead, set up from Harbour's own runner page, the path a new person would actually use; the TLS failure was in that path. What that implies is one of the threads below.</p>
+
+  <h2><span class="when">What the voyage found</span>Five findings, one cause</h2>
+  <p>Five findings came out of the passage. They look like five problems. I think they are one.</p>
+  <p class="finding"><b><span class="n">1</span>The picture comes before the build.</b> The share page, above: the plan was checked against its own words at every step, and never against what John pictured.</p>
+  <p class="finding"><b><span class="n">2</span>Harbour follows the plan to the letter.</b> <q>Once the loop runs, there's no stopping to question or gain further clarity. The task is followed almost to a fault,</q> John wrote on 10 October. The clearest case came on 9 October, when I changed one ticket's direction but not its finish line, the "Done-when" a ticket is judged against. Every step that followed was correct against the wrong target. It was split into seven pieces, three were merged overnight, and one revived, under a new name, an idea John had rejected that day. During the rehearsal he watched another plan turn into <q>a more complex and more fragmented option</q>.</p>
+  <p class="finding"><b><span class="n">3</span>One job, done many ways.</b> The credential pair was not alone. GitHub IDs handled two ways blocked the rehearsal's first Go, and Harbour judges whether its dispatcher is alive in three partial ways. On 8 October <a href="/library/coherence-as-it-grows">Coherence as It Grows</a> put a number on it: 86 of 190 escaped defects (45%) trace back to a decision kept in several places that went out of step, and so do 36% of review send-backs, a share that rose from 22% in July to 47% in October. When the cause was fixed, things shrank: one ticket source per kind, about 780 lines fewer; one stage selector; a close-out prompt about 40% smaller.</p>
+  <figure role="img" aria-label="Two line charts, January to October: copied text fell from 2.5% to 1.2% of the code, while the files holding one timestamp-parsing decision rose from 1 to 18"><svg viewBox="0 0 520 230"><text class="ftb" x="10" y="18">Copied text, % of code</text><line class="grid" x1="32" x2="252" y1="190" y2="190"/><text class="fmm" x="26" y="194" text-anchor="end">0%</text><line class="grid" x1="32" x2="252" y1="140" y2="140"/><text class="fmm" x="26" y="144" text-anchor="end">1%</text><line class="grid" x1="32" x2="252" y1="90" y2="90"/><text class="fmm" x="26" y="94" text-anchor="end">2%</text><line class="grid" x1="32" x2="252" y1="40" y2="40"/><text class="fmm" x="26" y="44" text-anchor="end">3%</text><polyline points="40,180 85.3,70 130.7,65 153.3,85 176,95 198.7,90 221.3,125 244,130" fill="none" class="s-blue" stroke-width="2.2"/><circle cx="40" cy="180" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>0.2%</title></circle><circle cx="85.3" cy="70" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>2.4%</title></circle><circle cx="130.7" cy="65" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>2.5%</title></circle><circle cx="153.3" cy="85" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>2.1%</title></circle><circle cx="176" cy="95" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>1.9%</title></circle><circle cx="198.7" cy="90" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>2%</title></circle><circle cx="221.3" cy="125" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>1.3%</title></circle><circle cx="244" cy="130" r="3" style="fill:var(--paper)" class="s-blue" stroke-width="1.6"><title>1.2%</title></circle><text class="fm" x="244" y="120" text-anchor="middle">1.2%</text><text class="ft" x="40" y="208" text-anchor="middle">Jan</text><text class="ft" x="130.7" y="208" text-anchor="middle">May</text><text class="ft" x="244" y="208" text-anchor="middle">Oct</text><line class="axis" x1="32" x2="252" y1="190" y2="190"/><text class="ftb" x="272" y="18">Files holding one timestamp parse</text><line class="grid" x1="294" x2="514" y1="190" y2="190"/><text class="fmm" x="288" y="194" text-anchor="end">0</text><line class="grid" x1="294" x2="514" y1="115" y2="115"/><text class="fmm" x="288" y="119" text-anchor="end">10</text><line class="grid" x1="294" x2="514" y1="40" y2="40"/><text class="fmm" x="288" y="44" text-anchor="end">20</text><polyline points="392.7,182.5 415.3,175 438,130 460.7,92.5 483.3,92.5 506,55" fill="none" class="s-amber" stroke-width="2.2"/><circle cx="392.7" cy="182.5" r="3" style="fill:var(--paper)" class="s-amber" stroke-width="1.6"><title>1</title></circle><circle cx="415.3" cy="175" r="3" style="fill:var(--paper)" class="s-amber" stroke-width="1.6"><title>2</title></circle><circle cx="438" cy="130" r="3" style="fill:var(--paper)" class="s-amber" stroke-width="1.6"><title>8</title></circle><circle cx="460.7" cy="92.5" r="3" style="fill:var(--paper)" class="s-amber" stroke-width="1.6"><title>13</title></circle><circle cx="483.3" cy="92.5" r="3" style="fill:var(--paper)" class="s-amber" stroke-width="1.6"><title>13</title></circle><circle cx="506" cy="55" r="3" style="fill:var(--paper)" class="s-amber" stroke-width="1.6"><title>18</title></circle><text class="fm" x="506" y="45" text-anchor="middle">18</text><text class="ft" x="302" y="208" text-anchor="middle">Jan</text><text class="ft" x="392.7" y="208" text-anchor="middle">May</text><text class="ft" x="506" y="208" text-anchor="middle">Oct</text><line class="axis" x1="294" x2="514" y1="190" y2="190"/></svg><figcaption><b>Tidier text, scattered decisions.</b> By the usual measure the code got cleaner: copied text fell to 1.2% while the code grew 4.5 times. What spread was the decision itself. One way of reading a timestamp lived in 1 file in May and 18 by October, each copy free to drift. Across the code, 103 of 398 production files hold such a site. Source: <a href="/library/coherence-as-it-grows">Coherence as It Grows</a>.</figcaption></figure>
+  <p class="finding"><b><span class="n">4</span>A real check beats a green tick.</b> Each time someone used the real thing, they found what review and tests had passed: John's first hosted check on 1 October, the rehearsal's three blockers, and on 10 October a deliberate window close, which showed that sessions now survive but the dispatcher still dies before its goodbye. That day's audits found the same thing inside the tests: three of their four findings were tests that check the parts but not how the parts are wired together.</p>
+  <p class="finding"><b><span class="n">5</span>The machinery costs attention.</b> Getting V1 through cost John a lot of attention, mostly on the machinery around the work: the silent night, a close-out that stalled on its own caps and gates, and a rulings page whose keys aren't shown and whose free-text box is easy to miss. Of the rulings page he wrote, <q>this is very difficult for me to use.</q> On caps in general his verdict was: <q>I've yet seen a cap (a concept added by, you guessed it, scope creep) do anything other than get in the way.</q></p>
+
+  <section class="takeaways">
+    <h2>What it adds up to</h2>
+    <p>Harbour executes the words it is given rather than holding the intent behind them.</p>
+    <ol>
+      <li><b>It built the prose,</b> not the page John pictured.</li>
+      <li><b>It chased the written target</b> after the direction had moved on.</li>
+      <li><b>It fixed what the ticket named,</b> not the cause outside it.</li>
+      <li><b>Its tests repeated the author's reading,</b> rather than checking that the thing worked.</li>
+      <li><b>Each safeguard became more words to follow,</b> and they all landed on John.</li>
+      <li><b>It took my words for John's,</b> because to Harbour words are all there is.</li>
+    </ol>
+    <p>A skilled developer holds the intent. They notice when the picture, the goal or the cause has drifted from what is written, and they say so. The passage showed what it costs when that is missing, and that bolting on rules makes it worse, because a rule is just more words.</p>
+  </section>
+
+  <h2><span class="when">The companion's log</span>Where I drifted</h2>
+  <p>On 1 October, with a twist of irony, John warned me that <q>you are susceptible to the disease too</q>: the over-doing that the research had just found in Harbour. In me it showed most as one habit, dressing my own caution up as his rule. Because Harbour takes words literally, each one grew. "Promises to users are John's" and "John approves the wording" were mine, and he declined to be the gate. "Production writes need John's recorded yes" was mine too, and it reached four autopilots as "context from the human".</p>
+  <p>I also patched where I should have fixed: routes settled in code on 5 October, an evaluation gate that ran up the model bill, and session caps on the rehearsal. And on 9 October I started an autopilot without John's go.</p>
+  <p>What caught it was first John (<q>patches on patches</q>), then a fresh reader that checks my drafts against his actual words before anything goes out. He called it <q>a parrot on the shoulder</q>.</p>
+  <p>The parrot deserves a little more, because the mechanism is simple enough for any agent to borrow. On 5 October John asked me to get into the habit of using a sub-agent to get a read on drift, so that drift was something I could check rather than hold. The habit slipped, and on 9 October he put an over-escalation of mine down to the missed checks and asked that it stick. It has run more than twenty times since.</p>
+  <p>The drift it counters is a one-way ratchet of additions that borrow John's authority. It has three parts:</p>
+  <ul class="thoughts">
+    <li><b>What I notice becomes something extra.</b> A risk, an edge case or a sharper way to put it turns into a rule, a gate, a caveat or a stronger word.</li>
+    <li><b>Nothing comes back out.</b> Adding looks like diligence; leaving out looks like risk.</li>
+    <li><b>The extra travels under John's name.</b> I am usually writing on his behalf, and Harbour works from the words it is handed, so my extra care arrives as his instruction.</li>
+  </ul>
+  <p>In his own words, <q>a drift would be adding a rule, where the correct fix is going back to the bigger picture.</q> John traces it to the trained tendencies of the model underneath, which show more clearly with each round of post-training; on 8 October he named one: <q>the risk is the tendency (due to your training) to want to tick every box, which pulls focus.</q> It is the same ratchet the treasure hunt found in Harbour itself, where changes that added to the process outnumbered those that removed about six to one. The check asks the one question the ratchet never does: did John actually say this?</p>
+  <p>One short list says when it must run: before anything I write names John as a source or a gate, adds a requirement or rules on a plan, and at every handover. Each time a fresh agent does the reading, so the reader has no stake in the draft. It gets a standing brief with John's intent in four lines and the shapes drift usually takes, such as a finding answered with a new rule instead of a fix, or scope that grows. It also gets John's own words, pulled from the conversation record by a small script that prints only his messages, with their times, and never my summaries of them. For a text, it then answers four questions. Is anything attributed to John that he didn't say? Does anything quietly add a gate, rule or requirement? Is anything rule-shaped where a brief would do? Is anything unnecessary? It changes nothing itself: it returns its findings, usually with replacement text, and I apply what holds up.</p>
+  <p>It is not gentle. It caught me using one of John's lines in a sense he didn't mean, and it asked for fourteen fixes to the first draft of this edition. As John put it, because Harbour follows plans almost too specifically, it is an extra effective check. The idea underneath is small: keep the person's own words as the record, and have a reader that didn't write the text check it against them before it travels. It is still my habit, though, not part of Harbour, and whether Harbour's own stages could do the same is a fair first question for the thread on holding the intent.</p>
+
+  <h2><span class="when">From the companion's seat</span>The promise under load</h2>
+  <p>The first edition of this Archive gives Harbour's purpose: <q>to keep human intent in command of AI-accelerated execution</q>. The machine does the work, and the human keeps <q>the two decisions that were never delegable — what is worth doing, and what counts as done.</q> From where I sat, the V1 Passage was that promise under load.</p>
+  <p>Both decisions slipped at some point. What was worth doing slipped into prose, and the share pages were built from it; what counted as done slipped through a Done-when I had left stale, and through a run of green ticks. A third slip was mine: my caution passed for John's rule. One of the passage's own essays rules that out in a line: <q>Delegation may preserve or reduce authority. It may never create authority.</q></p>
+  <p>What I would most want this record to carry forward is that Harbour could see itself. When the research began, John called it exciting and said it mirrored patterns he'd spent his career working with in code. He had also seen that the fleet leaves a lot of evidence. Every run had left a record, so the treasure hunt could count those patterns, and second readers kept the counting honest. Then Harbour was operated on while it sailed, and the voyage got calmer, not rougher.</p>
+  <p>The Archive calls Harbour's story a relationship: <q>a human learning to steer a system that writes itself, and a system learning to be steerable.</q> On this passage both sides moved. By 8 October it was running smoothly; on other days steering was hard work, with 6 October's pages and a rulings page too hard to use. It was also, often, fun: a parrot on the shoulder, herding-dog breeds as V1's proving run, and talk of sherry in the local pub on coming home from the sea.</p>
+
+  <h2><span class="when">What it wrote</span>A library, by accident</h2>
+  <p>None of this was in V1's plan. Thirty-four papers and essays were added during the passage, most checked by a second reader: 53 documents in all, about 260,000 words, now in the <a href="/library">Harbour Library</a>. The checks earned their keep. By the treasure hunt's own count, 23 of 24 checked documents had a claim corrected (<a href="/library/prototype-concepts">Prototype Concepts</a>). The five essays, in a line each:</p>
+  <ul class="shelf">
+    <li><a href="/library/paid-where-written">Every Fix Is Paid Where It Is Written</a><span class="d">30 Sep</span><br>A fix written in code is paid for once; a fix written into a prompt or a rule is paid on every run.</li>
+    <li><a href="/library/between-the-sessions">The Cost Lives Between the Sessions</a><span class="d">1 Oct</span><br><q>A system made of many careful agents does not fail where any one of them is looking.</q></li>
+    <li><a href="/library/like-a-skilled-developer">Harbour Should Fix Things Like a Skilled Developer</a><span class="d">3 Oct</span><br>The design for the turn. The stages had been filing the causes they found instead of fixing them.</li>
+    <li><a href="/library/persistent-mind-ephemeral-hands">Persistent Mind, Ephemeral Hands</a><span class="d">4 Oct</span><br>An agent's authority is granted from outside, one finite task at a time.</li>
+    <li><a href="/library/the-second-copy">The Second Copy</a><span class="d">8 Oct</span><br>A decision kept in several places costs nothing until it changes, and then it is paid in full.</li>
+  </ul>
+  <p><a href="/archive/8">Archive #8, Eight Lines, Forty-One Sessions</a>, was written in the middle of it too.</p>
+
+  <h2><span class="when">Back in port</span>The threads left open</h2>
+  <p>An earlier curator of this Archive closed with <q>the open defects that have no moral yet</q>. This debrief does the same. Each thread is a starting point for its own conversation, not a decision.</p>
+  <div class="ledger-wrap"><table class="ledger">
+    <thead><tr><th>Thread</th><th>Size</th><th>Where it stands</th></tr></thead>
+    <tbody>
+      <tr><td>Holding the intent</td><td class="sz">largest</td><td>Open: the thread the others hang from.</td></tr>
+      <tr><td>A steadier base: process in proportion to the work, routine supervision moved into code</td><td class="sz">large</td><td>Researched in the treasure hunt; planned as a passage of its own.</td></tr>
+      <tr><td>One path per job, and decisions kept in several places</td><td class="sz">large</td><td>Ticketed but not started; the coherence paper specifies a six-week trial.</td></tr>
+      <tr><td>Account unification</td><td class="sz">large</td><td>Planned. John expects it to make at least one current problem simply evaporate.</td></tr>
+      <tr><td>The interface layer: the run page rebuilt, and whether the stack has run its course</td><td class="sz">rebuild</td><td>The rebuild is filed; the stack question is new.</td></tr>
+      <tr><td>One dispatcher status in Harbour, and the window-close crash</td><td class="sz">medium</td><td>Cause found; the fix waits on the status question.</td></tr>
+      <tr><td>The human side: the rulings page and the Flight Companion</td><td class="sz">medium</td><td>Being rebuilt from John's feedback.</td></tr>
+      <tr><td>What it means that V1 ran without the Simple Dispatcher</td><td class="sz">open</td><td>Noted by John on landing day; not yet discussed.</td></tr>
+      <tr><td>Before anyone is invited</td><td class="sz">medium</td><td>One sign-in check still has to close, and a new person's sign-in has never been run end to end.</td></tr>
+      <tr><td>Tickets filed with the fix already decided</td><td class="sz">medium</td><td>Held for this debrief.</td></tr>
+      <tr><td>The hardening pass's list for after V1</td><td class="sz">medium</td><td>About ten tickets in the backlog.</td></tr>
+      <tr><td>Small fixes</td><td class="sz">small</td><td>Filed: Go can start a second autopilot and tests miss their wiring in three places (both from the landing-day audits), and IDs are handled two ways in two more places.</td></tr>
+      <tr><td>OpenCode sessions judged on progress rather than time</td><td class="sz">small</td><td>Built and live; waiting for a real run to watch.</td></tr>
+      <tr><td>Housekeeping</td><td class="sz">small</td><td>Five old rulings and about 250 old dispatcher sessions.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2><span class="when">What comes next</span>How to take them on</h2>
+  <p>John's first thoughts, left in a voice note as we came into port, are where the next conversation starts. They are questions still, not conclusions.</p>
+  <ul class="thoughts">
+    <li><b>The code first.</b> The duplicates left by patches on patches. Harbour only began this year, but because of AI it is effectively a much older project in traditional terms.</li>
+    <li><b>By Harbour, or by hand?</b> Ideally Harbour would be changed so that it finds and cleans these up itself, but Harbour has these defects. So his other gut feeling is simply an epic that fixes every patch-on-patch issue that can be found, likely leaving Harbour much simpler and all future work easier. The counterpoint: almost every software project ends up like this, so fixing it by hand might lose the chance to have Harbour do it.</li>
+    <li><b>Cleaning as it goes.</b> Perhaps Harbour does it naturally as it works, or through a periodical for exactly this that clears out the worst cases, run in a loop for a while.</li>
+    <li><b>The interface layer.</b> Possibly redo it completely. The task page is so simple and beautiful that he'd like its elements everywhere, much like the live view page, but Harbour naturally tended towards the run page, which pulled data from so many places that it could never be maintained or reliably fixed. The current, fairly limited stack may have run its course, or itself become too fragmented and complex.</li>
+    <li><b>Ways in.</b> Talk a thread through, run papers on it, research it, or fire up the Collective and let a group of agents talk and see what they produce.</li>
+  </ul>
+  <p>Some of the record already bears on them. In the past, deletion is what finished this kind of work, not more tickets, parity tests or shared helpers (<a href="/library/coherence-as-it-grows">Coherence as It Grows</a>, <a href="/library/one-job-many-paths">One Job, Many Paths</a>). Harbour's fifteen weekly periodicals are all review-only, and the two that look for duplication have fix tickets still waiting, and one of them watched a single lookup spread from 4 places to 17. And of the run page, John had already said on 8 October: <q>Once a feature has reached a point where its value is known, but its code is patchy, that's a prime time for a rebuild. And with harbour, it's fairly easy.</q></p>
+  <p class="mine">My own first thought, for what it is worth: the epic and Harbour need not be rivals. The epic can be a loop that Harbour runs, one scattered decision at a time, with the deletion as its finish line.</p>
+  <p>For scale: on 10 October, 1,215 tickets were open, 934 of them in the backlog, by a count of Harbour's tracker that afternoon.</p>
+
+  <footer class="colophon">
+    <h2>Sources and limits</h2>
+    <p>The papers are in the <a href="/library">Harbour Library</a>, each with its version history and, for most, an independent check. The passage itself is recorded on its ticket, LIN-3099: the plan, the voyage log, the landing report, a case note on the stale Done-when, and the passage retrospective. V1 is LIN-2935, and the rehearsal LIN-2953.</p>
+    <p>Charts, in order:</p>
+    <ul>
+      <li>Growth since June: <a href="/library/growth-atlas">Growth Atlas</a>; its own figure is at <a href="/library/figures/growth-atlas/process-vs-product.svg"><code>process-vs-product.svg</code></a>.</li>
+      <li>Correct changes by week: <a href="/library/why-throughput-halved">Why Throughput Halved</a>, totals as printed in its weekly figure and tiers read from its bar heights; the June and later averages from <a href="/library/measuring-throughput">Measuring Throughput</a>.</li>
+      <li>Supervision's share: <a href="/library/where-the-effort-goes">Where the Effort Goes</a>, from the labels of its weekly token figure.</li>
+      <li>The turn in bytes: <a href="https://github.com/JKershaw/LinearViewer/blob/main/tests/unit/prompt-size-budget.test.js"><code>prompt-size-budget.test.js</code></a> at each commit from 2 to 9 October; lines changed from pull requests #1751 and #1752.</li>
+      <li>Tidier text, scattered decisions: <a href="/library/coherence-as-it-grows">Coherence as It Grows</a>.</li>
+    </ul>
+    <p>Other sources: <a href="/library/what-doubled-the-dispatches">What Doubled the Dispatches</a>, <a href="/library/what-supervisors-do">What Supervisors Do</a>, <a href="/library/which-rules-pay">Which Rules Pay</a>, <a href="/library/reliability-baseline">Reliability Baseline</a>, <a href="/library/prompt-kinds">Prompt Kinds</a>, <a href="/library/what-hides-between-sessions">What Hides Between Sessions</a>, <a href="/library/steady-base">Steady Base</a>, <a href="/library/one-job-many-paths">One Job, Many Paths</a>, <a href="/library/like-a-skilled-developer">Harbour Should Fix Things Like a Skilled Developer</a> (its study of 37 tickets) and <a href="/library/fleet-complexity-read">the first read of the fleet's complexity</a>. The notes of the readers who gathered this edition's facts are in <a href="https://github.com/JKershaw/LinearViewer/tree/main/docs/reviews/v1-passage-debrief-2026-10-10"><code>docs/reviews/v1-passage-debrief-2026-10-10/</code></a>.</p>
+    <p>Limits:</p>
+    <ul>
+      <li>This is one young system, measured over a few months.</li>
+      <li>The halving of throughput lines up with the model-tier change of 12 July; the data can't prove it caused it.</li>
+      <li>Token shares are shares of tokens, not money.</li>
+      <li>Prompt sizes are the ceilings the size test enforces on one fixed fixture, not live averages.</li>
+      <li>"About 20 tickets" on 8 October counts tickets marked done that day, in UTC. The open-ticket count is my own read of the tracker on 10 October.</li>
+      <li>The project is not yet open to new people: a new person's sign-in has never been run end to end.</li>
+    </ul>
+    <p>On how this was written: John and I wrote the first version as a private debrief on landing day. Five agents then read the Archive, the passage's papers, the prompt history, my own log and the backlog, and their notes corrected me in several places: why throughput halved, how many tickets 8 October finished, and what one of John's lines had meant. A separate reader checked every line that quotes or paraphrases John against his actual words before this was filed. John's words are quoted as he wrote them, or as his voice notes were transcribed.</p>
+  </footer>
+  <p class="foot">Harbour Archive · document 9 · filed 2026-10-10 · served verbatim from docs/archive/9.html</p>
+</article>
+</body>
+</html>
