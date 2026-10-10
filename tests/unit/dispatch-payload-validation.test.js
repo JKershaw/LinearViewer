@@ -195,8 +195,18 @@ describe('validateDispatchPayload — dangerous chars', () => {
 });
 
 describe('validateDispatchPayload — id / combination rules', () => {
+  test('GitHub-style numeric issueId is accepted (LIN-3440)', () => {
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', issueId: '20' }), null);
+    assert.strictEqual(validateDispatchPayload({ prompt: 'x', issueId: '#20' }), null);
+  });
+
+  test('non-string issueId is rejected', () => {
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', issueId: 20 }),
+      { error: 'Invalid issueId format' });
+  });
+
   test('malformed issueId', () => {
-    assert.deepEqual(validateDispatchPayload({ prompt: 'x', issueId: 'not-a-uuid' }),
+    assert.deepEqual(validateDispatchPayload({ prompt: 'x', issueId: 'not a valid id!' }),
       { error: 'Invalid issueId format' });
   });
   test('malformed followUpTo', () => {
@@ -299,7 +309,7 @@ describe('validateDispatchPayload — check ORDER (first error is load-bearing)'
   test('sessionId keeps its LAST position — an earlier violation still wins', () => {
     // LIN-1118 swapped the rule, not its slot. A payload violating both issueId
     // and sessionId must still surface the issueId error first.
-    const r = validateDispatchPayload({ prompt: 'x', issueId: 'nope', sessionId: '__meta__' });
+    const r = validateDispatchPayload({ prompt: 'x', issueId: 'no pe!', sessionId: '__meta__' });
     assert.deepEqual(r, { error: 'Invalid issueId format' });
   });
 });
