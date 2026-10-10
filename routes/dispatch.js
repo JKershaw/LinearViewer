@@ -28,7 +28,6 @@ import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
-import { parseConsumerCaps, recordConsumerCaps, CONSUMER_CAPS_HEADER } from '../lib/consumer-caps.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
@@ -247,7 +246,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, ifParked, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -750,7 +749,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           abort: isAbort,
           abortTo: isAbort ? abortTo : null,
           cascade: cascade === true,
-          ifParked: ifParked === true,
           sessionId: sessionId || null,
           periodicalId: periodicalId || null,
           waitForFollowUps: waitForFollowUps === true,
@@ -1743,10 +1741,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    */
   router.get('/api/dispatch/poll', authenticateDispatchToken, async (req, res) => {
     try {
-      // Capability advertisement (LIN-3436): see routes/proxy-runner.js.
-      const caps = parseConsumerCaps(req.headers[CONSUMER_CAPS_HEADER]);
-      recordConsumerCaps(req.dispatchUrlKey, caps);
-      const itemsPromise = dispatchQueueStore.pollAvailable(req.dispatchUrlKey, { caps });
+      const itemsPromise = dispatchQueueStore.pollAvailable(req.dispatchUrlKey);
       // Mark this promise as handled right away so a pollAvailable rejection
       // arriving while the (independently bounded) halt read below is still
       // in flight never surfaces as an unhandledRejection. The no-op catch
