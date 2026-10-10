@@ -73,6 +73,36 @@ test.describe('Archive Pages', () => {
     expect(result.scripts).toBe(0);
   });
 
+  test('serves archive #9 (the V1 Passage debrief) without authentication', async ({ page }) => {
+    const response = await page.goto('/archive/9');
+    expect(response.status()).toBe(200);
+    await expect(page).toHaveTitle(/Surgery at Sea/);
+  });
+
+  test('archive #9 loads its faces, draws its five figures, and every Library link lands', async ({ page }) => {
+    // Its citations go to the Library by paper name; a renamed paper would
+    // strand a link silently.
+    await page.goto('/archive/9');
+    const result = await page.evaluate(async () => {
+      await document.fonts.ready;
+      return {
+        loaded: [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family),
+        figures: document.querySelectorAll('figure').length,
+        scripts: document.querySelectorAll('script').length,
+        internal: [...new Set([...document.querySelectorAll('a[href^="/"]')].map((a) => a.getAttribute('href')))],
+      };
+    });
+    expect(result.loaded).toContain('Inter');
+    expect(result.loaded).toContain('JetBrains Mono');
+    expect(result.figures).toBe(5);
+    expect(result.scripts).toBe(0);
+    expect(result.internal.length).toBeGreaterThan(10);
+    for (const href of result.internal) {
+      const response = await page.request.get(href);
+      expect(response.status(), href).toBe(200);
+    }
+  });
+
   test('archive #7 loads its faces and every in-page link lands', async ({ page }) => {
     // Its superscript citations, back-links and section cross-references are
     // all fragment links; a renumbered entry would strand one silently.
