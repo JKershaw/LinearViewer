@@ -55,7 +55,7 @@ import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetiremen
 import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
-import { readPrStatusFailOpen } from '../lib/github-pr-status.js';
+import { readPrStatusFailOpen, prReadToken } from '../lib/github-pr-status.js';
 import { readRunLedger } from '../lib/run-ledger.js';
 import { deriveCloseOutState, closeOutSetsDone } from '../lib/run-closeout-state.js';
 import { readTaskRunFacts } from '../lib/task-run-facts.js';
@@ -4417,6 +4417,7 @@ ${goal}`
         provider,
         callScope,
         viewerIsOwner: viewerIsOwner(req),
+        urlKey: workspace.urlKey,
         readPrStatus: (runEvidence && runEvidence.readPrStatus) || undefined,
         githubFetch: (runEvidence && runEvidence.githubFetch) || null,
       });
@@ -4526,11 +4527,14 @@ ${goal}`
       const prUrls = extractPrUrls(comments);
       const readPrStatus = seam.readPrStatus || readPrStatusFailOpen;
       const prStatuses = await Promise.all(prUrls.map(async pr => {
+        // LIN-3443: the bound repo is read with the workspace's own token.
+        const token = prReadToken(callScope, pr.repo);
         try {
           return await readPrStatus({
             repo: pr.repo,
             number: pr.number,
             doFetch: seam.githubFetch || null,
+            ...(token ? { token, scopeKey: workspace.urlKey } : {}),
           });
         } catch (err) {
           // Fail open: an unreadable PR state is "unknown", never a 500.

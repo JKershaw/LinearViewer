@@ -56,6 +56,7 @@ import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
+import { prReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
@@ -1487,7 +1488,9 @@ export function createDashboardRoutes({
         const payload = { state, number: null, checks: null, url: null };
         return res.json({ ...payload, message: prStateCopy(payload) });
       }
-      const payload = await prStateStore.readPayload(ref, nowMs);
+      // LIN-3443: the bound repo is read with the workspace's own token.
+      const token = prReadToken(callScope, ref.repo);
+      const payload = await prStateStore.readPayload(ref, nowMs, token ? { token, scopeKey: workspace.urlKey } : undefined);
       return res.json({ ...payload, message: prStateCopy(payload) });
     } catch (error) {
       console.error('Run PR-state error:', error.message);

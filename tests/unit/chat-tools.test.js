@@ -1764,6 +1764,21 @@ describe('get_pr_status', () => {
     assert.strictEqual(result.readable, true);
   });
 
+  test('LIN-3443: the bound repo is read with the workspace token; any other repo is anonymous', async () => {
+    const seen = [];
+    const githubFetch = async (url, opts) => {
+      seen.push({ url, auth: opts?.headers?.Authorization });
+      return { ok: true, status: 200, json: async () => (/check-runs$/.test(url) ? { check_runs: [] } : /status$/.test(url) ? { statuses: [] } : { private: false }) };
+    };
+    const provider = makeRepoProvider({});
+    const { executeTool } = createChatToolCatalog({ provider, scope: { repo: 'JKershaw/LinearViewer', token: 'ghs_tok' }, urlKey: URL_KEY, githubFetch });
+    await executeTool({ name: 'get_pr_status', arguments: { repo: 'jkershaw/linearviewer', sha: 'abc1234' } });
+    assert.ok(seen.length > 0 && seen.every(c => c.auth === 'Bearer ghs_tok'));
+    seen.length = 0;
+    await executeTool({ name: 'get_pr_status', arguments: { repo: 'someone/else', sha: 'abc1234' } });
+    assert.ok(seen.length > 0 && seen.every(c => c.auth === undefined), 'another repo never gets the token');
+  });
+
   test('rejects a malformed PR number before any fetch, including the allowlist read', async () => {
     const githubFetch = makeFakeGithubFetch();
     const provider = makeRepoProvider({});
