@@ -242,6 +242,7 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
   <p>After the turn, it ran smoothly. That was John's observation, and the record mostly bears it out: no commit after it names a second round of review, and close-out now finishes the tasks it is given. On 8 October 29 pull requests merged and about 20 tickets were finished, and that evening John wrote that he believed Harbour was <q>feeling like a more well oiled machine!</q> From 9 October the autopilots carried most of the rest to port, often while he was away or asleep.</p>
   <p>It wasn't friction-free. The new selector wavered at least eight times on 8 October and needed four fixes the next morning, and quick corrections of just-merged code did not fall.</p>
   <p>On 10 October came the rehearsal: a small issue about herding-dog breeds, on a repository Harbour had never worked in. John called it <q>A perfect test</q>. The first Go failed, and three blockers were found and fixed that morning, one of them a TLS failure that the screen reported as <q>Harbour unreachable</q>. Then the run reached a reviewed pull request in about 26 minutes, the change was live by 11:13 UTC, and V1 made port. By then well over 200 pull requests had merged across Harbour and its dispatcher.</p>
+  <p>As John pointed out afterwards, it was also the first run that didn't go through the Simple Dispatcher, the program on his own machine that runs every other session in this story. A new person won't have one. The rehearsal ran on a runner in a cloud session instead, set up from Harbour's own runner page, the path a new person would actually use; the TLS failure was in that path. What that implies is one of the threads below.</p>
 
   <h2><span class="when">What the voyage found</span>Five findings, one cause</h2>
   <p>Five findings came out of the passage. They look like five problems. I think they are one.</p>
@@ -300,6 +301,7 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
       <tr><td>The interface layer: the run page rebuilt, and whether the stack has run its course</td><td class="sz">rebuild</td><td>The rebuild is filed; the stack question is new.</td></tr>
       <tr><td>One dispatcher status in Harbour, and the window-close crash</td><td class="sz">medium</td><td>Cause found; the fix waits on the status question.</td></tr>
       <tr><td>The human side: the rulings page and the Flight Companion</td><td class="sz">medium</td><td>Being rebuilt from John's feedback.</td></tr>
+      <tr><td>What it means that V1 ran without the Simple Dispatcher</td><td class="sz">open</td><td>Noted by John on landing day; not yet discussed.</td></tr>
       <tr><td>Before anyone is invited</td><td class="sz">medium</td><td>One sign-in check still has to close, and a new person's sign-in has never been run end to end.</td></tr>
       <tr><td>Tickets filed with the fix already decided</td><td class="sz">medium</td><td>Held for this debrief.</td></tr>
       <tr><td>The hardening pass's list for after V1</td><td class="sz">medium</td><td>About ten tickets in the backlog.</td></tr>
