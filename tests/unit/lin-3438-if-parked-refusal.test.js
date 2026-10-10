@@ -4,9 +4,6 @@
  *  - POST /dispatch refuses `ifParked` for any value other than absent or
  *    `false`, ahead of the `sessionId` check. It must NOT be silently ignored:
  *    an ignored `ifParked:true` is a plain abort and can end a running session.
- *  - TEMPORARY: a row stored with `ifParked: true` before the 400 deployed is
- *    withheld from every poller until its 24h TTL expires. Remove the `it` that
- *    pins this (and the filter + `_formatItem` echo) 24h after the deploy.
  */
 process.env.NODE_ENV = 'test';
 
@@ -83,29 +80,5 @@ describe('LIN-3438 — ifParked is refused, not ignored', () => {
       validateDispatchPayload({ abort: true, abortTo: TARGET, ifParked: true, sessionId: 'bad id with spaces\n' }),
       { error: ERROR }
     );
-  });
-});
-
-describe('LIN-3438 — TEMPORARY withhold of already-stored ifParked rows', () => {
-  test('a stored ifParked row is withheld from every poller; a plain abort still delivers', async () => {
-    const collection = createMockCollection();
-    const store = new DispatchQueueStore({ collection, historyCollection: createMockCollection() });
-    const abortTo = TARGET;
-    await store.addItem('acme', { abort: true, abortTo, target: 'cli' });
-    await store.addItem('acme', { prompt: 'plain prompt' });
-    // addItem no longer writes the field, so the legacy doc is inserted raw.
-    await collection.insertOne({
-      _id: 'legacy-if-parked', urlKey: 'acme', abort: true, abortTo, ifParked: true, prompt: '',
-      expiresAt: new Date(Date.now() + 3600e3), createdAt: new Date()
-    });
-
-    assert.equal((await store.listItems('acme')).length, 3, 'the row is in the queue');
-    for (const polled of [await store.pollAvailable('acme'), await store.pollAvailable('acme', { caps: ['if-parked'] })]) {
-      assert.equal(polled.length, 2, 'only the two plain rows');
-      assert.ok(polled.every(i => i.ifParked !== true));
-      const abort = polled.find(i => i.abort === true);
-      assert.ok(abort, 'the plain abort is still delivered');
-      assert.equal(abort.abortTo, abortTo);
-    }
   });
 });
