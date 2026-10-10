@@ -130,6 +130,30 @@ describe('run page owner path (routes/dashboard.js)', () => {
     assert.equal(args.stopAt, null);
     assert.equal(args.variant, 'unknown');
   });
+
+  // LIN-3443 (review ledger item 2): the session/run page's `readRunExternal`
+  // is the scope supplier for the close-out box. A GitHub-bound workspace must
+  // hand the reader its own call scope AND its urlKey (the cache scope key),
+  // or the authenticated PR read either stays anonymous or has no scope.
+  test('a GitHub-bound workspace hands the reader its own token/repo scope and urlKey', async () => {
+    const { calls, reader } = capturingReader();
+    const router = makeRouter({ readRunEvidence: reader });
+    const layer = router.stack.find(l => l.route?.path === '/workspace/:urlKey/observation/session/:sessionId' && l.route.methods.get);
+    const handler = layer.route.stack[layer.route.stack.length - 1].handle;
+    const res = { statusCode: 200, status(c) { this.statusCode = c; return this; }, send(b) { this.sentBody = b; return this; } };
+    const workspace = {
+      urlKey: 'ws-a',
+      provider: 'github',
+      accessToken: 'ghs_workspace_tok',
+      bindings: [{ provider: 'github', scope: 'JKershaw/Herd', credentials: { token: 'ghs_workspace_tok' } }]
+    };
+    let nextErr = null;
+    await handler({ session: { features: { dispatch: true }, workspaces: [{ urlKey: 'ws-a', name: 'A' }] }, workspace, params: { sessionId: SID }, query: {} }, res, (err) => { nextErr = err; });
+    assert.equal(nextErr, null);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].urlKey, 'ws-a', 'the scope key the authenticated PR cache is keyed by');
+    assert.deepEqual(calls[0].callScope, { token: 'ghs_workspace_tok', repo: 'JKershaw/Herd' });
+  });
 });
 
 // LIN-3329: the task page's one tracker read already carries the issue's
