@@ -4260,6 +4260,43 @@ describe('flight-companion.js — scannable thread (LIN-3361)', () => {
     looseDeepEqual(m.loadStoredSession('acme').seenIdentifiers, []);
   });
 
+  // LIN-3357 close-out (ledger item 3): the reload path of LIN-3361's two
+  // load-bearing claims — a restored readout is still folded, and its task
+  // names still link. This harness stubs markdown and has no text nodes, so the
+  // real fold/linkify DOM is proven in the e2e spec; here the real helpers are
+  // wrapped to record what startSession()'s restore hands them. Goes red
+  // without `foldReadout(restoredBody)` (no calls) and without re-seeding
+  // `seenIdentifiers` (linkify gets an empty set).
+  test('a restored readout is folded with the page headings, then linked from the restored seen set', () => {
+    const storage = makeFakeStorage({
+      'flight-companion-session:acme': JSON.stringify({
+        history: [{ role: 'assistant', content: 'Two things need you.\n\n## The big thread\n\nLIN-5 is moving.' }],
+        seenIdentifiers: ['LIN-5'],
+      }),
+    });
+    const { windowShim, doc } = loadClient({
+      readyState: 'loading', storageImpl: storage, pageDataset: { fcReadoutHeadings: '["The big thread"]' },
+    });
+    const calls = [];
+    const realFold = windowShim.ChatUI.foldAfterAnchor;
+    const realLinkify = windowShim.ChatUI.linkifyIdentifiers;
+    windowShim.ChatUI.foldAfterAnchor = (el, opts) => { calls.push({ fn: 'fold', el, opts }); return realFold(el, opts); };
+    windowShim.ChatUI.linkifyIdentifiers = (el, known, hrefFor) => {
+      calls.push({ fn: 'linkify', el, known: Array.from(known), href: hrefFor('LIN-5') });
+      return realLinkify(el, known, hrefFor);
+    };
+    windowShim.taskPageHref = ({ urlKey, identifier }) => '/workspace/' + urlKey + '/task/' + identifier;
+
+    doc.dispatch('DOMContentLoaded');
+
+    assert.deepStrictEqual(calls.map(c => c.fn), ['fold', 'linkify'], 'the restored bubble is folded, THEN linked');
+    assert.strictEqual(calls[0].el, calls[1].el, 'both act on the same restored bubble body');
+    assert.ok(calls[0].el.closest('li'), 'that body is a rendered bubble');
+    looseDeepEqual(calls[0].opts, { summary: 'full readout', headings: ['The big thread'] });
+    looseDeepEqual(calls[1].known, ['LIN-5']); // the persisted seen set is re-seeded before the restored bubble is linked
+    assert.strictEqual(calls[1].href, '/workspace/acme/task/LIN-5');
+  });
+
   test('a save from a partial session object keeps the live set (no call site can drop it)', async () => {
     const storage = makeFakeStorage();
     const { exports: m } = loadClient({
