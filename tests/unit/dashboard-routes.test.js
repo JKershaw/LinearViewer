@@ -6292,6 +6292,26 @@ describe('GET /api/run/:runId/pr-state (LIN-3251, C1)', () => {
     assert.equal(counts.github, 4, 'the 4-call reader ran exactly once');
   });
 
+  test('LIN-3443: a GitHub-bound workspace reads its repo with its own token, cached under the workspace', async () => {
+    const authHeaders = [];
+    const comments = [prComment(PR_URL, '2026-07-01T00:00:00.000Z')];
+    const stub = githubStub({ counts: { github: 0 } });
+    const router = makeRouter({}, {
+      prState: {
+        now: () => Date.now(),
+        cache: new Map(),
+        bucket: [],
+        resolveProvider: () => ({ provider: { async fetchIssueComments() { return comments; } }, callScope: { repo: 'acme/widget', token: 'ghs_tok' } }),
+        loadRun: async () => ({ issueIdentifier: 'LIN-1', evidenceUrls: [] }),
+        githubFetch: async (url, opts) => { authHeaders.push(opts?.headers?.Authorization); return stub(url, opts); }
+      }
+    });
+    const res = await callPrState(router);
+    assert.equal(res.jsonBody.state, 'open');
+    assert.equal(authHeaders.length, 4);
+    assert.ok(authHeaders.every(h => h === 'Bearer ghs_tok'), 'all four calls carry the workspace token');
+  });
+
   test('a merged PR is not re-read within 24 h (injected clock, no sleeps)', async () => {
     let clock = 1_000_000;
     const bucket = [];
