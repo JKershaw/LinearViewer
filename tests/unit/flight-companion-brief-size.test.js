@@ -10,9 +10,9 @@ import { buildFlightCompanionMessages, formatCompanionClock } from '../../lib/pr
 export const BRIEF_CEILING_BYTES = 7182;
 const NOW = new Date('2026-10-08T12:00:00Z');
 
-function systemBytes(timeZone) {
+function systemBytes(timeZone, playbook = null) {
   const msgs = buildFlightCompanionMessages({
-    history: [], censusSeedText: 'SEED', now: NOW, turnKind: 'boot', playbook: null, timeZone,
+    history: [], censusSeedText: 'SEED', now: NOW, turnKind: 'boot', playbook, timeZone,
   });
   return Buffer.byteLength(msgs[0].content, 'utf8');
 }
@@ -48,4 +48,12 @@ test('a valid zone uses the canonical id, not the raw string', () => {
 test('the "how to use" pointer is in the chat brief', () => {
   const msgs = buildFlightCompanionMessages({ history: [], censusSeedText: 'SEED', now: NOW, turnKind: 'boot' });
   assert.match(msgs[0].content, /"show how to use" fold/);
+});
+
+// LIN-3357 close-out (plan correction C1): the fixture above measures
+// `playbook: null`. A non-empty playbook must cost exactly its own framing —
+// '\n\n---\n\n' (7) + '## Playbook\n\n' (13) + the playbook text (1) — so
+// text appended next to `## Playbook` (e.g. the how-to constant) goes red here.
+test('a non-empty playbook adds exactly its own framing bytes', () => {
+  assert.strictEqual(systemBytes(undefined, 'P') - systemBytes(undefined, null), 21);
 });
