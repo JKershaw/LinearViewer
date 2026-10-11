@@ -23,9 +23,10 @@ import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
 import { INDEX_SPECS, ensureIndexes } from '../../lib/db-indexes.js';
 import {
-  loadDispatchHistory, collectKpiStats, usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages,
+  loadDispatchHistory, collectKpiStats,
   __internal as KPI_INTERNAL
 } from '../../lib/kpi-stats.js';
+import { usageOf, evidenceCountOf, ticketMarkerEntriesOf, groupDispatchLineages } from '../../lib/dispatch-lineage.js';
 import { digestFeedback, isFreshDigest } from '../../lib/digest-feedback.js';
 import { __internal as TERMINAL_INTERNAL } from '../../lib/dispatch-terminal.js';
 import { __internal as SESSION_TELEMETRY_INTERNAL } from '../../lib/session-telemetry.js';

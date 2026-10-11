@@ -50,7 +50,7 @@ try {
 
 let formatFeedbackEntries = null;
 try {
-  ({ formatFeedbackEntries } = await import('../../lib/dispatch-store.js'));
+  ({ formatFeedbackEntries } = await import('../../lib/dispatch-feedback-format.js'));
 } catch (err) {
   // dispatch-store.js itself exists (DispatchQueueStore imports fine above),
   // so this only fires if a future change makes the whole module unloadable.
@@ -64,7 +64,7 @@ function requireDigestFeedback() {
 
 function requireFormatFeedbackEntries() {
   assert.ok(typeof formatFeedbackEntries === 'function',
-    'lib/dispatch-store.js must export formatFeedbackEntries (promoted from the private _formatFeedbackEntries method)');
+    'lib/dispatch-feedback-format.js must export formatFeedbackEntries (promoted from the private _formatFeedbackEntries method)');
 }
 
 const { _buildLoops } = PIPELINE_LOOPS_INTERNAL;
