@@ -23,6 +23,7 @@ import { Router } from 'express';
 import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
 import { jsonError, serverError } from '../lib/errors.js';
+import { findWorkspaceByUrlKey } from '../lib/workspace-lookup.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
@@ -55,7 +56,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
 
   function connectedWorkspaces(req, workspace) {
     const workspaces = (req.session.workspaces || []).map(w => ({ urlKey: w.urlKey, name: w.name }));
-    if (!workspaces.some(w => w.urlKey === workspace.urlKey)) {
+    if (!findWorkspaceByUrlKey(workspaces, workspace.urlKey)) {
       workspaces.push({ urlKey: workspace.urlKey, name: workspace.name || workspace.urlKey });
     }
     return workspaces;
