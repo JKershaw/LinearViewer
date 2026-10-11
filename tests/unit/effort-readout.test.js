@@ -595,3 +595,27 @@ describe('LIN-2830 — an effort-less opencode row survives, never dropped', () 
     assert.match(readout.notes.harnessModelRows, /never the dispatch row/i);
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): the lineage join through `normalizeDispatchRow` ───
+// One of the four `mergeLineageFeedback` callers (the others pass the same
+// `dispatchedAt` as `since`: task-cost, dispatch-store, routes/proxy-dispatch).
+// Junk is `undefined` / 'not-a-date', never `null` (a null `since` is the one
+// deliberate change, pinned in dispatch-terminal.test.js).
+describe('normalizeDispatchRow — lineage join with a junk dispatchedAt (LIN-3456 characterization)', () => {
+  const sibling = { feedback: [{ message: '[done] finished', timestamp: '2026-08-01T05:00:00.000Z', rootItemId: 'root-1' }] };
+  const row = (dispatchedAt) => ({ id: 'r1', rootItemId: 'root-1', kind: 'implementation', status: 'taken', dispatchedAt, feedback: [] });
+
+  test('control: a dated row inherits the later sibling terminal', () => {
+    const n = normalizeDispatchRow(row('2026-08-01T00:00:00.000Z'), { isLive: false, siblingRows: [sibling] });
+    assert.equal(n.lifecycleStatus, 'done');
+    assert.notEqual(n.completedAt, null);
+  });
+
+  test('a row with a missing/unparseable dispatchedAt inherits nothing (unverifiable `since` fails closed)', () => {
+    for (const junk of [undefined, 'not-a-date']) {
+      const n = normalizeDispatchRow(row(junk), { isLive: false, siblingRows: [sibling] });
+      assert.equal(n.completedAt, null, `dispatchedAt=${String(junk)}`);
+      assert.notEqual(n.lifecycleStatus, 'done');
+    }
+  });
+});

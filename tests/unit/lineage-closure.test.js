@@ -400,4 +400,47 @@ describe('selectLineageCloses — junk timestamps fail closed (LIN-3456 characte
       assert.equal(Object.values(sel.skippedIds).flat().includes('beat'), false, 'not even a recorded miss');
     }
   });
+
+  // `null` coerces to 0 in `<`, `<=` and `Math.min`, so for ordinary (post-1970)
+  // times an unguarded null is usually harmless. A pre-1970 clock is the one
+  // input where it flips the answer, which makes the `!= null` guards observable.
+  const early = (ms) => new Date(ms);
+
+  test('a lone junk-timestamp tagged entry is not the row\'s root at the event (storedRootAt guard)', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(3, 'hb', 'P'), fb(9, '[done] ok', 'P')] }),
+        row('c', {
+          kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: at(2), resolvedAt: at(4),
+          feedback: [{ message: 'hb', rootItemId: 'OTHER', timestamp: junk }]
+        })
+      ];
+      assert.deepEqual(ids(selectLineageCloses(rows)), ['c'], `timestamp=${String(junk)}: membership falls back to the seed`);
+    }
+  });
+
+  test('handed-on: a junk successor dispatchedAt never bounds an earlier wake, even a pre-1970 one (bound guard)', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('old-wake', { dispatchedAt: early(-5000), resolvedAt: at(2), feedback: [fb(3, 'hb', 'R')] }),
+        row('new-wake', { dispatchedAt: junk, resolvedAt: at(6), feedback: [fb(7, 'first tagged', 'R')] })
+      ];
+      assert.deepEqual(ids(selectLineageCloses(rows)), [], `dispatchedAt=${String(junk)}`);
+    }
+  });
+
+  test('unresolved seed: a junk tagged timestamp disables the pre-first-tag scan, even for pre-1970 events (firstTaggedMs guard)', () => {
+    const rowsWith = (taggedTimestamp) => [
+      row('Q', { kind: 'implementation', rootItemId: 'Q', dispatchedAt: early(-20000), resolvedAt: early(-20000),
+        feedback: [{ message: '[done] ok', rootItemId: 'Q', timestamp: early(-5000) }] }),
+      row('c', {
+        kind: 'implementation', followUpTo: 'MISSING-ANCHOR', rootItemId: 'X', dispatchedAt: early(-10000), resolvedAt: early(-9000),
+        feedback: [{ message: 'hb', rootItemId: 'X', timestamp: taggedTimestamp }]
+      })
+    ];
+    assert.deepEqual(selectLineageCloses(rowsWith(early(-1000))).skippedIds['membership-unresolved'], ['c'], 'control: a real first-tag bound records the miss');
+    for (const junk of JUNK) {
+      assert.deepEqual(selectLineageCloses(rowsWith(junk)).skippedIds['membership-unresolved'], [], `timestamp=${String(junk)}`);
+    }
+  });
 });
