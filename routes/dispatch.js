@@ -27,8 +27,9 @@ import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
 import { getPeriodicals, PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
-import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
+import { validateRunField, isPositiveInteger } from '../lib/dispatch-fields.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { mapDispatchRefusal } from '../lib/dispatch-refusal.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
@@ -306,8 +307,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // meaningful alongside abort — reject cascade:true without it rather than
       // storing an inert flag (mirroring the abortTo-requires-abort guard above).
       // Stored + forwarded blindly for now; the walk consumes it, not the runner.
-      if (cascade !== undefined && typeof cascade !== 'boolean') {
-        return badRequest.json(res, 'cascade must be a boolean');
+      const cascadeRuleError = validateRunField('cascade', cascade);
+      if (cascadeRuleError) {
+        return badRequest.json(res, cascadeRuleError);
       }
       if (cascade === true && !isAbort) {
         return badRequest.json(res, 'cascade requires abort to be true');
@@ -341,8 +343,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       // Opt-in completion hold (LIN-797): boolean, default false. Stored +
       // forwarded blindly — the runner owns the behaviour (see LIN-795).
-      if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
-        return badRequest.json(res, 'waitForFollowUps must be a boolean');
+      const waitForFollowUpsRuleError = validateRunField('waitForFollowUps', waitForFollowUps);
+      if (waitForFollowUpsRuleError) {
+        return badRequest.json(res, waitForFollowUpsRuleError);
       }
 
       // Push-based inter-session comms. Both are stored + forwarded blindly,
@@ -352,11 +355,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       //   subscription — edge declaration (LIN-900 §6): enum 'everything'|
       //                  'terminal-only' governing which of this child's events wake
       //                  the dispatching parent (§5 matrix). Declared, never inferred.
-      if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
-        return badRequest.json(res, 'queueIfBusy must be a boolean');
+      const queueIfBusyRuleError = validateRunField('queueIfBusy', queueIfBusy);
+      if (queueIfBusyRuleError) {
+        return badRequest.json(res, queueIfBusyRuleError);
       }
-      if (subscription !== undefined && !isValidSubscription(subscription)) {
-        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
+      const subscriptionRuleError = validateRunField('subscription', subscription);
+      if (subscriptionRuleError) {
+        return badRequest.json(res, subscriptionRuleError);
       }
 
       // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
@@ -381,10 +386,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // error text exactly (LIN-1737 D3), so a run kicked off through either seam
       // rejects an invalid budget identically. Optional; absent/null ⇒ no budget,
       // byte-identical to today.
-      if (maxTasks !== undefined && maxTasks !== null) {
-        if (!Number.isInteger(maxTasks) || maxTasks < 1) {
-          return badRequest.json(res, 'maxTasks must be an integer >= 1');
-        }
+      const maxTasksRuleError = validateRunField('maxTasks', maxTasks);
+      if (maxTasksRuleError) {
+        return badRequest.json(res, maxTasksRuleError);
       }
 
       // Server-side proxy-context attach (LIN-1162). The dispatch UI used to mint a
@@ -1365,7 +1369,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     if (maxTasks === undefined) {
       return badRequest.json(res, 'maxTasks is required');
     }
-    if (!Number.isInteger(maxTasks) || maxTasks < 1) {
+    if (!isPositiveInteger(maxTasks)) {
       return badRequest.json(res, 'maxTasks must be a positive integer');
     }
 

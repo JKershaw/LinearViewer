@@ -14,7 +14,7 @@ import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
-import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
@@ -22,6 +22,7 @@ import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, get
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX, dispatchIssueSourceField } from '../lib/workspace.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
+import { validateRunField } from '../lib/dispatch-fields.js';
 import { buildRunGate, resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
 import { POLLED_TARGETS, SESSION_TARGETS } from '../lib/dispatch-targets.js';
@@ -269,9 +270,10 @@ export function createDispatchRoutes({
       // storing an inert flag (mirroring the abortTo-requires-abort guard above).
       // Stored + forwarded blindly for now; the walk consumes it, not the runner.
       // This is the proxy-token twin the autopilot actually hits.
-      if (cascade !== undefined && typeof cascade !== 'boolean') {
+      const cascadeRuleError = validateRunField('cascade', cascade);
+      if (cascadeRuleError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'cascade must be a boolean');
+        return badRequest.json(res, cascadeRuleError);
       }
       if (cascade === true && !isAbort) {
         logEvent(req, '/api/proxy/dispatch', 400);
@@ -294,20 +296,23 @@ export function createDispatchRoutes({
       }
       // Opt-in completion hold (LIN-797): boolean, default false. Stored +
       // forwarded blindly — the runner owns the behaviour (see LIN-795).
-      if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
+      const waitForFollowUpsRuleError = validateRunField('waitForFollowUps', waitForFollowUps);
+      if (waitForFollowUpsRuleError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'waitForFollowUps must be a boolean');
+        return badRequest.json(res, waitForFollowUpsRuleError);
       }
       // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
       // exactly like waitForFollowUps/force — no Harbour-side semantics.
-      if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
+      const queueIfBusyRuleError = validateRunField('queueIfBusy', queueIfBusy);
+      if (queueIfBusyRuleError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'queueIfBusy must be a boolean');
+        return badRequest.json(res, queueIfBusyRuleError);
       }
       // Subscription edge declaration (LIN-900 §6): enum, no legacy boolean.
-      if (subscription !== undefined && !isValidSubscription(subscription)) {
+      const subscriptionRuleError = validateRunField('subscription', subscription);
+      if (subscriptionRuleError) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
+        return badRequest.json(res, subscriptionRuleError);
       }
       // Task budget (LIN-1751/LIN-1737, LIN-2975): a SCOPE bound on the run — up to
       // this many distinct tasks — enforced deterministically at the dispatch-factory
@@ -316,11 +321,10 @@ export function createDispatchRoutes({
       // identically. Optional; absent/null ⇒ no budget, byte-identical to today.
       // Placed before any store write or async guard runs (matches every other inline
       // check on this route).
-      if (maxTasks !== undefined && maxTasks !== null) {
-        if (!Number.isInteger(maxTasks) || maxTasks < 1) {
-          logEvent(req, '/api/proxy/dispatch', 400);
-          return badRequest.json(res, 'maxTasks must be an integer >= 1');
-        }
+      const maxTasksRuleError = validateRunField('maxTasks', maxTasks);
+      if (maxTasksRuleError) {
+        logEvent(req, '/api/proxy/dispatch', 400);
+        return badRequest.json(res, maxTasksRuleError);
       }
 
       // Shared payload validation for the two main handlers (LIN-1139): length
@@ -716,21 +720,24 @@ export function createDispatchRoutes({
       }
       // Opt-in completion hold (LIN-797): boolean, default false. Threaded through
       // to the dispatched item and forwarded blindly — the runner owns the behaviour.
-      if (waitForFollowUps !== undefined && typeof waitForFollowUps !== 'boolean') {
+      const waitForFollowUpsRuleError = validateRunField('waitForFollowUps', waitForFollowUps);
+      if (waitForFollowUpsRuleError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'waitForFollowUps must be a boolean');
+        return badRequest.json(res, waitForFollowUpsRuleError);
       }
       // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
       // exactly like waitForFollowUps. queueIfBusy is never defaulted here (it is
       // Harbour-set only on the auto-enqueued wake follow-up); subscription is a
       // declared enum (LIN-900 §6) that defaults to `terminal-only` when omitted.
-      if (queueIfBusy !== undefined && typeof queueIfBusy !== 'boolean') {
+      const queueIfBusyRuleError = validateRunField('queueIfBusy', queueIfBusy);
+      if (queueIfBusyRuleError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'queueIfBusy must be a boolean');
+        return badRequest.json(res, queueIfBusyRuleError);
       }
-      if (subscription !== undefined && !isValidSubscription(subscription)) {
+      const subscriptionRuleError = validateRunField('subscription', subscription);
+      if (subscriptionRuleError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
+        return badRequest.json(res, subscriptionRuleError);
       }
       const recommendRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
         maxLength: MAX_NAME_LENGTH,
@@ -818,9 +825,10 @@ export function createDispatchRoutes({
       // (the operator rescue hatch). No followUpTo/abort combination check is
       // needed: `cascade` does not exist on this verb and the followUpTo/abort
       // shapes are the runner's own gates, forwarded blindly either way.
-      if (force !== undefined && typeof force !== 'boolean') {
+      const forceRuleError = validateRunField('force', force);
+      if (forceRuleError) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'force must be a boolean');
+        return badRequest.json(res, forceRuleError);
       }
 
       // Resolve the subscription edge once for both dispatch paths below (LIN-900
