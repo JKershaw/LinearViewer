@@ -66,7 +66,7 @@ import { settleWithConcurrency } from './dashboard.js';
 import { getLoopsForIssue } from '../lib/pipeline-loops.js';
 import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
-import { UUID_REGEX, isValidIssueId, getWorkspaceMirrorToken, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
+import { UUID_REGEX, isValidIssueId, getWorkspaceToken, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
 import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
 import { activeConnectionBackedBinding, setBindingCredential, setWorkspaceCredential } from '../lib/connection-binding.js';
 import { fingerprintCredential } from '../lib/credential-diagnostics.js';
@@ -386,7 +386,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         });
       }
 
-      const report = await runAudit(getWorkspaceMirrorToken(workspace));
+      const report = await runAudit(getWorkspaceToken(workspace));
       res.json(report);
     } catch (error) {
       console.error('Audit error:', error);
@@ -3373,7 +3373,7 @@ ${goal}`
       // Placed at the fetch, AFTER the https-only / exact-host-allowlist /
       // path-traversal checks above — none of which are reordered or relaxed.
       const fetchHeaders = isActiveProviderLinear(workspace)
-        ? { Authorization: `Bearer ${getWorkspaceMirrorToken(workspace)}` }
+        ? { Authorization: `Bearer ${getWorkspaceToken(workspace)}` }
         : {}
       const response = await fetch(imageUrl, {
         headers: fetchHeaders,

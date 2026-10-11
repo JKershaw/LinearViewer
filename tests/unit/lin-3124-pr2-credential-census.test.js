@@ -38,7 +38,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 
-const D15_READ_CENSUS = 13;
+const D15_READ_CENSUS = 12; // LIN-3464: getWorkspaceToken no longer reads credentials.token
 const D15_WORKSPACE_MIRROR_WRITER_CENSUS = 5;
 
 // Files whose `.credentials` occurrences belong to a different D15 sub-class.

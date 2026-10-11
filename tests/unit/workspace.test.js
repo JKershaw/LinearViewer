@@ -1181,13 +1181,19 @@ describe('getWorkspaceToken (provider/scope selection)', () => {
 // =============================================================================
 
 describe('getWorkspaceToken', () => {
-  test('returns credentials.token for new-shape workspace', () => {
+  test('returns accessToken for new-shape workspace (writers set both fields)', () => {
     const workspace = {
       id: 'ws-1',
       provider: 'linear',
-      credentials: { token: 'new-token' }
+      credentials: { token: 'new-token' },
+      accessToken: 'new-token'
     };
     assert.strictEqual(getWorkspaceToken(workspace), 'new-token');
+  });
+
+  test('ignores a credentials.token-only row: accessToken is the one legacy field (LIN-3464)', () => {
+    const workspace = { id: 'ws-1', provider: 'linear', credentials: { token: 'copy-only' } };
+    assert.strictEqual(getWorkspaceToken(workspace), undefined);
   });
 
   test('falls back to legacy accessToken when no credentials', () => {
@@ -1198,14 +1204,14 @@ describe('getWorkspaceToken', () => {
     assert.strictEqual(getWorkspaceToken(workspace), 'legacy-token');
   });
 
-  test('prefers credentials.token over legacy accessToken when both present', () => {
+  test('prefers accessToken over a diverged credentials.token copy (LIN-3464)', () => {
     const workspace = {
       id: 'ws-1',
       provider: 'linear',
-      credentials: { token: 'new-token' },
-      accessToken: 'legacy-token'
+      credentials: { token: 'stale-copy' },
+      accessToken: 'refreshed-token'
     };
-    assert.strictEqual(getWorkspaceToken(workspace), 'new-token');
+    assert.strictEqual(getWorkspaceToken(workspace), 'refreshed-token');
   });
 
   test('returns undefined when neither credentials nor accessToken present', () => {
@@ -1217,7 +1223,7 @@ describe('getWorkspaceToken', () => {
     assert.strictEqual(getWorkspaceToken(undefined), undefined);
   });
 
-  test('falls back to accessToken when credentials present but token missing', () => {
+  test('reads accessToken when credentials present but token missing', () => {
     const workspace = {
       id: 'ws-1',
       credentials: {},
@@ -1233,7 +1239,8 @@ describe('getWorkspaceToken', () => {
       name: 'New Shape',
       urlKey: 'new-shape',
       provider: 'linear',
-      credentials: { token: 'round-trip-token' }
+      credentials: { token: 'round-trip-token' },
+      accessToken: 'round-trip-token'
     });
 
     const stored = getActiveWorkspace({ ...session, activeWorkspaceId: 'ws-1' });
@@ -1265,16 +1272,17 @@ describe('getWorkspaceToken', () => {
     upsertWorkspace(session, {
       id: 'ws-1',
       provider: 'linear',
-      credentials: { token: 'upgraded-token' }
+      credentials: { token: 'upgraded-token' },
+      accessToken: 'upgraded-token'
     });
 
     const stored = session.workspaces[0];
     // Spread merge keeps untouched legacy fields and adds the new ones.
     assert.strictEqual(stored.name, 'Test');
-    assert.strictEqual(stored.accessToken, 'legacy-token');
+    assert.strictEqual(stored.accessToken, 'upgraded-token');
     assert.strictEqual(stored.provider, 'linear');
     assert.deepStrictEqual(stored.credentials, { token: 'upgraded-token' });
-    // New credentials.token wins over the retained legacy accessToken.
+    // The re-auth upsert carries accessToken, which is the one current field.
     assert.strictEqual(getWorkspaceToken(stored), 'upgraded-token');
   });
 });

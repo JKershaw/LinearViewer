@@ -186,17 +186,17 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
   // Blocker 1 — mirror/expiry accessors (+ blocker 4's double gate)
   // ---------------------------------------------------------------------------
   describe('blocker 1: the mirror/expiry accessors serve a connection-backed workspace', () => {
-    test('(a) hydrated: the Connection token/expiry; unhydrated: fail closed; legacy: raw E2 unchanged', async () => {
+    test('(a) hydrated: the Connection token/expiry; unhydrated: fail closed; legacy: one current token', async () => {
       const s = stores();
       const expiresAt = Date.now() + 1234_000;
       const { workspace } = await connectionBackedSession(s, { token: 'REAL', expiresAt });
-      assert.equal(ws.getWorkspaceMirrorToken(workspace), 'REAL');
+      assert.equal(ws.getWorkspaceToken(workspace), 'REAL');
       assert.equal(ws.getWorkspaceTokenExpiry(workspace), expiresAt);
       const unhydrated = structuredClone(workspace);
-      assert.equal(ws.getWorkspaceMirrorToken(unhydrated), undefined);
+      assert.equal(ws.getWorkspaceToken(unhydrated), undefined);
       assert.equal(ws.getWorkspaceTokenExpiry(unhydrated), undefined);
-      const legacy = { provider: 'linear', accessToken: 'NEW-mirror', credentials: { token: 'OLD' }, tokenExpiresAt: 7 };
-      assert.equal(ws.getWorkspaceMirrorToken(legacy), 'NEW-mirror');
+      const legacy = { provider: 'linear', accessToken: 'NEW-mirror', credentials: { token: 'NEW-mirror' }, tokenExpiresAt: 7 };
+      assert.equal(ws.getWorkspaceToken(legacy), 'NEW-mirror');
       assert.equal(ws.getWorkspaceTokenExpiry(legacy), 7);
     });
 
