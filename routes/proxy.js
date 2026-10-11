@@ -65,7 +65,7 @@ import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
-import { loadRecentRuns } from '../lib/recent-runs.js';
+import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
@@ -95,7 +95,7 @@ import {
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
-import { badRequest, jsonError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
 
 /**
  * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
@@ -136,11 +136,11 @@ export function resolveProxyLLM(sessionApiKey) {
 const OPENROUTER_FALLBACK_PAID_NOTE = 'openrouter_key_fallback_paid_env';
 const OPENROUTER_FALLBACK_FREE_NOTE = 'openrouter_key_fallback_free_tier';
 
-// Lazy-load test fixtures only in test mode to avoid production dependency on test files
+// Lazy-load the sample data only in test mode (lib/sample-data, not a test fixture)
 let testMockData = null;
 async function getTestMockData() {
   if (!testMockData) {
-    const mod = await import('../tests/fixtures/mock-data.js');
+    const mod = await import('../lib/sample-data/mock-data.js');
     testMockData = mod.testMockData;
   }
   return testMockData;
@@ -888,7 +888,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       res.set('Retry-After', String(refusal.retryAfter));
     }
     if (keepalive) {
-      keepalive.send(409, { error: err.message, ...refusal });
+      keepaliveError(keepalive, 409, err.message, { ...refusal });
     } else {
       jsonError(res, 409, err.message, refusal);
     }
@@ -938,7 +938,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       const refusal = err.closeOutRefusal;
       logEvent(req, endpoint, 409, `${CLOSE_OUT_IS_THE_PERSONS_CODE} ${refusal.sessionId}`);
       if (keepalive) {
-        keepalive.send(409, { error: err.message, ...refusal });
+        keepaliveError(keepalive, 409, err.message, { ...refusal });
       } else {
         jsonError(res, 409, err.message, refusal);
       }
@@ -950,7 +950,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       const refusal = err.taskSessionRunaway;
       logEvent(req, endpoint, 409, `${TASK_SESSION_RUNAWAY_CODE} ${refusal.sessionId}`);
       if (keepalive) {
-        keepalive.send(409, { error: err.message, ...refusal });
+        keepaliveError(keepalive, 409, err.message, { ...refusal });
       } else {
         jsonError(res, 409, err.message, refusal);
       }
@@ -961,7 +961,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // Bound discriminator ('tasks') on the durable proxy-event note.
     logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.bound} ${refusal.sessionId}`);
     if (keepalive) {
-      keepalive.send(409, { error: err.message, ...refusal });
+      keepaliveError(keepalive, 409, err.message, { ...refusal });
     } else {
       jsonError(res, 409, err.message, refusal);
     }
@@ -998,7 +998,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       res.set('Retry-After', String(refusal.retryAfter));
     }
     if (keepalive) {
-      keepalive.send(status, { error: refusal.error, ...body });
+      keepaliveError(keepalive, status, refusal.error, { ...body });
     } else {
       jsonError(res, status, refusal.error, body);
     }
@@ -1609,7 +1609,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // then the AI recommendation. Uses a longer timeout since this makes a
     // Linear API call + an OpenRouter LLM call.
     const context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
-    const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
+    const { issue, children } = context;
 
     // Resolve the effective key (free-tier when no session/env key) so both
     // recommend surfaces send a valid key. Metering is NOT done here — this runs
@@ -1637,7 +1637,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          { parent, siblings, project, children, comments, focusedChild, attachments, runs: await loadRecentRuns(dispatchQueueStore, urlKey, issue.identifier) },
+          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,

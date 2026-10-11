@@ -48,7 +48,7 @@ describe('ship-biscuit editor-call budget wiring (LIN-1185)', () => {
     // Post LIN-1203 the error rides through the keepalive guard, so the 502 is
     // emitted via keepalive.send (works whether or not the guard already flushed)
     // rather than a bare res.status(502).
-    assert.match(ROUTE_SRC, /keepalive\.send\(502/);
+    assert.match(ROUTE_SRC, /keepaliveError\(\s*keepalive,\s*502/);
   });
 });
 
@@ -63,8 +63,8 @@ describe('ship-biscuit H12 keepalive guard (LIN-1203)', () => {
     // Success edition, the free-tier 429, and both error branches must all use
     // keepalive.send so they stay valid after the guard flushes HTTP 200 past H12.
     assert.match(ROUTE_SRC, /keepalive\.send\(200,\s*\{\s*edition:\s*saved\s*\}\)/);
-    assert.match(ROUTE_SRC, /keepalive\.send\(429/);
-    assert.match(ROUTE_SRC, /keepalive\.send\(401/);
+    assert.match(ROUTE_SRC, /keepaliveError\(keepalive,\s*429/);
+    assert.match(ROUTE_SRC, /keepaliveError\(keepalive,\s*401/);
     // Guard is torn down before every send (no dangling heartbeat interval).
     assert.match(ROUTE_SRC, /keepalive\.stop\(\)/);
     // The old unguarded success/error response shapes must be gone from the handler.

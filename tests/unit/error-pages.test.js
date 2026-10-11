@@ -18,8 +18,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import * as errorsModule from '../../lib/errors.js';
 import { classifyUpstreamError, isAuthError } from '../../lib/errors.js';
-import { renderErrorPage, renderUpstreamAwareErrorPage } from '../../lib/render-pages.js';
+import { renderErrorPage, renderUpstreamAwareErrorPage, renderServiceUnavailablePage } from '../../lib/render-pages.js';
 
 describe('classifyUpstreamError', () => {
   test('undici "Premature close" FetchError → retryable upstream', () => {
@@ -182,5 +183,21 @@ describe('renderErrorPage backward compatibility', () => {
     const html = renderErrorPage('X', 'Y', { action: 'Go', actionUrl: '/z' });
     assert.ok(!html.includes('error-details'));
     assert.ok(html.includes('Y'));
+  });
+});
+
+describe('one HTML error page (LIN-3466)', () => {
+  test('renderServiceUnavailablePage is renderErrorPage with the 503 copy', () => {
+    const html = renderServiceUnavailablePage();
+    assert.strictEqual(html, renderErrorPage('Service Unavailable', 'Service temporarily unavailable. Please try again later.'));
+    assert.match(html, /<h2 class="error-title">Service Unavailable<\/h2>/);
+    assert.match(html, /<h1[^>]*>Harbour<\/h1>/);
+  });
+
+  test('lib/errors.js has no second HTML writer', () => {
+    assert.strictEqual(errorsModule.htmlError, undefined);
+    for (const helper of [errorsModule.badRequest, errorsModule.unauthorized, errorsModule.notFound, errorsModule.serverError, errorsModule.serviceUnavailable]) {
+      assert.strictEqual(helper.html, undefined);
+    }
   });
 });

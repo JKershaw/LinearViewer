@@ -480,6 +480,22 @@ describe('POST /collective/start — facilitator designation threading (LIN-1049
     }
   });
 
+  test('a facilitator urlKey on two seats promotes only the first (LIN-3474)', async () => {
+    const captured = [];
+    const app = buildApp(captured);
+    const res = await call(app, 'post', START_PATH, {
+      channel: '#test-room',
+      characters: [{ workspaceUrlKey: 'alpha' }, { workspaceUrlKey: 'bravo' }, { workspaceUrlKey: 'bravo' }],
+      facilitator: 'bravo',
+    });
+    assert.equal(res.status, 201);
+    assert.equal(captured.length, 3);
+    assert.deepEqual(
+      captured.map((c) => c.item.promptName),
+      ['collective-participant', 'collective-facilitator', 'collective-participant'],
+    );
+  });
+
   test('an unmatched facilitator key falls back to a fully leaderless room', async () => {
     const captured = [];
     const app = buildApp(captured);

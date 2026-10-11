@@ -16,7 +16,7 @@ import { test, before, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
-import { testMockData } from '../fixtures/mock-data.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 

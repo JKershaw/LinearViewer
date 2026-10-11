@@ -13,7 +13,7 @@
  * Both dispatches are sliced out of the REAL server.js and executed in a
  * `node:vm` context (server.js is not import-safe in a unit test — it connects
  * to Mongo and listens at module load). The strategy table, `removeWorkspace`
- * and `serviceUnavailable` are the REAL implementations; only I/O boundaries are
+ * and `renderServiceUnavailablePage` are the REAL implementations; only I/O boundaries are
  * faked. This is the same harness convention as
  * `lin-1885-jira-401-workspace-preservation.test.js` and
  * `lin-1503-github-family-401-remint-behaviour.test.js`.
@@ -26,7 +26,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
 import { removeWorkspace, normalizeProvider, getWorkspaceTokenExpiry } from '../../lib/workspace.js';
-import { serviceUnavailable } from '../../lib/errors.js';
+import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, refreshStrategyFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
@@ -76,7 +76,7 @@ function makeContext({ workspace, extraWorkspaces = [], durableRecord = null, ca
     relinkNotice,
     normalizeProvider,
     removeWorkspace,
-    serviceUnavailable,
+    renderServiceUnavailablePage,
     isDefinitiveRevocation: () => definitiveRevocation,
     isTransientRefreshFailure: (e) => e instanceof TokenRefreshError && e.code !== 'EXPIRED',
 

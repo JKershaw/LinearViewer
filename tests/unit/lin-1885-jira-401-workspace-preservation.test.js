@@ -13,7 +13,7 @@
 // in a unit test — it connects to Mongo and calls app.listen() at module
 // load, the same constraint the LIN-1503 harness documents) by the same
 // docstring-marker convention, and EXECUTES it in a `node:vm` context with
-// every collaborator injected — `removeWorkspace` and `serviceUnavailable`
+// every collaborator injected — `removeWorkspace` and `renderServiceUnavailablePage`
 // are the REAL implementations (imported normally), so a removal decision
 // runs the genuine durable-delete gate rather than a stand-in. Only the I/O
 // boundaries (remint, session save/destroy, render, durable store, eviction)
@@ -36,7 +36,7 @@ import vm from 'node:vm';
 
 import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
-import { serviceUnavailable } from '../../lib/errors.js';
+import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -172,7 +172,7 @@ async function runHandleUnauthorizedError({
       return res.status(401).send(`<error:${notice.title}>`);
     },
     removeWorkspace,
-    serviceUnavailable,
+    renderServiceUnavailablePage,
 
     // Faked I/O boundaries, each independently injectable.
     renderErrorPage: (title, message, opts) => { calls.renderErrorPage.push({ title, message, opts }); return `<error:${title}>`; },

@@ -27,6 +27,7 @@ import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { getProvider } from '../lib/providers/registry.js';
 import { badRequest, jsonError, notFound, serviceUnavailable } from '../lib/errors.js';
+import { findWorkspaceIndexByUrlKey } from '../lib/workspace-lookup.js';
 import {
   buildCollectiveParticipantPrompt,
   buildCollectiveFacilitatorPrompt,
@@ -247,11 +248,10 @@ export function createCollectiveRoutes({
     // any prompt is built, so each prompt can name the whole room. The first
     // roster entry bound to `facilitatorKey` wins (a workspaceUrlKey may appear
     // more than once); at most one facilitator.
-    let facilitatorAssigned = false;
-    const entries = roster.map(({ ws, character, raw }) => {
+    const facilitatorIndex = findWorkspaceIndexByUrlKey(roster.map(r => r.ws), facilitatorKey);
+    const entries = roster.map(({ ws, character, raw }, i) => {
       const nick = assignNick(ws.name);
-      const isFacilitator = !facilitatorAssigned && facilitatorKey !== null && ws.urlKey === facilitatorKey;
-      if (isFacilitator) facilitatorAssigned = true;
+      const isFacilitator = i === facilitatorIndex;
       return { ws, character, raw, nick, isFacilitator };
     });
 

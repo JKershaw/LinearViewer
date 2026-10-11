@@ -22,22 +22,10 @@ import { resolveReasoningBudget, streamChat, AVAILABLE_MODELS } from '../lib/ope
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
-import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
+import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
+import { sendSSE } from '../lib/sse.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
-
-/**
- * Helper: write an SSE event to the response. Mirrors the identically-named
- * helper still in workspace-api.js (used by the recommend group) — kept as a
- * local duplicate rather than a shared import so route modules stay
- * independently movable.
- * @param {Object} res - Express response
- * @param {string} type - Event type
- * @param {Object} data - Event data (will be JSON-stringified)
- */
-function sendSSE(res, type, data) {
-  res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-}
 
 /**
  * Apply a per-request roadmap model override against the already-resolved

@@ -1412,7 +1412,7 @@ describe('Flight Companion turn endpoint (LIN-2432 §A.7) — deterministic cens
     // stays in the route (it is coupled to the census read and to
     // buildCompanionSnapshot) and is injected, which is what keeps lib/ free of
     // a routes/ import.
-    assert.match(CORE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*deps\.buildCensusSeedText\(currentCensusDoc\)/s);
+    assert.match(CORE_SRC, /buildFlightCompanionMessages\(\{[^}]*censusSeedText:\s*buildCensusSeedText\(currentCensusDoc\)/s);
     // ...and the user-initiated branch reads the doc fresh (auto-wake already
     // populated currentCensusDoc via the gate, above). LIN-2622's boot branch
     // deliberately does NOT widen this condition — its own reservation logic

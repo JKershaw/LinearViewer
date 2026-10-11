@@ -19,7 +19,7 @@
 // the real source of the GitHub-family branch and of handleWorkspaceRemoval by
 // the same pinned markers the census tests already depend on, then EXECUTES that
 // real source in a vm context with the collaborators injected. removeWorkspace
-// and serviceUnavailable are the real implementations, imported normally — only
+// and renderServiceUnavailablePage are the real implementations, imported normally — only
 // the I/O boundaries (re-mint, session save, render, durable store) are faked, so
 // a fault can be injected at each one.
 //
@@ -43,7 +43,7 @@ import vm from 'node:vm';
 
 import { removeWorkspace, normalizeProvider } from '../../lib/workspace.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
-import { serviceUnavailable } from '../../lib/errors.js';
+import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -162,7 +162,7 @@ async function runGitHubFamilyBranch({
       return res.status(401).send(`<error:${notice.title}>`);
     },
     removeWorkspace,
-    serviceUnavailable,
+    renderServiceUnavailablePage,
 
     // Faked I/O boundaries, each independently injectable.
     remintActiveCredential: async (...args) => { calls.remint++; return remint(...args); },
@@ -268,7 +268,7 @@ describe('LIN-1503 close-out: GitHub-family 401 branch, executed (ledger rows 3-
     assert.equal(session.activeWorkspaceId, 'ws-github', 'the workspace must still be the active one');
     assert.equal(calls.sessionDestroyed, false, 'the session must not be destroyed');
 
-    // And the failure is retryable, not terminal — real serviceUnavailable.
+    // And the failure is retryable, not terminal — real renderServiceUnavailablePage.
     assert.equal(res.statusCode, 503, 'a post-remint render failure must surface as a retryable 503');
     assert.notEqual(result, undefined, 'the branch must return the 503 response, not fall through to the Linear arm');
   });

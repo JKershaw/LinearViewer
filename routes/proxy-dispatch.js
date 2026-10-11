@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
-import { badRequest, jsonError, notFound } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
@@ -903,13 +903,13 @@ export function createDispatchRoutes({
           } catch (err) {
             if (err.message?.includes('not found')) {
               logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
-              return keepalive.send(404, { error: 'Issue not found' });
+              return keepaliveError(keepalive, 404, 'Issue not found');
             }
             throw err;
           }
           if (!ctx) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 404);
-            return keepalive.send(404, { error: 'Issue not found' });
+            return keepaliveError(keepalive, 404, 'Issue not found');
           }
 
           const { issue, parent, siblings, project, children, comments, attachments } = ctx;
@@ -931,7 +931,7 @@ export function createDispatchRoutes({
           const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
           if (!generated) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 500);
-            return keepalive.send(500, { error: 'Failed to generate prompt' });
+            return keepaliveError(keepalive, 500, 'Failed to generate prompt');
           }
 
           // The body is server-generated/trusted, so it skips the dangerous-char /
@@ -945,7 +945,7 @@ export function createDispatchRoutes({
           // createDispatchItem starts it is never abandoned: no signal reaches it.
           if (gone.gone) {
             logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 499, 'client closed before enqueue');
-            return keepalive.send(499, { error: 'Client closed the request before dispatch' });
+            return keepaliveError(keepalive, 499, 'Client closed the request before dispatch');
           }
 
           // Create the dispatch item through the shared factory (LIN-1139): it
@@ -1107,13 +1107,13 @@ export function createDispatchRoutes({
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-            return keepalive.send(503, { error: PROXY_ATTACH_FAILED_MESSAGE });
+            return keepaliveError(keepalive, 503, PROXY_ATTACH_FAILED_MESSAGE);
           }
           // A declared resume whose grant cannot be re-issued (LIN-3134): relay
           // the coded refusal ahead of graphqlErrorStatus, which would 500 it.
           if (isStructuralGrantRefusal(err)) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
-            return keepalive.send(err.status, { error: err.message, code: err.code, retryable: false });
+            return keepaliveError(keepalive, err.status, err.message, { code: err.code, retryable: false });
           }
           // LIN-2260: classify an upstream provider-auth failure the same way
           // the read path (and GET /recommend via recommendErrorResponse)
@@ -1124,7 +1124,7 @@ export function createDispatchRoutes({
           const status = graphqlErrorStatus(err, req);
           logEvent(req, '/api/proxy/recommend-and-dispatch', status);
           console.error('Proxy recommend-and-dispatch override error:', err.message);
-          return keepalive.send(status, { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
+          return keepaliveError(keepalive, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
         } finally {
           gone.release();
         }
@@ -1189,7 +1189,7 @@ export function createDispatchRoutes({
         // left, and that is not an AI outage.
         if (gone.gone) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 499, 'client closed');
-          return keepalive.send(499, { error: 'Client closed the request' });
+          return keepaliveError(keepalive, 499, 'Client closed the request');
         }
         const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend-and-dispatch', status);
@@ -1202,8 +1202,7 @@ export function createDispatchRoutes({
       // rather than dispatching an empty prompt. `defer` must never reach dispatch.
       if (rec.recommendedAction === 'defer' || !rec.prompt) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 422);
-        return keepalive.send(422, {
-          error: 'Recommendation did not resolve to an actionable task',
+        return keepaliveError(keepalive, 422, 'Recommendation did not resolve to an actionable task', {
           deferredVia,
           deferTruncated,
           deferStopReason
@@ -1248,7 +1247,7 @@ export function createDispatchRoutes({
         gone.release();
         if (gone.gone) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 499, 'client closed before enqueue');
-          return keepalive.send(499, { error: 'Client closed the request before dispatch' });
+          return keepaliveError(keepalive, 499, 'Client closed the request before dispatch');
         }
 
         // Create the dispatch item through the shared factory (LIN-1139): it
@@ -1430,13 +1429,13 @@ export function createDispatchRoutes({
         // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-          return keepalive.send(503, { error: PROXY_ATTACH_FAILED_MESSAGE });
+          return keepaliveError(keepalive, 503, PROXY_ATTACH_FAILED_MESSAGE);
         }
         // A declared resume whose grant cannot be re-issued (LIN-3134): relay
         // the coded refusal on the armed keepalive, same as the 503 above.
         if (isStructuralGrantRefusal(err)) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
-          return keepalive.send(err.status, { error: err.message, code: err.code, retryable: false });
+          return keepaliveError(keepalive, err.status, err.message, { code: err.code, retryable: false });
         }
         // LIN-2260: classify an upstream provider-auth failure (retryable
         // 503/LINEAR_AUTH) the same way GET /recommend's recommendErrorResponse
@@ -1446,7 +1445,7 @@ export function createDispatchRoutes({
         const status = graphqlErrorStatus(err, req);
         logEvent(req, '/api/proxy/recommend-and-dispatch', status);
         console.error('Proxy recommend-and-dispatch error:', err.message);
-        keepalive.send(status, { error: 'Failed to dispatch prompt', detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
+        keepaliveError(keepalive, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
       }
     } catch (err) {
       // LIN-2260: same classification as the inner catch arms above — this

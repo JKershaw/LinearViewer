@@ -18,7 +18,7 @@ import {
   toStackHeadline,
   STACK_HEADLINE_MAX,
 } from '../../lib/task-stack.js';
-import { testMockData } from '../fixtures/mock-data.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
 
 // buildTaskStack MUTATES its inputs (pushes a synthetic "No Project", stamps
 // parent/children + graph features onto issues), exactly as the route did. Give

@@ -39,7 +39,7 @@
  */
 
 import { Router, json } from 'express';
-import { badRequest, jsonError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
@@ -51,7 +51,7 @@ import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
-import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
+import { renderUpstreamAwareErrorPage, renderErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding, getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
@@ -61,6 +61,7 @@ import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { toEpochMs } from '../lib/utils/time.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -509,7 +510,7 @@ function latestAssistantText(loop) {
  */
 function loopActivityMs(loop) {
   const t = loop.completedAt || loop.agentTimestamp || loop.resolvedAt || loop.dispatchedAt;
-  const ownMs = t ? new Date(t).getTime() : 0;
+  const ownMs = toEpochMs(t) ?? 0;
   const lineageMs = Number.isFinite(loop.lineageLastActivityMs) ? loop.lineageLastActivityMs : 0;
   const ms = Math.max(ownMs, lineageMs);
   return Number.isFinite(ms) ? ms : 0;
@@ -774,8 +775,8 @@ export function createDashboardRoutes({
   function sessionActivityMs(enrichedLoops, session) {
     let max = 0;
     for (const l of enrichedLoops) max = Math.max(max, loopActivityMs(l));
-    if (!max && session.completedAt) max = new Date(session.completedAt).getTime() || 0;
-    if (!max && session.dispatchedAt) max = new Date(session.dispatchedAt).getTime() || 0;
+    if (!max) max = toEpochMs(session.completedAt) ?? 0;
+    if (!max) max = toEpochMs(session.dispatchedAt) ?? 0;
     return Number.isFinite(max) ? max : 0;
   }
 
@@ -1293,7 +1294,7 @@ export function createDashboardRoutes({
       res.send(html);
     } catch (error) {
       console.error('Observation page error:', error);
-      res.status(500).send('Failed to render the Observation page');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to render the Observation page'));
     }
   });
 
@@ -2006,7 +2007,7 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Observation sessions error:', error);
-      keepalive.send(500, { error: 'Could not load sessions' });
+      keepaliveError(keepalive, 500, 'Could not load sessions');
     }
   });
 
@@ -2032,7 +2033,7 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard loops error:', error);
-      keepalive.send(500, { error: 'Could not load runs' });
+      keepaliveError(keepalive, 500, 'Could not load runs');
     }
   });
 
@@ -2128,7 +2129,7 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard rulings error:', error);
-      keepalive.send(500, { error: 'Could not load rulings' });
+      keepaliveError(keepalive, 500, 'Could not load rulings');
     }
   });
 
@@ -2540,7 +2541,7 @@ export function createDashboardRoutes({
       }));
     } catch (error) {
       console.error('Escalation KPIs page error:', error);
-      res.status(500).send('Failed to compute escalation KPIs');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to compute escalation KPIs'));
     }
   });
 
@@ -2555,7 +2556,7 @@ export function createDashboardRoutes({
       keepalive.send(200, { windowDays, generatedAt: now.toISOString(), ...kpis });
     } catch (error) {
       console.error('Escalation KPIs error:', error);
-      keepalive.send(500, { error: 'Could not compute escalation KPIs' });
+      keepaliveError(keepalive, 500, 'Could not compute escalation KPIs');
     }
   });
 
@@ -2710,7 +2711,7 @@ export function createDashboardRoutes({
         return res.status(401).send(renderUpstreamAwareErrorPage(error, { time: now.toISOString() }));
       }
       console.error('Effort read-out page error:', error);
-      res.status(500).send('Failed to compute the effort read-out');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to compute the effort read-out'));
     }
   });
 
@@ -2725,10 +2726,10 @@ export function createDashboardRoutes({
       keepalive.stop();
       if (isAuthError(error)) {
         const classified = classifyUpstreamError(error);
-        return keepalive.send(401, { error: classified.detail, code: classified.code, retryable: classified.retryable });
+        return keepaliveError(keepalive, 401, classified.detail, { code: classified.code, retryable: classified.retryable });
       }
       console.error('Effort read-out error:', error);
-      keepalive.send(500, { error: 'Could not compute the effort read-out' });
+      keepaliveError(keepalive, 500, 'Could not compute the effort read-out');
     }
   });
 
@@ -3056,7 +3057,7 @@ export function createDashboardRoutes({
         session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
       }
       if (!session) {
-        return keepalive.send(404, { error: 'Session not found' });
+        return keepaliveError(keepalive, 404, 'Session not found');
       }
 
       const graph = buildSessionContextGraph(issues, session.tasksTouched, {
@@ -3076,9 +3077,9 @@ export function createDashboardRoutes({
       console.error('Dashboard session-context error:', error);
       keepalive.stop();
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
-      return keepalive.send(500, { error: 'Could not build session context' });
+      return keepaliveError(keepalive, 500, 'Could not build session context');
     }
   });
 
