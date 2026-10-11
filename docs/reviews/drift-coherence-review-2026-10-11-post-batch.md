@@ -11,7 +11,7 @@
 **Headline.** **Batches 1–2 did what they claimed on the gauge rows they targeted, and three of them are clean resolutions by a shape-based count as well:**
 - `lib-import-cycles`: 4 SCCs → **0**.
 - `provider-auth-router-upward-imports`: 5 edges → **0**, static and dynamic.
-- The `maxSessionsPerTask` cap: 5 restatements → **1 constant**.
+- The per-task session budget: 5 restatements → **0**, though by *deleting the field* (LIN-3461), not by consolidating it. The per-run field mechanism it rode on is unchanged (finding 6).
 
 Two zeros come from an old command that cannot see the shape the residue now takes:
 - **Error envelopes.** The 10-11 command reads 0, but **74** hand-built JSON error bodies go out through `keepalive.send(4xx/5xx, {error…})`. There were 73 at baseline: this residue was always invisible to the command, so it is *not* a regression from LIN-3460.
@@ -43,7 +43,7 @@ The window's largest **newly recorded** item is LIN-3449's own batch-2 candidate
 | **LIN-2388** | 6- and 2-member `lib/` SCCs gone | 0 SCCs. The new leaves `dispatch-lineage.js` and `dispatch-feedback-format.js` each define their exports once; `sameHead` is defined once (`run-closeout-state.js:22`). | **confirmed** |
 | **LIN-675** | `lib/` → `routes/` 5 → 0; 15-member provider SCC gone | 0 static and 0 dynamic `lib/` → `routes/` or `server.js` edges. The wiring is one table at the composition root (`routes/provider-auth-routers.js:21-27`). It re-lists provider names next to the registry (`lib/providers/index.js`) but throws at boot on a missing row (`:38-40`), so it is not drift. `render-swipe.js:23` now imports `lib/starter-seed.js`. | **confirmed** |
 | **LIN-3460** | 93 hand-written JSON error replies → 0 | The 10-11 command returns **0**. Importers of `lib/errors.js`: 35 → **43**. `res.status(<variable>).json(`: **8** route sites (they forward pre-built bodies). **Reshaped residue the command never saw:** **74** `keepalive.send(4xx/5xx, { error … })` (73 at `6df0fbd5`; the +1 is `routes/proxy.js` `keepalive.send(409, { error: err.message, ...refusal })`), plus 8 pre-built `{ status, body: { error } }` producers (`routes/proxy.js:1687-1694`, `lib/follow-up-dispatch.js:68-161`). The ticket's scope was the command, so this is a gauge blind spot, not an unmet claim. | **confirmed by its gauge; partial by shape** (finding 3) |
-| **LIN-3461** | per-task cap → one fixed failsafe (`MAX_FRESH_SESSIONS_PER_TASK`); `maxSessionsPerTask` refs 0 | One constant (`lib/dispatch-factory.js:179`, value 30), one check (`:693`). `maxSessionsPerTask` appears in 0 production lines in `lib/`, `routes/`, `public/` and `server.js` (one comment remains at `dispatch-store.js:1576`), and in 0 lines in SD (it never existed there; `git log -S` is empty). The client sender in `public/common.js` was removed in the same PR. A stale doc row remains in `docs/v1.md:110` (hand-off). | **confirmed** |
+| **LIN-3461** | per-task cap → one fixed failsafe (`MAX_FRESH_SESSIONS_PER_TASK`); `maxSessionsPerTask` refs 0 | One constant (`lib/dispatch-factory.js:179`, value 30), one check (`:693`). `maxSessionsPerTask` appears in 0 lines in `lib/`, `routes/`, `public/` and `server.js`, and 0 lines in SD (it never existed there; `git log -S` is empty). The client sender in `public/common.js` was removed in the same PR. A stale doc row remains in `docs/v1.md:110` (hand-off). | **confirmed** |
 
 **Batch-level reading:** 7 confirmed, 2 partial (LIN-2389 and LIN-3460, both on shape-based counts the old gauge cannot see), 0 regressed.
 
@@ -110,9 +110,9 @@ The 10-11 command (verbatim, below) returns **0**, and `lib/errors.js` importers
 `grep -rnE "res\.status\(4[0-9][0-9]\)|res\.status\(5[0-9][0-9]\)" routes/*.js server.js | grep "\.json(" | grep -v routes/test.js`
 
 - **Second writer, 74 sites:** `keepalive.send(<4xx|5xx>, { error … })`. By file: `workspace-api` 37, `proxy-compute` 10, `dashboard` 9, `proxy-dispatch` 9, `proxy` 4, `ship-biscuit` 4, `http-keepalive` 1. `lib/http-keepalive.js:92-99` legitimately needs its own transport (after a flush the status rides in the body as `statusCode`), but the *body* is hand-built at every site. There were **73 at `6df0fbd5`**: the 10-11 command never saw them, so the 10-11 "93" understated the residue by ~74. That is not a regression.
-- **Pre-built bodies:** 8 `{ status, body: { error } }` producers (`routes/proxy.js:1687-1694`, `lib/follow-up-dispatch.js:68,81,101,156,161`), sent through 8 `res.status(<var>).json(body)` sites. `follow-up-dispatch.js:101` hand-builds the `{error, code, category, retryable}` shape that `errorEnvelope` (`lib/errors.js:178`) exists to build; `errorEnvelope` has 2 callers.
-- **HTML error pages — two writers** (closes the 10-11 stated gap; new row `html-error-page-two-writers`). `lib/errors.js` `htmlError` (reached via `.html()` at **9** sites in `server.js` and `routes/workspace.js`) and `lib/render-pages.js:602` `renderErrorPage` (**62** sites) render *different* pages: `htmlError` has no header and an "Error N" title; `renderErrorPage` has the Harbour header, an action button and a diagnostic block. On top of those are 4 raw-text 500/404 replies (`dashboard.js:1295,2542,2712`, `task-share.js:78`). These counts are identical at `6df0fbd5`. The rendered difference goes to Design & Interface; the two authorities are ours.
-- **Cost.** Adding a field to the JSON error envelope is one place for the 96 converted sites and **74 + 8** places elsewhere. Choosing the HTML error page is two modules that already disagree.
+- **Pre-built bodies:** 8 `{ status, body: { error } }` producers (`routes/proxy.js:1687-1694`, `lib/follow-up-dispatch.js:68,81,101,156,161`), sent through 8 `res.status(<var>).json(body)` sites. `follow-up-dispatch.js:101` hand-builds the `{error, code, category, retryable}` shape that `errorEnvelope` (`lib/errors.js:178`) exists to build; `errorEnvelope` has 1 caller (`lib/errors.js:467`, inside `workspaceUnavailableEnvelope`).
+- **HTML error pages — two writers** (closes the 10-11 stated gap; new row `html-error-page-two-writers`). `lib/errors.js` `htmlError` (reached via `.html()` at **9** sites in `server.js` and `routes/workspace.js`) and `lib/render-pages.js:602` `renderErrorPage` (**116** call sites in `lib/`, `routes/` and `server.js`, 87 of them a one-line `.status(4xx/5xx).send(renderErrorPage…`; corrected from 62 by the second read) render *different* pages: `htmlError` has no header and an "Error N" title; `renderErrorPage` has the Harbour header, an action button and a diagnostic block. On top of those are 4 raw-text 500/404 replies (`dashboard.js:1295,2542,2712`, `task-share.js:78`). These counts are identical at `6df0fbd5` (`renderErrorPage` 119 including 3 internal calls, both SHAs). The rendered difference goes to Design & Interface; the two authorities are ours.
+- **Cost.** Adding a field to the JSON error envelope is one place for the 96 converted sites and **74 + 8** places elsewhere. Choosing the HTML error page is two modules that already disagree, at 9 vs 116 sites.
 - **Ticket.** LIN-3460 is Done; its scope was the command. The keepalive residue is **minted** as a batch-3-shaped single decision.
 
 ### 4. `ai-availability-gate-duplication` — **MEDIUM-LOW — NEW row** (neighbour of LIN-3459)
@@ -133,14 +133,16 @@ LIN-3459 consolidated *"is the AI mocked?"*. The decision that consumes it, *"is
 
 See the LIN-2389 row. The residue is all in `lib/workspace-urlkey.js` (a module that itself decides *keys*, not lookups) and `routes/live-console.js:58`. **Gauge validity:** the replacement guard keys on the identifier `urlKey`, so it repeats the evasion surface 10-11 found in the pin. Next edition: keep both counts. Not promoted.
 
-### 6. `dispatch-entrance-field-duplication` — **MEDIUM-LOW — IMPROVED** (cap part resolved)
+### 6. `dispatch-entrance-field-duplication` — **MEDIUM — cap removed, mechanism unchanged** (re-graded from MEDIUM-LOW / "improved" after the second read)
 
-The cap restatements (5 sites at 10-11) are gone (LIN-3461). What remains, all unchanged at `6df0fbd5`:
-- 15 field-validator lines across 5 files (`routes/proxy-dispatch.js` 8, `routes/dispatch.js` 4, `proxy-kickoff`, `dispatch-validation`, `proxy-instructions` 1 each). Examples: `waitForFollowUps must be a boolean` ×3, at `dispatch.js:343` and `proxy-dispatch.js:304,730`.
-- 3 doc→item projections in the store (`dispatch-store.js:1140,2214,3246`).
-- The census's top no-import-edge co-change pairs over 09-26 → now are still `dispatch-store` / `routes/dispatch` (13), `dispatch-store` / `proxy-dispatch` (12) and `dispatch` / `proxy-dispatch` (12).
+LIN-3461 removed the per-task session budget by **deleting the field**. At `6df0fbd5`, `maxSessionsPerTask` sat in 85 production lines in 13 files plus 5 docs. Deleting it took the window's largest PR: 41 files, 14 of them production. That cost *is* the finding: a run-row field is still hand-threaded through every entrance. Unchanged at `6df0fbd5`:
+- **The surviving sibling `maxTasks` has the same shape:** 116 word-matched lines in 15 files (134 at `6df0fbd5`; the −18 are lines LIN-3461 shared with the deleted field). Its validator is restated **5×**: `routes/dispatch.js:385` and `:1408` (a variant message), `routes/proxy-dispatch.js:329`, `routes/proxy-kickoff.js:251` and `routes/workspace-api.js:737`. These are the five sites the 10-11 edition named for the deleted cap.
+- **Other field validators:** 15 lines across 5 files (`routes/proxy-dispatch.js` 8, `routes/dispatch.js` 4, and 1 each in `proxy-kickoff`, `dispatch-validation` and `proxy-instructions`). For example, `waitForFollowUps must be a boolean` ×3, at `dispatch.js:343` and `proxy-dispatch.js:304,730`.
+- **Store projections:** 3 doc→item projections (`dispatch-store.js:1140,2214,3246`).
+- **New row `dispatch-refusal-relay-duplication`** (found by the second read, verified). The factory builds tagged refusals, but turning a refusal into an HTTP reply is written twice: `routes/proxy.js:878-1010` (the `refuseIf*` closures) and `routes/dispatch.js:880-918` (inline). LIN-3461 added the same `taskSessionRunaway` branch to both (`proxy.js:952-961`, `dispatch.js:916-918`). The two relays agree today.
+- **Census.** The top no-import-edge co-change pairs over 09-26 → now are still `dispatch-store` / `routes/dispatch` (13), `dispatch-store` / `proxy-dispatch` (12) and `dispatch` / `proxy-dispatch` (12).
 
-Not promoted (LIN-3339 remains the vehicle).
+**Cost:** the next run-row field is a hand edit in about 13 production files, and the next factory refusal means two relays plus their tests. Not promoted, because it is below the follow-up cut; LIN-3339 / batch 3 is the vehicle. One decision for a ticket: "a dispatch field is declared once (validate, persist, project) and every entrance reads the declaration".
 
 ### 7. `connection-binding-predicate-drift` — **LOW-MEDIUM — IMPROVED**
 
@@ -156,7 +158,7 @@ These are the 3 Date-returning private parses listed in the LIN-3453 row. Their 
 - `provider-auth-router-upward-imports`: 0 edges.
 - The `shouldMockAi` copies: 1 definition.
 - The loose-JSON copies: 1 owner.
-- The `maxSessionsPerTask` restatements: 0.
+- The `maxSessionsPerTask` restatements: 0, by deleting the field rather than consolidating it (see finding 6).
 
 ### 10. Unchanged (re-measured)
 
@@ -188,7 +190,7 @@ These are the 3 Date-returning private parses listed in the LIN-3453 row. Their 
   - `admissions` at `15990905`: **123** (125 at `6df0fbd5`). There are 0 new admission lines; the 2 that went are LIN-3453's.
   - `coupling --since 2026-10-11`: 0 pairs (13 PRs, too thin).
   - Widened to `--since 2026-09-26`: 341 pairs, 250 with no import edge. The top unlinked pairs are the dispatch-entrance trio (finding 6), `public/common.js` ↔ `public/prompt-section.js` (11) and `lib/proxy-instructions.js` ↔ `routes/proxy-dispatch.js` (9). The proxy-instructions pair is the catalogue text restating the route contract, which Documentation Review owns.
-  - `mirrored`: 0 of the 11 window PRs (consolidation PRs delete lines; they don't mirror them).
+  - `mirrored`: 0 of the 11 window PRs by the census's own threshold. The second read found one mirrored edit below that threshold: LIN-3461's `taskSessionRunaway` branch, added to both refusal relays (finding 6).
   - TODO/FIXME added this window: 0.
 - **Not flagged (coincidental similarity).** The one-line `bindings.find(b => b.provider === p && b.scope === s)` appears 5× (`held-connection.js:280`, `connection-credential.js:1269`, `connection-store.js:724`, `workspace.js:750`, `connection-binding.js:147`). It is a composite-key lookup, not a ranked choice. `openrouter.js:1140,1414` are two SSE *readers* of one stream format (Data & Fetch).
 
@@ -285,7 +287,49 @@ The 10-11 edition observed that "the promotion path is still not converting". Th
 
 ## Adversarial Second-Read
 
-*Pending: recorded after the report and follow-ups are written (see the LIN-3462 verdict comment).*
+**Tier used: Tier 2.** The reader was a fresh-context sub-agent with no memory of the report-writing turn. Tier 1, a separately dispatched session, was unavailable: this session's proxy token carries no `dispatch` grant (the `/instructions` grants line reads "(none)").
+
+**Question asked:** "What is the largest item in this window that this report missed or misfiled?" The reader got only that question, the report path and PR #1834, both SHAs and the window bounds.
+
+**Fields:** `Adversarial second-read verdict: DISAGREE` · `Differed from top finding: NO` · `Disposition: fixed in place`
+
+**Reader's full answer (verbatim in substance):**
+
+1. *Verdict: DISAGREE.* The top three findings and the batch table hold up. The headline and finding 6 misfile the window's largest PR, and three counts are wrong.
+2. *Differs from the report's top finding: NO.* `credential-decision-multiplicity` gives a wrong answer at function level. The item below only costs effort, so it does not displace #1.
+3. *Largest misfiled item: LIN-3461 (#1833).* It is booked as a consolidation ("5 restatements → 1 constant"), but it was a **feature deletion**, and its own cost shows that finding 6 is under-graded.
+   - **What the deletion cost.** At `6df0fbd5`, `maxSessionsPerTask` sat in 85 production lines in 13 files plus 5 docs. Removing it took the window's largest PR: 41 files, 14 of them production (+133/−289 production lines, +453/−1,277 in total).
+   - **The surviving sibling `maxTasks` has the same shape, still in place:** 116 lines in 15 files, with the validator restated 5× (`routes/dispatch.js:385,1408`, `routes/proxy-dispatch.js:329`, `routes/proxy-kickoff.js:251`, `routes/workspace-api.js:737`), and 15 hand-threaded `maxTasks: x ?? null` lines in 5 files.
+   - **An unrecorded duplicated decision that the window grew.** Turning a factory refusal into an HTTP reply is written twice: `routes/proxy.js:878-1010` and `routes/dispatch.js:880-918`. LIN-3461 added the same `taskSessionRunaway` branch to both, which is a mirrored edit, against §11's "`mirrored`: 0". The reader could not see the census's own definition of "mirrored", so offered this as an observation, not a proven error. There are also non-HTTP relay copies at `routes/workspace-api.js:3544` and `lib/follow-up-dispatch.js:150-161`.
+   - **Cost.** The next run-row field means hand-editing about 13 production files; the next refusal means two relays plus their tests. Finding 6 should be MEDIUM, "cap removed, mechanism unchanged", and the relay pair should get its own row.
+4. *Factual errors:*
+   - (a) `renderErrorPage` has **116** call sites in 22 files, not 62 (87 are one-line `.status(4xx/5xx).send(renderErrorPage…`).
+   - (b) `errorEnvelope` has **1** caller (`lib/errors.js:467`), not 2.
+   - (c) No `maxSessionsPerTask` comment remains: `dispatch-store.js:1576` names `MAX_FRESH_SESSIONS_PER_TASK`.
+5. *Checked and correct:*
+   - the grounding counts
+   - the Tarjan baseline: 4 SCCs at 15/6/2/4 members (27) → 0, and 5 → 0 upward edges
+   - the LIN-675 table and its boot-time throw
+   - finding 1's chain: `workspace.js:806-819`, `:844-848`, `workspace-token-refresh.js:135-136`, `workspace-token-resolver.js:150-155`, `workspace.js:1036`, `routes/proxy.js:812`
+   - finding 2's citations
+   - finding 3's 93 → 0, the 35 → 43 importers, and keepalive 74 (73 at baseline, +1 in `routes/proxy.js`)
+   - every batch-table row
+   - the `waitForFollowUps` validators
+
+**Disposition: fixed in place.** Every item was re-measured at HEAD before it was applied:
+- `renderErrorPage` 116 (119 with 3 internal calls; identical at both SHAs)
+- `errorEnvelope` 1 caller
+- the stray-comment claim removed
+- `maxTasks` 116 lines / 15 files (134 at baseline), validator ×5
+- the relay pair at `proxy.js:952` and `dispatch.js:916`
+
+The changes:
+- The headline now says the cap was **removed, not consolidated**.
+- Finding 6 is re-graded **MEDIUM — cap removed, mechanism unchanged**.
+- `dispatch-refusal-relay-duplication` is added as a new ledger row.
+- The census note records the sub-threshold mirrored edit.
+
+The top finding and the follow-up set are unchanged: finding 6 stays below the ~3-ticket cut, and the reader agreed #1 holds.
 
 ---
 
@@ -330,7 +374,7 @@ The 10-11 edition observed that "the promotion path is still not converting". Th
 | `runner-contract-semantics-cross-repo` | **high** | — | not recovered | — | — | **NEW: kit re-implements SD reactions; diverged on halt ×4, target, repo, markers** | unchanged on every row (LIN-3451, Backlog); corrections: `cascade`/`maxSessionsPerTask` never read by SD | unchanged |
 | `connection-binding-predicate-drift` | low-medium | — | not recovered | — | — | shared predicate + 3 inline copies lacking stale-marker guard; +1 copied selector | 3 copies → predicate (11 calls / 6 files); `legacyFallbackTarget` ≡ `selectIssueSourceBinding` remains | **improved** |
 | `run-page-identity-scrape` | medium | — | not recovered | — | — | `session.js:738-742,866` task id from neighbouring widget; LIN-3349 | `session.js:740,868`; LIN-3349 | unchanged |
-| `dispatch-entrance-field-duplication` | medium-low | — | not recovered | — | — | `maxSessionsPerTask` ×5; fields re-serialised 6×/4× | cap restatements 5→**0** (one constant, LIN-3461); field validators 15 lines / 5 files and store projections ×3 unchanged | **improved** (cap resolved) |
+| `dispatch-entrance-field-duplication` | medium | — | not recovered | — | — | `maxSessionsPerTask` ×5; fields re-serialised 6×/4× | cap field **deleted** (LIN-3461; 41-file PR); sibling `maxTasks` 116 lines / 15 files, validator ×5; other validators 15 lines / 5 files; store projections ×3 | **cap removed; mechanism unchanged** |
 | `owner-word-collision` | low | — | not recovered | — | — | `viewerIsOwner:true` ×4 = "session member" | 4 sites | unchanged |
 | `run-family-render-primitives` | low | — | not recovered | — | — | 2 fragment modules hand-build pills/buttons/details | 2/38 | unchanged |
 | `persist-binding-sibling-seams` | low | — | not recovered | — | — | ×7 sibling seams | 7 seams; fallback bodies differ (feeds `credential-decision-multiplicity`) | unchanged |
@@ -340,8 +384,9 @@ The 10-11 edition observed that "the promotion path is still not converting". Th
 | `workspace-urlkey-consolidation` | — | — | not recovered | — | — | `deriveUrlKey` used by all 7 bind arms; per-arm derivations deleted (LIN-3382); Linear `org.urlKey | held (module untouched) | held |
 | `credential-decision-multiplicity` | **high** | — | not recovered | — | — | — | ≥6 credential copies, ≥7 binding choosers, E1/E2 token precedences; session-scan returns `{token:NEW, scope:OLD}` after headless refresh (function-level repro); sweep watches 3 pairings | **new row** (LIN-3449 candidate 5) |
 | `keepalive-error-envelope-writer` | medium | — | not recovered | — | — | — | 74 hand-built `keepalive.send(4xx/5xx,{error})` (73 at `6df0fbd5`) | **new row** (pre-existing, newly measured) |
-| `html-error-page-two-writers` | low-medium | — | not recovered | — | — | — | `htmlError` 9 vs `renderErrorPage` 62 (+4 raw text), pages differ | **new row** (closes 10-11 gap) |
+| `html-error-page-two-writers` | low-medium | — | not recovered | — | — | — | `htmlError` 9 vs `renderErrorPage` 116 (+4 raw text), pages differ | **new row** (closes 10-11 gap) |
 | `ai-availability-gate-duplication` | medium-low | — | not recovered | — | — | — | 2 OpenRouter key resolvers; 13 inline 503 gates, 2 mock dialects; data-mock predicate inline ×34 (38 at `6df0fbd5`) | **new row** |
+| `dispatch-refusal-relay-duplication` | low-medium | — | not recovered | — | — | — | refusal→HTTP relay written twice (`routes/proxy.js:878-1010`, `routes/dispatch.js:880-918`); LIN-3461 mirrored a branch into both | **new row** (second read) |
 | `tolerant-date-parse-date-twins` | low | — | not recovered | — | — | — | 3 private Date-returning parses (`liveness-alarm-store:287`, `pipeline-loops:264`, `session-telemetry:66`), junk semantics differ | **new row** |
 | `timestamp-parse-consolidation` | — | — | not recovered | — | — | — | `toEpochMs` 30 importers; ticket grep 0 (LIN-3453) | **resolved** |
 | `loose-json-consolidation` | — | — | not recovered | — | — | — | 1 owner, 8 importers; no brace-slice elsewhere (LIN-3114) | **resolved** |
