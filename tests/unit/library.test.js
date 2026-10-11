@@ -66,12 +66,13 @@ describe('library catalog', () => {
     for (const doc of offShelf) {
       assert.ok(!shelfKinds.has(doc.docKind), `${doc.slug}: off-shelf for a non-shelf kind (${doc.docKind})`);
     }
-    // The expected off-shelf set: 19 checks, the pre-registration, the data appendix.
-    assert.equal(offShelf.length, 21, 'exactly the 21 non-shelf documents are off the shelves');
+    // The expected off-shelf set: 20 checks, the pre-registration, the data appendix.
+    assert.equal(offShelf.length, 22, 'exactly the 22 non-shelf documents are off the shelves');
     for (const slug of [
       'survey-check', 'survey-check-7', 'steady-base-check', 'paid-where-written-check',
       'learning-while-the-tools-change-check', 'between-the-sessions-check',
       'what-should-an-agent-leave-behind-check', 'coherence-as-it-grows-check',
+      'how-a-task-is-composed-check',
       'replay-small-work-preregistration', 'what-should-an-agent-leave-behind-evidence',
     ]) {
       assert.ok(offShelf.some(d => d.slug === slug), `${slug} is off-shelf`);
