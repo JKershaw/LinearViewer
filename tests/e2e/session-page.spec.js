@@ -277,7 +277,7 @@ async function seedSessionWithDecision(page) {
 // LIN-2948 R1: one decision-bearing run that ALSO carries a run-chat proposal,
 // so the dark-contrast check sees every control this ticket added in a single
 // render (card Answer + dismiss, chat link, proposal Apply/Decline). Uses
-// TEST-1 (a mockAi-resolvable fixture task, tests/fixtures/mock-data.js) so the
+// TEST-1 (a mockAi-resolvable fixture task, lib/sample-data/mock-data.js) so the
 // run-scoped chat turn takes the propose path with no live LLM — the same seam
 // session-proposals.spec.js uses. Returns the anchor id (the run's session id).
 async function seedDecisionRunWithProposal(page) {

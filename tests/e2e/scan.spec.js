@@ -16,7 +16,7 @@
  */
 import { test, expect } from '../fixtures/test-base.js';
 import { workspaceApiLocalSeed } from '../fixtures/local-harness.js';
-import { testMockData } from '../fixtures/mock-data.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
 
 test.describe('Scan UI — Dashboard', () => {
   test.beforeEach(async ({ page, seedLocal, localWorkerUrlKey }) => {

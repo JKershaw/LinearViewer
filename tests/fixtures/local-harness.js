@@ -71,8 +71,8 @@
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createMockCollection } from './mock-collection.js';
-import { swimSampleProjects, swimSampleIssues } from './swim-sample-data.js';
-import { testMockData } from './mock-data.js';
+import { swimSampleProjects, swimSampleIssues } from '../../lib/sample-data/swim-sample-data.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
 
 /** urlKey of the seeded local workspace; doubles as its store partition key. */
 export const LOCAL_WORKSPACE_URL_KEY = 'local-workspace';

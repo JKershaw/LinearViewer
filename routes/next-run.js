@@ -29,7 +29,7 @@ import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
-import { testMockData } from '../tests/fixtures/mock-data.js';
+import { testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 
 /**

@@ -19,7 +19,7 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { TaskSnapshotStore } from '../../lib/task-snapshot-store.js';
 
-const FIXTURE_ID = 'TEST-1'; // exists in tests/fixtures/mock-data.js (canonical id 'issue-1')
+const FIXTURE_ID = 'TEST-1'; // exists in lib/sample-data/mock-data.js (canonical id 'issue-1')
 
 function createMockCollection() {
   const docs = [];
