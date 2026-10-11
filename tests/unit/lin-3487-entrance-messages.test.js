@@ -15,6 +15,7 @@ import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { SUBSCRIPTION_LEVELS } from '../../lib/dispatch-wake.js';
 
 const UUID = '11111111-2222-4333-8444-555555555555';
 
@@ -127,6 +128,18 @@ describe('LIN-3487 — POST /workspace/:urlKey/api/dispatch entrance messages', 
     expect400(await call(buildDispatchApp(), DISPATCH, { prompt: 'x', cascade: true }), 'cascade requires abort to be true');
     expect400(await call(buildDispatchApp(), DISPATCH, { prompt: 'x', cascade: 'yes' }), 'cascade must be a boolean');
   });
+  test('waitForFollowUps must be a boolean', async () => {
+    expect400(await call(buildDispatchApp(), DISPATCH, { prompt: 'x', waitForFollowUps: 'yes' }),
+      'waitForFollowUps must be a boolean');
+  });
+  test('queueIfBusy must be a boolean', async () => {
+    expect400(await call(buildDispatchApp(), DISPATCH, { prompt: 'x', queueIfBusy: 'yes' }),
+      'queueIfBusy must be a boolean');
+  });
+  test('subscription lists the levels', async () => {
+    expect400(await call(buildDispatchApp(), DISPATCH, { prompt: 'x', subscription: 'bogus' }),
+      `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
+  });
 });
 
 describe('LIN-3487 — POST /api/proxy/dispatch entrance messages', () => {
@@ -155,6 +168,9 @@ describe('LIN-3487 — POST /api/proxy/dispatch entrance messages', () => {
     expect400(await call(buildProxyApp(), PATH, { prompt: 'x', subscription: 'nope' }, AUTH),
       'subscription must be one of: everything, terminal-only');
   });
+  test('cascade must be a boolean', async () => {
+    expect400(await call(buildProxyApp(), PATH, { prompt: 'x', cascade: 'yes' }, AUTH), 'cascade must be a boolean');
+  });
 });
 
 describe('LIN-3487 — POST /api/proxy/recommend-and-dispatch entrance messages', () => {
@@ -162,6 +178,14 @@ describe('LIN-3487 — POST /api/proxy/recommend-and-dispatch entrance messages'
   test('target: local is rejected with the POLLED list', async () => {
     const res = await call(buildProxyApp(), PATH, { issueIdentifier: 'LIN-1', target: 'local' }, AUTH);
     expect400(res, 'target must be one of: cli, web, dash');
+  });
+  test('waitForFollowUps must be a boolean', async () => {
+    expect400(await call(buildProxyApp(), PATH, { issueIdentifier: 'LIN-1', waitForFollowUps: 'yes' }, AUTH),
+      'waitForFollowUps must be a boolean');
+  });
+  test('queueIfBusy must be a boolean', async () => {
+    expect400(await call(buildProxyApp(), PATH, { issueIdentifier: 'LIN-1', queueIfBusy: 'yes' }, AUTH),
+      'queueIfBusy must be a boolean');
   });
 });
 
