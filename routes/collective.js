@@ -34,11 +34,11 @@ import {
   DEFAULT_COLLECTIVE_TOPIC,
   CHARACTER_FIELDS,
 } from '../lib/prompts/collective-participant.js';
+import { SESSION_TARGETS } from '../lib/dispatch-targets.js';
 
 // Substrate is DECIDED (John, 2026-06-13): full Claude Code sessions only.
 // `dash` is pure-code-change execution and `local`/Harbour OS isn't a fan-out
-// target here, so the Collective accepts only cli/web.
-const COLLECTIVE_TARGETS = ['cli', 'web'];
+// target here, so the Collective takes the session subset (cli/web).
 
 // A stable observer nick the server uses to read the channel on the human's
 // behalf (poll needs a nick). The human's own posts go out under their say nick.
@@ -171,8 +171,8 @@ export function createCollectiveRoutes({
     }
 
     const target = rawTarget || 'cli';
-    if (!COLLECTIVE_TARGETS.includes(target)) {
-      return badRequest.json(res, `target must be one of: ${COLLECTIVE_TARGETS.join(', ')}`);
+    if (!SESSION_TARGETS.includes(target)) {
+      return badRequest.json(res, `target must be one of: ${SESSION_TARGETS.join(', ')}`);
     }
 
     if (!Array.isArray(rawCharacters) || rawCharacters.length === 0) {

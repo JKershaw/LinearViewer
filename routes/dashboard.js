@@ -84,6 +84,7 @@ import {
   DEFAULT_SESSION_SUMMARY_MODEL
 } from '../lib/session-summary.js';
 import { hashSession } from '../lib/session-summary-cache.js';
+import { NON_SESSION_TARGETS } from '../lib/dispatch-targets.js';
 
 // A run is summarisable only once it is immutable. agentState is terminal at
 // 'complete'/'error'; until then a summary would snapshot a moving target and
@@ -1381,7 +1382,7 @@ export function createDashboardRoutes({
       // own `loop.target`, so the session-wide target no longer needs deriving
       // here — only the gate (from the anchor run) is still needed.
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
-      const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
+      const canReply = !NON_SESSION_TARGETS.includes(anchorTarget);
 
       // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
       // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
