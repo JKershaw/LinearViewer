@@ -85,14 +85,22 @@ describe('navbar active workspace', () => {
     assert.match(sel[0], /\/workspace\/two/);
   });
 
+  test('duplicate urlKeys mark exactly one option active (first match)', () => {
+    const dup = [
+      { urlKey: 'two', name: 'Two', provider: 'linear' },
+      { urlKey: 'two', name: 'Two again', provider: 'linear' },
+    ];
+    assert.equal(selectedOptions(renderNavBar({ workspaces: dup, urlKey: 'two' })).length, 1);
+  });
+
   test('a null urlKey marks no option active', () => {
     assert.equal(selectedOptions(renderNavBar({ workspaces, urlKey: null })).length, 0);
   });
 });
 
 describe('no hand-rolled workspace-by-urlKey comparison (replaces the urlkey-lookups count pin)', () => {
-  const FORWARD = /[\w$\])]\??\.urlKey\s*===?\s*urlKey\b/g;
-  const REVERSED = /(?<![\w$.])urlKey\s*===?\s*[\w$]+\??\.urlKey\b/g;
+  const FORWARD = /[\w$\])]\??\.urlKey\s*[!=]==?\s*urlKey\b/g;
+  const REVERSED = /(?<![\w$.])urlKey\s*[!=]==?\s*[\w$]+\??\.urlKey\b/g;
   const LEAF = 'lib/workspace-lookup.js';
   // lib/connection-credential.js: membership over *referents*, not workspaces (ticket-excluded).
   const REFERENT_EXEMPT = { file: 'lib/connection-credential.js', line: /r && r\.urlKey === urlKey && r\.provider/ };
@@ -104,11 +112,13 @@ describe('no hand-rolled workspace-by-urlKey comparison (replaces the urlkey-loo
     for (const [rel, src] of sources) {
       if (!/^(lib\/|routes\/|server\.js$)/.test(rel)) continue;
       if (rel === LEAF) continue;
-      src.split('\n').forEach((line, i) => {
-        if (!(line.match(FORWARD) || line.match(REVERSED))) return;
-        if (rel === REFERENT_EXEMPT.file && REFERENT_EXEMPT.line.test(line)) return;
-        out.push(`${rel}:${i + 1}: ${line.trim()}`);
-      });
+      // Whole-source matching, so `\s*` also catches a comparison split across lines.
+      for (const m of [...src.matchAll(FORWARD), ...src.matchAll(REVERSED)]) {
+        const lineNo = src.slice(0, m.index).split('\n').length;
+        const line = src.split('\n')[lineNo - 1];
+        if (rel === REFERENT_EXEMPT.file && REFERENT_EXEMPT.line.test(line)) continue;
+        out.push(`${rel}:${lineNo}: ${line.trim()}`);
+      }
     }
     return out;
   }
@@ -133,6 +143,8 @@ describe('no hand-rolled workspace-by-urlKey comparison (replaces the urlkey-loo
     'for-of loop': 'for (const x of xs) { if (x.urlKey === urlKey) return x; }',
     'reversed operand order': 'const m = xs.filter(w => urlKey === w.urlKey);',
     'optional chaining': 'const m = xs.find(w => w?.urlKey === urlKey);',
+    'split across lines': 'const e = xs.find(c => c.urlKey ===\n  urlKey);',
+    'negated': 'if (x.urlKey !== urlKey) continue;',
     'a second hit in the exempted file': 'const z = list.find(r => r.urlKey === urlKey);',
   };
   for (const [name, line] of Object.entries(PLANTS)) {
