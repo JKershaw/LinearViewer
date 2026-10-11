@@ -277,6 +277,16 @@ describe('LIN-3455 characterization: task-decisions-store', () => {
       assert.deepEqual(page2.items.map(r => r.issueId), ['issue-c']);
       assert.equal(page2.nextCursor, null);
     });
+
+    test('cursor paging: a junk cursor scannedAt returns an empty page (NaN compared false), not every candidate', async () => {
+      collection._docs.push(
+        row('c', 'issue-c', { scannedAt: T2 }),
+        row('a', 'issue-a', { scannedAt: T1 })
+      );
+      const page = await store.listCandidatesForWorkspace('acme', { cursor: { scannedAt: 'not-a-date', issueId: 'issue-0' } });
+      assert.deepEqual(page.items, []);
+      assert.equal(page.nextCursor, null);
+    });
   });
 
   describe('_docsFor / getStatus newest-first (:721 sort `|| seq`)', () => {
