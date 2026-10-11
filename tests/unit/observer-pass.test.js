@@ -908,9 +908,9 @@ describe('observer-pass: static import assertion', () => {
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./feature-defaults.js', './observer-sweep.js', './workspace-preferences.js'].sort(),
+      ['./feature-defaults.js', './loose-json.js', './observer-sweep.js', './workspace-preferences.js'].sort(),
       'a new import here (e.g. a direct lib/openrouter.js or dispatch-store/agent-status-store import bypassing the injected LLM seam) must be caught by this assertion. ' +
-      './observer-sweep.js is imported ONLY for its pure, I/O-free roster-union helpers (resolveRosterFromSessions/mergeRosterUnion) — reused rather than re-derived — never for buildSweepPayload or a fourth fleet summary.'
+      './loose-json.js is the pure shared JSON-reply extractor (LIN-3114). ./observer-sweep.js is imported ONLY for its pure, I/O-free roster-union helpers (resolveRosterFromSessions/mergeRosterUnion) — reused rather than re-derived — never for buildSweepPayload or a fourth fleet summary.'
     );
   });
 });
