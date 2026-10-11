@@ -23,11 +23,12 @@ One wire contract (Harbour's dispatch queue: poll → take → feedback markers,
 | decision | SD (`simple-dispatcher`) | runner kit (`lib/runner-kit/runner.mjs`) | verdict |
 |---|---|---|---|
 | unknown halt mode | fails **open** — only `pause`/`stop` are retained (`dispatcher.js:1652-1654`) | fails **closed** — `leave`, reason `halt:${mode}` (`runner.mjs:196`) | **diverged** |
-| abort row under `stop` | processed (research-stage reading; this stage verified only the kit side and SD's halt-stop sweep, which cancels live sessions and reuses `[aborted]`, `dispatcher.js:2023-2029`) | `stop` falls to the final `leave` (`runner.mjs:196`; only `pause` lets `item.abort` flow, `:189-190`) | **diverged** |
+| abort row under `stop` | processed (research-stage reading, **not independently confirmed — the second-read also could not confirm SD's side**; this stage verified only the kit side and SD's halt-stop sweep, which cancels live sessions and reuses `[aborted]`, `dispatcher.js:2023-2029`) | `stop` falls to the final `leave` (`runner.mjs:196`; only `pause` lets `item.abort` flow, `:189-190`) | **diverged** |
 | stop line text | phase-based closing text (`dispatcher.js:603`; halt-stop log line `dispatcher.js:2027` carries `${session.phase}`) | `(stopped by operator)` (`runner.mjs:235`); the phrase appears nowhere in SD | **diverged** |
 | `pause` + follow-up with no live session | posts `[failed] No live session to resume…` (`followup.js:40`) | resolves via `resolveFollowUp`; otherwise **leaves queued** (`runner.mjs:189-193`) | **diverged** |
 | `target` | takes only `cli`/`web` (`targets.js:16-19`, `queue.js:219`) | no target filter; Harbour's runner poll is an unfiltered `listItems` (`routes/proxy-runner.js:94` → `lib/dispatch-store.js:1057`) | **diverged** (kit can take a `dash` item SD ignores — inferred from code, not reproduced) |
 | `item.repo` | SD alone validates it (`dispatcher.js:159-187`, `admission.js:33-37`, terminal reject) | ignores `item.repo` entirely; Harbour's guard was deleted (LIN-3333) | **diverged** — the same item fails on SD and runs in the session's cwd on the kit |
+| other row fields | `queueIfBusy`, `cascade`, `waitForFollowUps`, `subscription`, `force` acted on by SD, absent from `runner.mjs`; `harnessDecision` (`runner.mjs:120-122`) filters on a hard-coded `'claude-code'` | not read / one-value copy | **diverged** (added after second-read) |
 | markers | full set incl. `[pending]`/`[decision]`/heartbeat | no `[pending]`/`[decision]`/`decision-withdrawn`/`[evidence]`/heartbeat path — a kit run **cannot raise a decision** | **diverged (capability gap)** |
 | 2000-char feedback cap | truncates (`feedback.js:6`) | throws (`runner.mjs:75`); Harbour returns 400 (`dispatch-feedback-validation.js:17`) | **three treatments of one limit** |
 | wake-marker regex | n/a | 3 LV copies (`run-view.js:135` ≡ `liveness-detectors.js:130`; `task-page-loader.js:60` a variant), none import the authority `dispatch-terminal.js:61` `WAKE_FEEDBACK_REGEX`; SD `feedback.js:22` cites the old line `:53` | copies, drifted citation |
@@ -125,7 +126,9 @@ SD's `NO_BOOTSTRAP_KINDS` was deleted by `7ca5e23` (LIN-3199); `grep NO_BOOTSTRA
 | `target` | SD `targets.js:16-19`; LV 17 literal lines / 9 files + 3 disagreeing named lists + `RUNNER_TARGETS`; kit has **no filter**, Harbour's runner poll is unfiltered. | Low-medium → **Medium** |
 | `repo` | **Harbour's list is gone** (LIN-3333 deleted the guard, allowlist and `known-repos`; `repo` stored verbatim). SD alone validates (`dispatcher.js:159-187`, `admission.js:33-37`); the kit ignores `item.repo`. The 09-26 grade "deliberate, closed by LIN-2974" no longer describes the code. LIN-3347 tracks only SD's dead references. | informational → **Medium-low** |
 | `kind` | **Resolved** — `NO_BOOTSTRAP_KINDS` deleted (LIN-3199); only the `'wake'` literal remains (18 lines / 10 files, no constant). | low-medium → **resolved** |
-| `harness` / `terminal` | Clean. SD owns the vocabulary; Harbour and the kit treat both as opaque. | held |
+| `terminal` | Clean. SD owns the vocabulary; Harbour and the kit treat it as opaque. | held |
+| `harness` | **Kit filters on it**: `runner.mjs:120-122` `harnessDecision` leaves any item whose `harness` is not null or `RUNNER_HARNESS` (`'claude-code'`, `:58`). SD owns the axis; the kit hard-codes a one-value copy. Low (found by the second-read). | held → **low drift** |
+| row fields SD acts on, kit ignores | `queueIfBusy` (`followup.js:99-108`; Harbour `routes/dispatch.js:249,349`), `cascade`, `waitForFollowUps`, `subscription`, `force`, `maxSessionsPerTask` — no occurrence in `runner.mjs`, so a kit session claims a busy-target follow-up SD would hold. Same class as the `target`/`repo` rows (finding 1). Also SD merges three halt sources (Harbour, local file, auto-pause, `halt.js:216-236`); the kit reads only Harbour's — a substrate difference, not drift. | new (second-read) |
 | `effort`, `model` | Clean. Opaque on the runner side. | held |
 | API base | SD 2 copies (unchanged); kit takes `baseUrl` from the server. | unchanged |
 | dispatch status enum | Clean; no cross-repo copy. | held |
@@ -147,8 +150,8 @@ SD's `NO_BOOTSTRAP_KINDS` was deleted by `7ca5e23` (LIN-3199); `grep NO_BOOTSTRA
 
 ## Follow-ups (highest severity only)
 
-* **Minted:** *Runner kit ↔ SD: one meaning for halt / target / repo / markers, with a cross-repo pin* (finding 1). No existing ticket covers it.
-* **Minted:** *Route the three inline active-binding lookups through `activeConnectionBackedBinding`* (finding 4).
+* **Minted: LIN-3451** — *Runner kit ↔ SD: one meaning for halt / target / repo / markers, with a cross-repo pin* (finding 1). No existing ticket covers it.
+* **Minted: LIN-3452** — *Route the three inline active-binding lookups through `activeConnectionBackedBinding`* (finding 4).
 * **Updated, not minted:** LIN-2388 (merged 6-member SCC, `run-evidence ↔ run-closeout-state`, the routes-only 4-cycle), LIN-675 (fifth upward edge `render-swipe.js:23`), LIN-2389 (18 sites / 21 raw lines, count-pin evasion, shape-based gauge), LIN-3349 (run-page identity scrape), LIN-2663 (SSE copies still 2).
 * **Not promoted:** findings 5, 8, 10, 12 (below the top-3 cut or already vehicle-owned; finding 8 is recommended input to LIN-3339).
 
@@ -171,7 +174,21 @@ All three standing 06-25/08-29 follow-ups (LIN-675, 2388, 2389) have now stood u
 
 ## Adversarial Second-Read
 
-*(pending — to be filled after the separate reader returns)*
+**Tier used: Tier 2** — a fresh-context sub-agent with no memory of the report-writing turn. (Tier 1, a separate dispatched session, was unavailable: this session's token carries no `dispatch` grant.)
+
+**Question asked:** "What is the largest item in this window that this report missed or misfiled?" (given only the report path, both SHAs and the window bounds).
+
+**Fields:** `Adversarial second-read verdict: AGREE` · `Differed from top finding: NO` · `Disposition: fixed in place`
+
+**Reader's full answer (verbatim in substance):**
+
+1. *Verdict AGREE.* Ranking and coverage hold; nothing larger than finding 1; its main claims check out against source.
+2. *Differs from top finding: NO.* The largest item is still the runner kit vs SD divergence; what was found is a gap inside it.
+3. *The item:* the table omits dispatch-row fields SD acts on and the kit never reads. `lib/runner-kit/runner.mjs` has no occurrence of `queueIfBusy`, `cascade`, `waitForFollowUps`, `subscription`, `force` or `maxSessionsPerTask`; SD acts on `queueIfBusy` (`followup.js:99-108`, also `dispatcher.js`/`queue.js`); Harbour accepts the fields (`routes/dispatch.js:249`) and describes `queueIfBusy` as "the runner leaves a busy-target follow-up unclaimed" (`:349`), so a kit session claims and runs such an item. Kit-only halt gap: SD merges three halt sources (Harbour, local halt file, host-wide auto-pause; `halt.js:216-236`, `dispatcher.js:1671`), the kit reads only Harbour's — not drift (no host-wide substrate) but one more way the "Simple Dispatcher's meaning" claim (`docs/runner-prompt.md:219`) does not hold.
+4. *Factual errors:* (a) the `harness` row was wrong — the kit filters on it (`runner.mjs:120-122` `harnessDecision`; `RUNNER_HARNESS = 'claude-code'` at `:58`) and reads `item.model`; "opaque" was incorrect. (b) The `target` row's "unfiltered `listItems`" is indirect: `proxy-runner.js:94` calls `pollAvailable`, which `dispatch-store.js:1057` forwards to `listItems`; conclusion holds. (c) The abort-under-`stop` SD side was not verified (the reader could not confirm it either; `dispatcher.js:1750-1766` comments say the follow-up resume hold applies only under `stop` and are silent on aborts).
+5. *Checked and correct:* unknown-halt fail-open vs fail-closed (`dispatcher.js:1654` / `runner.mjs:196`); the `haltAction` comment claiming SD's meaning (`:181-185`); the stale-marker guard and both copies; the `milestone-funnel` bridge edges; LIN-3135 `{itemId}` mint (no drift); `ifParked` retired consistently on both sides.
+
+**Disposition: fixed in place.** The `harness` verdict row was corrected, the missing row-fields row was added to the finding-1 table and the contract-verdict table, the `target` citation chain was noted, and the abort-under-`stop` SD cell now says it is unconfirmed by either reader. Severity and ranking unchanged.
 
 ---
 
