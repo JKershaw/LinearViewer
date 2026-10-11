@@ -186,12 +186,12 @@ describe('LIN-1545 — durable delete narrowed to definitive revocation at both 
     const catchBody = source.slice(catchIdx, nextFnIdx);
 
     const transientIdx = catchBody.indexOf('isTransientRefreshFailure(');
-    const serviceUnavailableIdx = catchBody.indexOf('serviceUnavailable');
+    const serviceUnavailableIdx = catchBody.indexOf('renderServiceUnavailablePage');
     const definitiveIdx = catchBody.indexOf('isDefinitiveRevocation(');
     const deleteIdx = catchBody.indexOf('ownerCredentialStore.delete(');  // per-partition: the routed provider (LIN-1887 N2)
 
     assert.notEqual(transientIdx, -1, 'expected an isTransientRefreshFailure( branch in ensureValidToken\'s catch');
-    assert.notEqual(serviceUnavailableIdx, -1, 'expected a serviceUnavailable (retryable 503) response for the transient path');
+    assert.notEqual(serviceUnavailableIdx, -1, 'expected a renderServiceUnavailablePage (retryable 503) response for the transient path');
     assert.notEqual(definitiveIdx, -1, 'expected an isDefinitiveRevocation( guard around the durable delete');
     assert.notEqual(deleteIdx, -1, 'expected the ownerCredentialStore.delete( call to still exist (census site)');
     assert.ok(
@@ -232,10 +232,10 @@ describe('LIN-1545 — durable delete narrowed to definitive revocation at both 
 
     const definitiveIdx = catchBody.indexOf('isDefinitiveRevocation(refreshError)');
     const removalIdx = catchBody.indexOf('handleWorkspaceRemoval(session, workspace.id, res, true)');
-    const serviceUnavailableIdx = catchBody.indexOf('serviceUnavailable');
+    const serviceUnavailableIdx = catchBody.indexOf('renderServiceUnavailablePage');
     assert.notEqual(definitiveIdx, -1, 'expected the removal to be gated on isDefinitiveRevocation(refreshError)');
     assert.notEqual(removalIdx, -1, 'expected a definitive-only handleWorkspaceRemoval(..., true) call in the catch');
-    assert.notEqual(serviceUnavailableIdx, -1, 'expected a serviceUnavailable (retryable 503) fall-through for transient failures');
+    assert.notEqual(serviceUnavailableIdx, -1, 'expected a renderServiceUnavailablePage (retryable 503) fall-through for transient failures');
     assert.ok(
       definitiveIdx < removalIdx && removalIdx < serviceUnavailableIdx,
       'the catch must delete+remove on definitive revocation, then fall through to the transient 503'

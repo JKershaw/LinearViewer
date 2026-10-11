@@ -104,6 +104,14 @@ async function get(base, path) {
   return { status: res.status, text, headers: res.headers };
 }
 
+/** The one Harbour error page, with nothing of the token or refusal kind in it. */
+function assertGuestNotFoundPage(text, token = TOKEN) {
+  assert.match(text, /<h1[^>]*>Harbour<\/h1>/);
+  assert.match(text, /<h2 class="error-title">Not Found<\/h2>/);
+  assert.match(text, /class="login-button">Go back<\/a>/);
+  assert.ok(!text.includes(token), 'the 404 never echoes the token');
+}
+
 describe('GET /t/:token — guest page matrix', () => {
   test('row 1: malformed token 404s with zero store and owner reads', async () => {
     const store = fakeStore();
@@ -113,7 +121,7 @@ describe('GET /t/:token — guest page matrix', () => {
       for (const token of ['short', '!'.repeat(43), 'A'.repeat(42), 'A'.repeat(44)]) {
         const res = await get(base, `/t/${token}`);
         assert.equal(res.status, 404);
-        assert.equal(res.text, 'Not found');
+        assertGuestNotFoundPage(res.text, token);
       }
       assert.equal(store.calls.length, 0, 'no store read for a malformed token');
       assert.equal(ownerCalls, 0);
@@ -131,20 +139,25 @@ describe('GET /t/:token — guest page matrix', () => {
       assert.equal(a.status, 404);
       assert.equal(b.status, 404);
       assert.equal(a.text, b.text);
-      assert.equal(a.text, 'Not found');
+      assertGuestNotFoundPage(a.text);
     } finally { await unknown.close(); await revoked.close(); }
   });
 
-  test('row 3: owner-changed is the same 404', async () => {
+  test('row 3: owner-changed is the same 404, byte-identical to malformed and unknown', async () => {
     const { base, close } = await build({
       store: fakeStore({ getByToken: async () => RECORD }),
       owner: async () => ({ status: 'not-owner' }),
     });
+    const unknown = await build({ store: fakeStore({ getByToken: async () => null }) });
     try {
       const res = await get(base, `/t/${TOKEN}`);
       assert.equal(res.status, 404);
-      assert.equal(res.text, 'Not found');
-    } finally { await close(); }
+      assertGuestNotFoundPage(res.text);
+      const malformed = await get(unknown.base, '/t/short');
+      const other = await get(unknown.base, `/t/${TOKEN}`);
+      assert.equal(res.text, malformed.text);
+      assert.equal(res.text, other.text);
+    } finally { await close(); await unknown.close(); }
   });
 
   test('row 4: a store or owner-check throw is a 503', async () => {
@@ -182,7 +195,7 @@ describe('GET /t/:token — guest page matrix', () => {
     try {
       const res = await get(base, `/t/${TOKEN}`);
       assert.equal(res.status, 404);
-      assert.equal(res.text, 'Not found');
+      assertGuestNotFoundPage(res.text);
     } finally { await close(); }
   });
 

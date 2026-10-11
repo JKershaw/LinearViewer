@@ -73,9 +73,12 @@ function ownerRefusalResponse(res, refusal, workspace) {
   });
 }
 
-/** The 404 body, byte-identical for malformed, unknown, revoked and owner-changed. */
+/**
+ * The 404 body, byte-identical for malformed, unknown, revoked and owner-changed.
+ * Built from constants only: never echo the token or the refusal kind (no oracle).
+ */
 function notFound(res) {
-  return res.status(404).send('Not found');
+  return res.status(404).send(renderErrorPage('Not Found', 'This page does not exist.'));
 }
 
 /** The 503 body, byte-identical for store/owner-check throws and unusable credentials. */

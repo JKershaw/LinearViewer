@@ -102,7 +102,8 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
-import { isAuthError, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, serviceUnavailable, unauthorized } from './lib/errors.js'
+import { isAuthError, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, unauthorized } from './lib/errors.js'
+import { renderServiceUnavailablePage } from './lib/render-pages.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
@@ -1276,7 +1277,7 @@ async function ensureValidToken(req, res, next) {
     // WORKSPACE_NOT_CONNECTED off one blip. Fail only THIS request, retryably,
     // and leave the credential, the workspace, and the session untouched.
     if (isTransientRefreshFailure(error)) {
-      return serviceUnavailable.html(res)
+      return res.status(503).send(renderServiceUnavailablePage())
     }
 
     // LIN-1887 Step 1: a failed refresh may only tear the workspace down for a
@@ -1925,7 +1926,7 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
       console.error('Post-remint dashboard render failed (workspace preserved):', renderError);
-      return serviceUnavailable.html(res);
+      return res.status(503).send(renderServiceUnavailablePage());
     }
   }
 
@@ -1972,13 +1973,13 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (isDefinitiveRevocation(refreshError)) {
         return handleWorkspaceRemoval(session, workspace.id, res, true);
       }
-      return serviceUnavailable.html(res);
+      return res.status(503).send(renderServiceUnavailablePage());
     }
     try {
       return await renderDashboardAfterRefresh(workspace, session, teamId, assigneeState, openRouterSource, res);
     } catch (renderError) {
       console.error('Post-connection-refresh dashboard render failed (workspace preserved):', renderError);
-      return serviceUnavailable.html(res);
+      return res.status(503).send(renderServiceUnavailablePage());
     }
   }
 
@@ -2022,7 +2023,7 @@ async function handleUnauthorizedError(workspace, session, teamId, assigneeState
       if (isDefinitiveRevocation(refreshError)) {
         return handleWorkspaceRemoval(session, workspace.id, res, true);
       }
-      return serviceUnavailable.html(res);
+      return res.status(503).send(renderServiceUnavailablePage());
     }
   }
 
