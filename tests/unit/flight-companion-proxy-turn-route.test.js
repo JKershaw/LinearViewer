@@ -31,7 +31,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { ACME, BASE_DEPS, buildApp, call } from './lib/proxy-fake-deps.js';
 import { renderSSEFrames } from '../fixtures/flight-companion-sse-frames.js';
@@ -332,5 +332,51 @@ describe('LIN-2620: no response ever carries a token', () => {
     );
     assert.ok(!text.includes(BEARER));
     assert.ok(!text.includes(OPENROUTER_KEY));
+  });
+});
+
+describe('LIN-2427: who paid for the turn is recorded (LIN-1458 source note)', () => {
+  const ENV_KEYS = ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
+  let saved;
+  beforeEach(() => {
+    saved = Object.fromEntries(ENV_KEYS.map(k => [k, process.env[k]]));
+    for (const k of ENV_KEYS) delete process.env[k];
+  });
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  async function turnEvents(overrides) {
+    const recorded = [];
+    const proxyEventStore = { ...BASE_DEPS().proxyEventStore, recordEvent: async (e) => { recorded.push(e); } };
+    const { status } = await postTurn(
+      { proxyEventStore, dispatchQueueStore: makeDispatchQueueStore(), flightCompanionChatClient: makeChatClient(), ...overrides },
+      { message: 'hi' }
+    );
+    return { status, notes: recorded.filter((e) => e.endpoint === '/api/proxy/flight-companion/turn').map((e) => e.note) };
+  }
+
+  test('creator has no key, server paid env key serves the turn: noted as paid env fallback', async () => {
+    process.env.OPENROUTER_API_KEY = 'sk-env-paid';
+    const { status, notes } = await turnEvents({ getWorkspaceOpenRouterKey: async () => null });
+    assert.equal(status, 200);
+    assert.ok(notes.includes('openrouter_key_fallback_paid_env'), `got notes ${JSON.stringify(notes)}`);
+  });
+
+  test('creator has no key, only the free-tier key exists: noted as free-tier fallback', async () => {
+    process.env.OPENROUTER_FREE_TIER_KEY = 'sk-env-free';
+    const { status, notes } = await turnEvents({ getWorkspaceOpenRouterKey: async () => null });
+    assert.equal(status, 200);
+    assert.ok(notes.includes('openrouter_key_fallback_free_tier'), `got notes ${JSON.stringify(notes)}`);
+  });
+
+  test('creator key present: no fallback note (the creator paid)', async () => {
+    process.env.OPENROUTER_API_KEY = 'sk-env-paid';
+    const { status, notes } = await turnEvents({});
+    assert.equal(status, 200);
+    assert.ok(!notes.some((n) => n && n.startsWith('openrouter_key_fallback')), `got notes ${JSON.stringify(notes)}`);
   });
 });
