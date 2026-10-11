@@ -14,6 +14,7 @@ import crypto from 'crypto'
 import { Router } from 'express'
 import { renderErrorPage, renderOpenRouterConsentPage } from '../lib/render.js'
 import { saveSession, getActiveWorkspace } from '../lib/workspace.js'
+import { jsonError } from '../lib/errors.js'
 
 /**
  * Generate a cryptographically secure code verifier for PKCE
@@ -249,12 +250,12 @@ export function createOpenRouterAuthRoutes({ userPreferencesStore } = {}) {
     }
 
     if (!userPreferencesStore || !req.session.accountId) {
-      return res.status(400).json({ error: 'no_account', message: 'No account to grant consent for.' })
+      return jsonError(res, 400, 'no_account', { message: 'No account to grant consent for.' })
     }
 
     const existingKey = await userPreferencesStore.getOpenRouterApiKey(req.session.accountId)
     if (!existingKey) {
-      return res.status(409).json({ error: 'not_connected', message: 'Connect OpenRouter before granting unattended-use consent.' })
+      return jsonError(res, 409, 'not_connected', { message: 'Connect OpenRouter before granting unattended-use consent.' })
     }
 
     await userPreferencesStore.setOpenRouterConsent(req.session.accountId)

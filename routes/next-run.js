@@ -20,6 +20,7 @@
 import { Router } from 'express';
 import { renderNextRunPage } from '../lib/render-next-run.js';
 import { renderErrorPage } from '../lib/render.js';
+import { jsonError, serviceUnavailable, unauthorized } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles, resolveDirections } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
@@ -170,7 +171,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
 
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.nextRun !== true) {
-      return res.status(403).json({ error: 'Suggested next run feature is not enabled' });
+      return jsonError(res, 403, 'Suggested next run feature is not enabled');
     }
 
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
@@ -178,14 +179,13 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
     const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!mockAi && !apiKeyToUse) {
-      return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return serviceUnavailable.json(res, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     if (!mockAi && isFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return res.status(429).json({
-          error: check.reason,
+        return jsonError(res, 429, check.reason, {
           freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
         });
       }
@@ -215,9 +215,9 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
     } catch (error) {
       console.error('Next run suggest error:', error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return unauthorized.json(res, 'Token expired or invalid');
       }
-      res.status(502).json({ error: 'Failed to generate suggestions' });
+      jsonError(res, 502, 'Failed to generate suggestions');
     }
   });
 

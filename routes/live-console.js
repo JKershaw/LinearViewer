@@ -22,6 +22,7 @@
 import { Router } from 'express';
 import { renderLiveConsolePage } from '../lib/render-live-console.js';
 import { renderErrorPage } from '../lib/render.js';
+import { jsonError, serverError } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildConsoleFeed, DEFAULT_PAGE_SIZE, isLoopActive, snapPulseWindowMs } from '../lib/live-console.js';
 import { getLoopsForWorkspace } from '../lib/pipeline-loops.js';
@@ -156,7 +157,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
     const workspace = req.workspace;
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.liveConsole !== true) {
-      return res.status(403).json({ error: 'Live console feature is not enabled' });
+      return jsonError(res, 403, 'Live console feature is not enabled');
     }
 
     const workspaces = connectedWorkspaces(req, workspace);
@@ -229,7 +230,7 @@ export function createLiveConsoleRoutes({ workspaceFromUrl, agentStatusStore, di
       res.json(feed);
     } catch (error) {
       console.error('Live console events error:', error);
-      res.status(500).json({ error: 'Failed to load the live feed' });
+      serverError.json(res, 'Failed to load the live feed');
     }
   });
 

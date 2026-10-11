@@ -534,7 +534,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         const referentProvider = injectedProvider || binding.provider;
         const referentToken = binding.callScope === AMBIGUOUS_CALL_SCOPE ? null : binding.callScope;
         if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
-          return res.status(422).json(danglingReferentBody(issueIdentifier));
+          const { error, ...rest } = danglingReferentBody(issueIdentifier);
+          return jsonError(res, 422, error, rest);
         }
       }
 

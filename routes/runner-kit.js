@@ -18,6 +18,7 @@ import { Router } from 'express';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { RUNNER_KIT_DIR, RUNNER_KIT_FILES } from '../lib/prompts/runner-kickoff.js';
+import { notFound } from '../lib/errors.js';
 
 export function createRunnerKitRoutes({ kitDir = RUNNER_KIT_DIR } = {}) {
   const router = Router();
@@ -26,14 +27,14 @@ export function createRunnerKitRoutes({ kitDir = RUNNER_KIT_DIR } = {}) {
   router.get('/runner-kit/:file', (req, res) => {
     const { file } = req.params;
     if (!RUNNER_KIT_FILES.includes(file)) {
-      return res.status(404).json({ error: 'Not a runner kit file' });
+      return notFound.json(res, 'Not a runner kit file');
     }
     let body = cache.get(file);
     if (!body) {
       try {
         body = readFileSync(join(kitDir, file));
       } catch {
-        return res.status(404).json({ error: 'Not a runner kit file' });
+        return notFound.json(res, 'Not a runner kit file');
       }
       cache.set(file, body);
     }
