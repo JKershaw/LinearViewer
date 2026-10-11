@@ -205,7 +205,7 @@ describe('LIN-3136 criterion 12(b)/(c) — one limiter pass and one token valida
       proxyLimiter: limiter, authenticateProxyToken, requireWriteScope, requireGrant,
       logEvent: () => {}, dispatchQueueStore: {}, proxyTokenStore: {}, workspacePreferencesStore: {},
       resolveProviderAccess: async () => ({}), workspaceUnavailable: () => {}, denyIfUnsupported: () => false,
-      resolvePromptIssueContext: async () => ({}), refuseIfDuplicateDispatch: () => false, refuseIfBudgetExhausted: () => false,
+      resolvePromptIssueContext: async () => ({}), relayDispatchRefusal: () => false,
       graphqlErrorStatus: () => 500, PROXY_ATTACH_FAILED_MESSAGE: 'x'
     };
     const app = express();

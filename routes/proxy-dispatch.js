@@ -172,8 +172,7 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Object} deps.proxyTokenStore - Proxy token storage instance
  * @param {Function} deps.recommendErrorResponse - Shapes a recommendation-path error into a status+body pair (closure-local)
  * @param {number} deps.RECOMMEND_DESCENT_BUDGET_MS - Shared cross-hop budget for the recommend recursion (module-scope)
- * @param {Function} deps.refuseIfBudgetExhausted - 409s a budget-exhausted dispatch error (closure-local)
- * @param {Function} deps.refuseIfDuplicateDispatch - 409s a duplicate dispatch error (closure-local)
+ * @param {Function} deps.relayDispatchRefusal - replies to a tagged factory refusal (closure-local)
  * @param {Function} deps.requireGrant - The grant gate middleware factory (module-scope in routes/proxy.js); gates POST /dispatch and /recommend-and-dispatch on the `dispatch` grant, after the scope check (LIN-3136)
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/H)
@@ -199,9 +198,7 @@ export function createDispatchRoutes({
   proxyTokenStore,
   recommendErrorResponse,
   RECOMMEND_DESCENT_BUDGET_MS,
-  refuseIfBudgetExhausted,
-  refuseIfDuplicateDispatch,
-  refuseIfRunLimit = () => false,
+  relayDispatchRefusal,
   freeTierStore = null,
   accountStore = null,
   requireGrant,
@@ -635,14 +632,10 @@ export function createDispatchRoutes({
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
       });
     } catch (err) {
-      // Duplicate-dispatch refusal (LIN-1656) — see the responder. Ahead of the
-      // generic 500 so an orchestrator can branch on `code` and adopt the `id`.
-      if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/dispatch')) return;
-      // Task-budget refusal (LIN-1751) — see the responder.
-      if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/dispatch')) return;
-      // Free-tier run-limit refusal (LIN-3238) — 429 RUN_LIMIT_REACHED, or 503
-      // RUN_LIMIT_UNVERIFIED when the count could not be read.
-      if (refuseIfRunLimit(err, req, res, '/api/proxy/dispatch')) return;
+      // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
+      // see `relayDispatchRefusal`. Ahead of the generic 500 so an orchestrator can
+      // branch on `code` and adopt the `id`.
+      if (relayDispatchRefusal(err, req, res, '/api/proxy/dispatch')) return;
       // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
       if (err && err.proxyAttachFailed) {
         logEvent(req, '/api/proxy/dispatch', 503);
@@ -1096,14 +1089,11 @@ export function createDispatchRoutes({
             });
           }
         } catch (err) {
-          // Duplicate-dispatch refusal (LIN-1656). The verb-override arm is
+          // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
+          // see `relayDispatchRefusal`. The verb-override arm is
           // keepalive-armed too, so every refusal rides `keepalive.send`, as on the
           // LLM arm below.
-          if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
-          // Task-budget refusal (LIN-1751) — same keepalive-armed arm as above.
-          if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
-          // Free-tier run-limit refusal (LIN-3238) — same keepalive-armed arm.
-          if (refuseIfRunLimit(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
+          if (relayDispatchRefusal(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
           // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
           if (err && err.proxyAttachFailed) {
             logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
@@ -1420,12 +1410,7 @@ export function createDispatchRoutes({
         // the 200 is committed and the real 409 travels as `statusCode` in the body
         // (same contract as the 503 below). The responder also skips the
         // `Retry-After` header once headers are sent.
-        if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
-        // Task-budget refusal (LIN-1751) — same keepalive-armed arm as above.
-        if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
-        // Free-tier run-limit refusal (LIN-3238) — keepalive-armed arm: the 429
-        // (with `Retry-After`) or 503 rides `keepalive.send`, same as above.
-        if (refuseIfRunLimit(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
+        if (relayDispatchRefusal(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
         if (err && err.proxyAttachFailed) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 503);

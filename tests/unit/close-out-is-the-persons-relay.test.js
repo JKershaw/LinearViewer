@@ -4,7 +4,7 @@
  * `createDispatchItem` throws `err.closeOutRefusal` (code
  * `CLOSE_OUT_IS_THE_PERSONS`) when a fresh close-out dispatch is bound to a run
  * row carrying `stopAt: 'pr'`. That refusal only reaches a caller where a
- * `refuseIf…` handler is wired. This file pins every one of those catch sites:
+ * refusal relay is wired. This file pins every one of those catch sites:
  *
  *   1. POST /api/proxy/dispatch                                (plain)
  *   2. POST /api/proxy/recommend-and-dispatch, verb-override    (non-keepalive)

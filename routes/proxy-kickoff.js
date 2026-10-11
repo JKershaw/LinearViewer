@@ -38,8 +38,7 @@ import { POLLED_TARGETS } from '../lib/dispatch-targets.js';
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  * @param {Function} deps.denyIfUnsupported - Capability gate; 422s an unsupported provider method (closure-local)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/I)
- * @param {Function} deps.refuseIfDuplicateDispatch - 409s a duplicate dispatch error (closure-local)
- * @param {Function} deps.refuseIfBudgetExhausted - 409s a budget-exhausted dispatch error (closure-local)
+ * @param {Function} deps.relayDispatchRefusal - replies to a tagged factory refusal (closure-local)
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local)
  * @param {string} deps.PROXY_ATTACH_FAILED_MESSAGE - 503 message when the out-of-band bootstrap token could not be minted (closure-local)
  */
@@ -58,9 +57,7 @@ export function createKickoffRoutes({
   workspaceUnavailable,
   denyIfUnsupported,
   resolvePromptIssueContext,
-  refuseIfDuplicateDispatch,
-  refuseIfBudgetExhausted,
-  refuseIfRunLimit = () => false,
+  relayDispatchRefusal,
   freeTierStore = null,
   accountStore = null,
   getWorkspaceOpenRouterKey = null,
@@ -492,19 +489,13 @@ export function createKickoffRoutes({
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
       });
     } catch (err) {
-      // An issue-scoped kickoff (kind 'autopilot') can duplicate like any other
-      // fresh dispatch — LIN-1656. A stack-walk kickoff carries no issueIdentifier
-      // and can never be refused. Ahead of the generic 500: a 500 here is worse
-      // than no guard, since a caller cannot tell it from a real fault.
-      if (refuseIfDuplicateDispatch(err, req, res, '/api/proxy/autopilot/kickoff')) return;
-      // Task budget reached (LIN-1751) — a kickoff itself is never budget-refused
-      // (this route's own dispatch is the run's OWNER row, not a worker dispatch
-      // under a budgeted sessionId), but a child-autopilot kickoff dispatched
-      // with `sessionId` set to a coordinator's budgeted run can be.
-      if (refuseIfBudgetExhausted(err, req, res, '/api/proxy/autopilot/kickoff')) return;
-      // Free-tier run-limit refusal (LIN-3238) — 429 RUN_LIMIT_REACHED or 503
-      // RUN_LIMIT_UNVERIFIED when the count could not be read.
-      if (refuseIfRunLimit(err, req, res, '/api/proxy/autopilot/kickoff')) return;
+      // Tagged factory refusals — duplicate (LIN-1656), budget (LIN-1751; a
+      // child-autopilot kickoff under a coordinator's budgeted run can be
+      // refused), close-out, runaway, free-tier run limit (LIN-3238). Ahead of
+      // the generic 500: a 500 here is worse than no guard, since a caller cannot
+      // tell it from a real fault. A stack-walk kickoff carries no
+      // issueIdentifier and can never be a duplicate.
+      if (relayDispatchRefusal(err, req, res, '/api/proxy/autopilot/kickoff')) return;
       // Fail closed (LIN-1175): a claude-code dispatch whose out-of-band bootstrap
       // token could not be minted must be REFUSED, never launched credential-less.
       // attachProxyContext flags this as proxyAttachFailed (same convention as the
