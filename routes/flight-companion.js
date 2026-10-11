@@ -94,7 +94,7 @@ import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
-import { badRequest, unauthorized, jsonError, serverError } from '../lib/errors.js';
+import { badRequest, unauthorized, jsonError, serverError, serviceUnavailable } from '../lib/errors.js';
 // LIN-2631 item 2: one shared writer, so LIN-2620's proxy turn does not become
 // a fourth copy of the frame format.
 import { sendSSE } from '../lib/sse.js';
@@ -623,7 +623,7 @@ export function createFlightCompanionRoutes({
     const featureFlags = getFeatureFlags(req.session);
 
     if (featureFlags.flightCompanion !== true) {
-      return res.status(403).json({ error: 'Flight Companion feature is not enabled' });
+      return jsonError(res, 403, 'Flight Companion feature is not enabled');
     }
 
     const body = req.body || {};
@@ -637,7 +637,7 @@ export function createFlightCompanionRoutes({
     const turnKind = hasUserMessage ? 'user-initiated' : 'auto-wake';
 
     if (hasUserMessage && rawMessage.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({ error: `message must be ${MAX_MESSAGE_LENGTH} characters or fewer` });
+      return badRequest.json(res, `message must be ${MAX_MESSAGE_LENGTH} characters or fewer`);
     }
 
     // LIN-2623 beat 2: validate BEFORE the free-tier clamp is even consulted,
@@ -649,7 +649,7 @@ export function createFlightCompanionRoutes({
       loadCatalog: () => getModelCatalog({ mock: shouldMockAi(req.workspace) }),
     });
     if (modelError) {
-      return res.status(400).json({ error: modelError });
+      return jsonError(res, 400, modelError);
     }
 
     const safeHistory = filterChatTurns(body.history);
@@ -753,7 +753,7 @@ export function createFlightCompanionRoutes({
 
       if (!outcome.spent && !streaming) {
         if (outcome.reason === 'not-configured') {
-          return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+          return serviceUnavailable.json(res, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
         }
         // A free-tier refusal is the one that differs by turn kind: a user
         // typed and deserves the 429 with its quota detail; an auto-wake tick
@@ -761,8 +761,7 @@ export function createFlightCompanionRoutes({
         // one watching it.
         if (outcome.reason === 'free-tier' && turnKind === 'user-initiated') {
           const check = outcome.freeTierCheck;
-          return res.status(429).json({
-            error: check.reason,
+          return jsonError(res, 429, check.reason, {
             freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
           });
         }
@@ -832,7 +831,7 @@ export function createFlightCompanionRoutes({
     const featureFlags = getFeatureFlags(req.session);
 
     if (featureFlags.flightCompanion !== true) {
-      return res.status(403).json({ error: 'Flight Companion feature is not enabled' });
+      return jsonError(res, 403, 'Flight Companion feature is not enabled');
     }
 
     const body = req.body || {};
@@ -907,14 +906,13 @@ export function createFlightCompanionRoutes({
 
       if (!outcome.spent && !streaming) {
         if (outcome.reason === 'not-configured') {
-          return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+          return serviceUnavailable.json(res, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
         }
         // A boot is always human-initiated (Start was clicked): the 429 shape
         // matches a typed turn's — never auto-wake's silent 200.
         if (outcome.reason === 'free-tier') {
           const check = outcome.freeTierCheck;
-          return res.status(429).json({
-            error: check.reason,
+          return jsonError(res, 429, check.reason, {
             freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
           });
         }

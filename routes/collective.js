@@ -26,7 +26,7 @@ import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { attachProxyContext, provisionBootstrapToken, shouldUseMcpTokenField } from '../lib/proxy-preamble.js';
 import { getProvider } from '../lib/providers/registry.js';
-import { jsonError, notFound } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, serviceUnavailable } from '../lib/errors.js';
 import {
   buildCollectiveParticipantPrompt,
   buildCollectiveFacilitatorPrompt,
@@ -152,7 +152,7 @@ export function createCollectiveRoutes({
   router.post('/workspace/:urlKey/collective/start', workspaceFromUrl, async (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
-      return res.status(403).json({ error: 'Collective feature is not enabled' });
+      return jsonError(res, 403, 'Collective feature is not enabled');
     }
 
     const {
@@ -167,16 +167,16 @@ export function createCollectiveRoutes({
 
     const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
-      return res.status(400).json({ error: 'A valid channel name is required' });
+      return badRequest.json(res, 'A valid channel name is required');
     }
 
     const target = rawTarget || 'cli';
     if (!COLLECTIVE_TARGETS.includes(target)) {
-      return res.status(400).json({ error: `target must be one of: ${COLLECTIVE_TARGETS.join(', ')}` });
+      return badRequest.json(res, `target must be one of: ${COLLECTIVE_TARGETS.join(', ')}`);
     }
 
     if (!Array.isArray(rawCharacters) || rawCharacters.length === 0) {
-      return res.status(400).json({ error: 'Select at least one character' });
+      return badRequest.json(res, 'Select at least one character');
     }
 
     // Each character carries its own repo binding (workspaceUrlKey). Resolve that
@@ -195,7 +195,7 @@ export function createCollectiveRoutes({
     }
 
     if (roster.length === 0) {
-      return res.status(400).json({ error: 'None of the selected characters are bound to a connected workspace' });
+      return badRequest.json(res, 'None of the selected characters are bound to a connected workspace');
     }
 
     const topic = (typeof rawTopic === 'string' && rawTopic.trim())
@@ -522,13 +522,13 @@ export function createCollectiveRoutes({
   router.post('/workspace/:urlKey/collective/preview', workspaceFromUrl, (req, res) => {
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.collective !== true) {
-      return res.status(403).json({ error: 'Collective feature is not enabled' });
+      return jsonError(res, 403, 'Collective feature is not enabled');
     }
 
     const { channel: rawChannel, topic: rawTopic, nick: rawNick, character: rawCharacter } = req.body || {};
     const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
-      return res.status(400).json({ error: 'A valid channel name is required' });
+      return badRequest.json(res, 'A valid channel name is required');
     }
     const topic = (typeof rawTopic === 'string' && rawTopic.trim())
       ? rawTopic.trim().slice(0, 500)
@@ -570,12 +570,12 @@ export function createCollectiveRoutes({
 
   router.get('/workspace/:urlKey/api/collective/state', workspaceFromUrl, async (req, res) => {
     if (!yapClient) {
-      return res.status(503).json({ error: 'Yap is not configured (set YAP_BASE_URL)' });
+      return serviceUnavailable.json(res, 'Yap is not configured (set YAP_BASE_URL)');
     }
 
     const channel = normalizeYapChannel(req.query.channel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
-      return res.status(400).json({ error: 'A valid channel name is required' });
+      return badRequest.json(res, 'A valid channel name is required');
     }
     const since = Math.max(parseInt(req.query.since, 10) || 0, 0);
 
@@ -600,7 +600,7 @@ export function createCollectiveRoutes({
       });
     } catch (error) {
       console.error('Collective state error:', error.message);
-      res.status(502).json({ error: 'Could not reach Yap', detail: error.detail || null });
+      jsonError(res, 502, 'Could not reach Yap', { detail: error.detail || null });
     }
   });
 
@@ -608,19 +608,19 @@ export function createCollectiveRoutes({
 
   router.post('/workspace/:urlKey/api/collective/say', workspaceFromUrl, async (req, res) => {
     if (!yapClient) {
-      return res.status(503).json({ error: 'Yap is not configured (set YAP_BASE_URL)' });
+      return serviceUnavailable.json(res, 'Yap is not configured (set YAP_BASE_URL)');
     }
 
     const { channel: rawChannel, message, nick: rawNick } = req.body || {};
     const channel = normalizeYapChannel(rawChannel || DEFAULT_COLLECTIVE_CHANNEL);
     if (!channel) {
-      return res.status(400).json({ error: 'A valid channel name is required' });
+      return badRequest.json(res, 'A valid channel name is required');
     }
     if (!message || typeof message !== 'string' || !message.trim()) {
-      return res.status(400).json({ error: 'message is required' });
+      return badRequest.json(res, 'message is required');
     }
     if (message.length > MAX_SAY_LENGTH) {
-      return res.status(400).json({ error: `message exceeds maximum length of ${MAX_SAY_LENGTH}` });
+      return badRequest.json(res, `message exceeds maximum length of ${MAX_SAY_LENGTH}`);
     }
 
     const nick = (typeof rawNick === 'string' && nickFromWorkspaceName(rawNick))
@@ -632,7 +632,7 @@ export function createCollectiveRoutes({
       res.json({ ok: true, id: result.id ?? null, timestamp: result.timestamp ?? null });
     } catch (error) {
       console.error('Collective say error:', error.message);
-      res.status(502).json({ error: 'Could not post to Yap', detail: error.detail || null });
+      jsonError(res, 502, 'Could not post to Yap', { detail: error.detail || null });
     }
   });
 

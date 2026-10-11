@@ -33,6 +33,7 @@ import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 import { sendSSE } from '../lib/sse.js';
+import { badRequest, jsonError, notFound, serverError, serviceUnavailable, unauthorized } from '../lib/errors.js';
 
 const MAX_QUESTION_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
@@ -313,12 +314,12 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
    */
   const resolveSavedChatUser = (req, res) => {
     if (getFeatureFlags(req.session).taskChat !== true) {
-      res.status(403).json({ error: 'Task chat feature is not enabled' });
+      jsonError(res, 403, 'Task chat feature is not enabled');
       return null;
     }
     const accountId = req.session.accountId;
     if (!accountId) {
-      res.status(401).json({ error: 'Authentication required to use saved chats' });
+      unauthorized.json(res, 'Authentication required to use saved chats');
       return null;
     }
     return accountId;
@@ -333,7 +334,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       res.json({ chats });
     } catch (error) {
       console.error('Saved chat list error:', error);
-      res.status(500).json({ error: 'Failed to list saved chats' });
+      serverError.json(res, 'Failed to list saved chats');
     }
   });
 
@@ -356,9 +357,9 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     } catch (error) {
       // Validation failures (e.g. empty transcript) are a 400; anything else 500.
       const isValidation = /required|at least one message/i.test(error.message || '');
-      if (isValidation) return res.status(400).json({ error: error.message });
+      if (isValidation) return jsonError(res, 400, error.message);
       console.error('Saved chat create error:', error);
-      res.status(500).json({ error: 'Failed to save the chat' });
+      serverError.json(res, 'Failed to save the chat');
     }
   });
 
@@ -368,11 +369,11 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     if (!accountId) return;
     try {
       const chat = await savedChatStore.get(req.workspace.urlKey, accountId, req.params.id);
-      if (!chat) return res.status(404).json({ error: 'Saved chat not found' });
+      if (!chat) return notFound.json(res, 'Saved chat not found');
       res.json({ chat });
     } catch (error) {
       console.error('Saved chat get error:', error);
-      res.status(500).json({ error: 'Failed to load the saved chat' });
+      serverError.json(res, 'Failed to load the saved chat');
     }
   });
 
@@ -382,11 +383,11 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     if (!accountId) return;
     try {
       const deleted = await savedChatStore.delete(req.workspace.urlKey, accountId, req.params.id);
-      if (!deleted) return res.status(404).json({ error: 'Saved chat not found' });
+      if (!deleted) return notFound.json(res, 'Saved chat not found');
       res.json({ ok: true });
     } catch (error) {
       console.error('Saved chat delete error:', error);
-      res.status(500).json({ error: 'Failed to delete the saved chat' });
+      serverError.json(res, 'Failed to delete the saved chat');
     }
   });
 
@@ -409,28 +410,27 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
 
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.taskChat !== true) {
-      return res.status(403).json({ error: 'Task chat feature is not enabled' });
+      return jsonError(res, 403, 'Task chat feature is not enabled');
     }
 
     if (!isValidIssueId(issueId)) {
-      return res.status(400).json({ error: 'Invalid issue ID format' });
+      return badRequest.json(res, 'Invalid issue ID format');
     }
 
     // Capability backstop — clean 422 (never a raw NotImplementedError → 502)
     // for a provider that never implements recommendation context (LIN-1910).
     if (!issueProvider.supports('fetchRecommendationContext')) {
-      return res.status(422).json({
-        error: "This workspace's provider does not support task chat for this issue",
+      return jsonError(res, 422, "This workspace's provider does not support task chat for this issue", {
         code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
       });
     }
 
     const { question, history } = req.body || {};
     if (!question || typeof question !== 'string' || !question.trim()) {
-      return res.status(400).json({ error: 'question is required and must be a non-empty string' });
+      return badRequest.json(res, 'question is required and must be a non-empty string');
     }
     if (question.length > MAX_QUESTION_LENGTH) {
-      return res.status(400).json({ error: `question must be ${MAX_QUESTION_LENGTH} characters or fewer` });
+      return badRequest.json(res, `question must be ${MAX_QUESTION_LENGTH} characters or fewer`);
     }
 
     // LIN-3254: a run-scoped chat carries a UUID `runId` in the turn body. The
@@ -438,7 +438,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     // and the run's session is confirmed to belong to THIS workspace below.
     const rawRunId = typeof req.body?.runId === 'string' ? req.body.runId.trim() : '';
     if (rawRunId && !UUID_REGEX.test(rawRunId)) {
-      return res.status(400).json({ error: 'runId must be a UUID' });
+      return badRequest.json(res, 'runId must be a UUID');
     }
 
     // `isTestMode` gates the DATA mock; `mockAi` additionally fires the AI mock
@@ -449,14 +449,13 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!mockAi && !apiKeyToUse) {
-      return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return serviceUnavailable.json(res, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     if (!mockAi) {
       const gate = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (gate) {
-        return res.status(429).json({
-          error: gate.reason,
+        return jsonError(res, 429, gate.reason, {
           freeTier: {
             used: true,
             remaining: gate.remaining,
@@ -476,17 +475,17 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     try {
       if (isTestMode) {
         context = buildMockTaskContext(issueId);
-        if (!context) return res.status(404).json({ error: 'Issue not found' });
+        if (!context) return notFound.json(res, 'Issue not found');
       } else {
         context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-        if (!context || !context.issue) return res.status(404).json({ error: 'Issue not found' });
+        if (!context || !context.issue) return notFound.json(res, 'Issue not found');
       }
     } catch (error) {
       console.error('Task chat context error:', error);
       if (error.response?.status === 401) {
-        return res.status(401).json({ error: 'Token expired or invalid' });
+        return unauthorized.json(res, 'Token expired or invalid');
       }
-      return res.status(502).json({ error: 'Failed to load the task' });
+      return jsonError(res, 502, 'Failed to load the task');
     }
 
     // LIN-3254: a run-scoped turn proposes instead of acting. Confirm the run's
@@ -495,16 +494,16 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     const runScoped = !!rawRunId;
     if (runScoped) {
       if (!dispatchQueueStore || !agentStatusStore || !runProposalsStore) {
-        return res.status(503).json({ error: 'Run-scoped chat is not configured for this workspace' });
+        return serviceUnavailable.json(res, 'Run-scoped chat is not configured for this workspace');
       }
       try {
         const sessions = await getSessionsForWorkspace(workspace.urlKey, { dispatchStore: dispatchQueueStore, agentStatusStore });
         if (!sessions.some(s => s.sessionId === rawRunId)) {
-          return res.status(404).json({ error: `Run ${rawRunId} not found in this workspace` });
+          return notFound.json(res, `Run ${rawRunId} not found in this workspace`);
         }
       } catch (error) {
         console.error('Task chat run lookup error:', error);
-        return res.status(502).json({ error: 'Failed to load the run' });
+        return jsonError(res, 502, 'Failed to load the run');
       }
     }
 

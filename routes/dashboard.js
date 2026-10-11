@@ -39,7 +39,7 @@
  */
 
 import { Router, json } from 'express';
-import { jsonError } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
@@ -51,7 +51,6 @@ import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
-import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding, getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
@@ -2737,12 +2736,12 @@ export function createDashboardRoutes({
 
   async function handleRunSummary(req, res, { force }) {
     if (!runSummaryCacheStore) {
-      return res.status(503).json({ error: 'Run summary store unavailable' });
+      return serviceUnavailable.json(res, 'Run summary store unavailable');
     }
 
     const workspace = req.workspace;
     const { loopId } = req.params;
-    if (!loopId) return res.status(400).json({ error: 'loopId is required' });
+    if (!loopId) return badRequest.json(res, 'loopId is required');
 
     const isPeek = !force && (req.query.cachedOnly === '1' || req.query.cachedOnly === 'true');
     let loop;
@@ -2755,16 +2754,16 @@ export function createDashboardRoutes({
       loop = await loadRunForSummary(workspace.urlKey, loopId, { allowFullScan: !isPeek });
     } catch (error) {
       console.error('Dashboard run-summary lookup error:', error);
-      return res.status(500).json({ error: 'Could not load the run' });
+      return serverError.json(res, 'Could not load the run');
     }
     if (!loop) {
       // Peek miss → cheap 204 (mirrors the cache-miss 204 below); else 404.
-      return isPeek ? res.status(204).end() : res.status(404).json({ error: 'Run not found' });
+      return isPeek ? res.status(204).end() : notFound.json(res, 'Run not found');
     }
 
     // Immutability gate: only terminal runs are summarisable/cacheable.
     if (!isTerminalLoop(loop)) {
-      return res.status(409).json({ error: 'Run is still active — a summary is available once it completes', agentState: loop.agentState });
+      return jsonError(res, 409, 'Run is still active — a summary is available once it completes', { agentState: loop.agentState });
     }
 
     const inputHash = hashLoop(loop);
@@ -2796,13 +2795,13 @@ export function createDashboardRoutes({
     const { apiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!apiKey) {
-      return res.status(503).json({ error: 'AI summaries are not configured' });
+      return serviceUnavailable.json(res, 'AI summaries are not configured');
     }
 
     if (isFreeTier && freeTierStore) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
@@ -2813,7 +2812,7 @@ export function createDashboardRoutes({
       res.json({ status: 'fresh', loopId, summary, model, generatedAt: new Date().toISOString() });
     } catch (error) {
       console.error('Dashboard run-summary generation error:', error);
-      res.status(502).json({ error: 'Could not generate the run summary' });
+      jsonError(res, 502, 'Could not generate the run summary');
     }
   }
 
@@ -2897,12 +2896,12 @@ export function createDashboardRoutes({
 
   async function handleSessionSummary(req, res, { force }) {
     if (!sessionSummaryCacheStore) {
-      return res.status(503).json({ error: 'Session summary store unavailable' });
+      return serviceUnavailable.json(res, 'Session summary store unavailable');
     }
 
     const workspace = req.workspace;
     const { sessionId } = req.params;
-    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+    if (!sessionId) return badRequest.json(res, 'sessionId is required');
 
     // Find one session by id: materialized read-model point-read (LIN-632) →
     // issue-scoped point-read (LIN-1022) → whole-workspace reconstruction.
@@ -2934,11 +2933,11 @@ export function createDashboardRoutes({
       }
     } catch (error) {
       console.error('Dashboard session-summary lookup error:', error);
-      return res.status(500).json({ error: 'Could not load the session' });
+      return serverError.json(res, 'Could not load the session');
     }
     if (!session) {
       // Peek miss → cheap 204 (mirrors the cache-miss 204 below); else 404.
-      return isPeek ? res.status(204).end() : res.status(404).json({ error: 'Session not found' });
+      return isPeek ? res.status(204).end() : notFound.json(res, 'Session not found');
     }
 
     // Live session: cheap proxy statusLine only, no generation, no caching.
@@ -2982,13 +2981,13 @@ export function createDashboardRoutes({
     const { apiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!apiKey) {
-      return res.status(503).json({ error: 'AI summaries are not configured' });
+      return serviceUnavailable.json(res, 'AI summaries are not configured');
     }
 
     if (isFreeTier && freeTierStore) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return res.status(429).json({ error: check.reason, freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
       }
     }
 
@@ -3000,7 +2999,7 @@ export function createDashboardRoutes({
       res.json({ status: 'fresh', sessionId, live: false, summary, model, generatedAt: new Date().toISOString() });
     } catch (error) {
       console.error('Dashboard session-summary generation error:', error);
-      res.status(502).json({ error: 'Could not generate the session summary' });
+      jsonError(res, 502, 'Could not generate the session summary');
     }
   }
 
@@ -3023,7 +3022,7 @@ export function createDashboardRoutes({
   router.get('/workspace/:urlKey/api/dashboard/session-context/:sessionId', workspaceFromUrl, async (req, res) => {
     const workspace = req.workspace;
     const { sessionId } = req.params;
-    if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+    if (!sessionId) return badRequest.json(res, 'sessionId is required');
 
     // Bound the request with a keepalive heartbeat (LIN-615).
     const keepalive = armKeepalive(res);
@@ -3107,7 +3106,7 @@ export function createDashboardRoutes({
     const { wsUrlKey, identifier } = req.params;
     // Only hydrate workspaces the user is actually connected to (never trust the path).
     const connected = !!getWorkspaceByUrlKey(req.session, wsUrlKey);
-    if (!connected) return res.status(403).json({ error: 'Not connected to that workspace' });
+    if (!connected) return jsonError(res, 403, 'Not connected to that workspace');
 
     try {
       const token = await getWorkspaceAccessToken(wsUrlKey, req.session);

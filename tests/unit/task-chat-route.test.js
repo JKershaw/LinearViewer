@@ -206,7 +206,7 @@ describe('task-chat saved-chats wiring (LIN-1008)', () => {
     const gateSrc = ROUTE_SRC.slice(start, end);
     assert.match(gateSrc, /req\.session\.accountId/);
     assert.doesNotMatch(gateSrc, /linearUserId/);
-    assert.match(gateSrc, /res\.status\(401\)/);
+    assert.match(gateSrc, /unauthorized\.json\(res|jsonError\(res, 401/);
     // …and it is gated on the taskChat feature flag like the rest of the surface.
     assert.match(gateSrc, /getFeatureFlags\(req\.session\)\.taskChat\s*!==\s*true/);
   });

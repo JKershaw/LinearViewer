@@ -8,7 +8,7 @@
  * pass-throughs with no owning helpers of their own.
  */
 import { Router } from 'express';
-import { badRequest, jsonError, notFound } from '../lib/errors.js';
+import { badRequest, jsonError, notFound, serverError } from '../lib/errors.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { EMPTY_PROVIDER_CONTEXT } from '../lib/prompt-trace-store.js';
 
@@ -44,7 +44,7 @@ export function createPromptsRoutes({ workspaceFromUrl, promptTraceStore, custom
       res.json({ ...result, providerContext });
     } catch (err) {
       console.error('Error listing prompt traces:', err);
-      res.status(500).json({ error: 'Failed to list prompt traces' });
+      serverError.json(res, 'Failed to list prompt traces');
     }
   });
 

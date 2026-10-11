@@ -1181,7 +1181,8 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    */
   function workspaceUnavailable(req, res, endpoint, reason) {
     logEvent(req, endpoint, 503, reason);
-    return res.status(503).json(workspaceUnavailableEnvelope(reason, req.proxyUrlKey));
+    const { error, ...rest } = workspaceUnavailableEnvelope(reason, req.proxyUrlKey);
+    return jsonError(res, 503, error, rest);
   }
 
   /**

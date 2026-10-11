@@ -413,7 +413,7 @@ describe('LIN-2631: the extraction must not change what the browser receives on 
     const turnStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
     const turnEnd = ROUTE_SRC.indexOf('\n  });\n', turnStart);
     const handler = ROUTE_SRC.slice(turnStart, turnEnd);
-    assert.doesNotMatch(handler, /status\(500\)/, 'the turn handler has never answered a throw with 500');
+    assert.doesNotMatch(handler, /status\(500\)|serverError\.json|jsonError\(res, 500/, 'the turn handler has never answered a throw with 500');
     // The catch opens the stream itself if the throw beat `onStreamStart`.
     assert.match(handler, /startStream\(\);\s*\n\s*sendSSE\(res, 'error'/);
   });
@@ -439,7 +439,7 @@ describe('LIN-2631 review round 1: the gate is EXTRACTED, not duplicated', () =>
     // gate ahead of the "AI is not configured" 503. Moving that check into the
     // hook the core calls at the right moment is what makes the deletion safe.
     assert.match(ROUTE_SRC, /onBeforeSpend: async \(\) => \{\s*\n\s*if \(!apiKeyToUse\) return \{ reason: 'not-configured' \}/);
-    assert.match(ROUTE_SRC, /outcome\.reason === 'not-configured'[\s\S]{0,200}status\(503\)/);
+    assert.match(ROUTE_SRC, /outcome\.reason === 'not-configured'[\s\S]{0,200}serviceUnavailable\.json\(res/);
   });
 
   test('an unconfigured workspace still 503s, and only AFTER the gate has spoken', async () => {

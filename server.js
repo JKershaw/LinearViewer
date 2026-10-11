@@ -102,7 +102,7 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
-import { isAuthError, clientErrorStatus, clientErrorMessage, serviceUnavailable } from './lib/errors.js'
+import { isAuthError, clientErrorStatus, clientErrorMessage, badRequest, serverError, serviceUnavailable, unauthorized } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
@@ -2301,7 +2301,7 @@ function workspaceFromUrl(req, res, next) {
     if (!validateWorkspaceUrlKey(urlKey)) {
       // For API routes, return JSON error
       if (req.path.includes('/api/')) {
-        return res.status(400).json({ error: 'Invalid workspace URL' })
+        return badRequest.json(res, 'Invalid workspace URL')
       }
       // For page routes, show error page (urlKey is sanitized by validation failure)
       return res.status(404).send(renderWorkspaceNotFoundPage('invalid', []))
@@ -2311,7 +2311,7 @@ function workspaceFromUrl(req, res, next) {
     if (!req.session.workspaces || req.session.workspaces.length === 0) {
       // For API routes, return JSON error
       if (req.path.includes('/api/')) {
-        return res.status(401).json({ error: 'Not authenticated' })
+        return unauthorized.json(res, 'Not authenticated')
       }
       // For page routes, redirect to login
       return res.redirect('/')
@@ -2328,7 +2328,7 @@ function workspaceFromUrl(req, res, next) {
   } catch (error) {
     console.error('Error in workspaceFromUrl middleware:', error)
     if (req.path.includes('/api/')) {
-      return res.status(500).json({ error: 'Internal server error' })
+      return serverError.json(res, 'Internal server error')
     }
     return res.status(500).send(renderErrorPage('Error', 'An unexpected error occurred'))
   }
@@ -4059,7 +4059,7 @@ app.post('/workspace/:urlKey/settings/workspace-features', workspaceFromUrl, asy
 
   // Validate workspace feature key
   if (!feature || !isValidWorkspaceFeatureKey(feature)) {
-    return res.status(400).json({ error: 'Invalid workspace feature key' });
+    return badRequest.json(res, 'Invalid workspace feature key');
   }
 
   const isEnabled = enabled === 'true' || enabled === true;
@@ -4105,7 +4105,7 @@ app.post('/workspace/:urlKey/settings/features', workspaceFromUrl, async (req, r
 
   // Validate feature key
   if (!feature || !isValidFeatureKey(feature)) {
-    return res.status(400).json({ error: 'Invalid feature key' });
+    return badRequest.json(res, 'Invalid feature key');
   }
 
   const isEnabled = enabled === 'true' || enabled === true;
@@ -4166,7 +4166,7 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
   const { theme } = req.body;
 
   if (!VALID_THEMES.includes(theme)) {
-    return res.status(400).json({ error: 'Invalid theme' });
+    return badRequest.json(res, 'Invalid theme');
   }
 
   // Session + the pre-paint cookie are the authoritative, immediate path.
@@ -4175,7 +4175,7 @@ app.post('/workspace/:urlKey/settings/theme', workspaceFromUrl, async (req, res)
     await saveSession(req.session);
   } catch (err) {
     console.error('Failed to save theme preference:', err);
-    return res.status(500).json({ error: 'Failed to save theme preference' });
+    return serverError.json(res, 'Failed to save theme preference');
   }
   setThemeCookie(res, theme);
 
@@ -4484,7 +4484,7 @@ app.use((err, req, res, next) => {
   // Genuinely unexpected error → full stack + 500 (unchanged path).
   console.error('Unhandled route error:', req.method, req.originalUrl, '-', err?.stack || err)
   if (wantsJson) {
-    res.status(500).json({ error: 'Internal server error' })
+    serverError.json(res, 'Internal server error')
   } else {
     // Helpful themed fallback page instead of a raw host crash / plain text (LIN-609).
     res.status(500).send(renderErrorPage(

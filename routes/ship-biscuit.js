@@ -25,6 +25,7 @@
 import { Router } from 'express';
 import { renderShipBiscuitPage } from '../lib/render-ship-biscuit.js';
 import { renderErrorPage } from '../lib/render.js';
+import { jsonError, serviceUnavailable } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
@@ -131,14 +132,14 @@ export function createShipBiscuitRoutes({
 
     const featureFlags = getFeatureFlags(req.session);
     if (featureFlags.shipBiscuit !== true) {
-      return res.status(403).json({ error: "The Ship's Biscuit feature is not enabled" });
+      return jsonError(res, 403, "The Ship's Biscuit feature is not enabled");
     }
 
     const mockAi = shouldMockAi(workspace);
     const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
 
     if (!mockAi && !apiKeyToUse) {
-      return res.status(503).json({ error: 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.' });
+      return serviceUnavailable.json(res, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.');
     }
 
     // The gather + editor-in-chief OpenRouter call can genuinely exceed Heroku's

@@ -334,7 +334,7 @@ export function createProxyFlightCompanionRoutes({
         }
         logEvent(req, ENDPOINT, 500);
         const body = { error: 'Failed to generate a response' };
-        keepalive ? keepalive.send(500, body) : res.status(500).json(body);
+        keepalive ? keepalive.send(500, body) : jsonError(res, 500, body.error);
       }
     }
   );

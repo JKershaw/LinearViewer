@@ -6,6 +6,7 @@
  */
 import { Router } from 'express';
 import { getActiveWorkspace } from '../lib/workspace.js';
+import { unauthorized } from '../lib/errors.js';
 
 /**
  * Create legacy redirect routes.
@@ -48,7 +49,7 @@ export function createLegacyRedirects() {
     if (workspace) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/audit`)
     }
-    res.status(401).json({ error: 'Not authenticated' })
+    unauthorized.json(res, 'Not authenticated')
   })
 
   router.get('/api/prompt/:issueId/:labelName', (req, res) => {
@@ -56,7 +57,7 @@ export function createLegacyRedirects() {
     if (workspace) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/prompt/${req.params.issueId}/${encodeURIComponent(req.params.labelName)}`)
     }
-    res.status(401).json({ error: 'Not authenticated' })
+    unauthorized.json(res, 'Not authenticated')
   })
 
   router.get('/api/recommend/status', (req, res) => {
@@ -64,7 +65,7 @@ export function createLegacyRedirects() {
     if (workspace) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/recommend/status`)
     }
-    res.status(401).json({ error: 'Not authenticated' })
+    unauthorized.json(res, 'Not authenticated')
   })
 
   router.get('/api/recommend/:issueId', (req, res) => {
@@ -72,7 +73,7 @@ export function createLegacyRedirects() {
     if (workspace) {
       return res.redirect(`/workspace/${encodeURIComponent(workspace.urlKey)}/api/recommend/${req.params.issueId}`)
     }
-    res.status(401).json({ error: 'Not authenticated' })
+    unauthorized.json(res, 'Not authenticated')
   })
 
   return router;
