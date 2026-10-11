@@ -108,6 +108,11 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     await store.takeItem(a._id, urlKey, TOKEN);
     await store.addFeedback(a._id, urlKey, { message: 'beat on a', rootItemId: a._id }, TOKEN);
 
+    // Distinct timestamps (LIN-1465): feedback is stamped with `new Date()`, so
+    // back-to-back writes can share a millisecond, and a same-instant tie between
+    // sibling rows is ordered by row `_id` (random UUIDs here), not by write order.
+    // This test is about hop coverage, not tie order, so keep the hops apart.
+    await new Promise(r => setTimeout(r, 5));
     const b = await dispatchTakenFollowUp(store, urlKey, {
       prompt: 'continue', followUpTo: a._id, sessionGroupId: a._id
     });
@@ -116,6 +121,7 @@ describe('getItemStatus merges feedback across a session-group, scoped to rootIt
     // `session.rootItemId || itemMetadata.itemId` convention (set once, never
     // overwritten by a repoint).
     await store.addFeedback(b._id, urlKey, { message: 'beat on b', rootItemId: a._id }, TOKEN);
+    await new Promise(r => setTimeout(r, 5));
 
     // C follows up on B (the immediate predecessor, matching simple-dispatcher's
     // repoint behavior), but per dispatch-factory.js's inheritance rule it still
@@ -483,5 +489,42 @@ describe('rootItemId as a first-class item field (LIN-1468, full-A)', () => {
     // Every previously-returned field stays byte-identical.
     assert.deepEqual(Object.keys(status.feedback[0]).sort(), ['kind', 'message', 'timestamp', 'url', 'urlLabel'].sort());
     assert.deepEqual(Object.keys(status.feedback[1]).sort(), ['message', 'timestamp', 'url', 'urlLabel'].sort());
+  });
+});
+
+// LIN-1465: the sibling `find()` in `_collectGroupFeedback` has no `.sort()`, so
+// the sibling rows arrive in the database's own order (the mock returns insertion
+// order; a real Mongo returns whatever it likes). The tie order of the merged
+// feedback must not depend on that — `mergeLineageFeedback` orders sibling rows by
+// row key itself. A collection that hands siblings back in REVERSE of `_id` order
+// is the case the mock's insertion order could not otherwise observe.
+describe('_collectGroupFeedback tie order is independent of the sibling query order (LIN-1465)', () => {
+  const URLKEY = 'acme';
+  const ANCHOR = 'root-1465';
+  const T = '2026-08-20T02:00:00.000Z';
+  const fb = (message) => ({ message, timestamp: T, rootItemId: ANCHOR });
+
+  async function collect(order) {
+    const store = makeStore();
+    const col = store.historyCollection;
+    const rows = [
+      { _id: 'sib-a', urlKey: URLKEY, rootItemId: ANCHOR, feedback: [fb('a1')] },
+      { _id: 'sib-b', urlKey: URLKEY, rootItemId: ANCHOR, feedback: [fb('b1')] },
+      { _id: 'sib-c', urlKey: URLKEY, rootItemId: ANCHOR, feedback: [fb('c1')] },
+    ];
+    for (const r of order(rows)) await col.insertOne(r);
+    const doc = {
+      _id: 'self', urlKey: URLKEY, sessionGroupId: 'grp', rootItemId: ANCHOR,
+      dispatchedAt: '2026-08-20T00:00:00.000Z', feedback: [fb('own')]
+    };
+    const out = await store._collectGroupFeedback(URLKEY, doc);
+    return out.map(e => e.message);
+  }
+
+  test('insertion order ascending, descending and shuffled all give `_id` order', async () => {
+    const expected = ['own', 'a1', 'b1', 'c1'];
+    assert.deepEqual(await collect(r => r), expected);
+    assert.deepEqual(await collect(r => [...r].reverse()), expected);
+    assert.deepEqual(await collect(r => [r[1], r[2], r[0]]), expected);
   });
 });
