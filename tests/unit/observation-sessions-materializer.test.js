@@ -36,7 +36,7 @@ function setup() {
 
 // Insert an archived dispatch row directly (bypassing the hooks) so we control the
 // exact cross-session fixture the equivalence spike needs.
-function archive(historyCollection, { id, issueIdentifier, sessionId = null, sessionGroupId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [], maxTasks = null, maxSessionsPerTask = null }) {
+function archive(historyCollection, { id, issueIdentifier, sessionId = null, sessionGroupId = null, kind = 'implementation', followUpTo = null, dispatchedAtMs, resolvedAtMs, feedback = [], maxTasks = null }) {
   historyCollection._docs.push({
     _id: id,
     urlKey: URL_KEY,
@@ -54,9 +54,8 @@ function archive(historyCollection, { id, issueIdentifier, sessionId = null, ses
     followUpTo,
     sessionId,
     sessionGroupId,
-    // LIN-2934: budget bounds, only meaningful on the kind:'autopilot' anchor row.
+    // LIN-2934: budget bound, only meaningful on the kind:'autopilot' anchor row.
     maxTasks,
-    maxSessionsPerTask,
     status: 'taken',
     resolvedAt: resolvedAtMs ? new Date(resolvedAtMs) : null,
     takenByTokenLabel: null,
@@ -145,41 +144,6 @@ test('rebuildForWrite by sessionId reconstructs that session\'s full closure (by
   assert.deepEqual(s1.tasksTouched.sort(), ['LIN-100', 'LIN-200', 'LIN-300'], 'full issue closure recovered');
 });
 
-// LIN-2934 (F2): a budgeted run's sessionPosition/taskPosition must survive
-// the materialized read path — not just the pure pipeline-loops.js build.
-function seedBudgetedFixture({ historyCollection, statusCollection }) {
-  archive(historyCollection, { id: 'SB', issueIdentifier: 'LIN-700', kind: 'autopilot', dispatchedAtMs: min(60), resolvedAtMs: min(61), maxSessionsPerTask: 5 });
-  archive(historyCollection, { id: 'WB1', issueIdentifier: 'LIN-700', sessionId: 'SB', dispatchedAtMs: min(62), resolvedAtMs: min(65), feedback: [{ message: '[done] shipped WB1', tsMs: min(65) }] });
-  archive(historyCollection, { id: 'WB2', issueIdentifier: 'LIN-700', sessionId: 'SB', dispatchedAtMs: min(66), resolvedAtMs: min(69), feedback: [{ message: '[done] shipped WB2', tsMs: min(69) }] });
-
-  status(statusCollection, { id: 'AS-sb-anchor', taskIdentifier: 'LIN-700', tsMs: min(60) + 30 * 1000 });
-  status(statusCollection, { id: 'AS-wb1', taskIdentifier: 'LIN-700', tsMs: min(63) });
-  status(statusCollection, { id: 'AS-wb2', taskIdentifier: 'LIN-700', tsMs: min(67) });
-}
-
-test('LIN-2934 (F2): a materialized session doc carries sessionPosition, matching the pure build byte-identically', async () => {
-  const ctx = setup();
-  seedBudgetedFixture(ctx);
-  const { agentStatusStore, observationSessionsStore, materializer } = ctx;
-
-  const full = await getSessionsForWorkspace(URL_KEY, { dispatchStore: ctx.dispatchStore, agentStatusStore, lean: true });
-  const fullSB = full.find(s => s.sessionId === 'SB');
-  assert.deepEqual(fullSB.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' },
-    'sanity: the pure build itself carries the position');
-
-  await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SB' });
-
-  const { sessions } = await observationSessionsStore.findByWorkspace(URL_KEY);
-  const sb = sessions.find(s => s.sessionId === 'SB');
-  assert.deepEqual(sb, fullSB, 'the materialized doc must be byte-identical to the pure build, including sessionPosition');
-  assert.deepEqual(sb.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' });
-
-  // Confirmed reachable through the point read too (what the Observation UI's
-  // per-session fetch actually calls).
-  const point = await observationSessionsStore.getSession(URL_KEY, 'SB');
-  assert.deepEqual(point.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-700' });
-});
-
 // LIN-2934 R1: a GENERAL (goal-only) autopilot kickoff — its own row carries
 // NO issueIdentifier at all (that's the whole point of "general"). Before the
 // R1 fix this anchor was dropped by `_buildLoops` as "malformed" (so the pure
@@ -188,7 +152,7 @@ test('LIN-2934 (F2): a materialized session doc carries sessionPosition, matchin
 // could never discover it — no issue in its closure is ever this anchor's own
 // id. Both halves are exercised here.
 function seedGeneralBudgetedFixture({ historyCollection, statusCollection }) {
-  archive(historyCollection, { id: 'SG', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(80), resolvedAtMs: min(81), maxTasks: 3, maxSessionsPerTask: 5 });
+  archive(historyCollection, { id: 'SG', issueIdentifier: null, kind: 'autopilot', dispatchedAtMs: min(80), resolvedAtMs: min(81), maxTasks: 3 });
   archive(historyCollection, { id: 'WG1', issueIdentifier: 'LIN-800', sessionId: 'SG', dispatchedAtMs: min(82), resolvedAtMs: min(85), feedback: [{ message: '[done] shipped WG1', tsMs: min(85) }] });
   archive(historyCollection, { id: 'WG2', issueIdentifier: 'LIN-800', sessionId: 'SG', dispatchedAtMs: min(86), resolvedAtMs: min(89), feedback: [{ message: '[done] shipped WG2', tsMs: min(89) }] });
 
@@ -196,7 +160,7 @@ function seedGeneralBudgetedFixture({ historyCollection, statusCollection }) {
   status(statusCollection, { id: 'AS-sg-w2', taskIdentifier: 'LIN-800', tsMs: min(87) });
 }
 
-test('LIN-2934 R1: a GENERAL (goal-only) run\'s materialized session doc carries taskPosition/sessionPosition too, byte-identical to the pure build', async () => {
+test('LIN-2934 R1: a GENERAL (goal-only) run\'s materialized session doc carries taskPosition too, byte-identical to the pure build', async () => {
   const ctx = setup();
   seedGeneralBudgetedFixture(ctx);
   const { agentStatusStore, observationSessionsStore, materializer } = ctx;
@@ -205,7 +169,6 @@ test('LIN-2934 R1: a GENERAL (goal-only) run\'s materialized session doc carries
   const fullSG = full.find(s => s.sessionId === 'SG');
   assert.ok(fullSG, 'sanity: the pure build must find the general run\'s session at all — this is exactly the gap R1 closes');
   assert.deepEqual(fullSG.taskPosition, { count: 1, maxTasks: 3 });
-  assert.deepEqual(fullSG.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-800' });
 
   await materializer.rebuildForWrite(URL_KEY, { sessionId: 'SG' });
 
@@ -214,7 +177,6 @@ test('LIN-2934 R1: a GENERAL (goal-only) run\'s materialized session doc carries
   assert.ok(sg, 'the materialized (incremental, per-issue-scoped) rebuild must find this session too — not only a full workspace build');
   assert.deepEqual(sg, fullSG, 'byte-identical to the pure build');
   assert.deepEqual(sg.taskPosition, { count: 1, maxTasks: 3 });
-  assert.deepEqual(sg.sessionPosition, { count: 2, maxSessionsPerTask: 5, issueIdentifier: 'LIN-800' });
 
   // Confirmed reachable through the point read too.
   const point = await observationSessionsStore.getSession(URL_KEY, 'SG');
@@ -231,7 +193,6 @@ test('LIN-2934 R1: a GENERAL run with zero workers dispatched yet still material
   const sg0 = sessions.find(s => s.sessionId === 'SG0');
   assert.ok(sg0, 'an anchor-only general run must still materialize a session doc, matching a scoped run\'s zero-worker behavior');
   assert.deepEqual(sg0.taskPosition, { count: 0, maxTasks: 3 });
-  assert.strictEqual(sg0.sessionPosition, null, 'no maxSessionsPerTask declared on this fixture');
 });
 
 // LIN-2934 (S5): TWO independent GENERAL (goal-only) runs in the same 30-day

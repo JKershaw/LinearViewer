@@ -84,23 +84,6 @@ describe('fetchAutopilotKickoff — issue-scoped URL construction (LIN-1904)', (
     assert.equal(url, '/workspace/ws/api/autopilot-prompt?goal=ship+it&variant=stepper&maxTasks=5');
   });
 
-  // LIN-2934: maxSessionsPerTask threads through the same goal-scoped-only
-  // pass-through as maxTasks, joined after it.
-  test('maxSessionsPerTask joins maxTasks with `&`, in that order', async () => {
-    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', goal: 'ship it', maxTasks: 8, maxSessionsPerTask: 10 });
-    assert.equal(url, '/workspace/ws/api/autopilot-prompt?goal=ship+it&maxTasks=8&maxSessionsPerTask=10');
-  });
-
-  test('maxSessionsPerTask alone (no maxTasks) is sent on its own', async () => {
-    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', goal: 'ship it', maxSessionsPerTask: 10 });
-    assert.equal(url, '/workspace/ws/api/autopilot-prompt?goal=ship+it&maxSessionsPerTask=10');
-  });
-
-  test('maxSessionsPerTask is a no-op on the issue-scoped branch, same as maxTasks', async () => {
-    const url = await callFetchAutopilotKickoff({ urlKey: 'ws', issueId: 'issue-1', maxSessionsPerTask: 10 });
-    assert.equal(url, '/workspace/ws/api/autopilot-prompt/issue-1');
-  });
-
   // LIN-3246: the ladder's own autopilot run adds `stopAt=pr` to the ISSUE-scoped
   // kickoff URL (the boundary needs a single task). It is a no-op on the
   // goal-scoped branch, like maxTasks is there.

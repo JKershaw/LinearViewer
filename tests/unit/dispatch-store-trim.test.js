@@ -140,8 +140,8 @@ describe('trimSessionBudget — successful trims', () => {
   });
 });
 
-// LIN-2934 (S2, R6): a successful trim changes the bound(s) the Observation
-// feed's `taskPosition`/`sessionPosition` chip reads, but until R6 no write
+// LIN-2934 (S2, R6): a successful trim changes the bound the Observation
+// feed's `taskPosition` chip reads, but until R6 no write
 // notified the materializer — the chip's denominator stayed stale until this
 // session's next UNRELATED write. `trimSessionBudget` now calls
 // `_notifyWriteForDoc` on success; this mirrors

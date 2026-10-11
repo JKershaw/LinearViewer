@@ -944,11 +944,10 @@ export function createDashboardRoutes({
       seedTitle: (anchor && anchor.issueTitle) || (session.loops || []).find(l => l.issueTitle)?.issueTitle || session.seedIssue || '',
       tasksTouched: Array.isArray(session.tasksTouched) ? session.tasksTouched : [],
       // Budget "n of N" (LIN-2934), derived read-time by pipeline-loops.js's
-      // `_assembleSession` off the run's own `maxTasks`/`maxSessionsPerTask` —
+      // `_assembleSession` off the run's own `maxTasks` —
       // null when the run declared no such bound. Additive; the client chip
-      // renders nothing when both are null.
+      // renders nothing when it is null.
       taskPosition: session.taskPosition || null,
-      sessionPosition: session.sessionPosition || null,
       status,
       terminal,
       stale,

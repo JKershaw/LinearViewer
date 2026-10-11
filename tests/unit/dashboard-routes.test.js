@@ -2033,28 +2033,7 @@ describe('GET /api/dashboard/sessions', () => {
     assert.ok(done.runtime, 'session carries a runtime telemetry block');
   });
 
-  test('LIN-2934: taskPosition/sessionPosition surface on the payload when the run declares a bound', async () => {
-    const perWorkspace = {
-      'ws-c': {
-        live: [{ ...autopilotLiveItem('sess-3', 'LIN-300'), maxSessionsPerTask: 5 }, workerLiveItem('w-3', 'LIN-300', 'sess-3')],
-        history: [],
-        agentStatus: []
-      }
-    };
-    const router = makeRouter(perWorkspace);
-    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/sessions');
-    const session = { ...ENABLED, workspaces: [{ urlKey: 'ws-c', name: 'Gamma' }] };
-    const { req, res } = makeReqRes({ session });
-    await handler(req, res);
-
-    assert.equal(res.statusCode, 200);
-    const live = res.jsonBody.active.find(s => s.sessionId === 'sess-3');
-    assert.ok(live, 'expected the budgeted live session on the payload');
-    assert.deepEqual(live.sessionPosition, { count: 1, maxSessionsPerTask: 5, issueIdentifier: 'LIN-300' });
-    assert.strictEqual(live.taskPosition, null, 'maxTasks was never declared on this run');
-  });
-
-  test('LIN-2934: taskPosition/sessionPosition are null when no bound is declared (unaffected by this ticket)', async () => {
+  test('LIN-2934: taskPosition is null when no bound is declared (unaffected by this ticket)', async () => {
     const perWorkspace = {
       'ws-d': {
         live: [autopilotLiveItem('sess-4', 'LIN-400')],
@@ -2072,7 +2051,6 @@ describe('GET /api/dashboard/sessions', () => {
     const live = res.jsonBody.active.find(s => s.sessionId === 'sess-4');
     assert.ok(live);
     assert.strictEqual(live.taskPosition, null);
-    assert.strictEqual(live.sessionPosition, null);
   });
 
   // LIN-2934 R1: a GENERAL (goal-only) autopilot kickoff — its own anchor row
@@ -2082,11 +2060,11 @@ describe('GET /api/dashboard/sessions', () => {
   // feed chip stayed null for every general run regardless of what was
   // declared at kickoff. `autopilotLiveItem(id, null)` builds exactly that
   // anchorless-by-design row.
-  test('LIN-2934 R1: taskPosition/sessionPosition surface for a GENERAL (goal-only) run too, not only a scoped one', async () => {
+  test('LIN-2934 R1: taskPosition surfaces for a GENERAL (goal-only) run too, not only a scoped one', async () => {
     const perWorkspace = {
       'ws-g': {
         live: [
-          { ...autopilotLiveItem('sess-g', null), maxTasks: 3, maxSessionsPerTask: 5 },
+          { ...autopilotLiveItem('sess-g', null), maxTasks: 3 },
           workerLiveItem('w-g', 'LIN-500', 'sess-g')
         ],
         history: [],
@@ -2104,7 +2082,6 @@ describe('GET /api/dashboard/sessions', () => {
     assert.ok(live, 'expected the general (seedIssue-less) run to surface on the payload at all');
     assert.strictEqual(live.seedIssue, null, 'sanity: this really is the unscoped shape, not a scoped run in disguise');
     assert.deepEqual(live.taskPosition, { count: 1, maxTasks: 3 });
-    assert.deepEqual(live.sessionPosition, { count: 1, maxSessionsPerTask: 5, issueIdentifier: 'LIN-500' });
   });
 
   // LIN-2934 (S7): R1 made the general anchor `session.loops[0]` — before R1

@@ -750,7 +750,6 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  * @param {boolean} [opts.force]                    Whether to force-follow-up even into a terminal session
  * @param {string} [opts.presetId]                  Selected dispatch preset id (LIN-1391); blank/omitted sends no presetId, so the consumer's own default resolution applies unchanged (LIN-1094/1390)
  * @param {number} [opts.maxTasks]                  Task-budget scope bound (LIN-1737/LIN-1751); blank/omitted sends no maxTasks, so the run stays unbounded exactly as before this field existed
- * @param {number} [opts.maxSessionsPerTask]         Sibling per-task session bound (LIN-2934); blank/omitted sends nothing, same optional pass-through as maxTasks
  * @param {string} [opts.entryRung]                LIN-2942: the ladder rung this dispatch was pressed from ('run-step' | 'run-task'); the server records the mode, linked to the created item. Blank/omitted sends nothing
  * @param {string} [opts.stopAt]                    LIN-3246: the run boundary ('pr') the ladder's own autopilot run declares; forwarded to the server as the validated `stopAt` body field (only 'pr', only on a fresh autopilot dispatch). Blank/omitted sends nothing, so every other launcher is unchanged.
  * @param {string} [opts.surface]                  LIN-2944 P1: the opened-task surface this dispatch came from ('home' | 'swipe'); the server records it on the mode event. Blank/omitted sends nothing (the route records null)
@@ -760,7 +759,7 @@ window.readSSEStream = async function readSSEStream(response, onEvent) {
  *                 error carries `.status` so callers can branch (e.g. 401).
  */
 window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
-  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
+  const { urlKey, prompt, issue, issueless = false, promptName = 'Prompt', target = 'cli', repo, kind, periodicalId, model, harness, appendProxyContext = true, proxyForce = false, followUpTo, force, presetId, maxTasks, composedRunMarker, entryRung, stopAt, variant, surface } = opts;
 
   if (!urlKey) throw new Error('dispatchPrompt: urlKey is required');
   if (!prompt) throw new Error('dispatchPrompt: prompt is required');
@@ -811,7 +810,6 @@ window.dispatchPrompt = async function dispatchPrompt(opts = {}) {
   if (force !== undefined) payload.force = force;
   if (presetId) payload.presetId = presetId;
   if (maxTasks !== undefined && maxTasks !== null) payload.maxTasks = maxTasks;
-  if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) payload.maxSessionsPerTask = maxSessionsPerTask;
   // LIN-2775 Area 8: truthy gate, like presetId/kind — only a composed-run
   // dispatch (today: a ruling reply's real agent brief) sets this; every
   // other dispatch surface sends nothing and is unaffected.
@@ -1872,8 +1870,6 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {number} [opts.maxTasks]              Optional task-budget scope bound (LIN-1737/LIN-1751):
  *   `?maxTasks=<n>` query param on the general (goal-scoped) kickoff only — the
  *   issue-scoped kickoff has no budget concept, so this is a no-op there.
- * @param {number} [opts.maxSessionsPerTask]    Sibling per-task session bound (LIN-2934):
- *   `?maxSessionsPerTask=<n>` query param, same goal-scoped-only pass-through as maxTasks.
  * @param {string} [opts.stopAt]                Run boundary (LIN-3246): `?stopAt=pr` query param on the
  *   ISSUE-scoped kickoff only — the ladder's own autopilot run declares it, and the boundary needs a
  *   single task, so it is a no-op on the goal-scoped branch like maxTasks is there. Blank/omitted
@@ -1882,7 +1878,7 @@ window.renderDispatchDisclosure = function renderDispatchDisclosure({ idPrefix, 
  * @param {boolean} [opts.on401=false]          Passed through to window.api
  * @returns {Promise<{prompt: string, promptName: string, kind: string, repo?: string}>}
  */
-window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, maxSessionsPerTask, stopAt, signal, on401 = false } = {}) {
+window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, issueId, goal, variant, source, maxTasks, stopAt, signal, on401 = false } = {}) {
   if (!urlKey) throw new Error('fetchAutopilotKickoff: urlKey is required');
 
   let url;
@@ -1902,7 +1898,6 @@ window.fetchAutopilotKickoff = async function fetchAutopilotKickoff({ urlKey, is
     if (goal) params.set('goal', goal);
     if (variant) params.set('variant', variant);
     if (maxTasks !== undefined && maxTasks !== null) params.set('maxTasks', String(maxTasks));
-    if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) params.set('maxSessionsPerTask', String(maxSessionsPerTask));
     const query = params.toString() ? `?${params.toString()}` : '';
     url = `/workspace/${encodeURIComponent(urlKey)}/api/autopilot-prompt${query}`;
   }

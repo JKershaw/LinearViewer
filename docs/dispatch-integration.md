@@ -605,13 +605,10 @@ dispatch. The example above passes no `issueIdentifier` at all, so neither call 
 
 A fresh, issue-bearing dispatch stamped with a `sessionId` can additionally be refused `409
 BUDGET_EXHAUSTED` when that `sessionId` names an Autopilot run launched with `maxTasks`
-(LIN-1751) and this dispatch would be that run's `maxTasks + 1`th **distinct** task, OR when the
-run was launched with the sibling per-task bound `maxSessionsPerTask` (LIN-2934) and this
-dispatch would be that one task's `maxSessionsPerTask + 1`th fresh worker session — see the
-[proxy API reference](proxy-integration.md#enqueue-a-dispatch) for both response bodies (they
-share the same `code` but carry a distinct `bound: "tasks"` / `bound: "sessionsPerTask"`) and
-what to do with either. `followUpTo`/`abort` dispatches, and any dispatch with no resolvable
-`sessionId`, are never refused by either bound.
+(LIN-1751) and this dispatch would be that run's `maxTasks + 1`th **distinct** task — see the
+[proxy API reference](proxy-integration.md#enqueue-a-dispatch) for the response body and what to
+do with it. `followUpTo`/`abort` dispatches, and any dispatch with no resolvable `sessionId`,
+are never refused by it.
 
 ## Aborting a session
 

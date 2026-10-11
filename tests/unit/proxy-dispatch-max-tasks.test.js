@@ -169,134 +169,21 @@ describe('LIN-2975 — end-to-end: a custom run declares a pool through the prox
   });
 });
 
-describe('LIN-2934 — POST /api/proxy/dispatch maxSessionsPerTask validation', () => {
-  test('no maxSessionsPerTask at all: stored null, byte-identical to today', async () => {
-    const { store } = makeSpiedStore();
-    const app = buildApp({ dispatchQueueStore: store });
-    const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli' });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.strictEqual(res.body.maxSessionsPerTask, null);
-  });
-
-  test('a valid integer maxSessionsPerTask is accepted, stored, and echoed on the 201', async () => {
+describe('LIN-3461 — POST /api/proxy/dispatch ignores maxSessionsPerTask', () => {
+  test('a caller that still sends maxSessionsPerTask gets a normal 201 with no such field on the response or the stored row', async () => {
     const { store } = makeSpiedStore();
     const app = buildApp({ dispatchQueueStore: store });
     const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: 5 });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.equal(res.body.maxSessionsPerTask, 5);
-
+    assert.ok(!('maxSessionsPerTask' in res.body));
     const stored = await store.getItemStatus('acme', res.body.id);
-    assert.equal(stored.maxSessionsPerTask, 5);
+    assert.ok(!('maxSessionsPerTask' in stored));
   });
 
-  for (const bad of [0, -1, 1.5, '5', true, {}, []]) {
-    test(`maxSessionsPerTask: ${JSON.stringify(bad)} is rejected 400 with the exact text, and addItem never runs`, async () => {
-      const { store, getInsertCount } = makeSpiedStore();
-      const app = buildApp({ dispatchQueueStore: store });
-      const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: bad });
-      assert.equal(res.status, 400, JSON.stringify(res.body));
-      assert.equal(res.body.error, 'maxSessionsPerTask must be an integer >= 1');
-      assert.equal(getInsertCount(), 0, 'addItem must not write on a rejected maxSessionsPerTask');
-    });
-  }
-});
-
-describe('LIN-2934 — end-to-end: a scoped one-task run bounded by maxSessionsPerTask', () => {
-  test('a run with maxSessionsPerTask: 2 admits two fresh dispatches to ONE task, then refuses a third to that same task', async () => {
-    const recordedEvents = [];
-    const { store } = makeSpiedStore();
-    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
-
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
-    assert.equal(run.status, 201, JSON.stringify(run.body));
-    assert.equal(run.body.maxSessionsPerTask, 2);
-    const sessionId = run.body.id;
-
-    const t1 = await call(app, 'post', DISPATCH, {
-      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t1.status, 201, JSON.stringify(t1.body));
-    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
-
-    const t2 = await call(app, 'post', DISPATCH, {
-      prompt: 'review it', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t2.status, 201, JSON.stringify(t2.body));
-    assert.deepEqual(t2.body.budgetPosition.sessionsPerTask, { count: 2, maxSessionsPerTask: 2 });
-
-    // A THIRD dispatch to the SAME task is refused — unlike maxTasks, there is
-    // no already-counted exemption, since this bound counts dispatches.
-    const t3 = await call(app, 'post', DISPATCH, {
-      prompt: 'close it out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t3.status, 409, JSON.stringify(t3.body));
-    assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(t3.body.bound, 'sessionsPerTask');
-    assert.equal(t3.body.taskDispatches, 2);
-    assert.equal(t3.body.maxSessionsPerTask, 2);
-    assert.equal(t3.body.sessionId, sessionId);
-
-    const refusalEvent = recordedEvents.find(e => e.status === 409);
-    assert.ok(refusalEvent);
-    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED sessionsPerTask ${sessionId}`);
-
-    // A dispatch to a DIFFERENT task under the same run is unaffected — the
-    // bound is per-task, not run-wide.
-    const other = await call(app, 'post', DISPATCH, {
-      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-2', target: 'cli', sessionId
-    });
-    assert.equal(other.status, 201, JSON.stringify(other.body));
-  });
-});
-
-describe('LIN-2934 R2 — maxSessionsPerTask survives the queue→history archive hop, end to end', () => {
-  test('a run whose kickoff row was taken (archived to history) before its bounded dispatches still enforces maxSessionsPerTask', async () => {
-    const recordedEvents = [];
-    const { store } = makeSpiedStore();
-    const app = buildApp({ dispatchQueueStore: store, recordedEvents });
-
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
-    assert.equal(run.status, 201, JSON.stringify(run.body));
-    const sessionId = run.body.id;
-
-    // Simulate the real lifecycle every other e2e case here skips: a real
-    // run's kickoff row is typically TAKEN (and so archived to history) by
-    // the runner within seconds of dispatch, well before its bounded worker
-    // dispatches land. The guard's anchor read (getItemStatus, inside
-    // dispatch-factory.js) must resolve maxSessionsPerTask through the
-    // ARCHIVED branch (_formatHistoryItem), not only the still-queued branch
-    // every other case in this file exercises.
-    const taken = await store.takeItem(sessionId, 'acme');
-    assert.ok(taken, 'sanity: the kickoff row was actually taken');
-    const anchorStatus = await store.getItemStatus('acme', sessionId);
-    assert.equal(anchorStatus.status, 'taken', 'sanity: resolved via the history branch, not the active queue');
-    assert.equal(anchorStatus.maxSessionsPerTask, 2, 'sanity: the archived anchor still carries the bound');
-
-    const t1 = await call(app, 'post', DISPATCH, {
-      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t1.status, 201, JSON.stringify(t1.body));
-    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
-
-    const t2 = await call(app, 'post', DISPATCH, {
-      prompt: 'review it', promptName: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t2.status, 201, JSON.stringify(t2.body));
-    assert.deepEqual(t2.body.budgetPosition.sessionsPerTask, { count: 2, maxSessionsPerTask: 2 });
-
-    const t3 = await call(app, 'post', DISPATCH, {
-      prompt: 'close it out', promptName: 'close-out', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t3.status, 409, JSON.stringify(t3.body));
-    assert.equal(t3.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(t3.body.bound, 'sessionsPerTask');
-    assert.equal(t3.body.taskDispatches, 2);
-    assert.equal(t3.body.maxSessionsPerTask, 2);
-    assert.equal(t3.body.sessionId, sessionId);
-
-    const refusalEvent = recordedEvents.find(e => e.status === 409);
-    assert.ok(refusalEvent);
-    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED sessionsPerTask ${sessionId}`);
+  test('a non-integer maxSessionsPerTask is no longer validated: the request is still accepted', async () => {
+    const app = buildApp({ dispatchQueueStore: makeSpiedStore().store });
+    const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: 0 });
+    assert.equal(res.status, 201, JSON.stringify(res.body));
   });
 });
 
@@ -325,12 +212,12 @@ function makeBudgetReadFailureStore() {
 }
 
 describe('LIN-2934 R4 — fail-closed budget-read failure, end to end (N3)', () => {
-  test('a real count-read error fails CLOSED with bound: sessionsPerTask, and the durable note names it (single bound declared)', async () => {
+  test('a real count-read error fails CLOSED with bound: tasks, and the durable note names it', async () => {
     const recordedEvents = [];
     const store = makeBudgetReadFailureStore();
     const app = buildApp({ dispatchQueueStore: store, recordedEvents });
 
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 3 });
     assert.equal(run.status, 201, JSON.stringify(run.body));
     const sessionId = run.body.id;
 
@@ -339,34 +226,55 @@ describe('LIN-2934 R4 — fail-closed budget-read failure, end to end (N3)', () 
     });
     assert.equal(t1.status, 409, JSON.stringify(t1.body));
     assert.equal(t1.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(t1.body.bound, 'sessionsPerTask', 'fails closed — never admits when the read itself is unverifiable');
+    assert.equal(t1.body.bound, 'tasks', 'fails closed — never admits when the read itself is unverifiable');
     assert.strictEqual(t1.body.count, null);
 
     const refusalEvent = recordedEvents.find(e => e.status === 409);
     assert.ok(refusalEvent, 'the fail-closed refusal must still write a durable proxy-event note');
-    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED sessionsPerTask ${sessionId}`,
-      'the note must name the single declared bound, never interpolate undefined');
+    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED tasks ${sessionId}`);
   });
 
-  test('a real count-read error with BOTH bounds declared fails CLOSED with bound: unverified, and the durable note names it', async () => {
-    const recordedEvents = [];
+  test('a real count-read error with NO maxTasks declared fails OPEN: the failsafe never turns a read blip into an outage (LIN-3461)', async () => {
     const store = makeBudgetReadFailureStore();
+    const app = buildApp({ dispatchQueueStore: store });
+
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli' });
+    assert.equal(run.status, 201, JSON.stringify(run.body));
+
+    const t1 = await call(app, 'post', DISPATCH, {
+      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId: run.body.id
+    });
+    assert.equal(t1.status, 201, JSON.stringify(t1.body));
+  });
+});
+
+describe('LIN-3461 — the runaway failsafe, relayed by the proxy dispatch route', () => {
+  test('the 31st fresh session to one task in a run is refused 409 TASK_SESSION_RUNAWAY, not BUDGET_EXHAUSTED, and the durable note names the code', async () => {
+    const recordedEvents = [];
+    const { store } = makeSpiedStore();
     const app = buildApp({ dispatchQueueStore: store, recordedEvents });
 
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 3, maxSessionsPerTask: 2 });
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli' });
     assert.equal(run.status, 201, JSON.stringify(run.body));
     const sessionId = run.body.id;
 
-    const t1 = await call(app, 'post', DISPATCH, {
-      prompt: 'work on it', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    for (let i = 0; i < 30; i++) {
+      await store.addItem('acme', { prompt: `worker ${i}`, kind: 'implementation', issueIdentifier: 'LIN-1', sessionId });
+    }
+
+    const refused = await call(app, 'post', DISPATCH, {
+      prompt: 'one more', promptName: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId, force: true
     });
-    assert.equal(t1.status, 409, JSON.stringify(t1.body));
-    assert.equal(t1.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(t1.body.bound, 'unverified', 'the read failed before either bound could be evaluated — neither can be misattributed as "the one that fired"');
-    assert.equal(t1.body.maxSessionsPerTask, 2, 'the fail-closed body still names maxSessionsPerTask when it is declared');
+    assert.equal(refused.status, 409, JSON.stringify(refused.body));
+    assert.equal(refused.body.code, 'TASK_SESSION_RUNAWAY');
+    assert.equal(refused.body.limit, 30);
+    assert.equal(refused.body.taskDispatches, 30);
+    assert.match(refused.body.error, /30 fresh sessions in this run/);
+    assert.match(refused.body.error, /runaway/);
+    assert.match(refused.body.error, /report \[blocked\]/);
 
     const refusalEvent = recordedEvents.find(e => e.status === 409);
     assert.ok(refusalEvent);
-    assert.equal(refusalEvent.note, `BUDGET_EXHAUSTED unverified ${sessionId}`);
+    assert.equal(refusalEvent.note, `TASK_SESSION_RUNAWAY ${sessionId}`);
   });
 });

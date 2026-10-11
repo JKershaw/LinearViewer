@@ -322,7 +322,7 @@ test.describe('sessionParkedWait / renderSummaryLine parked branch (LIN-2244)', 
   });
 });
 
-// Third-pass review L3 (`0cd1d40f`): the taskPosition/sessionPosition "n of N"
+// Third-pass review L3 (`0cd1d40f`): the taskPosition "n of N"
 // chip had ONLY ever been asserted against the JSON payload feeding it
 // (tests/unit/pipeline-sessions.test.js) — no test exercised the actual
 // rendered DOM `fillSessionHead` produces. Mutation M21 (deleting the chip's
@@ -360,35 +360,17 @@ test.describe('fillSessionHead — budget "n of N" chip (LIN-2934, L3)', () => {
       runtime: null,
       lastActivity: '2026-04-11T12:00:00.000Z',
       taskPosition: null,
-      sessionPosition: null,
       ...overrides
     };
   }
 
-  test('renders "task N of maxTasks · session M of maxSessionsPerTask" when both bounds are declared', () => {
-    const li = makeLi();
-    fillSessionHead(li, budgetSession({
-      taskPosition: { count: 2, maxTasks: 8 },
-      sessionPosition: { count: 4, maxSessionsPerTask: 10 }
-    }));
-    assert.match(li.head.innerHTML, /<span class="obs-meta obs-meta-budget">task 2 of 8 · session 4 of 10<\/span>/);
-  });
-
-  test('renders ONLY the session chip on a scoped run bounded by maxSessionsPerTask alone (the v1 Go shape)', () => {
-    const li = makeLi();
-    fillSessionHead(li, budgetSession({ sessionPosition: { count: 1, maxSessionsPerTask: 2 } }));
-    assert.match(li.head.innerHTML, /<span class="obs-meta obs-meta-budget">session 1 of 2<\/span>/);
-    assert.doesNotMatch(li.head.innerHTML, /task \d+ of \d+/);
-  });
-
-  test('renders ONLY the task chip when only maxTasks is declared', () => {
+  test('renders the task chip when maxTasks is declared', () => {
     const li = makeLi();
     fillSessionHead(li, budgetSession({ taskPosition: { count: 3, maxTasks: 8 } }));
     assert.match(li.head.innerHTML, /<span class="obs-meta obs-meta-budget">task 3 of 8<\/span>/);
-    assert.doesNotMatch(li.head.innerHTML, /session \d+ of \d+/);
   });
 
-  test('renders no budget chip at all when neither bound is declared', () => {
+  test('renders no budget chip at all when no bound is declared', () => {
     const li = makeLi();
     fillSessionHead(li, budgetSession());
     assert.doesNotMatch(li.head.innerHTML, /obs-meta-budget/);

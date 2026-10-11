@@ -246,7 +246,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     const { workspace } = req;
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, maxSessionsPerTask, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
 
       // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
       // existing session (named by abortTo) instead of running a prompt, so it
@@ -383,12 +383,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (maxTasks !== undefined && maxTasks !== null) {
         if (!Number.isInteger(maxTasks) || maxTasks < 1) {
           return badRequest.json(res, 'maxTasks must be an integer >= 1');
-        }
-      }
-      // Sibling per-task bound (LIN-2934): same rule/error text as maxTasks.
-      if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) {
-        if (!Number.isInteger(maxSessionsPerTask) || maxSessionsPerTask < 1) {
-          return badRequest.json(res, 'maxSessionsPerTask must be an integer >= 1');
         }
       }
 
@@ -755,8 +749,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           queueIfBusy: queueIfBusy === true,
           subscription: subscription ?? DEFAULT_SUBSCRIPTION,
           maxTasks: maxTasks ?? null,
-          // Sibling per-task bound (LIN-2934): same rationale as maxTasks.
-          maxSessionsPerTask: maxSessionsPerTask ?? null,
           // Run-boundary fact (LIN-3245 / LIN-2949 P1a): stamped only when the
           // validated `'pr'` value was supplied; null (the default) is
           // byte-identical to today.
@@ -866,7 +858,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           target: item.target,
           dispatchedAt: item.dispatchedAt,
           consumerLastSeenAt: item.consumerLastSeenAt,
-          maxSessionsPerTask: item.maxSessionsPerTask ?? null,
           ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {})
         },
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
@@ -918,6 +909,11 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // bodies can tell it apart. No `Retry-After` — nothing clears on a timer.
       if (err && err.closeOutRefusal) {
         return jsonError(res, 409, err.message, err.closeOutRefusal);
+      }
+      // Per-task runaway failsafe (LIN-3461): sibling of the relays above, its
+      // own code (TASK_SESSION_RUNAWAY), never BUDGET_EXHAUSTED.
+      if (err && err.taskSessionRunaway) {
+        return jsonError(res, 409, err.message, err.taskSessionRunaway);
       }
       // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
       // could not mint/append its block. Surface it (503, transient — mirrors the
@@ -1399,19 +1395,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim', workspaceFromUrl, async (req, res) => {
     const { workspace } = req;
     const { sessionId } = req.params;
-    const { maxTasks, maxSessionsPerTask } = req.body || {};
+    const { maxTasks } = req.body || {};
 
     if (!UUID_REGEX.test(sessionId)) {
       return badRequest.json(res, 'Invalid session ID format');
     }
-    if (maxTasks === undefined && maxSessionsPerTask === undefined) {
-      return badRequest.json(res, 'At least one of maxTasks or maxSessionsPerTask is required');
+    if (maxTasks === undefined) {
+      return badRequest.json(res, 'maxTasks is required');
     }
-    if (maxTasks !== undefined && (!Number.isInteger(maxTasks) || maxTasks < 1)) {
+    if (!Number.isInteger(maxTasks) || maxTasks < 1) {
       return badRequest.json(res, 'maxTasks must be a positive integer');
-    }
-    if (maxSessionsPerTask !== undefined && (!Number.isInteger(maxSessionsPerTask) || maxSessionsPerTask < 1)) {
-      return badRequest.json(res, 'maxSessionsPerTask must be a positive integer');
     }
 
     try {
@@ -1420,7 +1413,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (await refuseNonOwner(req, res, row?.target)) return;
 
       const result = await dispatchQueueStore.trimSessionBudget(
-        workspace.urlKey, sessionId, { maxTasks, maxSessionsPerTask }, { by: req.session?.accountId || null }
+        workspace.urlKey, sessionId, { maxTasks }, { by: req.session?.accountId || null }
       );
 
       if (result.ok) {
