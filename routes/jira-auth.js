@@ -112,10 +112,10 @@ export function normalizeJiraSite(site) {
 
 /**
  * @param {Object} options
- * @param {import('../lib/providers/jira/index.js').JiraProvider} options.provider - injected by JiraProvider.getAuthRouter().
+ * @param {import('../lib/providers/jira/index.js').JiraProvider} options.provider - injected by createProviderAuthRouter (routes/provider-auth-routers.js).
  * @param {import('../lib/account-store.js').AccountStore} [options.accountStore] - LIN-1329: find-or-create the durable account for the signing-in Jira identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} [options.accountWorkspaceStore] - LIN-1329: bind the account to the workspace.
- * @param {Object} [options.userPreferencesStore] - LIN-1890 N1: rehydrates durable preferences onto the regenerated session of a `mode: 'new'` Jira login, mirroring routes/github-auth.js. `server.js`'s auth-mount loop has always passed this and `getAuthRouter` has always spread it through — this router simply dropped it on the floor until the bootstrap needed it.
+ * @param {Object} [options.userPreferencesStore] - LIN-1890 N1: rehydrates durable preferences onto the regenerated session of a `mode: 'new'` Jira login, mirroring routes/github-auth.js. `server.js`'s auth-mount loop has always passed this and the router wiring has always spread it through — this router simply dropped it on the floor until the bootstrap needed it.
  * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the fresh-container arm fails closed (503 retry page, nothing written, carried refresh token dropped) without it.
  * @returns {import('express').Router}
  */

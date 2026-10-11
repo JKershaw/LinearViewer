@@ -7,12 +7,12 @@
  * it — and a dropped resolver is a dropped refusal. Top-level injection alone is
  * therefore not enough; this test walks each hop for real:
  *
- *   1 createGitHubAuthRoutes          via GitHubProvider.getAuthRouter       -> install flow
- *   2 createGitHubProjectsAuthRoutes  via GitHubProjectsProvider.getAuthRouter -> install flow
+ *   1 createGitHubAuthRoutes          via createProviderAuthRouter (GitHubProvider)       -> install flow
+ *   2 createGitHubProjectsAuthRoutes  via createProviderAuthRouter (GitHubProjectsProvider) -> install flow
  *   3 createGitHubInstallFlowRoutes   reached only through #1 and #2
  *   4 createHeldConnectionRoutes      mounted directly
- *   5 createJiraAuthRoutes            via JiraProvider.getAuthRouter
- *   6 createAuthRoutes                via LinearProvider.getAuthRouter
+ *   5 createJiraAuthRoutes            via createProviderAuthRouter (JiraProvider)
+ *   6 createAuthRoutes                via createProviderAuthRouter (LinearProvider)
  *   7 createWorkspaceRoutes           mounted directly
  *
  * For each: with a SPY resolver the spy is reached with the right arm and the
@@ -30,6 +30,7 @@ import fs from 'node:fs';
 import { createHeldConnectionRoutes } from '../../routes/held-connection.js';
 import { createWorkspaceRoutes } from '../../routes/workspace.js';
 import { getProvider } from '../../lib/providers/index.js';
+import { createProviderAuthRouter } from '../../routes/provider-auth-routers.js';
 import { convertToConnectionBacked, createAuthorizedAccountConnectionReader, heldConnectionCredentials } from '../../lib/connection-credential.js';
 import { getHandler, makeRes, makeSession } from '../fixtures/github-install-flow-branches.js';
 
@@ -79,15 +80,15 @@ const pending = (over = {}) => ({ token: 't', mode: 'new', fresh: true, login: '
 
 describe('H1 hops: the resolver is reached through each real factory path', () => {
   for (const hop of [
-    { n: 1, name: 'createGitHubAuthRoutes via GitHubProvider.getAuthRouter', provider: 'github', base: '/auth/github', field: 'repo', slug: 'octocat/hello-world', pendingKey: 'githubPending', arm: 'github-fresh', fresh: true },
-    { n: 3, name: 'createGitHubInstallFlowRoutes (container arm) via GitHubProvider.getAuthRouter', provider: 'github', base: '/auth/github', field: 'repo', slug: 'octocat/hello-world', pendingKey: 'githubPending', arm: 'github-container', fresh: false },
-    { n: 2, name: 'createGitHubProjectsAuthRoutes via GitHubProjectsProvider.getAuthRouter', provider: 'github-projects', base: '/auth/github-projects', field: 'board', slug: 'octocat/7', pendingKey: 'githubProjectsPending', arm: 'github-container', fresh: false }
+    { n: 1, name: 'createGitHubAuthRoutes via createProviderAuthRouter (GitHubProvider)', provider: 'github', base: '/auth/github', field: 'repo', slug: 'octocat/hello-world', pendingKey: 'githubPending', arm: 'github-fresh', fresh: true },
+    { n: 3, name: 'createGitHubInstallFlowRoutes (container arm) via createProviderAuthRouter (GitHubProvider)', provider: 'github', base: '/auth/github', field: 'repo', slug: 'octocat/hello-world', pendingKey: 'githubPending', arm: 'github-container', fresh: false },
+    { n: 2, name: 'createGitHubProjectsAuthRoutes via createProviderAuthRouter (GitHubProjectsProvider)', provider: 'github-projects', base: '/auth/github-projects', field: 'board', slug: 'octocat/7', pendingKey: 'githubProjectsPending', arm: 'github-container', fresh: false }
   ]) {
     test(`#${hop.n} ${hop.name}`, async () => {
       const provider = getProvider(hop.provider);
       const run = async (resolver) => {
         const stores = memoryStores();
-        const router = provider.getAuthRouter({
+        const router = createProviderAuthRouter(provider, {
           sessionStore: { cleanup: async () => {} },
           accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, ownerCredentialStore: stores.ownerCredentialStore,
           ...(resolver ? { resolveWorkspaceUrlKey: resolver } : {})
@@ -100,7 +101,7 @@ describe('H1 hops: the resolver is reached through each real factory path', () =
 
       const s = spy();
       const withSpy = await run(s.resolve);
-      assert.equal(s.calls.length, 1, 'the injected resolver is reached through the real getAuthRouter -> factory -> install flow path');
+      assert.equal(s.calls.length, 1, 'the injected resolver is reached through the real createProviderAuthRouter -> factory -> install flow path');
       assert.equal(s.calls[0].arm, hop.arm);
       assert.equal(s.calls[0].provider, hop.provider);
       assert.equal(withSpy.session.workspaces[0]?.urlKey, SPY_KEY, 'the workspace carries the resolver\'s key, not a local derivation');
@@ -161,11 +162,11 @@ describe('H1 hops: the resolver is reached through each real factory path', () =
     assert.deepEqual(bare.writes, []);
   });
 
-  test('#5 createJiraAuthRoutes via JiraProvider.getAuthRouter', async () => {
+  test('#5 createJiraAuthRoutes via createProviderAuthRouter (JiraProvider)', async () => {
     const provider = getProvider('jira');
     const run = async (resolver) => {
       const stores = memoryStores();
-      const router = provider.getAuthRouter({
+      const router = createProviderAuthRouter(provider, {
         accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, ownerCredentialStore: stores.ownerCredentialStore,
         ...(resolver ? { resolveWorkspaceUrlKey: resolver } : {})
       });
@@ -191,11 +192,11 @@ describe('H1 hops: the resolver is reached through each real factory path', () =
     assert.equal(bare.session.jiraPending.refreshToken, undefined, 'the carried refresh token is dropped on the fail-closed exit too');
   });
 
-  test('#6 createAuthRoutes via LinearProvider.getAuthRouter', async () => {
+  test('#6 createAuthRoutes via createProviderAuthRouter (LinearProvider)', async () => {
     const provider = getProvider('linear');
     const run = async (resolver) => {
       const stores = memoryStores();
-      const router = provider.getAuthRouter({
+      const router = createProviderAuthRouter(provider, {
         sessionStore: { cleanup: async () => {} },
         accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, ownerCredentialStore: stores.ownerCredentialStore,
         ...(resolver ? { resolveWorkspaceUrlKey: resolver } : {})
@@ -266,7 +267,7 @@ describe('server.js wiring (source pin; complements the behavioural hops above)'
   });
 
   test('the resolver reaches all three bind-arm mounts', () => {
-    assert.match(server, /provider\.getAuthRouter\(\{[^}]*\bresolveWorkspaceUrlKey\b[^}]*\}\)/, 'the provider auth loop (GitHub, GitHub Projects, Jira, Linear)');
+    assert.match(server, /createProviderAuthRouter\(provider, \{[^}]*\bresolveWorkspaceUrlKey\b[^}]*\}\)/, 'the provider auth loop (GitHub, GitHub Projects, Jira, Linear)');
     assert.match(server, /createWorkspaceRoutes\(\{[^}]*\bresolveWorkspaceUrlKey\b[^}]*\}\)/, 'createWorkspaceRoutes');
     assert.match(server, /createHeldConnectionRoutes\(\{[\s\S]*?\bresolveWorkspaceUrlKey,[\s\S]*?\}\)\)/, 'createHeldConnectionRoutes');
   });
