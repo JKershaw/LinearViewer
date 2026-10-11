@@ -126,6 +126,7 @@ function mergeToolEvents(events) {
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local) — the "a proxy-events row per turn" ticket line
  * @param {Function} deps.getWorkspaceOpenRouterKey - Resolves the TOKEN CREATOR's own OpenRouter key (module-scope, shared)
+ * @param {Function} deps.logOpenRouterCredentialSource - Records WHO PAID (LIN-1458 source note) when the creator has no key and the server's env key serves the turn (closure-local, shared with compute/dispatch groups)
  * @param {Function} deps.chargeFreeTierOrReject - Free-tier metering choke point (closure-local, shared with compute/dispatch groups)
  * @param {Object} deps.observerStateStore - Census/companion reservation store (turn-core dep)
  * @param {Object} deps.workspacePreferencesStore - Model + preference resolution (turn-core dep)
@@ -151,6 +152,7 @@ export function createProxyFlightCompanionRoutes({
   resolveProviderAccess,
   workspaceUnavailable,
   logEvent,
+  logOpenRouterCredentialSource,
   getWorkspaceOpenRouterKey,
   chargeFreeTierOrReject,
   observerStateStore,
@@ -200,6 +202,9 @@ export function createProxyFlightCompanionRoutes({
         logEvent(req, ENDPOINT, 503);
         return jsonError(res, 503, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY on the server.');
       }
+      // LIN-2427 ruling (b): the server keeps paying for a creator-less token
+      // (or a creator with no key); record who paid, as the other proxy LLM routes do.
+      logOpenRouterCredentialSource(req, ENDPOINT, { sessionApiKey, isFreeTier });
 
       const workspace = { urlKey: req.proxyUrlKey };
       const events = [];
