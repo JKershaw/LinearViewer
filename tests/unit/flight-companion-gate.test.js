@@ -1178,6 +1178,18 @@ describe('shouldSpendTurn: junk stamps (LIN-3456 characterization)', () => {
     }
   });
 
+  test('junk stamps never act as epoch 0, even for a clock before 1970 (the `!= null` guards are what keep this true)', () => {
+    // `null < x` and `x - null` coerce null to 0; a negative (pre-1970) but finite
+    // `now` is the one clock for which that would flip the answer.
+    const earlyNow = -5000;
+    for (const junk of JUNK) {
+      const lease = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ turnReservedUntil: junk }), now: earlyNow });
+      assert.strictEqual(lease.reason, 'spend', `turnReservedUntil=${String(junk)}`);
+      const floor = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ lastTurnAt: junk }), now: earlyNow });
+      assert.strictEqual(floor.reason, 'spend', `lastTurnAt=${String(junk)}`);
+    }
+  });
+
   test('the injected clock must be usable: undefined / junk string throws; a Date, ISO string and ms all work', () => {
     for (const bad of JUNK) {
       assert.throws(() => shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({}), now: bad }), /now \(epoch ms or Date\) is required/);
