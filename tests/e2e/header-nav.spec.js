@@ -703,7 +703,7 @@ test.describe('.nav-filters assignee-item mobile sweep (LIN-2529)', () => {
 // rendering three rows at 412px and 430px with a team selected. Sweeping only
 // the default state is how a sweep passes over the very bug it exists for.
 
-// The Engineering team from tests/fixtures/mock-data.js — the ID, not the
+// The Engineering team from lib/sample-data/mock-data.js — the ID, not the
 // name: `?team=` resolves through matchTeamId, and a bare name silently
 // degrades to unfiltered, which would quietly hand a "team selected" test the
 // `all` state it was written to avoid.

@@ -159,7 +159,7 @@ test.describe('Team Filtering', () => {
 // §1) and is visible in the raw HTML as which `TEST-N` issue identifiers
 // appear — Engineering-team issues (TEST-1/2/6/11/13/14/15/30/31) vs
 // Design-team issues (TEST-4/5), from the shared Linear test-token fixture
-// (tests/fixtures/mock-data.js) every one of these five routes reads from in
+// (lib/sample-data/mock-data.js) every one of these five routes reads from in
 // test mode. ship/roadmap need their feature flags on to avoid the settings
 // redirect; roadmap's own isTestMode arm always returns the full
 // `testMockData` regardless of resolvedTeamId (server.js, unchanged by this

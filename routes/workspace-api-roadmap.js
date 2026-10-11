@@ -22,7 +22,7 @@ import { resolveReasoningBudget, streamChat, AVAILABLE_MODELS } from '../lib/ope
 import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
-import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
+import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 

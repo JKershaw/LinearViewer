@@ -91,7 +91,7 @@ import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { isTerminalState, isBlocked } from '../lib/tree.js';
-import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
+import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 
 /**

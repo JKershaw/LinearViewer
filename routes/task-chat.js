@@ -30,7 +30,7 @@ import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
-import { testMockData } from '../tests/fixtures/mock-data.js';
+import { testMockData } from '../lib/sample-data/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 import { sendSSE } from '../lib/sse.js';

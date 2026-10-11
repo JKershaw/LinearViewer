@@ -135,7 +135,7 @@ const post = (path, body) => request('POST', path, body ?? {});
 // credentials") trigger the mock scan's decision-found branch; TEST-13/14/15
 // (bug report / feature description with no blocking language) don't — see
 // buildMockScanText in routes/workspace-api.js. All five have UUID-shaped
-// fixture ids (tests/fixtures/mock-data.js), unlike TEST-1..5.
+// fixture ids (lib/sample-data/mock-data.js), unlike TEST-1..5.
 const DECISION_ISSUE = 'TEST-6';
 const ZERO_FINDING_ISSUE = 'TEST-13';
 const NON_UUID_ISSUE = 'TEST-1'; // fixture id is the literal string "issue-1"

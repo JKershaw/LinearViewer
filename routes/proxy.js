@@ -136,11 +136,11 @@ export function resolveProxyLLM(sessionApiKey) {
 const OPENROUTER_FALLBACK_PAID_NOTE = 'openrouter_key_fallback_paid_env';
 const OPENROUTER_FALLBACK_FREE_NOTE = 'openrouter_key_fallback_free_tier';
 
-// Lazy-load test fixtures only in test mode to avoid production dependency on test files
+// Lazy-load the sample data only in test mode (lib/sample-data, not a test fixture)
 let testMockData = null;
 async function getTestMockData() {
   if (!testMockData) {
-    const mod = await import('../tests/fixtures/mock-data.js');
+    const mod = await import('../lib/sample-data/mock-data.js');
     testMockData = mod.testMockData;
   }
   return testMockData;
