@@ -19,6 +19,7 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
+import { renderProxyPage } from '../../lib/render-proxy.js';
 
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
 const HOURS_48 = 48 * 3600;
@@ -202,5 +203,23 @@ describe('LIN-3491 — validation on the agent purpose', () => {
     assert.equal(res.status, 400);
     assert.equal(res.body.code, 'INVALID_PURPOSE');
     assert.equal(collection._docs.length, 0);
+  });
+});
+
+describe('LIN-3491 — renderProxyPage offers the dispatch pick on the Agent Prompt picker only', () => {
+  const html = renderProxyPage('Acme', { urlKey: 'acme', workspaces: [], featureFlags: { proxy: true } });
+  const OPTION = '<option value="readWriteDispatch">read-write + dispatch</option>';
+  const selects = html.match(/<select\b[^>]*>[\s\S]*?<\/select>/g) || [];
+  const promptSelect = selects.find((s) => s.includes('id="proxy-scope-select"'));
+
+  test('#proxy-scope-select contains the read-write + dispatch option', () => {
+    assert.ok(promptSelect, 'the Agent Prompt scope <select> renders');
+    assert.ok(promptSelect.includes(OPTION), promptSelect);
+  });
+
+  test('the Create Token form scope <select> does not offer it', () => {
+    const others = selects.filter((s) => s !== promptSelect);
+    assert.ok(others.length > 0, 'the Create Token scope <select> renders');
+    for (const s of others) assert.ok(!s.includes('readWriteDispatch'), s);
   });
 });
