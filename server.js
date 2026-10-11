@@ -102,7 +102,7 @@ import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActi
 import { isHiddenState } from './lib/providers/state-map.js'
 import { buildPeriodicalNodes } from './lib/periodicals.js'
 import { renderPage, renderErrorPage, renderUpstreamAwareErrorPage, renderWorkspaceNotFoundPage } from './lib/render.js'
-import { isAuthError, clientErrorStatus, clientErrorMessage, badRequest, serverError, serviceUnavailable, unauthorized } from './lib/errors.js'
+import { isAuthError, clientErrorStatus, clientErrorMessage, badRequest, jsonError, serverError, serviceUnavailable, unauthorized } from './lib/errors.js'
 import { renderLandingPage } from './lib/render-landing.js'
 import { parseLandingPage } from './lib/parse-landing.js'
 import { refreshAccessToken, isDefinitiveRevocation, isTransientRefreshFailure } from './lib/token-refresh.js'
@@ -4470,7 +4470,7 @@ app.use((err, req, res, next) => {
     console.warn('Client request error:', req.method, req.originalUrl, '-', clientStatus, err?.type || err?.message)
     const message = clientErrorMessage(clientStatus, err)
     if (wantsJson) {
-      res.status(clientStatus).json({ error: message })
+      jsonError(res, clientStatus, message)
     } else {
       res.status(clientStatus).send(renderErrorPage(message, message, { action: 'Go back', actionUrl: req.originalUrl || '/' }))
     }
