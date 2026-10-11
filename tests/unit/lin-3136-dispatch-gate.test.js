@@ -206,7 +206,7 @@ describe('LIN-3136 criterion 12(b)/(c) — one limiter pass and one token valida
       logEvent: () => {}, dispatchQueueStore: {}, proxyTokenStore: {}, workspacePreferencesStore: {},
       resolveProviderAccess: async () => ({}), workspaceUnavailable: () => {}, denyIfUnsupported: () => false,
       resolvePromptIssueContext: async () => ({}), relayDispatchRefusal: () => false,
-      graphqlErrorStatus: () => 500, VALID_PROXY_DISPATCH_TARGETS: ['cli', 'web', 'dash'], PROXY_ATTACH_FAILED_MESSAGE: 'x'
+      graphqlErrorStatus: () => 500, PROXY_ATTACH_FAILED_MESSAGE: 'x'
     };
     const app = express();
     app.use(express.json());

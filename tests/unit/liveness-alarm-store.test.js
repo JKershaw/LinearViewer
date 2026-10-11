@@ -112,4 +112,18 @@ describe('liveness-alarm-store', () => {
     assert.ok(await store.getById(openDoc._id), 'an open alarm is never evicted');
     assert.equal(await store.getById(oldCleared._id), null);
   });
+
+  test('junk timestamps never reach the stored document as an Invalid Date (LIN-3473)', async () => {
+    const doc = await store.open({ urlKey: 'acme', rule: LIVENESS_ALARM_RULES.DISPATCHER_SILENT, members: ['acme'], startedAt: 'junk', firedAt: new Date('2026-10-02T00:00:00.000Z') });
+    assert.equal(doc.startedAt.toISOString(), '2026-10-02T00:00:00.000Z', 'junk startedAt falls back to firedAt');
+    const bad = new Date('not-a-date');
+    const before = Date.now();
+    await store.markMiss(doc._id, { at: bad });
+    const missed = await store.getById(doc._id);
+    assert.ok(Number.isFinite(missed.lastEvaluatedAt.getTime()), 'junk `at` falls back to now');
+    assert.ok(missed.lastEvaluatedAt.getTime() >= before);
+    await store.clear(doc._id, { clearedAt: bad });
+    const cleared = await store.getById(doc._id);
+    assert.ok(Number.isFinite(cleared.clearedAt.getTime()));
+  });
 });

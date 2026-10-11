@@ -8,20 +8,20 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  RUNNER_TARGETS,
   isRunnerTarget,
   resolveRunnerOwnerRefusal,
   assertRunnerOwnerAllowed,
   isRunnerOwnerRefusal
 } from '../../lib/runner-owner-gate.js';
 import { resolveOwnerMintRefusal, ownerMintRefusal } from '../../lib/owner-mint-refusals.js';
+import { SESSION_TARGETS } from '../../lib/dispatch-targets.js';
 
 const verdict = (status) => async () => ({ status });
 const args = (over = {}) => ({ ownerCheck: verdict('owner'), workspaceId: 'ws-1', accountId: 'acct-1', target: 'cli', ...over });
 
 describe('LIN-3383 — runner targets', () => {
   test('cli and web are runner targets; an absent target is cli; dash/local are not', () => {
-    assert.deepEqual([...RUNNER_TARGETS], ['cli', 'web']);
+    assert.deepEqual([...SESSION_TARGETS], ['cli', 'web']);
     assert.equal(isRunnerTarget('cli'), true);
     assert.equal(isRunnerTarget('web'), true);
     assert.equal(isRunnerTarget(undefined), true);

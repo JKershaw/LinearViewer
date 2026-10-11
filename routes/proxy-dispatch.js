@@ -25,6 +25,7 @@ import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload
 import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { buildRunGate } from '../lib/chat-request.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
+import { POLLED_TARGETS, SESSION_TARGETS } from '../lib/dispatch-targets.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -177,7 +178,6 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/H)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
  * @param {Function} deps.resolveProxyLLM - Resolves OpenRouter credentials for a proxy LLM call (module-scope, exported from routes/proxy.js)
- * @param {string[]} deps.VALID_PROXY_DISPATCH_TARGETS - Valid dispatch target values (module-scope)
  * @param {Object} deps.workspacePreferencesStore - Workspace-level preference storage
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  */
@@ -206,7 +206,6 @@ export function createDispatchRoutes({
   resolvePromptIssueContext,
   resolveProviderAccess,
   resolveProxyLLM,
-  VALID_PROXY_DISPATCH_TARGETS,
   workspacePreferencesStore,
   workspaceUnavailable,
 }) {
@@ -247,9 +246,9 @@ export function createDispatchRoutes({
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'prompt is required and must be a string');
       }
-      if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
+      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
+        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
       }
 
       // Abort eligibility (LIN-743): the abort item's OWN target must be
@@ -633,8 +632,9 @@ export function createDispatchRoutes({
         ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
       });
     } catch (err) {
-      // Duplicate-dispatch refusal (LIN-1656) — see the responder. Ahead of the
-      // generic 500 so an orchestrator can branch on `code` and adopt the `id`.
+      // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
+      // see `relayDispatchRefusal`. Ahead of the generic 500 so an orchestrator can
+      // branch on `code` and adopt the `id`.
       if (relayDispatchRefusal(err, req, res, '/api/proxy/dispatch')) return;
       // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
       if (err && err.proxyAttachFailed) {
@@ -709,9 +709,9 @@ export function createDispatchRoutes({
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'Invalid identifier format');
       }
-      if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
+      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
+        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
       }
       if (noDescend !== undefined && typeof noDescend !== 'boolean') {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
@@ -810,7 +810,7 @@ export function createDispatchRoutes({
           return badRequest.json(res, 'Invalid followUpTo format');
         }
         const followUpTarget = target || 'cli';
-        if (!['cli', 'web'].includes(followUpTarget)) {
+        if (!SESSION_TARGETS.includes(followUpTarget)) {
           logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
           return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
         }
@@ -1089,7 +1089,8 @@ export function createDispatchRoutes({
             });
           }
         } catch (err) {
-          // Duplicate-dispatch refusal (LIN-1656). The verb-override arm is
+          // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
+          // see `relayDispatchRefusal`. The verb-override arm is
           // keepalive-armed too, so every refusal rides `keepalive.send`, as on the
           // LLM arm below.
           if (relayDispatchRefusal(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;

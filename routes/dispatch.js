@@ -50,6 +50,7 @@ import { DISPATCH_RUNGS, SURFACES } from '../lib/task-mode-store.js';
 import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
+import { DISPATCH_TARGETS, POLLED_TARGETS } from '../lib/dispatch-targets.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -265,9 +266,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
 
       // Validate target if provided
-      const VALID_TARGETS = ['cli', 'web', 'dash', 'local'];
-      if (target !== undefined && !VALID_TARGETS.includes(target)) {
-        return badRequest.json(res, `target must be one of: ${VALID_TARGETS.join(', ')}`);
+      if (target !== undefined && !DISPATCH_TARGETS.includes(target)) {
+        return badRequest.json(res, `target must be one of: ${DISPATCH_TARGETS.join(', ')}`);
       }
 
       // LIN-3383 owner-only runner enqueue. Every write below (fresh, followUpTo,
@@ -292,7 +292,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
           return badRequest.json(res, 'abortTo is required and must be a UUID when abort is true');
         }
         const abortTarget = target || 'cli';
-        if (!['cli', 'web', 'dash'].includes(abortTarget)) {
+        if (!POLLED_TARGETS.includes(abortTarget)) {
           return badRequest.json(res, 'abort target must be poll-eligible (cli, web, or dash)');
         }
       } else if (abortTo !== undefined && abortTo !== null) {

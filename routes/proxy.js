@@ -66,7 +66,7 @@ import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
-import { loadRecentRuns } from '../lib/recent-runs.js';
+import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
@@ -336,9 +336,6 @@ const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy tok
 // routes/proxy-tokens-admin.js (LIN-679 Stage 2 / LIN-2534).
 // MAX_COMMENT_LENGTH now imported from lib/issue-write-validation.js (LIN-1552).
 
-// Proxy consumers are remote, so 'local' (Harbour OS, spawns on the server's
-// own /dev/tty) is intentionally excluded from the targets they may set.
-const VALID_PROXY_DISPATCH_TARGETS = ['cli', 'web', 'dash'];
 // LIN-1470: defensive cap on the list endpoint's lineage batch query
 // (`rootItemId: {$in: anchors}`). Unlike the 200-row PAGE bound, nothing
 // structurally limits how many rows one $in query can match: it spans the
@@ -1482,7 +1479,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // then the AI recommendation. Uses a longer timeout since this makes a
     // Linear API call + an OpenRouter LLM call.
     const context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
-    const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
+    const { issue, children } = context;
 
     // Resolve the effective key (free-tier when no session/env key) so both
     // recommend surfaces send a valid key. Metering is NOT done here — this runs
@@ -1510,7 +1507,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          { parent, siblings, project, children, comments, focusedChild, attachments, runs: await loadRecentRuns(dispatchQueueStore, urlKey, issue.identifier) },
+          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
@@ -1598,11 +1595,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, resolveProxyLLM, freeTierStore, accountStore, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, resolveProxyLLM, freeTierStore, accountStore, graphqlErrorStatus, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
   // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch

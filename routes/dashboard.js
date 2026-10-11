@@ -51,7 +51,7 @@ import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
-import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
+import { renderUpstreamAwareErrorPage, renderErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding, getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
@@ -61,6 +61,7 @@ import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { toEpochMs } from '../lib/utils/time.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -84,6 +85,7 @@ import {
   DEFAULT_SESSION_SUMMARY_MODEL
 } from '../lib/session-summary.js';
 import { hashSession } from '../lib/session-summary-cache.js';
+import { NON_SESSION_TARGETS } from '../lib/dispatch-targets.js';
 
 // A run is summarisable only once it is immutable. agentState is terminal at
 // 'complete'/'error'; until then a summary would snapshot a moving target and
@@ -508,7 +510,7 @@ function latestAssistantText(loop) {
  */
 function loopActivityMs(loop) {
   const t = loop.completedAt || loop.agentTimestamp || loop.resolvedAt || loop.dispatchedAt;
-  const ownMs = t ? new Date(t).getTime() : 0;
+  const ownMs = toEpochMs(t) ?? 0;
   const lineageMs = Number.isFinite(loop.lineageLastActivityMs) ? loop.lineageLastActivityMs : 0;
   const ms = Math.max(ownMs, lineageMs);
   return Number.isFinite(ms) ? ms : 0;
@@ -773,8 +775,8 @@ export function createDashboardRoutes({
   function sessionActivityMs(enrichedLoops, session) {
     let max = 0;
     for (const l of enrichedLoops) max = Math.max(max, loopActivityMs(l));
-    if (!max && session.completedAt) max = new Date(session.completedAt).getTime() || 0;
-    if (!max && session.dispatchedAt) max = new Date(session.dispatchedAt).getTime() || 0;
+    if (!max) max = toEpochMs(session.completedAt) ?? 0;
+    if (!max) max = toEpochMs(session.dispatchedAt) ?? 0;
     return Number.isFinite(max) ? max : 0;
   }
 
@@ -1292,7 +1294,7 @@ export function createDashboardRoutes({
       res.send(html);
     } catch (error) {
       console.error('Observation page error:', error);
-      res.status(500).send('Failed to render the Observation page');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to render the Observation page'));
     }
   });
 
@@ -1381,7 +1383,7 @@ export function createDashboardRoutes({
       // own `loop.target`, so the session-wide target no longer needs deriving
       // here — only the gate (from the anchor run) is still needed.
       const anchorTarget = (anchorLoop && anchorLoop.target) || null;
-      const canReply = anchorTarget !== 'dash' && anchorTarget !== 'local';
+      const canReply = !NON_SESSION_TARGETS.includes(anchorTarget);
 
       // Per-session credential state (LIN-1588, Beat 2). One bounded, single-
       // workspace Mongo read on a PAGE-LOAD path — never the feed poll, whose
@@ -2539,7 +2541,7 @@ export function createDashboardRoutes({
       }));
     } catch (error) {
       console.error('Escalation KPIs page error:', error);
-      res.status(500).send('Failed to compute escalation KPIs');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to compute escalation KPIs'));
     }
   });
 
@@ -2709,7 +2711,7 @@ export function createDashboardRoutes({
         return res.status(401).send(renderUpstreamAwareErrorPage(error, { time: now.toISOString() }));
       }
       console.error('Effort read-out page error:', error);
-      res.status(500).send('Failed to compute the effort read-out');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to compute the effort read-out'));
     }
   });
 
