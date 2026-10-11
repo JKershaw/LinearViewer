@@ -559,6 +559,38 @@ test.describe('Roadmap Pipeline UI', () => {
     expect(JSON.parse(withoutModel.postData())).not.toHaveProperty('model');
   });
 
+  // LIN-997: Roadmap parity with the Settings pricing-hint test (LIN-993).
+  // Pricing lives in the hint (from the option's data-pricing), never in option text;
+  // 'Workspace default' has no rate, so the hint clears and :empty hides it.
+  test('model pricing hint updates with the selected model and clears on Workspace default (LIN-997)', async ({ page }) => {
+    await page.goto(ROADMAP_URL);
+    await page.waitForLoadState('networkidle');
+
+    const price = page.locator('#roadmap-model-price');
+    const select = page.locator('.roadmap-model-select');
+
+    // Load-time: Workspace default is selected, so the hint is empty and hidden.
+    await expect(select).toHaveValue('');
+    await expect(price).toHaveText('');
+    await expect(price).toBeHidden();
+    // Pricing lives in the hint, never in option text.
+    await expect(select.locator('option', { hasText: 'per 1M tokens' })).toHaveCount(0);
+
+    // Selecting a model shows its rate from the option's data-pricing.
+    await select.selectOption('openai/gpt-5.5-pro');
+    await expect(price).toBeVisible();
+    await expect(price).toHaveText('$30.00 in / $180.00 out per 1M tokens');
+
+    // Switching to a different model updates the hint to the new rate.
+    await select.selectOption('openai/gpt-5.4-mini');
+    await expect(price).toHaveText('$0.75 in / $4.50 out per 1M tokens');
+
+    // Workspace default clears the hint; :empty { display: none } hides it.
+    await select.selectOption('');
+    await expect(price).toHaveText('');
+    await expect(price).toBeHidden();
+  });
+
   test('idle digest shows a placeholder hint before any reading exists', async ({ page }) => {
     await page.goto(ROADMAP_URL);
     await page.waitForLoadState('networkidle');
