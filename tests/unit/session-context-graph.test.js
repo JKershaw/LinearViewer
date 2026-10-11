@@ -194,3 +194,19 @@ describe('deriveIssueGraph', () => {
     assert.deepStrictEqual(deriveIssueGraph(undefined).parentOf, {});
   });
 });
+
+describe('buildSessionContextGraph — numeric epoch 0 (LIN-3453 toEpochMs)', () => {
+  // _toMs used to treat any falsy value as missing, so a window starting at
+  // epoch 0 or an issue created at epoch 0 was undatable. 0 is a valid epoch.
+  test('an issue created at epoch 0 inside a window starting at 0 is spun-off', () => {
+    const issues = [
+      issue('seed', { createdAt: BEFORE }),
+      issue('kid', { parentId: 'seed', createdAt: 0 }), // would be 'descended' if 0 were junk
+    ];
+    const graph = buildSessionContextGraph(issues, ['seed', 'kid'], {
+      seedIssue: 'seed',
+      window: { start: 0, end: 1000 },
+    });
+    assert.equal(tag(graph, 'kid'), 'spun-off');
+  });
+});
