@@ -123,7 +123,7 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
     });
     assert.equal(record.id, 'scan_11111111_aaaaaaaaaaaa');
     assert.deepEqual(record.decision, decision);
-    assert.equal(record.outcome, null);
+    assert.strictEqual(record.outcome, null);
 
     const status = await store.getStatus(URL_KEY, ISSUE_ID);
     assert.equal(status.id, record.id);
@@ -135,11 +135,11 @@ describe('TaskDecisionsStore.recordScan / getStatus', () => {
       urlKey: URL_KEY, issueId: ISSUE_ID, issueIdentifier: 'LIN-2197',
       inputHash: HASH_A, decision: null
     });
-    assert.equal(record.decision, null);
+    assert.strictEqual(record.decision, null);
 
     const status = await store.getStatus(URL_KEY, ISSUE_ID);
     assert.notEqual(status, null); // a real row exists...
-    assert.equal(status.decision, null); // ...that just found nothing
+    assert.strictEqual(status.decision, null); // ...that just found nothing
 
     const neverScanned = await store.getStatus(URL_KEY, 'no-such-issue');
     assert.equal(neverScanned, null);
@@ -1343,6 +1343,19 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
     await store.recordScan({ urlKey: 'ws-a', issueId: ISSUE_ID, inputHash: HASH_A, decision: sampleDecision() });
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
     assert.strictEqual(status.basisHash, null);
+  });
+
+  test('a stored row with no decision/outcome field at all reads as null, not undefined', async () => {
+    // JSON.stringify omits an undefined-valued key, so a dropped `?? null` in
+    // toRecord would silently remove these keys from the wire shape.
+    collection._docs.push({
+      _id: TaskDecisionsStore.buildId(ISSUE_ID, HASH_A),
+      urlKey: 'ws-a', issueId: ISSUE_ID, issueIdentifier: 'LIN-1',
+      inputHash: HASH_A, scannedAt: new Date(), seq: 0
+    });
+    const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
+    assert.strictEqual(status.decision, null);
+    assert.strictEqual(status.outcome, null);
   });
 
   test('a legacy row with no basisHash field at all reads as null, not undefined', async () => {
