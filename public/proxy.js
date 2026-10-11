@@ -53,24 +53,32 @@
       showFeedback(generateFeedback, 'Generating...', false);
 
       try {
-        const scope = scopeSelect?.value || 'read';
+        const pick = scopeSelect?.value || 'read';
+        // LIN-3491: "read-write + dispatch" is not a scope — it names a server
+        // copy purpose. The client sends only that name; the server owns the
+        // grants, label and lifetime, and never accepts a `grants` field.
+        const wantsDispatch = pick === 'readWriteDispatch';
+        const mintBody = wantsDispatch
+          ? { purpose: 'agent' }
+          : {
+              label: 'agent-prompt',
+              scope: pick,
+              // LIN-376: the copied prompt carries a single-use bootstrap the agent
+              // exchanges for a working token — never a standing token in the clipboard.
+              bootstrap: true
+            };
         // on401:false — failures surface via showFeedback (the catch), so a 401
         // must not redirect out from under the bespoke inline feedback.
         const data = await window.api(`${apiBase}/tokens`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            label: 'agent-prompt',
-            scope,
-            // LIN-376: the copied prompt carries a single-use bootstrap the agent
-            // exchanges for a working token — never a standing token in the clipboard.
-            bootstrap: true
-          }),
+          body: JSON.stringify(mintBody),
           on401: false
         });
         const token = data.token;
 
-        const prompt = buildAgentPrompt(token, scope, data.providerDisplayName || null);
+        // Scope and grants come from the mint response, never the picker.
+        const prompt = buildAgentPrompt(token, data.scope, data.providerDisplayName || null, data.grants);
         promptOutput.textContent = prompt;
         promptOutput.classList.add('has-prompt');
 
@@ -86,7 +94,7 @@
         refreshTokenCount();
         if (tokensExpanded) loadTokens();
       } catch (err) {
-        showFeedback(generateFeedback, err.message, true);
+        showFeedback(generateFeedback, mintErrorText(err, scopeSelect?.value === 'readWriteDispatch'), true);
       } finally {
         generateBtn.disabled = false;
       }
@@ -107,6 +115,24 @@
   }
 
   /**
+   * LIN-3491: readable text for a failed mint. Only the dispatch option maps
+   * through the driver-copy error map (the owner-only refusals are its point);
+   * `read`/`readWrite` keep showing `err.message`, as before. Fallback order
+   * mirrors getDriverCopyToken (public/common.js): the server's `code`, else
+   * no HTTP status is NETWORK, else 429 is RATE_LIMITED, else UNKNOWN.
+   */
+  function mintErrorText(err, isDispatchPick) {
+    const copy = isDispatchPick && window.ProxyToggle && window.ProxyToggle.DRIVER_COPY_ERROR_COPY;
+    if (!copy) return err.message;
+    const serverCode = (err && err.body && err.body.code) || null;
+    let code;
+    if (serverCode && Object.prototype.hasOwnProperty.call(copy, serverCode)) code = serverCode;
+    else if (!(err && typeof err.status === 'number')) code = 'NETWORK';
+    else code = err.status === 429 ? 'RATE_LIMITED' : 'UNKNOWN';
+    return copy[code] || err.message;
+  }
+
+  /**
    * Compose the copy-to-clipboard agent prompt.
    *
    * LIN-2370: `providerDisplayName` is the DECLARED provider identity, carried on
@@ -118,13 +144,19 @@
    * human pastes it straight into a worker's context.
    *
    * @param {string} token - single-use bootstrap
-   * @param {string} scope - 'read' | 'readWrite'
+   * @param {string} scope - 'read' | 'readWrite' (the minted token's, from the mint response)
    * @param {string|null} [providerDisplayName] - declared provider display name, or null
+   * @param {string[]} [grants] - the minted token's grants (LIN-3491): `dispatch` switches
+   *   the closing line from "cannot enqueue" to "can enqueue"
    */
-  function buildAgentPrompt(token, scope, providerDisplayName) {
+  function buildAgentPrompt(token, scope, providerDisplayName, grants) {
     const instructionsUrl = `${baseUrl}/api/proxy/instructions`;
     const tokenUrl = `${baseUrl}/api/proxy/token`;
     const backing = providerDisplayName ? `; currently backed by ${providerDisplayName}` : '';
+    const canDispatch = Array.isArray(grants) && grants.includes('dispatch');
+    const enqueueNote = canDispatch
+      ? ' It also holds the dispatch grant, so it can enqueue work (`POST /dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`) that runs on the operator\'s machine.'
+      : (scope === 'readWrite' ? ' It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.' : '');
     return `You have access to a workspace API proxy (source-neutral${backing}). Use it to read${scope === 'readWrite' ? ' and modify' : ''} workspace issues, projects, and more.
 
 This proxy is the workspace's own Harbour control-plane at ${baseUrl} — not a third-party service. An operator of this workspace generated this token for you; you do not have to take that on faith, because the exchange below returns live workspace data, which is itself the proof the channel is real. The token is scoped to this one workspace, is revocable, and every call is audit-logged.
@@ -137,7 +169,7 @@ That returns { "token": "<WORKING_TOKEN>", "scope": "${scope}", "expiresAt": "..
 
 curl -H "Authorization: Bearer <WORKING_TOKEN>" ${instructionsUrl}
 
-This will return all available endpoints with examples. Your token scope is: ${scope}.${scope === 'readWrite' ? ' It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.' : ''}`;
+This will return all available endpoints with examples. Your token scope is: ${scope}.${enqueueNote}`;
   }
 
   // =========================================================================
@@ -264,7 +296,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
   function renderTokenItem(t) {
     const scopeBadge = t.scope === 'readWrite' ? ' [rw]' : ' [r]';
     // LIN-3136: marks the ordinary tokens that can enqueue work (declared
-    // launches, driver copies) — the dispatch grant without `take`.
+    // launches, driver copies, agent prompt copies) — the dispatch grant without `take`.
     const grantBadge = hasDispatchGrant(t) ? ' [+dispatch]' : '';
     const consumedBadge = t.consumed ? ' (consumed)' : '';
     const expiryBadge = renderExpiryBadge(t.expiresAt);
@@ -327,7 +359,7 @@ This will return all available endpoints with examples. Your token scope is: ${s
   // =========================================================================
 
   // LIN-3136 (the LIN-3131 O-d carry): a runner row is a `take` holder. Any
-  // grant is no longer enough — declared launches and driver copies mint
+  // grant is no longer enough — declared launches, driver copies and agent prompt copies mint
   // `['dispatch']` tokens, which are ordinary rows with ordinary revoke copy.
   function isRunnerToken(t) {
     return Array.isArray(t.grants) && t.grants.includes('take');

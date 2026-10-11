@@ -112,11 +112,12 @@ runner routes and `403 DISPATCH_GRANT_REQUIRED` on the enqueue routes. What each
 | `readWrite` + `take` + `dispatch` (runner copy) | yes | yes | yes | yes |
 
 Who carries `dispatch`: the owner-minted **runner copy** (`take` + `dispatch`); the owner's
-**driver copies** (below), which hold `dispatch` alone; and the orchestrators the server
+**driver copies** (below), which hold `dispatch` alone; the owner's Proxy-page Agent Prompt
+generated as "read-write + dispatch" (below; `dispatch` alone); and the orchestrators the server
 launches for the owner, which it declares `dispatch` for: an `/autopilot/kickoff` child, an
 owner's Autopilot dispatch (including a periodical "+ Autopilot"), and a feedback-widget
 "Save + autopilot". Everything else is grant-less — a `+proxy` toggle-path copy, a Settings
-token, and every worker an orchestrator dispatches (a worker is a leaf: it cannot enqueue).
+token, a Proxy-page token generated as read-only or read-write, and every worker an orchestrator dispatches (a worker is a leaf: it cannot enqueue).
 
 ### Enqueue routes and the dispatch grant (LIN-3136)
 
@@ -127,7 +128,7 @@ token, and every worker an orchestrator dispatches (a worker is a leaf: it canno
 a token without it gets the same `403` whatever the body, and nothing is enqueued.
 
 ```json
-{ "error": "This token cannot enqueue work (no dispatch grant). Ask the workspace owner to copy the prompt again from the app (Autopilot, Flight Companion and Passage Planner copies carry the dispatch grant), or use the runner copy from Settings.",
+{ "error": "This token cannot enqueue work (no dispatch grant). Ask the workspace owner to copy the prompt again from the app (Autopilot, Flight Companion and Passage Planner copies carry the dispatch grant), to generate one from the Proxy page with \"read-write + dispatch\", or use the runner copy from Settings.",
   "code": "DISPATCH_GRANT_REQUIRED", "category": "auth", "retryable": false }
 ```
 
@@ -229,6 +230,8 @@ uses which one so a value change there is not also a doc-drift bug here.
 | Runner copy working token (its exchange) | `RUNNER_WORKING_TTL_SECONDS` (`lib/proxy-scopes.js`) | 24h |
 | Driver copy bootstrap (`{ "purpose": "driver" }`, label `prompt-driver`) | `LIFETIME_PROFILES.worker` (`lib/proxy-scopes.js`) | 48h |
 | Driver copy working token (its exchange) | `LIFETIME_PROFILES.worker` | 48h |
+| Agent prompt bootstrap (`{ "purpose": "agent" }`, label `agent-prompt-dispatch`; the Proxy page's "read-write + dispatch") | `LIFETIME_PROFILES.worker` | 48h |
+| Agent prompt working token (its exchange) | `LIFETIME_PROFILES.worker` | 48h |
 | An orchestrator's declared launch credential (kickoff child, owner Autopilot dispatch, feedback autopilot): bootstrap and working token | `LIFETIME_PROFILES.worker` | 48h |
 | Dispatch tokens (`DispatchTokenStore`) | — (schema has no `expiresAt`) | never expires |
 
@@ -283,7 +286,13 @@ profile, so the pasted session can enqueue.
 - **Only the workspace owner can mint one**, exactly as for a runner copy. The server resolves
   the grant (`['dispatch']`, never `take`), the lifetime profile and the label (`prompt-driver`);
   client `scope` and `label` are ignored. The purpose table is closed: `purpose` is `"runner"`
-  (the same as `{ "runner": true }`) or `"driver"`.
+  (the same as `{ "runner": true }`), `"driver"` or `"agent"`.
+- **The Proxy page's "read-write + dispatch" (LIN-3491).** The Agent Prompt picker's third option
+  mints `{ "purpose": "agent" }`: the same `['dispatch']`-only grant, `readWrite` scope and 48h
+  `worker` profile as a driver copy, under the label `agent-prompt-dispatch` so the audit log
+  tells it from `prompt-driver`. Owner-only, with the same refusals. The copied prompt reads the
+  token's scope and grants from the mint response, not from the picker. The Create Token form
+  stays grant-less (a long-lived token never carries a grant).
 - **No purpose, no grant.** The `+proxy` toggle's copy (`{ "label": "prompt-proxy", "scope":
   "readWrite", "bootstrap": true }`) is unchanged and grant-less: a session pasted from it can read
   and write but gets `403 DISPATCH_GRANT_REQUIRED` if it tries to enqueue.
