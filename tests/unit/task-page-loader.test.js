@@ -7,7 +7,6 @@
  *   - brief/recap are cache `get` only (no `put`, no generate);
  *   - exactly one task-scoped tracker read, `fetchRecommendationContext(...,
  *     {noDescend:true})`; evidence reuses its comments (no `fetchIssueComments`).
- *     The repo allowlist is a workspace-level `fetchProjects` read, named here;
  *   - sessions are read under the tracker's canonical identifier (a UUID open);
  *   - no stored-only fallback: a tracker that can't be read is not-found or
  *     unavailable, whatever is stored (John's no-fallback decision, LIN-3329);

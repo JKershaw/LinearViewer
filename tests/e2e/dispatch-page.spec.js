@@ -17,7 +17,10 @@ let WS, DISPATCH_URL, SETTINGS_URL, API_PREFIX;
 // render the issue tree.
 const REPO_SEED = {
   projects: [
-    { id: 'local-proj-1', name: 'Project Alpha', content: 'Seeded project', sortOrder: 1 },
+    // The `repo=` line is an inert DECOY (LIN-3445): nothing parses it. It exists only
+    // so the "no project derivation" tests (LIN-3333) can tell a derived repo apart
+    // from `null` — without a seed, a revived derivation or repo picker has nothing to list.
+    { id: 'local-proj-1', name: 'Project Alpha', content: 'Seeded project\n\nrepo=test-repo', sortOrder: 1 },
   ],
   // LIN-1948: the dangling-referent guard refuses a dispatch whose
   // `issueIdentifier` resolves to no issue in the workspace. Tests below that
@@ -191,7 +194,9 @@ test.describe('Dispatch Page', () => {
       const textarea = page.locator('.dispatch-prompt-input');
       await textarea.fill('Prompt without repo');
 
-      // No repo picker exists anymore (LIN-3333) — the item carries null.
+      // No repo picker exists anymore (LIN-3333) — even with a `repo=` decoy on the
+      // seeded project, nothing lists it and the item carries null.
+      await expect(page.locator('.dispatch-repo-select')).toHaveCount(0);
       const dispatchBtn = page.locator('.dispatch-prompt-send[data-target="cli"]');
       await dispatchBtn.click();
       await expect(dispatchBtn).toHaveText('dispatched!');
