@@ -22,8 +22,9 @@ const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf
 
 // Replace the element carrying `data-go-slot` (a <div>) in a flat HTML string,
 // honouring nested <div>s. Setter-only: this is the one write Go makes.
-function replaceGoSlot(html, replacement) {
-  const open = /<div\b[^>]*\bdata-go-slot\b[^>]*>/.exec(html);
+function replaceGoSlot(html, replacement) { return replaceSlot(html, 'data-go-slot', replacement); }
+function replaceSlot(html, attr, replacement) {
+  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
   if (!open) return html;
   const start = open.index;
   let depth = 1;
@@ -54,6 +55,12 @@ function makeContainer() {
       if (sel === '[data-go-slot]') {
         return {
           set outerHTML(v) { self._html = replaceGoSlot(self._html, v); },
+          get outerHTML() { return ''; },
+        };
+      }
+      if (sel === '[data-ladder-slot]') {
+        return {
+          set outerHTML(v) { self._html = replaceSlot(self._html, 'data-ladder-slot', v); },
           get outerHTML() { return ''; },
         };
       }
@@ -362,6 +369,17 @@ describe('LIN-3341 — Go is one press', () => {
       await m.flush();
       assert.equal(m.calls.quotaReads, 2, 'one load read, one post-press read');
       assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+    });
+
+    test('a Go press repaints only the Go and ladder slots, never the whole container', async () => {
+      const m = await mount({}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+      const before = m.container._fullRenders;
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(m.container._fullRenders, before, 'no whole-container write after the press');
+      assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+      assert.match(m.container.innerHTML, /data-ladder-slot/, 'the ladder slot is still there');
     });
 
     test('a RUN_LIMIT_REACHED 429 leaves Go exhausted via the quota read', async () => {

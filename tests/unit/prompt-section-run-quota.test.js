@@ -16,31 +16,67 @@ import vm from 'node:vm';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf8');
 
+const flush = () => new Promise((r) => setImmediate(r));
+
 const RUN_LIMIT_TITLE = 'daily run limit reached \u00b7 resets at midnight UTC';
 
+// Replace the first <div> carrying the bare attribute `attr`, honouring nested
+// <div>s. The setter-only slot write a paint*() helper makes (LIN-3267).
+function replaceSlot(html, attr, replacement) {
+  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
+  if (!open) return html;
+  const start = open.index;
+  let depth = 1;
+  const tagRe = /<div\b|<\/div>/g;
+  tagRe.lastIndex = start + open[0].length;
+  let t;
+  while ((t = tagRe.exec(html))) {
+    if (t[0] === '</div>') { depth -= 1; if (depth === 0) return html.slice(0, start) + replacement + html.slice(t.index + 6); }
+    else depth += 1;
+  }
+  return html;
+}
+
+// LIN-3267: resolves [data-go-slot] / [data-ladder-slot] and counts whole-
+// container innerHTML writes (`_fullRenders`), so a slot repaint can be told
+// apart from a full rebuild.
 function makeContainer() {
   const container = {
-    innerHTML: '',
+    _html: '',
+    _fullRenders: 0,
     dataset: {},
     classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
     setAttribute() {},
     getAttribute() { return null; },
-    querySelector() { return null; },
+    querySelector(sel) {
+      const m = /^\[(data-go-slot|data-ladder-slot)\]$/.exec(sel);
+      if (!m || !new RegExp(`\\b${m[1]}\\b`).test(this._html)) return null;
+      const self = this;
+      return {
+        set outerHTML(v) { self._html = replaceSlot(self._html, m[1], v); },
+        get outerHTML() { return ''; },
+      };
+    },
     contains() { return true; },
     _clickHandler: null,
     addEventListener(type, fn) { if (type === 'click') this._clickHandler = fn; },
     removeEventListener() {},
     async click(dataset) {
-      const btn = { dataset: { ...dataset }, disabled: false, textContent: '', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
+      const btn = { dataset: { ...dataset }, disabled: false, textContent: 'label', classList: { add() {}, remove() {} }, closest: (sel) => (/^button/.test(sel) ? btn : null) };
       await this._clickHandler({ target: btn });
       return btn;
     },
   };
+  Object.defineProperty(container, 'innerHTML', {
+    get() { return this._html; },
+    set(v) { this._html = v; this._fullRenders += 1; },
+  });
   return container;
 }
 
 function loadPromptSection({ quota, dispatch } = {}) {
   const calls = { api: [], dispatch: [], order: [] };
+  const timers = [];
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
@@ -77,14 +113,21 @@ function loadPromptSection({ quota, dispatch } = {}) {
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL: () => {} },
     document: { createElement: () => ({ click() {} }), body: { appendChild() {}, removeChild() {} } },
     requestAnimationFrame: (cb) => { cb(); return 1; },
-    setTimeout: () => 1,
+    setTimeout: (fn, delay) => { timers.push({ fn, delay }); return timers.length; },
     clearTimeout: () => {},
     navigator: { clipboard: { writeText: async () => {} } },
     fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
   };
   vm.createContext(sandbox);
   vm.runInContext(SRC, sandbox);
-  return { PromptSection: window.PromptSection, window, calls };
+  // Fire every pending timer once (the 2s button-restore), then let reads settle.
+  async function runTimers() {
+    const due = timers.splice(0);
+    for (const t of due) t.fn();
+    await flush();
+    await flush();
+  }
+  return { PromptSection: window.PromptSection, window, calls, timers, runTimers };
 }
 
 const ISSUE = { id: 'uuid-42', identifier: 'LIN-42', title: 'A task' };
@@ -108,8 +151,6 @@ function baseOpts(extra = {}) {
     ...extra,
   };
 }
-
-const flush = () => new Promise((r) => setImmediate(r));
 
 async function mountIdle(extra, loadOpts) {
   const loaded = loadPromptSection(loadOpts);
@@ -205,7 +246,9 @@ describe('LIN-3239 — ladder run allowance', () => {
 describe('LIN-3267 — re-read the run quota after a ladder press', () => {
   const seq = (...qs) => { let i = 0; return () => qs[Math.min(i++, qs.length - 1)]; };
   const Q = (remaining) => ({ limited: true, runsUsed: 10 - remaining, limit: 10, remaining, resetsAt: null });
-  const press = async (m) => { await m.container.click({ action: 'run-step', target: 'cli' }); await flush(); await flush(); };
+  // The re-read runs in the 2s restore timer (after ✓/err and the guard), so a
+  // settled press includes firing that timer.
+  const press = async (m) => { await m.container.click({ action: 'run-step', target: 'cli' }); await flush(); await flush(); await m.runTimers(); };
 
   test('after a successful run-step press the count and rungs show the re-read quota', async () => {
     const m = await mountFresh({}, { quota: seq(Q(1), Q(0)) });
@@ -244,5 +287,48 @@ describe('LIN-3267 — re-read the run quota after a ladder press', () => {
     const m = await mountFresh({ freeTier: false }, { quota: Q(5) });
     await press(m);
     assert.equal(m.calls.order.filter((x) => x === 'quota').length, 0);
+  });
+
+  // Slot repaint vs full rebuild: the container counts whole-container
+  // innerHTML writes, so a post-press refresh that calls render() is caught.
+  for (const [name, dataset] of [
+    ['a run-step press', { action: 'run-step', target: 'cli' }],
+    ['a Dispatch-panel dispatch press', { action: 'dispatch', target: 'cli' }],
+  ]) {
+    test(`${name} makes no whole-container write and the button keeps ✓ + disabled until the restore`, async () => {
+      const m = await mountFresh({}, { quota: seq(Q(1), Q(0)) });
+      const before = m.container._fullRenders;
+      const btn = await m.container.click(dataset);
+      await flush();
+      await flush();
+      assert.equal(btn.textContent, '\u2713', 'the ✓ feedback is shown');
+      assert.equal(btn.disabled, true, 'the double-press guard is held');
+      assert.deepEqual(m.calls.order, ['quota', 'dispatch'], 'no quota read before the restore');
+      assert.match(m.container.innerHTML, /1 of 10 runs left today/, 'the count is untouched until the restore');
+      await m.runTimers();
+      assert.equal(btn.textContent, 'label', 'the restore puts the label back');
+      assert.equal(btn.disabled, false, 'the restore lifts the guard');
+      assert.deepEqual(m.calls.order, ['quota', 'dispatch', 'quota'], 'the re-read follows the restore');
+      assert.equal(m.container._fullRenders, before, 'no whole-container write at any point');
+      assert.match(m.container.innerHTML, /0 of 10 runs left today/, 'the count still tracks the press');
+      assert.match(tagFor(m.container.innerHTML, 'run-step'), /disabled/, 'the run rung is disabled at zero');
+      assert.match(tagFor(m.container.innerHTML, 'run-task'), /disabled/, 'Go is disabled at zero');
+    });
+  }
+
+  test('a 429 run-step press keeps err + disabled until the restore, then exhausts the ladder without a full write', async () => {
+    const dispatch = async () => { const e = new Error('limit'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
+    const m = await mountFresh({}, { quota: seq(Q(1), Q(0)), dispatch });
+    const before = m.container._fullRenders;
+    const btn = await m.container.click({ action: 'run-step', target: 'cli' });
+    await flush();
+    await flush();
+    assert.equal(btn.textContent, 'err');
+    assert.equal(btn.disabled, true);
+    assert.deepEqual(m.calls.order, ['quota', 'dispatch']);
+    await m.runTimers();
+    assert.equal(m.container._fullRenders, before, 'no whole-container write');
+    assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+    assert.match(tagFor(m.container.innerHTML, 'run-step'), new RegExp(`disabled[^>]*${RUN_LIMIT_TITLE}`));
   });
 });
