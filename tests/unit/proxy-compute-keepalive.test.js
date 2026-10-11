@@ -91,7 +91,6 @@ function buildRouter({ issues }) {
     chargeFreeTierOrReject: async () => null,
     computeRecommendation: async () => { throw new Error('not exercised by this test'); },
     recommendErrorResponse: () => ({ status: 500, body: { error: 'not exercised by this test' } }),
-    resolveProxyLLM: () => ({ apiKey: undefined, isFreeTier: false }),
     resolvePromptIssueContext: async () => { throw new Error('not exercised by this test'); },
     withTimeout: async (p) => p,
     LINEAGE_QUERY_LIMIT: 2000,

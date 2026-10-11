@@ -65,7 +65,8 @@ import '../lib/providers/linear/index.js'; // side effect: self-registers the Li
 import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
-import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
+import { getRecommendation } from '../lib/openrouter.js';
+import { resolveChatCredential } from '../lib/chat-request.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -97,29 +98,6 @@ import {
 } from '../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
 import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
-
-/**
- * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
- * resolveRoadmapLLM (routes/workspace-api.js). Free tier is used ONLY when there
- * is no token-creator OAuth key (`sessionApiKey`) and no *usable* server paid key
- * (`getPaidEnvKey()` — trims, so empty/whitespace `OPENROUTER_API_KEY` counts as
- * unset; LIN-961), but `OPENROUTER_FREE_TIER_KEY` is set. On the paid-env path the
- * trimmed `getPaidEnvKey()` is returned as `apiKey` so a blank/whitespace value can
- * never be forwarded to OpenRouter as a bogus auth header; for a clean key the
- * trimmed value equals the raw one, so paid/OAuth/env behavior is unchanged. Model
- * resolution stays on resolveWorkspaceModel; the returned
- * `isFreeTier` is threaded into resolveWorkspaceModel as `forceDefault` at each
- * billed call site so free-tier requests clamp to DEFAULT_MODEL (LIN-513).
- * @param {string|null|undefined} sessionApiKey - Token-creator's OAuth key, if any.
- * @returns {{ apiKey: (string|undefined), isFreeTier: boolean }}
- */
-export function resolveProxyLLM(sessionApiKey) {
-  const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-  const paidEnvKey = getPaidEnvKey();
-  const isFreeTier = !sessionApiKey && !paidEnvKey && !!freeTierKey;
-  const apiKey = sessionApiKey || (isFreeTier ? freeTierKey : paidEnvKey);
-  return { apiKey, isFreeTier };
-}
 
 // LIN-1458: which OpenRouter credential source served a request whose token
 // creator's OWN account-keyed read (getWorkspaceOpenRouterKey) came back empty.
@@ -1032,7 +1010,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * production callers already pass a pre-resolved sessionApiKey), which
    * OpenRouter credential source served this request when the token creator's
    * OWN account-keyed read came back empty (null). Claims only what
-   * resolveProxyLLM's own return values prove: it does NOT claim a split
+   * resolveChatCredential's own return values prove: it does NOT claim a split
    * account, and does NOT claim re-authenticating would help (LIN-1413's
    * round-1 blocking defect — any copy written here inherits that
    * constraint). No entry is written for the ordinary creator-key-present
@@ -1362,10 +1340,10 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // keepalive.send depending on whether the H12 keepalive is already armed.
   //
   // This is the once-per-request metered choke point (LIN-961): it is only
-  // reached when resolveProxyLLM already selected free tier, i.e. neither the
+  // reached when resolveChatCredential already selected free tier, i.e. neither the
   // token-creator's OAuth key nor a usable paid `OPENROUTER_API_KEY` resolved.
   // That silent fallback is the bug the operator could not diagnose, so make it
-  // observable HERE (not inside resolveProxyLLM, which runs per descent hop and
+  // observable HERE (not inside resolveChatCredential, which runs per descent hop and
   // would over-log): emit a console.warn + an audited proxy event on EVERY
   // free-tier metered call — the successful charges too, not only the eventual
   // 429 — and, when the limit IS hit, name the real cause in the 429 body via
@@ -1486,7 +1464,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // once per descent hop, so charging here would bill an N-hop descent N units.
     // Resolved BEFORE the model so the free-tier clamp (LIN-513) can force the
     // default model — a free-tier descent must never bill a workspace-preferred model.
-    const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
+    const { apiKey: resolvedApiKey, isFreeTier } = resolveChatCredential({ sessionApiKey });
     const selectedModel = await resolveAiOperationModel({ urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
     // Cancel the in-flight LLM call when its deadline trips instead of racing and
     // leaving it running orphaned (fetchWithTimeout vs withTimeout, LIN-346 surface 5).
@@ -1563,7 +1541,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group F compute (LIN-679 Stage 4 / LIN-2538): extracted to
   // routes/proxy-compute.js, mounted at its original position.
-  router.use(createComputeRoutes({ recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolveProxyLLM, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
+  router.use(createComputeRoutes({ recapCacheStore, briefCacheStore, taskSnapshotStore, dispatchQueueStore, llmCallLogStore, getWorkspaceOpenRouterKey, getWorkspaceNorthStar, getNorthStarDocVersionForWorkspace, reportHistoryStore, workspacePreferencesStore, proxyLimiter, authenticateProxyToken, resolveProviderAccess, denyIfUnsupported, logEvent, logOpenRouterCredentialSource, workspaceUnavailable, graphqlErrorStatus, captureTaskSnapshot, chargeFreeTierOrReject, computeRecommendation, recommendErrorResponse, resolvePromptIssueContext, withTimeout, LINEAGE_QUERY_LIMIT, RECOMMEND_DESCENT_BUDGET_MS, LLM_TIMEOUT_MS, getTestMockData, fetchWithTimeout, CONTEXT_FETCH_TIMEOUT_MS }));
 
 
   // Group G agent-status (LIN-679 Stage 1 / LIN-2533): extracted to
@@ -1595,11 +1573,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, resolveProxyLLM, freeTierStore, accountStore, graphqlErrorStatus, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, freeTierStore, accountStore, graphqlErrorStatus, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
   // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch
@@ -1628,7 +1606,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   // router's own real defaults still apply. Named distinctly from a bare
   // `chatClient`/`createToolCatalog` at this composer's own top level so a
   // future second sub-router needing the same seam cannot collide with it.
-  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, getWorkspaceOpenRouterKey, resolveProxyLLM, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
+  router.use(createProxyFlightCompanionRoutes({ proxyLimiter, authenticateProxyToken, resolveProviderAccess, workspaceUnavailable, logEvent, getWorkspaceOpenRouterKey, chargeFreeTierOrReject, observerStateStore, workspacePreferencesStore, recapCacheStore, briefCacheStore, dispatchQueueStore, agentStatusStore, proxyTokenStore, taskDecisionsStore, shelvedRulingsStore, savedChatStore, chatClient: flightCompanionChatClient, createToolCatalog: flightCompanionCreateToolCatalog }));
 
   return router;
 }

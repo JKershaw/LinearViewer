@@ -20,7 +20,7 @@ import { renderTaskChatPage } from '../lib/render-task-chat.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildTaskChatMessages } from '../lib/prompts/task-chat-template.js';
-import { streamChat, streamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
+import { streamChat, streamChatWithTools } from '../lib/openrouter.js';
 import { createChatToolCatalog, deriveFollowUpDispatch } from '../lib/chat-tools.js';
 import { runAgentTurn } from '../lib/agent-turn.js';
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
@@ -259,7 +259,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
       // LIN-3254: a run-scoped chat carries the run id (a UUID). Malformed or
       // absent is simply "not run-scoped" — the page behaves exactly as today.
       const rawRun = typeof req.query.run === 'string' && UUID_REGEX.test(req.query.run.trim()) ? req.query.run.trim() : '';
-      const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
+      const aiConfigured = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey }).available;
       // Saved chats require a user identity (accountId). Absent only for a
       // genuinely anonymous session — local/GitHub sessions carry an accountId
       // via establishAccount same as Linear (LIN-1353) — the page renders an

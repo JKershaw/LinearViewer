@@ -17,7 +17,7 @@ import { buildPassageRunnerKickoff } from '../lib/prompts/passage-runner-kickoff
 import { isValidIssueId, dispatchIssueSourceField } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
-import { buildRunGate } from '../lib/chat-request.js';
+import { buildRunGate, resolveChatCredential } from '../lib/chat-request.js';
 import { POLLED_TARGETS } from '../lib/dispatch-targets.js';
 
 /**
@@ -61,7 +61,6 @@ export function createKickoffRoutes({
   freeTierStore = null,
   accountStore = null,
   getWorkspaceOpenRouterKey = null,
-  resolveProxyLLM = null,
   graphqlErrorStatus,
   PROXY_ATTACH_FAILED_MESSAGE,
 }) {
@@ -366,7 +365,7 @@ export function createKickoffRoutes({
       const kickoffSessionApiKey = getWorkspaceOpenRouterKey
         ? await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy)
         : null;
-      const { isFreeTier: kickoffIsFreeTier } = resolveProxyLLM(kickoffSessionApiKey);
+      const { isFreeTier: kickoffIsFreeTier } = resolveChatCredential({ sessionApiKey: kickoffSessionApiKey });
       const runGate = buildRunGate({
         isFreeTier: kickoffIsFreeTier,
         freeTierStore,

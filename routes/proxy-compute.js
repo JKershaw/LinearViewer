@@ -9,7 +9,7 @@
 import { Router } from 'express';
 import { graphqlErrorExtra, graphqlErrorDetail } from '../lib/proxy-graphql-errors.js';
 import { anchorFor as taskCostAnchorFor, buildTaskCost } from '../lib/task-cost.js';
-import { isRecommendationEnabled } from '../lib/openrouter.js';
+import { resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { resolveRecommendation } from '../lib/recommend-recurse.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
@@ -55,7 +55,6 @@ import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.j
  * @param {Function} deps.chargeFreeTierOrReject - Free-tier metering choke point (closure-local; relocated in routes/proxy.js by G1, shared with group I)
  * @param {Function} deps.computeRecommendation - Shared, test-mode-aware recommendation compute (closure-local; relocated in routes/proxy.js by G1, shared with group I)
  * @param {Function} deps.recommendErrorResponse - Maps a recommendation error to {status, body} (closure-local; relocated in routes/proxy.js by G1, shared with group I)
- * @param {Function} deps.resolveProxyLLM - Resolves OpenRouter credentials for a proxy LLM call (module-scope in routes/proxy.js, shared with group I)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups H/I)
  * @param {Function} deps.withTimeout - Races a promise against a timeout (module-scope, shared with group I)
  * @param {number} deps.LINEAGE_QUERY_LIMIT - Cap on lineage-history rows read for the north-star endpoint (module-scope)
@@ -88,7 +87,6 @@ export function createComputeRoutes({
   chargeFreeTierOrReject,
   computeRecommendation,
   recommendErrorResponse,
-  resolveProxyLLM,
   resolvePromptIssueContext,
   withTimeout,
   LINEAGE_QUERY_LIMIT,
@@ -385,8 +383,9 @@ export function createComputeRoutes({
       // Check if AI recommendations are available (skip in test mode and on the
       // deterministic kind-override path). A free-tier-only deployment (only
       // OPENROUTER_FREE_TIER_KEY set) is accepted via isFreeTier.
-      const { isFreeTier } = resolveProxyLLM(sessionApiKey);
-      if (kind === undefined && !isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+      const credential = resolveChatCredential({ sessionApiKey });
+      const { isFreeTier } = credential;
+      if (kind === undefined && isAiUnavailable({ credential, mockAi: isTestMode })) {
         logEvent(req, '/api/proxy/recommend', 503);
         return jsonError(res, 503, 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
@@ -1102,8 +1101,9 @@ export function createComputeRoutes({
         // A free-tier-only deployment is accepted via isFreeTier. The gate sits
         // AFTER the cache-hit / noRefresh returns above, so a fresh-cache read
         // never reaches it — and the charge below never bills a cache hit.
-        const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-        if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+        const credential = resolveChatCredential({ sessionApiKey });
+        const { apiKey: resolvedApiKey, isFreeTier } = credential;
+        if (isAiUnavailable({ credential, mockAi: isTestMode })) {
           logEvent(req, '/api/proxy/recap', 503);
           return keepaliveError(keepalive, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
         }
@@ -1208,8 +1208,9 @@ export function createComputeRoutes({
       // A free-tier-only deployment is accepted via isFreeTier. POST always
       // regenerates (no cache short-circuit), so charging right after the gate
       // bills exactly one unit per generation.
-      const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+      const credential = resolveChatCredential({ sessionApiKey });
+      const { apiKey: resolvedApiKey, isFreeTier } = credential;
+      if (isAiUnavailable({ credential, mockAi: isTestMode })) {
         logEvent(req, '/api/proxy/recap', 503);
         return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }
@@ -1384,8 +1385,9 @@ export function createComputeRoutes({
 
         // Free-tier-only deployments accepted via isFreeTier. The gate sits after
         // the cache-hit / noRefresh returns, so a fresh-cache read never charges.
-        const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-        if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+        const credential = resolveChatCredential({ sessionApiKey });
+        const { apiKey: resolvedApiKey, isFreeTier } = credential;
+        if (isAiUnavailable({ credential, mockAi: isTestMode })) {
           logEvent(req, '/api/proxy/brief', 503);
           return keepaliveError(keepalive, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
         }
@@ -1489,8 +1491,9 @@ export function createComputeRoutes({
 
       // Free-tier-only deployments accepted via isFreeTier. POST always regenerates,
       // so charging right after the gate bills exactly one unit per generation.
-      const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+      const credential = resolveChatCredential({ sessionApiKey });
+      const { apiKey: resolvedApiKey, isFreeTier } = credential;
+      if (isAiUnavailable({ credential, mockAi: isTestMode })) {
         logEvent(req, '/api/proxy/brief', 503);
         return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }

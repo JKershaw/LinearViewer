@@ -88,11 +88,10 @@
  *     — their old counts of the shared inline expression (1 each) now fold
  *     into the repo-wide sweep above rather than a per-file allow-list entry.
  *   - `routes/proxy.js` is explicitly OUT of this sweep (struck pending
- *     human confirmation — its `resolveProxyLLM` resolves the TOKEN
- *     CREATOR's key via `getWorkspaceOpenRouterKey`, a different mechanism,
- *     not a session field). A new pin below asserts it never imports from
- *     `lib/chat-request.js`, so that scope line is enforced, not just
- *     remembered.
+ *     human confirmation — LIN-2427 INVERTED this: it now resolves the
+ *     TOKEN CREATOR's key via `getWorkspaceOpenRouterKey` and feeds it to
+ *     `resolveChatCredential`). The pin below asserts it imports the shared
+ *     resolver and that `resolveProxyLLM` is gone.
  *   - A new pin (research's recommendation, `tests/unit/task-chat-route.test.js`'s
  *     existing "once per turn, never per hop" idiom) asserts `checkFreeTierGate`
  *     is called exactly once per full-adopt site across this sweep's files —
@@ -202,9 +201,11 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.doesNotMatch(src, /hasPaidEnvKey/, 'hasPaidEnvKey must be fully dead in routes/dashboard.js — its only calls were inside the code this sweep replaced');
   });
 
-  test('routes/proxy.js never imports from lib/chat-request.js — the struck-scope line stays enforced, not just remembered', () => {
+  test('routes/proxy.js resolves through lib/chat-request.js; the proxy-local resolveProxyLLM and its direct env reads are gone (LIN-2427)', () => {
     const src = read('routes/proxy.js');
-    assert.doesNotMatch(src, /from\s+['"][^'"]*chat-request(?:\.js)?['"]/, 'routes/proxy.js must not import from lib/chat-request.js — its credential chain resolves the token creator\'s key via getWorkspaceOpenRouterKey + resolveProxyLLM, a deliberately separate mechanism');
+    assert.match(src, /import \{[^}]*resolveChatCredential[^}]*\} from\s+['"][^'"]*chat-request(?:\.js)?['"]/, 'routes/proxy.js must import resolveChatCredential from lib/chat-request.js');
+    assert.doesNotMatch(src, /resolveProxyLLM/, 'resolveProxyLLM must be retired from routes/proxy.js');
+    assert.doesNotMatch(src, /getPaidEnvKey|isRecommendationEnabled/, 'routes/proxy.js must not read the env key or gate by itself');
   });
 
   test('checkFreeTierGate is called exactly once per full-adopt site (one quota unit per request, LIN-2978)', () => {

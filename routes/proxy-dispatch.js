@@ -22,8 +22,7 @@ import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, get
 import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, UUID_REGEX, dispatchIssueSourceField } from '../lib/workspace.js';
 import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
-import { isRecommendationEnabled } from '../lib/openrouter.js';
-import { buildRunGate } from '../lib/chat-request.js';
+import { buildRunGate, resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
 import { POLLED_TARGETS, SESSION_TARGETS } from '../lib/dispatch-targets.js';
 
@@ -177,7 +176,6 @@ function dispatchWatchChanged(baseline, item) {
  * @param {Function} deps.requireWriteScope - Requires readWrite scope on the token (closure-local)
  * @param {Function} deps.resolvePromptIssueContext - Resolves the issue + prompt context for deterministic, server-side prompt generation (module-scope, shared with groups F/H)
  * @param {Function} deps.resolveProviderAccess - Resolves {token, reason, provider} for the active workspace/provider (closure-local)
- * @param {Function} deps.resolveProxyLLM - Resolves OpenRouter credentials for a proxy LLM call (module-scope, exported from routes/proxy.js)
  * @param {Object} deps.workspacePreferencesStore - Workspace-level preference storage
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  */
@@ -205,7 +203,6 @@ export function createDispatchRoutes({
   requireWriteScope,
   resolvePromptIssueContext,
   resolveProviderAccess,
-  resolveProxyLLM,
   workspacePreferencesStore,
   workspaceUnavailable,
 }) {
@@ -462,7 +459,7 @@ export function createDispatchRoutes({
       // decides free tier; `buildRunGate` returns null otherwise (and for a null
       // creator). Built here so the factory sees it only on a fresh row (1.55).
       const dispatchSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-      const { isFreeTier: dispatchIsFreeTier } = resolveProxyLLM(dispatchSessionApiKey);
+      const { isFreeTier: dispatchIsFreeTier } = resolveChatCredential({ sessionApiKey: dispatchSessionApiKey });
       const runGate = buildRunGate({
         isFreeTier: dispatchIsFreeTier,
         freeTierStore,
@@ -884,7 +881,7 @@ export function createDispatchRoutes({
         // for the run gate at the enqueue (LIN-3238). The keepalive and the hang-up
         // check before the enqueue cover the provider calls below.
         const overrideSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-        const { isFreeTier: overrideIsFreeTier } = resolveProxyLLM(overrideSessionApiKey);
+        const { isFreeTier: overrideIsFreeTier } = resolveChatCredential({ sessionApiKey: overrideSessionApiKey });
         const keepalive = armKeepalive(res);
         const gone = clientGoneSignal(res);
         // Every exit below answers through the keepalive, the catch included: once it
@@ -1123,8 +1120,9 @@ export function createDispatchRoutes({
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
       // A free-tier-only deployment is accepted via isFreeTier. computeRecommendation
       // resolves the effective key per hop; here we only gate and meter.
-      const { isFreeTier } = resolveProxyLLM(sessionApiKey);
-      if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+      const credential = resolveChatCredential({ sessionApiKey });
+      const { isFreeTier } = credential;
+      if (isAiUnavailable({ credential, mockAi: isTestMode })) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
         return jsonError(res, 503, 'AI recommendations not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
       }

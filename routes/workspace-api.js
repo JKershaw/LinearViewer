@@ -22,7 +22,7 @@ import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
 import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
-import { resolveChatCredential, checkFreeTierGate, buildRunGate } from '../lib/chat-request.js';
+import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, buildRunGate } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
@@ -827,14 +827,14 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
     const mockAi = shouldMockAi(workspace)
     const sessionApiKey = req.session.openRouterApiKey
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY
-    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey })
+    const credential = resolveChatCredential({ sessionApiKey })
+    const { apiKey: apiKeyToUse, isFreeTier } = credential
     // Free-tier on the AI-mock path is the session flag (CI sets no env key, so
     // `isFreeTier` is always false there); the test-token DATA mock charges its
     // own inside the isTestMode block below, so this is scoped to !isTestMode.
     const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey()
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier)
-    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.')
     }
 
@@ -1044,12 +1044,12 @@ ${goal}`
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey });
+    const { apiKey: apiKeyToUse, isFreeTier } = credential;
     const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey();
     const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier);
 
-    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI recommendation feature is not configured.');
     }
 
@@ -1998,10 +1998,10 @@ ${goal}`
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey });
+    const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
-    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
@@ -2241,10 +2241,10 @@ ${goal}`
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey });
+    const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
-    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
@@ -2606,10 +2606,10 @@ ${goal}`
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey });
+    const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
-    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
 
@@ -2924,10 +2924,10 @@ ${goal}`
     const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
     const sessionApiKey = req.session.openRouterApiKey;
-    const freeTierKey = process.env.OPENROUTER_FREE_TIER_KEY;
-    const { apiKey: apiKeyToUse, isFreeTier } = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey });
+    const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
-    if (!mockAi && !isRecommendationEnabled(sessionApiKey) && !freeTierKey) {
+    if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
     }
     if (!mockAi && isFreeTier) {
