@@ -382,6 +382,16 @@ describe('F1: the served setup runs verbatim on a fresh machine', () => {
     }
   });
 
+  test('LIN-3213: §8 defers the open items and owner options to `runner open`, with no copy of its own', () => {
+    const end = prompt.slice(prompt.indexOf('## 8. End summary'), prompt.indexOf('## Markers, exactly'));
+    assert.ok(end.length > 0);
+    assert.match(end, /`runner open`/);
+    assert.match(end, /verbatim/);
+    assert.match(end, /unposted/);
+    assert.doesNotMatch(end, /re-dispatch/);
+    assert.doesNotMatch(end, /what the owner should do/);
+  });
+
   test('the prompt says when later commands need --url-key too', () => {
     assert.match(prompt, /another workspace, add `--url-key <urlKey>` to every command/);
   });
