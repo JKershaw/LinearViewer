@@ -1110,6 +1110,23 @@ async function fakeHarbour() {
   };
 }
 
+describe('openItems (LIN-3213)', () => {
+  const row = (state, over = {}) => ({ itemId: `${state}-1`, rootItemId: `${state}-1`, state, ...over });
+  const ledger = (...rs) => ({ items: Object.fromEntries(rs.map((r) => [r.itemId, r])) });
+  const cases = [
+    { name: 'a running row is listed', ledger: ledger(row('running')), ids: ['running-1'] },
+    { name: 'done is not listed', ledger: ledger(row('done')), ids: [] },
+    { name: 'lost is not listed', ledger: ledger(row('lost')), ids: [] },
+    { name: 'stopped is not listed', ledger: ledger(row('stopped')), ids: [] },
+    { name: 'only the running rows of a mixed ledger are listed', ledger: ledger(row('running'), row('done'), row('lost'), row('stopped')), ids: ['running-1'] },
+    { name: 'an empty ledger lists nothing', ledger: { items: {} }, ids: [] },
+    { name: 'a missing ledger lists nothing', ledger: undefined, ids: [] }
+  ];
+  for (const c of cases) {
+    test(c.name, () => assert.deepEqual(runnerKit.openItems(c.ledger).map((r) => r.itemId), c.ids));
+  }
+});
+
 describe('debounceWork (LIN-3213)', () => {
   const W = 120_000;
   const NOW = 1_000_000_000;
@@ -1486,6 +1503,46 @@ describe('commands (against a fake Harbour)', () => {
   test('ledger prints ids and states only', TIMEOUT, async () => {
     const r = await run(['ledger']);
     assert.ok(Object.keys(r.items).length > 0);
+  });
+
+  describe('open (LIN-3213)', () => {
+    const ledgerFile = () => join(home, 'acme', 'ledger.json');
+    const rows = {
+      aaaaaaaa: { itemId: 'aaaaaaaa', rootItemId: 'aaaaaaaa', agentId: 'ag-1', state: 'running' },
+      bbbbbbbb: { itemId: 'bbbbbbbb', rootItemId: 'bbbbbbbb', agentId: 'ag-2', state: 'done' }
+    };
+    let saved;
+    before(() => { saved = readFileSync(ledgerFile(), 'utf8'); });
+    after(() => { writeFileSync(ledgerFile(), saved); });
+
+    test('prints each open id and the options text exactly once', TIMEOUT, async () => {
+      writeFileSync(ledgerFile(), JSON.stringify({ items: { ...rows, cccccccc: { itemId: 'cccccccc', rootItemId: 'cccccccc', state: 'running' } } }));
+      const r = await run(['open']);
+      assert.deepEqual(r.open.map((x) => x.itemId).sort(), ['aaaaaaaa', 'cccccccc']);
+      assert.equal(r.options.split(runnerKit.OPEN_OPTIONS_COPY).length - 1, 1);
+      assert.ok(r.options.includes(runnerKit.ORPHAN_COPY));
+      assert.match(r.options, /follow-up/);
+      assert.match(r.options, /abort/);
+      assert.match(r.options, /\[blocked\]/);
+      assert.ok(!/DELETE/.test(r.options));
+    });
+
+    test('with nothing open it lists nothing and prints no options', TIMEOUT, async () => {
+      writeFileSync(ledgerFile(), JSON.stringify({ items: { bbbbbbbb: rows.bbbbbbbb } }));
+      const r = await run(['open']);
+      assert.deepEqual(r, { open: [] });
+    });
+
+    test('ledger output is unchanged by open', TIMEOUT, async () => {
+      const ledger = { items: rows };
+      writeFileSync(ledgerFile(), JSON.stringify(ledger));
+      await run(['open']);
+      assert.deepEqual(await run(['ledger']), ledger);
+    });
+
+    test('the usage string lists open', TIMEOUT, async () => {
+      await assert.rejects(() => run(['no-such-command']), /\|open\|/);
+    });
   });
 
   test('no command\'s output ever contains a bootstrap or working token', () => {
