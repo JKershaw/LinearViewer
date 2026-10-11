@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
 import { removeWorkspace, normalizeProvider, getWorkspaceTokenExpiry } from '../../lib/workspace.js';
-import { serviceUnavailable } from '../../lib/errors.js';
+import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor, relinkNotice } from '../../lib/refresh-strategy.js';
 import { TokenRefreshError } from '../../lib/token-refresh.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
@@ -67,7 +67,7 @@ function makeContext({ workspace, durableRecord, calls, refreshOnResolveGate }) 
     relinkNotice,
     normalizeProvider,
     removeWorkspace,
-    serviceUnavailable,
+    renderServiceUnavailablePage,
     isDefinitiveRevocation: () => false,
     isTransientRefreshFailure: (e) => e instanceof TokenRefreshError && e.code !== 'EXPIRED',
 

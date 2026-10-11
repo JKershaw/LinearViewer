@@ -36,7 +36,7 @@ import * as bindingModule from '../../lib/connection-binding.js';
 import * as ws from '../../lib/workspace.js';
 import { releaseConnectionCredential } from '../../lib/connection-lifecycle.js';
 import { REFRESH_STRATEGY, refreshDeclarationFor } from '../../lib/refresh-strategy.js';
-import { serviceUnavailable } from '../../lib/errors.js';
+import { renderServiceUnavailablePage } from '../../lib/render-pages.js';
 import { isDefinitiveRevocation, isTransientRefreshFailure, TokenRefreshError } from '../../lib/token-refresh.js';
 import { TOKEN_REFRESH_BUFFER_MS, selectOwnerSessionRow } from '../../lib/workspace-token-resolver.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
@@ -160,7 +160,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
       getProviderForWorkspace: () => ({}),
       refreshOwnerCredential: async () => { calls.legacyRefresh = (calls.legacyRefresh || 0) + 1; return null; },
       saveSession: async () => {},
-      serviceUnavailable,
+      renderServiceUnavailablePage,
       renderErrorPage: (title) => `<${title}>`,
       sendRelinkNotice: (_w, res) => { calls.relink = true; return res.status(401).send('relink'); },
       handleWorkspaceRemoval: async (_session, id, res, deleteDurable) => { calls.removal = { id, deleteDurable }; return res.status(302).send('removed'); },

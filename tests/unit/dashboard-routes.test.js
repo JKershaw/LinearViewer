@@ -5752,6 +5752,7 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
 
     assert.equal(res.statusCode, 500);
     assert.match(res.sentBody, /Failed to render the Observation page/);
+    assert.match(res.sentBody, /<h1[^>]*>Harbour<\/h1>/, 'the one Harbour error page');
   });
 });
 

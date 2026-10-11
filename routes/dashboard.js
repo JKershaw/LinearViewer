@@ -51,7 +51,7 @@ import { computeEscalationKpis } from '../lib/escalation-kpis.js';
 import { renderEscalationKpisPage } from '../lib/render-escalation-kpis.js';
 import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-readout.js';
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
-import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
+import { renderUpstreamAwareErrorPage, renderErrorPage } from '../lib/render-pages.js';
 import { resolveIssueBinding, getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
@@ -1292,7 +1292,7 @@ export function createDashboardRoutes({
       res.send(html);
     } catch (error) {
       console.error('Observation page error:', error);
-      res.status(500).send('Failed to render the Observation page');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to render the Observation page'));
     }
   });
 
@@ -2539,7 +2539,7 @@ export function createDashboardRoutes({
       }));
     } catch (error) {
       console.error('Escalation KPIs page error:', error);
-      res.status(500).send('Failed to compute escalation KPIs');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to compute escalation KPIs'));
     }
   });
 
@@ -2709,7 +2709,7 @@ export function createDashboardRoutes({
         return res.status(401).send(renderUpstreamAwareErrorPage(error, { time: now.toISOString() }));
       }
       console.error('Effort read-out page error:', error);
-      res.status(500).send('Failed to compute the effort read-out');
+      res.status(500).send(renderErrorPage('Something Went Wrong', 'Failed to compute the effort read-out'));
     }
   });
 

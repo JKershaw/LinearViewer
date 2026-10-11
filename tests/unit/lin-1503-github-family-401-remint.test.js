@@ -93,7 +93,7 @@ describe('LIN-1503: handleUnauthorizedError GitHub-family branch (source-text pi
     assert.notEqual(linearCheckIdx, -1, 'expected the Linear durableRecord check to follow the GitHub-family branch');
     const renderCatchBody = body.slice(renderCatchIdx, connectionArmIdx !== -1 ? connectionArmIdx : linearCheckIdx);
 
-    assert.ok(renderCatchBody.includes('serviceUnavailable'), 'expected catch (renderError) to return a retryable serviceUnavailable response');
+    assert.ok(renderCatchBody.includes('renderServiceUnavailablePage'), 'expected catch (renderError) to return a retryable renderServiceUnavailablePage response');
     assert.ok(!renderCatchBody.includes('handleWorkspaceRemoval('), 'catch (renderError) must NEVER call handleWorkspaceRemoval — a post-remint render failure must preserve the workspace, this is the direct F1 regression guard');
   });
 

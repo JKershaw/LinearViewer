@@ -5,7 +5,6 @@
 import { Router } from 'express'
 import { randomUUID } from 'node:crypto'
 import { removeWorkspace, upsertWorkspace, saveSession, getActiveWorkspace, getWorkspaceByUrlKey, validateWorkspaceUrlKey, linkProvider } from '../lib/workspace.js'
-import { badRequest, notFound, serverError } from '../lib/errors.js'
 import { establishAccount, clearUnresolvableAccountSession } from '../lib/account-session.js'
 import { evictWorkspaceTokenPair } from '../lib/workspace-token-cache.js'
 import { releaseConnectionCredential } from '../lib/connection-lifecycle.js'
@@ -76,7 +75,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
       upsertWorkspace(req.session, workspace)
     } catch (err) {
       // MAX_WORKSPACES reached
-      return badRequest.html(res, err.message)
+      return res.status(400).send(renderErrorPage('Bad Request', err.message))
     }
     req.session.activeWorkspaceId = workspace.id
 
@@ -88,7 +87,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     const established = await establishAccount(req.session, accountStore, accountWorkspaceStore, 'local', urlKey, {}, workspace.id)
     if (!established.ok) {
       if (!established.conflict) clearUnresolvableAccountSession(req.session)
-      return serverError.html(res, 'Could not set up your workspace account. Please try again.')
+      return res.status(500).send(renderErrorPage('Server Error', 'Could not set up your workspace account. Please try again.'))
     }
 
     if (localStore) {
@@ -105,7 +104,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
    */
   router.post('/workspace/:urlKey/remove', async (req, res) => {
     if (!validateWorkspaceUrlKey(req.params.urlKey)) {
-      return badRequest.html(res, 'Invalid workspace ID')
+      return res.status(400).send(renderErrorPage('Bad Request', 'Invalid workspace ID'))
     }
 
     // If only one workspace, just logout entirely
@@ -131,7 +130,7 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
 
     const workspace = getWorkspaceByUrlKey(req.session, req.params.urlKey)
     if (!workspace) {
-      return notFound.html(res, 'Workspace not found')
+      return res.status(404).send(renderErrorPage('Not Found', 'Workspace not found'))
     }
 
     // LIN-1507: the session survives this removal (unlike the branch above),
