@@ -10,7 +10,7 @@
  */
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { Router, json } from 'express';
-import { badRequest, jsonError, notFound, unauthorized, classifyUpstreamError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, unauthorized, classifyUpstreamError } from '../lib/errors.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { createRoadmapRoutes } from './workspace-api-roadmap.js';
@@ -855,7 +855,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       if (isTestMode) {
         const mockIssue = testMockData.issues.find(i => i.id === issueId)
         if (!mockIssue) {
-          return keepalive.send(404, { error: 'Issue not found' })
+          return keepaliveError(keepalive, 404, 'Issue not found')
         }
 
         // Atomically check free tier limits and record usage in test mode
@@ -863,8 +863,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         if (testIsFreeTier) {
           const check = await freeTierStore.tryUse(workspace.urlKey)
           if (!check.allowed) {
-            return keepalive.send(429, {
-              error: check.reason,
+            return keepaliveError(keepalive, 429, check.reason, {
               freeTier: {
                 used: true,
                 remaining: check.remaining,
@@ -988,20 +987,20 @@ ${goal}`
       // A hang-up aborts the model call, which surfaces as a timeout: the client
       // left, and that is not an AI outage.
       if (gone.gone) {
-        return keepalive.send(499, { error: 'Client closed the request' })
+        return keepaliveError(keepalive, 499, 'Client closed the request')
       }
       console.error('Recommendation error:', error)
 
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' })
+        return keepaliveError(keepalive, 401, 'Token expired or invalid')
       }
       if (error.message?.includes('not found')) {
-        return keepalive.send(404, { error: error.message })
+        return keepaliveError(keepalive, 404, error.message)
       }
       if (error.message?.includes('OpenRouter')) {
-        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message })
+        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message })
       }
-      keepalive.send(500, { error: 'Failed to get recommendation', message: error.message })
+      keepaliveError(keepalive, 500, 'Failed to get recommendation', { message: error.message })
     } finally {
       gone.release();
     }
@@ -2022,7 +2021,7 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          return keepalive.send(404, { error: 'Issue not found' });
+          return keepaliveError(keepalive, 404, 'Issue not found');
         }
       } else {
         context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
@@ -2065,15 +2064,15 @@ ${goal}`
       keepalive.stop();
       console.error('Recap POST error:', error);
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
       if (error.message?.includes('not found')) {
-        return keepalive.send(404, { error: error.message });
+        return keepaliveError(keepalive, 404, error.message);
       }
       if (error.message?.includes('OpenRouter')) {
-        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
       }
-      keepalive.send(500, { error: 'Failed to generate recap', message: error.message });
+      keepaliveError(keepalive, 500, 'Failed to generate recap', { message: error.message });
     }
   });
 
@@ -2265,7 +2264,7 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          return keepalive.send(404, { error: 'Issue not found' });
+          return keepaliveError(keepalive, 404, 'Issue not found');
         }
       } else {
         context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
@@ -2307,15 +2306,15 @@ ${goal}`
       keepalive.stop();
       console.error('Brief POST error:', error);
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
       if (error.message?.includes('not found')) {
-        return keepalive.send(404, { error: error.message });
+        return keepaliveError(keepalive, 404, error.message);
       }
       if (error.message?.includes('OpenRouter')) {
-        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
       }
-      keepalive.send(500, { error: 'Failed to generate brief', message: error.message });
+      keepaliveError(keepalive, 500, 'Failed to generate brief', { message: error.message });
     }
   });
 
@@ -2630,7 +2629,7 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          return keepalive.send(404, { error: 'Issue not found' });
+          return keepaliveError(keepalive, 404, 'Issue not found');
         }
       } else {
         context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
@@ -2638,8 +2637,7 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       if (!UUID_REGEX.test(canonicalId)) {
-        return keepalive.send(422, {
-          error: "This task's canonical id could not be resolved; scan requires a canonical identity",
+        return keepaliveError(keepalive, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
           code: 'CANONICAL_ID_REQUIRED'
         });
       }
@@ -2671,8 +2669,7 @@ ${goal}`
         // persist anything when it was skipped, since nothing was actually
         // evaluated (a stored zero-finding here would be a false "found
         // nothing", exactly what this feature exists to prevent).
-        return keepalive.send(503, {
-          error: 'Scan rubric is temporarily unavailable; nothing was evaluated',
+        return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {
           code: 'PRINCIPLE_ZERO_UNAVAILABLE'
         });
       }
@@ -2680,8 +2677,7 @@ ${goal}`
         // A claimed decision that failed validation, or an unparseable
         // response: persists nothing and asks the operator to retry, rather
         // than risk silently downgrading a real ruling into a zero-finding.
-        return keepalive.send(502, {
-          error: 'Scan produced an unusable response; please retry',
+        return keepaliveError(keepalive, 502, 'Scan produced an unusable response; please retry', {
           code: 'SCAN_PARSE_FAILED'
         });
       }
@@ -2732,7 +2728,7 @@ ${goal}`
         ...scanBindingPair
       });
       if (!record) {
-        return keepalive.send(500, { error: 'Failed to record scan result' });
+        return keepaliveError(keepalive, 500, 'Failed to record scan result');
       }
 
       keepalive.send(200, {
@@ -2751,15 +2747,15 @@ ${goal}`
       keepalive.stop();
       console.error('Scan POST error:', error);
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
       if (error.message?.includes('not found')) {
-        return keepalive.send(404, { error: error.message });
+        return keepaliveError(keepalive, 404, error.message);
       }
       if (error.message?.includes('OpenRouter')) {
-        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
       }
-      keepalive.send(500, { error: 'Failed to run scan', message: error.message });
+      keepaliveError(keepalive, 500, 'Failed to run scan', { message: error.message });
     }
   });
 
@@ -2951,7 +2947,7 @@ ${goal}`
       if (isTestMode) {
         context = await buildMockRecapContext(issueId);
         if (!context) {
-          return keepalive.send(404, { error: 'Issue not found' });
+          return keepaliveError(keepalive, 404, 'Issue not found');
         }
       } else {
         context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
@@ -2959,8 +2955,7 @@ ${goal}`
 
       const canonicalId = context.issue?.id || issueId;
       if (!UUID_REGEX.test(canonicalId)) {
-        return keepalive.send(422, {
-          error: "This task's canonical id could not be resolved; scan requires a canonical identity",
+        return keepaliveError(keepalive, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
           code: 'CANONICAL_ID_REQUIRED'
         });
       }
@@ -2976,8 +2971,7 @@ ${goal}`
           // Same fail-closed discipline as raising: never send a scan prompt
           // without the Principle 0 gate, and never touch the row when it
           // was skipped.
-          return keepalive.send(503, {
-            error: 'Scan rubric is temporarily unavailable; nothing was evaluated',
+          return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {
             code: 'PRINCIPLE_ZERO_UNAVAILABLE'
           });
         }
@@ -3001,7 +2995,7 @@ ${goal}`
         const { payload } = extractScanPayload(raw);
         if (payload === null) {
           // A genuine parse/model failure — same shape POST scan already uses.
-          return keepalive.send(502, { error: 'Scan produced an unusable response; please retry', code: 'SCAN_PARSE_FAILED' });
+          return keepaliveError(keepalive, 502, 'Scan produced an unusable response; please retry', { code: 'SCAN_PARSE_FAILED' });
         }
         // Covers a live decision, and absent/malformed input alike — all four
         // of the ticket's named negative cases collapse to "leave it standing".
@@ -3020,14 +3014,12 @@ ${goal}`
 
       keepalive.stop();
       if (!record) {
-        return keepalive.send(404, {
-          error: 'This ruling no longer exists — it may have been pruned or superseded by a newer scan',
+        return keepaliveError(keepalive, 404, 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', {
           code: 'ROW_GONE'
         });
       }
       if (record.outcome !== 'self-resolved') {
-        return keepalive.send(409, {
-          error: 'This ruling changed while the check was running and was not retired',
+        return keepaliveError(keepalive, 409, 'This ruling changed while the check was running and was not retired', {
           code: 'ALREADY_TERMINAL'
         });
       }
@@ -3052,15 +3044,15 @@ ${goal}`
       keepalive.stop();
       console.error('Scan retire error:', error);
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
       if (error.message?.includes('not found')) {
-        return keepalive.send(404, { error: error.message });
+        return keepaliveError(keepalive, 404, error.message);
       }
       if (error.message?.includes('OpenRouter')) {
-        return keepalive.send(503, { error: 'AI service temporarily unavailable', message: error.message });
+        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
       }
-      keepalive.send(500, { error: 'Failed to retire scan result', message: error.message });
+      keepaliveError(keepalive, 500, 'Failed to retire scan result', { message: error.message });
     }
   });
 
@@ -3310,7 +3302,7 @@ ${goal}`
       });
     } catch (error) {
       console.error('Scan-due GET error:', error);
-      keepalive.send(500, { error: 'Failed to fetch scan-due candidates', message: error.message });
+      keepaliveError(keepalive, 500, 'Failed to fetch scan-due candidates', { message: error.message });
     } finally {
       // Always stop, on the success path, on a settleWithConcurrency rejection
       // (defensive — its allSettled shape shouldn't reject), and on any

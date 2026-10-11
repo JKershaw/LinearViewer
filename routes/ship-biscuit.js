@@ -25,7 +25,7 @@
 import { Router } from 'express';
 import { renderShipBiscuitPage } from '../lib/render-ship-biscuit.js';
 import { renderErrorPage } from '../lib/render.js';
-import { jsonError, serviceUnavailable } from '../lib/errors.js';
+import { jsonError, keepaliveError, serviceUnavailable } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
@@ -185,8 +185,7 @@ export function createShipBiscuitRoutes({
         if (isFreeTier) {
           const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
           if (check) {
-            return keepalive.send(429, {
-              error: check.reason,
+            return keepaliveError(keepalive, 429, check.reason, {
               freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
             });
           }
@@ -245,19 +244,21 @@ export function createShipBiscuitRoutes({
       keepalive.stop();
       console.error("Ship's Biscuit generate error:", error);
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
       // Non-quiet editor reply that couldn't be parsed (typically truncated). Surface
       // it as a retryable error rather than a silent quiet edition (LIN-1185).
       if (error.editorFailure) {
-        return keepalive.send(502, {
-          error: error.editorFailure.truncated
+        return keepaliveError(
+          keepalive,
+          502,
+          error.editorFailure.truncated
             ? 'The edition was cut off before the editor finished writing it. Please try again.'
             : "The editor's reply couldn't be read. Please try again.",
-          editorFailure: error.editorFailure,
-        });
+          { editorFailure: error.editorFailure },
+        );
       }
-      keepalive.send(502, { error: 'Failed to generate the edition' });
+      keepaliveError(keepalive, 502, 'Failed to generate the edition');
     }
   });
 
