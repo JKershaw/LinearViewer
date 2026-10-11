@@ -1205,7 +1205,7 @@ ${goal}`
         issueId,
         { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
       );
-      const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
+      const { issue, children } = context;
 
       if (closed) return;
 
@@ -1339,7 +1339,7 @@ ${goal}`
           // Forward `attachments` (LIN-777) so the terminal hop's routing and stage
           // prompts carry the ## Attachments section, matching the proxy
           // recommendation path. fetchRecommendationContext carries it (LIN-772/773).
-          await prepareRecommendationInput({ parent, siblings, project, children, comments, focusedChild, attachments }, { dispatchQueueStore, urlKey: workspace.urlKey, identifier: issue.identifier }),
+          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey: workspace.urlKey, identifier: issue.identifier }),
           {
             apiKey: apiKeyToUse,
             model: selectedModel,

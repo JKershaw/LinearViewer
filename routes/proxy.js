@@ -1612,7 +1612,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // then the AI recommendation. Uses a longer timeout since this makes a
     // Linear API call + an OpenRouter LLM call.
     const context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal, noDescend }), CONTEXT_FETCH_TIMEOUT_MS);
-    const { issue, parent, siblings, project, children, comments, focusedChild, attachments } = context;
+    const { issue, children } = context;
 
     // Resolve the effective key (free-tier when no session/env key) so both
     // recommend surfaces send a valid key. Metering is NOT done here — this runs
@@ -1640,7 +1640,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          await prepareRecommendationInput({ parent, siblings, project, children, comments, focusedChild, attachments }, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
+          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
