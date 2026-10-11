@@ -39,7 +39,7 @@
  */
 
 import { Router, json } from 'express';
-import { badRequest, jsonError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, serverError, serviceUnavailable, classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
 import { dispatchSessionFollowUp } from '../lib/follow-up-dispatch.js';
 import { dispatchQueueLimiter } from './dispatch.js';
@@ -2005,7 +2005,7 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Observation sessions error:', error);
-      keepalive.send(500, { error: 'Could not load sessions' });
+      keepaliveError(keepalive, 500, 'Could not load sessions');
     }
   });
 
@@ -2031,7 +2031,7 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard loops error:', error);
-      keepalive.send(500, { error: 'Could not load runs' });
+      keepaliveError(keepalive, 500, 'Could not load runs');
     }
   });
 
@@ -2127,7 +2127,7 @@ export function createDashboardRoutes({
       });
     } catch (error) {
       console.error('Dashboard rulings error:', error);
-      keepalive.send(500, { error: 'Could not load rulings' });
+      keepaliveError(keepalive, 500, 'Could not load rulings');
     }
   });
 
@@ -2554,7 +2554,7 @@ export function createDashboardRoutes({
       keepalive.send(200, { windowDays, generatedAt: now.toISOString(), ...kpis });
     } catch (error) {
       console.error('Escalation KPIs error:', error);
-      keepalive.send(500, { error: 'Could not compute escalation KPIs' });
+      keepaliveError(keepalive, 500, 'Could not compute escalation KPIs');
     }
   });
 
@@ -2724,10 +2724,10 @@ export function createDashboardRoutes({
       keepalive.stop();
       if (isAuthError(error)) {
         const classified = classifyUpstreamError(error);
-        return keepalive.send(401, { error: classified.detail, code: classified.code, retryable: classified.retryable });
+        return keepaliveError(keepalive, 401, classified.detail, { code: classified.code, retryable: classified.retryable });
       }
       console.error('Effort read-out error:', error);
-      keepalive.send(500, { error: 'Could not compute the effort read-out' });
+      keepaliveError(keepalive, 500, 'Could not compute the effort read-out');
     }
   });
 
@@ -3055,7 +3055,7 @@ export function createDashboardRoutes({
         session = sessions.find(s => String(s.sessionId) === String(sessionId)) || null;
       }
       if (!session) {
-        return keepalive.send(404, { error: 'Session not found' });
+        return keepaliveError(keepalive, 404, 'Session not found');
       }
 
       const graph = buildSessionContextGraph(issues, session.tasksTouched, {
@@ -3075,9 +3075,9 @@ export function createDashboardRoutes({
       console.error('Dashboard session-context error:', error);
       keepalive.stop();
       if (error.response?.status === 401) {
-        return keepalive.send(401, { error: 'Token expired or invalid' });
+        return keepaliveError(keepalive, 401, 'Token expired or invalid');
       }
-      return keepalive.send(500, { error: 'Could not build session context' });
+      return keepaliveError(keepalive, 500, 'Could not build session context');
     }
   });
 

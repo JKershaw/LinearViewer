@@ -95,7 +95,7 @@ import {
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
-import { badRequest, jsonError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
 
 /**
  * Resolve the OpenRouter credentials for a proxy LLM call, mirroring
@@ -891,7 +891,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       res.set('Retry-After', String(refusal.retryAfter));
     }
     if (keepalive) {
-      keepalive.send(409, { error: err.message, ...refusal });
+      keepaliveError(keepalive, 409, err.message, { ...refusal });
     } else {
       jsonError(res, 409, err.message, refusal);
     }
@@ -941,7 +941,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       const refusal = err.closeOutRefusal;
       logEvent(req, endpoint, 409, `${CLOSE_OUT_IS_THE_PERSONS_CODE} ${refusal.sessionId}`);
       if (keepalive) {
-        keepalive.send(409, { error: err.message, ...refusal });
+        keepaliveError(keepalive, 409, err.message, { ...refusal });
       } else {
         jsonError(res, 409, err.message, refusal);
       }
@@ -953,7 +953,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       const refusal = err.taskSessionRunaway;
       logEvent(req, endpoint, 409, `${TASK_SESSION_RUNAWAY_CODE} ${refusal.sessionId}`);
       if (keepalive) {
-        keepalive.send(409, { error: err.message, ...refusal });
+        keepaliveError(keepalive, 409, err.message, { ...refusal });
       } else {
         jsonError(res, 409, err.message, refusal);
       }
@@ -964,7 +964,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     // Bound discriminator ('tasks') on the durable proxy-event note.
     logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.bound} ${refusal.sessionId}`);
     if (keepalive) {
-      keepalive.send(409, { error: err.message, ...refusal });
+      keepaliveError(keepalive, 409, err.message, { ...refusal });
     } else {
       jsonError(res, 409, err.message, refusal);
     }
@@ -1001,7 +1001,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       res.set('Retry-After', String(refusal.retryAfter));
     }
     if (keepalive) {
-      keepalive.send(status, { error: refusal.error, ...body });
+      keepaliveError(keepalive, status, refusal.error, { ...body });
     } else {
       jsonError(res, status, refusal.error, body);
     }

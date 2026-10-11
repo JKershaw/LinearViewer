@@ -4,7 +4,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { jsonError, badRequest, unauthorized, notFound, serverError, serviceUnavailable } from '../../lib/errors.js';
+import { EventEmitter } from 'node:events';
+import { armKeepalive, FIRST_BYTE_TARGET_MS } from '../../lib/http-keepalive.js';
+import { jsonError, keepaliveError, badRequest, unauthorized, notFound, serverError, serviceUnavailable } from '../../lib/errors.js';
 
 function fakeRes() {
   const res = {
@@ -35,6 +37,59 @@ describe('jsonError', () => {
     const res = fakeRes();
     jsonError(res, 502, 'upstream', { detail: null });
     assert.equal(JSON.stringify(res.body), '{"error":"upstream","detail":null}');
+  });
+});
+
+function keepaliveRes() {
+  const res = new EventEmitter();
+  Object.assign(res, {
+    statusCode: 200, writes: [], writableEnded: false, writableFinished: false, destroyed: false,
+    status(code) { this.statusCode = code; return this; },
+    setHeader() { return this; },
+    flushHeaders() { return this; },
+    write(chunk) { this.writes.push(chunk); return true; },
+    json(b) { this.jsonBody = b; return this; },
+    end(b) { this.endedWith = b; this.writableEnded = true; this.writableFinished = true; return this; }
+  });
+  return res;
+}
+
+describe('keepaliveError (LIN-3465)', () => {
+  test('unflushed: replies with the given status and { error }', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+    const res = keepaliveRes();
+    keepaliveError(armKeepalive(res), 503, 'x');
+    assert.equal(res.statusCode, 503);
+    assert.equal(JSON.stringify(res.jsonBody), '{"error":"x"}');
+  });
+
+  test('unflushed: extra follows error in order, explicit null kept', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+    const res = keepaliveRes();
+    keepaliveError(armKeepalive(res), 429, 'x', { code: 'C', detail: null });
+    assert.equal(res.statusCode, 429);
+    assert.equal(JSON.stringify(res.jsonBody), '{"error":"x","code":"C","detail":null}');
+  });
+
+  test('flushed: statusCode rides in the body, appended last', (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_800_000_000_000 });
+    const res = keepaliveRes();
+    res.req = { get: () => String(Date.now() - FIRST_BYTE_TARGET_MS) };
+    const ka = armKeepalive(res);
+    t.mock.timers.tick(0);
+    assert.equal(ka.flushed, true);
+    keepaliveError(ka, 429, 'x', { code: 'C' });
+    assert.equal(res.endedWith, '{"error":"x","code":"C","statusCode":429}');
+  });
+
+  test('returns what send returns and does not mutate extra', () => {
+    const sentinel = {};
+    const calls = [];
+    const extra = Object.freeze({ a: 1 });
+    const out = keepaliveError({ send: (...args) => { calls.push(args); return sentinel; } }, 500, 'e', extra);
+    assert.equal(out, sentinel);
+    assert.deepEqual(calls, [[500, { error: 'e', a: 1 }]]);
+    assert.deepEqual(extra, { a: 1 });
   });
 });
 

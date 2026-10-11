@@ -37,7 +37,7 @@ import { createChatToolCatalog as defaultCreateChatToolCatalog } from '../lib/ch
 import { buildCensusSeedText } from './flight-companion.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
-import { jsonError } from '../lib/errors.js';
+import { jsonError, keepaliveError } from '../lib/errors.js';
 import { CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
 
 // LIN-2970: a proxy caller's message body is capped the same as the
@@ -333,8 +333,8 @@ export function createProxyFlightCompanionRoutes({
           return res.end();
         }
         logEvent(req, ENDPOINT, 500);
-        const body = { error: 'Failed to generate a response' };
-        keepalive ? keepalive.send(500, body) : jsonError(res, 500, body.error);
+        const message = 'Failed to generate a response';
+        keepalive ? keepaliveError(keepalive, 500, message) : jsonError(res, 500, message);
       }
     }
   );

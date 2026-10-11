@@ -27,7 +27,7 @@ import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION } from '../lib/dis
 import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
-import { badRequest, jsonError, notFound } from '../lib/errors.js';
+import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 
 /**
  * @param {Object} deps
@@ -458,19 +458,19 @@ export function createComputeRoutes({
           } catch (err) {
             if (err.message?.includes('not found')) {
               logEvent(req, '/api/proxy/recommend', 404);
-              return keepalive.send(404, { error: 'Issue not found' });
+              return keepaliveError(keepalive, 404, 'Issue not found');
             }
             throw err;
           }
           if (!ctx) {
             logEvent(req, '/api/proxy/recommend', 404);
-            return keepalive.send(404, { error: 'Issue not found' });
+            return keepaliveError(keepalive, 404, 'Issue not found');
           }
           const { issue, parent, siblings, project, children, comments, attachments } = ctx;
           const generated = generatePrompt(kind, issue, { parent, siblings, project, children, comments, attachments }, {}, provider?.ui || null);
           if (!generated) {
             logEvent(req, '/api/proxy/recommend', 500);
-            return keepalive.send(500, { error: 'Failed to generate prompt' });
+            return keepaliveError(keepalive, 500, 'Failed to generate prompt');
           }
           // Shape a recommendation-equivalent object so the override falls through
           // to the shared md/JSON response below (no forked response path).
@@ -541,7 +541,7 @@ export function createComputeRoutes({
         // left, and that is not an AI outage.
         if (gone.gone) {
           logEvent(req, '/api/proxy/recommend', 499, 'client closed');
-          return keepalive.send(499, { error: 'Client closed the request' });
+          return keepaliveError(keepalive, 499, 'Client closed the request');
         }
         const { status, body } = recommendErrorResponse(err, req);
         logEvent(req, '/api/proxy/recommend', status);
@@ -1067,7 +1067,7 @@ export function createComputeRoutes({
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
             logEvent(req, '/api/proxy/recap', 404);
-            return keepalive.send(404, { error: 'Issue not found' });
+            return keepaliveError(keepalive, 404, 'Issue not found');
           }
         } else {
           context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
@@ -1105,7 +1105,7 @@ export function createComputeRoutes({
         const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
         if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
           logEvent(req, '/api/proxy/recap', 503);
-          return keepalive.send(503, { error: 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+          return keepaliveError(keepalive, 503, 'AI recap is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
         }
 
         // LIN-1458: witness which credential source served this request.
@@ -1235,7 +1235,7 @@ export function createComputeRoutes({
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
             logEvent(req, '/api/proxy/recap', 404);
-            return keepalive.send(404, { error: 'Issue not found' });
+            return keepaliveError(keepalive, 404, 'Issue not found');
           }
         } else {
           context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
@@ -1350,7 +1350,7 @@ export function createComputeRoutes({
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
             logEvent(req, '/api/proxy/brief', 404);
-            return keepalive.send(404, { error: 'Issue not found' });
+            return keepaliveError(keepalive, 404, 'Issue not found');
           }
         } else {
           context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
@@ -1387,7 +1387,7 @@ export function createComputeRoutes({
         const { apiKey: resolvedApiKey, isFreeTier } = resolveProxyLLM(sessionApiKey);
         if (!isTestMode && !isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
           logEvent(req, '/api/proxy/brief', 503);
-          return keepalive.send(503, { error: 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.' });
+          return keepaliveError(keepalive, 503, 'AI brief is not configured. Connect OpenRouter via OAuth or set OPENROUTER_API_KEY on the server.');
         }
 
         // LIN-1458: witness which credential source served this request.
@@ -1516,7 +1516,7 @@ export function createComputeRoutes({
           context = await buildMockRecapContextFromFixtures(identifier);
           if (!context) {
             logEvent(req, '/api/proxy/brief', 404);
-            return keepalive.send(404, { error: 'Issue not found' });
+            return keepaliveError(keepalive, 404, 'Issue not found');
           }
         } else {
           context = await fetchWithTimeout((signal) => provider.fetchRecommendationContext(accessToken, identifier, { signal }), CONTEXT_FETCH_TIMEOUT_MS);
