@@ -1,0 +1,23 @@
+Done tickets with features 335 with PR lines 273
+  words low  (58-351): n=111 sessions med 7 mean 10.9 split 14%
+  words mid  (351-607): n=112 sessions med 6.0 mean 10.0 split 6%
+  words high (615-4233): n=112 sessions med 7.0 mean 8.4 split 7%
+  file_refs low  (0-3): n=111 sessions med 7 mean 13.6 split 17%
+  file_refs mid  (3-9): n=112 sessions med 7.0 mean 7.9 split 4%
+  file_refs high (9-57): n=112 sessions med 6.0 mean 7.7 split 6%
+  line_anchors low  (0-0): n=111 sessions med 5 mean 9.8 split 12%
+  line_anchors mid  (0-4): n=112 sessions med 7.0 mean 9.9 split 10%
+  line_anchors high (4-107): n=112 sessions med 7.0 mean 9.5 split 5%
+  questions low  (0-0): n=111 sessions med 8 mean 10.1 split 8%
+  questions mid  (0-0): n=112 sessions med 7.0 mean 11.1 split 12%
+  questions high (0-10): n=112 sessions med 5.0 mean 8.1 split 7%
+  has_done=False: n=139 sessions med 5 mean 7.9 split 8%
+  has_done=True: n=196 sessions med 8.0 mean 11.0 split 10%
+  has_fix=False: n=327 sessions med 7 mean 9.8 split 9%
+  has_fix=True: n=8 sessions med 7.5 mean 6.8 split 12%
+  has_behaviour=False: n=329 sessions med 6 mean 9.8 split 9%
+  has_behaviour=True: n=6 sessions med 8.5 mean 8.3 split 0%
+  has_plan=False: n=248 sessions med 6.0 mean 10.1 split 11%
+  has_plan=True: n=87 sessions med 7 mean 8.8 split 3%
+  out_of_scope=False: n=265 sessions med 6 mean 9.5 split 10%
+  out_of_scope=True: n=70 sessions med 8.0 mean 10.6 split 6%

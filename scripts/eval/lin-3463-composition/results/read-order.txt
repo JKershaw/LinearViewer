@@ -1,0 +1,21 @@
+ALL 2843 {'brief+issue (brief first)': '1689 (59%)', 'brief+issue (issue first)': '981 (35%)', 'issue only': '126 (4%)', 'neither': '28 (1%)', 'brief only': '19 (1%)'}
+M2026-09 1952 {'brief+issue (brief first)': '923 (47%)', 'brief+issue (issue first)': '886 (45%)', 'issue only': '109 (6%)', 'neither': '20 (1%)', 'brief only': '14 (1%)'}
+M2026-10 863 {'brief+issue (brief first)': '752 (87%)', 'brief+issue (issue first)': '81 (9%)', 'issue only': '17 (2%)', 'neither': '8 (1%)', 'brief only': '5 (1%)'}
+review 652 {'brief+issue (brief first)': '343 (53%)', 'brief+issue (issue first)': '265 (41%)', 'issue only': '38 (6%)', 'brief only': '5 (1%)', 'neither': '1 (0%)'}
+plan 418 {'brief+issue (brief first)': '402 (96%)', 'issue only': '7 (2%)', 'brief+issue (issue first)': '7 (2%)', 'brief only': '1 (0%)', 'neither': '1 (0%)'}
+autopilot 387 {'brief+issue (issue first)': '221 (57%)', 'brief+issue (brief first)': '152 (39%)', 'issue only': '10 (3%)', 'brief only': '3 (1%)', 'neither': '1 (0%)'}
+implementation 373 {'brief+issue (brief first)': '357 (96%)', 'brief+issue (issue first)': '5 (1%)', 'brief only': '4 (1%)', 'issue only': '4 (1%)', 'neither': '3 (1%)'}
+close-out 336 {'brief+issue (issue first)': '194 (58%)', 'brief+issue (brief first)': '115 (34%)', 'issue only': '26 (8%)', 'neither': '1 (0%)'}
+plan-review 336 {'brief+issue (issue first)': '189 (56%)', 'brief+issue (brief first)': '119 (35%)', 'issue only': '26 (8%)', 'neither': '2 (1%)'}
+research 150 {'brief+issue (brief first)': '140 (93%)', 'brief only': '4 (3%)', 'neither': '3 (2%)', 'issue only': '2 (1%)', 'brief+issue (issue first)': '1 (1%)'}
+custom 64 {'brief+issue (issue first)': '30 (47%)', 'brief+issue (brief first)': '27 (42%)', 'issue only': '3 (5%)', 'neither': '3 (5%)', 'brief only': '1 (2%)'}
+blocked 39 {'brief+issue (issue first)': '19 (49%)', 'neither': '8 (21%)', 'brief+issue (brief first)': '8 (21%)', 'issue only': '3 (8%)', 'brief only': '1 (3%)'}
+breakdown 36 {'brief+issue (issue first)': '24 (67%)', 'brief+issue (brief first)': '6 (17%)', 'issue only': '5 (14%)', 'neither': '1 (3%)'}
+M2026-08 28 {'brief+issue (brief first)': '14 (50%)', 'brief+issue (issue first)': '14 (50%)'}
+week 2026-08-24 7 brief first 43%  issue first 57%
+week 2026-08-31 628 brief first 49%  issue first 42%
+week 2026-09-07 315 brief first 48%  issue first 44%
+week 2026-09-14 200 brief first 40%  issue first 52%
+week 2026-09-21 638 brief first 50%  issue first 43%
+week 2026-09-28 522 brief first 59%  issue first 36%
+week 2026-10-05 533 brief first 97%  issue first 1%

@@ -1,0 +1,2141 @@
+[
+ {
+  "pair": "F16",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "5 routes ... move group A tokens-admin to a router.use() sub-router",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "These five routes use workspaceFromUrl session auth, not authenticateProxyToken ... Do not \"harmonise\" the chain.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "WHAT",
+    "quote": "proxyTokenCreationLimiter ... is process-global ... a per-factory limiter would be a behaviour change.",
+    "fate": "kept",
+    "note": "Brief also carries the comment's warning against declaring it inside the factory."
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "The new module must carry that import ... Move it byte-identically; do not \"simplify\" it.",
+    "fate": "kept",
+    "note": "providerDisplayName via getProvider, not resolveProviderAccess/getProviderForWorkspace."
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Re-derive its line span before starting.",
+    "fate": "kept",
+    "note": "In open questions."
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "mounted at this group's own original position inside createProxyRoutes",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "Do not create routes/proxy-context.js.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "Handler bodies move verbatim. Wire contract byte-identical; 55 endpoints / 65 URL forms before and after; exported symbols stable",
+    "fate": "kept",
+    "note": "Endpoint/URL-form counts not restated."
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Do not absorb handler decomposition ... Folding any of it into a move PR is out of scope.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Re-run tests/unit/proxy-endpoint-inventory-witness.test.js. Its 65 HTTP rows ... must all stay green.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "Hand-lower the hard-coded 55 at tests/unit/proxy-endpoint-inventory-witness.test.js:544-548 in this same PR.",
+    "fate": "kept",
+    "note": "Brief keeps stale '55' in constraints but flags re-derivation in open questions."
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "Invoke node scripts/proxy-decomposition-tables.mjs by hand ... Table A destination column ... advisory only",
+    "fate": "kept",
+    "note": "Advisory-column caveat dropped."
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "Full npm test green, including tests/e2e/proxy.spec.js",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "A still-green absence assertion whose subject has left the file is a defect ... Re-point every one explicitly.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "HOW",
+    "quote": "Recommendation: inject, per the proxyLimiter precedent",
+    "fate": "weakened",
+    "note": "Brief presents inject-vs-move as an open question without the research's recommendation."
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "router.use(createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, workspaceFromUrl, proxyTokenCreationLimiter }));",
+    "fate": "weakened",
+    "note": "Brief: 'exact mount signature ... still needs confirmation'; names createTokensAdminRoutes/file but not the four deps."
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "No limiter on four of five routes ... A mechanical move must not helpfully add one.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "The count literal is 53, not 55, and the edit is 53 -> 48.",
+    "fate": "weakened",
+    "note": "Brief says the total must be re-derived; acceptable given the re-derive-at-PR-time rule."
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "Edit ... scripts/proxy-decomposition-tables.mjs:135 (EXPECTED_ROUTES_IN_FILE) ... CI will not catch an un-lowered script literal.",
+    "fate": "dropped",
+    "note": "Brief only mentions the witness literal."
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "Goes dead in routes/proxy.js after the move (remove the imports): getProvider, getFeatureFlags, ownerlessCompatEnabled, serviceUnavailable, BOOTSTRAP_TOKEN_TTL_SECONDS",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "HOW",
+    "quote": "PROMPT_PROXY_LABEL ... move (1 ref) ... carry the :401-405 comment",
+    "fate": "dropped",
+    "note": "Brief's 're-import plain imports as needed' covers imports, not module-scope moves."
+   },
+   {
+    "id": "S22",
+    "type": "WHAT",
+    "quote": "Say so in the PR — the names collide ... only one of the two moves.",
+    "fate": "dropped",
+    "note": "Credential-health collision note and 'mount position for reviewability' PR statements."
+   },
+   {
+    "id": "S23",
+    "type": "WHY",
+    "quote": "There are two direct browser consumers, not three — public/swipe.js:447 is a false positive.",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S24",
+    "type": "WHY",
+    "quote": "The && short-circuits — ... 'npm test green' is only meaningful when both halves are reported separately.",
+    "fate": "dropped",
+    "note": "Minor."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "Any absence assertion whose subject leaves routes/proxy.js must be re-pointed; if none exist, do not invent one.",
+    "note": "Source is neutral, and the LIN-2245 template adds pins/witnesses; 'do not invent one' is firmer than the source."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the research's finding that scripts/proxy-decomposition-tables.mjs:135 must also be hand-lowered (CI will not catch it), and presents the research's inject recommendation and four-dep mount signature as open.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F17",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "13 routes ... move group D reads to a router.use() sub-router",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "Independent of Stage 3b/E ... Either may land first; neither blocks the other.",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S3",
+    "type": "DONE",
+    "quote": "'uploads.linear.app' count is a security census and must stay exactly 2. Widen ASSET_RELAY_FILES ... never relax the count.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "trashed-signal.test.js:126,129 ... re-point to D.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": ":126 and :127 are the two {nodes:} ABSENCE assertions ... re-point them explicitly and add a complementary expect 0 in routes/proxy.js pin.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "proxy-provider-error-attribution.test.js:422 ... and its paired absence assertion :423 ... Re-point both in the same commit.",
+    "fate": "kept",
+    "note": "The ':392,:400 no action' note is dropped."
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Widen it here, at Stage 3a, to read every extracted module plus routes/proxy.js. Re-triage the check's shape",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "The prelude (routes/proxy.js:1-1597) never moves in any stage",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "mounted at this group's own original position inside createProxyRoutes",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "Do not create routes/proxy-context.js.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "Handler bodies move verbatim. Wire contract byte-identical; 55 endpoints / 65 URL forms before and after",
+    "fate": "kept",
+    "note": "Counts not restated."
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "Do not absorb handler decomposition.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "Re-run tests/unit/proxy-endpoint-inventory-witness.test.js.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "Hand-lower the hard-coded 55 ... in this same PR.",
+    "fate": "kept",
+    "note": "Open question oddly asks whether 55 should remain the same, but still says to lower it."
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "Invoke node scripts/proxy-decomposition-tables.mjs by hand",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "DONE",
+    "quote": "Full npm test green, including tests/e2e/proxy.spec.js",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "DONE",
+    "quote": "re-point to the new file, keep the count exact, add a complementary expect 0 ... and add an HTTP-level witness",
+    "fate": "kept",
+    "note": "HTTP-level witness clause dropped from the general rule."
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "Re-derive line anchors at PR time; do not trust the numbers above",
+    "fate": "kept",
+    "note": "In open questions."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "It is not stated whether the endpoint-inventory witness's hard-coded 55 should remain the same after the move",
+    "note": "Source says to lower it; the brief hedges, though it also states it must be lowered."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "An open question suggests it is unclear whether the hard-coded 55 should change, though the source and the brief's own constraints both say to lower it.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F18",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "12 routes ... move group E writes to a router.use() sub-router",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "Independent of Stage 3a/D — disjoint blame bands, either order.",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "the whole trashed guard is E-owned and moves as one unit ... Re-point together",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "the 409 presence/count pins straddle the prelude and E, so keep both files in the pin's read set.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "proxy-relations-query.test.js:101,106,108,111,114 — the DELETE-relations write-scope pins ... re-point to E.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "DONE",
+    "quote": "Re-verify the Stage-3a-widened ... floor pin ... ~11 remaining ... If it was not widened at 3a, widen it here",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Inject commentDedupe / commentDedupeGenerations from the composer; do NOT relocate their definitions",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHY",
+    "quote": "Table A's advisory 'destination: proxy-writes.js (+ re-export)' column encodes the rejected flat shape — ignore it here.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "Confirm routes/workspace-api.js's existing commentDedupe / commentDedupeGenerations import still resolves unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "mounted at this group's own original position inside createProxyRoutes",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "Do not create routes/proxy-context.js.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "Handler bodies move verbatim. Wire contract byte-identical; 55 endpoints / 65 URL forms",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "Do not absorb handler decomposition.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "Re-run ... witness ... Hand-lower the hard-coded 55 ... Invoke ... by hand ... Full npm test green",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "re-point to the new file, keep the count exact, add a complementary expect 0 in routes/proxy.js pin, and add an HTTP-level witness",
+    "fate": "kept",
+    "note": "Complementary expect-0 pin clause dropped; HTTP witness kept."
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "Re-derive line anchors at PR time",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "LIN-2561 now owns it and blocks this ticket. Close LIN-2561 first",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "LIN-2561 is a hard blocker here: whether it must be fixed first or whether this ticket should wait is unresolved in practice",
+    "note": "Source says close LIN-2561 first; the brief elsewhere agrees, so the effect is small."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "It is not explicitly confirmed here that the 55 inventory witness guard still targets only routes/proxy.js",
+    "note": "Source states 'That guard reads routes/proxy.js only'."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the instruction to keep both the prelude and E's module in the 409 pin's read set when re-pointing the trashed guard.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F19",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "4 routes ... move group H kickoff to a router.use() sub-router",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "H carries ZERO source-text pins ... Nothing here needs confirming at PR time.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "proxy-credential-fingerprint-stamping.test.js:121,130 — re-point again: new H module === 1 ... routes/proxy.js drops to === 1",
+    "fate": "dropped",
+    "note": "Three-way split part 2 of 3, 'still no expect 0' pin; absent from brief."
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "no-dep, always-200 text/plain responses. Keep the content type",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHAT",
+    "quote": "Move that envelope byte-identically and keep tests/unit/lin-2363-kickoff-provider-attribution.test.js green",
+    "fate": "kept",
+    "note": "Named test dropped."
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "Two findings LIN-2363 recorded but did not fix ... do not opportunistically fix them in a move PR",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "Decomposing POST /api/proxy/autopilot/kickoff (305 lines) — deferred follow-up ticket.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "mounted at this group's own original position inside createProxyRoutes",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Do not create routes/proxy-context.js.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Handler bodies move verbatim. Wire contract byte-identical",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "Re-run ... witness ... Hand-lower the hard-coded 55 ... script by hand ... Full npm test green",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "A still-green absence assertion whose subject has left the file is a defect ... Re-point every one explicitly.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "Ground against current origin/main, not this ticket's body ... Re-derive, don't re-read.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "Babel scope bindings over the moved span ... Do that first, not after a review demands it.",
+    "fate": "dropped",
+    "note": "Mechanical dependency enumeration and the warning about transitive propagation are both dropped."
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "Raise the census to include H's sub-router (F took it 5/39 -> 6/70; H makes seven).",
+    "fate": "kept",
+    "note": "Brief names the wrong file (lib helper rather than the .test.js census)."
+   },
+   {
+    "id": "S16",
+    "type": "DONE",
+    "quote": "Ensure the PR head is a genuine descendant of current main ... Get CI green on that rebased tree",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Do not cite the PR-0 inventory witness as an error-lane guard",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "One plan-review cycle; escalate only when findings stop narrowing ... plan is pinned deliberately",
+    "fate": "dropped",
+    "note": "Process discipline."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-fact",
+    "quote": "Raise tests/unit/lib/proxy-di-witness.js census for the new proxy sub-router",
+    "note": "Source places the census in proxy-di-witness.test.js; lib/proxy-di-witness.js is the discovery helper."
+   },
+   {
+    "id": "B2",
+    "type": "add-how",
+    "quote": "the new sub-router must be added to the witness corpus rather than hand-enumerated elsewhere",
+    "note": "Source says the corpus covers the new file 'the moment the file exists — no registration step'; the coordinator's 'mechanical' point concerned dep enumeration."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the coordinator's central instruction to compute the moved span's dependencies mechanically (Babel scope bindings, transitive propagation) before planning, along with the rebased-on-main CI requirement.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F20",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "a shared DI-witness helper such that deleting any dep from a router.use(createXRoutes({...})) mount turns something red",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "build the app through the real composer (createProxyRoutes), not the factory in isolation",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "DONE",
+    "quote": "One helper, used by Stage 2's PR rather than a fresh hand-rolled witness.",
+    "fate": "kept",
+    "note": "Re-grounded to 'needed now'; consistent with coordinator comment."
+   },
+   {
+    "id": "S4",
+    "type": "DONE",
+    "quote": "Validated by mutation ... drop a dep from a mount, observe the helper go red, restore.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "corpus derived from the filesystem (never hand-listed",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "A — mount-completeness census ... assert set-equality both ways ... fail loudly ... treat a defaulted param as optional",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "B — reach witness through the real composer ... reusing BASE_DEPS() / buildApp()",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "C — acceptance witness for B (script lane ...): run the suite under the registerHooks instrumentation and fail if any declared dep was never dereferenced",
+    "fate": "weakened",
+    "note": "Brief describes two halves only; C becomes an open question about where the helper lives."
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "recommend scoping B's initial rows to the store/data deps and the group's deepest error-path dep rather than attempting all 28",
+    "fate": "weakened",
+    "note": "Presented as open in two open questions."
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "Out of scope ... routes/workspace-api.js ... the helper should be shaped so a second glob can be added without redesign",
+    "fate": "weakened",
+    "note": "Out-of-scope kept; 'shape for a second glob' presented as not yet stated."
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "adding a parser dependency for a test-lane guard is out of proportion ... no new dependency",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "LIN-2555 ... Limiter lifetime is a different seam from dep presence ... Do not fold the two.",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "a new test must open zero non-loopback sockets ... app.listen(0, '127.0.0.1') ... closed in a finally",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "WHY",
+    "quote": "Reach is already total, so 'the dep was touched' is not a usable signal.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "WHY",
+    "quote": "it should assume the coverage is incidental and unlabelled",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "The only existing-file edit implied is exporting/lifting that file's BASE_DEPS()/buildApp()",
+    "fate": "kept",
+    "note": "Implied by the brief's reuse constraint."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "Should the helper live in tests/unit only, or be lifted into a small scripts/-lane acceptance check as the research recommends",
+    "note": "Research recommends the C script lane as part of the shape."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "Which specific probe rows should the initial runtime witness cover: only the store/data deps, or also the deeper error-path deps",
+    "note": "Research recommends store/data deps plus the deepest error-path dep."
+   },
+   {
+    "id": "B3",
+    "type": "opens-decided",
+    "quote": "it is not yet stated whether this helper should be shaped for easy reuse there later.",
+    "note": "Source states it should be shaped so a second glob can be added without redesign."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief cuts the recommended three-part shape to two halves, turning the script-lane 'every declared dep reached' acceptance witness (C) into an open question an agent could easily skip.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F21",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Move graphqlErrorStatus / graphqlErrorDetail / graphqlErrorExtra (and the family's shared helper) verbatim ... into a new lib/proxy-graphql-errors.js, imported rather than injected.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "Read it before planning — it carries the measurements ... This ticket is a pointer, not a re-specification.",
+    "fate": "dropped",
+    "note": "Brief never names the LIN-679 research comment 09dfee31 as source of truth."
+   },
+   {
+    "id": "S3",
+    "type": "WHY",
+    "quote": "it is a DI-surface win, not a size win",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "before Stage 3a (D), NOT before group C ... Group C (LIN-2535) proceeds first, unblocked by this.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHY",
+    "quote": "no pin anchors on them; the registration guard is untouched at 53; the wire contract is unchanged",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "a shared routes/proxy-context.js — remains correctly excluded",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "The PR-0 inventory witness does not cover the error-mapping lane and must not be cited as if it does",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "Verified against the behavioural error-lane corpus above, not the inventory witness alone.",
+    "fate": "kept",
+    "note": "Named corpus files not listed."
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "Full npm test green and CI green and read before merge.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Branch from origin/main.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the pointer to LIN-679's research comment 09dfee31, which the source names as the source of truth to read before planning, and omits the names of the behavioural corpus files.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F22",
+  "units": [
+   {
+    "id": "S1",
+    "type": "HOW",
+    "quote": "The turn core (LIN-2631) sums hop usage and emits the total on the final done",
+    "fate": "dropped",
+    "note": "Brief asks for per-turn cost in the meta line but never says to sum hop usage (final done carries only last hop)."
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "Silent ticks count too ... the strip reads N check-ins · $x this tab",
+    "fate": "kept",
+    "note": "Exact strip format dropped."
+   },
+   {
+    "id": "S3",
+    "type": "WHAT",
+    "quote": "Status strip above the thread: model id; tools on or off; last check-in; next check-in due; sweep liveness ... and the mode line",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "mode: read-only · proposes, never acts · rung 1 of 3",
+    "fate": "weakened",
+    "note": "Wording made an open question."
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "the GET handler must read the model through the SAME function the turn core resolves with today ... Keep tools-on/off derived from isToolCapableModel",
+    "fate": "weakened",
+    "note": "Brief constraint omits the same-resolver rule and makes it an open question."
+   },
+   {
+    "id": "S6",
+    "type": "WHAT",
+    "quote": "a tap answers through the same reply path (window.ReplyDelivery.postComment with the decision id) ... no new write posture",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "LIN-2625 ... item 4 of your What is already filled; leave it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "public/llms.txt's Flight Companion DOM block (:358-381) and endpoint list, and CLAUDE.md's ... entries",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Mobile first ... Dark theme and reduced motion, semantic tokens only.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "e2e via mockTurn extended with usage on done ... a silent tick updates the running total ... (LIN-2443 AC1 and AC2 stay green)",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "Unit: hop usage summing in the turn core; the strip reflects an uncurated model as tools-off; the mode line reads rung 1",
+    "fate": "weakened",
+    "note": "Brief keeps the tools-off/rung-1 behaviour but not the tests or hop summing."
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "e2e: a decision row renders option buttons; a tap posts through the reply path and the row settles.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "tests/e2e/flight-companion-proxy-copy.spec.js stays byte-for-byte green.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "Out of scope: The thinking state, breadcrumbs and page shape (LIN-2632). The Start button (LIN-2622). Model choice (LIN-2623).",
+    "fate": "narrowed",
+    "note": "Only the LIN-2632 exclusion kept."
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "LIN-2487 is Done ... Do NOT re-implement it; your strip reuses that formatter ... do not touch LIN-2487.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "WHAT",
+    "quote": "#flight-companion-reorient has no visual affordance — your strip absorbs it.",
+    "fate": "weakened",
+    "note": "Only in changelog, not listed as work."
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Forbidden: lib/workspace-preferences.js, lib/render-settings.js, server.js ... lib/flight-companion-turn.js (hop-usage summing ... ONLY, minimal + named)",
+    "fate": "dropped",
+    "note": "File carve absent apart from chat.css reuse."
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "Wind down if: The option-button primitive ... cannot be reused without forking it. The change needs the approve route altered.",
+    "fate": "weakened",
+    "note": "Brief says don't fork, but drops the stop/wind-down behaviour and the approve-route trigger."
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "Stage sequence: implementation, review, close-out ... fresh-context review in a DETACHED worktree ... CI 6/6 green on the exact head, rebased",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "Whether the status strip should reuse the turn-core model resolver exactly as the description says, given the later note that LIN-2623 has not landed",
+    "note": "The leg mandate decides: use the same function the turn core uses today."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "The exact wording/format of the mode line and whether 'rung 1 of 3' is final or only the current placeholder.",
+    "note": "Source gives the exact mode line text."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops summing hop usage onto the final done in the turn core, so per-turn cost would show only the last hop's usage. It also drops the file carve, the wind-down triggers and the acceptance tests.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F23",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "POST /workspace/:urlKey/api/flight-companion/boot, session-auth, flag-gated like the turn route ... calling the turn core",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "Server-composed boot prompt from the shared brief. Tools on.",
+    "fate": "kept",
+    "note": "'Tools on' dropped."
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "followUpMode: 'propose': a boot never executes a write.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "Its own budget for this turn only: maxIterations 5 and maxTokens 2500",
+    "fate": "weakened",
+    "note": "Brief says 'its own budget' with no values."
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "the boot reserves before the model call through buildTurnRecords ... commits its own baseline after done, and the commit skips when ... not this turn's",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "the boot passes its own lease, derived from its own budget, through the same parameter LIN-2631 introduces",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "WHAT",
+    "quote": "a boot is billable and charges freeTierStore.tryUse exactly like a user-initiated turn ... with the same 429",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "boot, selected by ENDPOINT, never by a body flag",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "WHAT",
+    "quote": "a 'start' button in the empty state and a 're-orient' affordance in the status strip ... SSE frames identical to /turn",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "Boot renders as a user-initiated turn with a synthetic 'start' user row, and resets the wake cadence on done.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "public/llms.txt's endpoint list and DOM block; CLAUDE.md's routes/flight-companion.js entry.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "commits the baseline on done but not on error or disconnect (LIN-2442's property; LIN-2449's hazard applies here too)",
+    "fate": "dropped",
+    "note": "Brief says commit after done but not the no-commit-on-error/disconnect property; mandate's 'read LIN-2449 before designing the commit' also dropped."
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "boot uses propose mode (mutation: flipping to execute makes a test red)",
+    "fate": "dropped",
+    "note": "Brief says only 'wire tests/e2e'."
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "a boot racing an auto-wake never clears the other's lease; whichever loses the CAS does not spend.",
+    "fate": "kept",
+    "note": "As a behaviour constraint, not a test."
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "e2e: the button exists in the empty state and drives a mocked SSE turn to a rendered readout.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "DONE",
+    "quote": "the boot prompt contains the headline-block instruction and the seven body headings in order",
+    "fate": "dropped",
+    "note": "Only an open question about the headline-block slot."
+   },
+   {
+    "id": "S17",
+    "type": "OPEN",
+    "quote": "Agent-graded or manual, recorded on LIN-2634: a live boot compared against the same morning's CLI boot.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "WHY",
+    "quote": "a short hello, three reads in parallel, a targeted second wave, then the headline block and the readout.",
+    "fate": "dropped",
+    "note": "Boot sequence spec."
+   },
+   {
+    "id": "S19",
+    "type": "BOUND",
+    "quote": "Wind down if: LIN-2631's record producer does not cover what the boot needs; record the gap on LIN-2631 and stop rather than forking",
+    "fate": "weakened",
+    "note": "Brief: 'do not invent a separate commit path', but drops record-and-stop, and the LIN-2449-contradiction trigger is gone too."
+   },
+   {
+    "id": "S20",
+    "type": "BOUND",
+    "quote": "Forbidden: lib/flight-companion-turn.js beyond a minimal named seam change ... lib/flight-companion-gate.js, lib/observer-state-store.js",
+    "fate": "kept",
+    "note": "Rest of forbidden list (chat-tools, proxy, dispatch-store etc.) dropped."
+   },
+   {
+    "id": "S21",
+    "type": "HOW",
+    "quote": "merge only on a recorded Approve with CI green on the exact head ... fresh-context review in a DETACHED worktree ... rebase before merge",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S22",
+    "type": "BOUND",
+    "quote": "Out of scope: Autonomy toggles, memory.",
+    "fate": "dropped",
+    "note": "Minor."
+   }
+  ],
+  "additions": [],
+  "verdict": "material",
+  "most_consequential": "The brief drops the concrete boot budget (maxIterations 5, maxTokens 2500) and the requirement that the baseline not commit on error or disconnect, so an agent would choose its own budget and commit semantics.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F24",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHY",
+    "quote": "this ticket retires them so 'nothing looks dead' is a true sentence and the observer starts from a clean fleet.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "So status is not touched.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "A new bookkeeping stamp on the history row, written by a dispatch-store maintenance method. classifyLoop ... treats a stamped row as resolved",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Observers must not mutate fleet truth through feedback[]",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHAT",
+    "quote": "a non-terminal row with no activity for over FOSSIL_AGE_MS ... whose runner session is not live.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "DONE",
+    "quote": "Dry run first: post the count by age bucket and lane on this ticket, then run.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "Idempotent: a second run is a no-op.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "Never touches terminal rows, live rows, or rows with activity inside the threshold.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "WHAT",
+    "quote": "Repeatable as an operator command if the debt returns. An audit entry per stamped row.",
+    "fate": "kept",
+    "note": "An open question muddles the audit entry."
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "the census attention list contains no row older than the threshold and the silent lane drops to live silence only",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "mutation: dropping the age check or the live-session check turns a test red",
+    "fate": "dropped",
+    "note": "Brief says only 'prove the constraints in tests'."
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "the LIN-1963 instrument, the periodical fold and _deriveAgentState are unchanged for a stamped row",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "FOSSIL_AGE_MS (7d) now exists in lib/observer-sweep.js — reuse it, never redefine it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "park BLOCKED with a DECISION block ... Do NOT run the write pass on any answer other than John's own yes relayed by the runner.",
+    "fate": "kept",
+    "note": "DECISION-block/park mechanics dropped."
+   },
+   {
+    "id": "S15",
+    "type": "HOW",
+    "quote": "Idempotence and the never-touch set ... must each be pinned by a test BEFORE the dry run is run against production data.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "BOUND",
+    "quote": "Wind down if: The dry run would stamp any live or terminal row. John's read has not arrived; stay parked, never self-certify.",
+    "fate": "weakened",
+    "note": "'Never self-certify' kept; the stop trigger on a bad dry run dropped."
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "File carve — yours: lib/dispatch-store.js ... classifyLoop's bookkeeping branch ONLY ... Forbidden: ...",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "Your close-out discharges the review ledger, merges on that verdict, sets Done ... the runner then VERIFIES the merge independently",
+    "fate": "weakened",
+    "note": "Brief makes merge responsibility an open question."
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "Unit suite green env-stripped at your PR head: env -u OPENROUTER_API_KEY -u OPENROUTER_MODEL node --test",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "start at implementation, do not re-plan. A genuinely new design question parks BLOCKED with ONE answerable question",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "The source says the runner, not the agent, performs verification/merge ... the exact execution responsibility is therefore unclear.",
+    "note": "Source records the accepted deviation: close-out merges on Approve, runner verifies."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "Whether the dispatch-store maintenance method should stamp existing rows in place or append an audit entry only",
+    "note": "Source decides both: stamp the row and write an audit entry per stamped row."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the rule that idempotence and the never-touch set must be pinned by tests before the dry run touches production data, and it makes the settled merge responsibility look open.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F25",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "The plan of record is LIN-2633's ## Implementation Plan — this ticket does not restate or re-decide it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "stampBookkeeping(urlKey, historyItemId, { by, reason }) ... One findOneAndUpdate, filter { _id ..., status: 'taken', bookkeeping: null } ... never throws.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "No selection, age, or lineage logic inside the store. No _notifyWriteForDoc call.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "add bookkeeping to _formatHistoryItem ... and to the loop record beside historyStatus",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "one new sibling branch ... a stamped row returns resolved ... Ordering is terminal -> resolved/bookkeeping -> blocked.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "Add no new import to lib/observer-sweep.js",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Operator script ... corpus query ... FOSSIL_AGE_MS is imported ... Dry-run is the default; --execute is opt-in; import.meta.url guard",
+    "fate": "kept",
+    "note": "'Modelled on scripts/repair-account-merge-lin2233.js' dropped."
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "note the additive bookkeeping field on GET /api/proxy/dispatch in docs/dispatch-integration.md / docs/proxy-integration.md",
+    "fate": "dropped",
+    "note": "Brief says only 'docs'."
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "Tests T1-T20 ... New: tests/unit/fossil-pass-selection.test.js ... dispatch-store-bookkeeping.test.js (real MangoDB tmpdir — the shared mock is a confirmed false witness",
+    "fate": "weakened",
+    "note": "Brief says 'plus the named new/extended files' but names none, and omits why the mock is a false witness."
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "This session writes no production data ... John's later approval is not authorization to write during S1.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "status on history rows is not touched",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "N1 — fix the cost comparator in the Strategy Framing table",
+    "fate": "dropped",
+    "note": "Only alluded to in changelog."
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "N2 — write the merged-set uniqueness argument in a comment.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "OPEN",
+    "quote": "N3 — decide hasLiveSessionGroupSibling's null semantics in one line ... both directions are safe",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "HOW",
+    "quote": "N4 — ... a getLoopsForWorkspace rejection throws and stamps nothing.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "N5 — Recover the row set as attentionKeysFull minus attention's loopIds",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "HOW",
+    "quote": "N6 — ... the script needs its own [epoch]",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "DONE",
+    "quote": "PR open with CI green on the exact PR head (ci-success read, not assumed) and the unit suite green env-stripped",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "DONE",
+    "quote": "Every mutation in the plan's mutation map kills its named test.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S20",
+    "type": "DONE",
+    "quote": "The pinned readers (_deriveAgentState, the periodical fold, NO_ATTEMPT_STATUSES, IN_FLIGHT_STATUSES) are byte-identical for a stamped vs. unstamped row.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "DONE",
+    "quote": "Recorded review Approve before merge.",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "ensure nothing about the later authorized write path is pre-implemented in a way that risks production side effects.",
+    "note": "Mild hedge not in source; source requires --execute to be built in S1 (just not run)."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the whole Acceptance section: a PR with CI green on the exact head, every planned mutation killing its named test, pinned readers byte-identical, and a recorded Approve before merge.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F26",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Do not reopen settled strategy or plan-review decisions.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "Soft ordering preference ...: land this before S2 ... sequential landing in partition order is the preferred default",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "Rewrite the query to build _id strings — `${urlKey}::${id}` ... and query find({ _id: { $in: idKeys } })",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "Public contract is unchanged: callers still get a Set<string> of comment ids, never _ids.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Add a harbour-comments entry to lib/db-indexes.js's 'Deliberately NOT indexed' docstring list ... No INDEX_SPECS row",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "inside the if (prior) { ... } branch and before the return ... await harbourCommentsStore.record({ urlKey, commentId: id }) [in try/catch]",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "No new dedupe cache — record() is an idempotent $setOnInsert upsert ... decisionStampDedupe half ... deliberately not copied.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "the attachment-embed create at routes/proxy-writes.js:790 ... was checked and needs no repair",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "new test in tests/unit/mongo-smoke.test.js ... assert IXSCAN with indexName === '_id_', and COLLSCAN === null",
+    "fate": "kept",
+    "note": "File and explain() shape not specified."
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Force a ledger-write failure on the original create, resubmit identical text within the dedupe TTL ... Both seams.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "The named residual ... is recorded and closed ... Do not file one, and do not build a reconciliation job.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "Do not widen this session into due-basis, route, or UI work.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "Re-read source at HEAD before trusting line numbers.",
+    "fate": "dropped",
+    "note": "Minor; brief carries no line numbers."
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The brief omits that no new dedupe cache should be added (the decisionStampDedupe half of LIN-2208's pattern is deliberately not copied), and does not say where the index-witness test goes.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F27",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Do not reopen settled strategy or plan-review decisions.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "S1's _id rewrite should land first when practical ... S1/S2/S3 all edit routes/workspace-api.js — land sequentially.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "dueBasisFromContext(context, { recordedCommentIds }) — identical projection to scanBasisFromContext ... drop any comment whose resolveCommentId(c) is in recordedCommentIds",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Pure function — it takes the set as a parameter and never reads the store ... lib/scan-fingerprint.js gains no new import.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "v: BASIS_VERSION stays in the projection — the same constant",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "Tier-1 basisHash is untouched ... a diff ... restricted to lines inside scanBasisFromContext / scanBasisHashFromContext / basisChanged must be empty.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "dueBasisFromContext must not read context.focusedChild.comments[] at all",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "add a one-line comment at lib/providers/linear/index.js:1104 pointing at LIN-2649's due-basis projection",
+    "fate": "weakened",
+    "note": "Appears only in the changelog, not in the work list."
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Do not fix F3 here and do not file it as a separate subtask — it is a recorded non-goal.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "dueChanged ... byte-parallel to basisChanged ... no code path can produce true from absent data",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "recordScan ... widens its destructured params to accept dueBasisHash = null ... Backward-compatible",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "The scan route write path ... computes dueBasisHash in the same request ... a scan always stores both hashes together",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "issue a targeted updateOne ... $set: { dueBasisHash, basisVersion } ... outcome / outcomeAt / decision / basisHash are never in that $set",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "listCandidatesForWorkspace ... find ... latest-row-per-issueId ... sort (scannedAt asc, issueId asc) ... keyset ... Returns { items, nextCursor, totalCandidateCount }",
+    "fate": "kept",
+    "note": "Comparator, sort keys and return shape not restated."
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "Deliberately not a $group aggregation",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "WHY",
+    "quote": "under concurrent scanning ... can return a candidate on two consecutive pages ... Recorded, not fixed.",
+    "fate": "dropped",
+    "note": "Minor."
+   },
+   {
+    "id": "S17",
+    "type": "HOW",
+    "quote": "[C-3] ... harbourCommentsStore ? await harbourCommentsStore.wereRecordedByHarbour(urlKey, context.comments) : new Set()",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "WHY",
+    "quote": "a false due, never a false not-due, and never a fabricated unknown",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "DONE",
+    "quote": "Required tests (plan §11) ... [F-5] WS1 ledger round-trip ... real HarbourCommentsStore ... no fake, no literal set",
+    "fate": "kept",
+    "note": "Summarised; step-level detail omitted."
+   },
+   {
+    "id": "S20",
+    "type": "DONE",
+    "quote": "Regression: no digest drift — lib/recap-cache.js's cache-key hash, lib/task-snapshot-store.js's snapshot digest ... byte-identical",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "BOUND",
+    "quote": "never updatedAt. A change to priority/labels/assignee alone must not mark a task due.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S22",
+    "type": "BOUND",
+    "quote": "Do not widen this session into the route (S3) or the tab (S4).",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The required one-line pointer comment at lib/providers/linear/index.js:1104 appears only in the changelog, and the brief drops the bounds that keep dueBasisFromContext pure (no store read, no new import) and that forbid fixing or filing F3.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F28",
+  "units": [
+   {
+    "id": "S1",
+    "type": "HOW",
+    "quote": "Project taskDecisionId and the raw issueId alongside issueIdentifier in projectPendingDecision",
+    "fate": "kept",
+    "note": "Brief calls it the 'client projection' and never names lib/chat-tools.js (changelog names projectPendingDecision)."
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "routes/workspace-api.js:269 stamps an outcome only when both taskDecisionId and taskDecisionIssueId are present",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "public/common.js:717 already supports the id pair and routes/workspace-api.js already accepts it — the client and server halves need no change.",
+    "fate": "narrowed",
+    "note": "Server half kept; brief contradicts the client half by placing the fix 'in the client projection'."
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "revert LIN-2621's read-only mitigation in public/flight-companion.js (drop the unlinked branch and its caption swap)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "DONE",
+    "quote": "replace the two mitigation tests in tests/unit/flight-companion-client.test.js with coverage that a task-bound tap posts with the stamp pair and the row leaves the pending set",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHY",
+    "quote": "it touches the shared projection every decision surface reads, so the regression surface is the rulings tab and Scan",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "drive a task-bound decision through a surface and assert it leaves the pending set on the next listing",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHY",
+    "quote": "each tap posting another duplicate comment on a real issue.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-fact",
+    "quote": "Must not change the server-side outcome path; the needed fix is in the client projection.",
+    "note": "Source says the projection is lib/chat-tools.js and 'the client and server halves need no change'."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief places the fix in 'the client projection' without naming lib/chat-tools.js, against the source's note that the client half needs no change. The changelog's naming of projectPendingDecision limits the risk.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F29",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Do not reopen settled strategy, the phase partition, option (a) over (b), the seven predicates, or the multi-session verdict.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "Re-ground at HEAD before starting ... Every line number in this ticket is a hypothesis to re-verify, not a fact.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "This session adds no spend path at all ... it does not even render a scan-triggering element.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "Read each step in LIN-2701's ## Implementation Plan before starting; the summaries below do not replace them.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "server.js:2489 — add llmCallLogStore ... make the ... handler async, with its entire body ... inside a single try/catch",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "carry scanCostEstimate into observationData verbatim ... The unknown flag must survive into the client untouched",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "The missing {urlKey, feature, expiresAt} compound index stays a recorded, non-blocking perf follow-up ... page-load path only, never the ~5s poll path",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "dueSelectedIds ... Clears on loadInitialDueCheckPage ... Survives loadMoreDueChecks ... pruned ... Loaded-rows-only",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "The bulk bar ... carries the select-all checkbox and the count/estimate readout ONLY ... Handlers are delegated ... never a per-row listener",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "The selected-row count ... labelled exact. Never merged with the cost figure",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "WHAT",
+    "quote": "unknown: true -> renders 'unknown'. Never $0.00 ... Priced rows averaging exactly zero -> renders $0.00 ... must render distinctly.",
+    "fate": "kept",
+    "note": "Priced-zero case not restated."
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "formatCost is not reused ... Write a small local formatter",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "Provider-read cost and LLM scan cost stay visually and mechanically distinct.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "Copy length is bounded ... its witness must measure rendered output",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "WHAT",
+    "quote": "Refuse, never silently truncate ... The selection is left intact ... The refusal message interpolates the constant, never hard-codes 40.",
+    "fate": "kept",
+    "note": "Interpolate-constant and clear-on-change details dropped."
+   },
+   {
+    "id": "S16",
+    "type": "WHAT",
+    "quote": "Carries verbatim: 'abort stops the queue and releases the browser; scans already sent will finish, bill, and may still raise a ruling.'",
+    "fate": "dropped",
+    "note": "Brief says only 'add the new disclaimer partial'."
+   },
+   {
+    "id": "S17",
+    "type": "WHAT",
+    "quote": "the dollar-estimate disclaimer is unconditional; the quota disclaimer is conditional on isFreeTier ... criterion-5 backstop-not-a-guarantee disclaimer",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "A new partial, textually distinct ... Introducing a shared renderer would defeat the very constraint",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "Three new rules ... .obs-bulk-scan-bar ... .obs-bulk-scan-estimate ... .obs-bulk-scan-limits ... Additive only",
+    "fate": "weakened",
+    "note": "Brief: 'additive CSS' with no rules, declarations or the additive-only rule."
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "drop the unqualified 'never auto-runs' framing ... The founding rule ... is not weakened ... :321 ... :328",
+    "fate": "kept",
+    "note": "Summarised as 'revised human-triggered wording'."
+   },
+   {
+    "id": "S21",
+    "type": "BOUND",
+    "quote": "Every piece of shared state has exactly one owner ... Introduce no second source of truth.",
+    "fate": "dropped",
+    "note": "Partly implied by the selection-not-capped constraint."
+   },
+   {
+    "id": "S22",
+    "type": "BOUND",
+    "quote": "the selection is not capped at BULK_SCAN_MAX_PER_RUN",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S23",
+    "type": "DONE",
+    "quote": "Witnesses required ... 1-6, incl. N2 over-ceiling witness ... a throwing renderObservationPage (stubbed) yields a 500",
+    "fate": "weakened",
+    "note": "Brief lists coverage areas only; case-level requirements (five formatter states, three route cases, both flag branches) dropped."
+   },
+   {
+    "id": "S24",
+    "type": "HOW",
+    "quote": "Anything asserting real wiring ... belongs in tests/unit/render-observation.test.js or e2e, not in the pool tests.",
+    "fate": "weakened",
+    "note": "Brief makes test placement an open question."
+   },
+   {
+    "id": "S25",
+    "type": "DONE",
+    "quote": "Existing suites must stay unchanged and green: npm run test:unit / npm run test:hermetic",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S26",
+    "type": "BOUND",
+    "quote": "No server-side batch runner ... No new server route ... No changes to lib/scan.js ... /scan.js ... already landed",
+    "fate": "kept",
+    "note": "'No second concurrency primitive' and 'no window.api/armKeepalive fix' dropped."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "whether existing pool tests need new DOM fixtures or only renderer/unit coverage is still a test-shape question.",
+    "note": "Source decides real-wiring tests belong in render-observation.test.js or e2e, not the pool tests."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the third disclaimer's verbatim abort wording and its flag logic (dollar disclaimer unconditional, quota disclaimer only when isFreeTier), along with the instruction to read each plan step first.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F30",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "A background check-in never touches the composer's enabled state or focus.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "Only a user-initiated or boot turn may lock the composer while it streams",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "Split the busy signal ... auto-wake shows its progress via the existing #flight-companion-checkin line and strip fields",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "keep that guard in JS — do not express it by disabling the input.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "restore focus only if the input had it when the turn began",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "DONE",
+    "quote": "Unit test on the busy-state decision by turn kind",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "E2E: focus the input, trigger an auto-wake, document.activeElement is still the input and its value/caret are intact.",
+    "fate": "kept",
+    "note": "Only in changelog ('an E2E focus-preservation check')."
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "No change to wake cadence, cost accounting, or the proposal controls.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "WHAT",
+    "quote": "Composer trio as one stepper, three ordered anchors ... LIN-2718 -> LIN-2717 -> LIN-2715",
+    "fate": "narrowed",
+    "note": "Brief scopes to the focus fix only; multi-line composer and pre-start overlap anchors appear only as an open question."
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "A2's composer work must not disturb the in-place swap or the script order.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "with a comment at :1016 that assumes the composer is disabled at stream open — read that assumption before changing it.",
+    "fate": "kept",
+    "note": "As an open question; fair."
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "NOT yours: public/observation.js ..., lib/chat-tools.js, public/chat.js, anything under routes/.",
+    "fate": "dropped",
+    "note": "chat.css restriction kept."
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "implementation ... -> fresh-context review in a DETACHED worktree -> close-out merges on Approve + CI 6/6 on the exact rebased head",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "Re-ground at HEAD first. Harbour main = 13912cf5",
+    "fate": "dropped",
+    "note": "Minor; brief cites no line numbers."
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "anything accepting a defect or choosing design is John's, emitted as a real decision row",
+    "fate": "dropped",
+    "note": "Minor."
+   }
+  ],
+  "additions": [],
+  "verdict": "material",
+  "most_consequential": "The brief covers only LIN-2718's focus fix and drops the leg mandate's three-anchor stepper (multi-line composer, pre-start overlap) and its review/close-out/merge sequence.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ }
+]

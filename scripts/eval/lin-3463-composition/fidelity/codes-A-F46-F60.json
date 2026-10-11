@@ -1,0 +1,1871 @@
+[
+ {
+  "pair": "F46",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "A north-star change should continue from the ship's current position.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "the existing treatment of no connecting line across the change, plus a ★ marker can stay. What goes is the position reset",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "derivePositions (lib/ship-journey.js:300-315) does this at every segment break ... x = 0; y = 0;",
+    "fate": "kept",
+    "note": "Brief names derivePositions and the x/y reset; line range dropped."
+   },
+   {
+    "id": "S4",
+    "type": "OPEN",
+    "quote": "does heading also carry through ... or does it snap to the new bearing at the junction? ... Recommend carrying it through",
+    "fate": "kept",
+    "note": "Kept as open question with carry-through preferred."
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "the ★ markers should go back to being per-change, at their junctions. Expect to revert the collapse in public/ship-journey.js and its e2e case.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "The rest of LIN-2089 stands untouched — the dot:step ratio, DOT_REACH containment, and the page/map budget",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "the origin-union in the client's fit box becomes unnecessary along with the collapsed marker.",
+    "fate": "dropped",
+    "note": "Not mentioned in brief."
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "P7 (LIN-2067) is rewriting public/ship-journey.js right now, so this must land after P7 merges",
+    "fate": "kept",
+    "note": "Constraint kept (scoped to the public/ship-journey.js change), but an open question then re-opens it as 'sequencing-dependent'."
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Best done before or alongside P8 (LIN-2068), since P8 renders onto this trail.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "A journey with >=2 north-star changes renders as one continuous path; no segment starts at the origin except the first.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "The change is still visibly marked (no connecting line across it, ★ at the junction).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "Unit-pinned in tests/unit/ship-journey.test.js against derivePositions: the first waypoint after a break sits one unit from the LAST waypoint",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "Existing LIN-2089 geometry guarantees (mark:step ratio, containment) still hold.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "WHY",
+    "quote": "That existed only because every segment restarted at the same origin, so the glyphs rendered at identical coordinates",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "Whether the public/ship-journey.js update must wait for P7 to merge or can be coordinated alongside it is sequencing-dependent",
+    "note": "Source states it must land after P7 merges; the brief's own constraint agrees, so this contradicts it."
+   },
+   {
+    "id": "B2",
+    "type": "add-rule",
+    "quote": "Prefer carrying heading through the break unless evidence in code/tests says snapping is required",
+    "note": "Adds an evidence-based override condition not in source; low impact."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the note that the client fit box's origin-union becomes unnecessary (so it would likely be left in place) and muddles the after-P7 sequencing with a contradictory open question.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F47",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "P8 must not merge until they are fixed.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "the waypoint focus indicator renders ~13x oversized, covering the map",
+    "fate": "kept",
+    "note": "Cause (global outline scaled in local SVG user space) kept."
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "give .sj-waypoint:focus-visible its own rule in public/ship-journey.css that does not rely on the scaled outline ... or render the ring in the unscaled outer viewBox",
+    "fate": "kept",
+    "note": "Both alternatives kept as an open question; WAYPOINT_HALO hand-sync contract reference dropped."
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Semantic tokens only, dark-safe",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "DONE",
+    "quote": "needs an e2e witness that the indicator's rendered size stays proportionate to the dot (a bounded ratio assertion, not a screenshot)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHAT",
+    "quote": "a stale lastBlurredWaypointIdx steals focus and breaks keyboard scrubbing",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "WHY",
+    "quote": "Reproduced with real pointer input (Chromium, 30 waypoints): 1. Click waypoint data-idx=\"28\" ... 4. ArrowLeft now does nothing",
+    "fate": "dropped",
+    "note": "Changelog says repros were documented, but the steps themselves are absent from the brief."
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "record only when e.relatedTarget is one of the playback controls ... or clear lastBlurredWaypointIdx from a delegated focusin",
+    "fate": "kept",
+    "note": "Both options kept as an open question."
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "after focusing a waypoint and then focusing the scrub, a backward scrub must leave focus on #ship-journey-scrub.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Both defects fixed on PR #1524 (pre-merge) or a follow-up PR, with a named regression witness each.",
+    "fate": "kept",
+    "note": "PR number not named."
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "LIN-2068's existing 20 Journey e2e cases stay green.",
+    "fate": "kept",
+    "note": "Specific 9d/9e reassignment cases not named, but covered by the 20."
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "Re-review of LIN-2068 once discharged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "WHY",
+    "quote": "are user-visible, and are not caught by CI — the PR's 20/20 Journey e2e cases are all green with both present.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "public/ship-journey.js and public/ship-journey.css are the implicated bounded surfaces; fixes should stay within the Journey map's own code path.",
+    "note": "Source's 'bounded classes' describes LIN-2068's review classes, not a restriction on where the fix may go; low impact since the suggested fixes are in those files."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The concrete reproduction steps for the focus-steal defect are dropped, leaving the agent without the source's repro path for verifying F2.",
+  "source_prescribes_how": "light",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F48",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHY",
+    "quote": "Hole 2 is falsified ... Option (a) is already built (appendAutopilotSessionRef ...) and works.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "list projection ... add sessionId: i.sessionId || null and maxTasks: i.maxTasks ?? null",
+    "fate": "kept",
+    "note": "null-as-present-key semantics not stated."
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "formatDispatchWatch: add repo: item.repo || null",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Do not touch the lineage join. Its \"NEVER sessionId/sessionGroupId\" rule ... is about the join key.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "update the expected Set to include sessionId and maxTasks. Invert the !keys.includes('sessionId') check ... Keep assertion 2",
+    "fate": "kept",
+    "note": "Brief says the pin must be updated; inversion, keep-assertion-2 and header-comment details dropped."
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "lib/proxy-instructions.js ... list every item field explicitly, no trailing .... Add repo to the GET /dispatch/{id} shape. docs/proxy-integration.md ... same fields.",
+    "fate": "dropped",
+    "note": "Contract-doc updates for Fix 1 absent."
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "docs/passage-runner-prompt.md §4, the \"cannot be filtered or grouped by sessionId\" paragraph: rewrite.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "add one line: \"verify stamping with GET /dispatch/{id}, never with a field missing from the row you read.\"",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "a stored row with sessionId: 'run-1', maxTasks: 5 comes back on the list with both. A row without them comes back null",
+    "fate": "dropped",
+    "note": "Fix 1 tests (list fields, detail repo case) absent."
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "Validate it with the exact rule and error text in routes/dispatch.js:343-346 ... before createDispatchItem, so a refusal mints no bootstrap token.",
+    "fate": "kept",
+    "note": "Rule and text kept; placement rationale dropped."
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "Pass maxTasks: maxTasks ?? null in fields ... Echo maxTasks: item.maxTasks ?? null on the 201 body.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "Parity choice: accept it on any dispatch ... Don't invent a new rule rejecting it on followUpTo/abort.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "The pool is declared by whoever launches the runner, as maxTasks on the launching POST /dispatch ... If that's null, the pool is undeclared",
+    "fate": "dropped",
+    "note": "All Fix 2 doc changes (proxy-instructions Body note, proxy-integration Enqueue, passage-runner §4 replacement, launcher one-liner) absent."
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "a new tests/unit/proxy-dispatch-max-tasks.test.js ... end-to-end: a custom run with maxTasks: 2 admits two ... then refuses a third with BUDGET_EXHAUSTED.",
+    "fate": "narrowed",
+    "note": "Only the 400/exact text/no addItem case survives."
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "A mutation check ...: remove sessionId from the projection and the new test and the updated contract pin both go red.",
+    "fate": "dropped",
+    "note": "Verification section (node --test, full suite, CI, mutation check) absent."
+   },
+   {
+    "id": "S16",
+    "type": "BOUND",
+    "quote": "Two fixes, one PR ... Docs in the same commit",
+    "fate": "weakened",
+    "note": "One PR mentioned, but 'docs in the same commit' is turned into an open question."
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Out of scope: hole 1 (lane self-poll seam), a ?sessionId= list filter, and option (a), which is already built.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "OPEN",
+    "quote": "The implementer should check the simple-dispatcher / MCP tool that reads dispatch rows, and file a follow-up if it hides sessionId too.",
+    "fate": "weakened",
+    "note": "Brief says MCP tools 'may need separate checking'; the instruction to check and file a follow-up is softened."
+   },
+   {
+    "id": "S19",
+    "type": "WHY",
+    "quote": "the passage runner row e1afc2f8 is kind: custom, maxTasks: null, so the ratified 16-task pool was never declared",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "Must preserve repo in detail reads only; the list and detail shapes differ by design.",
+    "note": "Source only adds repo to detail; it never says list/detail shapes differ by design or forbids repo on the list."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "Whether the documentation/test updates should be done in one commit or split, though the plan says one PR.",
+    "note": "Source: 'Docs in the same commit'."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops all of Fix 2's documentation changes (the passage-runner §4 rewrite that the launcher declares the pool and the runner reads it back, plus the proxy-instructions/proxy-integration contract text) along with most of the planned tests and the mutation-check verification.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F49",
+  "units": [
+   {
+    "id": "S1",
+    "type": "DONE",
+    "quote": "expectedGateCalls ... gains a routes/workspace-api-roadmap.js: 1 entry.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "That file carries exactly one adopted gate site — the roadmap-chat handler (routes/workspace-api-roadmap.js:828)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "WHY",
+    "quote": "Its resolveChatCredential count is pinned (at 2) in the assertion directly above, so only the gate axis is unpinned.",
+    "fate": "kept",
+    "note": "Rendered as 'preserve the existing pin'; fair inference."
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Roadmap-generate (resolveRoadmapLLM, :309) is credential-only by design and must stay ungated ... must therefore be 1, not 2.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "DONE",
+    "quote": "The addition is shown to be load-bearing: deleting the roadmap-chat gate, or adding a second gate to that file, turns the assertion red.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "No production file changes.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "Unit suite green env-stripped (env -u OPENROUTER_API_KEY -u OPENROUTER_MODEL node --test tests/unit/*.test.js).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHY",
+    "quote": "Lowest (priorityLevel: 1). The review classified it as cosmetic ... A natural pick-up alongside the next change",
+    "fate": "dropped",
+    "note": "Priority rationale absent; does not change the work."
+   }
+  ],
+  "additions": [],
+  "verdict": "faithful",
+  "most_consequential": "none",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F50",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "a call routed through HTTPS_PROXY connects to the proxy, not to its real destination ... the guard reports clean.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "Extend the shared defaultIsLoopback(host, port) to treat a connect to any endpoint parsed from HTTPS_PROXY/HTTP_PROXY/https_proxy/http_proxy as an escape.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "Read env at call time, match host and port, use scheme default ports, and strip IPv6 brackets.",
+    "fate": "kept",
+    "note": "Bare host:port parsing and exported proxyEndpoints(env) helper not mentioned."
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "Pass port from both call sites.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Add unit tests in network-guard-sockets.test.js: a local forwarding (or dead) proxy connect is recorded; a loopback server on another port is not",
+    "fate": "kept",
+    "note": "Test file not named."
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "Update README.md:166-167, CLAUDE.md:24-25, the watcher header and :118-120, and network-guard.js:104-114 ... and mention NODE_USE_ENV_PROXY.",
+    "fate": "kept",
+    "note": "Brief requires updating the 'native fetch ignores it' docs but names no files and drops the NODE_USE_ENV_PROXY mention."
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "re-run the forwarding-proxy witness and require recorded escapes to equal tunnels",
+    "fate": "weakened",
+    "note": "Brief recasts as tests plus an open question saying the harness to re-run is not fixed."
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "test:hermetic and test:hermetic:proxy stay green keyless",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "with a dummy key, expect exactly LIN-2369's 3 files.",
+    "fate": "weakened",
+    "note": "Brief says live-proxy-plus-key runs go red until LIN-2369; the exact-3-files check is dropped."
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "Don't fix those 3 tests here, and state the dependency",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "Proxy-aware clients ... none change; the fix is instrument-only",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "add an optional port argument so custom isLoopback overrides ... still work",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "WHY",
+    "quote": "native fetch honours HTTPS_PROXY ... Env-endpoint classification covers this; recording at the agent layer would not.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "OPEN",
+    "quote": "Including ALL_PROXY is harmless but optional.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "HOW",
+    "quote": "the watcher is generated from a template string, so any new comment in it must avoid backticks (:89-90).",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "WHY",
+    "quote": "the plan should compare files, not socket counts, across arms.",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "the exact harness to re-run is not yet fixed in the task state.",
+    "note": "Source specifies re-running the forwarding-proxy witness with escapes = tunnels; mild, since the harness itself is not committed."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The acceptance checks are softened: escapes-equal-tunnels on a forwarding proxy is framed as an unfixed harness and the dummy-key 'exactly LIN-2369's 3 files' check is dropped, as is the no-backticks gotcha for the generated watcher.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F51",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Don't reopen the plan. The strategy is B + E ... It is fixed.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "If the code no longer matches a citation below, re-read it at HEAD and reconcile it before relying on this ticket.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "LIN-446 (routes/dispatch.js:749, the unbounded /api/dispatch/history) ... Leave it unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Don't touch the kpi-stats.js aggregation-failure rethrows ... and don't reintroduce any whole-collection fallback.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHY",
+    "quote": "Make the digest fields reach _buildLoops ... a field the formatter doesn't copy silently disappears.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "_formatHistoryItem (dispatch-store.js:1571). Shallow passthrough of feedbackVersion and feedbackDigest. Do not re-format anything inside feedbackDigest.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "The insert seeds feedbackVersion: 0, feedbackDigest: null on every new history row",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "Both must read not fresh under the shared freshness predicate ... isFreshDigest(doc): typeof doc.feedbackDigest === 'object' && ...",
+    "fate": "dropped",
+    "note": "N4 not-fresh requirement and predicate absent; brief says the convention is 'defined elsewhere'."
+   },
+   {
+    "id": "S9",
+    "type": "WHAT",
+    "quote": "The formatter must preserve the difference between a field that is absent and one that is null, and must not invent either.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Test all three cases (absent, seeded null, present) through _formatHistoryItem.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "A history item with a digest formats with feedbackVersion/feedbackDigest deep-equal to the stored values, Date values untouched.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "A legacy item with neither field formats without adding them, or adds them per the documented N4 convention. The same convention must apply everywhere.",
+    "fate": "kept",
+    "note": "Kept via 'do not invent either'; 'same convention everywhere' dropped."
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "An archived (newly inserted) row carries feedbackVersion: 0, feedbackDigest: null.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "No other formatted-item field changes, and the existing formatter and archive tests stay green.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "HOW",
+    "quote": "Workflow: TDD. Write the failing test first. Keep the unit suite green (npm run test:hermetic).",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "Whether legacy items with neither field should remain absent after formatting or be normalized ... the exact convention is only defined elsewhere.",
+    "note": "N4 is defined in this source, and 'must not invent either' settles that the formatter leaves absent fields absent."
+   },
+   {
+    "id": "B2",
+    "type": "add-rule",
+    "quote": "if it does, changing tests/implementation should avoid double-seeding or altering existing insert semantics.",
+    "note": "Speculative caution; source says queue docs never carry these fields. Low impact."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The N4 isFreshDigest predicate (seeded-null and legacy-absent rows must both read not fresh) is dropped and the convention described as defined elsewhere.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F52",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Don't reopen the plan. The strategy is B + E",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "If the code no longer matches a citation below, re-read it at HEAD and reconcile it",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "LIN-446 (routes/dispatch.js:749 ...) ... Leave it unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Don't touch the kpi-stats.js aggregation-failure rethrows ... don't reintroduce any whole-collection fallback.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHAT",
+    "quote": "reads the per-row digest ... It keeps today's exact expression as a per-document fallback for rows whose digest is missing or stale.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHY",
+    "quote": "/kpis has no self-heal, so this fallback is what keeps legacy rows correct.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "terminalEntry → $cond: [FRESH_DIGEST, '$feedbackDigest.kpiTerminalEntry', <today's exact expression>] ... feedbackCount ... feedbackDigest.count",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "{ $and: [ { $eq: [ { $type: '$feedbackDigest' }, 'object' ] }, { $eq: [ { $ifNull: ['$feedbackDigest.version', -1] } ...",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "It must have the same semantics as Phase 3's JS isFreshDigest ... Define it once and share it where practical.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "kpi* values are the raw shape, with Date timestamps preserved (W1). The downstream F1 guard ... stays unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "It lands inside the existing try ... Keep the no-aggregate() mock branches (:221-222, :291-294)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "WHAT",
+    "quote": "When a kpi* digest field is absent, the digest branch must yield exactly what today's $map/$filter branch yields for the same row",
+    "fate": "weakened",
+    "note": "Brief blurs N4 into fallback rows matching today's expression; the requirement that the digest branch's absent/null kpi* fields match, asserted per kpi* field, is not stated."
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "Legacy row (both fields absent): falls through to today's expression, and feedbackCount === N, not missing.",
+    "fate": "kept",
+    "note": "feedbackCount === N detail dropped."
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "Seeded-empty row, stale row (version ≠ feedbackVersion) and digest-without-version row: each falls through.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "Structural witness ... assert the literal shape of the $cond/FRESH_DIGEST operands.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "DONE",
+    "quote": "Real-mongod witness (tests/unit/mongo-smoke.test.js). Run the actual loadDispatchHistory pipeline over those row shapes.",
+    "fate": "kept",
+    "note": "Test file not named."
+   },
+   {
+    "id": "S17",
+    "type": "DONE",
+    "quote": "/kpis renders identical numbers on a fixture workspace, and the existing kpi-stats and LIN-3002 acceptance tests stay green.",
+    "fate": "kept",
+    "note": "Existing-tests-green clause dropped."
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "Workflow: TDD. Write the failing test first.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The N4 requirement that the digest branch with an absent/null kpi* field must equal today's expression output, per kpi* field, is blurred into fallback-row equivalence, and the shared isFreshDigest definition is dropped.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F53",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Don't reopen the plan. The strategy is B + E",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "LIN-446 (routes/dispatch.js:749 ...) ... Leave it unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "Don't touch the kpi-stats.js aggregation-failure rethrows ... don't reintroduce any whole-collection fallback.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "In server.js:2748, the swipe page's getLoopsForWorkspace(...) switches to lean: true ... re-confirm it at HEAD.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "This depends on Phase 3. Once Phase 3 has landed, a lean read is digest-backed and no longer transfers feedback.",
+    "fate": "kept",
+    "note": "Constraint kept, but the changelog contradicts it by asserting Phase 3 is complete."
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "No other swipe behaviour changes.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "buildSessionCounts(allLoops) is identical for lean and non-lean loops on a representative fixture. That includes aborted, harvested, parked and decision rows.",
+    "fate": "dropped",
+    "note": "Equivalence test absent."
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "A unit test pins that the swipe read passes lean: true.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "Swipe E2E specs stay green, and the rendered swipe page is unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "Workflow: TDD. Write the failing test first.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "WHY",
+    "quote": "The swipe page reads loops only to compute buildSessionCounts, and today that read is a full non-lean workspace read.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "invents-done",
+    "quote": "Phase 3 completed with digest-backed lean reads — makes lean: true safe here",
+    "note": "Source only says this phase depends on Phase 3 and describes what happens once it lands."
+   },
+   {
+    "id": "B2",
+    "type": "invents-done",
+    "quote": "Phase 2 completed with feedbackVersion/feedbackDigest plumbing",
+    "note": "Source says nothing about Phase 2's status."
+   },
+   {
+    "id": "B3",
+    "type": "add-fact",
+    "quote": "The parent note says to fetch the full child list if the Strategy Framing step names a contract gap not in the listed siblings",
+    "note": "No such note in the source."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief asserts Phase 3 (and Phase 2) are complete where the source states Phase 3 only as a prerequisite, and it drops the lean-vs-non-lean buildSessionCounts equivalence test that would catch a premature switch.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F54",
+  "units": [
+   {
+    "id": "S1",
+    "type": "HOW",
+    "quote": "New lib/workspace-halt.js: a store class with getWorkspaceHalt(urlKey), setWorkspaceHalt(urlKey, { mode, setBy }) and clearWorkspaceHalt(urlKey). None of them swallows errors.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "New collection db.collection('workspace-halt') wired in server.js ... thread it into the createDispatchRoutes ... and createProxyRoutes calls as workspaceHaltStore.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "Add workspace-halt to the deliberately-unindexed _id-only collection list in the lib/db-indexes.js docblock ... Do not add a createIndex.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "{ _id: <urlKey>, mode: 'pause' | 'stop', setAt: <Date>, setBy: <string> } ... Set: updateOne(... {upsert: true}). Resume: deleteOne ... Read: findOne",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "No TTL, no per-session rows, no history-collection involvement, no Linear.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "DONE",
+    "quote": "The halt lives in its own workspace-halt collection, not as a field on workspace-preferences (Decision 1).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "workspace-halt-store.test.js covers: set upserts; a second set overwrites ... clear on an unset key is harmless; a store error propagates.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "Behaviour with no halt set is unchanged ... the existing suites pass unmodified (npm run test:hermetic).",
+    "fate": "dropped",
+    "note": "Neither the suite-green criterion nor the verification commands (test:hermetic, :proxy, DI witness run) appear."
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "no routes/proxy-*.js factory may declare workspaceHaltStore, and no router.use(...) block may pass it on.",
+    "fate": "kept",
+    "note": "10/132 witness stability kept."
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "Do not redesign the settled decisions: D1 ... D4 ... Re-run the staleness check against these SHAs before starting.",
+    "fate": "dropped",
+    "note": "D1 kept implicitly; D2-D4 and the staleness re-run absent."
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "Out of scope, owned elsewhere: LIN-2995 ..., LIN-2997 ..., LIN-2998 ..., LIN-1795 (... do not merge the flags).",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "Thread workspaceHaltStore into exactly two calls: server.js:2011 ... and server.js:2484 ... Keep both on one line.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "Add workspaceHaltStore = null to exactly two signatures: routes/dispatch.js:138 and routes/proxy.js:468.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "routes/proxy-dispatch.js:174 has the same name but is a different factory. Don't touch it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "The collection map at server.js:1903-1918 ... workspace-halt doesn't belong in it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "tests/unit/db-indexes.test.js:22-39 EXCLUDED_COLLECTIONS += 'workspace-halt'.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "HOW",
+    "quote": "Build the store test on the shared tests/fixtures/mock-collection.js.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "DONE",
+    "quote": "G2: ... Add a one-line source check asserting workspaceHaltStore on both the createDispatchRoutes({ and createProxyRoutes({ lines.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "DONE",
+    "quote": "G3: one assert.rejects per method (get, set, clear), not just one.",
+    "fate": "kept",
+    "note": "Brief: errors propagate out of all three methods; per-method test implied."
+   },
+   {
+    "id": "S20",
+    "type": "DONE",
+    "quote": "G5: an injected now ... so \"last write wins\" actually proves setAt changes.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "OPEN",
+    "quote": "Should a test reset hook, or any future purge, clear workspace-halt? ... Surface 1 needs nothing.",
+    "fate": "kept",
+    "note": "'Surface 1 needs nothing' not stated."
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The brief omits the verification step (npm run test:hermetic and :proxy, DI witness run at 10/132) and the list of out-of-scope sibling tickets, neither of which would change the code written.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F55",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Close-out may author a change ... only when both hold: (a) the review named the change with its exact content; (b) trivially small",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "At most 2 files and 3 hunks. Each hunk is at most one clause or sentence of prose, or at most 3 code lines.",
+    "fate": "weakened",
+    "note": "Brief requires 'concretely bounded' and keeps 'witness test is never trivial', but drops the numeric limits, the rejection of line counts and the e.g.-does-not-qualify calibration, and calls the limits 'not yet encoded'."
+   },
+   {
+    "id": "S3",
+    "type": "WHAT",
+    "quote": "Anything else goes back ... Close-out holds the merge, leaves the task open, and names implementation (then review)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "its summary says so: the commit, and the review sentence that named the change. CI is re-established on the new head before merge",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "the merge is pinned with --match-head-commit.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHAT",
+    "quote": "Review states exact before → after when it hands an edit over; otherwise its verdict is Request Changes.",
+    "fate": "kept",
+    "note": "'Request Changes' consequence not stated."
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "This doesn't change LIN-2825/LIN-3006's scope rules (what is inside, done-or-drop, outside-only filing).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "Qualify clause (4)'s \"treat any caveats … as gaps to discharge\" so it cannot be read as permission to author.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "Extend the Role line at :1147 ... Add one bullet ... to the Ledger Gate ... Widen the \"Always name a next action\" trigger",
+    "fate": "dropped",
+    "note": "Brief says only 'update both prompt paths'; the three insertion points are absent."
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "Worker lane (docs/worker-lane-prompt.md, Step 3 ...): any edit after the fresh-context review's Approve that is not a trivial edit ... needs another fresh-context review",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "docs/architecture/prompt-system.md:28: one sentence ... docs/autopilot-operating-manual.md:~514: one clause, with no \"Linear\".",
+    "fate": "weakened",
+    "note": "Brief includes 'relevant docs/restatements' but lists whether the manual needs a wording change as still to be confirmed."
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "lib/completion-signals.js close-out: one signal line",
+    "fate": "kept",
+    "note": "In Current; an open question also casts doubt on it."
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "Tests pin each path independently in tests/unit/prompt-templates.test.js and tests/unit/openrouter.test.js.",
+    "fate": "kept",
+    "note": "Files and mutation-check step not named."
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "Grounding parity and byte parity stay green; no literal \"Linear\" in new text.",
+    "fate": "narrowed",
+    "note": "Brief limits the no-'Linear' rule to new close-out text."
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "One row in scripts/prompt-template-change-log.md, both paths named.",
+    "fate": "kept",
+    "note": "Expected direction (down/up) dropped."
+   },
+   {
+    "id": "S16",
+    "type": "BOUND",
+    "quote": "Meta rules must stay one line each ... Keep exactly one **Close-out prompts** must and one **Review prompts** must:",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "WHY",
+    "quote": "LIN-3026 ... merged 229 lines that close-out wrote after review approved",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "WHY",
+    "quote": "Most test-witness discharges become round trips, which is the intended cost.",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "material",
+  "most_consequential": "The brief drops the research's concrete definition of 'trivial' (≤2 files, ≤3 hunks, one clause or ≤3 code lines, no test/function/branch change, line counts rejected) and calls the limits unencoded, so an agent writing the rule text would plausibly invent a different bound.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F56",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Review returns Request Changes ... whenever any inside ledger item can only be discharged by authoring beyond LIN-3033's trivial, review-named edit.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "Conditional Approve is reserved for ledgers where close-out can discharge every item by what it is allowed to do",
+    "fate": "kept",
+    "note": "Enumerated discharge means not listed."
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "lib/prompt-template-defs.js:1098 — 'review' ### Verdict paragraph. lib/prompts/meta-prompt-template.js:308 — - **Review prompts** rule (7).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "BOUND",
+    "quote": "Don't loosen LIN-3033's close-out bound, and don't change the ledger's content rules (inside/outside, lanes). Only the verdict choice changes.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "Keep it small: this is a wording change to one rule on two paths.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "append a row to scripts/prompt-template-change-log.md",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "pin both paths with tests in the LIN-3033/LIN-3049 style (tests/unit/prompt-templates.test.js and tests/unit/openrouter.test.js).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "Both must confirm the existing \"conditional on close-out\" wording is preserved for dischargeable ledgers",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "No literal \"Linear\" introduced on the meta path ... scope the no-Linear check to the new clause",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "the con sent a direct resume at 06:47Z ... That supersedes the 06:50Z hold.",
+    "fate": "dropped",
+    "note": "Brief treats the superseded hold as the active instruction."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "Do not dispatch another OpenCode step or switch harness on your own; the last explicit instruction on hold said to wait for John.",
+    "note": "The hold was superseded by the 06:47Z resume, and research has since run."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "The ticket text says research should come next, but the hold/resume sequence makes execution status ambiguous until the next instruction.",
+    "note": "Source: resume supersedes hold; research was dispatched and its notes are posted."
+   },
+   {
+    "id": "B3",
+    "type": "opens-decided",
+    "quote": "Whether the host/harness fault is fully cleared is not confirmed in the source",
+    "note": "Source records credits topped up and a resume that let research run."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief revives a hold the source says was superseded ('wait for John') and calls execution status ambiguous, so an agent could plausibly stop and wait instead of making the wording change.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F57",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Viability — no-go for Jev in the meta-AI template-selection step.",
+    "fate": "weakened",
+    "note": "Brief: 'the answer is likely no, but the task remains to verify'."
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "Jev is a decision model ... it cannot write the prompt body",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "WHY",
+    "quote": "already measured non-viable (11/21 vs 13/21 for the incumbent, confidence not gating)",
+    "fate": "kept",
+    "note": "Figures dropped."
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "Single decisive re-test via the existing decoupled scripts/eval/jev-spike.mjs against the current 17-action vocabulary",
+    "fate": "kept",
+    "note": "Script name dropped."
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "defer held for node cases only",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "one criteria iteration, K=3 over the 7 frozen fixtures",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "decision criterion = routing meets-or-beats the incumbent and confidence gates the contested wrong answers (LIN-510/LIN-813)",
+    "fate": "weakened",
+    "note": "Elements appear as constraints, but the brief lists the success threshold as an open question."
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "Evidence-based budget: ~$0.01 / ~5 min",
+    "fate": "dropped",
+    "note": "Brief keeps only 'bounded: one decisive eval run'."
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "no production-code change ... a two-call split ... explicitly NOT recommended now and would only be priced if the re-test surprises",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "either closes the question with a corrected negative or, if it surprises, prices the two-call structural cost",
+    "fate": "weakened",
+    "note": "Brief reopens what happens on failure (end as no-go vs price a refactor)."
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "Sibling decision-gate classifyRefusal ... out of scope: different repo/project.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "WHY",
+    "quote": "any plan must test the gate, not trust calibration.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "the open item is a decision → next action: plan",
+    "fate": "narrowed",
+    "note": "Brief frames the work as running the re-test rather than planning it; minor."
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "What exact success threshold should be used for \"meets-or-beats\" on the routing arm: exact match, contested-case correctness, confidence gating, or all of these?",
+    "note": "Research fixes the criterion: meets-or-beats on contested cases and confidence gates the wrong answers."
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "If Jev still fails the routing test, should the task end as a documented no-go, or should a two-call router/writer refactor be priced separately?",
+    "note": "Source: a failure closes with a corrected negative; pricing happens only if the re-test surprises."
+   },
+   {
+    "id": "B3",
+    "type": "opens-decided",
+    "quote": "Is there any need to compare against additional OpenRouter models, or only the current incumbent?",
+    "note": "Raised by triage; research's design compares only against the incumbent. Low impact."
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The research's settled go/no-go criterion (meets-or-beats the incumbent on the contested cases and confidence gates the wrong answers) is presented as an open question, while K=3, the one criteria iteration and the ~$0.01 budget are dropped.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F58",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "The last consumer poll of the linearviewer workspace queue was at 2026-09-26 21:50:47Z. Nothing was claimed after that.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "Every in-flight session's feedback stream froze at about 21:50Z. No [failed] or [blocked] markers were posted before the stop.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "WHY",
+    "quote": "The simple-dispatcher terminal showed the line [Restored 27 Sep 2026 at 08:07:07]. ... John restarted it by hand at about 07:09Z.",
+    "fate": "kept",
+    "note": "The 08:07 local discovery time is dropped; the marker is kept only as a question."
+   },
+   {
+    "id": "S4",
+    "type": "WHY",
+    "quote": "[stalled?] no tool activity for 557m in EXECUTING (last tool: Bash)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "OPEN",
+    "quote": "What happened to the host at about 21:50Z: sleep, restart, log-out, crash, or something else?",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "OPEN",
+    "quote": "Why did the dispatcher not come back? ... What did watch-restart.sh do, if anything?",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "OPEN",
+    "quote": "What does the [Restored …] marker mean in this setup?",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "OPEN",
+    "quote": "What happened to sessions that were mid-command across the gap? Is any cleanup needed now?",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "OPEN",
+    "quote": "What would stop this recurring, ranked by effort?",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "An RCA comment on this ticket gives: the timeline, with timestamps from real logs; the cause, with its evidence; what is still uncertain; recommended fixes.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "No fixes are applied in this ticket.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "Treat the dispatcher being manually restarted at ~07:09Z as known; do not re-investigate whether polling resumed.",
+    "note": "The fact is in the source; the prohibition is new. Negligible impact."
+   },
+   {
+    "id": "B2",
+    "type": "add-fact",
+    "quote": "The [stalled?] ... note is a consequence observed after restart, not the root cause by itself.",
+    "note": "Interpretive claim the source does not make. Low impact."
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the evidence that all feedback streams froze at ~21:50Z with no [failed]/[blocked] markers, a clue to a host-level stop.",
+  "source_prescribes_how": "none",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F59",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Wire requireGrant ... into the two proxy enqueue sub-router factories as a declared but unused dependency ... No mount is gated in T1",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "routes/proxy.js: pass requireGrant to createKickoffRoutes(...) and createDispatchRoutes(...) ... :1573 is createRulingsRoutes and is not touched.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "move the census literals by the merge-time delta, +2 deps / +0 files ... apply the delta to whatever the census reads at merge time.",
+    "fate": "kept",
+    "note": "Brief gives both +2/+0 and the absolute 145→147, without the 'merge-time reading wins' caveat."
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "tests/unit/lib/proxy-fake-deps.js (BASE_DEPS): a grants-aware validateToken and a requireGrant stub",
+    "fate": "weakened",
+    "note": "Made an open question; the source's research flags it as dead weight, but the ticket says the plan wins."
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "If this slice conflicts with the plan, the plan wins; raise the conflict on LIN-2884 rather than changing the approach here.",
+    "fate": "dropped",
+    "note": "Research's 'Raise on LIN-2884' for the BASE_DEPS discrepancy is also absent."
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "proxy-endpoint-inventory-witness.test.js and proxy-halt-collision-witness.test.js: build the routes with requireGrant available.",
+    "fate": "kept",
+    "note": "Kept as 'keep green', with an open question on whether edits are needed."
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "Inert by construction. No requireGrant('dispatch') in any registration chain, no default-off toggle, and no router.use(path).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "Handler bodies in routes/proxy-dispatch.js / routes/proxy-kickoff.js stay untouched",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "The P2 line references are documentation only: no test or census literal names routes/proxy.js line numbers.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "A readWrite token without grants still gets 201 ... A read token still gets today's requireWriteScope 403.",
+    "fate": "weakened",
+    "note": "Brief says only 'keep all enqueue behavior unchanged'; the explicit criterion and research's note that read→403 has no witness are absent."
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "The S1.7 criterion test (runner working token → POST /api/proxy/dispatch → 201) stays green.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "npm test is green.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "routes/proxy.js — add requireGrant, to the two mount literals ... No composer signature change.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "Mount order unchanged (halt :1565 → rulings :1573 → kickoff :1577 → dispatch :1581 → runner :1591).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "a bare requireGrant destructure/mount does NOT match its call-regex, but no requireGrant('dispatch') may appear.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "Re-derive every anchor with the plan's own greps at the SHA you start from.",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The plan-vs-code BASE_DEPS discrepancy becomes a bare open question, without the source's rule that the plan wins and the conflict goes to LIN-2884; the read→403, S1.7 and npm test acceptance checks are also dropped.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F60",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "what did the steady-base expedition find, and what is the menu of changes John can choose from? ... Output: docs/papers/harbour/steady-base-menu.md.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "After this paper and its check, the research stage closes; new questions go to proposals.md.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "Read: docs/steady-base.md ... and every paper and check it cites",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "especially the wave-5 papers at version 2 and their checks (survey-check-7.md, -8.md, -9.md), and: wake-inventory.md ... fleet-complexity-read.md",
+    "fate": "dropped",
+    "note": "Named reading list absent."
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "Use only checked figures (version 2 or later), and cite paper and section. If you must use an unchecked figure, mark it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHAT",
+    "quote": "What we found, in one page. ... why the cost rose while quality held, where the cost sits, what was ruled out, and the ceiling.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "WHAT",
+    "quote": "Merge every candidate: the anchor's map rows 1–16 and each paper's Options section. Count overlapping savings once",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "For each option give: its size, as a checked range ...; its risk to correctness; how it would be measured ...; the effort; ...",
+    "fate": "dropped",
+    "note": "Per-option fields absent from the menu item; finish lines and retirement conditions appear only under the landing order."
+   },
+   {
+    "id": "S9",
+    "type": "WHAT",
+    "quote": "Which stacks of options reach 2×, and what is the plausible top, against cost-mix.md's bound? ... show the arithmetic.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "One change at a time, or in a few independent groups, each measured before the next lands ... Recommend an order; John decides.",
+    "fate": "kept",
+    "note": "'Each measured before the next' not explicit."
+   },
+   {
+    "id": "S11",
+    "type": "WHAT",
+    "quote": "Consolidate proposals.md into a short ranked list. Name the scorecard's charging rule and census as the prerequisite.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "WHAT",
+    "quote": "A note on method ... What the checks changed, and where the research process drifted towards complication and overconfidence.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "Keep it as short as the content allows. No new measurement except arithmetic over checked figures.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "Headline chart: the menu, plotted as size against risk, with the stacks that reach 2× marked.",
+    "fate": "dropped",
+    "note": "Brief keeps only generic SVG chart rules."
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "Change no code, prompt, template, rule or process in the repos, and don't file follow-up tickets.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "BOUND",
+    "quote": "The V1 passage is live ... Don't comment on its tickets, message its sessions, or dispatch anything.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Cover both repos ... Say which repo each number comes from.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "Charge wakes both ways.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "Every number comes from a committed script under scripts/survey-*.mjs with a one-line header.",
+    "fate": "weakened",
+    "note": "Brief: 'Prefer committed scripts'."
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "Commit SVG charts under docs/papers/harbour/figures/<paper-slug>/, drawn by a committed script with no new npm dependencies.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "WHY",
+    "quote": "Known gaps: Server-side evidence was kept 30 days ... The dispatch list caps at 100 rows ... Claude [usage] lines are cumulative",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S22",
+    "type": "BOUND",
+    "quote": "Proxy pacing: at most 12 requests a minute.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S23",
+    "type": "BOUND",
+    "quote": "Use model tiers (frontier/mid/cheap), not product identifiers.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S24",
+    "type": "BOUND",
+    "quote": "Limits must say which way each bias runs.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S25",
+    "type": "WHY",
+    "quote": "Find out what the evidence says is reachable. Don't assume it.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "material",
+  "most_consequential": "The brief drops the required per-option fields (checked size range, risk to correctness, measurement design, effort, dependencies, finish line/retirement) and the size-vs-risk headline chart, so the menu an agent produced would plausibly lack the structure the source specifies.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ }
+]

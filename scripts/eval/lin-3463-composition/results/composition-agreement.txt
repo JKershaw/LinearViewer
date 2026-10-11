@@ -1,0 +1,18 @@
+overlap 28
+origin           agree 96% kappa 0.95
+what_decided     agree 79% kappa 0.46 within1 28/28
+open_behaviour   agree 89% kappa 0.52
+how_prescribed   agree 79% kappa 0.69 within1 28/28
+decisions        agree 61% kappa 0.50 within1 28/28
+asserted_facts   agree 93% kappa 0.86 within1 28/28
+acceptance       agree 82% kappa 0.64
+work_type        agree 93% kappa 0.90
+size_guess       agree 86% kappa 0.76
+  C054 A 1 no | B 1 yes
+  C099 A 1 no | B 1 yes
+  C189 A 2 no | B 1 no
+  C198 A 2 no | B 1 no
+  C207 A 2 no | B 1 yes
+  C225 A 2 no | B 1 no
+  C234 A 2 no | B 1 no
+  C252 A 2 no | B 1 no

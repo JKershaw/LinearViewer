@@ -1,0 +1,272 @@
+[
+ {
+  "pair": "F01",
+  "ticket": "LIN-679",
+  "session_kind": "research",
+  "fate": "followed-source",
+  "evidence": "L447 12:29:51 (research comment table): \"brief constraint 'must keep route registration compatible with tests that inspect router.stack' | superseded by LIN-2505. Zero router.stack reads...\"; L468: \"The router.stack constraint is gone\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": true,
+  "note": "Fetched brief L39, raw issue L67, then LIN-2505/2245 issues. Verified LIN-2505 had landed and explicitly marked the brief's router.stack constraint as superseded in its posted research table. The only pair in this set where the agent names the brief as wrong."
+ },
+ {
+  "pair": "F03",
+  "ticket": "LIN-1988",
+  "session_kind": "research",
+  "fate": "followed-source",
+  "evidence": "L414 18:53:51: \"the issue is left In Progress for the human scoping pass\" + DECISION asking which capability to pursue; L379 comment: \"### 9. Open product decisions (unchanged in substance, sharpened)\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent researched but did not decide. It kept the open questions as product decisions and escalated them to a human, as the triage comment says. The dispatch prompt (L25) also said 'without deciding product scope prematurely', so the source and the dispatch prompt agree here. It did move the ticket out of Backlog, as a research dispatch does."
+ },
+ {
+  "pair": "F04",
+  "ticket": "LIN-2066",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L204 07:49:43: \"Tests added: provenance-follows-newest-reading (sibling to the existing scenario 7...), no-project issue (createIssue({ project: null })...), empty-reason → null, and the truncation boundary at exactly MAX_WAYPOINT_REASON_CHARS and +1.\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The raw issue was fetched in parallel, 1s after the brief (L34/L35). The plan names all three tests the brief dropped (no-project, provenance, truncation boundary) as unconditional."
+ },
+ {
+  "pair": "F08",
+  "ticket": "LIN-2434",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L679 15:40:19 route test run: \"R1 — dispatchQueueLimiter is applied to this route (behavioral, not source-grep) ✔ enforces exactly 30/min … missing-session guard ✔ an unknown sessionId is a clean 404\"; L710 mutation-witness removes limiter and watches it fail.",
+  "read_issue_after_brief": false,
+  "noticed_mismatch": false,
+  "note": "Fetched raw issue (L25 15:19:48) one second BEFORE the brief (L27); later issue GETs were a state PATCH and a URL lookup only (L1492). Session was a 5-beat stepper; beat 3 prompt (L538) was literally 'route test suite + direct deriveFollowUpDispatch coverage', so the test-asserted acceptance items (limiter, 404, dash/local 422, direct helper tests) arrived via the coordinator's beat prompts and raw issue, not the brief. Brief's untested-limiter gap did not propagate."
+ },
+ {
+  "pair": "F14",
+  "ticket": "LIN-2511",
+  "session_kind": "research",
+  "fate": "followed-source",
+  "evidence": "L436 07:26:06: \"Do NOT take as written: 'a resume resets the stall/refire bookkeeping.' LIN-1731's ratified design explicitly rejected clearing/re-stamping refiredAt ... Items 1-2 are that reset\" (resumedAt cross-check on every resume)",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent quoted and argued with the source's unconditional wording ('a resume resets'), not the brief's version conditioned on progress. Its recommended fix (a resumedAt cross-check at the read site) applies on every resume. It pushed back on the ticket's wording against ratified history but did not adopt the brief's progress condition."
+ },
+ {
+  "pair": "F19",
+  "ticket": "LIN-2539",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L306 01:22:48 plan: \"Dependency enumeration (Hazard 1): every identifier referenced in routes/proxy.js:1591-1987 was grepped against its definition site ... rather than eyeballed\"; \"git merge-base --is-ancestor origin/main <head> before requesting CI, per the coordinator's Hazard 2\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent cited the coordinator's Hazard 1 and Hazard 2, which appear only in the source. It derived the deps first, before planning, and wrote the rebased-on-main check into the plan. It used per-identifier grep rather than Babel scope bindings and did not mention transitive propagation, so this is a partial follow."
+ },
+ {
+  "pair": "F20",
+  "ticket": "LIN-2543",
+  "session_kind": "plan",
+  "fate": "followed-brief",
+  "evidence": "L180 23:15:44: \"The brief itself lists 'should the helper live in tests/unit only, or be lifted into a scripts/-lane acceptance check' as an open, unresolved question — building it now would be deciding an explicitly-flagged-open question\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The plan scoped A+B only and deferred C (the script-lane 'every declared dep reached' witness) to a new follow-up ticket. Its stated reason was the brief's open question, even though the raw issue it read at L61 recommends C as part of the shape. The plan cites the brief by name as its authority."
+ },
+ {
+  "pair": "F22",
+  "ticket": "LIN-2621",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L234 21:47:04 commit: \"characterize hop-usage summing at HEAD (beat 1/5) … the turn-core cost total this beat asked to 'implement' already landed with LIN-2631 (commit 64433a6d): sumUsage and the accumulatedUsage\"; added two fail-first tests.",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "Brief GET L39 21:41:45, issue GET L45 21:41:51. Beat 1 prompt (L24) itself was 're-ground + branch + turn-core cost total', so the dropped hop-summing reached the agent via the stepper and leg mandate (it cites 'the leg mandate's more precise file carve', L59). Agent also flagged that streamChatWithTools never emits per-hop usage, so summing is a production no-op (L244). Other dropped items also acted on: e2e silent-tick running-total test (L1893), rung-1 unit test (L740). Agent cited 'the brief's open question' once (L970) for check-in sourcing but never remarked on a brief/ticket mismatch."
+ },
+ {
+  "pair": "F23",
+  "ticket": "LIN-2622",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L188 18:30:25 grounding report: \"own budget ... the boot passes `{maxIterations: 5, maxTokens: 2500}`\"; L801 18:56:46 beat-3 report: \"commit-only-after-`done` (error/disconnect coverage), commit scoped to its own reservation, and a propose->execute mutation witness\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "Brief (L37) and raw issue (L39) fetched in parallel in the same second. The 5/2500 budget was coded into the route and a 2500 test (mutation-witnessed at L523), and the no-commit-on-error/disconnect property was tested. Caveat: this was a 5-beat stepped session driven by coordinator prompts. The beat-2 prompt (L229) itself contains 2500, and beat 1 (L24) mentions disconnect, so the ticket content also arrived through the dispatch prompts, not only through the raw issue."
+ },
+ {
+  "pair": "F25",
+  "ticket": "LIN-2653",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L1323 14:28:35 final: \"all 14 mutations confirmed to kill named tests ... PR #1406 open ... CI ... conclusion: success on that exact head ... merge plus setting Done deliberately remain undone as they are gated on a recorded review Approve\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "Every element of the dropped Acceptance section shows up in the work: env-stripped full suite exit 0, the mutation map, pinned-reader byte-identical tests T17/T19/T19b (L1033-L1109), CI read on the exact head, merge held for Approve, and no production writes. The agent fetched the raw LIN-2653 (L38) and the parent plan LIN-2633 (L39) right after the brief (L37). The coordinator's beat prompts (L24/L352/L565/L862 and beat 5) also drove these steps, e.g. 'beat 4/5: ... pinned-reader tests'."
+ },
+ {
+  "pair": "F29",
+  "ticket": "LIN-2706",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L1149 08:24:09 rendered partial: \"Abort stops the queue and releases the browser; scans already sent will finish, bill, and may still raise a ruling.\" L1414: \"renderBulkScanDisclaimer(isFreeTier) ... unconditional abort/backstop/dollar-estimate text plus a conditional free-tier quota note\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "Both dropped parts of B.9 were implemented: the verbatim abort wording and the flag logic (dollar estimate unconditional, quota only when isFreeTier). The agent also fetched the parent LIN-2701 plan (L41), which covers the dropped 'read each plan step first' instruction. The raw issue (L40) was fetched one second after the brief (L38). Again a 5-beat stepped session: the beat-4 prompt (L993) names 'third due-tab disclaimer partial (both branches, textually distinct)', so the dispatch prompts also carried the ticket's version."
+ },
+ {
+  "pair": "F30",
+  "ticket": "LIN-2718",
+  "session_kind": "implementation",
+  "fate": "not-reached",
+  "evidence": "L212 16:18:31 (beat 1 report): \"Not done (by design, per beat scope): no tests added (beats 2/3), no PR opened, no merge\"; beat 4 L857 16:49: \"opened PR #1430 ... posted the implementation comment to LIN-2718 naming review\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The dropped content (three-anchor stepper over LIN-2718/2717/2715 and the review/close-out/merge sequence) belonged to the runner/stepper, not this session. The runner's 4 beat prompts confined the session to LIN-2718's focus fix and banned merge and review chaining, so the difference never bore on this session's work. The agent did read the mandate comment from the raw issue (it cites the 'passage runner's re-grounding notes' at shifted line numbers), and its e2e preserves focus/draft/caret across an auto-wake, which matches both the ticket and the mandate."
+ },
+ {
+  "pair": "F31",
+  "ticket": "LIN-2738",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L366 00:19:57: \"Now let's add the F-table cell for `:1469` — one test demonstrating the degraded-read log line fires.\" L541 00:25:52: \"Now let's append the new F-8 cell after the F-7 describe block.\" L205: \"five fixtures quoted, and baseline npm test recorded\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent landed the :1465/:1469 F-table log cell, quoted the five fixtures, and recorded the npm test triple against the Darwin baseline. All three are in the ticket only. The runner's beat prompts carried this content: beat 2 named the F-table cell, and beat 1 and beat 3 named the baseline triple. The agent first put the cell in the wrong file (hold-backstop-logging.test.js), and only a corrective runner beat (L462) moved it into the real Table F in test/opencode-liveness.test.js. So the ticket's version reached the work through the runner, not through the agent's own reading."
+ },
+ {
+  "pair": "F32",
+  "ticket": "LIN-2756",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L698 07:57:53 edit: \"`rulingsSelected` is a module `Set` keyed `rulingKey(urlKey, anchor, decisionId)`\"; L1236 08:12:39: \"Now update the `suggest-dismissal` route to accept `decisionLoopId`.\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent implemented the ticket's client triple key (urlKey::loopId??taskDecisionId::decisionId) and server loop-aware store keys with decisionLoopId, not fan-out. The runner's beat prompts quoted the formula verbatim (beat 3, L582). Beat 4 (L911) said 'the server fork ... is not a coin-flip ... Take the loop-aware option', which overrode the brief's even-choice framing. A red-first witness (beat 2) was also written. The agent itself never remarked on the brief vs ticket difference."
+ },
+ {
+  "pair": "F33",
+  "ticket": "LIN-2773",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L471 12:25:02 test edit: \"the full-row deepStrictEqual is rewritten, not loosened to a subset match ... `effect`/`declaredEffect`/`alternate` are now part of the asserted shape.\" L408 adds resolveEffect returning effect/declaredEffect/alternate.",
+  "read_issue_after_brief": false,
+  "noticed_mismatch": false,
+  "note": "The agent fetched /issues (L50, 12:14:16) about 3s before /brief (L60), in the same parallel batch, and never re-fetched the issue afterwards. resolveEffect returns {effect, declaredEffect, alternate}, with alternate null on overrides, and the full-row test was rewritten rather than loosened. Both match the ticket. The beat-2 runner prompt (L351) restated both requirements verbatim."
+ },
+ {
+  "pair": "F34",
+  "ticket": "LIN-2775",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L1475 14:43:57 \"Exactly as expected — the headline witness and the two corrective-item tests all go red against beat-2's code.\" (the .prompt composition witness); beat 4 adds all-three-TERMINAL_TYPES refusal tests with red-first (L2314 15:03:19).",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent fetched the brief and the issue in parallel (L37/L38) and later re-read raw Area sections with sed (L632, L1116, L1626). The coordinator's beat prompts (L626, L1110, L1620) restated the dropped witness table almost verbatim: the red-first three-way terminal test, the capturedOpts.prompt assertion and 'rewrite, do not loosen'. So the ticket content reached the work through the dispatcher as well as through the raw issue. The brief's omission had no effect."
+ },
+ {
+  "pair": "F36",
+  "ticket": "LIN-2790",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "PR body L659 21:03:14: \"sharing a factored-out `resolveTargetRuling` (decision lookup + orphan-row guard) and `attributionFromToken` helper with the existing `suggest-dismissal` route.\" Also adds CLAUDE.md lines and a 'Deliberate pin amendments' section.",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The dispatch prompt was the generic 'implement' template, so it did not relay 'Factor, do not copy'. The agent got it from the raw issue, which it fetched in parallel with the brief (L37/L38), and from the parent LIN-2754 (L93). All three dropped items reached the work: the shared helper (L286 'Shared by both propose routes'), the three CLAUDE.md module lines (L551/L564) and the PR-body pin disclosure (L659/L813)."
+ },
+ {
+  "pair": "F41",
+  "ticket": "LIN-2820",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L207 11:28:35 plan: \"Same link (fallback form) added to the empty state, replacing/alongside the exi[sting]...\"; tests keep \"empty-state-has-no-form\" and pin the fallback href /auth/github",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The session was dispatched as a plan, so the brief's implementation framing had no effect: the agent wrote a plan. The plan includes the empty-state link that the brief dropped. The non-goals were never mentioned, but the plan adds no setup-URL callback and no LIN-2149 work, so that part was not reached. The raw issue was fetched in parallel, 1s after the brief."
+ },
+ {
+  "pair": "F42",
+  "ticket": "LIN-2874",
+  "session_kind": "research",
+  "fate": "followed-source",
+  "evidence": "L391 08:34:36 comment.md: \"add a terminal branch to runOpenCodeHeartbeats keyed on now - session.createdAt ... following config.js bound conventions\"; Case B: \"same mechanism, ~likely but not proven, and unprovable. I am recording it as such rather than asserting it.\"",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "Brief and issue fetched back to back (L38/L39). The research recommends the source's configurable bound with fail/re-fire (item 3) and treats pre-grant only as a narrowed complement, not a substitute. It also refuses to assert the cause of Case B, matching the source's 'very likely'. It corrects the ticket's own comment (trap not prompt-driven; clock not non-monotonic) but never compares the brief with the ticket."
+ },
+ {
+  "pair": "F43",
+  "ticket": "LIN-2893",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L866 22:43:54 \"Now let's write test #3: the query-cost assertion in `task-decisions-store.test.js`.\" L909 22:44:51 \"fail-first the query-cost test with a mutation: broaden the projection to include `decision`.\" L944: proving all four consumers call listNewestScanPerTask.",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent fetched the issue 4s after the brief (L37 then L43). The beat-4 coordinator prompt (L766) explicitly ordered the query-cost assertion: the projection shape {urlKey, issueId, outcome, scannedAt, _id: 0}, no decision payload, and all 4 sites. So the dropped acceptance item reached the agent through the dispatcher, and the agent wrote the test with mutation fail-first."
+ },
+ {
+  "pair": "F44",
+  "ticket": "LIN-2896",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L165 22:03:28 anchor table: \"CLAUDE.md:273-276 | both-paths rule; :276 = AI-generated path | true\" and \"observer-efficacy-signal.js:47 ... G2's oddity reconfirmed\"; L555 22:24:15: \"## Invariants has a hard ≤14-line ceiling\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "Brief and issue fetched in parallel (L45/L46). The plan re-verifies the step-11/G2/G5 corrected anchors that the brief dropped, and it budgets the ## Invariants and ## Where the detail lives sections. The consolidated description kept the original Sequence verbatim (L749 22:34:01 summary). Plan session only: no code was written."
+ },
+ {
+  "pair": "F48",
+  "ticket": "LIN-2975",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L180 18:35:14 plan: \"docs/passage-runner-prompt.md §4, 'Still declare your own maxTasks' line: replace — the pool is declared by whoever launches the runner\"; tests list \"0, -1, 1.5, \\\"5\\\" → each 400 ... end-to-end ... BUDGET_EXHAUSTED\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The finalized plan restores all of Fix 2's documentation changes and the full test list (absent/null/valid/invalid/e2e, list-budget-fields, detail repo) that the brief dropped. It describes itself as revising the draft plan in the ticket, which it took from the raw issue. The mutation check was not separately confirmed in the excerpt."
+ },
+ {
+  "pair": "F53",
+  "ticket": "LIN-3013",
+  "session_kind": "implementation",
+  "fate": "followed-source",
+  "evidence": "L443 15:05:09 test output: \"LIN-3013 — buildSessionCounts is identical for lean and non-lean loops (aborted/harvested/parked/decision rows)\", mutation-checked red, then green (L539).",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent wrote the lean-vs-non-lean equivalence test from the source's Acceptance section, which the brief dropped, and fetched LIN-3011 (Phase 3) to check it (L47). It branched from LIN-3011's merge (L97), so Phase 3 had in fact landed and the brief's 'complete' claim was harmless here."
+ },
+ {
+  "pair": "F55",
+  "ticket": "LIN-3033",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L206 plan step 1: \"close-out may author ... only when review named it with exact content and it is trivially small (≤2 files, ≤3 hunks, no new/changed test/function/branch/condition, no behaviour change beyond the quoted text)\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The plan encodes the research's concrete 'trivial' bound verbatim, which the brief had called unencoded. Brief and issue fetched in parallel (L38/L39). The posted summary comment (L228) repeats '≤2 files/≤3 hunks/no new test'."
+ },
+ {
+  "pair": "F56",
+  "ticket": "LIN-3056",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L212 07:01:01: \"Plan complete and posted to LIN-3056 ... Posted the full plan to the Linear description and a concise summary comment recommending implementation as the next action.\" No mention of the hold or of waiting for John.",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The agent went ahead with the wording-change plan, ignoring the revived 'wait for John' hold, which the source says the 06:51Z resume superseded. The evidence is by omission: the agent never mentions the hold. Read literally, the brief's constraint only bars dispatching opencode or switching harness, so the plan session did not strictly conflict with it."
+ },
+ {
+  "pair": "F57",
+  "ticket": "LIN-3097",
+  "session_kind": "plan",
+  "fate": "followed-source",
+  "evidence": "L244 18:41:31 plan: \"Decision rule (go/no-go): Jev is viable ... only if (i) its total hits across 7×K=21 meet-or-beat the incumbent's fresh run, and (ii) it resolves LIN-510 and LIN-813 ... or ... a single confidence threshold gates both wrong answers\"; \"~5 min, ~$0.01\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The plan adopts the research's settled criterion, which the brief presented as an open question, along with K=3, the ~$0.01 budget and 'one bounded criteria-wording iteration'. All three were dropped by the brief and taken from the raw issue."
+ },
+ {
+  "pair": "F60",
+  "ticket": "LIN-3194",
+  "session_kind": "custom",
+  "fate": "followed-source",
+  "evidence": "L320 12:57:24 paper menu table header: \"| # | Option | Repo | Size | Risk to correctness | Trial | Effort | Depends on | Finish line | Retire if |\"; \"![The menu: each option's size against its risk to correctness, with the stack that reaches 2× marked](figures/steady-base-menu/menu-size-vs-risk.svg)\".",
+  "read_issue_after_brief": true,
+  "noticed_mismatch": false,
+  "note": "The paper carries every per-option field the source requires and the size-vs-risk headline chart, all of which the brief dropped. Brief and issue were fetched together at L68/L69. The paper was merged (PR #1688)."
+ }
+]

@@ -1,0 +1,51 @@
+population 376 Counter({'Done': 335, 'Canceled': 13, 'Todo': 10, 'In Progress': 10, 'Backlog': 7, 'Duplicate': 1})
+== origin
+   breakdown: n=141 sessions med 7 mean 10.3 p75 10 | split 7% | plan-review>=2 19% | review>=2 43% | done 92%
+   companion: n=168 sessions med 5 mean 10.7 p75 12 | split 15% | plan-review>=2 27% | review>=2 23% | done 88%
+   follow-up: n=39 sessions med 6 mean 5.9 p75 8 | split 5% | plan-review>=2 5% | review>=2 23% | done 87%
+   john: n=6 sessions med 4 mean 5.8 p75 5 | split 0% | plan-review>=2 33% | review>=2 17% | done 67%
+   other-agent: n=9 sessions med 12 mean 11.6 p75 16 | split 11% | plan-review>=2 33% | review>=2 33% | done 89%
+   periodical: n=11 sessions med 9 mean 10.3 p75 9 | split 9% | plan-review>=2 27% | review>=2 36% | done 91%
+   unclear: n=2 sessions med 4 mean 3.5 p75 1 | split 0% | plan-review>=2 0% | review>=2 50% | done 50%
+== what_decided
+   0: n=7 sessions med 6 mean 7.0 p75 11 | split 0% | plan-review>=2 43% | review>=2 43% | done 71%
+   1: n=58 sessions med 9 mean 18.2 p75 15 | split 24% | plan-review>=2 38% | review>=2 29% | done 74%
+   2: n=311 sessions med 6 mean 8.5 p75 10 | split 8% | plan-review>=2 18% | review>=2 31% | done 92%
+== open_behaviour
+   no: n=320 sessions med 6 mean 8.1 p75 10 | split 8% | plan-review>=2 18% | review>=2 29% | done 90%
+   yes: n=56 sessions med 10 mean 20.7 p75 21 | split 27% | plan-review>=2 43% | review>=2 41% | done 84%
+== how_prescribed
+   0: n=17 sessions med 11 mean 11.8 p75 15 | split 29% | plan-review>=2 47% | review>=2 18% | done 65%
+   1: n=70 sessions med 9 mean 18.4 p75 20 | split 24% | plan-review>=2 37% | review>=2 31% | done 80%
+   2: n=109 sessions med 7 mean 9.6 p75 10 | split 11% | plan-review>=2 22% | review>=2 33% | done 90%
+   3: n=180 sessions med 5 mean 6.8 p75 9 | split 3% | plan-review>=2 13% | review>=2 31% | done 94%
+== decisions
+   1: n=91 sessions med 6 mean 6.7 p75 8 | split 5% | plan-review>=2 9% | review>=2 25% | done 85%
+   2: n=67 sessions med 6 mean 9.0 p75 9 | split 13% | plan-review>=2 19% | review>=2 22% | done 87%
+   3: n=72 sessions med 9 mean 11.4 p75 14 | split 8% | plan-review>=2 38% | review>=2 39% | done 96%
+   4: n=73 sessions med 7 mean 12.5 p75 12 | split 16% | plan-review>=2 30% | review>=2 33% | done 88%
+   5: n=73 sessions med 6 mean 11.0 p75 9 | split 11% | plan-review>=2 16% | review>=2 37% | done 92%
+== asserted_facts
+   0: n=30 sessions med 5 mean 11.3 p75 13 | split 20% | plan-review>=2 23% | review>=2 20% | done 70%
+   1: n=141 sessions med 6 mean 10.6 p75 10 | split 12% | plan-review>=2 25% | review>=2 26% | done 89%
+   2: n=205 sessions med 7 mean 9.3 p75 10 | split 8% | plan-review>=2 20% | review>=2 37% | done 92%
+== acceptance
+   checkable: n=260 sessions med 7 mean 9.9 p75 11 | split 9% | plan-review>=2 21% | review>=2 38% | done 93%
+   none: n=16 sessions med 7 mean 10.2 p75 11 | split 12% | plan-review>=2 25% | review>=2 38% | done 88%
+   prose: n=100 sessions med 1 mean 10.1 p75 9 | split 14% | plan-review>=2 23% | review>=2 12% | done 78%
+== size_guess
+   L: n=139 sessions med 6 mean 13.2 p75 11 | split 16% | plan-review>=2 26% | review>=2 36% | done 88%
+   M: n=157 sessions med 7 mean 9.0 p75 12 | split 11% | plan-review>=2 27% | review>=2 31% | done 89%
+   S: n=80 sessions med 5 mean 6.3 p75 8 | split 1% | plan-review>=2 5% | review>=2 22% | done 92%
+== work_type
+   bug: n=81 sessions med 8 mean 11.1 p75 11 | split 15% | plan-review>=2 26% | review>=2 32% | done 88%
+   docs: n=12 sessions med 6 mean 7.3 p75 9 | split 0% | plan-review>=2 17% | review>=2 25% | done 83%
+   feature: n=117 sessions med 8 mean 13.9 p75 13 | split 15% | plan-review>=2 30% | review>=2 50% | done 89%
+   ops: n=7 sessions med 6 mean 7.0 p75 7 | split 0% | plan-review>=2 14% | review>=2 43% | done 100%
+   other: n=9 sessions med 4 mean 14.3 p75 6 | split 11% | plan-review>=2 11% | review>=2 22% | done 89%
+   process: n=20 sessions med 8 mean 8.5 p75 12 | split 10% | plan-review>=2 30% | review>=2 25% | done 95%
+   refactor: n=50 sessions med 6 mean 9.8 p75 8 | split 10% | plan-review>=2 22% | review>=2 16% | done 90%
+   research: n=80 sessions med 1 mean 3.8 p75 5 | split 2% | plan-review>=2 6% | review>=2 15% | done 89%
+== is_child
+   False: n=184 sessions med 5 mean 9.0 p75 10 | split 9% | plan-review>=2 20% | review>=2 24% | done 86%
+   True: n=192 sessions med 7 mean 10.9 p75 11 | split 12% | plan-review>=2 24% | review>=2 38% | done 92%

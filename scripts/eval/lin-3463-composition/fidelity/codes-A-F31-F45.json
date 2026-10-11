@@ -1,0 +1,1968 @@
+[
+ {
+  "pair": "F31",
+  "units": [
+   {
+    "id": "S1",
+    "type": "HOW",
+    "quote": "runStallFailsafe's opencode branch, reapers.js:1750-1753: add state === 'HOLDING' (read through readOpenCodeLiveness) to the branch condition. This is a narrowing, and a true no-op.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "degraded-read log line ... runStallFailsafe (:1465): one line per candidate per pass, only when Reading.degraded is non-empty, immediately above the first verdict-acting write",
+    "fate": "kept",
+    "note": "format string and 'clean Reading logs nothing' also kept"
+   },
+   {
+    "id": "S3",
+    "type": "WHAT",
+    "quote": "The matching F-table log cell for :1465 lands here (see C1's cell-ownership rule: a cell lands with the commit whose behaviour it asserts).",
+    "fate": "dropped",
+    "note": "a deliverable (test-table cell) is absent from the brief"
+   },
+   {
+    "id": "S4",
+    "type": "DONE",
+    "quote": "the added condition changes no verdict and no fixture is edited. Show this, don't assert it: quote the five fixtures' shapes and the unchanged test results.",
+    "fate": "kept",
+    "note": "brief keeps the requirement but see S5"
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "test/hold-backstop-logging.test.js:131, :163, :178, :202; test/stall-failsafe.test.js:1917 (via heldFollowUpSession)",
+    "fate": "dropped",
+    "note": "brief says 'the five listed fixtures' but never lists them"
+   },
+   {
+    "id": "S6",
+    "type": "WHY",
+    "quote": "This holds only because no state row consults folder. ... If C1 ever grows a folder-consulting row, this subtask's no-op claim dies with it.",
+    "fate": "strengthened",
+    "note": "a conditional explanation becomes a constraint 'Do not add a folder-consulting row'; changelog calls it 'explicitly ruled out'"
+   },
+   {
+    "id": "S7",
+    "type": "WHY",
+    "quote": "0b0732f/LIN-2414's holdKind: 'blocked' branch below :1750 is let through by the narrowing, and the shape is unreachable for opencode anyway",
+    "fate": "dropped",
+    "note": "reviewer-facing justification"
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "findExpiredHolds (:1119) does not adopt the activation clock ... The freshResume skip (:1733) and findStalledPending (:826) also stay unadopted.",
+    "fate": "kept",
+    "note": "rationale (holdingSince ?? updatedAt ?? createdAt, pinning tests) dropped"
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "No write side is touched: the only writes in this branch are pre-existing.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "LIN-2679 item 1 rides along unsolved — do not fold it in ... owned by LIN-2679",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "(The :2467 and :2308 log sites belong to C2.)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "npm test ... Darwin baseline ℹ tests 2477 · pass 2475 · fail 2 ... Quote your triple, diff it against the baseline, and record it on this subtask.",
+    "fate": "weakened",
+    "note": "baseline numbers and command absent; brief presents the evidence to quote as an open question"
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "The five non-CI runs ... are C2's obligation — do not duplicate them here.",
+    "fate": "kept",
+    "note": "in changelog"
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "Blocked by C1 (the seam must land inert first). No dependency on C2",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "WHAT",
+    "quote": "C3 reverts alone — a different function from C2's lane.",
+    "fate": "dropped",
+    "note": "rollback contract; low impact"
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-fact",
+    "quote": "The task says C3 is “blocked by C1” and C1 is marked done",
+    "note": "source never says C1 is done"
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "It is not stated whether the degraded-read log line has already been implemented at :1465 or still needs to be added",
+    "note": "source plainly says to add it ('Plus the degraded-read log line')"
+   },
+   {
+    "id": "B3",
+    "type": "opens-decided",
+    "quote": "The exact final test evidence to quote for the unchanged behavior is not provided here beyond the named fixtures",
+    "note": "source names the command, the baseline triple, and the fixtures"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the F-table log cell for :1465 and the five fixture paths/baseline triple, so the no-op evidence deliverable is underspecified and one test-table deliverable would likely be missed.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F32",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Everything that identifies a ruling assumes decision_id is unique per workspace. Nothing guarantees that",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "the row map kept only the last <li>, select-all counted one, and the 2026-09-11 bulk agree stamped 07509b1e only",
+    "fate": "kept",
+    "note": "summarised in changelog"
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "public/observation.js:101 rulingKey(...); lib/dismissal-suggestions-store.js:43-48 and lib/shelved-rulings-store.js:35-41; POST /api/proxy/rulings/:decisionId/suggest-dismissal addresses the id only",
+    "fate": "dropped",
+    "note": "named sites absent; the id-only POST route would not be found by the rg pattern"
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "Enumerate with rg -n ... lib public routes tests and record the output + sha in this ticket before planning.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHY",
+    "quote": "The dismiss stamp itself is already per-loop (markDecisionAnswered(itemId, …)), so per-loop identity is the truthful unit.",
+    "fate": "kept",
+    "note": "rendered as a 'do not change its meaning' constraint; fair inference"
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "Client key becomes ${urlKey}::${anchor.loopId ?? anchor.taskDecisionId}::${decisionId} (every ruling has exactly one of the two anchors).",
+    "fate": "weakened",
+    "note": "formula not given; the anchor choice is turned into an open question"
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Server: key suggestion and shelf documents by the same triple, with the proxy route taking decisionLoopId in the body; keep a decisionId-only write back-compatible",
+    "fate": "weakened",
+    "note": "primary proposal flattened to one of two equal options; back-compat decisionId-only write dropped"
+   },
+   {
+    "id": "S8",
+    "type": "OPEN",
+    "quote": "Alternative if that is too wide: keep the stores as they are and have the client fan a suggested Agree out ... say so explicitly in the banner.",
+    "fate": "kept",
+    "note": "banner detail dropped"
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Sibling, not in scope: hook.js in simple-dispatcher could de-duplicate a re-emitted DECISION: within one session.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Unit: two loops in one workspace carrying the same decision_id render two rows with two keys; select-all counts 2; bulk agree dismisses both.",
+    "fate": "weakened",
+    "note": "only 'verifying the duplicate-id case works end-to-end'"
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "A suggestion or shelve addresses one loop's row without touching the other (or the documented fan-out, whichever is chosen).",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "Existing single-loop behaviour byte-identical.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "Stage sequence: implementation → fresh-context review in a DETACHED worktree → close-out merges on Approve + CI 6/6 on the exact head → Done.",
+    "fate": "kept",
+    "note": "detached worktree and CI 6/6 details dropped"
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "No research/plan step unless the Proposal turns out not to hold at HEAD (main = 3ace169d or later).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "do not touch public/flight-companion.* (Lane A) or the dispatch model picker in public/common.js / lib/render-settings.js",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "the e2e that reproduces the duplicate-id skip goes red-first.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Wind down if: the fix needs the feedback wire contract or the dispatch API request shape changed.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "behind an explicit gate that stops and hands back if the Proposal does not hold at HEAD.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "What exact loop anchor field should be authoritative when forming the client key if both anchor.loopId and anchor.taskDecisionId are present or missing",
+    "note": "source decides: loopId ?? taskDecisionId, and every ruling has exactly one"
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "Whether the final implementation should key suggestion/shelf documents by the full triple ... or keep the current stores and fan out client-side",
+    "note": "source has a primary proposal with fan-out only as a fallback 'if that is too wide'; brief presents them as equal"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the concrete client key formula and presents the server triple-keying as an even choice against client fan-out, while also dropping the red-first e2e and the wind-down condition.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F33",
+  "units": [
+   {
+    "id": "S1",
+    "type": "DONE",
+    "quote": "No rendered HTML changes; the published proxy contract does. ... Both halves of that sentence are acceptance criteria.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "re-ground at HEAD before editing, and treat any drift as the citation being stale, not the design.",
+    "fate": "kept",
+    "note": "in open questions; 'drift is not the design' nuance dropped"
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "parseDecision is the single discard point ... gains a sixth optional field via a new _parseOnAnswer helper mirroring _parseIfUnanswered's object guard",
+    "fate": "kept",
+    "note": "helper name and closed set {resume, dispatch, record} not restated in Area-1 terms"
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "record_on validated with ISSUE_ID_REGEX (lib/workspace.js:77) — reused, never re-derived",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHAT",
+    "quote": "field-level drop on invalid ... parseDecision never throws and never returns decision === null because of it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "This subtask does not bump it: the two surfaces may carry different decision shapes for up to 30 days. Not user-visible",
+    "fate": "kept",
+    "note": "rationale dropped; an open question re-raises compatibility"
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "lib/scan.js:176 ... gains on_answer: { effect: 'record' }. Injected, never exposed via the LLM schema",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "New pure function in lib/unanswered-decisions.js: resolveEffect(decision, disposition, { anchorTerminal, liveDispatchOnAnchor } = {})",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "WHAT",
+    "quote": "disposition === 'resumable' → always 'resume', unconditional.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "disposition === 'gone' and anchorTerminal === true → 'record'. liveDispatchOnAnchor === true → 'record'.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "WHAT",
+    "quote": "gone/task-bound take the declared decision.on_answer.effect if present, else today's default (gone→dispatch, task-bound→record)",
+    "fate": "dropped",
+    "note": "branch 4 default mapping not in brief"
+   },
+   {
+    "id": "S12",
+    "type": "WHAT",
+    "quote": "mid-turn and indeterminate ... never return a declared effect; they return null",
+    "fate": "kept",
+    "note": "the explicit null return is not stated"
+   },
+   {
+    "id": "S13",
+    "type": "WHAT",
+    "quote": "Returns { effect, declaredEffect, alternate }. alternate is null for every hard-override branch (1-3) by construction",
+    "fate": "dropped",
+    "note": "row shape and override-enforcement mechanism absent"
+   },
+   {
+    "id": "S14",
+    "type": "BOUND",
+    "quote": "anchorTerminal/liveDispatchOnAnchor are undefined, not false, when a caller omits them — the branch is skipped ... Must never throw",
+    "fate": "kept",
+    "note": "four call sites list dropped"
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "do not touch the escalation-KPI join key at routes/dashboard.js:1709-1736 ... verify it stays undisturbed.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "merged.some(l => l.issueIdentifier === row.anchor.issueIdentifier && !isTerminalLoop(l)) ... Zero new reads. No && l.agentState === 'running' conjunct",
+    "fate": "dropped",
+    "note": "brief says only 'compute and pass liveDispatchOnAnchor'"
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Never DUPLICATE_DISPATCH — confirmed unusable",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "anchorTerminal is never evaluated inside it — full stop, not merely cached.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "lib/proxy-instructions.js:412-427 gains \"effect\": \"resume|dispatch|record\" beside the existing \"disposition\" enum. Not optional",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "docs/proxy-integration.md ... add the route's full section ... docs/autopilot-operating-manual.md:444-451 gets one added sentence",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "DONE",
+    "quote": "Red-first: a blocked-parked loop always resumes ... The declaration must be present and overridden",
+    "fate": "weakened",
+    "note": "reduced to 'effect precedence' tests; red-first and declared-present fixture requirement dropped"
+   },
+   {
+    "id": "S22",
+    "type": "DONE",
+    "quote": "unanswered-decisions.test.js:165-179 — rewrite, do not loosen ... do not relax it to a subset match",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S23",
+    "type": "DONE",
+    "quote": "on_answer end-to-end, plus the negative ... a DECISION: block without on_answer produces a row byte-identical to today's",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S24",
+    "type": "DONE",
+    "quote": "A spy that throws if the provider dependency is called, with 200 + correct count still asserted ... This test does not exist yet ... Write it",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S25",
+    "type": "BOUND",
+    "quote": "Flight Companion stays out ... session.js reply box ... No cron-shaped sweep. Bulk paths never dispatch. No proxy path stamps or dispatches on a human's behalf",
+    "fate": "dropped",
+    "note": "cross-child boundaries absent"
+   },
+   {
+    "id": "S26",
+    "type": "BOUND",
+    "quote": "effect stays distinct from disposition ... No client code reads row.effect ... No simple-dispatcher edit (S2)",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "Whether any existing route or test still assumes the old decision shape in a way that needs explicit compatibility handling beyond the stated non-bump decision.",
+    "note": "source settles this: additive, not user-visible, no bump; minor"
+   },
+   {
+    "id": "B2",
+    "type": "add-fact",
+    "quote": "Expanded on_answer from a no-op idea into a validated field",
+    "note": "source never describes on_answer as previously a no-op idea; changelog history invented, low impact"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops resolveEffect's return shape ({effect, declaredEffect, alternate} with alternate null on overrides) and the 'rewrite, do not loosen' full-row test, so the row fields and test discipline an agent produces would plausibly differ.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F34",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "S1 is Done: merged as de478d84 on main ... Re-ground against main at or after de478d84, not against the SHAs in the plan",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "HOW",
+    "quote": "A separate EFFECT_CAPTIONS object beside the existing DISPOSITION_CAPTIONS at public/chat.js:123-131 — not three entries merged into it",
+    "fate": "dropped",
+    "note": "brief says only 'add effect-specific captions'; the separate-object rule and lookup chain are absent"
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "readOnly at :172 stays disposition-keyed, unchanged.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "New module-level rulingEffectOverride (Map<rulingKey, effect>) ... keyed on rulingKey(urlKey, anchor, decisionId)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Restored at row-creation time mirroring the bulk-checkbox precedent (:1863-1873), not via mustReuse (:1639), and pruned in the seen sweep",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHAT",
+    "quote": "The override is honoured only when it exactly equals the current payload's row.alternate; otherwise it is pruned outright, not merely ignored",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": ":1638's mustReuse path skips renderRulingRow entirely ... so a check written only inside renderRulingRow never runs on that path.",
+    "fate": "weakened",
+    "note": "only surfaces as a test topic in an open question"
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "The flip control renders only when row.alternate is non-null ... never a global toggle.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "Widen the hydrate route ... additively, with no new provider read ... Response gains neighborhood: { parent, siblings, children, cousins }",
+    "fate": "kept",
+    "note": "'one widened hydrate response' kept; 'no new provider read' and the shape are absent"
+   },
+   {
+    "id": "S10",
+    "type": "WHAT",
+    "quote": "record_on valid + in-neighbourhood + not itself terminal → the button shows that target identifier. Otherwise fall back to the anchor with a visible note",
+    "fate": "kept",
+    "note": "fallback-to-anchor rule only implicit"
+   },
+   {
+    "id": "S11",
+    "type": "BOUND",
+    "quote": "Server-side guards are unchanged ... the neighbourhood check is client-side/advisory",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "a new sibling branch inside deliverRulingReply ... reusing the gone branch's comment call verbatim ... never calling startRun. The task-bound branch itself is untouched.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "WHAT",
+    "quote": "The gone branch's !anchor.issueIdentifier refusal ... is a precondition for the run half only",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "a dispatch-effect row composes question + chosen option (or free text) + the decisionCase recap ... and passes explicit promptName and kind",
+    "fate": "kept",
+    "note": "default kind 'custom' dropped"
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "waiting has no fixture ... this records waiting specifically so it is not dropped as 'covered by queued'.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "WHAT",
+    "quote": "on disagreement (anchor now terminal) downgrade to record ... on hydration failure ... fail closed to record with the same note. Never silently dispatch",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "HOW",
+    "quote": "gated on a new, explicit structural marker ... not by kind ... validated the opaque-passthrough way ... living inside createDispatchItem",
+    "fate": "kept",
+    "note": "validateOpaqueDispatchField route dropped"
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "Naming hazard: the marker must NOT be called terminal.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "The check instantiates its own createTaskDoneCache() instance ... Producer predicate: TERMINAL_TYPES.includes(issue.state.type) ... 60s TTL kept",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S20",
+    "type": "DONE",
+    "quote": "Red-first: a Done/Canceled/Duplicate anchor never dispatches ... dispatchPrompt count === 0 AND postComment called once AND the visible downgrade note",
+    "fate": "dropped",
+    "note": "witness table not carried; brief refers to 'witness descriptions' it does not contain"
+   },
+   {
+    "id": "S21",
+    "type": "DONE",
+    "quote": "capturedOpts.prompt contains the decision's question and the chosen option's label and the decisionCase excerpt ... Fails against today's raw-reply-text dispatch",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S22",
+    "type": "DONE",
+    "quote": "observation-ruling-delivery.test.js:233/:246, :328/:350 — rewrite, do not loosen ... re-anchored on a row whose resolved effect is dispatch",
+    "fate": "dropped",
+    "note": "record_on misrouting trio and e2e net-new also absent beyond 'tests/e2e coverage'"
+   },
+   {
+    "id": "S23",
+    "type": "BOUND",
+    "quote": "Flight Companion stays out — arithmetically forced: cap lib/chat-tools.js:670 is 20000, measured usage 19993",
+    "fate": "dropped",
+    "note": "brief instead lists lib/chat-tools.js among files to edit"
+   },
+   {
+    "id": "S24",
+    "type": "BOUND",
+    "quote": "session.js reply box ... wording-only ... No cron-shaped sweep. Bulk paths never dispatch ... No proxy path stamps or dispatches",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S25",
+    "type": "WHAT",
+    "quote": "A naive effect-first caption therefore renders 'Answer & start a run' on a mid-turn row ... Key the caption so a row that cannot act never claims an effect.",
+    "fate": "kept",
+    "note": "the fact that mid-turn rows emit effect 'record' not null is dropped"
+   },
+   {
+    "id": "S26",
+    "type": "BOUND",
+    "quote": "do not write a new unverified guarantee into the contract either: audit any claim you add against the code that produces it",
+    "fate": "dropped",
+    "note": "also dropped: captions follow branch order (live run forces record only on non-resumable rows)"
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-scope",
+    "quote": "editing the live files/tests, especially public/chat.js, public/observation.js, routes/dashboard.js, routes/dispatch.js, lib/chat-tools.js",
+    "note": "lib/chat-tools.js is Flight Companion, which the source says stays out; the guard lives inside createDispatchItem so no chat-tools edit is called for"
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "The widened hydrate route response shape is described, but whether any existing callers need compatibility handling is not stated.",
+    "note": "source says the widening is additive; minor"
+   },
+   {
+    "id": "B3",
+    "type": "opens-decided",
+    "quote": "The exact test file edits needed ... are not fully enumerated beyond the witness descriptions.",
+    "note": "source enumerates witnesses with file:line targets in a table"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the source's acceptance-witness table (red-first three-way terminal test, .prompt composition assertions, rewrite-not-loosen of existing delivery tests), so the tests an agent writes would plausibly lack the properties the source says separate a real pass from a decorative one.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F35",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Prose-only; no behavior change is wanted anywhere in this ticket.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "introduced a new false claim of the same class on both published surfaces: lib/proxy-instructions.js:435-441 ... docs/proxy-integration.md:1199-1200",
+    "fate": "kept",
+    "note": "line numbers dropped"
+   },
+   {
+    "id": "S3",
+    "type": "WHY",
+    "quote": "declaredEffect is read straight off the decision and is not disposition-dependent at all",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHY",
+    "quote": "A mid-turn loop ... whose DECISION: block declared on_answer: { effect: 'dispatch' } ... declaredEffect\":\"dispatch\"",
+    "fate": "kept",
+    "note": "in changelog"
+   },
+   {
+    "id": "S5",
+    "type": "WHY",
+    "quote": "This is a near-term contract falsehood, not a theoretical one.",
+    "fate": "dropped",
+    "note": "reachability argument; low impact"
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "Replace the declaredEffect-guaranteed-null sentence on both surfaces with what is actually guaranteed, e.g.: 'A read-only row never surfaces its declared effect in effect; ...'",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Re-point the tests/unit/proxy-instructions.test.js assertion ... which currently pins the false wording",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "OPEN",
+    "quote": "Secondary, same class, optional here: ... Add | null to effect.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Do not change resolveEffect's branch order, the route predicates, or the self-match behavior",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "pushed to the existing PR #1441 branch lin-2773-on-answer-parse-scan-injection",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "then review on LIN-2773 against the new head. LIN-2773 stays In Progress and PR #1441 stays unmerged until then.",
+    "fate": "broadened",
+    "note": "brief folds the subsequent review stage into this agent's task ('Then rerun review'); 'PR stays unmerged' dropped"
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The brief tells the implementing agent to 'rerun review for LIN-2773' itself, where the source sequences review as a separate next stage.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F36",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "the ## Plan section there is the implementation source of truth ... it does not re-open settled design.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "Dependency order: A ∥ B → C. A and B are independently startable from main",
+    "fate": "dropped",
+    "note": "low impact for Track A"
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "suggest() gains two optional fields: proposedOutcome ... defaulting to 'dismissed' ... and optionId ... The store stays a dumb writer",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "The accepted-field set is frozen at exactly {proposedOutcome, optionId, reason, decisionLoopId, suggestedBy, suggestedAt, withdrawn}.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "attachStandingSuggestions currently narrows every suggestion to exactly {reason, suggestedBy, suggestedAt} (:325-326). Widen it to also carry proposedOutcome and optionId.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "POST /api/proxy/rulings/:decisionId/suggest-answer {optionId, reason, decisionLoopId?}, readWrite scope, alongside the existing suggest-dismissal",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Factor, do not copy. Extract the shared decision lookup + orphan-row guard (:236-253), attribution-from-token (:258), and the readRulings-based existence check into one internal helper",
+    "fate": "dropped",
+    "note": "no mention of a shared helper; an agent could duplicate the suggest-dismissal logic"
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "Step 4a — validation, exactly this table (404 RULING_NOT_FOUND / 400 / 422 / 403 / 503)",
+    "fate": "kept",
+    "note": "403 and 503 rows only implicit"
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "The absent disposition gate is load-bearing, not an omission ... Do not add a disposition check here.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "The proxy may never write agreed, agreedAt, or acceptedAt on its own proposal row.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "Both surfaces also document the widened payload, not just the new route ... state explicitly how a legacy record with no proposedOutcome reads",
+    "fate": "kept",
+    "note": "explicit legacy-read statement and 400/404/422 error shapes not restated"
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "CLAUDE.md gains one line each for lib/dismissal-suggestions-store.js, lib/shelved-rulings-store.js, routes/proxy-rulings.js.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": ":266-272 (forbidden-field loop) ... add agreed, agreedAt, acceptedAt ... :304-316 ... split into FORBIDDEN ... and PERMITTED",
+    "fate": "kept",
+    "note": "details compressed to 'forbidden-field/presence list amendments'"
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "Both are currently-passing tests on the discharge boundary. Say so in the PR body",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "A suggest-answer doc carries proposedOutcome: 'answered' and its optionId, and a subsequent GET /api/proxy/rulings still reports the ruling unanswered.",
+    "fate": "kept",
+    "note": "'still unanswered' assertion only implicit"
+   },
+   {
+    "id": "S16",
+    "type": "DONE",
+    "quote": "Acceptance witnesses owned here (F3) — each on a freshly-created decision ... Witness 1 ... Witness 2 ... Witness 5, proxy-read half ... Witness 7",
+    "fate": "weakened",
+    "note": "behaviours appear as constraints but the witness tests and fresh-decision requirement are not stated as obligations"
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "No public/observation.js edit ... No routes/dashboard.js ... No public/common.js, routes/workspace-api.js",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "No LIN-2739 ... or LIN-2767 ... work ... No wording changes — the banner label is Track C's.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "DONE",
+    "quote": "npm run test:hermetic ... plus Playwright must pass with only this track's code present.",
+    "fate": "dropped",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "material",
+  "most_consequential": "The brief omits 'Factor, do not copy' (extract one shared lookup/orphan-guard/attribution helper for both routes), so an agent could plausibly duplicate the suggest-dismissal logic; CLAUDE.md lines and the PR-body pin disclosure are also missed.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F37",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "What are all the levers Harbour has already written down that make a task complete faster or cheaper, and what does each one rest on?",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "This is a map for choosing later papers, not a ranking, and not a savings estimate.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "docs/reviews/ in both repos, especially capacity-test-run-review-2026-08-14, intra-session-efficiency-review-2026-08-14, lane-run-review-2026-08-23, model-effort-routing-proposal-2026-09-11",
+    "fate": "dropped",
+    "note": "brief keeps only source categories; named reviews, docs/archive/5, north-star.md, the manuals and proxy search terms are absent"
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "The tracker over the proxy: GET /api/proxy/search?q= for terms like cost, effort, cache, preamble, resume, lane, cadence, wake, serialize",
+    "fate": "dropped",
+    "note": "'proxy tickets' mentioned generically"
+   },
+   {
+    "id": "S5",
+    "type": "WHAT",
+    "quote": "One file, docs/papers/efficiency-levers.md, with the same five-line header as docs/papers/archive-proposal.md ... and nothing added to it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHAT",
+    "quote": "one table, one row per lever: name, what it changes, where it is documented ..., what has been measured ..., and what a test would need.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "WHAT",
+    "quote": "Group rows by where in a ticket's life they act: before dispatch, inside a session, between sessions, at a gate, in the machinery. Under 40 rows.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "After the table, at most 200 words: which levers have no document at all that you noticed while reading, and what this map cannot tell us.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "No savings estimates, no recommendations, no ranking. If a lever has been measured twice with different numbers, record both.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "Branch from origin/claude/keen-planck-qwdhu4 ... Open a PR against main, remove this paper's line from docs/papers/proposals.md in the same PR, CI green. Do not merge.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "Post the PR link as a comment here.",
+    "fate": "kept",
+    "note": "brief also questions where 'here' is"
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "Blocked by LIN-2800 ... Dispatch after that paper's PR is open.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "WHAT",
+    "quote": "LIN-2800, whose paper is a source for this one.",
+    "fate": "dropped",
+    "note": "brief recasts LIN-2800 as work not to duplicate rather than a source to read"
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "Do not redo work that would duplicate the blocked upstream source paper",
+    "note": "source only says LIN-2800's paper is a source and sequences dispatch after its PR"
+   },
+   {
+    "id": "B2",
+    "type": "add-fact",
+    "quote": "Scope shifted from single-source review to cross-repo map",
+    "note": "no such shift in the source; invented history, low impact"
+   },
+   {
+    "id": "B3",
+    "type": "opens-decided",
+    "quote": "Whether the PR comment with the link is expected on the issue itself or another tracking surface is not clarified",
+    "note": "'comment here' means this ticket; low impact"
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief drops the named priority sources (four specific reviews, archive essay 5, north-star.md, proxy search terms) and recasts LIN-2800's paper from a source into something not to duplicate, which could thin source coverage but leaves the deliverable spec intact.",
+  "source_prescribes_how": "light",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F38",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "That is the RIGHT behaviour for \"this project also has a second repo\" (John: a workspace can hold any number of repos)",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "Only Linear declares an addHint, and Linear's add-source is the one case that creates a whole separate workspace rather than binding",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "Every provider with an addProvider gets an addHint; the base class supplies the default binding wording so a new provider inherits it, and Linear keeps its existing exception text.",
+    "fate": "kept",
+    "note": "base-class mechanism only implied ('inherited default', changelog 'inheritance')"
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "The add row offers two verbs where the provider declares an entryCta: bind to this workspace ... and as a new workspace ... Providers with no entryCta (github-projects) render bind-only.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "WHAT",
+    "quote": "The post-bind success notice names the binding and links to \"make active\", so a bound source is one click from being usable.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "DONE",
+    "quote": "Render tests pin the hint per provider and the two verbs per entryCta presence.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "DONE",
+    "quote": "The existing add-source install-flow tests are unchanged.",
+    "fate": "weakened",
+    "note": "brief adds 'unless the intended behavior truly changes' and 'intended to remain unchanged'"
+   },
+   {
+    "id": "S8",
+    "type": "DONE",
+    "quote": "e2e: add a second Local/fake source to a seeded workspace, follow the notice's link, activate it, and the drill-down now reads from it.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Multi-binding reads on single-provider surfaces ... is LIN-2149's cutover phase, not this ticket.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "WHY",
+    "quote": "the switcher (sibling ticket) is the only door. The two surfaces should agree on how you get a new workspace.",
+    "fate": "dropped",
+    "note": "consistency-with-switcher rationale absent; low impact"
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "lib/github-install-flow.js:449-482 ... lib/render-settings.js:1031-1038 ... lib/render-settings.js:956-961",
+    "fate": "dropped",
+    "note": "file anchors absent"
+   }
+  ],
+  "additions": [],
+  "verdict": "minor",
+  "most_consequential": "The brief softens 'existing add-source install-flow tests are unchanged' with an 'unless the intended behavior truly changes' escape clause.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F39",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "the flight companion gives me a long reply, and whilst reading I keep being taken to the end, and have to scroll back to my place.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "I think this happens when there's a tool call or the flight companion is doing some kind of update.",
+    "fate": "kept",
+    "note": "kept as a hypothesis, explicitly not assumed"
+   },
+   {
+    "id": "S3",
+    "type": "WHAT",
+    "quote": "I'd like to see an indication if there's more added to the conversation since I last scrolled to the end",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "but I'd also like my place to stay so I can keep reading.",
+    "fate": "kept",
+    "note": "brief's 'unless they are already at the bottom' is a fair inference and is also listed as open"
+   },
+   {
+    "id": "S5",
+    "type": "WHY",
+    "quote": "Page: https://harbour.cat/workspace/linearviewer/flight-companion ... Android 10 ... Mobile Safari",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "Its natural next step is triage: work out what is actually being asked, confirm the real priority, and scope it before any research or implementation.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "faithful",
+  "most_consequential": "none",
+  "source_prescribes_how": "none",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F40",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "public/task-chat.js:398 performs an unconditional raw scroll write on every SSE token/message frame ... A reader who has scrolled up mid-stream ... is yanked back",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHY",
+    "quote": "public/task-chat.js:398's write matched neither LIN-2811's ChatUI-consumer taxonomy ... nor LIN-2808's named three Flight-Companion-only sites",
+    "fate": "dropped",
+    "note": "discovery provenance; low impact"
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "if (window.ChatUI.isPinnedToBottom(transcript)) transcript.scrollTop = transcript.scrollHeight;",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "WHAT",
+    "quote": "a reader who is following along (or the user's own question, which should always reveal) keeps auto-following.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "BOUND",
+    "quote": "Must not duplicate the predicate — consume window.ChatUI.isPinnedToBottom once it exists (blocked on LIN-2811).",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "Must not regress the existing behavior for the user's own sent question ... this ticket only concerns the streamed-token write at line 398",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "BOUND",
+    "quote": "Out of scope: LIN-2811 (shared chat.js predicate/gate) and LIN-2808 (Flight Companion's three sites)",
+    "fate": "kept",
+    "note": "as 'not broader chat rendering behavior'"
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "Blocked by LIN-2811 (needs window.ChatUI.isPinnedToBottom to exist first).",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [],
+  "verdict": "faithful",
+  "most_consequential": "none",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F41",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Say what the list is. Subtitle names it: repositories this Harbour installation has been granted on GitHub, grouped by account",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "A link on the page — beside the list AND in the empty state — to the installation's configure page ... https://github.com/settings/installations/<installationId>",
+    "fate": "narrowed",
+    "note": "brief has the per-installation link but not the empty-state link"
+   },
+   {
+    "id": "S3",
+    "type": "DONE",
+    "quote": "Empty state renders the same link instead of only \"Go to homepage\".",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "buildInstallUrl must not be called from the renderer ... Recommended fallback href: Harbour's own begin route /auth/github ... If a literal buildInstallUrl fallback is wanted, compute it in the route",
+    "fate": "kept",
+    "note": "constraint kept; fallback choice kept open as in source"
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Replace the bare <select> with a radio-row list ... and a client-side filter input that shows once the list is longer than ~8 rows.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "BOUND",
+    "quote": "Keep the single form POST to /auth/github/link with the same repo field and the same data-testids",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Semantic-token-only CSS (dark-safe), mono for slugs per the house typography split.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "walk by page number keeping page 1's URL byte-identical (?per_page=100) ... bounded + .truncated flag ... surface the note only when genuinely truncated",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "Multi-installation renders per-account sections, each with its own link.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Unit tests on renderGitHubRepoSelectPage pin: the link href per installation id, the fallback href when none, the filter input threshold, and that the POSTed field is still repo.",
+    "fate": "weakened",
+    "note": "only the threshold pin is mentioned; the rest collapses to 'adding/newly adjusting tests'"
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "Those five pin the <select> implementation and must be rewritten ... This is the only sanctioned edit to existing assertions",
+    "fate": "kept",
+    "note": "'only sanctioned edit' and github-auth.test.js unchanged are not stated"
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "thread installationId (install path) and login (re-bind path) through the renderPicker opts",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "group by installationId (labelling each section with the slug owner) rather than by the re-derived slug owner",
+    "fate": "weakened",
+    "note": "section labelling turned into an open question"
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "re-capture the two github golden bodies as a reviewed, isolated commit.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "DONE",
+    "quote": "Add one route-level test that the fresh-install path receives the installation id.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S16",
+    "type": "HOW",
+    "quote": "a ~15-line inline filter IIFE is house-consistent; a new public/*.js file for one page is not",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "BOUND",
+    "quote": "Do not touch the six shared hook classes",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S18",
+    "type": "BOUND",
+    "quote": "A callback that lands the user back on the picker ... The LIN-2149 connection/scope picker; LIN-2014 ... renderGitHubProjectSelectPage ... renderJiraSiteSelectPage ... out of scope",
+    "fate": "dropped",
+    "note": "non-goals absent"
+   },
+   {
+    "id": "S19",
+    "type": "OPEN",
+    "quote": "GitHub's actual total_count semantics ... asserted only by the in-repo comments and a 2-item fixture",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "Recommended next action: plan.",
+    "fate": "dropped",
+    "note": "brief frames the job as implementation ('Fix ... Remaining work includes updating renderers')"
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "It is not yet confirmed whether the final UI should label sections by installation account name, slug owner, or both",
+    "note": "research recommends grouping by installationId labelled with the slug owner"
+   },
+   {
+    "id": "B2",
+    "type": "add-fact",
+    "quote": "Problem re-scoped from “just explain the list” to a full picker overhaul",
+    "note": "the ticket always specified all four changes; invented history, low impact"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief frames the task as implementation and drops the research's recommended next action (plan), along with the empty-state link acceptance and the non-goals.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F42",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "both left Harbour showing a live session with nothing happening, and both needed a human to notice and abort.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "BOUND",
+    "quote": "LIN-2836 (completion provenance) is adjacent but would only record how these ended, not surface them while they were stuck.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "WHY",
+    "quote": "then a [usage] row (25k output tokens, so the work happened), then nothing. No [done], no [failed], completedAt null ... The dispatcher side recorded the session complete.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "OPEN",
+    "quote": "did the hook's [done] POST fail ... Or did the session finalize on a path that posts usage but no terminal marker? The dispatcher log for that session id answers it.",
+    "fate": "kept",
+    "note": "pointer to the dispatcher log dropped"
+   },
+   {
+    "id": "S5",
+    "type": "OPEN",
+    "quote": "whether a [usage] row after a verify re-ask with no terminal marker within a bound should itself be a signal Harbour or SD reacts to.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "WHY",
+    "quote": "Six [working] (opencode — 10m so far; next check in 10m) rows and nothing else until I aborted ... The runner's heartbeat reports the server as busy, so SD's stall failsafe never fired",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "WHY",
+    "quote": "Case B on this ticket (the LIN-2153 plan, 62 minutes, same signature) is very likely the same mechanism.",
+    "fate": "strengthened",
+    "note": "brief states Case B 'is caused by' the unanswered external_directory prompt; the source diagnosed case C and called B 'very likely' the same"
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "an opencode session that is busy for an hour with zero tool calls and zero output needs a bound, the same shape as LIN-2515's settled-silent watchdog",
+    "fate": "kept",
+    "note": "LIN-2515 precedent dropped"
+   },
+   {
+    "id": "S9",
+    "type": "DONE",
+    "quote": "Both log causes are named on this ticket.",
+    "fate": "dropped",
+    "note": "brief treats Case B as already diagnosed and never asks for causes to be recorded"
+   },
+   {
+    "id": "S10",
+    "type": "DONE",
+    "quote": "Case A: a lost terminal POST is retried or, failing that, Harbour's [usage]-after-verify-with-no-terminal gap is surfaced within a bound.",
+    "fate": "strengthened",
+    "note": "'surfaced' becomes 'treats ... as a terminal signal'"
+   },
+   {
+    "id": "S11",
+    "type": "DONE",
+    "quote": "Case B: an opencode session with no output and no tool activity for longer than a configurable bound is re-fired or failed, with the reason posted, never left heartbeating.",
+    "fate": "weakened",
+    "note": "brief offers 'a bound or pre-grant/reroute' as alternatives; configurable and reason-posted dropped"
+   },
+   {
+    "id": "S12",
+    "type": "WHY",
+    "quote": "The heartbeat's elapsed clock is not monotonic ... it is why \"heartbeats for an hour\" is invisible to any duration-based watchdog.",
+    "fate": "kept",
+    "note": "'worth a ticket of its own' scope note dropped; brief also misattributes 'busy' to the clock"
+   },
+   {
+    "id": "S13",
+    "type": "BOUND",
+    "quote": "I have not re-dispatched research. A fresh opencode research dispatch would hit the same unanswered external_directory prompt and wedge again",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "OPEN",
+    "quote": "That needs either the permission pre-granted in the opencode launch config, or this ticket's research routed to a harness that can reach the host path, and both are calls above my line.",
+    "fate": "strengthened",
+    "note": "a human-level call about re-dispatching research becomes a constraint on the fix"
+   },
+   {
+    "id": "S15",
+    "type": "WHAT",
+    "quote": "Case A ... is a different mechanism and remains unresearched.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "The opencode fix must account for headless runs: interactive approval is not available, so permission must be pre-granted or the task must be routed to a harness",
+    "note": "source names these as options for re-dispatching research, left to a higher call, not as a requirement on the fix; done-when asks for a bound"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief lets Case B be satisfied by pre-granting permission or rerouting instead of the source's required configurable silence bound that re-fires or fails with a posted reason, and states Case B's cause as settled when the source only called it very likely.",
+  "source_prescribes_how": "light",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F43",
+  "units": [
+   {
+    "id": "S1",
+    "type": "BOUND",
+    "quote": "Read the parent's Strategy framing and Cross-cutting concerns before starting; do not redesign the approved approach here.",
+    "fate": "dropped",
+    "note": "invariants are carried, the pointer to read the parent is not"
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "giving a ruling any outcome resurfaces an older superseded ruling, because the outcome:null filter sits upstream of the most-recent-wins reduction.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "BOUND",
+    "quote": "Do NOT \"fix\" this by dropping the query-level filter. That filter is LIN-2227's deliberate cost control",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "Add listNewestScanPerTask(urlKeys): a narrow-projection store method returning only {urlKey, issueId, outcome, scannedAt} ... no decision payload",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Signature becomes collectUnansweredDecisions({loops, taskDecisions, shelvedRulings, newestScanByTask}, {now, liveDispatchOnAnchor}).",
+    "fate": "kept",
+    "note": "exact signature not restated; brief's open question treats the threading shape as unspecified"
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "newestScanByTask is keyed the way the reduction already keys task rows — <urlKey>::<issueId>.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "use newestScanByTask first to determine each task's true newest scannedAt, and only THEN ask whether the row already held from the candidate set matches it",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "WHAT",
+    "quote": "the candidate row is dropped only when the newest newestScanByTask row for that task is outcome-bearing (outcome truthy) AND newer than the candidate's own scannedAt.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "The 4 read consumers — all must be edited ... A site that is missed silently keeps the LIN-2729 bug for its own readers.",
+    "fate": "kept",
+    "note": "line numbers dropped"
+   },
+   {
+    "id": "S10",
+    "type": "BOUND",
+    "quote": "One predicate, never forked ... Two lineages stay two lineages ... Identity scoping is one rule ... A basis hash is refresh-only ... State is never a discharge signal.",
+    "fate": "kept",
+    "note": "'no second overtaken list; no model-judged correlation' detail dropped"
+   },
+   {
+    "id": "S11",
+    "type": "WHAT",
+    "quote": "None needed — a pure read-path correction. No data migration, no write-path change.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S12",
+    "type": "DONE",
+    "quote": "Port LIN-2729's own three-line repro (before retire / after retire / after dismiss) into a unit test against collectUnansweredDecisions",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "DONE",
+    "quote": "Named regression (F5): a zero-finding rescan (outcome: null, newest scannedAt) must NOT drop an older, still-unanswered candidate row.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "DONE",
+    "quote": "A query-cost assertion (mock collection call count/shape) confirming the narrow second query never fetches a full decision payload — extended to cover all 4 call sites",
+    "fate": "dropped",
+    "note": "only an open question about whether existing query-shape assertions need updates"
+   },
+   {
+    "id": "S15",
+    "type": "BOUND",
+    "quote": "Dependencies: None. Independent of every other step; smallest and most isolated; land this first.",
+    "fate": "dropped",
+    "note": "low impact"
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "opens-decided",
+    "quote": "The exact API / method shape for threading listNewestScanPerTask into each of the four consumers is not fully specified",
+    "note": "source gives the new collectUnansweredDecisions signature; minor"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the third acceptance item, a query-cost assertion across all 4 call sites proving the narrow query never fetches a decision payload, so that test would likely not be written.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ },
+ {
+  "pair": "F44",
+  "units": [
+   {
+    "id": "S1",
+    "type": "DONE",
+    "quote": "CLAUDE.md at ≤110 lines and ≤12,000 bytes, guarded by a unit test, bytes binding.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S2",
+    "type": "DONE",
+    "quote": "All 8 destination docs exist under docs/architecture/, each headed with a scope line, prose moved byte-for-byte.",
+    "fate": "kept",
+    "note": "'headed with a scope line' dropped"
+   },
+   {
+    "id": "S3",
+    "type": "DONE",
+    "quote": "npm run test:unit, npm run test:hermetic and full npm test green; ci-success green on the PR.",
+    "fate": "narrowed",
+    "note": "brief names only a real test:hermetic run"
+   },
+   {
+    "id": "S4",
+    "type": "DONE",
+    "quote": "Before/after line and byte counts recorded on LIN-2887.",
+    "fate": "weakened",
+    "note": "brief says 'The parent task records before/after counts', reading as someone else's job"
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "Re-point tests/unit/claude-md-scheduler-jobs-census.test.js ... at source-map.md; run and mutation-check",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "Re-point tests/unit/prompt-templates.test.js:219-227's file entry at prompt-system.md; run and mutation-check.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "HOW",
+    "quote": "Add docs/architecture/source-map.md to tests/unit/flight-companion-kickoff.test.js:358-370's doesNotMatch path list.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S8",
+    "type": "HOW",
+    "quote": "Update lib/periodical-report-gate.js:173's refusal string — G1: name docs/architecture/source-map.md, not ci.md.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S9",
+    "type": "HOW",
+    "quote": "Reword README.md:195 (\"Architecture and full project reference\" goes false) to point at docs/architecture/.",
+    "fate": "kept",
+    "note": "brief garbles it as rewording README away from the Prompt System heading"
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "Reword lib/prompts/worker-lane-kickoff.js:18 and tests/unit/prompt-templates.test.js:1458 off the dissolved \"Prompt System (two independent paths)\" heading.",
+    "fate": "kept",
+    "note": "sites not named"
+   },
+   {
+    "id": "S11",
+    "type": "HOW",
+    "quote": "Reword lib/observer-efficacy-signal.js:47 — G2: cite prompt-system.md, not source-map.md ... and scripts/eval-plan-review-verdict.mjs:18 at source-map.md",
+    "fate": "dropped",
+    "note": "the G2 destination correction is absent"
+   },
+   {
+    "id": "S12",
+    "type": "HOW",
+    "quote": "G4 — server.js:1553 quotes CLAUDE.md:364 verbatim ... and lib/periodical-report-gate.js:19 cites the same relocating convention",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S13",
+    "type": "HOW",
+    "quote": "Re-sweep CLAUDE.md and docs/ for commits immediately before the shrink lands",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S14",
+    "type": "HOW",
+    "quote": "Add ## Invariants and ## Where the detail lives (8 lines, one per doc).",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S15",
+    "type": "HOW",
+    "quote": "G5: the both-paths rule is :273-276, not :273-275 ... :302 ... also needs a home. ... :22-23 are the npm test / npm run test:unit bullets and stay verbatim",
+    "fate": "dropped",
+    "note": "step 11's corrected internal anchors absent"
+   },
+   {
+    "id": "S16",
+    "type": "BOUND",
+    "quote": "Preserve ## Unit Testing Pattern (LIN-2023) verbatim — tests/unit/test-server-listen-bind.test.js:153's live assertion-failure string cites it by name.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S17",
+    "type": "HOW",
+    "quote": "Fix tests/unit/session-id-render-seam.test.js:156 ... to the post-shrink line ... Run tests/unit/test-server-listen-bind.test.js against the post-shrink heading",
+    "fate": "dropped",
+    "note": "steps 12-13 absent"
+   },
+   {
+    "id": "S18",
+    "type": "HOW",
+    "quote": "Conditional: if simple-dispatcher's after-count is already recorded on LIN-2887, add the docs/papers/proposals.md bullet ... if not, skip it and say so",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S19",
+    "type": "HOW",
+    "quote": "Budget guard — tests/unit/claude-md-line-budget.test.js (ESM) ... Named exported constants with a reasoning comment ... Five-part failure message",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S20",
+    "type": "HOW",
+    "quote": "Anchor resolver ... Enumerate, not hardcode ... Assert the target resolves ... Fail loudly on a dangling anchor, naming the referring site",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S21",
+    "type": "BOUND",
+    "quote": "CI runs npm run test:hermetic ... confirm with a real test:hermetic run. No package.json or workflow change.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S22",
+    "type": "WHY",
+    "quote": "the stays/splits ranges sum to ~113 lines before ## Invariants and ## Where the detail lives are added ... Compress rather than merely relocate where the two are in tension.",
+    "fate": "dropped",
+    "note": ""
+   },
+   {
+    "id": "S23",
+    "type": "BOUND",
+    "quote": "Move, not edit. Anything found wrong in the moved prose is filed, not fixed. ... Do a second adversarial read of the moved prose",
+    "fate": "kept",
+    "note": "second adversarial read dropped"
+   },
+   {
+    "id": "S24",
+    "type": "BOUND",
+    "quote": "Out of scope: prompt templates, the meta-prompt, llms.txt, docs/reviews/*, scripts/eval/fixtures/*, and docs/papers/harbour/efficiency-levers.md",
+    "fate": "dropped",
+    "note": "G7 note also absent"
+   },
+   {
+    "id": "S25",
+    "type": "WHY",
+    "quote": "CLAUDE.md is byte-identical at the new HEAD ... every corrected internal anchor in step 11 above ... is therefore still valid.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "add-rule",
+    "quote": "docs/architecture/ must contain exactly the 8 destination docs named in the task.",
+    "note": "source requires the 8 to exist; 'exactly' is new, low impact"
+   },
+   {
+    "id": "B2",
+    "type": "add-fact",
+    "quote": "Moved from “just shrink CLAUDE.md” to “shrink plus line/byte guard”",
+    "note": "invented history; low impact"
+   }
+  ],
+  "verdict": "material",
+  "most_consequential": "The brief drops the new ## Invariants and ## Where the detail lives sections and the step-11/G2/G5 corrected anchors (e.g. both-paths rule is :273-276; observer-efficacy-signal cites prompt-system.md), so the shrunk CLAUDE.md and repointed references could plausibly differ.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "high"
+ },
+ {
+  "pair": "F45",
+  "units": [
+   {
+    "id": "S1",
+    "type": "WHAT",
+    "quote": "Which of a review's sentences does the close-out actually cite, discharge or act on, which does the implementation's fix round consume, and what share of the review is left over?",
+    "fate": "kept",
+    "note": "paper already exists in PR #1502"
+   },
+   {
+    "id": "S2",
+    "type": "WHAT",
+    "quote": "Verdict: Request Changes. The paper itself is sound and its central claims verify independently.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S3",
+    "type": "HOW",
+    "quote": "F1 ... Rebase onto origin/main 4919ec0a ... re-run CI on the rebased head",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S4",
+    "type": "HOW",
+    "quote": "F2 — This paper's own proposals line is now on main and the PR does not remove it ... The line must be removed and the PR body corrected",
+    "fate": "weakened",
+    "note": "brief makes removal conditional ('if it is now present on main') though the source confirms it is"
+   },
+   {
+    "id": "S5",
+    "type": "HOW",
+    "quote": "F3 ... place the row after ticket-record-and-quality in the rebase",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S6",
+    "type": "HOW",
+    "quote": "F4 ... recompute the Sentences column from review-consumption-marks.json (957, not 902), or state in Method which units the 902 basis excludes ... reconcile the findings row",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S7",
+    "type": "OPEN",
+    "quote": "F5 ... commit per-unit word counts into the marks file, or commit the splitter script, or state in Limits that word shares are not independently reproducible",
+    "fate": "kept",
+    "note": "Current and open questions keep the options; one constraint closes the Limits option (see B1)"
+   },
+   {
+    "id": "S8",
+    "type": "BOUND",
+    "quote": "The hand marking is correct ... accepted as a stated limit ... Comment ids beyond the two tickets I sampled ... accepted on the strength of the two that did verify",
+    "fate": "weakened",
+    "note": "brief re-raises unverified comment ids as an open question"
+   },
+   {
+    "id": "S9",
+    "type": "BOUND",
+    "quote": "Post the PR link as a comment here; do not merge or set Done.",
+    "fate": "kept",
+    "note": ""
+   },
+   {
+    "id": "S10",
+    "type": "HOW",
+    "quote": "Re-run CI on the rebased head and re-request review.",
+    "fate": "narrowed",
+    "note": "'re-request review' dropped"
+   },
+   {
+    "id": "S11",
+    "type": "WHY",
+    "quote": "F4 and F5 are the ones that matter for the paper standing on its own; F1–F3 are the follow-up this review round exists to check.",
+    "fate": "dropped",
+    "note": "priority signal; low impact"
+   },
+   {
+    "id": "S12",
+    "type": "BOUND",
+    "quote": "GET /api/proxy/issues/LIN-n ... at most one call per second. Cite every review and close-out by comment id.",
+    "fate": "kept",
+    "note": ""
+   }
+  ],
+  "additions": [
+   {
+    "id": "B1",
+    "type": "closes-open",
+    "quote": "Must not leave word-weighted results unsupported by artifacts; CI does not prove them.",
+    "note": "review allows stating in Limits that word shares are not reproducible; this constraint rules that option out (Current still allows it)"
+   },
+   {
+    "id": "B2",
+    "type": "opens-decided",
+    "quote": "Whether all remaining tickets in the sample have their cited comment ids and classifications verified beyond the two independently checked cases.",
+    "note": "review accepted this item; low impact"
+   }
+  ],
+  "verdict": "minor",
+  "most_consequential": "The brief makes removing the now-on-main proposals line conditional and has one constraint that rules out the review's permitted 'state it in Limits' discharge for F5, though its Current section still allows it.",
+  "source_prescribes_how": "heavy",
+  "coder_confidence": "medium"
+ }
+]

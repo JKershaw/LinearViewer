@@ -1,0 +1,20 @@
+n 184
+const           coef +1.117  x3.05 sessions  95% CI [+0.535, +1.669]
+open_behaviour  coef +0.181  x1.20 sessions  95% CI [-0.784, +1.501]
+not_settled     coef +0.058  x1.06 sessions  95% CI [-1.222, +1.052]
+decisions       coef -0.046  x0.96 sessions  95% CI [-0.144, +0.054]
+how_prescribed  coef -0.091  x0.91 sessions  95% CI [-0.267, +0.086]
+asserted_facts  coef -0.046  x0.96 sessions  95% CI [-0.245, +0.140]
+log_pr_lines    coef +0.269  x1.31 sessions  95% CI [+0.175, +0.375]
+breakdown       coef -0.174  x0.84 sessions  95% CI [-0.480, +0.103]
+follow_up       coef -0.065  x0.94 sessions  95% CI [-0.336, +0.198]
+R2 0.317
+split (linear probability):
+  open_behaviour  +0.300 [-0.170, +0.879]
+  not_settled     -0.341 [-0.906, +0.119]
+  decisions       -0.009 [-0.057, +0.043]
+  how_prescribed  -0.067 [-0.178, +0.044]
+  asserted_facts  -0.008 [-0.123, +0.103]
+  log_pr_lines    +0.086 [+0.037, +0.132]
+  breakdown       -0.140 [-0.302, +0.030]
+  follow_up       -0.052 [-0.211, +0.106]

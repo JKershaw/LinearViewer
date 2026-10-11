@@ -1,0 +1,32 @@
+pairs coded 60
+verdicts {'material': 27, 'minor': 29, 'faithful': 4}
+fates {'kept': 657, 'weakened': 58, 'dropped': 177, 'strengthened': 8, 'narrowed': 10, 'broadened': 1}
+additions {'add-rule': 13, 'invents-done': 5, 'opens-decided': 35, 'add-how': 2, 'add-fact': 10, 'add-scope': 1, 'closes-open': 1} pairs with any addition 36
+  WHAT: n=121 dropped=11 (9%) altered=8 (7%)
+  DONE: n=185 dropped=39 (21%) altered=24 (13%)
+  HOW: n=256 dropped=55 (21%) altered=30 (12%)
+  OPEN: n=33 dropped=0 (0%) altered=2 (6%)
+  BOUND: n=237 dropped=47 (20%) altered=11 (5%)
+  WHY: n=79 dropped=25 (32%) altered=2 (3%)
+source_prescribes_how Counter({'heavy': 47, 'light': 10, 'none': 3})
+  none 3 Counter({'material': 1, 'faithful': 1, 'minor': 1})
+  light 10 Counter({'minor': 8, 'material': 2})
+  heavy 47 Counter({'material': 24, 'minor': 20, 'faithful': 3})
+desc chars median: material 5581 other 3391
+agreement on 15: exact 10 material-vs-not 13
+   F02 minor minor
+   F06 minor minor
+   F10 minor minor
+   F14 material minor
+   F18 minor minor
+   F22 material material
+   F26 minor faithful
+   F30 material minor
+   F34 material material
+   F38 minor faithful
+   F42 material material
+   F46 minor minor
+   F50 minor minor
+   F54 minor faithful
+   F58 minor minor
+B verdicts Counter({'minor': 9, 'material': 3, 'faithful': 3})
