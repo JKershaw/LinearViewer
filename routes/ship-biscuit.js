@@ -31,6 +31,7 @@ import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQui
 import { DEFAULT_MODEL, streamChat, resolveReasoningBudget, isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
+import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 
 /**
@@ -46,16 +47,6 @@ import { armKeepalive } from '../lib/http-keepalive.js';
  * eating the visible-output budget — exactly as the roadmap LLM layers do.
  */
 const EDITOR_PROSE_MAX_TOKENS = 6000;
-
-/**
- * Whether the AI layer should be mocked for this request — mirrors `shouldMockAi`
- * in routes/next-run.js so e2e specs (and local-provider sessions) get a deterministic
- * grounded edition without an OpenRouter key.
- */
-function shouldMockAi(workspace) {
-  return process.env.NODE_ENV === 'test' &&
-    (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
-}
 
 /**
  * @param {Object} deps
