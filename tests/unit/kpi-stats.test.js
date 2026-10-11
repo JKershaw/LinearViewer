@@ -364,6 +364,23 @@ describe('collectKpiStats', () => {
     assert.strictEqual(stats.vanity.medianQueueToTakeMinutes, 30);
   });
 
+  test('a numeric 0 timestamp is epoch 0, not junk (LIN-3453 toEpochMs)', async () => {
+    // toTime used to treat any falsy value as missing, so dispatchedAt: 0 was
+    // dropped from the queue→take median. `now` sits just after the epoch so
+    // the read horizon still admits a row stamped at 0.
+    const collections = buildCollections({
+      dispatchHistory: createMockCollection([
+        { _id: 'h1', status: 'taken', dispatchedAt: 0, resolvedAt: 10 * 60000 }  // 10m
+      ])
+    });
+
+    const stats = await collectKpiStats(collections, {
+      now: new Date('1970-01-10T00:00:00.000Z'),
+      milestoneFunnelDeps: NO_MILESTONE_FUNNEL_DEPS
+    });
+    assert.strictEqual(stats.vanity.medianQueueToTakeMinutes, 10);
+  });
+
   test('buckets step outcomes from agent-status, defaulting to other', async () => {
     const entry = (status) => ({ action: 'research', status, timestamp: daysAgo(1) });
     const collections = buildCollections({
