@@ -93,6 +93,7 @@ import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-kee
 import { isTerminalState, isBlocked } from '../lib/tree.js';
 import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
+import { sendSSE } from '../lib/sse.js';
 
 /**
  * Send a generated prompt as JSON (default) or as a downloadable markdown
@@ -1009,16 +1010,6 @@ ${goal}`
   // ===========================================================================
   // AI Recommendation Streaming API (SSE)
   // ===========================================================================
-
-  /**
-   * Helper: write an SSE event to the response.
-   * @param {Object} res - Express response
-   * @param {string} type - Event type
-   * @param {Object} data - Event data (will be JSON-stringified)
-   */
-  function sendSSE(res, type, data) {
-    res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-  }
 
   /**
    * Stream AI-generated prompt for a task via Server-Sent Events.
