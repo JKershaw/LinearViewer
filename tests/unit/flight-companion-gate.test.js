@@ -1199,3 +1199,24 @@ describe('shouldSpendTurn: junk stamps (LIN-3456 characterization)', () => {
     }
   });
 });
+
+describe('shouldSpendTurn: non-finite numeric stamps are missing (LIN-3453)', () => {
+  const NOW = Date.parse('2026-09-01T12:00:00.000Z');
+  const priorSnapshot = { lanes: lanes({}), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+  const newDoc = () => census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+  const prior = (extra) => companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null, ...extra });
+
+  test('numeric NaN / ±Infinity / out-of-range turnReservedUntil is no lease (was: Infinity blocked as turn-in-flight)', () => {
+    for (const v of [NaN, Infinity, -Infinity, 8.64e15 + 1]) {
+      const r = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ turnReservedUntil: v }), now: NOW });
+      assert.strictEqual(r.reason, 'spend', `turnReservedUntil=${v}`);
+    }
+  });
+
+  test('numeric NaN / ±Infinity / out-of-range lastTurnAt does not trip the floor (was: Infinity tripped it)', () => {
+    for (const v of [NaN, Infinity, -Infinity, 8.64e15 + 1]) {
+      const r = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ lastTurnAt: v }), now: NOW });
+      assert.strictEqual(r.reason, 'spend', `lastTurnAt=${v}`);
+    }
+  });
+});

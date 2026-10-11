@@ -1362,3 +1362,18 @@ describe('junk timestamps (LIN-3456 characterization)', () => {
     assert.doesNotThrow(() => computeIssueRoundTrips(issue('x'), { asOf: new Date(ASOF) }));
   });
 });
+
+describe('comment window: a junk comment createdAt never lands in a pre-1970 window (LIN-3453)', () => {
+  const VERDICT_COMMENT = (createdAt) => comment('c1', '**Verdict: Approve** — ok.', createdAt);
+  const gate = () => row('r1', 'plan-review', 'done', '1969-12-31T23:00:00.000Z', '1970-01-01T01:00:00.000Z');
+
+  test('control: a dated in-window comment resolves tier A for a pre-1970 gate row', () => {
+    const r = computeIssueRoundTrips(issue('pre70-ctl', { rows: [gate()], comments: [VERDICT_COMMENT('1969-12-31T23:30:00.000Z')] }), { asOf: ASOF });
+    assert.equal(r.R0.tier, 'a');
+  });
+
+  test("a 'not-a-date' comment createdAt is not in the window, even though epoch 0 lies inside it", () => {
+    const r = computeIssueRoundTrips(issue('pre70-junk', { rows: [gate()], comments: [VERDICT_COMMENT('not-a-date')] }), { asOf: ASOF });
+    assert.notEqual(r.R0.tier, 'a');
+  });
+});
