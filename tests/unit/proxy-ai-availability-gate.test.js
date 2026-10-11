@@ -3,6 +3,8 @@
 // the `aiConfigured` page renders. proxy-free-tier.test.js pins the resolver and
 // the predicate's truth table; this file pins that each proxy site actually
 // CONSULTS the gate (deleting a gate, or flipping its `mockAi` flag, goes red).
+// Every proxy case here ends at or before the gate or on the mock path: a request
+// that PASSED the gate would call OpenRouter, which the hermetic suite forbids.
 //
 // Setup: no server key (OPENROUTER_API_KEY / OPENROUTER_FREE_TIER_KEY unset), no
 // token-creator key (getWorkspaceOpenRouterKey -> null). A non-`test-token`
@@ -66,13 +68,6 @@ describe('proxy-family availability gate (no key anywhere)', () => {
       const app = buildApp({ ...MOCK_TOKEN, provider: providerWithContext() });
       const res = await call(app, site.method, site.path, { body: site.body });
       assert.notEqual(res.status, 503, JSON.stringify(res.body));
-    });
-
-    test(`${site.name}: a server free-tier key alone makes AI available (no 503)`, async () => {
-      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
-      const app = buildApp({ ...REAL_TOKEN, provider: providerWithContext() });
-      const res = await call(app, site.method, site.path, { body: site.body });
-      assert.doesNotMatch(JSON.stringify(res.body), /not configured/);
     });
   }
 
