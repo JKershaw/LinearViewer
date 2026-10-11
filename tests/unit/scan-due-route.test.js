@@ -170,11 +170,13 @@ describe('GET /workspace/:urlKey/api/scan-due — pagination (LIN-2666)', () => 
     assert.ok(page1.body.nextCursor, 'page 1 must carry a non-null nextCursor — 41 candidates exist');
     assert.strictEqual(typeof page1.body.nextCursor, 'string', 'nextCursor is emitted as the same opaque string the cursor param accepts (LIN-2667 N-A)');
     assert.strictEqual(page1.body.totalCandidateCount, 41);
+    assert.strictEqual(page1.body.pageCandidateCount, 40, 'page 1 pageCandidateCount is the page size, not the total (LIN-2698)');
 
     const page2 = await getScanDue(app, `?cursor=${page1.body.nextCursor}`);
     assert.strictEqual(page2.status, 200);
     assert.strictEqual(page2.body.items.length, 1, 'page 2 returns the 41st candidate');
     assert.strictEqual(page2.body.nextCursor, null, 'the last page carries a null nextCursor');
+    assert.strictEqual(page2.body.pageCandidateCount, 1, 'page 2 pageCandidateCount is the remainder, not the total (LIN-2698)');
 
     const seenIds = [...page1.body.items, ...page2.body.items].map(i => i.issueId);
     const expectedIds = rows.map(r => r.issueId);
@@ -366,5 +368,42 @@ describe('GET /workspace/:urlKey/api/scan-due — tri-state dueStatus (LIN-2666)
 
     assert.strictEqual(byId['issue-old-version'].dueStatus, null);
     assert.strictEqual(byId['issue-old-version'].error, undefined, 'a version mismatch is null, never a fabricated error');
+  });
+});
+
+describe('GET /workspace/:urlKey/api/scan-due — harbourCommentsStore ledger-present branch (LIN-2698)', () => {
+  test('a present ledger is asked about the real context.comments, and a Harbour-authored comment does not flip dueStatus', async () => {
+    const humanComment = { id: 'c-human', createdAt: '2026-03-01T00:00:00.000Z', body: 'a person wrote this' };
+    const harbourComment = { id: 'c-harbour', createdAt: '2026-03-02T00:00:00.000Z', body: 'Harbour close-out comment' };
+
+    // Stored at raise time: only the human comment existed.
+    const atRaise = { ...makeContext('issue-1'), comments: [humanComment] };
+    const storedHash = dueBasisHashFromContext(atRaise, { recordedCommentIds: new Set() });
+    // Now: the same task plus a comment Harbour itself wrote since.
+    const now = { ...makeContext('issue-1'), comments: [humanComment, harbourComment] };
+
+    const row = () => makeRow({ issueId: 'issue-1', scannedAt: new Date(1000), dueBasisHash: storedHash, dueBasisVersion: 2 });
+
+    // Discriminator: with no ledger the Harbour comment is indistinguishable
+    // from a person's, so the very same fixture reads DUE.
+    const { provider: nullLedgerProvider } = makeFakeProvider({ contexts: { 'issue-1': now } });
+    const withoutLedger = await getScanDue(buildApp({ provider: nullLedgerProvider, taskDecisionsStore: makeStore([row()]).store }));
+    assert.strictEqual(withoutLedger.body.items[0].dueStatus, true, 'fixture sanity: without the ledger exclusion the Harbour comment flips dueStatus');
+
+    const ledgerCalls = [];
+    const harbourCommentsStore = {
+      async wereRecordedByHarbour(urlKey, comments) {
+        ledgerCalls.push({ urlKey, comments });
+        return new Set(['c-harbour']);
+      }
+    };
+    const { provider } = makeFakeProvider({ contexts: { 'issue-1': now } });
+    const res = await getScanDue(buildApp({ provider, taskDecisionsStore: makeStore([row()]).store, harbourCommentsStore }));
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(ledgerCalls.length, 1, 'the ledger is consulted once per candidate');
+    assert.strictEqual(ledgerCalls[0].urlKey, 'ws1');
+    assert.deepStrictEqual(ledgerCalls[0].comments, [humanComment, harbourComment], 'wereRecordedByHarbour receives the real context.comments');
+    assert.strictEqual(res.body.items[0].dueStatus, false, 'a Harbour-authored comment recorded in the ledger must not flip dueStatus');
   });
 });
