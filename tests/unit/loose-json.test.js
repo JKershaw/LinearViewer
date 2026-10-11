@@ -22,6 +22,16 @@ describe('extractJsonObject', () => {
   test('uses the FIRST fenced block', () => {
     assert.deepEqual(extractJsonObject('```\n{"a":1}\n```\n```\n{"b":2}\n```'), { a: 1 });
   });
+  test('fence after prose containing a brace', () => {
+    assert.deepEqual(extractJsonObject('Note {x}:\n```json\n{"a":1}\n```'), { a: 1 });
+  });
+  test('handles ```js and ```JSON language tags', () => {
+    assert.deepEqual(extractJsonObject('```js\n{"a":1}\n```'), { a: 1 });
+    assert.deepEqual(extractJsonObject('```JSON\n{"a":1}\n```'), { a: 1 });
+  });
+  test('a } in trailing prose makes the parse fail (documents last-} slicing)', () => {
+    assert.equal(extractJsonObject('{"a":1} see }'), null);
+  });
   test('slices first { to LAST } out of prose', () => {
     assert.deepEqual(extractJsonObject('Sure! {"a":{"b":2}} hope that helps'), { a: { b: 2 } });
   });
@@ -40,6 +50,12 @@ describe('extractJsonObject', () => {
 describe('stripCodeFence', () => {
   test('returns first fenced body, trimmed', () => {
     assert.equal(stripCodeFence('```text\n hello \n```'), 'hello');
+  });
+  test('takes a fence that follows prose', () => {
+    assert.equal(stripCodeFence('Here it is:\n```\nhello\n```'), 'hello');
+  });
+  test('non-string input returns an empty string', () => {
+    for (const bad of [null, undefined, 42, {}]) assert.equal(stripCodeFence(bad), '', String(bad));
   });
   test('returns trimmed input when unfenced', () => {
     assert.equal(stripCodeFence('  plain  '), 'plain');
