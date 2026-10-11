@@ -56,7 +56,7 @@ const mirrorExpr = (ws) => ws?.accessToken;
 const expiryExpr = (ws) => ws?.tokenExpiresAt;
 
 // =============================================================================
-// T1 — accessor identity grid (E1/E2, diverged state)
+// T1 — accessor identity grid (diverged state)
 // =============================================================================
 
 // Goldens captured at the pre-change SHA. `e1` is getWorkspaceToken (unchanged);
@@ -148,10 +148,10 @@ const GRID = [
 // before it, this silently skipped and hid a dropped export).
 function assertAccessorGolden(name, accessor, ws, golden) {
   assert.strictEqual(typeof accessor, 'function', `${name} must be exported (S0 landed)`);
-  assert.strictEqual(accessor(ws), golden, `${name} must reproduce the pre-change golden (raw mirror precedence)`);
+  assert.strictEqual(accessor(ws), golden, `${name} must reproduce the pre-change golden`);
 }
 
-describe('LIN-3124 PR1 T1 — S0 accessor identity grid (E1/E2, diverged state)', () => {
+describe('LIN-3124 PR1 T1 — S0 accessor identity grid (diverged state)', () => {
   for (const c of GRID) {
     test(`golden: ${c.name}`, () => {
       // The literal pre-change expressions.
@@ -230,7 +230,7 @@ function buildApp(workspace) {
   return app;
 }
 
-describe('LIN-3124 PR1 T2(a) — audit egress uses the raw mirror (routes/workspace-api.js:401)', () => {
+describe('LIN-3124 PR1 T2(a) — audit egress uses the one current token (routes/workspace-api.js:389)', () => {
   let realFetch;
   let realNodeEnv;
   let outbound;
@@ -288,7 +288,7 @@ function fakeUpstream(body = PNG) {
   };
 }
 
-describe('LIN-3124 PR1 T2(b) — image relay header uses the raw mirror (routes/workspace-api.js:3400)', () => {
+describe('LIN-3124 PR1 T2(b) — image relay header uses the one current token (routes/workspace-api.js:3376)', () => {
   let realFetch;
   let sawInit;
 
