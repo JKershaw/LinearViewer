@@ -399,7 +399,7 @@ describe('LIN-2631: the extraction must not change what the browser receives on 
     assert.match(ROUTE_SRC, /sendSSE\(res, 'error', \{ message: 'Failed to generate a response' \}\)/);
     // The internal text must not reach the wire from the turn handler's catch.
     const turnStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
-    const turnEnd = ROUTE_SRC.indexOf('\n  });\n', turnStart);
+    const turnEnd = ROUTE_SRC.indexOf('Failed to generate a response', turnStart);
     const handler = ROUTE_SRC.slice(turnStart, turnEnd);
     assert.match(handler, /client disconnected mid-turn/, 'the slice must reach the handler\'s own catch');
     assert.doesNotMatch(handler, /sendSSE\([^)]*error\.message/);
@@ -411,7 +411,7 @@ describe('LIN-2631: the extraction must not change what the browser receives on 
     // instead would be a different client contract for a store fault.
     const ROUTE_SRC = readFileSync(new URL('../../routes/flight-companion.js', import.meta.url), 'utf8');
     const turnStart = ROUTE_SRC.indexOf("router.post('/workspace/:urlKey/api/flight-companion/turn'");
-    const turnEnd = ROUTE_SRC.indexOf('\n  });\n', turnStart);
+    const turnEnd = ROUTE_SRC.indexOf('Failed to generate a response', turnStart);
     const handler = ROUTE_SRC.slice(turnStart, turnEnd);
     assert.doesNotMatch(handler, /status\(500\)|serverError\.json|jsonError\(res, 500/, 'the turn handler has never answered a throw with 500');
     // The catch opens the stream itself if the throw beat `onStreamStart`.
