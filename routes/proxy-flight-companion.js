@@ -23,7 +23,7 @@
  * `requireWriteScope` is never called here. A proposal is not a write.
  *
  * Credential: the token creator's own OpenRouter key
- * (`getWorkspaceOpenRouterKey` + `resolveProxyLLM`, exactly as recap/brief
+ * (`getWorkspaceOpenRouterKey` + `resolveChatCredential`, exactly as recap/brief
  * do), never the caller's own bearer token — the proxy token authenticates
  * the CALL, not the LLM spend.
  */
@@ -32,20 +32,19 @@ import rateLimit from 'express-rate-limit';
 import { sendSSE } from '../lib/sse.js';
 import { runAgentTurn, FC_MAX_TOKENS } from '../lib/agent-turn.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools, isRecommendationEnabled } from '../lib/openrouter.js';
+import { streamChat as defaultStreamChat, streamChatWithTools as defaultStreamChatWithTools } from '../lib/openrouter.js';
 import { createChatToolCatalog as defaultCreateChatToolCatalog } from '../lib/chat-tools.js';
 import { buildCensusSeedText } from './flight-companion.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { jsonError, keepaliveError } from '../lib/errors.js';
-import { CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
+import { CHAT_MESSAGE_MAX_LENGTH, resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 
 // LIN-2970: a proxy caller's message body is capped the same as the
 // browser's, via the shared chat-lane constant — no longer kept in sync by
-// inspection. This file does NOT adopt `lib/chat-request.js`'s credential
-// chain or free-tier gate (see this file's own header): the token creator's
-// key, resolved via `getWorkspaceOpenRouterKey` + `resolveProxyLLM` below,
-// stays its own deliberately separate path.
+// inspection. The credential is the token creator's key, read via
+// `getWorkspaceOpenRouterKey` and fed to `lib/chat-request.js`'s
+// `resolveChatCredential` as `sessionApiKey` (LIN-2427).
 const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
 // LIN-2620: a message-less (auto-wake-shaped) proxy turn reserves/commits
@@ -127,7 +126,6 @@ function mergeToolEvents(events) {
  * @param {Function} deps.workspaceUnavailable - 503 envelope for an unresolvable workspace credential (closure-local)
  * @param {Function} deps.logEvent - Audit/witness event logger (closure-local) — the "a proxy-events row per turn" ticket line
  * @param {Function} deps.getWorkspaceOpenRouterKey - Resolves the TOKEN CREATOR's own OpenRouter key (module-scope, shared)
- * @param {Function} deps.resolveProxyLLM - Resolves {apiKey, isFreeTier} from a session key (module-scope in routes/proxy.js, shared)
  * @param {Function} deps.chargeFreeTierOrReject - Free-tier metering choke point (closure-local, shared with compute/dispatch groups)
  * @param {Object} deps.observerStateStore - Census/companion reservation store (turn-core dep)
  * @param {Object} deps.workspacePreferencesStore - Model + preference resolution (turn-core dep)
@@ -154,7 +152,6 @@ export function createProxyFlightCompanionRoutes({
   workspaceUnavailable,
   logEvent,
   getWorkspaceOpenRouterKey,
-  resolveProxyLLM,
   chargeFreeTierOrReject,
   observerStateStore,
   workspacePreferencesStore,
@@ -197,8 +194,9 @@ export function createProxyFlightCompanionRoutes({
       const safeHistory = filterChatTurns(body.history);
 
       const sessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
-      const { apiKey: apiKeyToUse, isFreeTier } = resolveProxyLLM(sessionApiKey);
-      if (!isRecommendationEnabled(sessionApiKey) && !isFreeTier) {
+      const credential = resolveChatCredential({ sessionApiKey });
+      const { apiKey: apiKeyToUse, isFreeTier } = credential;
+      if (isAiUnavailable({ credential, mockAi: false })) {
         logEvent(req, ENDPOINT, 503);
         return jsonError(res, 503, 'AI is not configured. Connect OpenRouter or set OPENROUTER_API_KEY on the server.');
       }

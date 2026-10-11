@@ -29,7 +29,7 @@ import { jsonError, keepaliveError, serviceUnavailable } from '../lib/errors.js'
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
-import { DEFAULT_MODEL, streamChat, resolveReasoningBudget, isRecommendationEnabled } from '../lib/openrouter.js';
+import { DEFAULT_MODEL, streamChat, resolveReasoningBudget } from '../lib/openrouter.js';
 import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
@@ -91,7 +91,7 @@ export function createShipBiscuitRoutes({
     }
 
     try {
-      const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
+      const aiConfigured = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey }).available;
       const latest = shipBiscuitHistoryStore
         ? await shipBiscuitHistoryStore.getLatest(workspace.urlKey).catch(() => null)
         : null;

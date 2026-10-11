@@ -24,7 +24,6 @@ import { jsonError, serviceUnavailable, unauthorized } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles, resolveDirections } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
-import { isRecommendationEnabled } from '../lib/openrouter.js';
 import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
@@ -136,7 +135,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
     }
 
     try {
-      const aiConfigured = isRecommendationEnabled(req.session.openRouterApiKey) || !!process.env.OPENROUTER_FREE_TIER_KEY;
+      const aiConfigured = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey }).available;
       // Localhost is the only place the `local`/harbour dispatch target makes
       // sense (a Harbour OS session on the operator's own machine), mirroring the
       // tree/swipe disclosure's `isLocalhost` gate.

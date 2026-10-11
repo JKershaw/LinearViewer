@@ -215,7 +215,7 @@ describe('LIN-3136 criterion 12(b)/(c) — one limiter pass and one token valida
       ...shared, chargeFreeTierOrReject: async () => true, computeRecommendation: async () => ({}),
       getWorkspaceOpenRouterKey: async () => null, LINEAGE_QUERY_LIMIT: 100, logOpenRouterCredentialSource: () => {},
       recommendErrorResponse: () => ({ status: 500, body: {} }), RECOMMEND_DESCENT_BUDGET_MS: 1000,
-      resolveProxyLLM: async () => ({}), workspaceUnavailable: () => {}
+      workspaceUnavailable: () => {}
     }));
     return { app, counts };
   }
