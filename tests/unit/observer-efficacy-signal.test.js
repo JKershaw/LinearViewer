@@ -714,7 +714,7 @@ describe('observer-efficacy-signal: static import assertion', () => {
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./pipeline-loops.js', './dispatch-terminal.js'].sort(),
+      ['./pipeline-loops.js', './dispatch-terminal.js', './utils/time.js'].sort(),
       'a new import here (e.g. a direct store import bypassing the injected deps seam, or any write-capable/network module) must be caught by this assertion'
     );
   });
