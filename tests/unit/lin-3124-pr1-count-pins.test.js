@@ -52,15 +52,6 @@ function withoutFirstMatch(sources, re, fileRe = null) {
 
 const countTestTokenGuards = (s) => total(s, /accessToken === 'test-token'/g);
 
-function countProviderAuthEdges(sources) {
-  let n = 0;
-  for (const [rel, src] of sources) {
-    if (!/^lib\/providers\/[^/]+\/index\.js$/.test(rel)) continue;
-    n += (src.match(/^import .*routes\/[a-z-]*auth/gm) || []).length;
-  }
-  return n;
-}
-
 function countOffSessionReaders(sources) {
   const m = new Map(sources);
   m.delete('lib/workspace-token-resolver.js');
@@ -136,15 +127,6 @@ const PINS = [
     count: countTestTokenGuards,
     plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
     minus: (s) => countTestTokenGuards(withoutFirstMatch(s, /accessToken === 'test-token'/)),
-  },
-  {
-    id: 'provider-auth-edges',
-    label: 'upward provider index.js -> routes/*-auth import edges (LIN-675)',
-    expected: 4,
-    sources: REAL,
-    count: countProviderAuthEdges,
-    plus: (s) => countProviderAuthEdges(withLine(s, 'lib/providers/local/index.js', "import '../routes/auth.js';")),
-    minus: (s) => countProviderAuthEdges(withoutFirstMatch(s, /^import .*routes\/[a-z-]*auth/, /^lib\/providers\/[^/]+\/index\.js$/)),
   },
   {
     id: 'off-session-readers',

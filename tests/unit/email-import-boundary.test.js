@@ -37,27 +37,6 @@ const EMAIL_MODULES = [
   'lib/render-account-home.js',
 ];
 
-// Q13 at 2c00dee3 (reproduced by verdict 0def5b66): the provider/auth SCC.
-// If a refactor genuinely breaks this cycle, shrink the list; the test only
-// requires these to be in ONE component, as a check that the parser works.
-const PROVIDER_AUTH_SCC_Q13 = [
-  'lib/account-conflict.js',
-  'lib/components/navbar.js',
-  'lib/github-install-flow.js',
-  'lib/providers/index.js',
-  'lib/providers/linear/index.js',
-  'lib/providers/github/index.js',
-  'lib/providers/github-projects/index.js',
-  'lib/providers/jira/index.js',
-  'lib/render-pages.js',
-  'lib/render-settings.js',
-  'lib/render.js',
-  'routes/auth.js',
-  'routes/github-auth.js',
-  'routes/github-projects-auth.js',
-  'routes/jira-auth.js',
-];
-
 // Q15's four, plus EMAIL_LINK_ORIGIN (the link-origin guard added in beat 2).
 const EMAIL_ENV_VARS = ['EMAIL_TRANSPORT', 'EMAIL_PROMPT_STEP', 'RESEND_API_KEY', 'EMAIL_FROM', 'EMAIL_LINK_ORIGIN'];
 const EMAIL_ENV_READERS = ['lib/email-availability.js', 'lib/email-transport.js'];
@@ -166,12 +145,15 @@ describe('email import boundary (LIN-1892 N6)', () => {
   const cycles = components.filter(c => c.length > 1 || (graph.get(c[0]) || []).includes(c[0]));
   const cycleMembers = new Set(cycles.flat());
 
-  test('the parser sees the known provider/auth cycle (Q13), so the checks below are not vacuous', () => {
-    const scc = cycles.find(c => c.includes('lib/providers/index.js'));
-    assert.ok(scc, 'lib/providers/index.js is in an import cycle');
-    for (const member of PROVIDER_AUTH_SCC_Q13) {
-      assert.ok(scc.includes(member), `${member} is in the provider/auth SCC`);
-    }
+  // LIN-675 removed the provider/auth SCC this used to anchor on (the four
+  // provider -> routes/*-auth edges are gone), so non-vacuity is shown on the
+  // parser and Tarjan directly instead of on a particular live cycle.
+  test('the parser and SCC finder work, so the checks below are not vacuous', () => {
+    assert.ok(graph.get('routes/auth.js').includes('lib/render.js'), 'import parsing resolves a known real edge');
+    const synthetic = new Map([['a', ['b']], ['b', ['c']], ['c', ['a']], ['d', ['a']]]);
+    const sccs = tarjanScc(synthetic).filter(c => c.length > 1);
+    assert.equal(sccs.length, 1);
+    assert.deepStrictEqual([...sccs[0]].sort(), ['a', 'b', 'c']);
   });
 
   test('no cycle member imports an email module (so none can be pulled into a cycle)', () => {
