@@ -19,6 +19,7 @@ import { MangoClient } from '@jkershaw/mangodb';
 import { runRevert } from '../../scripts/revert-connection-backed.js';
 import { ConnectionStore } from '../../lib/connection-store.js';
 import { OwnerCredentialStore } from '../../lib/owner-credential-store.js';
+import { activeConnectionBackedBinding } from '../../lib/connection-binding.js';
 import { convertToConnectionBacked, sanitizeSessionForPersist } from '../../lib/connection-credential.js';
 import { linkProvider, getWorkspaceToken, getWorkspaceCallScope } from '../../lib/workspace.js';
 import { refreshOwnerCredential } from '../../lib/workspace-token-refresh.js';
@@ -131,6 +132,39 @@ describe('LIN-3124 T28 — scripts/revert-connection-backed.js', () => {
     assert.equal(typeof session.workspaces[0].bindings[1].connectionId, 'string', 'the skipped binding is left for the user to re-link');
     assert.ok(await db.collection('connections').findOne({ _id: `${ACCT}::jira::https://j.atlassian.net` }), 'a skipped binding keeps its Connection');
     assert.ok(await ownerCredentialStore.getByConnection(`${ACCT}::jira::https://j.atlassian.net`), 'and its connection-keyed record');
+  });
+
+  test('LIN-3452: a stale marker never mirrors a reverted binding onto the workspace scalar mirror', async () => {
+    // Legacy Linear workspace; the marker names a github binding (marker provider !== workspace
+    // provider = stale), and that github binding is connection-backed.
+    const db = client.db(`revert_${n++}`);
+    const connectionId = `${ACCT}::github::9`;
+    await db.collection('connections').insertOne({
+      _id: connectionId, accountId: ACCT, provider: 'github',
+      credentials: { installationId: '9', token: 'ghs-tok', tokenExpiresAt: 3000 },
+      referents: [{ urlKey: 'stale', provider: 'github', scope: 'o/r' }],
+    });
+    const workspace = {
+      id: 'ws-stale', urlKey: 'stale', provider: 'linear', accessToken: 'linear-legacy',
+      credentials: { token: 'linear-legacy' }, tokenExpiresAt: 7,
+      activeBinding: { provider: 'github', scope: 'o/r' },
+      bindings: [
+        { provider: 'linear', scope: 'org-s', credentials: { token: 'linear-legacy', tokenExpiresAt: 7 } },
+        { provider: 'github', scope: 'o/r', connectionId },
+      ],
+    };
+    assert.equal(activeConnectionBackedBinding(workspace), null, 'precondition: the shared predicate refuses the stale marker');
+    await db.collection('sessions').insertOne({ _id: 'sid-stale', session: { accountId: ACCT, workspaces: [workspace] }, expires: new Date(Date.now() + 86400_000) });
+
+    const report = await runRevert({ db, execute: true, log: () => {} });
+    assert.deepEqual(report.reverted.map(r => r.provider), ['github'], 'the github binding is still reverted');
+    const [{ session }] = await db.collection('sessions').find({}).toArray();
+    const ws = session.workspaces[0];
+    assert.equal(ws.accessToken, 'linear-legacy', 'scalar mirror untouched');
+    assert.equal(ws.credentials.token, 'linear-legacy');
+    assert.equal(ws.tokenExpiresAt, 7);
+    assert.deepEqual(ws.bindings[1], { provider: 'github', scope: 'o/r', credentials: { installationId: '9', token: 'ghs-tok', tokenExpiresAt: 3000 } });
+    assert.equal(ws.activeBinding, undefined, 'no dangling marker');
   });
 
   test('the report is secret-safe: no token, refresh token, session id or account id', async () => {

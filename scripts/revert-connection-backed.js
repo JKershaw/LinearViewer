@@ -51,10 +51,9 @@ import { MongoClient } from 'mongodb'
 import { MangoClient } from '@jkershaw/mangodb'
 import { OwnerCredentialStore } from '../lib/owner-credential-store.js'
 import { ConnectionStore } from '../lib/connection-store.js'
+import { isConnectionBacked, activeConnectionBackedBinding } from '../lib/connection-binding.js'
 
 const REFRESH_TOKEN_KINDS = new Set(['linear', 'jira'])
-
-const isConnectionBacked = (binding) => !!(binding && typeof binding.connectionId === 'string')
 
 /**
  * Plans (and, with `execute`, applies) the revert over every stored session.
@@ -97,6 +96,9 @@ export async function runRevert({ db, execute = false, log = console.log }) {
 
     for (const workspace of next.workspaces) {
       if (!workspace || !Array.isArray(workspace.bindings)) continue
+      // The shared predicate decides which binding is active (a stale marker matches nothing);
+      // computed once, before the loop below replaces entries of `workspace.bindings`.
+      const active = activeConnectionBackedBinding(workspace)
       for (let i = 0; i < workspace.bindings.length; i++) {
         const binding = workspace.bindings[i]
         if (!isConnectionBacked(binding)) continue
@@ -129,12 +131,13 @@ export async function runRevert({ db, execute = false, log = console.log }) {
 
         workspace.bindings[i] = { provider: binding.provider, scope: binding.scope, credentials }
         const marker = workspace.activeBinding
-        if (marker && marker.provider === binding.provider && marker.scope === binding.scope) {
+        if (binding === active) {
           workspace.credentials = { ...(workspace.credentials || {}), token: credentials.token }
           workspace.accessToken = credentials.token
           if (credentials.tokenExpiresAt !== undefined) workspace.tokenExpiresAt = credentials.tokenExpiresAt
-          delete workspace.activeBinding
         }
+        // A reverted binding never leaves a dangling marker, stale or not.
+        if (marker && marker.provider === binding.provider && marker.scope === binding.scope) delete workspace.activeBinding
         report.reverted.push(where)
         releases.push({ connectionId: binding.connectionId, referent: { urlKey: workspace.urlKey, provider: binding.provider, scope: binding.scope } })
         changed = true
