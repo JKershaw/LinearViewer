@@ -4,7 +4,7 @@ kind: paper
 version: 1
 date: 2026-10-11
 authors: [Claude (LIN-3463)]
-model: claude-sonnet-5-5, Claude Code CLI; effort not recorded in the dispatch item. This is the writing session (LIN-3463, kind implementation). The study it reports was done in an earlier research session on the same ticket.
+model: claude-sonnet-5-5, claude-code, effort medium (the writing session, LIN-3463, kind implementation); the study it reports was done by the research lineage on the same ticket, claude-opus-5-5, claude-code, effort high. Both as the dispatch lineage reports them (`/cost/LIN-3463`).
 grounded_at: 15990905
 cites: [research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/README.md, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/size-bands.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-stratified.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-by-code.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-agreement.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/model.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/auto-features.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/read-order.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/fidelity-summary.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/propagation.json, lib/brief.js@15990905:21, lib/brief.js@15990905:32, lib/brief.js@15990905:38, lib/recap-cache.js@15990905:44-86, docs/papers/harbour/ticket-record-and-quality.md@15990905:35, docs/papers/harbour/replay-small-work.md@15990905:50-59, docs/papers/harbour/survey-check-11.md@15990905:52-54, docs/archive/9.html@15990905:235-238, docs/archive/8.html@15990905:201, LIN-3463 (research comment, 2026-10-11), LIN-3449, LIN-3453]
 ---
@@ -108,13 +108,13 @@ test of it.
 wins.** Agents read both: of 2,843 dispatched sessions, 59% read the brief and then the issue,
 35% the issue and then the brief, 4% the issue only (`results/read-order.txt`). Plan,
 implementation and research sessions read the brief first in 93–96%, and since the week of
-5 October 97% of all sessions do, against 40–50% before. In 60 brief-and-ticket pairs
+5 October 97% of all sessions do, against 40–59% in each earlier week. In 60 brief-and-ticket pairs
 (132 of the 136 sampled tickets were from September), the primary coder found 27 material, 29
 minor and 4 faithful. A second coder, on 15 of the pairs, found 3 material where the first
 found 5, agreeing on material-or-not for 13 of 15, so the true rate of material briefs is
 uncertain; 27 of 60 is the primary reading, and the second suggests it is high. The loss is
-uneven: acceptance is dropped or altered in 25 of 60 briefs (21% of acceptance units dropped,
-another 13% altered), and the why is dropped most (32%), while open items are never dropped.
+uneven: at least one acceptance unit is dropped in 25 of 60 briefs (dropped or altered in 32; 21% of
+acceptance units dropped, another 13% altered), and the why is dropped most (32%), while open items are never dropped.
 The additions go one way: 35 additions in 23 pairs turn something the ticket settled into an
 open question, against 13 added rules, 10 added facts and 5 invented done-conditions
 (`results/fidelity-summary.txt`). The brief's own instructions invite it: "surface
@@ -149,7 +149,7 @@ enforced until a forward trial says whether it helps.
 
 ## Method
 
-The population is the 376 tickets (LIN-2800 to LIN-3462) first dispatched between 11 September
+The population is the 376 tickets (LIN-2572 to LIN-3462) first dispatched between 11 September
 and 11 October. Each was read as it stood at its first dispatch, which is the earliest task-history
 snapshot, then coded blind to outcome against a rubric written before any join (origin, what
 is decided, whether behaviour is open, how much of the how is prescribed, decision count,
@@ -184,9 +184,9 @@ The outcome population is production data, so no source sweep was run.
   about 10 September is included and lane-worked tickets are absent.
 - **The ticket text is the first dispatch, not the filing.** An edit between the two is
   invisible. The brief sample is 132 of 136 September tickets, before the 4 October prompt change.
-- **Not checked.** 4 of the 12 interpretation surfaces and the Flight Companion's transcripts;
-  three authoring surfaces cannot be bounded from source (custom prompts, the Flight
-  Companion's playbook, ad-hoc `POST /issues`).
+- **Not checked.** The Flight Companion's transcripts (`GET /flight-companion/transcripts` is
+  empty, as LIN-3372 found); three authoring surfaces cannot be bounded from source (custom
+  prompts, the Flight Companion's playbook, ad-hoc `POST /issues`).
 - **Not independently checked.** Under `standard.md` rule 2 this paper needs a second
   document by someone other than its author. None exists yet, so every figure here is the
   study's and this paper's recomputation, not a second reading.
