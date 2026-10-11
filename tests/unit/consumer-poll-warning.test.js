@@ -1,49 +1,19 @@
 /**
  * Unit tests for lib/consumer-poll-warning.js (LIN-2885).
  *
- * Pins: the configurable threshold (default + env override + invalid-value
- * fallback), `getConsumerLastSeenAt`'s max-across-tokens resolution and its
+ * Pins: the fixed 20-minute NOBODY_LISTENING_MS limit and its boundary,
+ * `getConsumerLastSeenAt`'s max-across-tokens resolution and its
  * "never" (null) case, and `buildConsumerPollWarning`'s three outcomes — live
  * (null), stale (a "since <time>" message), and never (a "no consumer has
  * ever polled" message).
  */
-import { test, describe, afterEach } from 'node:test';
+import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS,
-  getConsumerPollWarningThresholdMs,
+  NOBODY_LISTENING_MS,
   getConsumerLastSeenAt,
   buildConsumerPollWarning
 } from '../../lib/consumer-poll-warning.js';
-
-describe('getConsumerPollWarningThresholdMs (LIN-2885)', () => {
-  afterEach(() => {
-    delete process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS;
-  });
-
-  test('defaults to 1 hour when unset', () => {
-    delete process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS;
-    assert.strictEqual(getConsumerPollWarningThresholdMs(), DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS);
-    assert.strictEqual(DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS, 60 * 60 * 1000);
-  });
-
-  test('honors a configured positive value', () => {
-    process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS = '120000';
-    assert.strictEqual(getConsumerPollWarningThresholdMs(), 120000);
-  });
-
-  test('falls back to the default on a non-numeric value', () => {
-    process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS = 'not-a-number';
-    assert.strictEqual(getConsumerPollWarningThresholdMs(), DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS);
-  });
-
-  test('falls back to the default on a zero or negative value', () => {
-    process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS = '0';
-    assert.strictEqual(getConsumerPollWarningThresholdMs(), DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS);
-    process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS = '-500';
-    assert.strictEqual(getConsumerPollWarningThresholdMs(), DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS);
-  });
-});
 
 describe('getConsumerLastSeenAt (LIN-2885)', () => {
   test('returns null when the store has no tokens', async () => {
@@ -89,28 +59,37 @@ describe('buildConsumerPollWarning (LIN-2885)', () => {
     assert.match(warning, /ever polled/i);
   });
 
-  test('returns null when the last poll is within the threshold (live workspace)', () => {
-    const recent = new Date(now.getTime() - 5 * 60 * 1000).toISOString(); // 5 min ago
-    assert.strictEqual(buildConsumerPollWarning(recent, { now, thresholdMs: 60 * 60 * 1000 }), null);
+  test('NOBODY_LISTENING_MS is 20 minutes', () => {
+    assert.strictEqual(NOBODY_LISTENING_MS, 20 * 60 * 1000);
   });
 
-  test('returns a "since <time>" message when the last poll is older than the threshold', () => {
-    const stale = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString(); // 2h ago
-    const warning = buildConsumerPollWarning(stale, { now, thresholdMs: 60 * 60 * 1000 });
-    assert.ok(warning);
-    assert.ok(warning.includes(stale));
-    assert.doesNotMatch(warning, /ever polled/i);
+  const ago = (ms) => new Date(now.getTime() - ms).toISOString();
+
+  test('returns null when the last poll is within the limit (live workspace)', () => {
+    assert.strictEqual(buildConsumerPollWarning(ago(5 * 60 * 1000), { now }), null);
+    assert.strictEqual(buildConsumerPollWarning(ago(19 * 60 * 1000 + 59 * 1000), { now }), null);
   });
 
-  test('is exactly at the threshold boundary: not yet stale', () => {
-    const boundary = new Date(now.getTime() - 60 * 60 * 1000).toISOString(); // exactly 1h ago
-    assert.strictEqual(buildConsumerPollWarning(boundary, { now, thresholdMs: 60 * 60 * 1000 }), null);
+  test('is exactly at the limit boundary: not yet stale', () => {
+    assert.strictEqual(buildConsumerPollWarning(ago(NOBODY_LISTENING_MS), { now }), null);
   });
 
-  test('uses the configured default threshold when none is passed explicitly', () => {
-    delete process.env.CONSUMER_POLL_WARNING_THRESHOLD_MS;
-    const justOverAnHour = new Date(Date.now() - (60 * 60 * 1000 + 1000)).toISOString();
-    const warning = buildConsumerPollWarning(justOverAnHour);
+  test('warns with a "since <time>" message just past the limit', () => {
+    for (const ageMs of [NOBODY_LISTENING_MS + 1, 21 * 60 * 1000]) {
+      const stamp = ago(ageMs);
+      const warning = buildConsumerPollWarning(stamp, { now });
+      assert.ok(warning);
+      assert.ok(warning.includes(stamp));
+      assert.doesNotMatch(warning, /ever polled/i);
+    }
+  });
+
+  test('a runner gone 30 minutes now warns (LIN-2953; was silent under the old 1h window)', () => {
+    assert.ok(buildConsumerPollWarning(ago(30 * 60 * 1000), { now }));
+  });
+
+  test('uses the real clock when no now is passed', () => {
+    const warning = buildConsumerPollWarning(new Date(Date.now() - (NOBODY_LISTENING_MS + 1000)).toISOString());
     assert.ok(warning);
   });
 });

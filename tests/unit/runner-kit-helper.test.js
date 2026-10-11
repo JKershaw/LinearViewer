@@ -74,7 +74,7 @@ import { findTerminalFeedback, findWakeEvent } from '../../lib/dispatch-terminal
 import { parseUsage } from '../../lib/session-telemetry.js';
 import { buildTaskCost } from '../../lib/task-cost.js';
 import { HALT_MODES } from '../../lib/workspace-halt.js';
-import { DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS } from '../../lib/consumer-poll-warning.js';
+import { NOBODY_LISTENING_MS } from '../../lib/consumer-poll-warning.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 // LIN-3211: the guard is read off the namespace, so its absence at HEAD fails
 // only the LIN-3211 tests rather than the whole file's import.
@@ -135,9 +135,9 @@ function ledgerWith(rows) {
 const fb = (message, kind = 'status') => [{ message, kind, timestamp: new Date(NOW).toISOString() }];
 
 describe('constants', () => {
-  test('the other-consumer window is named and no wider than Harbour\'s own "active consumer" window', () => {
+  test('the other-consumer window is named and no wider than Harbour\'s own "nobody is listening" limit', () => {
     assert.ok(OTHER_CONSUMER_RECENT_MS > 0);
-    assert.ok(OTHER_CONSUMER_RECENT_MS <= DEFAULT_CONSUMER_POLL_WARNING_THRESHOLD_MS);
+    assert.ok(OTHER_CONSUMER_RECENT_MS <= NOBODY_LISTENING_MS);
   });
 
   test('the fresh-take margin is a named constant well inside the 24h runner token life', () => {
