@@ -133,6 +133,7 @@ lib/
     runner-kickoff.js  Runner kickoff prompt source (LIN-3098 S3): docs/runner-prompt.md at HEAD, cut at its first `---`, cached (uncached FALLBACK); fills every {{PLACEHOLDER}} from its source (runner TTLs, HALT_MODES, FEEDBACK_ENTRY_KINDS, the kit's thresholds, the request baseUrl, a sha256 per kit file); an unknown placeholder serves the FALLBACK
     roadmap-*.js             Roadmap narrative-pipeline templates (orientation,
                              trajectory, north-star, product, gap, narrative, digest, chat)
+  loose-json.js        Shared loose-JSON reply extractor (fence-strip → brace-slice → parse) + stripCodeFence (LIN-3114)
   recap.js             Task recap prompt + response handling
   recap-cache.js       Hash-based cache for AI recaps
   run-summary.js       On-demand short summary of a single autopilot run (Loop); mirrors recap.js (LIN-509)
