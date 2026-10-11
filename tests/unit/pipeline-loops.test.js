@@ -284,6 +284,14 @@ describe('_buildLoops', () => {
     assert.strictEqual(loops[0].resolvedAt, null);
   });
 
+  test('live item with junk dispatchedAt is skipped, not built with an Invalid Date', () => {
+    const loops = _buildLoops({
+      liveItems: [liveItem({ id: 'live-junk', dispatchedAt: 'not-a-date' })],
+      now: NOW
+    });
+    assert.deepStrictEqual(loops, []);
+  });
+
   test('two history loops for same issue → iterations 1, 2 in dispatch order', () => {
     const a = historyItem({ id: 'h-old', dispatchedAt: '2026-04-09T10:00:00.000Z', resolvedAt: '2026-04-09T10:30:00.000Z' });
     const b = historyItem({ id: 'h-new', dispatchedAt: '2026-04-10T10:00:00.000Z', resolvedAt: '2026-04-10T10:30:00.000Z' });

@@ -61,6 +61,7 @@ import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
 import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
+import { toEpochMs } from '../lib/utils/time.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
 import { createTaskDoneCache } from '../lib/task-done-cache.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
@@ -508,7 +509,7 @@ function latestAssistantText(loop) {
  */
 function loopActivityMs(loop) {
   const t = loop.completedAt || loop.agentTimestamp || loop.resolvedAt || loop.dispatchedAt;
-  const ownMs = t ? new Date(t).getTime() : 0;
+  const ownMs = toEpochMs(t) ?? 0;
   const lineageMs = Number.isFinite(loop.lineageLastActivityMs) ? loop.lineageLastActivityMs : 0;
   const ms = Math.max(ownMs, lineageMs);
   return Number.isFinite(ms) ? ms : 0;
@@ -773,8 +774,8 @@ export function createDashboardRoutes({
   function sessionActivityMs(enrichedLoops, session) {
     let max = 0;
     for (const l of enrichedLoops) max = Math.max(max, loopActivityMs(l));
-    if (!max && session.completedAt) max = new Date(session.completedAt).getTime() || 0;
-    if (!max && session.dispatchedAt) max = new Date(session.dispatchedAt).getTime() || 0;
+    if (!max) max = toEpochMs(session.completedAt) ?? 0;
+    if (!max) max = toEpochMs(session.dispatchedAt) ?? 0;
     return Number.isFinite(max) ? max : 0;
   }
 
