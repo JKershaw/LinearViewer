@@ -99,7 +99,13 @@ test('render: every model option carries its rate as data-pricing, never in opti
   assert.ok(html.includes('data-pricing="$0.75 in / $4.50 out per 1M tokens"'), 'gpt-5.4-mini rate rendered');
   // Workspace default: empty value, no rate.
   assert.ok(html.includes('<option value="">Workspace default</option>'), 'default option has no data-pricing');
-  // No visible option text contains pricing.
+});
+
+test('render: no visible <option> text contains pricing (LIN-997)', () => {
+  const html = renderRoadmapPage(
+    { roadmapModel: {}, organizationName: 'Test Org' },
+    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: AVAILABLE_MODELS }
+  );
   assert.doesNotMatch(html, /<option[^>]*>[^<]*per 1M tokens[^<]*<\/option>/);
 });
 
