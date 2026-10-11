@@ -18,6 +18,7 @@ import { isValidIssueId, dispatchIssueSourceField } from '../lib/workspace.js';
 import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-graphql-errors.js';
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { buildRunGate } from '../lib/chat-request.js';
+import { POLLED_TARGETS } from '../lib/dispatch-targets.js';
 
 /**
  * @param {Object} deps
@@ -40,7 +41,6 @@ import { buildRunGate } from '../lib/chat-request.js';
  * @param {Function} deps.refuseIfDuplicateDispatch - 409s a duplicate dispatch error (closure-local)
  * @param {Function} deps.refuseIfBudgetExhausted - 409s a budget-exhausted dispatch error (closure-local)
  * @param {Function} deps.graphqlErrorStatus - Maps a provider/GraphQL error to an HTTP status (closure-local)
- * @param {string[]} deps.VALID_PROXY_DISPATCH_TARGETS - Valid dispatch target values (closure-local)
  * @param {string} deps.PROXY_ATTACH_FAILED_MESSAGE - 503 message when the out-of-band bootstrap token could not be minted (closure-local)
  */
 export function createKickoffRoutes({
@@ -66,7 +66,6 @@ export function createKickoffRoutes({
   getWorkspaceOpenRouterKey = null,
   resolveProxyLLM = null,
   graphqlErrorStatus,
-  VALID_PROXY_DISPATCH_TARGETS,
   PROXY_ATTACH_FAILED_MESSAGE,
 }) {
   const router = Router();
@@ -161,9 +160,9 @@ export function createKickoffRoutes({
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffGoalValidationError.error);
       }
-      if (target !== undefined && !VALID_PROXY_DISPATCH_TARGETS.includes(target)) {
+      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, `target must be one of: ${VALID_PROXY_DISPATCH_TARGETS.join(', ')}`);
+        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
       }
       const kickoffRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
         maxLength: MAX_NAME_LENGTH,
