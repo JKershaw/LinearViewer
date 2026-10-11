@@ -654,10 +654,8 @@
     let abortController = null;
     let destroyed = false;
     // LIN-3341: the mount-time "is a run already live?" read and its poll. The
-    // read is one best-effort call to the stored-data task state endpoint; the
-    // promise is shared with `startRun` so a press during an in-flight read can
-    // wait for it (and paint the running line if it reports in progress).
-    let mountRead = null;
+    // read is one best-effort call to the stored-data task state endpoint;
+    // `startRun` does its own fresh read at press time (LIN-3446).
     let pollTimer = null;
     let pollFailures = 0;
 
@@ -1041,12 +1039,12 @@
 
     function applyGoRefusal(error) {
       const code = error && error.body && error.body.code;
+      // LIN-3446: a duplicate refusal means a run IS live — same outcome as the
+      // press-time read finding one: the running/watch line and the poll, never
+      // a pressable Go.
+      if (code === 'DUPLICATE_DISPATCH') { setGoRunning(null); return; }
       const g = { status: 'ready', headerHtml: null, notice: null, noticeLink: null, noticeLinkLabel: null };
-      if (code === 'DUPLICATE_DISPATCH') {
-        g.notice = 'Already running';
-        g.noticeLink = window.taskPageHref({ urlKey: opts.urlKey, identifier: issue.identifier, source: issue.source });
-        g.noticeLinkLabel = 'watch \u203A';
-      } else if (code === 'RUN_LIMIT_REACHED') {
+      if (code === 'RUN_LIMIT_REACHED') {
         g.notice = 'You\u2019ve used today\u2019s runs \u00b7 resets at midnight UTC';
       } else {
         // Includes a code-less 503 (proxyAttachFailed) and RUN_LIMIT_UNVERIFIED:
@@ -1067,15 +1065,15 @@
       paintGo();
       recordTaskMode({ rung: 'run-task', ready: true, needs: null, act: 'press' });
 
-      // Race (round-3 fix 1B): if the mount read is still in flight, wait for it;
-      // if it reports in progress, paint the running line and start the poll HERE
-      // (the mount handler drops its own result because Go is now `starting`).
-      if (mountRead) {
-        const data = await mountRead.catch(() => null);
-        if (destroyed) return;
-        if (goInProgress(data)) { setGoRunning(data.headerHtml); return; }
-        if (state.go.status !== 'starting') return;
-      }
+      // LIN-3446: read the state afresh at press time — the mount read can be
+      // arbitrarily old (another tab, a phone, the second Home mount). This also
+      // covers a mount read still in flight (round-3 fix 1B): the mount handler
+      // drops its own result because Go is now `starting`. A failed read is
+      // best-effort (null) and proceeds; the server's duplicate guard remains.
+      const data = await readTaskState();
+      if (destroyed) return;
+      if (goInProgress(data)) { setGoRunning(data.headerHtml); return; }
+      if (state.go.status !== 'starting') return;
 
       try {
         const kickoff = await window.fetchAutopilotKickoff({
@@ -1386,12 +1384,9 @@
     // this task, so a reopened task shows the running/waiting line instead of a
     // pressable Go. Best-effort and guarded exactly like the quota read, so a
     // unit with no window.api makes no network call and no unhandled rejection.
-    // The promise is kept in `mountRead` so a press during the in-flight read can
-    // wait for it (round-3 fix 1B).
     if (goReady(opts) && typeof window.api === 'function'
       && opts.urlKey && issue.identifier && issueId) {
-      mountRead = readTaskState();
-      mountRead.then((data) => {
+      readTaskState().then((data) => {
         if (destroyed) return;
         if (!goInProgress(data)) return;
         if (!state.go || state.go.status !== 'ready') return; // a press already won
