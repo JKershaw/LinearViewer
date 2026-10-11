@@ -13,7 +13,7 @@
  *
  * Run with: node --test tests/unit/scan-routes.test.js
  */
-import { test, describe, before, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'http';
 import express from 'express';
@@ -22,6 +22,9 @@ import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { githubProvider } from '../../lib/providers/github/index.js';
+import { createFakeGitHubClient } from '../../lib/providers/github/fake-client.js';
+import { registerProvider } from '../../lib/providers/registry.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -939,4 +942,188 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       assert.equal(result.status, 200, 'the unretire itself must succeed');
     });
   });
+});
+
+// ─── LIN-3441 repro: a GitHub-backed task's canonical id is "20", not a UUID ──
+//
+// Drives the scan routes through the REAL GitHubProvider (its canonical
+// mapping, `id: String(gh.number)`) on a fake client, so the canonical id the
+// routes see is the one production would see. The workspace is a Local
+// primary with a GitHub binding and every request carries `?source=github`:
+// `resolveIssueBinding` then routes the issue to the GitHub binding, while the
+// Local primary is only what turns the AI mock on (`shouldMockAi`) without the
+// `test-token` data mock (which would bypass the provider entirely).
+//
+// UUID control: the same harness, the same fake repo and the same binding
+// routing, through a thin provider that calls the real GitHubProvider and
+// swaps only `issue.id` for a UUID — so a red "20" next to a green control
+// isolates the canonical id's shape and nothing else.
+//
+// Every success case also reads the stored row back (the mock collection
+// directly, and the store's own `getStatus`), so a 200 with nothing persisted
+// cannot pass.
+describe('LIN-3441: scan routes for a GitHub-style canonical id', () => {
+  const REPO = 'octo/lin3441';
+  const GH_TOKEN = 'gh-installation-token-lin3441';
+  const DECISION_NUMBER = '20'; // body trips buildMockScanText's decision branch
+  const ZERO_FINDING_NUMBER = '21'; // body does not
+  const CONTROL_SOURCE = 'lin3441-uuid-control';
+  const CONTROL_UUID = {
+    [DECISION_NUMBER]: '20202020-2020-4020-8020-202020202020',
+    [ZERO_FINDING_NUMBER]: '21212121-2121-4121-8121-212121212121',
+  };
+
+  const fakeClient = createFakeGitHubClient({
+    [REPO]: {
+      milestones: [],
+      labels: [],
+      issues: [
+        { number: 20, title: 'Pick a storage engine', body: 'We are blocked waiting on a decision about which engine to use.', state: 'open', html_url: `https://github.com/${REPO}/issues/20`, created_at: '2026-10-01T00:00:00Z', labels: [], milestone: null, comments: [] },
+        { number: 21, title: 'Fix the footer', body: 'The footer link points at the old docs page.', state: 'open', html_url: `https://github.com/${REPO}/issues/21`, created_at: '2026-10-01T00:00:00Z', labels: [], milestone: null, comments: [] },
+      ],
+    },
+  });
+
+  let savedClientFactory;
+  before(() => {
+    savedClientFactory = githubProvider.clientFactory;
+    githubProvider.clientFactory = () => fakeClient;
+    registerProvider({
+      name: CONTROL_SOURCE,
+      supports: () => true,
+      async fetchRecommendationContext(_scope, issueId, opts) {
+        const context = await githubProvider.fetchRecommendationContext({ token: GH_TOKEN, repo: REPO }, issueId, opts);
+        return { ...context, issue: { ...context.issue, id: CONTROL_UUID[context.issue.id] } };
+      },
+    });
+  });
+  after(() => { githubProvider.clientFactory = savedClientFactory; });
+
+  beforeEach(() => {
+    // Reuses the file-level collection/taskDecisionsStore the outer beforeEach
+    // just built; only the workspace differs from the shared app.
+    app = express();
+    app.use(express.json());
+    app.use(createWorkspaceApiRoutes({
+      workspaceFromUrl: (req, _res, next) => {
+        req.workspace = {
+          urlKey: 'test-workspace', provider: 'local', accessToken: 'local-token-lin3441',
+          bindings: [
+            { provider: 'local', scope: 'test-workspace', credentials: { token: 'local-token-lin3441' } },
+            { provider: 'github', scope: REPO, credentials: { token: GH_TOKEN } },
+            { provider: CONTROL_SOURCE, scope: REPO, credentials: { token: GH_TOKEN } },
+          ],
+        };
+        req.session = {};
+        next();
+      },
+      freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) }, customPromptsStore: {}, recapCacheStore: {},
+      briefCacheStore: {}, reportHistoryStore: {}, dispatchQueueStore: {}, agentStatusStore: {}, promptTraceStore: {}, proxyTokenStore: {},
+      taskDecisionsStore,
+    }));
+  });
+
+  const CASES = [
+    { label: '"20" (GitHub)', source: 'github', canonical: (n) => n },
+    { label: 'UUID control', source: CONTROL_SOURCE, canonical: (n) => CONTROL_UUID[n] },
+  ];
+  const scanPath = (c, number, suffix = '') => `/workspace/test-workspace/api/scan/${number}${suffix}?source=${c.source}`;
+  const rowsFor = (issueId) => collection._docs.filter(d => d.urlKey === 'test-workspace' && d.issueId === issueId);
+
+  // A prior scan's row, written into the collection exactly as recordScan
+  // would (so each outcome route is tested on its own guard, not recordScan's).
+  function seedRow(issueId, inputHash, fields = {}) {
+    const _id = TaskDecisionsStore.buildId(issueId, inputHash);
+    collection._docs.push({
+      _id, urlKey: 'test-workspace', issueId, issueIdentifier: 'seeded', inputHash,
+      basisHash: null, basisVersion: null, dueBasisHash: null, dueBasisVersion: null,
+      decision: seededDecision(), scannedAt: new Date(), seq: 0,
+      outcome: null, outcomeAt: null, outcomeReason: null, outcomeBasisHash: null, optionId: null,
+      ...fields
+    });
+    return _id;
+  }
+
+  for (const c of CASES) {
+    describe(c.label, () => {
+      test('POST scan persists a decision row under the canonical id, and GET reads it back', async () => {
+        const canonicalId = c.canonical(DECISION_NUMBER);
+        const posted = await post(scanPath(c, DECISION_NUMBER));
+        assert.equal(posted.status, 200, `POST scan: ${JSON.stringify(posted.body)}`);
+        assert.equal(posted.body.status, 'fresh');
+        assert.ok(posted.body.decision, 'the mock scan found a decision');
+        assert.equal(posted.body.issueId, canonicalId);
+
+        assert.equal(rowsFor(canonicalId).length, 1, 'a scan row is stored under the canonical id');
+        assert.equal(rowsFor(canonicalId)[0]._id, posted.body.id);
+
+        const got = await get(scanPath(c, DECISION_NUMBER));
+        assert.equal(got.status, 200, `GET scan: ${JSON.stringify(got.body)}`);
+        assert.equal(got.body.status, 'fresh');
+        assert.equal(got.body.id, posted.body.id);
+        assert.deepEqual(got.body.decision, posted.body.decision);
+      });
+
+      test('GET scan finds an existing row stored under the canonical id', async () => {
+        const canonicalId = c.canonical(DECISION_NUMBER);
+        const id = seedRow(canonicalId, 'seed-get'.padEnd(64, '0'));
+        const got = await get(scanPath(c, DECISION_NUMBER));
+        assert.equal(got.status, 200, `GET scan: ${JSON.stringify(got.body)}`);
+        assert.notEqual(got.body.status, 'missing');
+        assert.equal(got.body.id, id);
+      });
+
+      test('dismiss stamps the stored row, and GET reads the outcome back', async () => {
+        const canonicalId = c.canonical(DECISION_NUMBER);
+        const id = seedRow(canonicalId, 'seed-dismiss'.padEnd(64, '0'));
+        const dismissed = await post(scanPath(c, DECISION_NUMBER, '/dismiss'), { id });
+        assert.equal(dismissed.status, 200, `dismiss: ${JSON.stringify(dismissed.body)}`);
+        assert.equal(dismissed.body.outcome, 'dismissed');
+        assert.equal(rowsFor(canonicalId)[0].outcome, 'dismissed', 'the outcome is on the stored row');
+        const status = await taskDecisionsStore.getStatus('test-workspace', canonicalId);
+        assert.equal(status?.outcome, 'dismissed', 'the store reads the outcome back');
+      });
+
+      test('retire self-resolves the stored row after a zero-finding rescan', async () => {
+        const canonicalId = c.canonical(ZERO_FINDING_NUMBER);
+        const id = seedRow(canonicalId, 'seed-retire'.padEnd(64, '0'));
+        const retired = await post(scanPath(c, ZERO_FINDING_NUMBER, '/retire'), { id });
+        assert.equal(retired.status, 200, `retire: ${JSON.stringify(retired.body)}`);
+        assert.equal(retired.body.retired, true);
+        assert.equal(retired.body.outcome, 'self-resolved');
+        assert.equal(rowsFor(canonicalId)[0].outcome, 'self-resolved', 'the outcome is on the stored row');
+        const status = await taskDecisionsStore.getStatus('test-workspace', canonicalId);
+        assert.equal(status?.outcome, 'self-resolved', 'the store reads the outcome back');
+      });
+
+      test('unretire restores a stored self-resolved row to unanswered', async () => {
+        const canonicalId = c.canonical(ZERO_FINDING_NUMBER);
+        const id = seedRow(canonicalId, 'seed-unretire'.padEnd(64, '0'), {
+          outcome: 'self-resolved', outcomeAt: new Date(), outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz'
+        });
+        const result = await post(scanPath(c, ZERO_FINDING_NUMBER, '/unretire'), { id });
+        assert.equal(result.status, 200, `unretire: ${JSON.stringify(result.body)}`);
+        assert.equal(result.body.outcome, null);
+        assert.equal(rowsFor(canonicalId)[0].outcome, null, 'the stored row is back to unanswered');
+        const status = await taskDecisionsStore.getStatus('test-workspace', canonicalId);
+        assert.ok(status, 'the store reads the row back');
+        assert.equal(status.outcome, null);
+      });
+
+      test('end to end over HTTP: POST scan, dismiss, then GET reports the dismissal', async () => {
+        const canonicalId = c.canonical(DECISION_NUMBER);
+        const posted = await post(scanPath(c, DECISION_NUMBER));
+        assert.equal(posted.status, 200, `POST scan: ${JSON.stringify(posted.body)}`);
+        const dismissed = await post(scanPath(c, DECISION_NUMBER, '/dismiss'), { id: posted.body.id });
+        assert.equal(dismissed.status, 200, `dismiss: ${JSON.stringify(dismissed.body)}`);
+        const got = await get(scanPath(c, DECISION_NUMBER));
+        assert.equal(got.status, 200, `GET scan: ${JSON.stringify(got.body)}`);
+        assert.equal(got.body.status, 'fresh');
+        assert.equal(got.body.outcome, 'dismissed');
+        assert.equal(rowsFor(canonicalId).length, 1);
+        assert.equal(rowsFor(canonicalId)[0].outcome, 'dismissed');
+      });
+    });
+  }
 });

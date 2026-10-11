@@ -1780,3 +1780,137 @@ describe('TaskDecisionsStore ticketClosed marker (LIN-3366)', () => {
     assert.ok(status.ticketClosedAt);
   });
 });
+
+// LIN-3441 repro: a GitHub-backed task's canonical id is the bare issue number
+// (`lib/providers/github/index.js`'s `_toCanonicalIssue`: `id: String(gh.number)`),
+// never a UUID. Every case asserts the row really PERSISTED — a direct look at
+// the collection plus a read-back through `getStatus` — never just a non-null
+// return. The UUID control runs the identical sequence through the same
+// helper, so a red "20" with a green control isolates the id shape.
+describe('LIN-3441: scan + outcome persistence for a GitHub-style canonical id', () => {
+  const GITHUB_ID = '20';
+  let collection, store;
+
+  beforeEach(() => {
+    collection = createMockCollection();
+    store = new TaskDecisionsStore({ collection });
+  });
+
+  const rowsFor = (issueId) => collection._docs.filter(d => d.urlKey === URL_KEY && d.issueId === issueId);
+
+  async function scanThenStamp(issueId, outcome) {
+    const decision = sampleDecision();
+    const recorded = await store.recordScan({ urlKey: URL_KEY, issueId, issueIdentifier: `#${issueId}`, inputHash: HASH_A, decision });
+    assert.ok(recorded, `recordScan(${JSON.stringify(issueId)}) returned a record`);
+    assert.equal(rowsFor(issueId).length, 1, `a scan row was written under issueId ${JSON.stringify(issueId)}`);
+    const scanned = await store.getStatus(URL_KEY, issueId, HASH_A);
+    assert.ok(scanned, `getStatus(${JSON.stringify(issueId)}) reads the scan back`);
+    assert.equal(scanned.id, recorded.id);
+    assert.equal(scanned.issueId, issueId);
+    assert.deepEqual(scanned.decision, decision);
+    assert.equal(scanned.outcome, null);
+
+    const stamped = await store.markOutcome({ urlKey: URL_KEY, issueId, id: recorded.id, outcome });
+    assert.ok(stamped, `markOutcome(${JSON.stringify(issueId)}, ${outcome}) returned a record`);
+    assert.equal(stamped.outcome, outcome);
+    assert.equal(rowsFor(issueId)[0].outcome, outcome, 'the outcome is on the stored row');
+    const after = await store.getStatus(URL_KEY, issueId, HASH_A);
+    assert.equal(after?.outcome, outcome, 'getStatus reads the outcome back');
+    assert.ok(after.outcomeAt);
+    return recorded.id;
+  }
+
+  async function answerFlow(issueId) {
+    const recorded = await store.recordScan({ urlKey: URL_KEY, issueId, inputHash: HASH_A, decision: sampleDecision() });
+    assert.ok(recorded, `recordScan(${JSON.stringify(issueId)}) returned a record`);
+    const result = await store.answer({ urlKey: URL_KEY, issueId, id: recorded.id, optionId: 'a' });
+    assert.ok(result.record, `answer(${JSON.stringify(issueId)}) returned a record`);
+    assert.equal(result.firstStampWins, true);
+    assert.equal(rowsFor(issueId)[0].outcome, 'answered', 'the answer is on the stored row');
+    assert.equal(rowsFor(issueId)[0].optionId, 'a');
+    const after = await store.getStatus(URL_KEY, issueId);
+    assert.equal(after?.outcome, 'answered', 'getStatus reads the answer back');
+    assert.equal(after.optionId, 'a');
+  }
+
+  async function retireThenReverse(issueId) {
+    const recorded = await store.recordScan({ urlKey: URL_KEY, issueId, inputHash: HASH_A, decision: sampleDecision() });
+    assert.ok(recorded, `recordScan(${JSON.stringify(issueId)}) returned a record`);
+    const retired = await store.markOutcome({ urlKey: URL_KEY, issueId, id: recorded.id, outcome: 'self-resolved', outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz' });
+    assert.equal(retired?.outcome, 'self-resolved');
+    assert.equal(rowsFor(issueId)[0].outcome, 'self-resolved');
+
+    const reversed = await store.reverseOutcome({ urlKey: URL_KEY, issueId, id: recorded.id });
+    assert.equal(reversed.outcome, null);
+    assert.equal(rowsFor(issueId)[0].outcome, null, 'the stored row is back to unanswered');
+    assert.equal(rowsFor(issueId)[0].outcomeReason, null);
+    const after = await store.getStatus(URL_KEY, issueId);
+    assert.ok(after, 'getStatus reads the reversed row back');
+    assert.equal(after.outcome, null);
+  }
+
+  test('UUID control: recordScan then markOutcome(dismissed) persist and read back', async () => {
+    await scanThenStamp(ISSUE_ID, 'dismissed');
+  });
+
+  test('"20": recordScan then markOutcome(dismissed) persist and read back', async () => {
+    await scanThenStamp(GITHUB_ID, 'dismissed');
+  });
+
+  test('UUID control: answer() (the dashboard/reply-delivery caller) persists the answer', async () => {
+    await answerFlow(ISSUE_ID);
+  });
+
+  test('"20": answer() (the dashboard/reply-delivery caller) persists the answer', async () => {
+    await answerFlow(GITHUB_ID);
+  });
+
+  test('UUID control: self-resolved stamp then reverseOutcome round-trip on the stored row', async () => {
+    await retireThenReverse(ISSUE_ID);
+  });
+
+  test('"20": self-resolved stamp then reverseOutcome round-trip on the stored row', async () => {
+    await retireThenReverse(GITHUB_ID);
+  });
+
+  // The seeded cases below isolate each method's own guard from recordScan's:
+  // the row sits in the collection exactly as recordScan would have written it.
+  function seedGithubRow(fields = {}) {
+    const id = TaskDecisionsStore.buildId(GITHUB_ID, HASH_A);
+    collection._docs.push({
+      _id: id, urlKey: URL_KEY, issueId: GITHUB_ID, issueIdentifier: '#20', inputHash: HASH_A,
+      decision: sampleDecision(), scannedAt: new Date(), seq: 0,
+      outcome: null, outcomeAt: null, outcomeReason: null, outcomeBasisHash: null,
+      ...fields
+    });
+    return id;
+  }
+
+  test('"20": getStatus reads back a row already stored under "20" (seeded past recordScan)', async () => {
+    const id = seedGithubRow();
+    const status = await store.getStatus(URL_KEY, GITHUB_ID, HASH_A);
+    assert.equal(status?.id, id);
+    assert.equal(status.issueId, GITHUB_ID);
+  });
+
+  test('"20": markOutcome stamps a row already stored under "20" (seeded past recordScan)', async () => {
+    const id = seedGithubRow();
+    const stamped = await store.markOutcome({ urlKey: URL_KEY, issueId: GITHUB_ID, id, outcome: 'dismissed' });
+    assert.equal(stamped?.outcome, 'dismissed');
+    assert.equal(rowsFor(GITHUB_ID)[0].outcome, 'dismissed', 'the outcome is on the stored row');
+  });
+
+  test('"20": answer() stamps a row already stored under "20" (seeded past recordScan)', async () => {
+    const id = seedGithubRow();
+    const result = await store.answer({ urlKey: URL_KEY, issueId: GITHUB_ID, id, optionId: 'a' });
+    assert.equal(result.record?.outcome, 'answered');
+    assert.equal(rowsFor(GITHUB_ID)[0].outcome, 'answered', 'the answer is on the stored row');
+  });
+
+  test('"20": reverseOutcome on a row already stored under "20" (seeded past recordScan) still clears it', async () => {
+    const id = seedGithubRow({ outcome: 'self-resolved', outcomeAt: new Date(), outcomeReason: 'nothing pending', outcomeBasisHash: 'basis-xyz' });
+    const reversed = await store.reverseOutcome({ urlKey: URL_KEY, issueId: GITHUB_ID, id });
+    assert.equal(reversed.outcome, null);
+    assert.equal(rowsFor(GITHUB_ID)[0].outcome, null);
+  });
+});
