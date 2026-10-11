@@ -5854,6 +5854,19 @@ describe('GET /api/dashboard/hydrate/:wsUrlKey/:identifier — widened neighborh
     assert.deepEqual(res.jsonBody.neighborhood, { parent: null, siblings: [], children: [], cousins: [] });
   });
 
+  test('a session that lacks wsUrlKey gets 403 and no provider read (LIN-2389)', async () => {
+    let tokenCalls = 0;
+    const router = makeHydrateRouter({ getWorkspaceAccessToken: async () => { tokenCalls += 1; return 'token'; } });
+    const handler = getHandler(router, 'get', '/workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier');
+    for (const session of [{ workspaces: [{ urlKey: 'ws-other', name: 'Other' }] }, { workspaces: [] }, {}]) {
+      const { req, res } = makeReqRes({ session, params: { wsUrlKey: 'ws-a', identifier: 'LIN-1' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 403);
+      assert.deepEqual(res.jsonBody, { error: 'Not connected to that workspace' });
+    }
+    assert.equal(tokenCalls, 0);
+  });
+
   test('no token → hydrated: false, reason: no_token — unchanged, no neighborhood field at all', async () => {
     const router = makeHydrateRouter({ getWorkspaceAccessToken: async () => null });
     const res = await callHydrate(router);
