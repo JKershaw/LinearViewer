@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, classifyUpstreamError } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../lib/issue-write-validation.js';
-import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
+import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS, isValidAutopilotVariant, targetError } from '../lib/dispatch-validation.js';
 import { validateRunField } from '../lib/dispatch-fields.js';
 import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -141,7 +141,7 @@ export function createKickoffRoutes({
         return badRequest.json(res, `mode must be one of: ${AUTOPILOT_MODES.join(', ')}`);
       }
       const resolvedVariant = variant === undefined ? AUTOPILOT_VARIANT_DEFAULT : variant;
-      if (!AUTOPILOT_VARIANTS.includes(resolvedVariant)) {
+      if (!isValidAutopilotVariant(resolvedVariant)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
       }
@@ -157,9 +157,10 @@ export function createKickoffRoutes({
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffGoalValidationError.error);
       }
-      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
+      const targetMsg = targetError(target, POLLED_TARGETS);
+      if (targetMsg) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
+        return badRequest.json(res, targetMsg);
       }
       const kickoffRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
         maxLength: MAX_NAME_LENGTH,

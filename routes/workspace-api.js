@@ -623,8 +623,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // contract (`routes/dispatch.js`).
     let stopAt = null
     if (typeof req.query.stopAt === 'string' && req.query.stopAt.trim() !== '') {
-      if (req.query.stopAt.trim() !== 'pr') {
-        return badRequest.json(res, "stopAt must be 'pr'")
+      const stopAtMsg = validateRunField('stopAt', req.query.stopAt.trim())
+      if (stopAtMsg) {
+        return badRequest.json(res, stopAtMsg)
       }
       stopAt = 'pr'
     }

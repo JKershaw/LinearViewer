@@ -18,14 +18,17 @@ import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import { deriveCompletedAt, deriveWireStatus, deriveWireTerminal, closedProjection, feedbackWithHarvestedAbort, harvestAbortedTargets, mergeLineageFeedback } from '../lib/dispatch-terminal.js';
 import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { describeDescent, resolveRecommendation } from '../lib/recommend-recurse.js';
-import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES, DISPATCH_KINDS } from '../lib/prompt-templates.js';
-import { getPeriodicals, resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
-import { isValidIssueId, UUID_REGEX, dispatchIssueSourceField } from '../lib/workspace.js';
-import { validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
+import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, getPromptDisplayName, PROMPT_TEMPLATES } from '../lib/prompt-templates.js';
+import { resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
+import { isValidIssueId, dispatchIssueSourceField } from '../lib/workspace.js';
+import {
+  validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS,
+  abortFollowUpError, abortToError, cascadeAbortError, dispatchKindError, periodicalIdError, targetError, followUpToError
+} from '../lib/dispatch-validation.js';
 import { validateRunField } from '../lib/dispatch-fields.js';
 import { buildRunGate, resolveChatCredential, isAiUnavailable } from '../lib/chat-request.js';
 import { redactSessionItem } from '../lib/dispatch-session-redaction.js';
-import { POLLED_TARGETS, SESSION_TARGETS } from '../lib/dispatch-targets.js';
+import { POLLED_TARGETS } from '../lib/dispatch-targets.js';
 
 // Dispatch input limits. The prompt/url caps for the POST /dispatch payload now
 // live in lib/dispatch-validation.js (shared with the session-auth twin via
@@ -235,32 +238,30 @@ export function createDispatchRoutes({
       // (named by abortTo) instead of running a prompt — it carries no prompt and
       // skips the prompt-required check. abort and followUpTo are mutually exclusive.
       const isAbort = abort === true;
-      if (isAbort && followUpTo !== undefined && followUpTo !== null) {
+      const abortFollowUpMsg = abortFollowUpError({ isAbort, followUpTo });
+      if (abortFollowUpMsg) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'abort and followUpTo are mutually exclusive');
+        return badRequest.json(res, abortFollowUpMsg);
       }
 
       if (!isAbort && (!prompt || typeof prompt !== 'string')) {
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, 'prompt is required and must be a string');
       }
-      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
+      const targetMsg = targetError(target, POLLED_TARGETS);
+      if (targetMsg) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
+        return badRequest.json(res, targetMsg);
       }
 
       // Abort eligibility (LIN-743): the abort item's OWN target must be
       // poll-eligible — NOT derived from the aborted session's substrate. The
       // proxy target set (cli/web/dash) is already exactly the poll-eligible set,
       // so the check above suffices; here we only enforce abortTo's presence/shape.
-      if (isAbort) {
-        if (!abortTo || !UUID_REGEX.test(abortTo)) {
-          logEvent(req, '/api/proxy/dispatch', 400);
-          return badRequest.json(res, 'abortTo is required and must be a UUID when abort is true');
-        }
-      } else if (abortTo !== undefined && abortTo !== null) {
+      const abortToMsg = abortToError({ isAbort, abortTo });
+      if (abortToMsg) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'abortTo requires abort to be true');
+        return badRequest.json(res, abortToMsg);
       }
       // Cascade close (LIN-946): a boolean modifier on an abort. When true the
       // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
@@ -275,14 +276,16 @@ export function createDispatchRoutes({
         logEvent(req, '/api/proxy/dispatch', 400);
         return badRequest.json(res, cascadeRuleError);
       }
-      if (cascade === true && !isAbort) {
+      const cascadeAbortMsg = cascadeAbortError({ isAbort, cascade });
+      if (cascadeAbortMsg) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'cascade requires abort to be true');
+        return badRequest.json(res, cascadeAbortMsg);
       }
       // Validate kind if provided; when omitted it is derived from promptName below.
-      if (kind !== undefined && !isValidDispatchKind(kind)) {
+      const kindMsg = dispatchKindError(kind);
+      if (kindMsg) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+        return badRequest.json(res, kindMsg);
       }
       // Periodical-template join key (LIN-1825): registry-membership check, not
       // format validation, so it stays route-local rather than routing through
@@ -290,9 +293,10 @@ export function createDispatchRoutes({
       // model registry). This is the entry point that makes "works from any
       // entry point, including a bare-token agent POST" true — the id must be
       // validated here too, not just at the session route.
-      if (periodicalId !== undefined && !getPeriodicals().map(p => p.id).includes(periodicalId)) {
+      const periodicalIdMsg = periodicalIdError(periodicalId);
+      if (periodicalIdMsg) {
         logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
+        return badRequest.json(res, periodicalIdMsg);
       }
       // Opt-in completion hold (LIN-797): boolean, default false. Stored +
       // forwarded blindly — the runner owns the behaviour (see LIN-795).
@@ -710,9 +714,10 @@ export function createDispatchRoutes({
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
         return badRequest.json(res, 'Invalid identifier format');
       }
-      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
+      const targetMsg = targetError(target, POLLED_TARGETS);
+      if (targetMsg) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
+        return badRequest.json(res, targetMsg);
       }
       if (noDescend !== undefined && typeof noDescend !== 'boolean') {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
@@ -788,9 +793,10 @@ export function createDispatchRoutes({
       // stamping capability POST /dispatch already has (LIN-2385 B1) — without
       // it, a periodical's Stage-2 batch/lane dispatch has no way to stamp
       // `periodicalId` on the verb it actually takes.
-      if (periodicalId !== undefined && !getPeriodicals().map(p => p.id).includes(periodicalId)) {
+      const periodicalIdMsg = periodicalIdError(periodicalId);
+      if (periodicalIdMsg) {
         logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
+        return badRequest.json(res, periodicalIdMsg);
       }
       // Autopilot session reference (LIN-591): the autopilot dispatchId that is
       // driving this run, stamped onto the spawned worker so the dashboard can
@@ -808,16 +814,10 @@ export function createDispatchRoutes({
       // + cli/web-only rule the main dispatch handlers enforce via
       // validateDispatchPayload (the server-generated prompt never reaches
       // validateDispatchPayload, so the rule is mirrored here).
-      if (followUpTo !== undefined && followUpTo !== null) {
-        if (!UUID_REGEX.test(followUpTo)) {
-          logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-          return badRequest.json(res, 'Invalid followUpTo format');
-        }
-        const followUpTarget = target || 'cli';
-        if (!SESSION_TARGETS.includes(followUpTarget)) {
-          logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-          return badRequest.json(res, 'followUpTo is only supported for cli/web targets');
-        }
+      const followUpToMsg = followUpToError({ followUpTo, target });
+      if (followUpToMsg) {
+        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
+        return badRequest.json(res, followUpToMsg);
       }
       // Force flag (LIN-2872): boolean only. On this verb `force: true` is
       // ALWAYS meaningful — `issueIdentifier` is required above, so the

@@ -25,10 +25,13 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
-import { isValidDispatchKind, DISPATCH_KINDS, DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
-import { getPeriodicals, PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
+import { DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
+import { PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
 import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
-import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
+import {
+  validateDispatchPayload, validateOpaqueDispatchField, abortFollowUpError, abortToError, cascadeAbortError,
+  dispatchKindError, periodicalIdError, isValidAutopilotVariant, targetError
+} from '../lib/dispatch-validation.js';
 import { validateRunField, isPositiveInteger } from '../lib/dispatch-fields.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { mapDispatchRefusal } from '../lib/dispatch-refusal.js';
@@ -256,8 +259,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // carries no prompt and skips the prompt-required check below. abort and
       // followUpTo are mutually-exclusive verbs.
       const isAbort = abort === true;
-      if (isAbort && followUpTo !== undefined && followUpTo !== null) {
-        return badRequest.json(res, 'abort and followUpTo are mutually exclusive');
+      const abortFollowUpMsg = abortFollowUpError({ isAbort, followUpTo });
+      if (abortFollowUpMsg) {
+        return badRequest.json(res, abortFollowUpMsg);
       }
 
       // Validate required fields. prompt is required for a normal dispatch; an
@@ -267,8 +271,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       }
 
       // Validate target if provided
-      if (target !== undefined && !DISPATCH_TARGETS.includes(target)) {
-        return badRequest.json(res, `target must be one of: ${DISPATCH_TARGETS.join(', ')}`);
+      const targetMsg = targetError(target, DISPATCH_TARGETS);
+      if (targetMsg) {
+        return badRequest.json(res, targetMsg);
       }
 
       // LIN-3383 owner-only runner enqueue. Every write below (fresh, followUpTo,
@@ -288,16 +293,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // poll-eligible (cli/web/dash) — eligibility is NOT derived from the aborted
       // session's substrate. 'local' (Harbour OS) spawns server-side and is never
       // polled, so it cannot carry an abort. Default 'cli'.
+      const abortToMsg = abortToError({ isAbort, abortTo });
+      if (abortToMsg) {
+        return badRequest.json(res, abortToMsg);
+      }
       if (isAbort) {
-        if (!abortTo || !UUID_REGEX.test(abortTo)) {
-          return badRequest.json(res, 'abortTo is required and must be a UUID when abort is true');
-        }
         const abortTarget = target || 'cli';
         if (!POLLED_TARGETS.includes(abortTarget)) {
           return badRequest.json(res, 'abort target must be poll-eligible (cli, web, or dash)');
         }
-      } else if (abortTo !== undefined && abortTo !== null) {
-        return badRequest.json(res, 'abortTo requires abort to be true');
       }
 
       // Cascade close (LIN-946): a boolean modifier on an abort. When true the
@@ -311,13 +315,15 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (cascadeRuleError) {
         return badRequest.json(res, cascadeRuleError);
       }
-      if (cascade === true && !isAbort) {
-        return badRequest.json(res, 'cascade requires abort to be true');
+      const cascadeAbortMsg = cascadeAbortError({ isAbort, cascade });
+      if (cascadeAbortMsg) {
+        return badRequest.json(res, cascadeAbortMsg);
       }
 
       // Validate kind if provided; when omitted it is derived from promptName below.
-      if (kind !== undefined && !isValidDispatchKind(kind)) {
-        return badRequest.json(res, `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+      const kindMsg = dispatchKindError(kind);
+      if (kindMsg) {
+        return badRequest.json(res, kindMsg);
       }
 
       // Periodical-template join key (LIN-1825): registry-membership check, not
@@ -325,8 +331,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // validateDispatchPayload (deliberately format-only, never against a
       // model registry). Optional; absent/undefined means a non-periodical
       // dispatch and is left untouched.
-      if (periodicalId !== undefined && !getPeriodicals().map(p => p.id).includes(periodicalId)) {
-        return badRequest.json(res, 'periodicalId must be one of the known periodical template ids');
+      const periodicalIdMsg = periodicalIdError(periodicalId);
+      if (periodicalIdMsg) {
+        return badRequest.json(res, periodicalIdMsg);
       }
 
       // LIN-3136 M2 / M2b: which launches declare the dispatch grant. An
@@ -430,8 +437,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // silently dropped (the entryRung/cascade/abortTo precedent above).
       const hasStopAt = stopAt !== undefined && stopAt !== null;
       if (hasStopAt) {
-        if (stopAt !== 'pr') {
-          return badRequest.json(res, "stopAt must be 'pr'");
+        const stopAtMsg = validateRunField('stopAt', stopAt);
+        if (stopAtMsg) {
+          return badRequest.json(res, stopAtMsg);
         }
         if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
           return badRequest.json(res, 'stopAt is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
@@ -452,7 +460,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // closed. Same freshness discipline as stopAt above.
       const hasVariant = variant !== undefined && variant !== null;
       if (hasVariant) {
-        if (variant !== 'standard' && variant !== 'stepper') {
+        if (!isValidAutopilotVariant(variant)) {
           return badRequest.json(res, "variant must be 'standard' or 'stepper'");
         }
         if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
