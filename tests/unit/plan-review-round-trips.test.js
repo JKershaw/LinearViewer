@@ -815,7 +815,7 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
 
   // ─── LIN-2358: an unparseable rulerChangeAt must not report a confident 0 ───
   //
-  // `toMs` returns NaN on unparseable input, and `NaN != null` is true — so the
+  // The module's old private parser returned NaN on unparseable input, and `NaN != null` is true — so the
   // contamination branch RAN and `rulerContamination` was EMITTED, while every
   // `x < NaN` comparison was false and it therefore always read 0. A
   // well-formed answer meaning "nothing measured" rather than "nothing found",
@@ -858,8 +858,8 @@ describe('computePlanReviewRoundTrips — aggregate', () => {
   test('a VALID Date instance is accepted — the validator rejects unparseable input, not a parseable shape', () => {
     // Caught in review: an earlier revision checked `typeof value !== 'string'`,
     // which threw on a valid Date with the self-contradicting message
-    // 'must be a parseable ISO instant (got "2026-08-02T00:00:00.000Z")'. `toMs`
-    // has always accepted Dates, so that NARROWED behaviour rather than
+    // 'must be a parseable ISO instant (got "2026-08-02T00:00:00.000Z")'. the old
+    // private parser has always accepted Dates, so that NARROWED behaviour rather than
     // validating it. The list above is careful about the distinction: it
     // includes `new Date('nope')` (an Invalid Date, genuinely unparseable) and
     // this test covers its valid counterpart.

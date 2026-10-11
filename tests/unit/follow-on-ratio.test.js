@@ -631,7 +631,7 @@ describe('F. clock-freedom, loudness and __internal', () => {
 
   test('__internal helpers behave as the module relies on', () => {
     const {
-      peerOf, toMs, rate, typeCounted, buildPeerIndex, dedupeById, hasPlanMarker, hasReviewLedger,
+      peerOf, rate, typeCounted, buildPeerIndex, dedupeById, hasPlanMarker, hasReviewLedger,
       requireInstant, textOf, descriptionOf, nonGlobal,
     } = __internal;
 
@@ -641,9 +641,9 @@ describe('F. clock-freedom, loudness and __internal', () => {
     assert.equal(peerOf({ type: 'related' }), null);
     assert.equal(peerOf(null), null);
 
-    assert.equal(toMs('2026-06-10T00:00:00.000Z'), Date.parse('2026-06-10T00:00:00.000Z'));
-    assert.ok(Number.isNaN(toMs(null)));
-    assert.ok(Number.isNaN(toMs('nope')));
+    // The private `toMs` is gone (LIN-3453): timestamp parsing is the shared
+    // `toEpochMs`, whose null/junk contract is pinned in epoch-ms.test.js.
+    assert.equal('toMs' in __internal, false);
 
     assert.equal(rate(1, 4), 0.25);
     assert.equal(rate(0, 4), 0, 'a real zero is preserved');
