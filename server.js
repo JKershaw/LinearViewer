@@ -96,7 +96,7 @@ import { FunnelEventStore } from './lib/funnel-event-store.js'
 import { CloseOutEventsStore } from './lib/close-out-events-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
-import { NotImplementedError } from './lib/providers/interface.js'
+import { createProviderAuthRouter } from './routes/provider-auth-routers.js'
 import { LocalStore } from './lib/local-store.js'
 import { buildForest, partitionCompleted, buildInProgressForest, buildRecentActivityForest, NO_PROJECT_ID, PERIODICALS_PROJECT_ID, expandToTreeContext, nodeKey } from './lib/tree.js'
 import { isHiddenState } from './lib/providers/state-map.js'
@@ -125,7 +125,8 @@ import { createProxyDefaultRoute } from './lib/settings-proxy-default.js'
 import { createMilestoneFunnelRoutes } from './routes/milestone-funnel.js'
 import { createRunnerKitRoutes } from './routes/runner-kit.js'
 import { createTestRoutes } from './routes/test.js'
-import { createWorkspaceApiRoutes, shouldMockAi, decisionStampDedupe } from './routes/workspace-api.js'
+import { createWorkspaceApiRoutes, decisionStampDedupe } from './routes/workspace-api.js'
+import { shouldMockAi } from './lib/should-mock-ai.js'
 import { getModelCatalog, CATALOG_CACHE_TTL_MS } from './lib/openrouter-catalog.js'
 import { createLegacyRedirects } from './routes/legacy-redirects.js'
 import { testMockTeams, testMockData } from './tests/fixtures/mock-data.js'
@@ -1386,12 +1387,13 @@ app.use((req, res, next) => {
 // =============================================================================
 // Mount extracted route modules
 // LIN-561: mount every registered provider's auth router, not just Linear's.
-// Providers that don't implement getAuthRouter (the base throws
-// NotImplementedError) are skipped — so today, with only Linear providing one,
-// this mounts exactly the Linear OAuth router as before (behaviour-identical).
+// LIN-675: server.js (the composition root) owns which router serves which
+// provider, via routes/provider-auth-routers.js — providers no longer expose
+// getAuthRouter, so lib/ never imports routes/. A provider with no login flow
+// (`local`) yields null and is skipped; a provider missing from the helper's
+// table throws at boot.
 // LIN-2010: the barrel moved `local` from 2nd to last in registration order;
-// inert here — `local` implements no getAuthRouter (skipped via NotImplementedError)
-// and the relative order of `github`/`github-projects`/`jira` (the three that do) is unchanged.
+// the relative order of `github`/`github-projects`/`jira` (mount order) is unchanged.
 // LIN-3125 Phase 3 (C1): the owner-scoped held reader, bound to the store here
 // (the reader module owns the `readConnectionsByAccountPrefix` call; the flow
 // and the picker route receive only this function). The shared factory keeps
@@ -1399,14 +1401,8 @@ app.use((req, res, next) => {
 const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionReader({ connectionStore })
 
 for (const provider of getAllProviders()) {
-  let authRouter
-  try {
-    authRouter = provider.getAuthRouter({ sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey })
-  } catch (err) {
-    if (err instanceof NotImplementedError) continue
-    throw err
-  }
-  app.use(authRouter)
+  const authRouter = createProviderAuthRouter(provider, { sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey })
+  if (authRouter) app.use(authRouter)
 }
 // LIN-2304: the merge confirm/decline routes are shared across every
 // provider's conflict-offer flow — mounted exactly ONCE here, never

@@ -23,27 +23,14 @@ import { resolveWorkspaceModel } from '../lib/workspace-preferences.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
 import { testMockTeams, testMockData } from '../tests/fixtures/mock-data.js';
+import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
-
-/**
- * Whether the AI layer should be mocked for this request (LIN-388). Mirrors
- * the identically-named/identically-defined helper in workspace-api.js (and
- * next-run.js, task-chat.js, ship-biscuit.js) — this codebase's established
- * convention is to duplicate this 3-line predicate per route module rather
- * than share it via import, so route modules stay independently movable.
- * @param {Object} workspace - req.workspace (carries provider + accessToken)
- * @returns {boolean}
- */
-function shouldMockAi(workspace) {
-  return process.env.NODE_ENV === 'test' &&
-    (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
-}
 
 /**
  * Helper: write an SSE event to the response. Mirrors the identically-named
  * helper still in workspace-api.js (used by the recommend group) — kept as a
- * local duplicate rather than a shared import, per the same reasoning as
- * shouldMockAi above.
+ * local duplicate rather than a shared import so route modules stay
+ * independently movable.
  * @param {Object} res - Express response
  * @param {string} type - Event type
  * @param {Object} data - Event data (will be JSON-stringified)

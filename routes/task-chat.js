@@ -28,6 +28,7 @@ import { getSessionsForWorkspace } from '../lib/pipeline-loops.js';
 import { UUID_REGEX } from '../lib/dispatch-validation.js';
 import { sessionIsTerminal, enrichLoop } from './dashboard.js';
 import { resolveIssueBinding, isValidIssueId, getWorkspaceCallScope } from '../lib/workspace.js';
+import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
@@ -47,16 +48,6 @@ const MAX_QUESTION_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
  */
 function sanitizeHistory(history) {
   return filterChatTurns(history);
-}
-
-/**
- * Whether the AI layer should be mocked for this request — mirrors
- * `shouldMockAi` in routes/workspace-api.js so e2e specs (and local-provider
- * sessions) stream a deterministic answer without an OpenRouter key.
- */
-function shouldMockAi(workspace) {
-  return process.env.NODE_ENV === 'test' &&
-    (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
 }
 
 /**

@@ -18,7 +18,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { orderIssuesForSwipe } from '../../lib/render-swipe.js';
-import { starterSeedIssueIds } from '../../routes/workspace.js';
+import { starterSeedIssueIds } from '../../lib/starter-seed.js';
 import { nodeKey } from '../../lib/tree.js';
 import '../../lib/providers/linear/index.js';
 

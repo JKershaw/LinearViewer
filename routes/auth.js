@@ -26,7 +26,7 @@ import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-c
  * @param {Object} options.sessionStore - Session store with cleanup() method
  * @param {Object} options.userPreferencesStore - User preferences store for loading saved preferences
  * @param {Object} [options.provider] - The provider this auth router serves. Injected by the
- *   mounting provider (LinearProvider.getAuthRouter passes `this`); falls back to the Linear
+ *   mounting provider (createProviderAuthRouter passes the provider instance); falls back to the Linear
  *   provider as a documented legacy default for direct constructions (LIN-561).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.

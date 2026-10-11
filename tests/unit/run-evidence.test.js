@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractPrUrls, summarizeChecks, sameHead, buildRunEvidence } from '../../lib/run-evidence.js';
+import { extractPrUrls, summarizeChecks, buildRunEvidence } from '../../lib/run-evidence.js';
 
 const REPLY = '## Review\n\n### What CI Did Not Prove\n- one claim\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**';
 
@@ -58,12 +58,6 @@ describe('run-evidence: check summarisation', () => {
     assert.equal(summarizeChecks([{ conclusion: 'success' }, { conclusion: null }]), 'pending');
     assert.equal(summarizeChecks([{ conclusion: 'in_progress' }]), 'pending');
     assert.equal(summarizeChecks([]), 'unknown');
-  });
-
-  test('an abbreviated sha equals its full form; a different sha does not', () => {
-    assert.equal(sameHead('abc1234', 'abc1234def'), true);
-    assert.equal(sameHead('abc1234', 'def5678'), false);
-    assert.equal(sameHead(null, 'abc1234'), true);
   });
 });
 

@@ -30,16 +30,7 @@ import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
 import { testMockData } from '../tests/fixtures/mock-data.js';
-
-/**
- * Whether the AI layer should be mocked for this request — mirrors `shouldMockAi`
- * in routes/workspace-api.js / task-chat.js so e2e specs (and local-provider
- * sessions) get deterministic options without an OpenRouter key.
- */
-function shouldMockAi(workspace) {
-  return process.env.NODE_ENV === 'test' &&
-    (workspace?.accessToken === 'test-token' || workspace?.provider === 'local');
-}
+import { shouldMockAi } from '../lib/should-mock-ai.js';
 
 /**
  * Deterministic, grounded mock response for test mode — a headline-titled
