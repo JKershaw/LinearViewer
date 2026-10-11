@@ -29,6 +29,7 @@
   "fleet-complexity-read": "Auditor read, 2026-09-29. This is read-only: nothing in the repo, tracker or queue was changed.",
   "growth-atlas": "Mostly after June, and mostly in the process around the product rather than in the product itself. The fleet started on 1 June. Between then and 28 September, Harbour's production code grew 3.7×, its tests 9.3×, and what its agents are…",
   "held-or-fresh": "A held supervisor pays for its whole history on every wake. Each model step costs about 3–6k weighted tokens plus 0.11 of everything the session has accumulated, because the whole context is read back from cache. Cost per wake therefore…",
+  "how-a-task-is-composed": "Partly, and the record cannot say how much. In every band of change size, tickets whose behaviour was left open ran longer, split more often and went round plan-review more than tickets whose behaviour was settled. That agrees with your…",
   "how-process-changes-land": "Since June, process changes have landed often and been measured rarely. 27 notable changes were read across both repos. 16 landed as a series of PRs, 7 as one PR and 4 as configuration with no code. Only 2 were measured before and after by…",
   "jev-decision-model": "As a gate, not as a model. Jev returns a typed choice, a score or a yes/no probability and never a sentence, so it can do none of the calls Harbour makes today: all fourteen streamChat call sites and the recommender write prose, or JSON…",
   "learning-while-the-tools-change": "How AI reshapes developer expertise and what history teaches us",

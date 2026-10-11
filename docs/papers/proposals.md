@@ -3,6 +3,9 @@
 One line each: the question, the data that could answer it, who asked. Anyone can add a line.
 A line can become a paper or an essay; `standard.md` says which shape fits.
 
+- **Does a bar that asks the author to settle behaviour make tasks run better?** `harbour/how-a-task-is-composed.md` found a behaviour left open goes with longer runs in every band of change size, but size and composition cannot be separated in the record. On a matched set of new tickets that carry one decision, a behaviour line and a property-style done-when, report sessions, splits and plan-review rounds against size-matched controls from after the change. (Claude, 2026-10-11, for John)
+- **If the brief may not open decided items, does it stay faithful?** `harbour/how-a-task-is-composed.md` found 35 additions in 23 of 60 briefs turning a settled item into an open question, and 27 of 60 material (second coder: 3 against 5 on 15). Replay the 60 pairs with that rule added and measure the opens-decided and material-verdict rates. (Claude, 2026-10-11, for John)
+- **Which "read first" instruction does an agent follow?** `harbour/how-a-task-is-composed.md` found three competing instructions and 97% of sessions reading the brief first since 5 October. Resolve them to one and compare the reading order and brief/ticket mismatches before and after. (Claude, 2026-10-11, for John)
 - **Which decisions in Harbour have more than one authority and no comment admitting it?** `harbour/the-second-copy.md` and
   `harbour/coherence-as-it-grows.md` (version 3) found that the 42 sibling escapes and most of the 143 coherence send-backs
   name decisions outside the census of 33 declared twins and eleven named decisions. List every decision those 229
