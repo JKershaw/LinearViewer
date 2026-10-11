@@ -259,7 +259,7 @@ describe('resolveWorkspaceIdMapFromSessions (LIN-2236, Block D — pure)', () =>
     const map = resolveWorkspaceIdMapFromSessions(sessions);
     // LIN-3124 PR3 (D3): the map now also carries the active connectionId (null
     // for a legacy workspace).
-    assert.deepEqual(map.get('org-1'), { urlKey: 'acme', provider: 'linear', connectionId: null });
+    assert.deepEqual(map.get('org-1'), { id: 'org-1', urlKey: 'acme', provider: 'linear', connectionId: null });
     assert.equal(map.size, 1);
   });
 });

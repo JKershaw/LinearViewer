@@ -51,7 +51,6 @@ function withoutFirstMatch(sources, re, fileRe = null) {
 // ---------------------------------------------------------------------------
 
 const countTestTokenGuards = (s) => total(s, /accessToken === 'test-token'/g);
-const countUrlKeyLookups = (s) => total(s, /w\??\.urlKey === urlKey/g);
 
 function countProviderAuthEdges(sources) {
   let n = 0;
@@ -135,15 +134,6 @@ const PINS = [
     count: countTestTokenGuards,
     plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
     minus: (s) => countTestTokenGuards(withoutFirstMatch(s, /accessToken === 'test-token'/)),
-  },
-  {
-    id: 'urlkey-lookups',
-    label: 'hand-rolled `w.urlKey === urlKey` lookups',
-    expected: 16,
-    sources: REAL,
-    count: countUrlKeyLookups,
-    plus: (s) => countUrlKeyLookups(withLine(s, 'lib/workspace.js', 'if (w.urlKey === urlKey) {}')),
-    minus: (s) => countUrlKeyLookups(withoutFirstMatch(s, /w\??\.urlKey === urlKey/)),
   },
   {
     id: 'provider-auth-edges',

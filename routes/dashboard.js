@@ -53,7 +53,7 @@ import { computeEffortReadout, eligibleIssueIdentifiers } from '../lib/effort-re
 import { renderEffortReadoutPage } from '../lib/render-effort-readout.js';
 import { classifyUpstreamError, isAuthError } from '../lib/errors.js';
 import { renderUpstreamAwareErrorPage } from '../lib/render-pages.js';
-import { resolveIssueBinding } from '../lib/workspace.js';
+import { resolveIssueBinding, getWorkspaceByUrlKey } from '../lib/workspace.js';
 import { readRunEvidence, buildRunEvidence } from '../lib/run-evidence.js';
 import { createPrStateStore, resolveRunPrRef } from '../lib/pr-state-store.js';
 import { prReadToken } from '../lib/github-pr-status.js';
@@ -3106,7 +3106,7 @@ export function createDashboardRoutes({
   router.get('/workspace/:urlKey/api/dashboard/hydrate/:wsUrlKey/:identifier', workspaceFromUrl, async (req, res) => {
     const { wsUrlKey, identifier } = req.params;
     // Only hydrate workspaces the user is actually connected to (never trust the path).
-    const connected = (req.session.workspaces || []).some(w => w.urlKey === wsUrlKey);
+    const connected = !!getWorkspaceByUrlKey(req.session, wsUrlKey);
     if (!connected) return res.status(403).json({ error: 'Not connected to that workspace' });
 
     try {
