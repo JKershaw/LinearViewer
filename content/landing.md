@@ -10,12 +10,12 @@ title: Harbour
   @identifier: LV-2
   @priority: 1
 - ✓ Any backend, one cockpit
-  Linear, GitHub Issues, or a local store—behind a single provider abstraction. You're no longer tied to one tracker.
+  Linear, GitHub Issues, GitHub Projects, Jira, or a local store—behind a single provider abstraction. You're no longer tied to one tracker.
   @identifier: LV-3
   @priority: 2
   @completedAt: 2026-01-15T10:00:00.000Z
 - ✓ Grounded prompts
-  14 deterministic templates, chosen by an LLM router and re-grounded against your current code before they run.
+  17 deterministic templates, chosen by an LLM router and re-grounded against your current code before they run.
   @identifier: LV-4
   @priority: 2
   @completedAt: 2026-02-01T10:00:00.000Z
