@@ -191,7 +191,7 @@ describe('LIN-3461 — POST /api/proxy/dispatch ignores maxSessionsPerTask', () 
 // error, N3) was only proven at the dispatch-factory unit level
 // (tests/unit/dispatch-factory.test.js) — never at the route level, where the
 // durable proxy-event note is actually written (routes/proxy.js's
-// refuseIfBudgetExhausted -> logEvent). The 409 body's `bound` is pinned
+// relayDispatchRefusal -> logEvent). The 409 body's `bound` is pinned
 // there, so the note's own `bound` interpolation was only pinned indirectly.
 function makeBudgetReadFailureStore() {
   const collection = createMockCollection();

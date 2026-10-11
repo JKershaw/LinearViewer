@@ -30,6 +30,7 @@ import { getPeriodicals, PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js
 import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
 import { validateDispatchPayload, validateOpaqueDispatchField } from '../lib/dispatch-validation.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { mapDispatchRefusal } from '../lib/dispatch-refusal.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE, resolveIssueBinding, dispatchIssueSourceField } from '../lib/workspace.js';
@@ -865,56 +866,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         ...(spawn ? { spawn } : {})
       });
     } catch (err) {
-      // Duplicate-dispatch refusal (LIN-1656): a fresh dispatch for this
-      // issue+kind already exists from the last few minutes. Same tagged-throw
-      // convention as `proxyAttachFailed` just below, and it must sit ahead of the
-      // generic 500 — a 500 would be indistinguishable from a real fault, which is
-      // worse than having no guard at all.
-      //
-      // The body is constructed once by `createDispatchItem` and carried on the
-      // error, so this is a relay, not a second construction site: `code`
-      // (DUPLICATE_DISPATCH) is what a caller branches on, and `id` names the LIVE
-      // dispatch to watch instead of re-dispatching. `Retry-After` duplicates the
-      // body's `retryAfter` for standards-friendly clients. This route is
-      // session-auth'd (no proxy audit log), so there is no logEvent to write.
-      if (err && err.duplicateDispatch) {
-        res.set('Retry-After', String(err.duplicateDispatch.retryAfter));
-        return jsonError(res, 409, err.message, err.duplicateDispatch);
-      }
-      // Free-tier run-limit refusal (LIN-3238): the body is built once by
-      // `createDispatchItem` (step 1.55) and carried on `err.runLimit` —
-      // `{ error, code, freeTier, retryAfter }`. A 429 for an exhausted limit
-      // (with `Retry-After` to `resetsAt`); a 503 when the count could not be
-      // read (fail closed). This route is session-auth'd, so no audit log.
-      if (err && err.runLimit) {
-        const status = err.runLimit.code === 'RUN_LIMIT_UNVERIFIED' ? 503 : 429;
-        if (status === 429) {
-          res.set('Retry-After', String(err.runLimit.retryAfter));
-        }
-        return jsonError(res, status, err.runLimit.error, {
-          code: err.runLimit.code,
-          freeTier: err.runLimit.freeTier,
-          retryAfter: err.runLimit.retryAfter
-        });
-      }
-      // Task-budget refusal (LIN-1751): same tagged-throw relay convention as
-      // the duplicate guard above, distinct `code` (BUDGET_EXHAUSTED) so a
-      // caller branching on 409 bodies can tell the two refusals apart. No
-      // `Retry-After` — the budget doesn't clear on a timer.
-      if (err && err.budgetExhausted) {
-        return jsonError(res, 409, err.message, err.budgetExhausted);
-      }
-      // Run-boundary refusal (LIN-3245 / LIN-2949 P1a): a fresh close-out
-      // dispatch for a `stopAt: 'pr'` run. Sibling of the budget relay above,
-      // distinct code (CLOSE_OUT_IS_THE_PERSONS) so a caller branching on 409
-      // bodies can tell it apart. No `Retry-After` — nothing clears on a timer.
-      if (err && err.closeOutRefusal) {
-        return jsonError(res, 409, err.message, err.closeOutRefusal);
-      }
-      // Per-task runaway failsafe (LIN-3461): sibling of the relays above, its
-      // own code (TASK_SESSION_RUNAWAY), never BUDGET_EXHAUSTED.
-      if (err && err.taskSessionRunaway) {
-        return jsonError(res, 409, err.message, err.taskSessionRunaway);
+      // Tagged factory refusals (duplicate, run-limit 429/503, budget, close-out,
+      // per-task runaway): `lib/dispatch-refusal.js` owns the status/body/
+      // `Retry-After` mapping, shared with the proxy entrance. Ahead of the
+      // generic 500 — a 500 would be indistinguishable from a real fault. This
+      // route is session-auth'd (no proxy audit log), so the mapper's log note
+      // goes unused and there is no keepalive.
+      const refusal = mapDispatchRefusal(err);
+      if (refusal) {
+        if (refusal.retryAfter != null) res.set('Retry-After', String(refusal.retryAfter));
+        return jsonError(res, refusal.status, refusal.message, refusal.body);
       }
       // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
       // could not mint/append its block. Surface it (503, transient — mirrors the

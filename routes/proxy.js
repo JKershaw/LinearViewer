@@ -47,7 +47,8 @@ import {
   MAX_NAME_LENGTH,
   DANGEROUS_CHARS_REGEX,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE, CLOSE_OUT_IS_THE_PERSONS_CODE, TASK_SESSION_RUNAWAY_CODE, RUN_LIMIT_UNVERIFIED_CODE } from '../lib/dispatch-factory.js';
+import { createDispatchItem } from '../lib/dispatch-factory.js';
+import { mapDispatchRefusal } from '../lib/dispatch-refusal.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
@@ -839,23 +840,12 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
   }
 
   /**
-   * Shared refusal responder for the duplicate-dispatch guard (LIN-1656),
-   * mirroring `denyIfUnsupported` above: one construction site for the 409 so
-   * every creating route replies identically and a new one inherits the shape
-   * instead of having to remember it.
-   *
-   * The BODY itself is built once further up, by `createDispatchItem`, and
-   * carried on `err.duplicateDispatch` — `{ code, id, issueIdentifier, kind,
-   * dispatchedAt, retryAfter }`. This just labels it, audits it, and picks the
-   * right transport. `code` is the programmatic discriminator callers branch on;
-   * 409 is already taken on this router by the trashed-issue refusal, so the
-   * status alone is not enough to tell them apart.
-   *
-   * `id` is the load-bearing field: it names the LIVE dispatch, so a refused
-   * orchestrator can WATCH that one instead of guessing. This is exactly why the
-   * plan chose 409 over a `{deduped:true}` 200 — a wake is addressed to the
-   * original dispatcher's edge, so a success shape would leave the second
-   * orchestrator standing by forever on an edge it does not own.
+   * The proxy entrance's relay for a tagged dispatch-factory refusal (duplicate,
+   * run-limit 429/503, budget, close-out, per-task runaway). The status/body/
+   * `Retry-After`/log-note mapping lives in `mapDispatchRefusal`
+   * (lib/dispatch-refusal.js), shared with the session `/dispatch` route; this
+   * keeps only what is the proxy's own: the audit `logEvent`, the keepalive-aware
+   * reply, and the headers-sent guard.
    *
    * KEEPALIVE CAVEAT (`lib/http-keepalive.js`). On a long handler the keepalive
    * may already have flushed `200 + Content-Type` before the guard fires, at
@@ -864,66 +854,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * caller MUST pass its keepalive here rather than touching `res` directly, and
    * the `Retry-After` header is set only while headers are still open (setting one
    * after flush throws ERR_HTTP_HEADERS_SENT and would turn a clean refusal into a
-   * crash). The body's `retryAfter` is the authoritative copy either way; the
-   * header is the standards-friendly duplicate, matching what `standardHeaders`
-   * already emits on the rate limiters.
-   *
-   * @param {*} err - the caught error (a non-duplicate error passes straight through)
-   * @param {import('express').Request} req
-   * @param {import('express').Response} res
-   * @param {string} endpoint - audit-log endpoint tag
-   * @param {{send: Function}} [keepalive] - pass when the handler armed one
-   * @returns {boolean} true if a refusal was sent (caller returns early)
-   */
-  function refuseIfDuplicateDispatch(err, req, res, endpoint, keepalive = null) {
-    if (!err || !err.duplicateDispatch) return false;
-    const refusal = err.duplicateDispatch;
-    // The `note` is what makes the guard COUNTABLE, following the
-    // `workspaceUnavailable` precedent (LIN-1540 threads its reason so 503s are
-    // countable by reason). 409 on this router is already taken by the
-    // trashed-issue refusal, so without a note the Proxy page cannot tell "the
-    // guard fired 40 times" from "40 writes hit trashed issues" — and the
-    // production false-refusal rate is only measurable because of this line.
-    // Carries the colliding id, so a refusal is diagnosable from the log alone
-    // and not just from the wire body the caller received.
-    logEvent(req, endpoint, 409, `${DUPLICATE_DISPATCH_CODE} ${refusal.id}`);
-    if (!res.headersSent) {
-      res.set('Retry-After', String(refusal.retryAfter));
-    }
-    if (keepalive) {
-      keepaliveError(keepalive, 409, err.message, { ...refusal });
-    } else {
-      jsonError(res, 409, err.message, refusal);
-    }
-    return true;
-  }
-
-  /**
-   * Shared refusal responder for the task-budget guard (LIN-1751), mirroring
-   * `refuseIfDuplicateDispatch` above in every respect: one construction site
-   * for the 409 so a route replies identically and doesn't have to remember the
-   * shape, the same keepalive caveat (a long handler may have already flushed
-   * `200` via whitespace keepalive before this guard fires), and the same
-   * `note` argument to `logEvent` so refusals are countable on the Proxy page.
-   *
-   * The BODY is built once, in `createDispatchItem`, and carried on
-   * `err.budgetExhausted` — `{ code, count, maxTasks, sessionId }`. `code` is
-   * the programmatic discriminator (`BUDGET_EXHAUSTED`), distinct from
-   * `DUPLICATE_DISPATCH` so a caller branching on 409 bodies can tell the two
-   * refusals apart.
-   *
-   * It ALSO relays the run-boundary refusal (LIN-3245 / LIN-2949 P1a) carried on
-   * `err.closeOutRefusal` — `{ code: CLOSE_OUT_IS_THE_PERSONS, sessionId }` —
-   * through the same `jsonError`/keepalive paths and `logEvent` note. The two
-   * are sibling branches, never merged, so a caller still branches on `code`.
-   * It likewise relays the per-task runaway failsafe (LIN-3461) carried on
-   * `err.taskSessionRunaway` (`TASK_SESSION_RUNAWAY`). The helper's name stays
-   * (renaming every call site buys nothing): it now relays all three tags.
-   *
-   * Wired at the same call sites `refuseIfDuplicateDispatch` is (LIN-1751
-   * deliberately matches that existing coverage rather than closing its gap —
-   * see the plan): every route that checks the duplicate guard on its
-   * `createDispatchItem` catch also checks this one.
+   * crash). The body's `retryAfter` is the authoritative copy either way.
    *
    * @param {*} err - the caught error (any other error passes straight through)
    * @param {import('express').Request} req
@@ -932,78 +863,17 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * @param {{send: Function}} [keepalive] - pass when the handler armed one
    * @returns {boolean} true if a refusal was sent (caller returns early)
    */
-  function refuseIfBudgetExhausted(err, req, res, endpoint, keepalive = null) {
-    if (!err) return false;
-    // Run-boundary refusal (LIN-3245 / LIN-2949 P1a): a fresh close-out dispatch
-    // for a `stopAt: 'pr'` run gets a 409 on the SAME relay paths as a budget
-    // refusal, with its own code on the durable proxy-event note.
-    if (err.closeOutRefusal) {
-      const refusal = err.closeOutRefusal;
-      logEvent(req, endpoint, 409, `${CLOSE_OUT_IS_THE_PERSONS_CODE} ${refusal.sessionId}`);
-      if (keepalive) {
-        keepaliveError(keepalive, 409, err.message, { ...refusal });
-      } else {
-        jsonError(res, 409, err.message, refusal);
-      }
-      return true;
-    }
-    // Per-task runaway failsafe (LIN-3461): same relay paths, its own code. An
-    // alarm to stop and report, never a budget finish.
-    if (err.taskSessionRunaway) {
-      const refusal = err.taskSessionRunaway;
-      logEvent(req, endpoint, 409, `${TASK_SESSION_RUNAWAY_CODE} ${refusal.sessionId}`);
-      if (keepalive) {
-        keepaliveError(keepalive, 409, err.message, { ...refusal });
-      } else {
-        jsonError(res, 409, err.message, refusal);
-      }
-      return true;
-    }
-    if (!err.budgetExhausted) return false;
-    const refusal = err.budgetExhausted;
-    // Bound discriminator ('tasks') on the durable proxy-event note.
-    logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.bound} ${refusal.sessionId}`);
-    if (keepalive) {
-      keepaliveError(keepalive, 409, err.message, { ...refusal });
-    } else {
-      jsonError(res, 409, err.message, refusal);
-    }
-    return true;
-  }
-
-  /**
-   * Shared refusal responder for the free-tier run-limit guard (LIN-3238),
-   * mirroring `refuseIfDuplicateDispatch`/`refuseIfBudgetExhausted` above: one
-   * construction site so every creating proxy route replies identically.
-   *
-   * The body is built once, in `createDispatchItem` (step 1.55), and carried on
-   * `err.runLimit` — `{ error, code, freeTier: { used, remaining, limit,
-   * resetsAt, runsUsed }, retryAfter }`. `RUN_LIMIT_REACHED` is a 429;
-   * `RUN_LIMIT_UNVERIFIED` (the count could not be read) is a 503. `Retry-After`
-   * duplicates the body's `retryAfter` for standards-friendly clients, and is
-   * set only while headers are still open (a keepalive-armed caller may have
-   * already committed the 200).
-   *
-   * @param {*} err - the caught error (a non-run-limit error passes straight through)
-   * @param {import('express').Request} req
-   * @param {import('express').Response} res
-   * @param {string} endpoint - audit-log endpoint tag
-   * @param {{send: Function}} [keepalive] - pass when the handler armed one
-   * @returns {boolean} true if a refusal was sent (caller returns early)
-   */
-  function refuseIfRunLimit(err, req, res, endpoint, keepalive = null) {
-    if (!err || !err.runLimit) return false;
-    const refusal = err.runLimit;
-    const status = refusal.code === RUN_LIMIT_UNVERIFIED_CODE ? 503 : 429;
-    logEvent(req, endpoint, status, refusal.code);
-    const body = { code: refusal.code, freeTier: refusal.freeTier, retryAfter: refusal.retryAfter };
-    if (status === 429 && !res.headersSent) {
-      res.set('Retry-After', String(refusal.retryAfter));
+  function relayDispatchRefusal(err, req, res, endpoint, keepalive = null) {
+    const reply = mapDispatchRefusal(err);
+    if (!reply) return false;
+    logEvent(req, endpoint, reply.status, reply.note);
+    if (reply.retryAfter != null && !res.headersSent) {
+      res.set('Retry-After', String(reply.retryAfter));
     }
     if (keepalive) {
-      keepaliveError(keepalive, status, refusal.error, { ...body });
+      keepaliveError(keepalive, reply.status, reply.message, { ...reply.body });
     } else {
-      jsonError(res, status, refusal.error, body);
+      jsonError(res, reply.status, reply.message, reply.body);
     }
     return true;
   }
@@ -1728,11 +1598,11 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
 
   // Group H kickoff (LIN-679 Stage 5 / LIN-2539): extracted to
   // routes/proxy-kickoff.js, mounted at its original position.
-  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, refuseIfDuplicateDispatch, refuseIfBudgetExhausted, getWorkspaceOpenRouterKey, resolveProxyLLM, freeTierStore, accountStore, refuseIfRunLimit, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
+  router.use(createKickoffRoutes({ proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant, logEvent, dispatchQueueStore, dispatchTokenStore, dispatchPresetsStore, workspacePreferencesStore, proxyTokenStore, resolveProviderAccess, workspaceUnavailable, denyIfUnsupported, resolvePromptIssueContext, relayDispatchRefusal, getWorkspaceOpenRouterKey, resolveProxyLLM, freeTierStore, accountStore, graphqlErrorStatus, VALID_PROXY_DISPATCH_TARGETS, PROXY_ATTACH_FAILED_MESSAGE }));
 
   // Group I dispatch (LIN-679 Stage 6 / LIN-2540): extracted to
   // routes/proxy-dispatch.js, mounted at its original position.
-  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, refuseIfBudgetExhausted, refuseIfDuplicateDispatch, refuseIfRunLimit, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
+  router.use(createDispatchRoutes({ authenticateProxyToken, chargeFreeTierOrReject, computeRecommendation, denyIfUnsupported, dispatchQueueStore, dispatchTokenStore, getWorkspaceOpenRouterKey, graphqlErrorStatus, LINEAGE_QUERY_LIMIT, logEvent, logOpenRouterCredentialSource, proxyLimiter, PROXY_ATTACH_FAILED_MESSAGE, proxyTokenStore, recommendErrorResponse, RECOMMEND_DESCENT_BUDGET_MS, relayDispatchRefusal, freeTierStore, accountStore, requireGrant, requireWriteScope, resolvePromptIssueContext, resolveProviderAccess, resolveProxyLLM, VALID_PROXY_DISPATCH_TARGETS, workspacePreferencesStore, workspaceUnavailable }));
 
   // LIN-3130 S2a: the runner proxy surface (routes/proxy-runner.js) over the
   // runner credential. Mounted PATH-LESS like the halt/kickoff/dispatch

@@ -247,17 +247,20 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
 
     for (const f of gated) {
       const src = readFileSync(`${routesDir}/${f}`, 'utf8');
-      // Session lanes relay inline (`err.runLimit`); proxy lanes relay through the
-      // shared `refuseIfRunLimit` helper defined in routes/proxy.js.
-      const hasRelay = /err\.runLimit/.test(src) || /refuseIfRunLimit\s*\(/.test(src);
+      // The feedback lanes relay inline (`err.runLimit`); the session `/dispatch` lane
+      // calls `mapDispatchRefusal`; proxy lanes relay through the
+      // shared `relayDispatchRefusal` helper defined in routes/proxy.js.
+      const hasRelay = /err\.runLimit/.test(src) || /mapDispatchRefusal\s*\(/.test(src) || /relayDispatchRefusal\s*\(/.test(src);
       assert.ok(hasRelay, `${f} passes runGate but has no err.runLimit relay`);
     }
   });
 
-  test('routes/proxy.js defines the shared refuseIfRunLimit which reads err.runLimit', () => {
+  test('routes/proxy.js defines the shared relayDispatchRefusal, which maps via lib/dispatch-refusal.js', () => {
     const src = readFileSync(`${routesDir}/proxy.js`, 'utf8');
-    assert.match(src, /function refuseIfRunLimit\s*\(/, 'proxy.js must define refuseIfRunLimit');
-    assert.match(src, /err\.runLimit/, 'refuseIfRunLimit must branch on err.runLimit');
+    assert.match(src, /function relayDispatchRefusal\s*\(/, 'proxy.js must define relayDispatchRefusal');
+    assert.match(src, /mapDispatchRefusal\s*\(/, 'relayDispatchRefusal must map via mapDispatchRefusal');
+    const lib = readFileSync(`${routesDir}/../lib/dispatch-refusal.js`, 'utf8');
+    assert.match(lib, /err\.runLimit/, 'mapDispatchRefusal must branch on err.runLimit');
   });
 
   test('collective.js is deliberately NOT gated (Q11)', () => {
