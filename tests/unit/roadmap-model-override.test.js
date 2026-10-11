@@ -81,6 +81,25 @@ test('render: model selector appears (with Workspace default + curated options) 
   }
 });
 
+// LIN-997: Roadmap parity with the Settings pricing-hint render test (LIN-993).
+// Pricing rides as data-pricing on each option, never as visible option text;
+// 'Workspace default' has no rate, so it carries no data-pricing.
+test('render: every model option carries its rate as data-pricing, never in option text (LIN-997)', () => {
+  const html = renderRoadmapPage(
+    { roadmapModel: {}, organizationName: 'Test Org' },
+    { urlKey: 'test-ws', openRouterSource: 'session', availableModels: AVAILABLE_MODELS }
+  );
+  for (const m of AVAILABLE_MODELS) {
+    const re = new RegExp(`<option value="${m.id}"[^>]*data-pricing="[^"]+"[^>]*>${m.name}</option>`);
+    assert.match(html, re, `${m.id} should carry data-pricing`);
+  }
+  assert.ok(html.includes('data-pricing="$0.75 in / $4.50 out per 1M tokens"'), 'gpt-5.4-mini rate rendered');
+  // Workspace default: empty value, no rate.
+  assert.ok(html.includes('<option value="">Workspace default</option>'), 'default option has no data-pricing');
+  // No visible option text contains pricing.
+  assert.doesNotMatch(html, /<option[^>]*>[^<]*per 1M tokens[^<]*<\/option>/);
+});
+
 test('render: no model selector when AI is not connected (no openRouterSource)', () => {
   const html = renderRoadmapPage(
     { roadmapModel: {}, organizationName: 'Test Org' },
