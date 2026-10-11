@@ -15,6 +15,7 @@ import {
   closeOutSetsDone,
   isApprovedReview,
   resolveRunVariant,
+  sameHead,
   CLOSE_OUT_STATUS,
 } from '../../lib/run-closeout-state.js';
 
@@ -34,6 +35,14 @@ const closedStatus = (sha = 'aaaaaaa') => ({
 const unknownStatus = (reason = 'not checked') => ({ repo: REPO, readable: false, state: 'unknown', reason });
 
 const approve = (verdict = 'approve') => ({ verdict, verdictText: verdict === 'approve' ? 'Approve' : 'Approve — conditional', sha: 'aaaaaaa' });
+
+describe('sameHead', () => {
+  test('an abbreviated sha equals its full form; a different sha does not', () => {
+    assert.equal(sameHead('abc1234', 'abc1234def'), true);
+    assert.equal(sameHead('abc1234', 'def5678'), false);
+    assert.equal(sameHead(null, 'abc1234'), true);
+  });
+});
 
 describe('resolveRunVariant — the authoritative row variant, fail-closed', () => {
   test('a real stepper kickoff row (promptName Autopilot (LIN-NNNN), variant stepper) resolves stepper — the case that caught the bug', () => {
