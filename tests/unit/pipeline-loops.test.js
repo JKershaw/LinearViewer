@@ -32,7 +32,6 @@ import { isDecisionAnsweredInLineage } from '../../lib/unanswered-decisions.js';
 import { READ_HORIZON_MS } from '../../lib/read-horizon.js';
 
 const {
-  _toDate,
   _deriveAgentState,
   _deriveStage,
   _matchAgentStatusToLoop,
@@ -119,34 +118,6 @@ function agentStatusEntry(overrides = {}) {
     ...overrides
   };
 }
-
-// ─── _toDate ─────────────────────────────────────────────────────────────────
-
-describe('_toDate', () => {
-  test('passes Date through unchanged', () => {
-    const d = new Date('2026-01-01T00:00:00Z');
-    assert.strictEqual(_toDate(d), d);
-  });
-
-  test('parses ISO string', () => {
-    const d = _toDate('2026-01-01T00:00:00Z');
-    assert.ok(d instanceof Date);
-    assert.strictEqual(d.toISOString(), '2026-01-01T00:00:00.000Z');
-  });
-
-  test('returns null for null/undefined', () => {
-    assert.strictEqual(_toDate(null), null);
-    assert.strictEqual(_toDate(undefined), null);
-  });
-
-  test('returns null for invalid string', () => {
-    assert.strictEqual(_toDate('not-a-date'), null);
-  });
-
-  test('returns null for invalid Date', () => {
-    assert.strictEqual(_toDate(new Date('not-a-date')), null);
-  });
-});
 
 // ─── _deriveAgentState ───────────────────────────────────────────────────────
 
