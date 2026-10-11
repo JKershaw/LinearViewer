@@ -4,9 +4,9 @@ kind: check
 version: 1
 date: 2026-10-11
 authors: [Claude (LIN-3489)]
-model: claude-sonnet-5-5, claude-code, one dispatch session (LIN-3489, kind implementation), a different lineage from both the paper's research and writing sessions (LIN-3463). It read the LIN-3489 research comment (a separate research lineage, which had seen the study's codes and had already re-run the scripts) and re-ran everything it relies on. The blind re-code was done by one fresh subagent (claude-sonnet-5-5, general-purpose) that was given only a folder of blind ticket files and `composition/RUBRIC.md`.
+model: claude-sonnet-5-5, claude-code, effort medium, one dispatch session (LIN-3489, kind implementation), a different lineage from both the paper's research and writing sessions (LIN-3463). It read the LIN-3489 research comment (a separate research lineage, which had seen the study's codes and had already re-run the scripts) and re-ran everything it relies on. The blind re-code was done by one fresh subagent (claude-sonnet-5-5, general-purpose) that was given only a folder of blind ticket files and `composition/RUBRIC.md`.
 grounded_at: b5be7535 (LinearViewer origin/main); evidence at research/lin-3463-composition@b2ed3a35; code cited by the paper at 15990905
-cites: [docs/papers/harbour/how-a-task-is-composed.md@b5be7535 (version 1), research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/agreement.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity_summary.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/analyse.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/analyse2.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/sizebands.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/model.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/composition/RUBRIC.md, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/propagation.json, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/index.json, lib/brief.js@15990905:21, lib/brief.js@15990905:32, lib/brief.js@15990905:38, lib/recap-cache.js@15990905:44-86, docs/papers/harbour/ticket-record-and-quality.md@15990905:35, docs/papers/harbour/replay-small-work.md@15990905:50-59, docs/papers/harbour/survey-check-11.md@15990905:52-54, docs/archive/9.html@15990905:235-238, docs/archive/8.html@15990905:201, docs/papers/standard.md@b5be7535, LIN-3489 (research comment, 2026-10-11), LIN-3463, LIN-3453]
+cites: [docs/papers/harbour/how-a-task-is-composed.md@b5be7535 (version 1), research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/agreement.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity_summary.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/analyse.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/analyse2.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/sizebands.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/model.py, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/composition/RUBRIC.md, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/propagation.json, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/index.json, lib/brief.js@15990905:21, lib/brief.js@15990905:32, lib/brief.js@15990905:38, lib/recap-cache.js@15990905:44-86, docs/papers/harbour/ticket-record-and-quality.md@15990905:35, docs/papers/harbour/replay-small-work.md@15990905:50-59, docs/papers/harbour/survey-check-11.md@15990905:52-54, docs/archive/9.html@15990905:235-238, docs/archive/8.html@15990905:201, docs/papers/standard.md@b5be7535, LIN-3489 (research comment, 2026-10-11), LIN-3489 (review comment, 2026-10-11), LIN-3463, LIN-3453]
 ---
 
 # Does "how a task is composed" (version 1) hold up?
@@ -236,6 +236,14 @@ For a revision to version 2. Each replaces the quoted sentence.
 9. **Recompute and re-run.** In the Next section, replace "Have someone other than this paper's
    author check it from the branch, re-running `agreement.py` and `fidelity_summary.py`." with
    nothing; it has been done.
+10. **Anchors, sessions only.** In the paper's "The surface of the text predicts nothing", replace
+    "show no gradient either" with "show no gradient in median sessions either (on split, file
+    anchors run 17%, 4% and 6% from low to high, and an embedded plan 11% against 3%)".
+11. **Open rows are small.** After "changed." in the Table 1 lead paragraph, add "The open rows
+    are small: 8, 9 and 15 tickets."
+12. **First direction.** After "the record supports the first most (fix the ticket where it is
+    written)", add "on the authorship count and on a composition effect that rests on 32
+    tickets".
 
 ## Method
 
@@ -243,7 +251,7 @@ I extracted `scripts/eval/lin-3463-composition/` from `research/lin-3463-composi
 into a scratch directory and ran six scripts on `outcomes.json`, `composition/` and `fidelity/`,
 diffing each against its `results/` file. I re-joined the 184 for the two tables with a new
 `recompute.py` (analyse.py's join, sizebands.py's banding) and re-ran the model with three
-variants (`model_alt.py`; both scripts are reproduced in the LIN-3489 research comment). For the
+variants (`model_alt.py`; the two analysis scripts are reproduced in the LIN-3489 research comment, and the blind sample script, key, fresh codes and comparison are in the LIN-3489 review comment, which preserved them after the session scratch was gone). For the
 blind re-code a script drew the sample, fetched each earliest snapshot, asserted it matched
 `outcomes.json`, and wrote only the blind files; the coder was one fresh subagent given those
 files and the rubric; a second script compared its codes with the study's after the fact and

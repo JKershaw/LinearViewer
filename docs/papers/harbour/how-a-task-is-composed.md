@@ -4,9 +4,9 @@ kind: paper
 version: 2
 date: 2026-10-11
 authors: [Claude (LIN-3463), Claude (LIN-3489, corrections from the check)]
-model: claude-sonnet-5-5, claude-code, effort medium (the writing session, LIN-3463, kind implementation); the study it reports was done by the research lineage on the same ticket, claude-opus-5-5, claude-code, effort high. Both as the dispatch lineage reports them (`/cost/LIN-3463`). Version 2 corrections: claude-sonnet-5-5, claude-code, the LIN-3489 dispatch session, which also wrote the check.
+model: claude-sonnet-5-5, claude-code, effort medium (the writing session, LIN-3463, kind implementation); the study it reports was done by the research lineage on the same ticket, claude-opus-5-5, claude-code, effort high. Both as the dispatch lineage reports them (`/cost/LIN-3463`). Version 2 corrections: claude-sonnet-5-5, claude-code, effort medium, the LIN-3489 dispatch session, which also wrote the check.
 grounded_at: 15990905
-cites: [research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/README.md, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/size-bands.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-stratified.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-by-code.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-agreement.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/model.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/auto-features.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/read-order.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/fidelity-summary.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/propagation.json, lib/brief.js@15990905:21, lib/brief.js@15990905:32, lib/brief.js@15990905:38, lib/recap-cache.js@15990905:44-86, docs/papers/harbour/ticket-record-and-quality.md@15990905:35, docs/papers/harbour/replay-small-work.md@15990905:50-59, docs/papers/harbour/survey-check-11.md@15990905:52-54, docs/archive/9.html@15990905:235-238, docs/archive/8.html@15990905:201, LIN-3463 (research comment, 2026-10-11), LIN-3449, LIN-3453, docs/papers/harbour/how-a-task-is-composed-check.md@b5be7535 (the check, of version 1)]
+cites: [research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/README.md, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/size-bands.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-stratified.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-by-code.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/composition-agreement.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/model.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/auto-features.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/read-order.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/results/fidelity-summary.txt, research/lin-3463-composition@b2ed3a35:scripts/eval/lin-3463-composition/fidelity/propagation.json, lib/brief.js@15990905:21, lib/brief.js@15990905:32, lib/brief.js@15990905:38, lib/recap-cache.js@15990905:44-86, docs/papers/harbour/ticket-record-and-quality.md@15990905:35, docs/papers/harbour/replay-small-work.md@15990905:50-59, docs/papers/harbour/survey-check-11.md@15990905:52-54, docs/archive/9.html@15990905:235-238, docs/archive/8.html@15990905:201, LIN-3463 (research comment, 2026-10-11), LIN-3449, LIN-3453, docs/papers/harbour/how-a-task-is-composed-check.md (LIN-3489)]
 ---
 
 # How is a task composed, and does that shape the way it runs?
@@ -25,7 +25,7 @@ And almost every ticket is written by an agent, not by a person, in places that 
 guidance on composition.
 
 Of the three directions you named, the record supports the first most (fix the ticket where
-it is written), the second a little (the brief loses intent, but the ticket usually wins),
+it is written; on the authorship count and on a composition effect that rests on 32 tickets), the second a little (the brief loses intent, but the ticket usually wins),
 and the third only as a question put to the author, because a bar that reads the text alone
 would have passed LIN-3453.
 
@@ -41,14 +41,15 @@ second batch lives in that one ticket's description, not where tickets are writt
 
 **The surface of the text predicts nothing.** Over 335 Done tickets, split into thirds by
 first-dispatch word count, median sessions are 7, 6 and 7. File anchors, line anchors,
-question marks, a Done-when, a "Fix:" line and an embedded plan show no gradient either
-(`results/auto-features.txt`). This repeats, for runs, what `ticket-record-and-quality.md`
+question marks, a Done-when, a "Fix:" line and an embedded plan show no gradient in median
+sessions either (on split, file anchors run 17%, 4% and 6% from low to high, and an embedded
+plan 11% against 3%; `results/auto-features.txt`). This repeats, for runs, what `ticket-record-and-quality.md`
 found for reviews: what is written before the review does not predict the review
 (`docs/papers/harbour/ticket-record-and-quality.md@15990905:35`).
 
 **A behaviour left open goes with longer runs in every band of change size.** Table 1 takes
 the 184 Done work tickets with a joined PR and splits them in thirds by production lines
-changed.
+changed. The open rows are small: 8, 9 and 15 tickets.
 
 | Change size (PR lines) | Behaviour open: n, median sessions, split, plan-review ≥ 2 | Behaviour settled: n, median sessions, split, plan-review ≥ 2 |
 |---|---|---|
