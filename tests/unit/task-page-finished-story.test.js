@@ -284,7 +284,7 @@ describe('B4 owner load: a press merge is never "merged by you" (review F1)', ()
 
   async function ownerPage({ stateType, events = PRESS, comments }) {
     const { loader, access } = makeLoader({ ctx: ctxFor({ stateType, ...(comments ? { comments } : {}) }), events });
-    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true });
+    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true, viewerAccountId: 'acct-1' });
     return { model, html: renderTaskPage(model, { viewer: 'owner', urlKey: 'ws', now: NOW }) };
   }
 
@@ -300,33 +300,41 @@ describe('B4 owner load: a press merge is never "merged by you" (review F1)', ()
   }
 
   test('a press event for another PR leaves the owner self-merge claim alone', async () => {
-    const { model } = await ownerPage({ stateType: 'started', events: [{ by: 'press', prUrl: OTHER_PR_URL, merged: true }] });
-    assert.equal(model.evidence.closeOut.mergedBy, null);
+    const { model } = await ownerPage({ stateType: 'started', events: [{ by: 'press', prUrl: OTHER_PR_URL, merged: true }, { by: 'person', prUrl: PR_URL, merged: true, accountId: 'acct-1' }] });
+    assert.equal(model.evidence.closeOut.mergedBy, 'person');
     assert.equal(model.evidence.closeOut.mergedByYou, true);
   });
 
   test('partial merge with a press event: the owner box does not claim it either', async () => {
-    const partial = { status: 'partial', pr: { number: 41, url: PR_URL }, mergedByYou: true, message: 'PR #41 merged · 1 more PR open' };
     const loader = createTaskPageLoader({
       dispatchStore: {}, agentStatusStore: {}, briefCacheStore: { async get() { return null; } }, recapCacheStore: { async get() { return null; } },
       closeOutEventsStore: { async listForIssue() { return PRESS; } },
-      readRunEvidence: async () => ({ closeOut: partial, ledger: null, state: { pr: partial.pr } }),
+      readRunEvidence: async (args) => {
+        const closeOut = deriveCloseOutState({
+          prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }, { url: OTHER_PR_URL, repo: 'acme/app', number: 42 }],
+          prStatuses: [{ readable: true, state: 'closed', merged: true }, { readable: true, state: 'open', merged: false }],
+          owner: true, stopAt: 'pr', mergeEvents: await args.closeOutEventsStore.listForIssue({ urlKey: 'ws', issueIdentifier: 'LIN-51' }), viewerAccountId: args.viewerAccountId,
+        });
+        return { closeOut, ledger: null, state: { pr: closeOut.pr } };
+      },
       prStateStore: null, readTaskRunFacts: async () => ({ stopAt: 'pr', variant: 'standard' }),
       enrichLoop, deriveSessionWaiting, getLoopsForIssue: async () => [loop()], now: () => NOW,
     });
     const access = { provider: { async fetchRecommendationContext() { return ctxFor({ stateType: 'started' }); } }, callScope: 'tok' };
-    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true });
+    const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true, viewerAccountId: 'acct-1' });
     assert.equal(model.evidence.closeOut.mergedBy, 'close-out');
     assert.equal(model.evidence.closeOut.mergedByYou, false);
   });
 });
 
-describe('deriveCloseOutState: "merged by you" belongs to the owner only', () => {
+describe('deriveCloseOutState: "merged by you" belongs to the recorded merger only', () => {
   const merged = { readable: true, state: 'closed', merged: true, head: { sha: 'a' } };
-  const run = (owner) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: [merged], review: null, owner, stopAt: 'pr' });
-  test('owner keeps it, a guest never gets it', () => {
-    assert.equal(run(true).mergedByYou, true);
-    assert.equal(run(false).mergedByYou, false);
+  const mergeEvents = [{ by: 'person', merged: true, accountId: 'acct-1', prUrl: PR_URL }];
+  const run = (viewerAccountId, owner = true) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: [merged], review: null, owner, stopAt: 'pr', mergeEvents, viewerAccountId });
+  test('the merger keeps it, another viewer never gets it', () => {
+    assert.equal(run('acct-1').mergedByYou, true);
+    assert.equal(run('acct-2', false).mergedByYou, false);
+    assert.equal(run('acct-2', true).mergedByYou, false);
   });
 });
 

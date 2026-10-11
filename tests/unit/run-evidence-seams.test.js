@@ -120,8 +120,8 @@ describe('run page owner path (routes/dashboard.js)', () => {
     assert.equal(res.statusCode, 200);
     assert.equal(calls.length, 1);
     const args = calls[0];
-    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'evidenceUrls', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerIsOwner'],
-      'the same keys the pre-split readSessionRunEvidence passed — no allowlist/readPrStatus on the owner page');
+    assert.deepEqual(Object.keys(args).sort(), ['asked', 'callScope', 'closeOutEventsStore', 'evidenceUrls', 'issueIdentifier', 'provider', 'runnerReady', 'stopAt', 'urlKey', 'variant', 'viewerAccountId', 'viewerIsOwner'],
+      'the pre-split keys plus the stored events and viewer account that decide "merged by you" (LIN-3426) — no allowlist/readPrStatus on the owner page');
     assert.equal(args.viewerIsOwner, true, 'the owner page still passes true explicitly');
     assert.equal(args.asked, 'Anchor title');
     assert.equal(args.issueIdentifier, 'LIN-10');

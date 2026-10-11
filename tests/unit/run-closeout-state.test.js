@@ -22,6 +22,7 @@ import {
 const REPO = 'JKershaw/LinearViewer';
 
 const pr = (number, over = {}) => ({ url: `https://github.com/${REPO}/pull/${number}`, repo: REPO, number, corroborated: false, ...over });
+const personMerge = (number, over = {}) => ({ by: 'person', merged: true, accountId: 'acct-1', prUrl: pr(number).url, ...over });
 
 const openStatus = (sha = 'aaaaaaa', over = {}) => ({
   repo: REPO, readable: true, number: 1, state: 'open', merged: false, head: { ref: 'x', sha }, ref: sha, checks: [], ...over
@@ -179,6 +180,8 @@ describe('deriveCloseOutState — truth table', () => {
       runnerReady: true,
       owner: true,
       stopAt: 'pr',
+      mergeEvents: [personMerge(41)],
+      viewerAccountId: 'acct-1',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.PARTIAL);
     assert.strictEqual(state.mergedCount, 1);
@@ -267,6 +270,8 @@ describe('deriveCloseOutState — truth table', () => {
       owner: true,
       stopAt: 'pr',
       byPersonCheck: true,
+      mergeEvents: [personMerge(41)],
+      viewerAccountId: 'acct-1',
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
     assert.strictEqual(state.mergedByYou, true);
@@ -368,5 +373,55 @@ describe('closeOutSetsDone — one test per bound that withholds Done', () => {
   test('the target PR may be selected by index among many', () => {
     assert.strictEqual(closeOutSetsDone({ prStatuses: [mergedStatus(), mergedStatus()], prIndex: 1, review: approve(), byPersonCheck: true }), true);
     assert.strictEqual(closeOutSetsDone({ prStatuses: [openStatus(), mergedStatus()], prIndex: 1, review: approve(), byPersonCheck: true }), false);
+  });
+});
+
+describe('deriveCloseOutState: "merged by you" comes from the stored close-out events (LIN-3426)', () => {
+  const derive = (over = {}) => deriveCloseOutState({
+    prs: [pr(41)],
+    prStatuses: [mergedStatus()],
+    review: approve(),
+    runnerReady: true,
+    owner: true,
+    stopAt: 'pr',
+    byPersonCheck: true,
+    ...over,
+  });
+
+  test('the viewer is the recorded merger: true', () => {
+    assert.strictEqual(derive({ mergeEvents: [personMerge(41)], viewerAccountId: 'acct-1' }).mergedByYou, true);
+  });
+
+  test('a different signed-in member viewing a merge the owner made: false', () => {
+    assert.strictEqual(derive({ mergeEvents: [personMerge(41)], viewerAccountId: 'acct-member', owner: false }).mergedByYou, false);
+  });
+
+  test('the owner viewing a merge someone else made: false', () => {
+    assert.strictEqual(derive({ mergeEvents: [personMerge(41, { accountId: 'acct-other' })], viewerAccountId: 'acct-1', owner: true }).mergedByYou, false);
+  });
+
+  test('a merge event not by a person (close-out / press): false', () => {
+    for (const by of ['close-out', 'press']) {
+      assert.strictEqual(derive({ mergeEvents: [personMerge(41, { by })], viewerAccountId: 'acct-1' }).mergedByYou, false, by);
+    }
+  });
+
+  test('a person event for another PR, or one that is not a merge: false', () => {
+    assert.strictEqual(derive({ mergeEvents: [personMerge(99)], viewerAccountId: 'acct-1' }).mergedByYou, false);
+    assert.strictEqual(derive({ mergeEvents: [personMerge(41, { merged: false })], viewerAccountId: 'acct-1' }).mergedByYou, false);
+  });
+
+  test('events missing, empty, or without an account: false', () => {
+    assert.strictEqual(derive({ viewerAccountId: 'acct-1' }).mergedByYou, false);
+    assert.strictEqual(derive({ mergeEvents: [], viewerAccountId: 'acct-1' }).mergedByYou, false);
+    assert.strictEqual(derive({ mergeEvents: [personMerge(41, { accountId: null })], viewerAccountId: 'acct-1' }).mergedByYou, false);
+    assert.strictEqual(derive({ mergeEvents: [personMerge(41)], viewerAccountId: null }).mergedByYou, false);
+  });
+
+  test('partial merge follows the same rule', () => {
+    const partial = over => deriveCloseOutState({ prs: [pr(41), pr(42)], prStatuses: [mergedStatus(), openStatus()], review: approve(), runnerReady: true, owner: true, stopAt: 'pr', ...over });
+    assert.strictEqual(partial({ mergeEvents: [personMerge(41)], viewerAccountId: 'acct-1' }).mergedByYou, true);
+    assert.strictEqual(partial({ mergeEvents: [personMerge(41)], viewerAccountId: 'acct-member' }).mergedByYou, false);
+    assert.strictEqual(partial({ viewerAccountId: 'acct-1' }).mergedByYou, false);
   });
 });

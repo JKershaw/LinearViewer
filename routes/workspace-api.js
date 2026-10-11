@@ -4352,6 +4352,8 @@ ${goal}`
         provider,
         callScope,
         viewerIsOwner: viewerIsOwner(req),
+        viewerAccountId: req.session?.accountId || null,
+        closeOutEventsStore,
         urlKey: workspace.urlKey,
         readPrStatus: (runEvidence && runEvidence.readPrStatus) || undefined,
         githubFetch: (runEvidence && runEvidence.githubFetch) || null,
@@ -4485,7 +4487,10 @@ ${goal}`
         ? !!seam.runnerReady(req)
         : getFeatureFlags(req.session).dispatch === true;
 
-      const state = deriveCloseOutState({
+      // "Merged by you" is decided from the stored close-out events, which this
+      // call may itself record below; so the state is derived again once they
+      // are known (LIN-3426).
+      const deriveState = mergeEvents => deriveCloseOutState({
         prs: prUrls,
         prStatuses,
         review: ledger,
@@ -4493,7 +4498,11 @@ ${goal}`
         owner: true,
         stopAt: runStopAt,
         byPersonCheck: true,
+        mergeEvents,
+        viewerAccountId: accountId,
       });
+      let state = deriveState([]);
+      const mergeEvents = [];
 
       const recorded = [];
       let done = false;
@@ -4537,6 +4546,7 @@ ${goal}`
             })
             : null;
           if (event) {
+            mergeEvents.push(event);
             recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
             if (!mergedEvent) { mergedEvent = event; mergedPrIndex = i; }
           }
@@ -4579,9 +4589,9 @@ ${goal}`
           }
         }
 
-        // F1: show a press-then-merge as a close-out merge, not "by you".
+        state = deriveState(mergeEvents);
+        // F1: a press-then-merge reads as a close-out merge.
         if (mergedEvent && mergedEvent.by === 'close-out') {
-          state.mergedByYou = false;
           state.mergedBy = 'close-out';
           state.message = 'the pull request was merged by close-out';
         }

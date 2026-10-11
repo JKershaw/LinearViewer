@@ -83,6 +83,7 @@ export function createTaskPageRoutes({ workspaceFromUrl, getOpenRouterSource, ge
         identifier,
         access,
         viewerIsOwner: true,
+        viewerAccountId: req.session?.accountId || null,
         runnerReady: getFeatureFlags(req.session).dispatch === true,
       });
       if (result.notFound) {

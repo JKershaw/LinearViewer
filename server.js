@@ -2984,7 +2984,7 @@ app.use(createCollectiveRoutes({ workspaceFromUrl, dispatchQueueStore, proxyToke
 // Mount dashboard routes (experimental combined realtime autopilot dashboard — LIN-509).
 // Merges Mongo-only Loop reads across session.workspaces; Linear is hydrated lazily
 // (drill-down only), never fanned out per poll.
-app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, prStateStore, workspaceOwnerCheck }))
+app.use(createDashboardRoutes({ workspaceFromUrl, dispatchQueueStore, agentStatusStore, observationSessionsStore, observationMaterializer, sessionsFeedCache, runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, briefCacheStore, recapCacheStore, proxyEventStore, freeTierStore, getWorkspaceAccessToken, fetchIssueContext, fetchWorkspaceIssues, getOpenRouterSource, getDeployInfo, workspacePreferencesStore, taskDecisionsStore, shelvedRulingsStore, dismissalSuggestionsStore, llmCallLogStore, runProposalsStore, proxyTokenStore, readRunEvidence, closeOutEventsStore, prStateStore, workspaceOwnerCheck }))
 
 // Mount task-chat routes (experimental "talk to a task" conversation).
 // LIN-2966: taskDecisionsStore + shelvedRulingsStore thread the

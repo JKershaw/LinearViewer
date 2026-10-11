@@ -694,6 +694,8 @@ export function createDashboardRoutes({
   // existing session-page assertion) sees no provider I/O and no page change.
   // server.js injects the real `lib/run-evidence.js` reader.
   readRunEvidence: readRunEvidenceFn = null,
+  // LIN-3426: the stored close-out events that decide "merged by you".
+  closeOutEventsStore = null,
   // LIN-3251: PR-state cache/budget/DI seam. Default null -> a fresh per-router
   // store, which is process-wide in production (one router). Tests inject
   // `{ now, resolveProvider, loadRun, githubFetch, cache, bucket }`.
@@ -1413,6 +1415,7 @@ export function createDashboardRoutes({
       const runEvidence = await readRunExternal(workspace, session, {
         asked: anchorIssueTitle,
         viewerIsOwner: true,
+        viewerAccountId: req.session?.accountId || null,
         runFacts,
         runnerReady: getFeatureFlags(req.session).dispatch === true,
       });
@@ -1704,6 +1707,7 @@ export function createDashboardRoutes({
    * @param {Object} [opts]
    * @param {string|null} [opts.asked] - the "asked" line (the anchor title); falls back to the seed
    * @param {boolean} [opts.viewerIsOwner=false]
+   * @param {string|null} [opts.viewerAccountId=null]
    * @param {{ stopAt?: ('pr'|null), variant?: string }|null} [opts.runFacts]
    * @param {boolean} [opts.runnerReady=false]
    * @returns {Promise<Object|null>}
@@ -1711,6 +1715,7 @@ export function createDashboardRoutes({
   async function readRunExternal(workspace, session, {
     asked = null,
     viewerIsOwner = false,
+    viewerAccountId = null,
     runFacts = null,
     runnerReady = false
   } = {}) {
@@ -1724,6 +1729,8 @@ export function createDashboardRoutes({
         provider,
         callScope,
         viewerIsOwner: !!viewerIsOwner,
+        viewerAccountId,
+        closeOutEventsStore,
         evidenceUrls,
         asked: asked || session.seedIssue,
         urlKey: workspace.urlKey,

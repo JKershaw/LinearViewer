@@ -334,6 +334,21 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(built.calls.markDone, 1);
   });
 
+  test('LIN-3426: "merged by you" is the recorded merger only — a later member\'s check is not "you"', async () => {
+    const built = makeRouter({
+      comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
+      statuses: { 41: mergedStatus(41) },
+    });
+    const first = await check(built);
+    assert.equal(first.jsonBody.recorded[0].by, 'person');
+    assert.equal(first.jsonBody.state.mergedByYou, true);
+    const member = await check(built, baseReq({ session: { accountId: 'acct-member', workspaces: ['ws'] } }));
+    assert.equal(member.statusCode, 200, JSON.stringify(member.jsonBody));
+    assert.equal(member.jsonBody.state.mergedByYou, false);
+    const again = await check(built);
+    assert.equal(again.jsonBody.state.mergedByYou, true);
+  });
+
   test('F2: repeated checks after a merge call markDone exactly once (Done written once per merge)', async () => {
     const built = makeRouter({
       comments: [comment(PR_A, '2026-07-01T00:00:00.000Z'), comment(reviewBody(), '2026-07-02T00:00:00.000Z')],
