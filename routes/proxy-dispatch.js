@@ -90,8 +90,6 @@ function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerL
     // other stored field, so a caller inspecting its own run can see the
     // declared budget without guessing. null ⇒ unbounded.
     maxTasks: item.maxTasks ?? null,
-    // Sibling per-task bound (LIN-2934) — same visibility rationale as maxTasks.
-    maxSessionsPerTask: item.maxSessionsPerTask ?? null,
     repo: item.repo || null,
     dispatchedAt: item.dispatchedAt,
     // Attribution (LIN-1948, fix 3b): the detail/watch read is where a human
@@ -237,7 +235,7 @@ export function createDispatchRoutes({
     }
 
     try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks, maxSessionsPerTask } = req.body || {};
+      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks } = req.body || {};
 
       // Abort verb (LIN-743): an abort item cancels/closes an existing session
       // (named by abortTo) instead of running a prompt — it carries no prompt and
@@ -329,13 +327,6 @@ export function createDispatchRoutes({
         if (!Number.isInteger(maxTasks) || maxTasks < 1) {
           logEvent(req, '/api/proxy/dispatch', 400);
           return badRequest.json(res, 'maxTasks must be an integer >= 1');
-        }
-      }
-      // Sibling per-task bound (LIN-2934): same rule/error text as maxTasks.
-      if (maxSessionsPerTask !== undefined && maxSessionsPerTask !== null) {
-        if (!Number.isInteger(maxSessionsPerTask) || maxSessionsPerTask < 1) {
-          logEvent(req, '/api/proxy/dispatch', 400);
-          return badRequest.json(res, 'maxSessionsPerTask must be an integer >= 1');
         }
       }
 
@@ -613,8 +604,6 @@ export function createDispatchRoutes({
           // LIN-2975: scope bound (LIN-1751), parity with routes/dispatch.js —
           // absent/null stores as unbounded, byte-identical to today.
           maxTasks: maxTasks ?? null,
-          // Sibling per-task bound (LIN-2934): same rationale as maxTasks.
-          maxSessionsPerTask: maxSessionsPerTask ?? null,
           // LIN-3335 (reduced from LIN-3242): the kind-only issue source, only
           // when this named-issue request supplied one. `?? null` here; the
           // STORE writes it SPARSELY (no key when null).
@@ -641,7 +630,6 @@ export function createDispatchRoutes({
         cascade: item.cascade === true,
         sessionId: item.sessionId || null,
         maxTasks: item.maxTasks ?? null,
-        maxSessionsPerTask: item.maxSessionsPerTask ?? null,
         ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
         consumerLastSeenAt: item.consumerLastSeenAt || null,
@@ -1099,7 +1087,6 @@ export function createDispatchRoutes({
               // orchestrator's MAIN path, so it must see "n of N" too, not just
               // the /dispatch handler.
               maxTasks: item.maxTasks ?? null,
-              maxSessionsPerTask: item.maxSessionsPerTask ?? null,
               ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
               dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
               consumerLastSeenAt: item.consumerLastSeenAt || null,
@@ -1421,7 +1408,6 @@ export function createDispatchRoutes({
           // and the override arm just above — the LLM-driven path is the same
           // fused verb, so it must see "n of N" too.
           maxTasks: item.maxTasks ?? null,
-          maxSessionsPerTask: item.maxSessionsPerTask ?? null,
           ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
           dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
           consumerLastSeenAt: item.consumerLastSeenAt || null,
@@ -1683,8 +1669,6 @@ export function createDispatchRoutes({
         // `i` — see the bootstrapToken caveat below.
         sessionId: i.sessionId || null,
         maxTasks: i.maxTasks ?? null,
-        // Sibling per-task bound (LIN-2934) — same list-read rationale as maxTasks.
-        maxSessionsPerTask: i.maxSessionsPerTask ?? null,
         dispatchedAt: i.dispatchedAt,
         // resolvedAt = take/archive time; completedAt = real completion (null until terminal).
         resolvedAt: i.resolvedAt || null,

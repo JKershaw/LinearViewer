@@ -361,15 +361,15 @@ test('a v12 doc (pre-answeredDecisions loops, LIN-3022) read-misses on both list
 });
 
 // LIN-2934: the v13 -> v14 bump exists because the assembled session now
-// carries `taskPosition`/`sessionPosition` ("n of N" against the run's
-// `maxTasks`/`maxSessionsPerTask` bounds) — a v13 doc was built before those
+// carries `taskPosition` ("n of N" against the run's
+// `maxTasks` bound) — a v13 doc was built before those
 // keys existed, so without the bump it would keep serving a session with
-// neither field (the Observation feed chip renders nothing) for up to
+// no such field (the Observation feed chip renders nothing) for up to
 // DEFAULT_HISTORY_TTL (30 days). Pinning the v13 doc as the target set is
 // what makes this bump load-bearing rather than cosmetic — same
 // version-agnostic style as the v11 doc test above, so this stays meaningful
 // after the next bump instead of asserting a specific CURRENT version number.
-test('a v13 doc (pre-taskPosition/sessionPosition, LIN-2934) read-misses on both list and point reads', async () => {
+test('a v13 doc (pre-taskPosition, LIN-2934) read-misses on both list and point reads', async () => {
   const collection = createMockCollection();
   const store = new ObservationSessionsStore({ collection });
   await store.upsertSession(URL_KEY, makeSession('S1'));

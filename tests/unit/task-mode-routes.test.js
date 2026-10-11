@@ -118,8 +118,7 @@ describe('LIN-2942 — session dispatch route, entryRung', () => {
         issueIdentifier: 'LIN-42',
         target: 'cli',
         dispatchedAt: '2026-10-02T00:00:00.000Z',
-        consumerLastSeenAt: null,
-        maxSessionsPerTask: null
+        consumerLastSeenAt: null
       },
       warning: 'No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts.'
     }));

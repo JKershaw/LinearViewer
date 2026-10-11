@@ -113,7 +113,6 @@ const EXPECTED_GOLDEN_LOOP = {
   // LIN-2934: budget bounds carried through per-loop, null on a non-autopilot
   // worker row (as here).
   maxTasks: null,
-  maxSessionsPerTask: null,
   promptName: 'implementation',
   promptText: 'do the thing',
   dispatchedAt: '2026-01-01T10:00:00.000Z',

@@ -148,100 +148,52 @@ describe('LIN-1737 Beat 1 — POST /workspace/:urlKey/api/dispatch maxTasks', ()
   });
 });
 
-describe('LIN-2934 — POST /workspace/:urlKey/api/dispatch maxSessionsPerTask', () => {
-  test('no maxSessionsPerTask at all: byte-identical (defaults to null)', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation' });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.strictEqual(captured.item.maxSessionsPerTask, null);
-    assert.strictEqual(res.body.item.maxSessionsPerTask, null);
-  });
-
-  test('a valid maxSessionsPerTask is persisted onto the fields block and echoed on the 201', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 10 });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.strictEqual(captured.item.maxSessionsPerTask, 10);
-    assert.strictEqual(res.body.item.maxSessionsPerTask, 10);
-  });
-
-  test('maxSessionsPerTask: 0 is rejected 400 with the exact error text', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 0 });
-    assert.equal(res.status, 400);
-    assert.equal(res.body.error, 'maxSessionsPerTask must be an integer >= 1');
-  });
-
-  test('a non-integer maxSessionsPerTask is rejected 400', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: 5.5 });
-    assert.equal(res.status, 400);
-  });
-
-  test('maxSessionsPerTask: null is explicitly accepted as "no bound"', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'implementation', maxSessionsPerTask: null });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.strictEqual(captured.item.maxSessionsPerTask, null);
-  });
-
-  test('both bounds may be declared together, independently', async () => {
-    const captured = {};
-    const app = buildApp(captured);
-    const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxTasks: 8, maxSessionsPerTask: 10 });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.strictEqual(captured.item.maxTasks, 8);
-    assert.strictEqual(captured.item.maxSessionsPerTask, 10);
+describe('LIN-3461 — POST /workspace/:urlKey/api/dispatch ignores maxSessionsPerTask', () => {
+  test('a caller that still sends maxSessionsPerTask (even an invalid one) gets a normal 201 and nothing is stored or echoed', async () => {
+    for (const legacy of [10, 0, 5.5, null]) {
+      const captured = {};
+      const app = buildApp(captured);
+      const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: legacy });
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+      assert.ok(!('maxSessionsPerTask' in captured.item));
+      assert.ok(!('maxSessionsPerTask' in res.body.item));
+    }
   });
 });
 
-describe('LIN-2934 R4 — end-to-end: the guard actually runs, and the 201 echoes budgetPosition', () => {
-  test('a real store: budgetPosition.sessionsPerTask is echoed on the 201, and a bound-exceeding dispatch is refused (M10)', async () => {
+describe('LIN-3461 — the runaway failsafe, relayed by the session dispatch route', () => {
+  async function seedRun() {
     const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
     const app = buildRealApp(store);
-
-    const kickoff = await call(app, 'post', PATH, { prompt: 'launch the runner', kind: 'custom', target: 'cli', maxSessionsPerTask: 1 });
+    const kickoff = await call(app, 'post', PATH, { prompt: 'launch the runner', kind: 'custom', target: 'cli' });
     assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));
     const sessionId = kickoff.body.item.id;
+    for (let i = 0; i < 30; i++) {
+      await store.addItem('acme', { prompt: `worker ${i}`, kind: 'implementation', issueIdentifier: 'LIN-1', sessionId });
+    }
+    return { app, sessionId };
+  }
 
-    const t1 = await call(app, 'post', PATH, {
-      prompt: 'work on it', kind: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
-    });
-    assert.equal(t1.status, 201, JSON.stringify(t1.body));
-    assert.deepEqual(t1.body.item.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 1 });
+  test('the 31st fresh session to one task is refused 409 TASK_SESSION_RUNAWAY (not BUDGET_EXHAUSTED), even with force: true', async () => {
+    const { app, sessionId } = await seedRun();
 
-    const t2 = await call(app, 'post', PATH, {
-      prompt: 'review it', kind: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    const refused = await call(app, 'post', PATH, {
+      prompt: 'one more', kind: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId, force: true
     });
-    assert.equal(t2.status, 409, JSON.stringify(t2.body));
-    assert.equal(t2.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(t2.body.bound, 'sessionsPerTask');
+    assert.equal(refused.status, 409, JSON.stringify(refused.body));
+    assert.equal(refused.body.code, 'TASK_SESSION_RUNAWAY');
+    assert.equal(refused.body.limit, 30);
+    assert.equal(refused.body.taskDispatches, 30);
+    assert.match(refused.body.error, /30 fresh sessions in this run/);
   });
 
-  test('force: true does NOT bypass the sessionsPerTask bound — the guard never reads `force` (plan §6)', async () => {
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
-    const app = buildRealApp(store);
+  test('a different task in the same run is still admitted, and no budgetPosition appears without maxTasks', async () => {
+    const { app, sessionId } = await seedRun();
 
-    const kickoff = await call(app, 'post', PATH, { prompt: 'launch the runner', kind: 'custom', target: 'cli', maxSessionsPerTask: 1 });
-    const sessionId = kickoff.body.item.id;
-
-    const t1 = await call(app, 'post', PATH, {
-      prompt: 'work on it', kind: 'implementation', issueIdentifier: 'LIN-1', target: 'cli', sessionId
+    const other = await call(app, 'post', PATH, {
+      prompt: 'other task', kind: 'implementation', issueIdentifier: 'LIN-2', target: 'cli', sessionId
     });
-    assert.equal(t1.status, 201, JSON.stringify(t1.body));
-
-    // The operator escape hatch bypasses the DUPLICATE_DISPATCH guard, but the
-    // budget bound is not advisory — a forced dispatch is still refused.
-    const forced = await call(app, 'post', PATH, {
-      prompt: 'review it', kind: 'review', issueIdentifier: 'LIN-1', target: 'cli', sessionId, force: true
-    });
-    assert.equal(forced.status, 409, JSON.stringify(forced.body));
-    assert.equal(forced.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(forced.body.bound, 'sessionsPerTask');
+    assert.equal(other.status, 201, JSON.stringify(other.body));
+    assert.ok(!('budgetPosition' in other.body.item));
   });
 });

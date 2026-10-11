@@ -47,7 +47,7 @@ import {
   MAX_NAME_LENGTH,
   DANGEROUS_CHARS_REGEX,
 } from '../lib/issue-write-validation.js';
-import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE, CLOSE_OUT_IS_THE_PERSONS_CODE, RUN_LIMIT_UNVERIFIED_CODE } from '../lib/dispatch-factory.js';
+import { createDispatchItem, DUPLICATE_DISPATCH_CODE, BUDGET_EXHAUSTED_CODE, CLOSE_OUT_IS_THE_PERSONS_CODE, TASK_SESSION_RUNAWAY_CODE, RUN_LIMIT_UNVERIFIED_CODE } from '../lib/dispatch-factory.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 // The entire consumer-API surface — reads (LIN-308), writes + write-guard reads
 // (LIN-309), and the compute-endpoint fetchers — sources through a provider; the
@@ -916,8 +916,9 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
    * `err.closeOutRefusal` — `{ code: CLOSE_OUT_IS_THE_PERSONS, sessionId }` —
    * through the same `jsonError`/keepalive paths and `logEvent` note. The two
    * are sibling branches, never merged, so a caller still branches on `code`.
-   * The helper's name stays (renaming every call site buys nothing): it now
-   * relays both refusal tags.
+   * It likewise relays the per-task runaway failsafe (LIN-3461) carried on
+   * `err.taskSessionRunaway` (`TASK_SESSION_RUNAWAY`). The helper's name stays
+   * (renaming every call site buys nothing): it now relays all three tags.
    *
    * Wired at the same call sites `refuseIfDuplicateDispatch` is (LIN-1751
    * deliberately matches that existing coverage rather than closing its gap —
@@ -946,12 +947,21 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       }
       return true;
     }
+    // Per-task runaway failsafe (LIN-3461): same relay paths, its own code. An
+    // alarm to stop and report, never a budget finish.
+    if (err.taskSessionRunaway) {
+      const refusal = err.taskSessionRunaway;
+      logEvent(req, endpoint, 409, `${TASK_SESSION_RUNAWAY_CODE} ${refusal.sessionId}`);
+      if (keepalive) {
+        keepalive.send(409, { error: err.message, ...refusal });
+      } else {
+        jsonError(res, 409, err.message, refusal);
+      }
+      return true;
+    }
     if (!err.budgetExhausted) return false;
     const refusal = err.budgetExhausted;
-    // LIN-2934 (F1): additive bound discriminator on the durable proxy-event
-    // note, so a BUDGET_EXHAUSTED refusal's server-written record distinguishes
-    // which bound fired ('tasks' | 'sessionsPerTask' | 'unverified') without a
-    // new field or a new code.
+    // Bound discriminator ('tasks') on the durable proxy-event note.
     logEvent(req, endpoint, 409, `${BUDGET_EXHAUSTED_CODE} ${refusal.bound} ${refusal.sessionId}`);
     if (keepalive) {
       keepalive.send(409, { error: err.message, ...refusal });

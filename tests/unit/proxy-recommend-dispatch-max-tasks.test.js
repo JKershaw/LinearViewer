@@ -79,11 +79,11 @@ const DISPATCH = '/api/proxy/dispatch';
 const RECOMMEND_DISPATCH = '/api/proxy/recommend-and-dispatch';
 
 describe('LIN-2934 R3 — recommend-and-dispatch 201s echo the declared bounds and budgetPosition', () => {
-  test('verb-override arm (kind set): budgetPosition.sessionsPerTask is echoed on the 201', async () => {
+  test('verb-override arm (kind set): budgetPosition.tasks is echoed on the 201', async () => {
     const store = makeStore();
     const app = buildApp({ dispatchQueueStore: store });
 
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 2 });
     assert.equal(run.status, 201, JSON.stringify(run.body));
     const sessionId = run.body.id;
 
@@ -92,34 +92,33 @@ describe('LIN-2934 R3 — recommend-and-dispatch 201s echo the declared bounds a
     });
     assert.equal(t1.status, 201, JSON.stringify(t1.body));
     assert.equal(t1.body.override, true, 'sanity: this is the verb-override arm');
-    assert.equal(t1.body.maxSessionsPerTask, null, 'sanity: the bound lives on the anchor row, not this worker row');
-    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
+    assert.equal(t1.body.maxTasks, null, 'sanity: the bound lives on the anchor row, not this worker row');
+    assert.deepEqual(t1.body.budgetPosition.tasks, { count: 1, maxTasks: 2 });
   });
 
-  test('verb-override arm (kind set): a refused third dispatch to the same task still 409s (unaffected by the new echo)', async () => {
+  test('verb-override arm (kind set): a refused dispatch for a NEW task still 409s (unaffected by the new echo)', async () => {
     const recordedEvents = [];
     const store = makeStore();
     const app = buildApp({ dispatchQueueStore: store, recordedEvents });
 
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 1 });
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 1 });
     const sessionId = run.body.id;
 
     const t1 = await call(app, 'post', RECOMMEND_DISPATCH, { issueIdentifier: 'TEST-1', kind: 'implementation', sessionId });
     assert.equal(t1.status, 201, JSON.stringify(t1.body));
 
-    // A DIFFERENT kind, so this hits the budget guard rather than the
-    // unrelated same-issue-same-kind DUPLICATE_DISPATCH cooldown.
-    const t2 = await call(app, 'post', RECOMMEND_DISPATCH, { issueIdentifier: 'TEST-1', kind: 'review', sessionId });
+    // A DIFFERENT task, past the one-task budget.
+    const t2 = await call(app, 'post', RECOMMEND_DISPATCH, { issueIdentifier: 'TEST-2', kind: 'implementation', sessionId });
     assert.equal(t2.status, 409, JSON.stringify(t2.body));
     assert.equal(t2.body.code, 'BUDGET_EXHAUSTED');
-    assert.equal(t2.body.bound, 'sessionsPerTask');
+    assert.equal(t2.body.bound, 'tasks');
   });
 
-  test('recommendation-derived (LLM) arm (no kind, TEST-14 test-token descent): budgetPosition.sessionsPerTask is echoed on the 201', async () => {
+  test('recommendation-derived (LLM) arm (no kind, TEST-14 test-token descent): budgetPosition.tasks is echoed on the 201', async () => {
     const store = makeStore();
     const app = buildApp({ dispatchQueueStore: store });
 
-    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxSessionsPerTask: 2 });
+    const run = await call(app, 'post', DISPATCH, { prompt: 'launch the runner', target: 'cli', maxTasks: 2 });
     assert.equal(run.status, 201, JSON.stringify(run.body));
     const sessionId = run.body.id;
 
@@ -130,9 +129,8 @@ describe('LIN-2934 R3 — recommend-and-dispatch 201s echo the declared bounds a
     assert.equal(t1.status, 201, JSON.stringify(t1.body));
     assert.equal(t1.body.override, undefined, 'sanity: this is the LLM-derived arm, not the override arm');
     // LIN-2934 (S3): the declared bound itself, not just budgetPosition, must
-    // be echoed on this arm too — this was unpinned (a mutation dropping
-    // `maxSessionsPerTask` from this response survived the full suite).
-    assert.equal(t1.body.maxSessionsPerTask, null, 'sanity: the bound lives on the anchor row, not this worker row');
-    assert.deepEqual(t1.body.budgetPosition.sessionsPerTask, { count: 1, maxSessionsPerTask: 2 });
+    // be echoed on this arm too.
+    assert.equal(t1.body.maxTasks, null, 'sanity: the bound lives on the anchor row, not this worker row');
+    assert.deepEqual(t1.body.budgetPosition.tasks, { count: 1, maxTasks: 2 });
   });
 });
