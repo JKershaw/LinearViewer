@@ -9,6 +9,7 @@ import {
   getActiveWorkspace,
   upsertWorkspace,
   removeWorkspace,
+  applyAccessTokenToWorkspace,
   persistOwnerCredential,
   getWorkspaceToken,
   linkProvider,
@@ -73,6 +74,123 @@ function fakeCredentialStore() {
     },
   };
 }
+
+// =============================================================================
+// applyAccessTokenToWorkspace Tests (LIN-1550: re-homed from the removed
+// updateWorkspaceTokens block, which delegated to this function)
+// =============================================================================
+
+describe('applyAccessTokenToWorkspace', () => {
+  test('mirrors the token and the ABSOLUTE expiry onto the workspace', () => {
+    const workspace = { id: 'ws-1', name: 'Test Workspace' };
+    const expiresAt = Date.now() + 3600 * 1000;
+
+    applyAccessTokenToWorkspace(workspace, 'new-access-token', expiresAt);
+
+    assert.strictEqual(workspace.accessToken, 'new-access-token');
+    assert.strictEqual(workspace.tokenExpiresAt, expiresAt);
+    // LIN-1524: refreshToken is never written to the workspace (durable-store-only).
+    assert.strictEqual(workspace.refreshToken, undefined);
+  });
+
+  test('overwrites existing token data, and never touches a stale legacy refreshToken', () => {
+    const workspace = {
+      id: 'ws-1',
+      name: 'Test Workspace',
+      accessToken: 'old-access-token',
+      refreshToken: 'old-refresh-token',
+      tokenExpiresAt: Date.now() - 1000
+    };
+    const expiresAt = Date.now() + 7200 * 1000;
+
+    applyAccessTokenToWorkspace(workspace, 'new-access-token', expiresAt);
+
+    assert.strictEqual(workspace.accessToken, 'new-access-token');
+    assert.strictEqual(workspace.tokenExpiresAt, expiresAt);
+    // LIN-1524: a stale legacy refreshToken is left exactly as it was — never
+    // overwritten, never cleared.
+    assert.strictEqual(workspace.refreshToken, 'old-refresh-token');
+  });
+
+  test('preserves non-token workspace properties', () => {
+    const workspace = {
+      id: 'ws-1',
+      name: 'Test Workspace',
+      urlKey: 'test-workspace',
+      addedAt: 12345,
+      customField: 'should-remain'
+    };
+
+    applyAccessTokenToWorkspace(workspace, 'token', Date.now() + 3600 * 1000);
+
+    assert.strictEqual(workspace.id, 'ws-1');
+    assert.strictEqual(workspace.name, 'Test Workspace');
+    assert.strictEqual(workspace.urlKey, 'test-workspace');
+    assert.strictEqual(workspace.addedAt, 12345);
+    assert.strictEqual(workspace.customField, 'should-remain');
+  });
+
+  // Provider-aware write shape (LIN-334 / S2)
+  test('writes generalized {provider, credentials} shape', () => {
+    const workspace = { id: 'ws-1', name: 'Test Workspace' };
+    applyAccessTokenToWorkspace(workspace, 'new-access-token', Date.now() + 3600 * 1000);
+
+    assert.strictEqual(workspace.provider, 'linear');
+    assert.deepStrictEqual(workspace.credentials, { token: 'new-access-token' });
+  });
+
+  test('written shape reads back through getWorkspaceToken (dual-read round-trip)', () => {
+    const workspace = { id: 'ws-1' };
+    applyAccessTokenToWorkspace(workspace, 'round-trip-token', Date.now() + 3600 * 1000);
+
+    // New canonical seam resolves to credentials.token.
+    assert.strictEqual(getWorkspaceToken(workspace), 'round-trip-token');
+    // Legacy field is still populated for un-migrated read sites (S3+).
+    assert.strictEqual(workspace.accessToken, 'round-trip-token');
+  });
+
+  test('refresh rotates credentials.token and preserves other credential fields', () => {
+    const workspace = {
+      id: 'ws-1',
+      provider: 'linear',
+      credentials: { token: 'old-token', scope: 'read,write' }
+    };
+    applyAccessTokenToWorkspace(workspace, 'rotated-token', Date.now() + 3600 * 1000);
+
+    assert.strictEqual(workspace.credentials.token, 'rotated-token');
+    assert.strictEqual(workspace.credentials.scope, 'read,write');
+    assert.strictEqual(getWorkspaceToken(workspace), 'rotated-token');
+  });
+
+  // LIN-562: a refreshed token must land inside the active binding too —
+  // otherwise bindings[] goes stale.
+  test('rotates the active binding in lockstep with the scalar mirror (LIN-562)', () => {
+    const workspace = linkProvider({ id: 'ws-1' }, 'linear', 'org-1', {
+      token: 'old-token', tokenExpiresAt: 1
+    });
+    const expiresAt = Date.now() + 3600 * 1000;
+
+    applyAccessTokenToWorkspace(workspace, 'fresh-token', expiresAt);
+
+    const binding = workspace.bindings.find(b => b.provider === 'linear');
+    assert.strictEqual(binding.credentials.token, 'fresh-token');
+    assert.strictEqual(binding.credentials.tokenExpiresAt, expiresAt);
+    assert.strictEqual(binding.credentials.tokenExpiresAt, workspace.tokenExpiresAt);
+    // LIN-1524: refreshToken is never rotated into the binding either — durable-store-only.
+    assert.strictEqual(binding.credentials.refreshToken, undefined);
+    // Scalar mirror + per-binding token agree (no drift).
+    assert.strictEqual(getWorkspaceToken(workspace), 'fresh-token');
+    assert.strictEqual(getWorkspaceToken(workspace, 'linear', 'org-1'), 'fresh-token');
+  });
+
+  test('does not synthesize a binding for legacy workspaces on refresh (byte-identical)', () => {
+    const workspace = { id: 'ws-1', accessToken: 'old' };
+    applyAccessTokenToWorkspace(workspace, 'new', Date.now() + 3600 * 1000);
+    // No bindings[] grown — legacy workspaces stay scalar-only and rely on
+    // getBindingsForWorkspace synthesizing on read.
+    assert.strictEqual(workspace.bindings, undefined);
+  });
+});
 
 // =============================================================================
 // persistOwnerCredential Tests (LIN-1523, Session 1)
