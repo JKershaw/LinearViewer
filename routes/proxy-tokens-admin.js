@@ -66,6 +66,8 @@ const RUNNER_CREDENTIAL_SUBJECT = 'a runner credential';
 // RUNNER_GRANTS, which would over-grant `take` and shorten its lifetime.
 // `label` is fixed server-side so the audit log tells a driver copy from the
 // toggle path's `prompt-proxy`; the runner row passes none, as before.
+// `agent` (LIN-3491) is the Proxy page's "read-write + dispatch" Agent Prompt:
+// the same grants and profile as `driver`, under its own label and message.
 // `providerIdentity` marks the rows whose response carries
 // `providerDisplayName` (the driver block names the declared backend); the
 // runner response stays as it was.
@@ -84,7 +86,21 @@ export const COPY_PURPOSES = Object.freeze({
     subject: 'a driver credential',
     label: 'prompt-driver',
     providerIdentity: true,
-    logName: 'Driver copy'
+    logName: 'Driver copy',
+    message: 'Driver bootstrap created. Save this token now - it cannot be retrieved later.'
+  }),
+  // LIN-3491 — the Proxy page's "read-write + dispatch" Agent Prompt option.
+  // Same grants/profile as `driver` (`['dispatch']` only, 48h `worker`), but its
+  // own label so the audit log tells it from a driver copy (`prompt-driver`)
+  // and from the plain Proxy-page `agent-prompt` mint.
+  agent: Object.freeze({
+    grants: Object.freeze(['dispatch']),
+    profile: 'worker',
+    subject: 'an agent credential',
+    label: 'agent-prompt-dispatch',
+    providerIdentity: true,
+    logName: 'Agent prompt copy',
+    message: 'Agent bootstrap created. Save this token now - it cannot be retrieved later.'
   })
 });
 
@@ -173,7 +189,7 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
         if (!req.session?.accountId) {
           console.warn(
             `${row.logName} refused: session has no account owner (urlKey=${workspace.urlKey}) — ` +
-            `GRANT_OWNERLESS (${purposeName === 'runner' ? 'LIN-3131' : 'LIN-3136'})`
+            `GRANT_OWNERLESS (${purposeName === 'runner' ? 'LIN-3131' : purposeName === 'agent' ? 'LIN-3491' : 'LIN-3136'})`
           );
           const refusal = ownerMintRefusal('GRANT_OWNERLESS', row.subject);
           return jsonError(res, refusal.status, refusal.error, {
@@ -230,7 +246,7 @@ export function createTokensAdminRoutes({ proxyTokenStore, proxyEventStore, work
           expiresAt: minted.expiresAt,
           lifetimeProfile: minted.lifetimeProfile,
           providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
-          message: 'Driver bootstrap created. Save this token now - it cannot be retrieved later.'
+          message: row.message
         });
       }
 

@@ -29,7 +29,8 @@ import { mintDispatchWriter, armDispatchWriterOnce } from './lib/dispatch-writer
 const R3_DISPATCH_COPY =
   'This token cannot enqueue work (no dispatch grant). Ask the workspace owner to copy ' +
   'the prompt again from the app (Autopilot, Flight Companion and Passage Planner copies ' +
-  'carry the dispatch grant), or use the runner copy from Settings.';
+  'carry the dispatch grant), to generate one from the Proxy page with "read-write + dispatch", ' +
+  'or use the runner copy from Settings.';
 
 async function listen(app, fn) {
   const server = app.listen(0, '127.0.0.1');
@@ -211,4 +212,13 @@ describe('LIN-3136 B2 — the dispatch-writer fixture', () => {
     assert.deepEqual((await store.validateToken(second.token)).grants, []);
     assert.equal(Object.prototype.hasOwnProperty.call(store, 'createToken'), false, 'the prototype method is back');
   });
+});
+
+test('LIN-3491: docs/proxy-integration.md quotes GRANT_REFUSAL_COPY.dispatch word for word', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { GRANT_REFUSAL_COPY } = await import('../../lib/require-grant.js');
+  const doc = readFileSync(new URL('../../docs/proxy-integration.md', import.meta.url), 'utf8');
+  const m = doc.match(/\{ "error": "(.*)",\n\s+"code": "DISPATCH_GRANT_REQUIRED"/);
+  assert.ok(m, 'the DISPATCH_GRANT_REQUIRED example is in the doc');
+  assert.equal(JSON.parse(`"${m[1]}"`), GRANT_REFUSAL_COPY.dispatch);
 });

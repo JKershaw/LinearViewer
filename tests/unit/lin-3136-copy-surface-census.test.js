@@ -170,7 +170,7 @@ const MINT_POSTS = [
   { file: 'public/common.js', body: "body: JSON.stringify({ label: 'prompt-proxy', scope: 'readWrite', bootstrap: true }),", class: 'toggle', reason: 'grant-less prompt-proxy (unforced copies)' },
   { file: 'public/common.js', body: 'body: JSON.stringify({ runner: true }),', class: 'runner', reason: 'owner-checked runner copy (LIN-3131)' },
   { file: 'public/common.js', body: "body: JSON.stringify({ purpose: 'driver' }),", class: 'driver', reason: 'owner-checked driver copy (forced copies, M5)' },
-  { file: 'public/proxy.js', body: 'body: JSON.stringify({', class: 'settings-out', reason: 'Settings "Generate agent prompt" (agent-prompt, grant-less)' },
+  { file: 'public/proxy.js', body: 'body: JSON.stringify(mintBody),', class: 'agent', reason: 'Proxy page "Generate agent prompt": grant-less agent-prompt for read/readWrite, or the owner-checked { purpose: \'agent\' } for "read-write + dispatch" (LIN-3491)' },
   { file: 'public/proxy.js', body: 'body: JSON.stringify({ label, scope }),', class: 'settings-out', reason: 'Settings manual token create (grant-less)' }
 ];
 
@@ -274,6 +274,20 @@ describe('LIN-3136 C5d — browser token-mint POSTs are listed', () => {
       src: "const d = await window.api(`/workspace/${k}/api/proxy/tokens`, {\n  method: 'POST',\n  body: JSON.stringify({ purpose: 'driver' }),\n});\n"
     }];
     assert.ok(scanMintPosts(planted).some(o => o.kind === 'unlisted'));
+  });
+});
+
+describe('LIN-3491 C5d — the Proxy-page mint body is closed', () => {
+  // The generate POST sends `mintBody`, so the literal-body scan above cannot see
+  // the purpose. Pin the two bodies in the source instead: the dispatch pick is
+  // exactly { purpose: 'agent' }, and no `grants` key is ever sent.
+  const { src } = SOURCES.find(s => s.file === 'public/proxy.js');
+  test("the dispatch pick sends exactly { purpose: 'agent' }", () => {
+    assert.ok(src.includes("? { purpose: 'agent' }"));
+  });
+  test('the client never sends a grants key from the Proxy page', () => {
+    const code = src.split('\n').filter(l => !isComment(l)).join('\n');
+    assert.ok(!/\bgrants\s*:/.test(code.slice(code.indexOf('const mintBody'), code.indexOf('const token = data.token'))));
   });
 });
 
