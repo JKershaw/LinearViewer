@@ -23,7 +23,7 @@ One wire contract (Harbour's dispatch queue: poll → take → feedback markers,
 | decision | SD (`simple-dispatcher`) | runner kit (`lib/runner-kit/runner.mjs`) | verdict |
 |---|---|---|---|
 | unknown halt mode | fails **open** — only `pause`/`stop` are retained (`dispatcher.js:1652-1654`) | fails **closed** — `leave`, reason `halt:${mode}` (`runner.mjs:196`) | **diverged** |
-| abort row under `stop` | processed (research-stage reading, **not independently confirmed — the second-read also could not confirm SD's side**; this stage verified only the kit side and SD's halt-stop sweep, which cancels live sessions and reuses `[aborted]`, `dispatcher.js:2023-2029`) | `stop` falls to the final `leave` (`runner.mjs:196`; only `pause` lets `item.abort` flow, `:189-190`) | **diverged** |
+| abort row under `stop` | processed — aborts bypass every halt: `pacing.js:106` (`freshLaunchDeferReason` returns null for `item.abort` before the halt check) and `pacing.js:28` (`isFreshHookLaunch` excludes aborts); confirmed at review | `stop` falls to the final `leave` (`runner.mjs:196`; only `pause` lets `item.abort` flow, `:189-190`) | **diverged** |
 | stop line text | phase-based closing text (`dispatcher.js:603`; halt-stop log line `dispatcher.js:2027` carries `${session.phase}`) | `(stopped by operator)` (`runner.mjs:235`); the phrase appears nowhere in SD | **diverged** |
 | `pause` + follow-up with no live session | posts `[failed] No live session to resume…` (`followup.js:40`) | resolves via `resolveFollowUp`; otherwise **leaves queued** (`runner.mjs:189-193`) | **diverged** |
 | `target` | takes only `cli`/`web` (`targets.js:16-19`, `queue.js:219`) | no target filter; Harbour's runner poll is an unfiltered `listItems` (`routes/proxy-runner.js:94` → `lib/dispatch-store.js:1057`) | **diverged** (kit can take a `dash` item SD ignores — inferred from code, not reproduced) |
@@ -194,7 +194,7 @@ All three standing 06-25/08-29 follow-ups (LIN-675, 2388, 2389) have now stood u
 
 ## Compact trend ledger
 
-`07-12` was never recovered (lost edition, task LIN-1231); every 07-12 cell is `not recovered` and no value is interpolated. Row names are stable; the 33 rows of the 09-26 ledger are carried, then new rows are appended. Severity is this run's grade.
+`07-12` was never recovered (lost edition, task LIN-1231); every 07-12 cell is `not recovered` and no value is interpolated. Row names are stable; the 32 rows of the 09-26 ledger are carried, then new rows are appended. Severity is this run's grade.
 
 | finding | severity | 06-25 | 07-12 | 08-29 | 2026-09-26 | 2026-10-11 | delta |
 |---|---|---|---|---|---|---|---|
