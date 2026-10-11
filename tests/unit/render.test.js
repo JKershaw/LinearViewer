@@ -12,7 +12,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderDisplayLabels, renderPage, renderDetailsContent } from '../../lib/render.js';
 import { PERIODICALS_PROJECT_ID, NO_PROJECT_ID, buildInProgressForest } from '../../lib/tree.js';
-import { testMockPeriodicalsTree } from '../fixtures/mock-data.js';
+import { testMockPeriodicalsTree } from '../../lib/sample-data/mock-data.js';
 // Side-effect import: the Linear provider self-registers on load, so getProvider
 // ('linear') (used by the add-task link) resolves in this unit-test context.
 import '../../lib/providers/linear/index.js';
