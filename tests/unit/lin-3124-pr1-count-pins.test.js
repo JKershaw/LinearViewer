@@ -169,8 +169,10 @@ const PINS = [
   },
   {
     id: 'raw-accesstoken-writers',
+    // LIN-3464: 4 -> 3. The headless mirror's hand assignment now goes through
+    // applyAccessTokenToWorkspace, the shared writer.
     label: 'raw .accessToken assignments',
-    expected: 4,
+    expected: 3,
     sources: REAL,
     count: countRawAccessTokenWriters,
     plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),

@@ -34,7 +34,7 @@ import {
 import { activeBindingIsConnectionBacked, readWorkspaceCredential } from '../../lib/connection-binding.js';
 import {
   linkProvider, getWorkspaceCallScope, getBindingCallScope, resolveIssueBinding, getWorkspaceToken,
-  getWorkspaceByUrlKey, normalizeProvider, getWorkspaceMirrorToken, getWorkspaceTokenExpiry,
+  getWorkspaceByUrlKey, normalizeProvider, getWorkspaceTokenExpiry,
 } from '../../lib/workspace.js';
 import {
   UNSCOPED, TOKEN_REFRESH_BUFFER_MS, selectOwnerWorkspaceToken, selectOwnerSessionRow,
@@ -120,7 +120,7 @@ describe('LIN-3124 T18 — decoy-token across every lane', () => {
     'per-binding: dashboard fan-out': async (w) => tokenOf(getBindingCallScope(w.session.workspaces[0].bindings.find(b => b.provider === 'github'))),
     'per-binding: resolveIssueBinding': async (w) => tokenOf(resolveIssueBinding(w.session.workspaces[0], 'github').callScope),
     'per-binding: settings probe (3-arg getWorkspaceToken)': async (w) => getWorkspaceToken(w.session.workspaces[0], 'linear', 'org-1'),
-    'raw mirror (audit egress / image relay)': async (w) => getWorkspaceMirrorToken(w.session.workspaces[0]),
+    'raw mirror (audit egress / image relay)': async (w) => getWorkspaceToken(w.session.workspaces[0]),
     // The expiry lane serves an expiry, not a token: map it onto the same
     // REAL / DECOY vocabulary so one assertion covers every lane.
     'expiry (ensureValidToken proactive refresh)': async (w) => {

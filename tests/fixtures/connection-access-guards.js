@@ -311,6 +311,6 @@ export const DECOY_LANES = Object.freeze([
   { lane: 'owner-blind', accessor: 'getWorkspaceAccessToken' },
   // LIN-3124 PR3 review blocker 1: the raw-mirror readers (the audit egress and
   // the Linear image relay) and the proactive-refresh expiry read.
-  { lane: 'raw mirror (audit egress / image relay)', accessor: 'getWorkspaceMirrorToken' },
+  { lane: 'raw mirror (audit egress / image relay)', accessor: 'getWorkspaceToken' },
   { lane: 'expiry (ensureValidToken proactive refresh)', accessor: 'getWorkspaceTokenExpiry' },
 ]);

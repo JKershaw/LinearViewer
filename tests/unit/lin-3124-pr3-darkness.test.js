@@ -2,8 +2,8 @@
  * LIN-3124 PR3 — checkpoint A darkness / byte-identity (D1, D15, F4).
  *
  * Proves the accessor side-table hook-up is DARK: for every legacy shape the
- * accessors evaluate the verbatim legacy expression, and the raw E2 accessors
- * (getWorkspaceMirrorToken / getWorkspaceTokenExpiry) are unchanged. For a
+ * accessors evaluate the verbatim legacy expression, and the raw expiry accessor
+ * (getWorkspaceTokenExpiry) is unchanged. For a
  * connection-backed binding with no hydrated entry, the binding accessor fails
  * closed (undefined) rather than serving a session copy. The side-table is only
  * served when a credential was explicitly hydrated by the seam.
@@ -15,7 +15,6 @@ import assert from 'node:assert/strict';
 import '../../lib/providers/index.js'; // register the provider barrel (linear/github/jira)
 import {
   getWorkspaceToken,
-  getWorkspaceMirrorToken,
   getWorkspaceTokenExpiry,
   getWorkspaceCallScope,
   getBindingCallScope,
@@ -67,12 +66,9 @@ describe('LIN-3124 PR3 checkpoint A — legacy byte-identity', () => {
     }
   });
 
-  test('the raw E2 mirror/expiry accessors are unchanged (F4)', () => {
+  test('the raw expiry accessor is unchanged (F4); LIN-3464: the token has one source', () => {
     const ws = legacyWorkspace();
-    assert.strictEqual(getWorkspaceMirrorToken(ws), ws.accessToken);
     assert.strictEqual(getWorkspaceTokenExpiry(ws), ws.tokenExpiresAt);
-    // E2 must NOT prefer the richer credential the way E1 does.
-    assert.notStrictEqual(getWorkspaceMirrorToken(ws), ws.credentials.token);
   });
 
   test('getBindingCredentials returns the SAME legacy credentials object', () => {
@@ -153,8 +149,7 @@ describe('LIN-3124 PR3 checkpoint A — connection-backed fail-closed + hydrated
       // PR3 review blocker 1: a connection-backed workspace carries no raw
       // mirror, so the mirror/expiry accessors serve the Connection credential
       // (legacy workspaces stay raw E2 — PR1's T1–T3 are unchanged).
-      assert.strictEqual(getWorkspaceMirrorToken(ws), 'conn-tok');
-      assert.strictEqual(getWorkspaceTokenExpiry(ws), 4242);
+            assert.strictEqual(getWorkspaceTokenExpiry(ws), 4242);
       // The bind itself still carries no credentials (nothing to persist).
       assert.strictEqual(b.credentials, undefined);
     } finally {

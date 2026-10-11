@@ -2,7 +2,13 @@
 // LIN-3124 PR1 (S0) — characterization tests (T1, T2, T3)
 // =============================================================================
 //
-// PR1 is behaviour-neutral in production. S0 adds two identity accessors in
+// LIN-3464: the E1/E2 split is retired. `getWorkspaceMirrorToken` is deleted;
+// the audit egress and image relay read `getWorkspaceToken`, and the headless
+// mirror writes through `applyAccessTokenToWorkspace`, so a refresh leaves ONE
+// current token (accessToken === credentials.token) that every reader sees.
+// What follows is the original PR1 history, kept for the expiry accessor.
+//
+// PR1 S0 added two identity accessors in
 // lib/workspace.js — `getWorkspaceMirrorToken(ws) = ws?.accessToken` and
 // `getWorkspaceTokenExpiry(ws) = ws?.tokenExpiresAt` (the raw scalar mirror,
 // "E2") — and converts EXACTLY three read sites to them:
@@ -42,7 +48,6 @@ import { mirrorRefreshedCredentialIntoOwnerRows } from '../../lib/workspace-toke
 const { getWorkspaceToken } = workspaceModule;
 // Added by S0. Absent before the accessors exist; bound into the assertions
 // the moment they do (see assertAccessorGolden).
-const getWorkspaceMirrorToken = workspaceModule.getWorkspaceMirrorToken;
 const getWorkspaceTokenExpiry = workspaceModule.getWorkspaceTokenExpiry;
 
 // The literal pre-change expressions. S0's accessors must reproduce these
@@ -148,33 +153,26 @@ function assertAccessorGolden(name, accessor, ws, golden) {
 
 describe('LIN-3124 PR1 T1 — S0 accessor identity grid (E1/E2, diverged state)', () => {
   for (const c of GRID) {
-    test(`raw-mirror golden: ${c.name}`, () => {
+    test(`golden: ${c.name}`, () => {
       // The literal pre-change expressions.
       assert.strictEqual(mirrorExpr(c.ws), c.mirror, `mirrorExpr golden for ${c.name}`);
       assert.strictEqual(expiryExpr(c.ws), c.expiry, `expiryExpr golden for ${c.name}`);
       // E1 stays unchanged.
       assert.strictEqual(getWorkspaceToken(c.ws), c.e1, `getWorkspaceToken (E1) golden for ${c.name}`);
-      // The two S0 accessors must equal the raw-mirror expression.
-      assertAccessorGolden('getWorkspaceMirrorToken', getWorkspaceMirrorToken, c.ws, c.mirror);
+      // LIN-3464: the token has one reader; the expiry accessor is the raw field.
       assertAccessorGolden('getWorkspaceTokenExpiry', getWorkspaceTokenExpiry, c.ws, c.expiry);
     });
   }
 
-  test('diverged state: E2 raw mirror and E1 credential disagree (the property S0 must not lose)', () => {
-    const diverged = GRID.find(c => c.name.startsWith('diverged')).ws;
-    assert.strictEqual(mirrorExpr(diverged), 'NEW-mirror');
-    assert.strictEqual(getWorkspaceToken(diverged), 'OLD-credential');
-    assert.notStrictEqual(mirrorExpr(diverged), getWorkspaceToken(diverged),
-      'E2 (raw mirror) and E1 (credentials-preferred) must stay distinguishable — this is the whole reason S0 adds a new accessor rather than reusing getWorkspaceToken');
+  test('LIN-3464: the retired accessor is gone, so no reader can pick the other side of a split', () => {
+    assert.strictEqual(workspaceModule.getWorkspaceMirrorToken, undefined);
   });
 
   test('does not throw on null/undefined', () => {
     assert.doesNotThrow(() => mirrorExpr(null));
     assert.doesNotThrow(() => expiryExpr(undefined));
-    if (typeof getWorkspaceMirrorToken === 'function') {
-      assert.doesNotThrow(() => getWorkspaceMirrorToken(null));
-      assert.doesNotThrow(() => getWorkspaceTokenExpiry(undefined));
-    }
+    assert.doesNotThrow(() => getWorkspaceToken(null));
+    assert.doesNotThrow(() => getWorkspaceTokenExpiry(undefined));
   });
 });
 
@@ -186,10 +184,11 @@ describe('LIN-3124 PR1 T1 — S0 accessor identity grid (E1/E2, diverged state)'
 // its VM-slice harness: tests/unit/lin-2110-ensure-valid-token-refresh-gate.test.js
 // ("LIN-3124 PR1 T2 — ensureValidToken reads the raw tokenExpiresAt mirror").
 
+// LIN-3464: the state a refresh now leaves — one current token in both fields.
 const DIVERGED = Object.freeze({
   provider: 'linear',
   accessToken: 'NEW-mirror',
-  credentials: { token: 'OLD-credential' },
+  credentials: { token: 'NEW-mirror' },
   tokenExpiresAt: Date.now() + 3_600_000,
 });
 
@@ -255,7 +254,7 @@ describe('LIN-3124 PR1 T2(a) — audit egress uses the raw mirror (routes/worksp
     else process.env.NODE_ENV = realNodeEnv;
   });
 
-  test('a diverged Linear workspace audits with accessToken (NEW), never credentials.token (OLD)', async () => {
+  test('a diverged Linear workspace audits with the one current token', async () => {
     const app = buildApp(DIVERGED);
     const server = app.listen(0, '127.0.0.1');
     await new Promise(r => server.once('listening', r));
@@ -270,7 +269,7 @@ describe('LIN-3124 PR1 T2(a) — audit egress uses the raw mirror (routes/worksp
     assert.ok(outbound.length > 0, 'a Linear workspace must still call Linear');
     // lib/audit.js sends the bare token (no Bearer prefix).
     assert.strictEqual(outbound[0].auth, 'NEW-mirror',
-      'the audit egress must use the raw accessToken mirror, not the E1 credentials.token');
+      'the audit egress must use the current token');
   });
 });
 
@@ -306,7 +305,7 @@ describe('LIN-3124 PR1 T2(b) — image relay header uses the raw mirror (routes/
 
   afterEach(() => { globalThis.fetch = realFetch; });
 
-  test('a diverged Linear workspace relays with accessToken (NEW), never credentials.token (OLD)', async () => {
+  test('a diverged Linear workspace relays with the one current token', async () => {
     const app = buildApp(DIVERGED);
     const server = app.listen(0, '127.0.0.1');
     await new Promise(r => server.once('listening', r));
@@ -319,25 +318,20 @@ describe('LIN-3124 PR1 T2(b) — image relay header uses the raw mirror (routes/
     }
     assert.strictEqual(res.status, 200);
     assert.strictEqual(sawInit.headers.Authorization, 'Bearer NEW-mirror',
-      'the image relay must use the raw accessToken mirror, not the E1 credentials.token');
+      'the image relay must use the current token');
   });
 });
 
 // =============================================================================
-// T3 — headless mirror then resolve, pinned as-is
+// T3 — headless mirror then resolve: every reader sees the refreshed token
 // =============================================================================
 //
-// CHARACTERIZATION OF A KNOWN DEFECT; UPDATE DELIBERATELY.
-//
-// The headless mirror (lib/workspace-token-refresh.js:201-202) updates ONLY
-// `accessToken`/`tokenExpiresAt`; it does not touch `credentials` or the
-// bindings. Jira's call scope is built from the E1 credential
-// (getWorkspaceToken -> selectActiveBinding), so after a headless refresh it
-// carries the OLD token. This divergence is pre-existing (credential-defect
-// cluster: LIN-2639/2642/2640/2530/2394), cited by LIN-3124, and NOT fixed by
-// PR1. PR1's accessors must NOT be changed to "fix" it.
+// LIN-3464 (was: "characterization of a known defect"). The headless mirror
+// used to update ONLY `accessToken`/`tokenExpiresAt`, so E1 readers and Jira's
+// call scope kept the OLD token. It now writes through
+// applyAccessTokenToWorkspace, which rotates credentials and the binding too.
 
-describe('LIN-3124 PR1 T3 — headless mirror then resolve, pinned as-is (characterization of a known defect)', () => {
+describe('LIN-3464 T3 — headless mirror then resolve: one current token for every reader', () => {
   function jiraWorkspace() {
     const old = 'OLD-oauth-access';
     return {
@@ -352,43 +346,33 @@ describe('LIN-3124 PR1 T3 — headless mirror then resolve, pinned as-is (charac
     };
   }
 
-  // PR3 checkpoint B hardening: drive the REAL mirror loop
-  // (`mirrorRefreshedCredentialIntoOwnerRows`) instead of hand-copying its two
-  // assignment lines, so T3 notices if the loop drifts.
+  // Drive the REAL mirror loop so this notices if the loop drifts.
   function ownerSessions(workspace) {
     return [{ _id: 'sid-1', session: { accountId: 'acct-1', workspaces: [workspace] } }];
   }
 
-  test('after the real headless mirror loop the raw E2 accessors see NEW, but Jira call scope / E1 still carry OLD', async () => {
+  test('after the real headless mirror loop every reader sees NEW (refresh-then-read)', async () => {
     const ws = jiraWorkspace();
     ws.urlKey = 'jira-ws';
     const persisted = [];
-    let ownerWorkspace;
-    try {
-      ownerWorkspace = await mirrorRefreshedCredentialIntoOwnerRows({
-        sessions: ownerSessions(ws),
-        urlKey: 'jira-ws',
-        ownerAccountId: 'acct-1',
-        token: 'NEW-oauth-access',
-        expiresAt: Date.now() + 3_600_000,
-        persistSession: async (sid) => { persisted.push(sid); },
-      });
-    } catch (err) {
-      assert.fail(`the real mirror loop must run: ${err.message}`);
-    }
+    const expiresAt = Date.now() + 3_600_000;
+    const ownerWorkspace = await mirrorRefreshedCredentialIntoOwnerRows({
+      sessions: ownerSessions(ws),
+      urlKey: 'jira-ws',
+      ownerAccountId: 'acct-1',
+      token: 'NEW-oauth-access',
+      expiresAt,
+      persistSession: async (sid) => { persisted.push(sid); },
+    });
     assert.strictEqual(ownerWorkspace, ws, 'the mirrored workspace is returned');
     assert.deepStrictEqual(persisted, ['sid-1'], 'the row is persisted once');
 
-    // E2 raw mirror: refreshed.
-    assert.strictEqual(mirrorExpr(ws), 'NEW-oauth-access');
-    assert.strictEqual(expiryExpr(ws), ws.tokenExpiresAt);
-    assertAccessorGolden('getWorkspaceMirrorToken', getWorkspaceMirrorToken, ws, 'NEW-oauth-access');
-
-    // E1 credential and the binding: stale (the known defect).
-    assert.strictEqual(getWorkspaceToken(ws), 'OLD-oauth-access');
+    assert.strictEqual(ws.accessToken, 'NEW-oauth-access');
+    assert.strictEqual(getWorkspaceTokenExpiry(ws), expiresAt);
+    assert.strictEqual(getWorkspaceToken(ws), 'NEW-oauth-access');
+    assert.strictEqual(getWorkspaceToken(ws, 'jira'), 'NEW-oauth-access', 'the binding rotates too');
     const scope = workspaceModule.getWorkspaceCallScope(ws);
-    assert.strictEqual(scope.accessToken, 'OLD-oauth-access',
-      'known defect: the Jira call scope carries the superseded token after a headless mirror');
+    assert.strictEqual(scope.accessToken, 'NEW-oauth-access', 'Jira call scope carries the refreshed token');
     assert.strictEqual(scope.cloudId, 'cloud-1');
   });
 });
