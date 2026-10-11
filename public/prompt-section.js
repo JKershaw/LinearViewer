@@ -1120,6 +1120,8 @@
         if (destroyed) return;
         applyGoRefusal(error);
       }
+      // LIN-3267: the press has settled either way — re-read the allowance.
+      await refreshRunQuota();
     }
 
     function handleClick(e) {
@@ -1344,6 +1346,8 @@
         if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' });
         btn.textContent = 'err';
       } finally {
+        // LIN-3267: the press has settled either way — re-read the allowance.
+        refreshRunQuota();
         setTimeout(() => {
           if (destroyed) return;
           btn.textContent = originalText;
@@ -1362,9 +1366,17 @@
     // instance-wide. It is a read, never a spend. Only consulted when the caller
     // marks the workspace free-tier, so other consumers/units never touch the
     // network from init.
-    if (opts.freeTier) {
+    //
+    // LIN-3267: this is the ONE place the ladder's run state is decided from the
+    // quota. Load calls it, and so does every settled ladder press (Go and the
+    // run-step rung, success or failure), so the count and the disabled rungs
+    // track the press — including a RUN_LIMIT_REACHED 429, whose exhausted state
+    // comes from this read, never from a hand-set flag. An unreadable response
+    // leaves the last known value untouched.
+    function refreshRunQuota() {
+      if (!opts.freeTier) return Promise.resolve();
       const quotaPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
-      Promise.resolve()
+      return Promise.resolve()
         .then(() => window.api(`${quotaPrefix}/api/dispatch/quota`, { on401: false }))
         .then((data) => {
           if (destroyed) return;
@@ -1372,13 +1384,16 @@
             && typeof data.remaining === 'number' && typeof data.limit === 'number') {
             state.runQuota = { remaining: data.remaining, limit: data.limit, runsUsed: data.runsUsed };
           }
-          render();
         })
-        .catch(() => {
+        .catch(() => {})
+        .then(() => {
           if (destroyed) return;
-          render();
+          // A ✦ stream in flight owns [data-prompt-body] (N4): repaint only Go.
+          if (state.result && state.result.streaming) paintGo();
+          else render();
         });
     }
+    refreshRunQuota();
 
     // LIN-3341 finding 7: on mount, ask once whether a run is already live on
     // this task, so a reopened task shows the running/waiting line instead of a

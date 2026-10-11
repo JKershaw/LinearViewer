@@ -39,21 +39,30 @@ function makeContainer() {
   return container;
 }
 
-function loadPromptSection({ quota } = {}) {
-  const calls = { api: [] };
+function loadPromptSection({ quota, dispatch } = {}) {
+  const calls = { api: [], dispatch: [], order: [] };
   const window = {
     escapeHtml: (s) => (s == null ? '' : String(s)),
     stripCodeBlockWrapper: (s) => s,
     renderMarkdown: (s) => String(s == null ? '' : s),
     api: async (url) => {
       calls.api.push(url);
-      if (String(url).endsWith('/api/dispatch/quota')) return quota;
+      if (String(url).endsWith('/api/dispatch/quota')) {
+        calls.order.push('quota');
+        // LIN-3267: a function yields the allowance at each read.
+        return typeof quota === 'function' ? quota() : quota;
+      }
       return { prompt: 'TEMPLATE PROMPT', promptName: 'Template' };
     },
     ProxyToggle: { maybeAppend: async (raw) => raw },
     renderDispatchDisclosure: () => '<div class="swipe-prompt-options"></div>',
     readDispatchExecControls: () => ({}),
-    dispatchPrompt: async () => ({ item: { id: 'disp-1' } }),
+    dispatchPrompt: async (args) => {
+      calls.dispatch.push(args);
+      calls.order.push('dispatch');
+      if (dispatch) return dispatch(args);
+      return { item: { id: 'disp-1' } };
+    },
     isPinnedToBottom: () => false,
     toast: () => {},
     fetchAutopilotKickoff: async () => ({ prompt: 'AUTOPILOT PROMPT', promptName: 'Autopilot', kind: 'autopilot' }),
@@ -188,5 +197,52 @@ describe('LIN-3239 — ladder run allowance', () => {
     assert.equal(m.calls.api.some((u) => String(u).endsWith('/api/dispatch/quota')), false, 'no quota read when not free tier');
     assert.doesNotMatch(m.container.innerHTML, /data-testid="opened-task-run-quota"/);
     assert.match(tagFor(m.container.innerHTML, 'run-step') || '', /data-action="run-step"/);
+  });
+});
+
+// LIN-3267 — the allowance is re-read after a ladder press settles, through the
+// same read that populates the ladder at load.
+describe('LIN-3267 — re-read the run quota after a ladder press', () => {
+  const seq = (...qs) => { let i = 0; return () => qs[Math.min(i++, qs.length - 1)]; };
+  const Q = (remaining) => ({ limited: true, runsUsed: 10 - remaining, limit: 10, remaining, resetsAt: null });
+  const press = async (m) => { await m.container.click({ action: 'run-step', target: 'cli' }); await flush(); await flush(); };
+
+  test('after a successful run-step press the count and rungs show the re-read quota', async () => {
+    const m = await mountFresh({}, { quota: seq(Q(1), Q(0)) });
+    assert.match(m.container.innerHTML, /1 of 10 runs left today/);
+    assert.match(tagFor(m.container.innerHTML, 'run-step'), /data-action="run-step"/);
+    await press(m);
+    assert.equal(m.calls.dispatch.length, 1);
+    assert.match(m.container.innerHTML, /0 of 10 runs left today/, 'count tracks the press');
+    assert.match(tagFor(m.container.innerHTML, 'run-step'), /disabled/, 'run this step is disabled at zero');
+    assert.match(tagFor(m.container.innerHTML, 'run-task'), /disabled/, 'Go is disabled at zero');
+  });
+
+  test('a RUN_LIMIT_REACHED 429 on a run-step press leaves the ladder exhausted', async () => {
+    const dispatch = async () => { const e = new Error('limit'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
+    const m = await mountFresh({}, { quota: seq(Q(1), Q(0)), dispatch });
+    await press(m);
+    assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+    assert.match(tagFor(m.container.innerHTML, 'run-step'), new RegExp(`disabled[^>]*${RUN_LIMIT_TITLE}`));
+  });
+
+  test('the quota is re-read after the press settles, never before or during it', async () => {
+    const m = await mountFresh({}, { quota: seq(Q(5), Q(4)) });
+    assert.deepEqual(m.calls.order, ['quota'], 'only the load read before the press');
+    await press(m);
+    assert.deepEqual(m.calls.order, ['quota', 'dispatch', 'quota']);
+  });
+
+  test('a failed re-read keeps the last known allowance', async () => {
+    let n = 0;
+    const m = await mountFresh({}, { quota: () => { if (n++ === 0) return Q(5); throw new Error('down'); } });
+    await press(m);
+    assert.match(m.container.innerHTML, /5 of 10 runs left today/);
+  });
+
+  test('not free tier: a press makes no quota read', async () => {
+    const m = await mountFresh({ freeTier: false }, { quota: Q(5) });
+    await press(m);
+    assert.equal(m.calls.order.filter((x) => x === 'quota').length, 0);
   });
 });
