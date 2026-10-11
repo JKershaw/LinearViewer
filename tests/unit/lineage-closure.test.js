@@ -288,3 +288,116 @@ describe('parity: live closers vs selectLineageCloses on replayed events (real M
     assert.deepEqual(live, []);
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): characterization of the NaN-contract `toMs` ───────
+// Written BEFORE the swap to lib/utils/time.js#toEpochMs and green on the old
+// code. Junk is `undefined` (field absent) or 'not-a-date', NEVER `null`.
+// Posture being pinned: the pure selector never closes what it cannot verify
+// (fail closed), so a junk timestamp must never promote a row to a close.
+
+describe('selectLineageCloses — junk timestamps fail closed (LIN-3456 characterization)', () => {
+  const JUNK = [undefined, 'not-a-date'];
+
+  test('a taken row whose resolvedAt is missing/junk is a taken-after-event miss, not a close candidate', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(3, 'hb', 'P'), fb(9, '[done] ok', 'P')] }),
+        row('beat', { kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: at(2), resolvedAt: junk })
+      ];
+      const sel = selectLineageCloses(rows);
+      assert.deepEqual(ids(sel), [], `resolvedAt=${String(junk)} must not close`);
+      assert.deepEqual(sel.skippedIds['taken-after-event'], ['beat']);
+    }
+  });
+
+  test('control: the same row with a valid resolvedAt before the event is closed', () => {
+    const rows = [
+      row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(3, 'hb', 'P'), fb(9, '[done] ok', 'P')] }),
+      row('beat', { kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: at(2), resolvedAt: at(3) })
+    ];
+    assert.deepEqual(ids(selectLineageCloses(rows)), ['beat']);
+  });
+
+  test('a terminal entry with a junk timestamp is not an event (nothing closes)', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [{ message: '[done] ok', rootItemId: 'P', timestamp: junk }] }),
+        row('beat', { kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: at(2), resolvedAt: at(3) })
+      ];
+      assert.deepEqual(ids(selectLineageCloses(rows)), [], `timestamp=${String(junk)}`);
+    }
+  });
+
+  test('a junk-timestamp tagged entry never becomes the row\'s root at the event (storedRootAt)', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(3, 'hb', 'P'), fb(9, '[done] ok', 'P')] }),
+        row('c', {
+          kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: at(2), resolvedAt: at(4),
+          feedback: [fb(3, 'hb', 'P'), { message: 'hb', rootItemId: 'OTHER', timestamp: junk }]
+        })
+      ];
+      const sel = selectLineageCloses(rows);
+      assert.deepEqual(ids(sel), ['c'], `timestamp=${String(junk)}: the valid entry still decides membership`);
+    }
+  });
+
+  test('a junk-timestamp terminal entry on the candidate is not its own terminal as of the event (ownTerminalAt)', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(3, 'hb', 'P'), fb(9, '[done] ok', 'P')] }),
+        row('c', {
+          kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: at(2), resolvedAt: at(4),
+          feedback: [fb(3, 'hb', 'P'), { message: '[failed] x', timestamp: junk }]
+        })
+      ];
+      const sel = selectLineageCloses(rows);
+      assert.deepEqual(ids(sel), ['c'], `timestamp=${String(junk)}`);
+      assert.equal(sel.closes[0].ownTerminalNow, true, 'the flag only reads the message');
+    }
+  });
+
+  test('unresolved seed: a junk tagged-entry timestamp makes firstTaggedMs unusable, so no membership-unresolved miss is recorded', () => {
+    // `c` points at an anchor that is not in `rows`, so its seed is unresolvable
+    // and the "terminals before the first tagged entry" scan runs against
+    // firstTaggedMs. Q's terminal at minute 4 predates c's valid first tagged
+    // entry (minute 5), so the control records the miss; with a junk timestamp
+    // there is no first-tagged bound and nothing is recorded.
+    const rowsWith = (taggedTimestamp) => [
+      row('Q', { kind: 'implementation', rootItemId: 'Q', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(4, '[done] ok', 'Q')] }),
+      row('c', {
+        kind: 'implementation', followUpTo: 'MISSING-ANCHOR', rootItemId: 'X', dispatchedAt: at(2), resolvedAt: at(3),
+        feedback: [{ message: 'hb', rootItemId: 'X', timestamp: taggedTimestamp }]
+      })
+    ];
+    const control = selectLineageCloses(rowsWith(at(5)));
+    assert.deepEqual(control.skippedIds['membership-unresolved'], ['c'], 'control: valid first-tagged bound records the miss');
+    for (const junk of JUNK) {
+      const sel = selectLineageCloses(rowsWith(junk));
+      assert.deepEqual(ids(sel), [], `timestamp=${String(junk)}`);
+      assert.deepEqual(sel.skippedIds['membership-unresolved'], [], `timestamp=${String(junk)}: no miss without a first-tagged bound`);
+    }
+  });
+
+  test('handed-on: a successor wake with a missing/junk dispatchedAt closes nothing', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('old-wake', { dispatchedAt: at(1), resolvedAt: at(2), feedback: [fb(3, 'hb', 'R')] }),
+        row('new-wake', { dispatchedAt: junk, resolvedAt: at(6), feedback: [fb(7, 'first tagged', 'R')] })
+      ];
+      assert.deepEqual(ids(selectLineageCloses(rows)), [], `dispatchedAt=${String(junk)}`);
+    }
+  });
+
+  test('a candidate with a missing/junk dispatchedAt is skipped outright', () => {
+    for (const junk of JUNK) {
+      const rows = [
+        row('P', { kind: 'implementation', dispatchedAt: at(0), resolvedAt: at(0), feedback: [fb(3, 'hb', 'P'), fb(9, '[done] ok', 'P')] }),
+        row('beat', { kind: 'implementation', followUpTo: 'P', rootItemId: 'P', dispatchedAt: junk, resolvedAt: at(3) })
+      ];
+      const sel = selectLineageCloses(rows);
+      assert.deepEqual(ids(sel), []);
+      assert.equal(Object.values(sel.skippedIds).flat().includes('beat'), false, 'not even a recorded miss');
+    }
+  });
+});

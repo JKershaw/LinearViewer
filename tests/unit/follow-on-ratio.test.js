@@ -831,3 +831,75 @@ describe('LIN-1770: close-out prune must preserve a PLAN_MARKER-matching stub', 
       'without the mandated phrase, the pruned description is indistinguishable from "no plan ever ran"');
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): characterization of the NaN-contract `toMs` ───────
+// Written BEFORE the swap to lib/utils/time.js#toEpochMs and green on the old
+// code. Junk is `undefined` (field absent) or 'not-a-date', NEVER `null`.
+describe('junk and non-instant timestamps (LIN-3456 characterization)', () => {
+  const D = '2026-06-10T00:00:00.000Z';
+  const LATER = '2026-06-20T00:00:00.000Z';
+  const JUNK = [undefined, 'not-a-date'];
+
+  test('a completed issue with a missing/junk completedAt is undated: excluded and surfaced', () => {
+    for (const junk of JUNK) {
+      const r = run([source('bad', junk), source('ok', D)]);
+      assert.equal(r.denominator, 1, `completedAt=${String(junk)}`);
+      assert.equal(r.diagnostics.undated, 1);
+      assert.equal(r.scale.totalCompleted, 2);
+    }
+  });
+
+  test('a peer with a missing/junk createdAt is an unresolved peer, never counted', () => {
+    for (const junk of JUNK) {
+      const r = run([
+        source('s', D, { relations: [outgoing('related', 'p')] }),
+        peer('p', junk),
+      ]);
+      assert.equal(r.diagnostics.unresolvedPeers, 1, `createdAt=${String(junk)}`);
+      assert.equal(r.numerator, 0);
+    }
+  });
+
+  test('countFollowOns: a source with a missing/junk completedAt counts no peers, even a resolvable one', () => {
+    const idx = new Map([['p', peer('p', LATER)]]);
+    for (const junk of JUNK) {
+      const out = countFollowOns(source('s', junk, { relations: [outgoing('related', 'p')] }), idx);
+      assert.deepEqual(out.peers, [], `completedAt=${String(junk)}`);
+      assert.equal(out.unresolvedPeers, 0, 'the peer itself resolved');
+      assert.equal(out.relationsSeen, 1);
+    }
+  });
+
+  test('control: a dated source and a later peer count', () => {
+    const idx = new Map([['p', peer('p', LATER)]]);
+    const out = countFollowOns(source('s', D, { relations: [outgoing('related', 'p')] }), idx);
+    assert.equal(out.peers.length, 1);
+  });
+
+  test('F3: a missing/junk/numeric window bound or asOf makes computeFollowOnRatio throw', () => {
+    // The numeric cases are the widening risk: a bare epoch-ms number must stay
+    // rejected even once the private parser accepts numbers (LIN-3453 F3).
+    for (const key of ['windowStart', 'windowEnd', 'asOf']) {
+      for (const bad of [undefined, 'not-a-date', 1717977600000, 0]) {
+        assert.throws(
+          () => computeFollowOnRatio([], { ...WINDOW, [key]: bad }),
+          new RegExp(`${key} must be a parseable ISO instant`),
+          `${key}=${String(bad)}`,
+        );
+      }
+    }
+    // Dates and ISO strings are the accepted shapes.
+    assert.doesNotThrow(() => computeFollowOnRatio([], {
+      windowStart: new Date(WINDOW.windowStart), windowEnd: new Date(WINDOW.windowEnd), asOf: new Date(WINDOW.asOf),
+    }));
+  });
+
+  test('F3: requireInstant (via __internal) rejects a number and accepts a string or Date', () => {
+    const { requireInstant } = __internal;
+    assert.throws(() => requireInstant(1717977600000, 'x'), /x must be a parseable ISO instant/);
+    assert.throws(() => requireInstant(0, 'x'), /x must be a parseable ISO instant/);
+    assert.throws(() => requireInstant('not-a-date', 'x'), /x must be a parseable ISO instant/);
+    assert.equal(requireInstant(new Date(D), 'x'), Date.parse(D));
+    assert.equal(requireInstant(D, 'x'), Date.parse(D));
+  });
+});

@@ -1256,3 +1256,109 @@ describe('LIN-1871 — options.windowDays (calendar window, not a row-count cap)
       /windowDays must be a positive finite number/);
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): characterization of the NaN-contract `toMs` ───────
+// Written BEFORE the swap to lib/utils/time.js#toEpochMs and green on the old
+// code. Junk is `undefined` (field absent) or 'not-a-date', NEVER `null`.
+// Row `dispatchedAt` is unvalidated row data (the gate row's is `windowStart`),
+// so these are the paths where a `null` that coerces to 0 would be dangerous.
+describe('junk timestamps (LIN-3456 characterization)', () => {
+  const JUNK = [undefined, 'not-a-date'];
+  const VERDICT_COMMENT = (createdAt) => comment('c1', '**Verdict: Approve** — ok.', createdAt);
+
+  test('control: a dated gate row resolves tier A from an in-window comment', () => {
+    const r = computeIssueRoundTrips(issue('ctl', {
+      rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z')],
+      comments: [VERDICT_COMMENT('2026-08-09T10:05:00.000Z')],
+    }), { asOf: ASOF });
+    assert.equal(r.R0.tier, 'a');
+    assert.equal(r.R0.verdict, 'approve');
+  });
+
+  test('a gate row with a missing/junk dispatchedAt has an empty comment window (no tier A)', () => {
+    for (const junk of JUNK) {
+      const r = computeIssueRoundTrips(issue('junk-gate', {
+        rows: [row('r1', 'plan-review', 'done', junk, '2026-08-09T10:30:00.000Z')],
+        // Would be in any window that started at the epoch: must NOT be picked up.
+        comments: [VERDICT_COMMENT('2026-08-09T10:05:00.000Z')],
+      }), { asOf: ASOF });
+      assert.notEqual(r.R0.tier, 'a', `dispatchedAt=${String(junk)}`);
+      assert.equal(r.R0.resolved, false);
+    }
+  });
+
+  test('a next row with a missing/junk dispatchedAt leaves the gate window empty (no tier A) and no lineageBleed', () => {
+    for (const junk of JUNK) {
+      const r = computeIssueRoundTrips(issue('junk-next', {
+        rows: [
+          row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z'),
+          row('r2', 'plan', 'done', junk, '2026-08-09T10:20:00.000Z'),
+        ],
+        comments: [VERDICT_COMMENT('2026-08-09T10:05:00.000Z')],
+      }), { asOf: ASOF });
+      assert.notEqual(r.R0.tier, 'a', `nextRow.dispatchedAt=${String(junk)}`);
+      assert.equal(r.lineageBleed, false);
+    }
+  });
+
+  test('an unparseable R0 completedAt is not a lineageBleed', () => {
+    const r = computeIssueRoundTrips(issue('junk-completed', {
+      rows: [
+        row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', 'not-a-date'),
+        row('r2', 'plan', 'done', '2026-08-09T10:15:00.000Z', '2026-08-09T10:20:00.000Z'),
+      ],
+    }), { asOf: ASOF });
+    assert.equal(r.lineageBleed, false);
+  });
+
+  test('comments with a missing/junk createdAt are ignored; the newest valid in-window one wins', () => {
+    for (const junk of JUNK) {
+      const r = computeIssueRoundTrips(issue('junk-comment', {
+        rows: [row('r1', 'plan-review', 'done', '2026-08-09T10:00:00.000Z', '2026-08-09T10:30:00.000Z')],
+        comments: [
+          comment('cj', '**Verdict: Request Changes** — junk-dated.', junk),
+          comment('c1', '**Verdict: Approve** — early.', '2026-08-09T10:05:00.000Z'),
+          comment('c2', '**Verdict: Needs Discussion** — newest.', '2026-08-09T10:15:00.000Z'),
+        ],
+      }), { asOf: ASOF });
+      assert.equal(r.R0.tier, 'a', `createdAt=${String(junk)}`);
+      assert.equal(r.R0.verdict, 'needs discussion');
+    }
+  });
+
+  test('windowDays: an issue whose only gate/re-pass rows have a missing/junk dispatchedAt is excluded', () => {
+    for (const junk of JUNK) {
+      const agg = computePlanReviewRoundTrips([
+        issue('junk-only', { rows: [row('r1', 'plan-review', 'done', junk, '2026-08-09T10:30:00.000Z')] }),
+        issue('dated', { rows: [row('r1', 'plan-review', 'done', '2026-08-05T01:00:00.000Z', '2026-08-05T01:05:00.000Z')] }),
+      ], { asOf: ASOF, windowDays: 30 });
+      assert.equal(agg.scale.issuesRead, 1, `dispatchedAt=${String(junk)}`);
+      assert.equal(agg.scale.issuesExcludedByWindow, 1);
+      assert.deepEqual(agg.perIssue.map((p) => p.identifier), ['LIN-dated']);
+    }
+  });
+
+  test('rulerContamination: a junk dispatchedAt on R0 or on its next row is never counted', () => {
+    for (const junk of JUNK) {
+      const agg = computePlanReviewRoundTrips([
+        issue('junk-r0', { rows: [
+          row('r1', 'plan-review', 'done', junk, '2026-08-01T00:05:00.000Z'),
+          row('r2', 'plan', 'done', '2026-08-03T00:00:00.000Z', '2026-08-03T00:05:00.000Z'),
+        ] }),
+        issue('junk-next', { rows: [
+          row('r1', 'plan-review', 'done', '2026-08-01T00:00:00.000Z', '2026-08-01T00:05:00.000Z'),
+          row('r2', 'plan', 'done', junk, '2026-08-03T00:05:00.000Z'),
+        ] }),
+      ], { asOf: ASOF, rulerChangeAt: '2026-08-02T00:00:00.000Z' });
+      assert.equal(agg.diagnostics.rulerContamination, 0, `dispatchedAt=${String(junk)}`);
+    }
+  });
+
+  test('requireInstant (via the entry points) rejects a number and junk; accepts a string and a Date', () => {
+    for (const bad of [1717977600000, 0, undefined, 'not-a-date']) {
+      assert.throws(() => computeIssueRoundTrips(issue('x'), { asOf: bad }), /asOf must be a parseable ISO instant/, String(bad));
+    }
+    assert.doesNotThrow(() => computeIssueRoundTrips(issue('x'), { asOf: ASOF }));
+    assert.doesNotThrow(() => computeIssueRoundTrips(issue('x'), { asOf: new Date(ASOF) }));
+  });
+});

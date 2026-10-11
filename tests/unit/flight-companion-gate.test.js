@@ -1124,3 +1124,66 @@ describe('LIN-2631 item 5: the lease is derived from the turn\'s own budget', ()
     }
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): characterization of the NaN-contract `toEpochMs` ──
+// Written BEFORE the swap to lib/utils/time.js#toEpochMs and green on the old
+// code. Junk is `undefined` (field absent) or 'not-a-date', NEVER `null`: a
+// `null` stamp is the legitimate "no stamp" value on these records and is
+// already guarded by `!= null` at the call sites.
+describe('shouldSpendTurn: junk stamps (LIN-3456 characterization)', () => {
+  const NOW = Date.parse('2026-09-01T12:00:00.000Z');
+  const JUNK = [undefined, 'not-a-date'];
+  const priorSnapshot = { lanes: lanes({}), attentionKeys: [], attentionCount: 0, truncated: false, censusRev: 1 };
+  const newDoc = () => census({ stateHash: 'hNew', rev: 2, lanesState: lanes({}), attention: [attentionRow('loop-1', 'blocked', 'review')] });
+  const prior = (extra) => companion({ lastCensusStateHash: 'hOld', lastCensusSnapshot: priorSnapshot, lastTurnAt: null, ...extra });
+
+  test('turnReservedUntil: a live lease blocks (control); a junk lease does not', () => {
+    const live = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ turnReservedUntil: new Date(NOW + 60000).toISOString() }), now: NOW });
+    assert.strictEqual(live.reason, 'turn-in-flight');
+    for (const junk of JUNK) {
+      const r = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ turnReservedUntil: junk }), now: NOW });
+      assert.strictEqual(r.spend, true, `turnReservedUntil=${String(junk)}`);
+      assert.strictEqual(r.reason, 'spend');
+    }
+  });
+
+  test('turnReservedUntil: an expired lease does not block', () => {
+    const r = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ turnReservedUntil: new Date(NOW - 1).toISOString() }), now: NOW });
+    assert.strictEqual(r.reason, 'spend');
+  });
+
+  test('lastTurnAt: a recent turn trips the floor (control); a junk lastTurnAt does not', () => {
+    const recent = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ lastTurnAt: new Date(NOW - 1000).toISOString() }), now: NOW });
+    assert.strictEqual(recent.reason, 'floor');
+    for (const junk of JUNK) {
+      const r = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ lastTurnAt: junk }), now: NOW });
+      assert.strictEqual(r.spend, true, `lastTurnAt=${String(junk)}`);
+      assert.strictEqual(r.reason, 'spend');
+    }
+  });
+
+  test('lastTurnAt: a turn older than the floor does not trip it', () => {
+    const r = shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({ lastTurnAt: new Date(NOW - DEFAULT_COMPANION_FLOOR_MS - 1).toISOString() }), now: NOW });
+    assert.strictEqual(r.reason, 'spend');
+  });
+
+  test('census lastSeenAt: a stale stamp reports sweep-not-seen (control); a junk stamp says nothing new', () => {
+    const same = (lastSeenAt) => ({ ...census({ stateHash: 'h1' }), lastSeenAt });
+    const companionDoc = companion({ lastCensusStateHash: 'h1', lastTurnAt: null });
+    const stale = shouldSpendTurn({ currentCensusDoc: same(new Date(NOW - DEFAULT_SWEEP_LIVENESS_HORIZON_MS - 1).toISOString()), companionDoc, now: NOW });
+    assert.strictEqual(stale.reason, 'sweep-not-seen');
+    for (const junk of JUNK) {
+      const r = shouldSpendTurn({ currentCensusDoc: same(junk), companionDoc, now: NOW });
+      assert.deepStrictEqual(r, { spend: false, surface: false, reason: 'hash-identical', nextRecord: null }, `lastSeenAt=${String(junk)}`);
+    }
+  });
+
+  test('the injected clock must be usable: undefined / junk string throws; a Date, ISO string and ms all work', () => {
+    for (const bad of JUNK) {
+      assert.throws(() => shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({}), now: bad }), /now \(epoch ms or Date\) is required/);
+    }
+    for (const ok of [NOW, new Date(NOW), new Date(NOW).toISOString()]) {
+      assert.strictEqual(shouldSpendTurn({ currentCensusDoc: newDoc(), companionDoc: prior({}), now: ok }).reason, 'spend');
+    }
+  });
+});
