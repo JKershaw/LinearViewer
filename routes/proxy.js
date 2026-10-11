@@ -65,7 +65,7 @@ import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { isRecommendationEnabled, getRecommendation, getPaidEnvKey } from '../lib/openrouter.js';
-import { loadRecentRuns } from '../lib/recent-runs.js';
+import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { resolveNorthStarSignal, resolveRoadmapNarrative, classifyReportFreshness, ROADMAP_REPORT_MAX_AGE_DAYS } from '../lib/next-run.js';
@@ -1640,7 +1640,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
           // (LIN-772/773); dropping it here silently hid the section on the LLM
           // recommendation path autopilot drives by default — the sibling of the
           // deterministic LIN-776 fix. `focusedChild` stays (the router reads it).
-          { parent, siblings, project, children, comments, focusedChild, attachments, runs: await loadRecentRuns(dispatchQueueStore, urlKey, issue.identifier) },
+          await prepareRecommendationInput({ parent, siblings, project, children, comments, focusedChild, attachments }, { dispatchQueueStore, urlKey, identifier: issue.identifier }),
           {
             apiKey: resolvedApiKey,
             model: selectedModel,
