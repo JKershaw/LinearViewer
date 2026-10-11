@@ -35,8 +35,8 @@ function legacyWorkspace(overrides = {}) {
     id: 'org-1',
     urlKey: 'acme',
     provider: 'linear',
-    credentials: { token: 'NEW-credential' },
-    accessToken: 'OLD-mirror',
+    credentials: { token: 'OLD-credential' },
+    accessToken: 'NEW-mirror',
     tokenExpiresAt: 1000,
     ...overrides,
   };
@@ -51,7 +51,7 @@ function connectionBackedBinding(overrides = {}) {
 }
 
 describe('LIN-3124 PR3 checkpoint A — legacy byte-identity', () => {
-  test('getWorkspaceToken(ws) equals the verbatim legacy E1 expression', () => {
+  test('getWorkspaceToken(ws) equals the one legacy field, accessToken (LIN-3464)', () => {
     const cases = [
       legacyWorkspace(),
       legacyWorkspace({ credentials: undefined }),
@@ -61,7 +61,7 @@ describe('LIN-3124 PR3 checkpoint A — legacy byte-identity', () => {
       undefined,
     ];
     for (const ws of cases) {
-      const expected = ws?.credentials?.token ?? ws?.accessToken;
+      const expected = ws?.accessToken;
       assert.strictEqual(getWorkspaceToken(ws), expected);
     }
   });
@@ -105,8 +105,8 @@ describe('LIN-3124 PR3 checkpoint A — legacy byte-identity', () => {
   });
 
   test('getWorkspaceCallScope legacy projections are byte-identical', () => {
-    assert.strictEqual(getWorkspaceCallScope(legacyWorkspace()), 'NEW-credential');
-    const gh = { ...legacyWorkspace(), provider: 'github', credentials: { token: 'gh' }, bindings: [{ provider: 'github', scope: 'o/r', credentials: { token: 'gh' } }] };
+    assert.strictEqual(getWorkspaceCallScope(legacyWorkspace()), 'NEW-mirror');
+    const gh = { ...legacyWorkspace(), provider: 'github', accessToken: 'gh', credentials: { token: 'gh' }, bindings: [{ provider: 'github', scope: 'o/r', credentials: { token: 'gh' } }] };
     assert.deepEqual(getWorkspaceCallScope(gh), { token: 'gh', repo: 'o/r' });
   });
 
@@ -148,8 +148,8 @@ describe('LIN-3124 PR3 checkpoint A — connection-backed fail-closed + hydrated
       assert.strictEqual(getWorkspaceCallScope(ws), 'conn-tok');
       // PR3 review blocker 1: a connection-backed workspace carries no raw
       // mirror, so the mirror/expiry accessors serve the Connection credential
-      // (legacy workspaces stay raw E2 — PR1's T1–T3 are unchanged).
-            assert.strictEqual(getWorkspaceTokenExpiry(ws), 4242);
+      // (legacy workspaces read the raw field — LIN-3464).
+      assert.strictEqual(getWorkspaceTokenExpiry(ws), 4242);
       // The bind itself still carries no credentials (nothing to persist).
       assert.strictEqual(b.credentials, undefined);
     } finally {

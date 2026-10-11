@@ -74,7 +74,7 @@ const GRID = [
     ws: { id: 'w-2', provider: 'jira', credentials: { token: 'OLD-credential' }, accessToken: 'NEW-mirror', tokenExpiresAt: 2_000 },
     mirror: 'NEW-mirror',
     expiry: 2_000,
-    e1: 'OLD-credential',
+    e1: 'NEW-mirror',
   },
   {
     name: 'no credentials',
@@ -88,7 +88,7 @@ const GRID = [
     ws: { id: 'w-4', provider: 'linear', credentials: { token: 'C-only' } },
     mirror: undefined,
     expiry: undefined,
-    e1: 'C-only',
+    e1: undefined,
   },
   {
     name: 'two same-provider bindings (mirror ignores bindings)',
@@ -157,7 +157,7 @@ describe('LIN-3124 PR1 T1 — S0 accessor identity grid (E1/E2, diverged state)'
       // The literal pre-change expressions.
       assert.strictEqual(mirrorExpr(c.ws), c.mirror, `mirrorExpr golden for ${c.name}`);
       assert.strictEqual(expiryExpr(c.ws), c.expiry, `expiryExpr golden for ${c.name}`);
-      // E1 stays unchanged.
+      // LIN-3464: E1 now reads the one legacy field, accessToken.
       assert.strictEqual(getWorkspaceToken(c.ws), c.e1, `getWorkspaceToken (E1) golden for ${c.name}`);
       // LIN-3464: the token has one reader; the expiry accessor is the raw field.
       assertAccessorGolden('getWorkspaceTokenExpiry', getWorkspaceTokenExpiry, c.ws, c.expiry);
@@ -184,11 +184,13 @@ describe('LIN-3124 PR1 T1 — S0 accessor identity grid (E1/E2, diverged state)'
 // its VM-slice harness: tests/unit/lin-2110-ensure-valid-token-refresh-gate.test.js
 // ("LIN-3124 PR1 T2 — ensureValidToken reads the raw tokenExpiresAt mirror").
 
-// LIN-3464: the state a refresh now leaves — one current token in both fields.
+// A genuinely pre-diverged legacy row (refreshed by the old headless mirror
+// before LIN-3464): `accessToken` is current, `credentials.token` is stale.
+// Every reader must send NEW-mirror — the canonical field is `accessToken`.
 const DIVERGED = Object.freeze({
   provider: 'linear',
   accessToken: 'NEW-mirror',
-  credentials: { token: 'NEW-mirror' },
+  credentials: { token: 'OLD-credential' },
   tokenExpiresAt: Date.now() + 3_600_000,
 });
 
