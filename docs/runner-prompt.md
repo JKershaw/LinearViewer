@@ -174,12 +174,21 @@ without the socket fails closed.
 
 **The closing contract**, appended to every subagent prompt:
 
-> When you finish, end your final message with exactly one line: `DONE: <one-line summary>`,
-> `FAILED: <why>`, or `BLOCKED: <what you need from a human>`.
+> When you finish, end your final message with exactly one outcome line: `DONE: <one-line summary>`,
+> `FAILED: <why>`, or `BLOCKED: <what you need from a human>`. If the person's choice is what you
+> need, write a `DECISION:` line just before the `BLOCKED:` line: `DECISION:` then one strict-JSON
+> object with a `decision_id` (a short unique string) and `options` (1 to 10 of
+> `{"id": "...", "label": "..."}`), optionally `question`, `recommended` (one option's `id`) and
+> `free_text`. Keep it under 2000 characters and never start a line inside it with `DONE:`,
+> `FAILED:` or `BLOCKED:`. The `DECISION:` line is not an outcome line.
 
 **When a subagent finishes**, post, in this order:
 
 1. `runner feedback <id> recap "<two to four sentences on what it did>"`
+   For `BLOCKED:` with a `DECISION:` line before it, also post the JSON object exactly as the
+   subagent wrote it (the text from its `{`, nothing added), as a `decision` entry **before** the
+   marker: `runner feedback <id> decision '<the JSON>'`. Harbour reads it as a ruling. Re-posting
+   the same `decision_id` is safe (the last one wins). Don't post a `decision` for `DONE:`/`FAILED:`.
 2. `runner usage <agentId>`: the `[usage]` line, from the subagent's own transcript. It carries
    the **realised** `harness` and `model` (what actually ran, never what the item asked for).
    With no readable transcript it posts the harness alone, which reads unpriced, never $0.
@@ -264,6 +273,7 @@ let running subagents finish or stop them, and report:
 ## Markers, exactly as Harbour reads them
 
 ```markers
+DECISION: {"decision_id":"keep-schema","question":"Which schema do we keep?","options":[{"id":"a","label":"Schema A"},{"id":"b","label":"Schema B"}],"recommended":"a"}
 [handoff] item 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b → subagent a1b2c3d4 (new)
 [handoff] item 7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f → subagent a1b2c3d4 (continued from 0f3a9c2e-1b4d-4e8f-9a7b-2c6d8e0f1a3b)
 [usage] {"schema":1,"harness":"claude-code","model":"claude-opus-5-5","inputTokens":130,"outputTokens":1050,"cacheCreationInputTokens":1500,"cacheCreation1hInputTokens":200,"cacheReadInputTokens":12300}
@@ -284,4 +294,4 @@ let running subagents finish or stop them, and report:
 
 `[handoff]` and `recap` are status only; `[usage]` is `kind: usage`; `[done]`, `[failed]`,
 `[aborted]` and `[skipped]` end an item (`[skipped]` wakes no one); `[blocked]` wakes the parent
-without ending the item.
+without ending the item. A `DECISION:` line is the subagent's own; the runner posts its JSON as a `decision` entry, then the `[blocked]` marker.
