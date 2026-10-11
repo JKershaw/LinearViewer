@@ -502,3 +502,59 @@ describe('formatEditionContext — roadmap branch (LIN-1212)', () => {
     assert.doesNotMatch(ctx, /LIN-8/);                     // archived bearing filtered upstream
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): characterization of the NaN-contract `toMs` ───────
+// Written BEFORE the swap to lib/utils/time.js#toEpochMs and green on the old
+// code. Junk is `undefined` (field absent) or 'not-a-date', NEVER `null`: `null`
+// is a distinct case in some of the sibling modules (LIN-3453 plan, test rule).
+
+describe('buildEditionModel — junk timestamps (LIN-3456 characterization)', () => {
+  test('a junk capturedAt never becomes earliest or latest, even with the highest seq', () => {
+    for (const junk of [undefined, 'not-a-date']) {
+      const m = buildEditionModel({
+        window: 'week', now: NOW,
+        taskSnapshotItems: [
+          { ...taskSnap('LIN-20', 3, { state: { name: 'In Progress', type: 'started' } }), seq: 1 },
+          { ...taskSnap('LIN-20', 2, { state: { name: 'Mid', type: 'started' } }), capturedAt: junk, seq: 99 },
+          { ...taskSnap('LIN-20', 1, { state: { name: 'In Review', type: 'started' } }), seq: 2 },
+        ],
+      });
+      const s = m.sources.find(x => x.id === 'task:LIN-20');
+      assert.strictEqual(s.snapshot.snapshots, 2, `the junk row (${String(junk)}) is outside every window`);
+      assert.strictEqual(s.snapshot.from, 'In Progress');
+      assert.strictEqual(s.snapshot.to, 'In Review');
+      assert.strictEqual(s.snapshot.capturedFrom, new Date(NOW - 3 * 86400000).toISOString());
+      assert.strictEqual(s.snapshot.capturedTo, new Date(NOW - 1 * 86400000).toISOString());
+    }
+  });
+
+  test('a junk first snapshot does not stick as earliest/latest', () => {
+    const m = buildEditionModel({
+      window: 'week', now: NOW,
+      taskSnapshotItems: [
+        { ...taskSnap('LIN-21', 2, { state: { name: 'Junk first', type: 'started' } }), capturedAt: 'not-a-date' },
+        taskSnap('LIN-21', 3, { state: { name: 'In Progress', type: 'started' } }),
+        taskSnap('LIN-21', 1, { state: { name: 'In Review', type: 'started' } }),
+      ],
+    });
+    const s = m.sources.find(x => x.id === 'task:LIN-21');
+    assert.strictEqual(s.snapshot.snapshots, 2);
+    assert.strictEqual(s.snapshot.from, 'In Progress');
+    assert.strictEqual(s.snapshot.to, 'In Review');
+  });
+
+  test('a source with an unparseable timestamp sorts as epoch 0: after every dated source', () => {
+    const m = buildEditionModel({
+      window: 'month', now: NOW,
+      sessions: [
+        // dispatchedAt is in the window (so it is admitted); completedAt wins the
+        // source timestamp and is junk.
+        sessionAt('s-junk', 1, { completedAt: 'not-a-date' }),
+        sessionAt('s-old', 20),
+        sessionAt('s-new', 2),
+      ],
+    });
+    const order = m.sources.map(x => x.id);
+    assert.deepStrictEqual(order, ['session:s-new', 'session:s-old', 'session:s-junk']);
+  });
+});

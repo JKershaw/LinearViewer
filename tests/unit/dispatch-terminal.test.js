@@ -497,3 +497,95 @@ describe('deriveLifecycleStatus (LIN-2079)', () => {
     });
   });
 });
+
+// ── LIN-3456 (LIN-3453 C): characterization of lineageFeedbackTimestampMs ────
+// Written BEFORE the swap to lib/utils/time.js#toEpochMs and green on the old
+// code. Junk is `undefined` (field absent) or 'not-a-date', NEVER `null`: on the
+// old code `null` parsed as epoch 0, and the swap deliberately changes that
+// (LIN-3453 plan, "the null rule"); it gets its own named test in the swap commit.
+describe('mergeLineageFeedback — junk timestamps (LIN-3456 characterization)', () => {
+  const ANCHOR = 'root-1';
+  const SINCE = '2026-08-20T00:00:00.000Z';
+  const entry = (message, timestamp, extra = {}) => ({ message, timestamp, ...extra });
+  const JUNK = [undefined, 'not-a-date'];
+
+  test('own entries with a missing/unparseable timestamp sort last, in input order, after the dated ones', () => {
+    for (const junk of JUNK) {
+      const own = [
+        entry('junk-1', junk),
+        entry('late', '2026-08-20T03:00:00.000Z'),
+        entry('junk-2', junk),
+        entry('early', '2026-08-20T01:00:00.000Z'),
+      ];
+      const merged = mergeLineageFeedback(own, [], ANCHOR, SINCE);
+      assert.deepEqual(merged.map(e => e.message), ['early', 'late', 'junk-1', 'junk-2'], `timestamp=${String(junk)}`);
+    }
+  });
+
+  test('a sibling entry with a junk timestamp is excluded (cannot be verified), a dated one is kept', () => {
+    for (const junk of JUNK) {
+      const siblings = [{ feedback: [
+        entry('sib-junk', junk, { rootItemId: ANCHOR }),
+        entry('sib-ok', '2026-08-20T02:00:00.000Z', { rootItemId: ANCHOR }),
+      ] }];
+      const merged = mergeLineageFeedback([entry('own', '2026-08-20T01:00:00.000Z')], siblings, ANCHOR, SINCE);
+      assert.deepEqual(merged.map(e => e.message), ['own', 'sib-ok'], `timestamp=${String(junk)}`);
+    }
+  });
+
+  test('a missing/unparseable `since` merges no siblings (fails closed)', () => {
+    const siblings = [{ feedback: [entry('sib', '2026-08-20T02:00:00.000Z', { rootItemId: ANCHOR })] }];
+    for (const junk of JUNK) {
+      const merged = mergeLineageFeedback([entry('own', '2026-08-20T01:00:00.000Z')], siblings, ANCHOR, junk);
+      assert.deepEqual(merged.map(e => e.message), ['own'], `since=${String(junk)}`);
+    }
+  });
+
+  test('a sibling entry before `since` is still excluded; one at `since` is kept (forward-only boundary)', () => {
+    const siblings = [{ feedback: [
+      entry('before', '2026-08-19T23:59:59.999Z', { rootItemId: ANCHOR }),
+      entry('at', SINCE, { rootItemId: ANCHOR }),
+    ] }];
+    const merged = mergeLineageFeedback([], siblings, ANCHOR, SINCE);
+    assert.deepEqual(merged.map(e => e.message), ['at']);
+  });
+
+  test('Date instances and ISO strings order together', () => {
+    const own = [entry('str', '2026-08-20T02:00:00.000Z'), entry('date', new Date('2026-08-20T01:00:00.000Z'))];
+    assert.deepEqual(mergeLineageFeedback(own, [], ANCHOR, SINCE).map(e => e.message), ['date', 'str']);
+  });
+});
+
+// LIN-3453 swap commit: the one deliberate tightening in this module. On the old
+// private parser `new Date(null).getTime()` was a VALID epoch 0, so a null `since`
+// admitted every sibling entry and a null timestamp sorted first. The docstring
+// promises the opposite (missing/unparseable sorts last; unverifiable `since`
+// excludes), and the shared parser makes `null` missing.
+describe('mergeLineageFeedback — null is missing, not epoch 0 (LIN-3453)', () => {
+  const ANCHOR = 'root-1';
+  const SINCE = '2026-08-20T00:00:00.000Z';
+  const entry = (message, timestamp, extra = {}) => ({ message, timestamp, ...extra });
+
+  test('null is missing, not epoch 0 (LIN-3453): a null `since` merges no siblings', () => {
+    const siblings = [{ feedback: [
+      entry('sib-1', '2026-08-20T02:00:00.000Z', { rootItemId: ANCHOR }),
+      entry('sib-2', '2026-08-21T02:00:00.000Z', { rootItemId: ANCHOR }),
+    ] }];
+    const merged = mergeLineageFeedback([entry('own', '2026-08-20T01:00:00.000Z')], siblings, ANCHOR, null);
+    assert.deepEqual(merged.map(e => e.message), ['own']);
+  });
+
+  test('null is missing, not epoch 0 (LIN-3453): a null timestamp sorts last, and a null sibling timestamp is excluded', () => {
+    const own = [
+      entry('null-ts', null),
+      entry('late', '2026-08-20T03:00:00.000Z'),
+      entry('early', '2026-08-20T01:00:00.000Z'),
+    ];
+    const siblings = [{ feedback: [
+      entry('sib-null', null, { rootItemId: ANCHOR }),
+      entry('sib-ok', '2026-08-20T02:00:00.000Z', { rootItemId: ANCHOR }),
+    ] }];
+    const merged = mergeLineageFeedback(own, siblings, ANCHOR, SINCE);
+    assert.deepEqual(merged.map(e => e.message), ['early', 'sib-ok', 'late', 'null-ts']);
+  });
+});
