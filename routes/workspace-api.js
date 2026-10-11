@@ -68,7 +68,7 @@ import { toSessionView } from '../lib/sessions-view.js';
 import { runAudit, computeAuditFromData } from '../lib/audit.js';
 import { UUID_REGEX, isValidIssueId, getWorkspaceMirrorToken, resolveIssueBinding, isActiveProviderLinear, applyAccessTokenToWorkspace, saveSession } from '../lib/workspace.js';
 import { adoptDurableCredentialIfDifferent } from '../lib/suspect-credential-refresh.js';
-import { isConnectionBacked, setBindingCredential, setWorkspaceCredential } from '../lib/connection-binding.js';
+import { activeConnectionBackedBinding, setBindingCredential, setWorkspaceCredential } from '../lib/connection-binding.js';
 import { fingerprintCredential } from '../lib/credential-diagnostics.js';
 // LIN-1552 Session A: the session-auth issue write routes reuse the SAME
 // symbolic-ref primitives the proxy write path uses, the shared trashed-signal
@@ -312,17 +312,6 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
   }
 
   return ok;
-}
-
-/**
- * LIN-3124 PR3 (D2): the workspace's active connectionId when its active binding
- * is connection-backed, else null. Store-free (connection-binding.js).
- */
-function connectionBackedId(workspace) {
-  const marker = workspace?.activeBinding;
-  if (!marker || !Array.isArray(workspace.bindings)) return null;
-  const binding = workspace.bindings.find(b => b && b.provider === marker.provider && b.scope === marker.scope);
-  return isConnectionBacked(binding) ? binding.connectionId : null;
 }
 
 /**
@@ -1712,7 +1701,7 @@ ${goal}`
         // per-request side-table — `applyAccessTokenToWorkspace` no-ops for such
         // a workspace, so without this the retry would read the stale credential.
         // The legacy path is byte-identical.
-        const activeConnectionId = connectionBackedId(workspace)
+        const activeConnectionId = activeConnectionBackedBinding(workspace)?.connectionId ?? null
         let adopted = null
         if (activeConnectionId && typeof adoptConnectionCredential === 'function') {
           const adoptedConnection = await adoptConnectionCredential({

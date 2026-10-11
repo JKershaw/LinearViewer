@@ -95,7 +95,7 @@ describe('LIN-3124 PR3 checkpoint C3 — source-text pins', () => {
   // re-link path).
 
   test('workspace-api adopt entrant uses the injected connection read + hydrates the side-table', () => {
-    assert.match(WORKSPACE_API_SRC, /connectionBackedId\(workspace\)/);
+    assert.match(WORKSPACE_API_SRC, /activeConnectionBackedBinding\(workspace\)\?\.connectionId/);
     assert.match(WORKSPACE_API_SRC, /adoptConnectionCredential\(\{/);
     assert.match(WORKSPACE_API_SRC, /setBindingCredential\(adoptedConnection\.binding, adoptedConnection\.credentialBag\)/);
     assert.match(WORKSPACE_API_SRC, /setWorkspaceCredential\(workspace, adoptedConnection\.credentialBag\)/);
