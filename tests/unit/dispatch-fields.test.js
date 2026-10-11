@@ -132,10 +132,10 @@ describe('isPositiveInteger', () => {
 });
 
 describe('RUN_FIELD_RULES', () => {
-  test('covers exactly the six rule fields, frozen', () => {
+  test('covers exactly the seven rule fields, frozen', () => {
     assert.deepEqual(
       Object.keys(RUN_FIELD_RULES).sort(),
-      ['cascade', 'force', 'maxTasks', 'queueIfBusy', 'subscription', 'waitForFollowUps']
+      ['cascade', 'force', 'maxTasks', 'queueIfBusy', 'stopAt', 'subscription', 'waitForFollowUps']
     );
     assert.equal(Object.isFrozen(RUN_FIELD_RULES), true);
     for (const rule of Object.values(RUN_FIELD_RULES)) {
@@ -152,6 +152,16 @@ describe('RUN_FIELD_RULES', () => {
     assert.equal(validateRunField('maxTasks', 40), null);
     for (const bad of [0, -1, 2.5, NaN, '2', true, [2], {}]) {
       assert.equal(validateRunField('maxTasks', bad), msg, String(bad));
+    }
+  });
+
+  test("stopAt: absent for undefined and null; only 'pr' accepted; exact message (LIN-3487)", () => {
+    const msg = "stopAt must be 'pr'";
+    assert.equal(validateRunField('stopAt', undefined), null);
+    assert.equal(validateRunField('stopAt', null), null);
+    assert.equal(validateRunField('stopAt', 'pr'), null);
+    for (const bad of ['', 'PR', 'merge', 'pr ', 0, false, true, {}, ['pr']]) {
+      assert.equal(validateRunField('stopAt', bad), msg, JSON.stringify(bad));
     }
   });
 

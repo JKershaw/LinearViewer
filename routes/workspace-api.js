@@ -49,6 +49,7 @@ const DUE_CHECK_CONCURRENCY = 5;
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
+import { validateRunField } from '../lib/dispatch-fields.js'
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
@@ -622,8 +623,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // contract (`routes/dispatch.js`).
     let stopAt = null
     if (typeof req.query.stopAt === 'string' && req.query.stopAt.trim() !== '') {
-      if (req.query.stopAt.trim() !== 'pr') {
-        return badRequest.json(res, "stopAt must be 'pr'")
+      const stopAtMsg = validateRunField('stopAt', req.query.stopAt.trim())
+      if (stopAtMsg) {
+        return badRequest.json(res, stopAtMsg)
       }
       stopAt = 'pr'
     }
@@ -734,8 +736,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     let maxTasks = null
     if (typeof req.query.maxTasks === 'string' && req.query.maxTasks.trim() !== '') {
       const parsedMaxTasks = Number(req.query.maxTasks.trim())
-      if (!Number.isInteger(parsedMaxTasks) || parsedMaxTasks < 1) {
-        return badRequest.json(res, 'maxTasks must be an integer >= 1')
+      const maxTasksRuleError = validateRunField('maxTasks', parsedMaxTasks)
+      if (maxTasksRuleError) {
+        return badRequest.json(res, maxTasksRuleError)
       }
       maxTasks = parsedMaxTasks
     }

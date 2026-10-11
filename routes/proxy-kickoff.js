@@ -7,8 +7,9 @@
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, classifyUpstreamError } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../lib/issue-write-validation.js';
-import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS } from '../lib/dispatch-validation.js';
-import { isValidSubscription, DEFAULT_SUBSCRIPTION, SUBSCRIPTION_LEVELS } from '../lib/dispatch-wake.js';
+import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS, isValidAutopilotVariant, targetError } from '../lib/dispatch-validation.js';
+import { validateRunField } from '../lib/dispatch-fields.js';
+import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { attachProxyContext, isStructuralGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
@@ -140,7 +141,7 @@ export function createKickoffRoutes({
         return badRequest.json(res, `mode must be one of: ${AUTOPILOT_MODES.join(', ')}`);
       }
       const resolvedVariant = variant === undefined ? AUTOPILOT_VARIANT_DEFAULT : variant;
-      if (!AUTOPILOT_VARIANTS.includes(resolvedVariant)) {
+      if (!isValidAutopilotVariant(resolvedVariant)) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
       }
@@ -156,9 +157,10 @@ export function createKickoffRoutes({
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffGoalValidationError.error);
       }
-      if (target !== undefined && !POLLED_TARGETS.includes(target)) {
+      const targetMsg = targetError(target, POLLED_TARGETS);
+      if (targetMsg) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, `target must be one of: ${POLLED_TARGETS.join(', ')}`);
+        return badRequest.json(res, targetMsg);
       }
       const kickoffRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
         maxLength: MAX_NAME_LENGTH,
@@ -185,9 +187,10 @@ export function createKickoffRoutes({
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
         return badRequest.json(res, kickoffSessionIdError.error);
       }
-      if (subscription !== undefined && !isValidSubscription(subscription)) {
+      const subscriptionRuleError = validateRunField('subscription', subscription);
+      if (subscriptionRuleError) {
         logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, `subscription must be one of: ${SUBSCRIPTION_LEVELS.join(', ')}`);
+        return badRequest.json(res, subscriptionRuleError);
       }
       // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
       // via the shared helper (type/length/dangerous-chars only — NOT checked
@@ -240,11 +243,10 @@ export function createKickoffRoutes({
       // (never a cost control; see the kickoff prose). Optional; validated here,
       // up front, following the presetId precedent just above. Absent/null ⇒ no
       // budget, byte-identical to today.
-      if (maxTasks !== undefined && maxTasks !== null) {
-        if (!Number.isInteger(maxTasks) || maxTasks < 1) {
-          logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-          return badRequest.json(res, 'maxTasks must be an integer >= 1');
-        }
+      const maxTasksRuleError = validateRunField('maxTasks', maxTasks);
+      if (maxTasksRuleError) {
+        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+        return badRequest.json(res, maxTasksRuleError);
       }
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
