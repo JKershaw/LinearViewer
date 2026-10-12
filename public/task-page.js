@@ -453,6 +453,20 @@
   }
 
   /**
+   * The one place that decides what a state-poll 404 means (LIN-3447). A guest
+   * page (`/t/:token`) whose link was revoked, or never issued, is gone: the
+   * handler replaces <main> with the notice. An owner page gets `null`, so its
+   * 404 stays an ordinary poll failure (the poller only stops on a 404 when it
+   * was handed an `onGone`). `init()` passes the result straight to the poller.
+   */
+  function goneHandlerFor(stateUrl, main) {
+    if (!isGuestStateUrl(stateUrl)) return null;
+    return function () {
+      main.innerHTML = '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>';
+    };
+  }
+
+  /**
    * Keep the load-time "approved, ready to merge" answer while the stored-data
    * poll reports `idle` (it can't see the ready state) and the box is still
    * ready. A polled running/waiting — a close-out session started — overrides.
@@ -568,10 +582,7 @@
         apply: apply,
         isVisible: function () { return !doc.hidden; },
         initial: initial,
-        onGone: isGuestStateUrl(main.getAttribute('data-state-url')) ? function () {
-          // A guest link that 404s (revoked, or never issued): the page is gone.
-          main.innerHTML = '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>';
-        } : null
+        onGone: goneHandlerFor(main.getAttribute('data-state-url'), main)
       });
       poller.start();
       doc.addEventListener('visibilitychange', function () { poller.onVisibilityChange(doc.hidden); });
@@ -602,6 +613,7 @@
       restoreCheckIns: restoreCheckIns,
       repaintHeader: repaintHeader,
       isGuestStateUrl: isGuestStateUrl,
+      goneHandlerFor: goneHandlerFor,
       shouldKeepReady: shouldKeepReady,
       contextNeedsRepaint: contextNeedsRepaint,
       enhanceMarkdown: enhanceMarkdown,

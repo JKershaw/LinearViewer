@@ -116,6 +116,32 @@ test.describe('Task share link (LIN-3330)', () => {
     await goneCtx.close();
   });
 
+  // LIN-3447: the guest-only 404 gate in the page's own init(). A guest who
+  // already has the page open when the owner revokes sees "no longer available"
+  // on the next poll, instead of a stale task that silently stopped updating.
+  test('a guest page that is open when the owner revokes the link shows the gone notice on its next poll', async ({ page, browser }) => {
+    await seedTask(page);
+    await seedSession(page);
+    const minted = await page.request.post(`/workspace/${URL_KEY}/api/task/LOCAL-SHARE1/share`, { data: { source: 'local' } });
+    expect(minted.status(), `mint failed: ${await minted.text()}`).toBe(201);
+    const { id, path } = await minted.json();
+
+    const guestCtx = await browser.newContext({ viewport: PHONE });
+    const guest = await guestCtx.newPage();
+    expect((await guest.goto(`${BASE}${path}`)).status()).toBe(200);
+    await expect(guest.locator('[data-testid="task-page-title"]')).toHaveText('A shared task');
+    await expect(guest.locator('[data-testid="task-share-gone"]')).toHaveCount(0);
+
+    const revoked = await page.request.post(`/workspace/${URL_KEY}/api/task/LOCAL-SHARE1/shares/${id}/revoke`);
+    expect(revoked.status()).toBe(200);
+
+    // One poll, forced the way the tab-return catch-up forces it.
+    await guest.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(guest.locator('[data-testid="task-share-gone"]')).toHaveText('This link is no longer available.');
+    await expect(guest.locator('[data-testid="task-page-title"]')).toHaveCount(0);
+    await guestCtx.close();
+  });
+
   test('the owner share controls create a link from the page and list it', async ({ page }) => {
     await seedTask(page);
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-SHARE1`);

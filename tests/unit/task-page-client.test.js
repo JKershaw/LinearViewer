@@ -251,6 +251,89 @@ describe('isGuestStateUrl (the onGone gate)', () => {
   });
 });
 
+// LIN-3447 (found by the LIN-3330 retrospective audit): the guest-only 404 gate
+// was tested only in halves (`createPoller` given an `onGone`, `isGuestStateUrl`
+// alone) — the join in `init()` was not, so `onGone: true ? …` and
+// `onGone: false ? …` both passed. `goneHandlerFor` is now the one place that
+// decides, and the second block drives the real `init()` through it.
+describe('goneHandlerFor (the one decision)', () => {
+  const { goneHandlerFor } = load();
+  const GUEST = '/t/' + 'A'.repeat(43) + '/state';
+  const OWNER = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
+
+  test('an owner state URL gets no handler, so its 404 stays a poll failure', () => {
+    assert.equal(goneHandlerFor(OWNER, { innerHTML: 'page' }), null);
+    assert.equal(goneHandlerFor('', { innerHTML: 'page' }), null);
+    assert.equal(goneHandlerFor(null, { innerHTML: 'page' }), null);
+  });
+
+  test('a guest state URL gets a handler that replaces <main> with the gone notice', () => {
+    const main = { innerHTML: '<p>the shared task</p>' };
+    const onGone = goneHandlerFor(GUEST, main);
+    assert.equal(typeof onGone, 'function');
+    assert.equal(main.innerHTML, '<p>the shared task</p>', 'building the handler changes nothing');
+    onGone();
+    assert.equal(main.innerHTML, '<p class="task-share-gone" data-testid="task-share-gone">This link is no longer available.</p>');
+  });
+});
+
+describe('init() wires the 404 gate (LIN-3447)', () => {
+  const GUEST = '/t/' + 'A'.repeat(43) + '/state';
+  const OWNER = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
+
+  /** Run the real DOMContentLoaded -> init(), then deliver one 404 to its poll. */
+  async function pageThatGets404(stateUrl) {
+    const timers = [];
+    let onReady = null;
+    const attrs = { 'data-state-url': stateUrl, 'data-status': 'running', 'data-live': 'true' };
+    const main = {
+      innerHTML: '<p>the task</p>',
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      setAttribute: (k, v) => { attrs[k] = v; },
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+    const doc = {
+      hidden: false,
+      querySelector: (sel) => (sel === '[data-testid="task-page"][data-state-url]' ? main : null),
+      querySelectorAll: () => [],
+      addEventListener: (type, fn) => { if (type === 'DOMContentLoaded') onReady = fn; },
+    };
+    const fetched = [];
+    const window = {
+      api: async (url) => { fetched.push(url); throw Object.assign(new Error('gone'), { status: 404 }); },
+    };
+    const ctx = {
+      module: { exports: {} }, window, Set, Math, Promise, Date, String, isNaN, Array,
+      document: doc,
+      setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+    };
+    vm.runInNewContext(SRC, ctx);
+    onReady();
+    assert.equal(timers.length > 0, true, 'init() started the poll loop');
+    timers.shift().fn();
+    await flush();
+    return { main, fetched, timers };
+  }
+
+  test('a guest page whose state URL 404s is replaced by the gone notice and stops polling', async () => {
+    const { main, fetched, timers } = await pageThatGets404(GUEST);
+    assert.deepEqual(fetched, [GUEST]);
+    assert.match(main.innerHTML, /data-testid="task-share-gone"/);
+    assert.match(main.innerHTML, /This link is no longer available\./);
+    assert.equal(timers.length, 0, 'no further poll is scheduled once the link is gone');
+  });
+
+  test('an owner page whose state URL 404s is left intact and keeps polling', async () => {
+    const { main, fetched, timers } = await pageThatGets404(OWNER);
+    assert.deepEqual(fetched, [OWNER]);
+    assert.equal(main.innerHTML, '<p>the task</p>');
+    assert.equal(timers.length, 1, 'the poll loop backs off and carries on');
+  });
+});
+
 // LIN-3340 G1/F2 (review `388f4246`): the owner's brief/recap widgets must be
 // mounted WITH the task's provider kind, or their GET/POST resolve the wrong
 // provider. A mutation dropping `source: source` left the suite green, because
