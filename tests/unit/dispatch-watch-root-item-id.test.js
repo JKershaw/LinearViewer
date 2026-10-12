@@ -8,12 +8,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-root-item-id-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore }) {
   const app = express();
@@ -57,8 +61,8 @@ async function call(app, method, path) {
 describe('LIN-1468 — watch endpoint rootItemId exposure', () => {
   test('feedback.rootItemId is present when tagged, absent (no null) when not, matching _formatFeedbackEntries', async () => {
     const dispatchQueueStore = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: harness.freshDb().collection('dispatch-queue'),
+      historyCollection: harness.freshDb().collection('dispatch-history')
     });
     const app = buildApp({ dispatchQueueStore });
 

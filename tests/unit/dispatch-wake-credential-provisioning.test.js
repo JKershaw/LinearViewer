@@ -22,7 +22,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
@@ -30,13 +30,17 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { applyDefaultDispatchHarness, shouldUseMcpTokenField } from '../../lib/proxy-preamble.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-wake-credential-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 
 function makeStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const collection = harness.freshDb().collection('dispatch-queue');
+  const historyCollection = harness.freshDb().collection('dispatch-history');
   const store = new DispatchQueueStore({ collection, historyCollection });
   return { store, collection, historyCollection };
 }
@@ -57,8 +61,8 @@ async function takenChild(store, overrides = {}, tokenLabel = 'token-a') {
   return child;
 }
 
-function wakeItems(collection, historyCollection) {
-  return [...collection._docs, ...historyCollection._docs].filter(d => d.kind === 'wake');
+async function wakeItems(collection, historyCollection) {
+  return [...(await collection.find({}).toArray()), ...(await historyCollection.find({}).toArray())].filter(d => d.kind === 'wake');
 }
 
 // ── Test 1: the honest witness — a real mint -> exchange -> validate chain ──
@@ -100,8 +104,8 @@ async function call(app, method, path, body, bearerToken) {
 describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate on the wake path', () => {
   test('a wake follow-up mints its OWN bootstrap; createdBy survives exchange + validate', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const proxyTokenStore = new ProxyTokenStore({ collection: createMockCollection() });
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const proxyTokenStore = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
 
     // The consumer's own dispatch token, owned by account-A (LIN-1397 shape) —
     // this is req.dispatchTokenOwner, threaded into the wake mint as createdBy.
@@ -117,7 +121,7 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
     const res = await call(app, 'post', `/api/dispatch/feedback/${child._id}`, { message: '[done] shipped' }, consumerToken);
     assert.equal(res.status, 200, JSON.stringify(res.body));
 
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the wake enqueued exactly once');
     const wake = wakes[0];
     assert.ok(wake.bootstrapToken, 'the wake carries its OWN minted bootstrap — distinct from the consumer token used to authenticate');
@@ -139,8 +143,8 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
 
   test('ownerless caller (harbour-feedback auth branch): wake STILL enqueues, token-less — never suppressed (LIN-1447 parity)', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const proxyTokenStore = new ProxyTokenStore({ collection: createMockCollection() });
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const proxyTokenStore = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     // A harbour feedback token store whose validateAndConsume sets urlKey/label
     // only — mirrors authenticateFeedbackToken's branch 1, which never sets
     // req.dispatchTokenOwner (routes/dispatch.js:194-197).
@@ -171,7 +175,7 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
     // the LIN-1430 review blocked, because it contradicts LIN-1447 (which stopped
     // POST /api/dispatch/broker-token 503ing for exactly this ownerless legacy
     // token) and reproduces the LIN-1428 stall: a parent that never wakes at all.
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the wake still enqueues for an ownerless caller — tolerate, never suppress (LIN-1447)');
     assert.equal(
       wakes[0].bootstrapToken,
@@ -183,7 +187,7 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
 
   test('no proxy token store: wake STILL enqueues, token-less — structural, not transient', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token: consumerToken } = await dispatchTokenStore.createToken(URL_KEY, 'consumer', 'account-A');
 
     const parent = await dispatchQueueStore.addItem(URL_KEY, { prompt: 'parent work', kind: 'implementation', harness: 'claude-code' });
@@ -194,7 +198,7 @@ describe('LIN-1430 S2 — the honest witness: real mint -> exchange -> validate 
     const res = await call(app, 'post', `/api/dispatch/feedback/${child._id}`, { message: '[done] shipped' }, consumerToken);
     assert.equal(res.status, 200, JSON.stringify(res.body));
 
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the wake still enqueues with no proxy token store — retrying cannot conjure one');
     assert.equal(wakes[0].bootstrapToken, null, 'token-less');
   });
@@ -226,7 +230,7 @@ describe('LIN-1430 S2 — donor rule: parent stored harness decides, never the c
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a', fn);
 
     assert.deepEqual(calls, ['claude-code'], 'the donor is the PARENT stored harness, never the finished child');
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1);
     assert.equal(wakes[0].bootstrapToken, 'synthetic-wake-token');
   });
@@ -241,7 +245,7 @@ describe('LIN-1430 S2 — donor rule: parent stored harness decides, never the c
 
     assert.deepEqual(calls, ['opencode']);
     assert.ok(res && res.success, 'feedback still written');
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the wake still enqueues, with no credential');
     assert.equal(wakes[0].bootstrapToken, null, 'a prose-harness donor gets no token, even though the child is claude-code');
   });
@@ -254,7 +258,7 @@ describe('LIN-1430 S2 — donor rule: parent stored harness decides, never the c
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a', fn);
 
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1);
     assert.equal(wakes[0].bootstrapToken, null);
   });
@@ -275,7 +279,7 @@ describe('LIN-1430 S2 — donor rule: parent stored harness decides, never the c
 
     assert.deepEqual(calls, [null], 'the store passes null straight through — never fabricates a default itself');
     assert.ok(res && res.success);
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1);
     assert.equal(wakes[0].bootstrapToken, 'synthetic-wake-token', 'null resolves toward claude-code and mints');
   });
@@ -288,7 +292,7 @@ describe('LIN-1430 S2 — donor rule: parent stored harness decides, never the c
     const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
 
     assert.ok(res && res.success);
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1);
     assert.equal(wakes[0].bootstrapToken, null, 'no callback -> no provisioning, exactly like before S2');
   });
@@ -314,12 +318,12 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
     assert.ok(res && res.success, 'the feedback entry is still written despite the provisioning failure');
     assert.equal(res.feedbackCount, 1);
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'no wake enqueued with no credential');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 0, 'no wake enqueued with no credential');
 
     // This child has no followUpTo, so it IS its own edge doc — the CAS witness
     // must NOT be set on a failed provision, or the terminal could never re-win
     // its election on retry (the lost-wake window this ordering exists to close).
-    const edgeAfter = historyCollection._docs.find(d => d._id === child._id);
+    const edgeAfter = (await historyCollection.find({}).toArray()).find(d => d._id === child._id);
     assert.ok(!(edgeAfter.terminalWakeItems || []).includes(child._id), 'CAS witness NOT set on a failed provision');
 
     const logged = logMock.mock.calls.map(c => c.arguments[0]);
@@ -337,7 +341,7 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
 
     assert.ok(res2 && res2.success);
     assert.ok(secondCallInvoked, 'the retry re-enters provisioning — self-heals from a transient mint failure');
-    const wakesAfterRetry = wakeItems(collection, historyCollection);
+    const wakesAfterRetry = await wakeItems(collection, historyCollection);
     assert.equal(wakesAfterRetry.length, 1, 'the retry succeeds and enqueues the wake');
     assert.equal(wakesAfterRetry[0].bootstrapToken, 'retry-token');
   });
@@ -352,7 +356,7 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
     const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a', degradingCallback);
 
     assert.ok(res && res.success);
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the wake enqueues despite having no credential');
     assert.equal(wakes[0].bootstrapToken, null);
 
@@ -360,7 +364,7 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
     // once-only witness must be set. Otherwise a re-report would enqueue a second
     // wake for the same terminal — trading the suppressed-wake bug for a
     // duplicate-wake one, and breaking the LIN-1357 once-only guarantee.
-    const edgeAfter = historyCollection._docs.find(d => d._id === child._id);
+    const edgeAfter = (await historyCollection.find({}).toArray()).find(d => d._id === child._id);
     assert.ok(
       (edgeAfter.terminalWakeItems || []).includes(child._id),
       'CAS witness IS set for a degraded-but-enqueued wake — once-only still holds'
@@ -375,7 +379,7 @@ describe('LIN-1430 S2 — provisioning failure is retryable, never loses feedbac
     // And a re-report is suppressed by the witness, not re-enqueued.
     const res2 = await store.addFeedback(child._id, URL_KEY, { message: '[done] re-reported' }, 'token-a', degradingCallback);
     assert.ok(res2 && res2.success);
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'no duplicate wake on re-report');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'no duplicate wake on re-report');
   });
 
   test('already-woke-for-this-item still suppresses correctly with a provisioning callback present (LIN-1357 coverage preserved)', async () => {

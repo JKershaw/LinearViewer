@@ -10,12 +10,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-repo-field-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore }) {
   const app = express();
@@ -58,8 +62,8 @@ async function call(app, path) {
 describe('LIN-2975 — /dispatch/:id (watch) carries repo', () => {
   test('a row with repo set echoes it on the watch response', async () => {
     const dispatchQueueStore = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: harness.freshDb().collection('dispatch-queue'),
+      historyCollection: harness.freshDb().collection('dispatch-history')
     });
     const app = buildApp({ dispatchQueueStore });
 
@@ -74,8 +78,8 @@ describe('LIN-2975 — /dispatch/:id (watch) carries repo', () => {
 
   test('a row without repo echoes repo: null, not absent', async () => {
     const dispatchQueueStore = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: harness.freshDb().collection('dispatch-queue'),
+      historyCollection: harness.freshDb().collection('dispatch-history')
     });
     const app = buildApp({ dispatchQueueStore });
 

@@ -9,12 +9,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-feedback-kind-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore }) {
   const app = express();
@@ -58,8 +62,8 @@ async function call(app, method, path) {
 describe('LIN-1475 — watch endpoint kind exposure', () => {
   test('feedback.kind is present when tagged, absent (no null) when not, matching _formatFeedbackEntries', async () => {
     const dispatchQueueStore = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: harness.freshDb().collection('dispatch-queue'),
+      historyCollection: harness.freshDb().collection('dispatch-history')
     });
     const app = buildApp({ dispatchQueueStore });
 
@@ -80,8 +84,8 @@ describe('LIN-1475 — watch endpoint kind exposure', () => {
 
   test('LIN-1425: kind:"usage" survives the watch endpoint\'s formatter unchanged', async () => {
     const dispatchQueueStore = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: harness.freshDb().collection('dispatch-queue'),
+      historyCollection: harness.freshDb().collection('dispatch-history')
     });
     const app = buildApp({ dispatchQueueStore });
 
@@ -102,8 +106,8 @@ describe('LIN-1475 — watch endpoint kind exposure', () => {
 
   test('LIN-1427: kind:"refusal" survives the watch endpoint\'s formatter unchanged', async () => {
     const dispatchQueueStore = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: harness.freshDb().collection('dispatch-queue'),
+      historyCollection: harness.freshDb().collection('dispatch-history')
     });
     const app = buildApp({ dispatchQueueStore });
 

@@ -24,22 +24,26 @@
  *    exists to close, reproduced inside the fix if either allowlist entry
  *    were missed.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-wake-witness-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 
 function makeStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const collection = harness.freshDb().collection('dispatch-queue');
+  const historyCollection = harness.freshDb().collection('dispatch-history');
   const store = new DispatchQueueStore({ collection, historyCollection });
   return { store, collection, historyCollection };
 }
 
-function wakeItems(collection, historyCollection) {
-  return [...collection._docs, ...historyCollection._docs].filter(d => d.kind === 'wake');
+async function wakeItems(collection, historyCollection) {
+  return [...(await collection.find({}).toArray()), ...(await historyCollection.find({}).toArray())].filter(d => d.kind === 'wake');
 }
 
 async function takenChild(store, overrides = {}) {
@@ -63,12 +67,12 @@ describe('LIN-1698 Phase 1 — wakeWitnessMeta seeded atomically with the termin
     const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     assert.ok(res && res.success);
 
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'exactly one wake minted');
     const mintedWakeId = wakes[0]._id;
 
     // This child has no followUpTo, so it IS its own edge doc.
-    const edge = historyCollection._docs.find(d => d._id === child._id);
+    const edge = (await historyCollection.find({}).toArray()).find(d => d._id === child._id);
     assert.ok(edge.terminalWakeItems?.includes(child._id), 'the once-only CAS witness is set');
     assert.ok(edge.wakeWitnessMeta, 'edge doc carries wakeWitnessMeta');
 
@@ -89,7 +93,7 @@ describe('LIN-1698 Phase 1 — wakeWitnessMeta seeded atomically with the termin
     await store.addFeedback(child._id, URL_KEY, { message: 'heartbeat 2' }, 'token-a');
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
 
-    const edge = historyCollection._docs.find(d => d._id === child._id);
+    const edge = (await historyCollection.find({}).toArray()).find(d => d._id === child._id);
     const witness = edge.wakeWitnessMeta[child._id];
     assert.equal(witness.feedbackIndex, 2, 'the terminal is the third (index 2) entry');
   });
@@ -99,7 +103,7 @@ describe('LIN-1698 Phase 1 — wakeWitnessMeta seeded atomically with the termin
     const item = await store.addItem(URL_KEY, { prompt: 'plain manual dispatch', kind: 'implementation' });
     await store.takeItem(item._id, URL_KEY, 'token-a');
 
-    const archived = historyCollection._docs.find(d => d._id === item._id);
+    const archived = (await historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.equal(archived.producingItemId, null);
     assert.equal(archived.producingItemAttempt, null);
   });
@@ -128,7 +132,7 @@ describe('LIN-1698 Phase 1 — failed-but-present: an addItem throw during mint 
     assert.equal(res, null);
     assert.ok(errMock.mock.calls.length >= 1, 'the failure is logged via the existing outer catch');
 
-    const edge = historyCollection._docs.find(d => d._id === child._id);
+    const edge = (await historyCollection.find({}).toArray()).find(d => d._id === child._id);
     assert.ok(
       edge.terminalWakeItems?.includes(child._id),
       'CAS witness stays set — no compensating $pull (the owner-superseded revision 1-3 design)'
@@ -163,7 +167,7 @@ describe('LIN-1698 Phase 1 — failed-but-present: an addItem throw during mint 
     // ships no re-mint / attempt-reservation CAS (out of scope; see the
     // ticket's §1 out-of-scope list) — a durably-lost wake stays lost until
     // the spun-out reconciliation-sweep ticket lands.
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'no wake minted — the CAS was already spent on the failed attempt');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 0, 'no wake minted — the CAS was already spent on the failed attempt');
   });
 });
 
@@ -175,15 +179,15 @@ describe('LIN-1698 Phase 1 — producingItemId/producingItemAttempt survive queu
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
 
-    const queuedWake = collection._docs.find(d => d.kind === 'wake');
+    const queuedWake = (await collection.find({}).toArray()).find(d => d.kind === 'wake');
     assert.ok(queuedWake, 'the wake is live in dispatch-queue before claim');
     assert.equal(queuedWake.producingItemId, child._id, 'threaded via addItem\'s field list');
     assert.equal(queuedWake.producingItemAttempt, 0);
 
     await store.takeItem(queuedWake._id, URL_KEY, 'consumer-token');
 
-    assert.ok(!collection._docs.some(d => d._id === queuedWake._id), 'the wake is gone from the active queue after claim');
-    const archivedWake = historyCollection._docs.find(d => d._id === queuedWake._id);
+    assert.ok(!(await collection.find({}).toArray()).some(d => d._id === queuedWake._id), 'the wake is gone from the active queue after claim');
+    const archivedWake = (await historyCollection.find({}).toArray()).find(d => d._id === queuedWake._id);
     assert.ok(archivedWake, 'the wake is archived to dispatch-history after claim');
     assert.equal(archivedWake.producingItemId, child._id, 'survives the _archiveItem allowlist hop — the load-bearing edit');
     assert.equal(archivedWake.producingItemAttempt, 0);
@@ -236,9 +240,9 @@ describe('LIN-1698 Phase 1 — structural pin: the CAS and the witness seed are 
   });
 });
 
-describe('mock-collection: dot-path $set support (LIN-1698)', () => {
+describe('MangoDB: dot-path $set support (LIN-1698)', () => {
   test('a dot-path $set creates nested structure without clobbering sibling keys', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('dot-path-set');
     await collection.insertOne({ _id: 'a', wakeWitnessMeta: { x: { attempt: 0 } } });
 
     await collection.updateOne({ _id: 'a' }, { $set: { 'wakeWitnessMeta.y': { attempt: 0, mintedWakeId: null } } });
@@ -249,7 +253,7 @@ describe('mock-collection: dot-path $set support (LIN-1698)', () => {
   });
 
   test('a deep dot-path $set updates a single leaf, leaving sibling leaves untouched', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('dot-path-set');
     await collection.insertOne({ _id: 'a', wakeWitnessMeta: { x: { attempt: 0, mintedWakeId: null, feedbackIndex: 0 } } });
 
     await collection.updateOne({ _id: 'a' }, { $set: { 'wakeWitnessMeta.x.mintedWakeId': 'wake-123' } });
@@ -260,7 +264,7 @@ describe('mock-collection: dot-path $set support (LIN-1698)', () => {
   });
 
   test('$addToSet and a dot-path $set compose in ONE update (mirrors the CAS + witness seed write)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('dot-path-set');
     await collection.insertOne({ _id: 'a', terminalWakeItems: [] });
 
     await collection.updateOne(
