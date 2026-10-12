@@ -4,7 +4,8 @@
  *
  * This exercises the REAL `server.js` resolver wiring — extracted verbatim into
  * `createWorkspaceTitleResolver` so it can be driven with a FAKE Linear client
- * (fake `fetchWorkspaceIssues`) and a fake sessions collection, rather than a
+ * (fake `fetchWorkspaceIssues`) and a REAL MangoDB sessions collection
+ * (tests/fixtures/mango-tmpdir.js, LIN-3519), rather than a
  * reimplementation. It closes close-out ledger item 1 for the parts CI can reach:
  * session scan → owner-scoped workspace-row pick (delegated to
  * `selectOwnerWorkspaceRow`, lib/workspace-token-resolver.js) → issue fetch → map
@@ -21,9 +22,14 @@
  * the old fixed `now: () => NOW` clock. Every fixture that reaches the selector
  * also needs `data.accountId` plus a matching `ownerAccountId` at the call site.
  */
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceTitleResolver } from '../../lib/workspace-title-resolver.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3526-workspace-title-resolver-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const BUFFER_MS = 5 * 60 * 1000; // mirrors TOKEN_REFRESH_BUFFER_MS
 const FAR_FUTURE_MS = 10_000_000; // ~2.8h — comfortably past the 5-minute refresh buffer
@@ -31,9 +37,11 @@ const PAST_MS = -10_000; // already expired
 
 const OWNER = 'account-A';
 
-// A fake Mongo/Mango sessions collection: `find({}).toArray()` yields the docs.
-function fakeSessions(docs) {
-  return { find: () => ({ toArray: async () => docs }) };
+// A real MangoDB sessions collection seeded with `docs` (explicit `_id`s).
+async function seedSessions(docs) {
+  const collection = harness.freshDb().collection('sessions');
+  if (docs.length) await collection.insertMany(docs.map((d, i) => ({ _id: `sess-${i}`, ...d })));
+  return collection;
 }
 
 // A fake "Linear client": records the workspace it was asked about and returns a
@@ -45,17 +53,17 @@ function fakeIssuesFetcher(issues) {
   return fn;
 }
 
-function make({ sessions = [], issues = [], fetchWorkspaceIssues } = {}) {
+async function make({ sessions = [], issues = [], fetchWorkspaceIssues } = {}) {
   const fetcher = fetchWorkspaceIssues || fakeIssuesFetcher(issues);
   const resolver = createWorkspaceTitleResolver({
-    sessionsCollection: fakeSessions(sessions),
+    sessionsCollection: await seedSessions(sessions),
     fetchWorkspaceIssues: fetcher
   });
   return { resolver, fetcher };
 }
 
 test('LIN-962/1986 glue: session scan → owner-scoped workspace pick → issue fetch → {identifier→title} map', async () => {
-  const { resolver, fetcher } = make({
+  const { resolver, fetcher } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'tok-acme', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }
     ],
@@ -74,7 +82,7 @@ test('LIN-962/1986 glue: session scan → owner-scoped workspace pick → issue 
 
 test('LIN-962/1986 glue: among the OWNER\'S OWN rows, picks the LATEST-expiring live token', async () => {
   const laterExpiry = Date.now() + FAR_FUTURE_MS + 10 * 60 * 1000;
-  const { resolver, fetcher } = make({
+  const { resolver, fetcher } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'stale-but-live', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } },
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'freshest', tokenExpiresAt: laterExpiry }] } },
@@ -91,7 +99,7 @@ test('LIN-962/1986 glue: among the OWNER\'S OWN rows, picks the LATEST-expiring 
 test('LIN-962/1986 glue: cross-account isolation — owner A never resolves via owner B\'s live-only row for the same urlKey', async () => {
   // The LIN-1986 regression test: pre-change (owner-blind) code would have
   // resolved this via account-B's live row despite account-A having none.
-  const { resolver, fetcher } = make({
+  const { resolver, fetcher } = await make({
     sessions: [
       { session: { accountId: 'account-B', workspaces: [{ urlKey: 'acme', accessToken: 'owner-b-live', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }
     ],
@@ -105,7 +113,7 @@ test('LIN-962/1986 glue: cross-account isolation — owner A never resolves via 
 });
 
 test('LIN-962/1986 glue: no ownerAccountId supplied → {} (fails closed, never falls back owner-blind)', async () => {
-  const { resolver, fetcher } = make({
+  const { resolver, fetcher } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'tok', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }
     ],
@@ -119,7 +127,7 @@ test('LIN-962/1986 glue: no ownerAccountId supplied → {} (fails closed, never 
 });
 
 test('LIN-962/1986 glue: a token expiring within the refresh buffer is not usable → {} (no fetch)', async () => {
-  const { resolver, fetcher } = make({
+  const { resolver, fetcher } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'about-to-expire', tokenExpiresAt: Date.now() + BUFFER_MS - 1000 }] } }
     ],
@@ -133,7 +141,7 @@ test('LIN-962/1986 glue: a token expiring within the refresh buffer is not usabl
 });
 
 test('LIN-962/1986 glue: a session stored as a JSON string is parsed', async () => {
-  const { resolver } = make({
+  const { resolver } = await make({
     sessions: [
       { session: JSON.stringify({ accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'tok', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] }) }
     ],
@@ -146,7 +154,7 @@ test('LIN-962/1986 glue: a session stored as a JSON string is parsed', async () 
 });
 
 test('LIN-962/1986 glue: a workspace missing an accessToken is skipped', async () => {
-  const { resolver, fetcher } = make({
+  const { resolver, fetcher } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } } // no accessToken
     ]
@@ -158,7 +166,7 @@ test('LIN-962/1986 glue: a workspace missing an accessToken is skipped', async (
 });
 
 test('LIN-962/1986 glue: no session references the workspace → {}', async () => {
-  const { resolver } = make({
+  const { resolver } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'someone-else', accessToken: 'tok', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }
     ]
@@ -167,7 +175,7 @@ test('LIN-962/1986 glue: no session references the workspace → {}', async () =
 });
 
 test('LIN-962/1986 glue: only issues carrying BOTH identifier and title enter the map', async () => {
-  const { resolver } = make({
+  const { resolver } = await make({
     sessions: [{ session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'tok', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }],
     issues: [
       { identifier: 'LIN-1', title: 'Kept' },
@@ -181,7 +189,7 @@ test('LIN-962/1986 glue: only issues carrying BOTH identifier and title enter th
 });
 
 test('LIN-962/1986 glue: fetchWorkspaceIssues throwing degrades to {} (never worse)', async () => {
-  const { resolver } = make({
+  const { resolver } = await make({
     sessions: [{ session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'tok', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }],
     fetchWorkspaceIssues: async () => { throw new Error('Linear 500'); }
   });
@@ -199,7 +207,7 @@ test('LIN-962/1986 glue: a sessions-store read failure degrades to {} (never thr
 test('LIN-962/1986 glue: resolveWorkspaceForTitles returns the raw workspace row with the owner\'s live token', async () => {
   // Direct assertion on the first half of the glue (the workspace pick), independent
   // of the issue fetch.
-  const { resolver } = make({
+  const { resolver } = await make({
     sessions: [
       { session: { accountId: OWNER, workspaces: [{ urlKey: 'acme', accessToken: 'tok', tokenExpiresAt: Date.now() + FAR_FUTURE_MS }] } }
     ]
@@ -211,7 +219,7 @@ test('LIN-962/1986 glue: resolveWorkspaceForTitles returns the raw workspace row
 
 test('LIN-962 glue: the NODE_ENV=test / urlKey=\'test-workspace\' short-circuit bypasses selection entirely', async () => {
   process.env.NODE_ENV = 'test';
-  const { resolver } = make({ sessions: [] });
+  const { resolver } = await make({ sessions: [] });
   const ws = await resolver.resolveWorkspaceForTitles('test-workspace', OWNER);
   assert.deepEqual(ws, { urlKey: 'test-workspace', accessToken: 'test-token' });
 });
