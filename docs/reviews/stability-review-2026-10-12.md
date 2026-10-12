@@ -106,8 +106,9 @@ Baseline read "rising, not asymptotic". Landings per ISO week (baseline era re-e
 | workspace-api ↔ server.js | 14% / 1.9 | **18% / 2.4** |
 | proxy family ↔ server.js | 9% / 1.0 | **21% / 2.1** |
 
-Landings are 30% bigger by src-file count but lift roughly doubled on all three pairs; proxy↔server went from
-independent (1.0) to coupled. Drivers (47 two-of-three landings in 30 days) are cross-cutting programmes:
+Landings are 30% bigger by src-file count, but lift rose on all three pairs (1.5→2.6, 1.9→2.3, 1.0→2.0 on 403
+landings on re-measurement; 2.9 / 2.4 / 2.1 as first measured, shown in the table), well beyond the +30% in landing
+size; proxy↔server went from independent (1.0) to coupled. Drivers (47 two-of-three landings in 30 days) are cross-cutting programmes:
 the connection/credential cutover (LIN-3124/3126/3240/3241/3335), runner and dispatch grants
 (LIN-3130/3131/3136/3137/3383/3409), one-path (LIN-3300), share links and their removal, and free-tier runs
 (LIN-3238/3239). The **W41 consolidation sweep** (LIN-3459/3460/3465/3469/3472, e.g. "route JSON error
@@ -227,7 +228,7 @@ not a worsening. SD: see F7.
 
 - **Trend Ledger rows:** the baseline's 9 stable names plus `decision-reversal`, `test-suite-accretion`,
   `opencode-runner-convergence`, `dispatch-entrance-churn`, `prompt-cluster-coupling`, `docs-index-churn`,
-  `periodic-loop-two-mechanisms`.
+  `periodic-loop-two-mechanisms`, `research-eval-programme`.
 - **Build-then-remove episodes:** bounded by the short-lived-file query since 06-25 plus the
   revert/retire/rollback subject scan since 05-01; members are F1's six plus `b6e7cf27` and `35dc0e14`.
 - **Hub surfaces:** bounded by the top-25 files by landings in the last 30 days: the proxy family (26 files),
@@ -252,7 +253,7 @@ resolved. SD rows are baseline (no prior series).
 | `route-boundary-coupling` (S3) | LV | change-coupling | low–med | lifts 2.9 / 2.4 / 2.1 (base 1.5 / 1.9 / 1.0) | entangling | **worsened** |
 | `test-suite-accretion` | LV | growth shape | low–med | tests 8.8× vs src 2.8×; CI 4.1 → 5.7 min | accelerating | **new** |
 | `research-eval-programme` | LV | excluded-path churn | low–med | ≈193k papers+eval lines in 30d, W40 peak | collapsing after W40 | new |
-| `true-reverts` | LV | rework | low–med | 3 in 30d (base 0) | up, clean reverts | **worsened** |
+| `true-reverts` | LV + SD | rework | low–med | 3 in 30d across both repos (LV 2, SD 1); base 0 | up, clean reverts | **worsened** |
 | `server-js-growth` (S2) | LV | surface rate | low | 16% of landings (base 14%); 4,582 lines | batch-stepped | unchanged (slightly worse) |
 | `opencode-runner-convergence` | SD | surface rate | low | 9 landings, 3 corrective, +56% size | not converging | new / baseline |
 | `dispatch-entrance-churn` | LV | surface rate | low | `dispatch.js` 13 / 15 landings W40–W41 | bursting | new |
@@ -279,7 +280,7 @@ steady build-out with almost no rework. Now it moves in bursts, and in the lates
 features were built and then taken out again, some within a day: share links, a feature switch for the brief
 writer, the ticket-closed sweep, ifParked, "merged by you". The removals were clean and nothing broke, so
 this is not thrash. It is decisions being made after the code lands rather than before. If it repeats it
-will cost review and CI time (CI is up from 4.1 to 5.7 minutes in five weeks, with test code growing three
+will cost review and CI time (CI is up from 4.1 to 5.7 minutes in four weeks, with test code growing three
 times faster than product code).
 
 Convergent signs: rework is flat at about 8%; the one-path prompt system deleted a whole coupling rule; the
@@ -301,14 +302,30 @@ next-run and collective tickets, since the backlog keeps pointing at code nobody
 **Tier 2** (fresh-context sub-agent, no memory of the report-writing turn; given the report and both repos).
 **Question:** "What is the largest item in this window that this report missed or misfiled?"
 
-**Reader's answer (summarised faithfully):** The W39–W41 research and eval programme, filed as
-`docs-index-churn` (severity none, "burst that collapsed"). Excluded paths took ~265k lines in 30 days
-(`docs/papers` +126.9k, `scripts/eval` +66.7k, `docs/reviews` +71k), more than product src. Largest landings
-#1748 (31.5k) and #1770 (27.7k). The report never links it to the F1 reversals. Smaller miss: SD's halt/auto-pause
-build-out, 8 landings on 09-25/26 (LIN-3041–3046), not in F7. On the top finding: partly DISAGREE; F1's
-episodes are real (confirmed `159b6822`, LIN-3325/3335/3426) but reversal is not the largest change. Numbers:
-landings 403 vs 404 (window edge); tests/unit 286,764 vs 285,967 lines; `scripts/survey-*` 167 files / 19.6k
-lines vs the report's 182 / 22k (deletions may explain; unverified); could not reproduce two LV `This reverts` bodies.
+**Reader's answer (verbatim):**
+
+> **(1) Largest item missed or misfiled: the W39–W41 research and eval programme.** The report files it as `docs-index-churn`, severity none, a "burst that collapsed". It is the biggest change in the window.
+>
+> - In the last 30 days, `docs/papers` took +126.9k lines across 496 file-touches. `scripts/eval` took +66.7k lines, and `docs/reviews` +71k.
+> - All three are excluded paths. Product src is 35.8k lines/wk. Together these are about 265k lines, which is more than the product src added in the whole window.
+> - By ISO week, `docs/papers` added 0.9k (W37), 3.0k (W38), 1.2k (W39), **92.9k (W40)**, 28.9k (W41). `scripts/eval` added 1.2k (W38), 23.5k (W39), **41.4k (W40)**, 0.6k (W41).
+> - Landings by raw size: #1748 (`3ad34935`, LIN-3309) is 31.5k lines, of which 30.2k is `scripts/eval`. #1770 (`4daba6c5`) is 27.7k lines, all `docs/papers`. #1598 is 22.3k lines, and the biggest of the lot, #1597, is 65.5k lines of review evidence.
+> - HEAD holds 211 `docs/papers` files (125k lines) and 221 `scripts/eval` files (87k lines).
+> - The report excludes these paths, then calls `docs/papers` "bookkeeping". The paper and eval work looks like it drove product direction: LIN-3300 one-path, the `meta-prompt-template.js` deletion, and the LIN-3309 next-stage choice. The report never links the W40 research programme to the six reversals in F1. Whether it caused them is unverified; it needs checking before F1's reading is trusted.
+>
+> A smaller miss is simple-dispatcher's halt/auto-pause build-out, merged 09-25 to 09-26 (LIN-3041 to 3046 and 3043 to 3045, 8 landings in 2 days). It is not in the report, and F7 covers only the OpenCode runner. It is not the largest item.
+>
+> **(2) Top finding: partly DISAGREE.**
+> - F1's episodes are real. I confirmed `159b6822` and `ce3c4ee8`, and the LIN-3325, LIN-3335 and LIN-3426 merges. But 54 short-lived files is a few thousand lines; the share-links removal alone is −8k lines (`dcfbf7fa`).
+> - Reversal fits the story best (the report itself treats reversals as direction changing faster than the build), but it is not the largest change. The ordering argument is thin: the report calls the removals "decisions after code lands", while the research programme is the unaccounted-for decision machinery.
+> - I would lead with the volume and shape of the W40 research and eval landing, then put reversal second, linked to it. The core F1 claim stands, but its "Medium" ranking depends on ignoring about 4 times more churn than the product src.
+>
+> **(3) Numbers checked.**
+> - Landings: 403 by my count in the window vs the report's 404, which is an off-by-one on the window boundary. ISO-week landings match: W40 141, W41 104.
+> - `server.js` is 4,582 lines (matches). `tests/unit` is 286,764 lines vs 285,967 reported (about 0.3% off). `lin-*` unit tests are 175 files (matches).
+> - The report says `scripts/survey-*` was 182 files and 22k lines in W40. I found 167 files in the 30-day window and 19.6k lines added (current `git ls-files` also shows 167). That is roughly 15 files and 2.4k lines lower. Files deleted since may explain it, but I did not verify that.
+> - SD has 35 landings since 09-12. That is consistent with the report's 6/wk in W40 and W41, and with 8 of 34 corrective, though I did not re-run the classifier.
+> - F5 says there are 3 true reverts in the last 30 days, two of them "This reverts commit". My `--grep='This reverts'` over first-parent merges since 09-12 found none. The `--grep=revert` search surfaced `159b6822`, but that is a "retire" commit with "revert" in its title. The report's count may be using a different method, such as non-first-parent history.
 
 **Response:** F1b added; F5 corrected; F1 left as top *measured-trajectory* finding because it is the only
 one that is a decision-quality signal, but the ranking is contestable and the maintainer should weigh F1b
