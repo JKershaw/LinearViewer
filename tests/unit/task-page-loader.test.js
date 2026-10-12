@@ -379,6 +379,12 @@ describe('session rows', () => {
       assert.equal(s.message, null);
     });
 
+    test('ended after a block without its own end marker: does not show the question', () => {
+      const [s] = msgs([loop({ ...question, bookkeeping: { by: 'close-out' } })]);
+      assert.equal(s.state, 'closed');
+      assert.equal(s.message, null);
+    });
+
     test('sessionMessage never falls back to waitingMessage', () => {
       assert.equal(sessionMessage(loop({ waitingMessage: '[blocked] stale' }), 'done'), null);
     });
