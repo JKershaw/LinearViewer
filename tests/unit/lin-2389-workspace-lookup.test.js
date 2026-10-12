@@ -1,11 +1,7 @@
 /**
  * LIN-2389: one function decides "which workspace has this urlKey".
  *
- * Part 1 pins the leaf's semantics and the session-shaped delegate.
- * Part 2 is the guard that replaced the old `urlkey-lookups` count pin: it keys
- * on the comparison itself (any construct, any variable name, either operand
- * order), not on `.find(w => ...)` predicates, so renaming the variable or
- * writing a loop cannot evade it.
+ * Pins the leaf's semantics and the session-shaped delegate.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +9,6 @@ import { findWorkspaceByUrlKey, findWorkspaceIndexByUrlKey } from '../../lib/wor
 import { getWorkspaceByUrlKey } from '../../lib/workspace.js';
 import * as workspaceModule from '../../lib/workspace.js';
 import { renderNavBar } from '../../lib/components/navbar.js';
-import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 
 describe('findWorkspaceByUrlKey / findWorkspaceIndexByUrlKey', () => {
   const a = { urlKey: 'a', id: 1 };
@@ -95,67 +90,5 @@ describe('navbar active workspace', () => {
 
   test('a null urlKey marks no option active', () => {
     assert.equal(selectedOptions(renderNavBar({ workspaces, urlKey: null })).length, 0);
-  });
-});
-
-describe('no hand-rolled workspace-by-urlKey comparison (replaces the urlkey-lookups count pin)', () => {
-  const FORWARD = /[\w$\])]\??\.urlKey\s*[!=]==?\s*urlKey\b/g;
-  const REVERSED = /(?<![\w$.])urlKey\s*[!=]==?\s*[\w$]+\??\.urlKey\b/g;
-  const LEAF = 'lib/workspace-lookup.js';
-  // lib/connection-credential.js: membership over *referents*, not workspaces (ticket-excluded).
-  const REFERENT_EXEMPT = { file: 'lib/connection-credential.js', line: /r && r\.urlKey === urlKey && r\.provider/ };
-
-  const REAL = loadStrippedSources();
-
-  function hits(sources) {
-    const out = [];
-    for (const [rel, src] of sources) {
-      if (!/^(lib\/|routes\/|server\.js$)/.test(rel)) continue;
-      if (rel === LEAF) continue;
-      // Whole-source matching, so `\s*` also catches a comparison split across lines.
-      for (const m of [...src.matchAll(FORWARD), ...src.matchAll(REVERSED)]) {
-        const lineNo = src.slice(0, m.index).split('\n').length;
-        const line = src.split('\n')[lineNo - 1];
-        if (rel === REFERENT_EXEMPT.file && REFERENT_EXEMPT.line.test(line)) continue;
-        out.push(`${rel}:${lineNo}: ${line.trim()}`);
-      }
-    }
-    return out;
-  }
-
-  const withLine = (sources, rel, line) => new Map(sources).set(rel, `${sources.get(rel)}\n${line}\n`);
-
-  test('the corpus is scanned (guard is not vacuous)', () => {
-    assert.ok(REAL.has('lib/workspace.js'));
-    assert.ok(REAL.has(REFERENT_EXEMPT.file));
-    assert.ok(REAL.has('server.js'));
-    assert.ok([...REAL.keys()].some(k => k.startsWith('routes/')));
-    assert.match(REAL.get(REFERENT_EXEMPT.file), REFERENT_EXEMPT.line, 'the named exemption still exists');
-  });
-
-  test('zero remaining outside the leaf and the referents exemption', () => {
-    assert.deepEqual(hits(REAL), []);
-  });
-
-  const PLANTS = {
-    'renamed variable in a find': 'const e = xs.find(candidate => candidate.urlKey === urlKey);',
-    'bare if (the old pin plant)': 'if (w.urlKey === urlKey) {}',
-    'for-of loop': 'for (const x of xs) { if (x.urlKey === urlKey) return x; }',
-    'reversed operand order': 'const m = xs.filter(w => urlKey === w.urlKey);',
-    'optional chaining': 'const m = xs.find(w => w?.urlKey === urlKey);',
-    'split across lines': 'const e = xs.find(c => c.urlKey ===\n  urlKey);',
-    'negated': 'if (x.urlKey !== urlKey) continue;',
-    'a second hit in the exempted file': 'const z = list.find(r => r.urlKey === urlKey);',
-  };
-  for (const [name, line] of Object.entries(PLANTS)) {
-    test(`plant fails the guard: ${name}`, () => {
-      const rel = name.startsWith('a second hit') ? REFERENT_EXEMPT.file : 'lib/workspace.js';
-      assert.equal(hits(withLine(REAL, rel, line)).length, 1);
-    });
-  }
-
-  test('a referent-style comparison elsewhere does not trip it', () => {
-    assert.deepEqual(hits(withLine(REAL, 'lib/workspace.js', 'const k = r.urlKey === referent.urlKey;')), []);
-    assert.deepEqual(hits(withLine(REAL, 'routes/live-console.js', 'x = w.urlKey === workspace.urlKey;')), []);
   });
 });

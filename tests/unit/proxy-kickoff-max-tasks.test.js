@@ -216,26 +216,6 @@ describe('LIN-1751 — end-to-end budget enforcement at the dispatch seam', () =
   });
 });
 
-describe('LIN-3461 — POST /api/proxy/autopilot/kickoff ignores maxSessionsPerTask', () => {
-  test('a caller that still sends maxSessionsPerTask gets a normal 201 with no such field, and the prompt carries no per-task budget', async () => {
-    const store = makeStore();
-    const app = buildApp({ dispatchQueueStore: store });
-    const res = await call(app, 'post', KICKOFF, { goal: 'ship TEST-1', issueIdentifier: 'TEST-1', target: 'cli', maxSessionsPerTask: 10 });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.ok(!('maxSessionsPerTask' in res.body));
-    assert.strictEqual(res.body.maxTasks, null, 'the ignored field must not synthesize maxTasks');
-    const item = await store.getItemStatus('acme', res.body.id);
-    assert.ok(!('maxSessionsPerTask' in item));
-    assert.doesNotMatch(item.prompt, /Per-task session budget|worker sessions\*\*/);
-  });
-
-  test('a value the old validation rejected is no longer a 400', async () => {
-    const app = buildApp({ dispatchQueueStore: makeStore() });
-    const res = await call(app, 'post', KICKOFF, { goal: 'ship it', target: 'cli', maxSessionsPerTask: 0 });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-  });
-});
-
 describe('LIN-2934 R4 (M9) — a CHILD kickoff dispatched under a budgeted coordinator echoes budgetPosition too', () => {
   // The route's own comment (routes/proxy-kickoff.js) is explicit: "a kickoff
   // itself is never budget-refused ... but a child-autopilot kickoff

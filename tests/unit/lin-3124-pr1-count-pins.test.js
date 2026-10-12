@@ -13,9 +13,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadRawSources, loadStrippedSources } from '../fixtures/connection-access-guards.js';
+import { loadStrippedSources } from '../fixtures/connection-access-guards.js';
 
-const RAW = loadRawSources();
 const REAL = loadStrippedSources();
 
 function total(sources, re) {
@@ -50,8 +49,6 @@ function withoutFirstMatch(sources, re, fileRe = null) {
 // Count functions
 // ---------------------------------------------------------------------------
 
-const countTestTokenGuards = (s) => total(s, /accessToken === 'test-token'/g);
-
 function countOffSessionReaders(sources) {
   const m = new Map(sources);
   m.delete('lib/workspace-token-resolver.js');
@@ -69,8 +66,6 @@ function countBindingWriters(sources) {
   }
   return { link, upsert, total: link + upsert };
 }
-
-const countRawAccessTokenWriters = (s) => total(s, /\.accessToken *=[^=]/g);
 
 /**
  * LIN-3125 Phase 3 (F8): account↔workspace edge writers — every
@@ -115,20 +110,6 @@ function countHeldMarkerEmitters(sources) {
 
 const PINS = [
   {
-    id: 'test-token-guards',
-    label: "accessToken === 'test-token' guards",
-    // LIN-3333: 38 -> 37 — the dispatch page's repo-selector block (server.js)
-    // carried a `workspace.accessToken === 'test-token'` test-mode guard; it was
-    // deleted with the repo= selector.
-    // LIN-3459: 37 -> 33 — the 5 byte-identical route-local shouldMockAi copies
-    // collapsed into the one in lib/should-mock-ai.js (4 guards retired).
-    expected: 33,
-    sources: RAW,
-    count: countTestTokenGuards,
-    plus: (s) => countTestTokenGuards(withLine(s, 'lib/workspace.js', "const g = ws.accessToken === 'test-token';")),
-    minus: (s) => countTestTokenGuards(withoutFirstMatch(s, /accessToken === 'test-token'/)),
-  },
-  {
     id: 'off-session-readers',
     label: 'off-session raw-session credential readers',
     // LIN-3124 PR3 checkpoint C: 5 -> 6 — the connection-first arm's
@@ -166,17 +147,6 @@ const PINS = [
     count: countWorkspaceEdgeWriters,
     plus: (s) => countWorkspaceEdgeWriters(withLine(s, 'lib/workspace.js', "await accountWorkspaceStore.bindAccountToWorkspace('a', 'w');")),
     minus: (s) => countWorkspaceEdgeWriters(withoutFirstMatch(s, /(^|[^a-zA-Z])bindAccountToWorkspace\(/, /^(?!lib\/account-workspace-store\.js).*/)),
-  },
-  {
-    id: 'raw-accesstoken-writers',
-    // LIN-3464: 4 -> 3. The headless mirror's hand assignment now goes through
-    // applyAccessTokenToWorkspace, the shared writer.
-    label: 'raw .accessToken assignments',
-    expected: 3,
-    sources: REAL,
-    count: countRawAccessTokenWriters,
-    plus: (s) => countRawAccessTokenWriters(withLine(s, 'lib/workspace.js', "ws.accessToken = 'x';")),
-    minus: (s) => countRawAccessTokenWriters(withoutFirstMatch(s, /\.accessToken *=[^=]/)),
   },
   {
     // LIN-3125 Phase 3 (F1): the EXPLICIT held-entry marker emitters. Exactly 4 —

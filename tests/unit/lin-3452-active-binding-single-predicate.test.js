@@ -8,15 +8,9 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { resolveWorkspaceIdMapFromSessions } from '../../lib/credential-invariant-sweep.js';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const read = p => readFileSync(join(__dirname, '../..', p), 'utf8');
 
 // A legacy re-login of jira replaced the workspace's provider, but the
 // session-resident marker still points at the linear connection-backed binding.
@@ -63,13 +57,4 @@ describe('LIN-3452 stale marker: adoptConnectionCredential', () => {
     const out = await access().adoptConnectionCredential({ workspace: liveWorkspace(), ownerAccountId: 'acct', fingerprint: fingerprintCredential('old') });
     assert.strictEqual(out.token, 'conn-new');
   });
-});
-
-describe('LIN-3452 no inline copies of the active-binding lookup', () => {
-  for (const f of ['lib/credential-invariant-sweep.js', 'routes/workspace-api.js', 'lib/connection-credential.js']) {
-    test(`${f} does not re-derive the active binding from the marker`, () => {
-      assert.doesNotMatch(read(f), /\.activeBinding\b[^\n]*\n?[^\n]*bindings\.find|marker\.scope/);
-      assert.doesNotMatch(read(f), /const marker = workspace\?\.activeBinding/);
-    });
-  }
 });

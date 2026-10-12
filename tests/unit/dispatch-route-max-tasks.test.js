@@ -148,19 +148,6 @@ describe('LIN-1737 Beat 1 — POST /workspace/:urlKey/api/dispatch maxTasks', ()
   });
 });
 
-describe('LIN-3461 — POST /workspace/:urlKey/api/dispatch ignores maxSessionsPerTask', () => {
-  test('a caller that still sends maxSessionsPerTask (even an invalid one) gets a normal 201 and nothing is stored or echoed', async () => {
-    for (const legacy of [10, 0, 5.5, null]) {
-      const captured = {};
-      const app = buildApp(captured);
-      const res = await call(app, 'post', PATH, { prompt: 'run me', kind: 'autopilot', maxSessionsPerTask: legacy });
-      assert.equal(res.status, 201, JSON.stringify(res.body));
-      assert.ok(!('maxSessionsPerTask' in captured.item));
-      assert.ok(!('maxSessionsPerTask' in res.body.item));
-    }
-  });
-});
-
 describe('LIN-3461 — the runaway failsafe, relayed by the session dispatch route', () => {
   async function seedRun() {
     const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });

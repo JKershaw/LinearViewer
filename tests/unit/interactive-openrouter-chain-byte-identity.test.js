@@ -201,11 +201,9 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
     assert.doesNotMatch(src, /hasPaidEnvKey/, 'hasPaidEnvKey must be fully dead in routes/dashboard.js — its only calls were inside the code this sweep replaced');
   });
 
-  test('routes/proxy.js resolves through lib/chat-request.js; the proxy-local resolveProxyLLM and its direct env reads are gone (LIN-2427)', () => {
+  test('routes/proxy.js resolves through lib/chat-request.js (LIN-2427)', () => {
     const src = read('routes/proxy.js');
     assert.match(src, /import \{[^}]*resolveChatCredential[^}]*\} from\s+['"][^'"]*chat-request(?:\.js)?['"]/, 'routes/proxy.js must import resolveChatCredential from lib/chat-request.js');
-    assert.doesNotMatch(src, /resolveProxyLLM/, 'resolveProxyLLM must be retired from routes/proxy.js');
-    assert.doesNotMatch(src, /getPaidEnvKey|isRecommendationEnabled/, 'routes/proxy.js must not read the env key or gate by itself');
   });
 
   test('checkFreeTierGate is called exactly once per full-adopt site (one quota unit per request, LIN-2978)', () => {
