@@ -17,7 +17,7 @@ import { TaskModeStore } from '../../lib/task-mode-store.js';
 import { FunnelEventStore } from '../../lib/funnel-event-store.js';
 import { buildCanonicalMap, isPullRequestUrl, stepsForAccountGroup, collectMilestoneFunnel, STEP_STATES } from '../../lib/milestone-funnel.js';
 import { isFreshRun, DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { createMangoTmpdir, recordingCollection } from '../fixtures/mango-tmpdir.js';
 
 const harness = createMangoTmpdir('lin-2952-milestone-');
 before(() => harness.connect());
@@ -509,15 +509,14 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
 
   test('R4: the aggregate dispatch read is projected to predicate + feedback-link fields only', async () => {
     const w = freshWorld();
-    const seen = [];
-    const recording = () => ({
-      find(_filter, options) { seen.push(options?.projection ?? null); return { toArray: async () => [] }; }
-    });
+    const queue = recordingCollection(w.dispatchQueue);
+    const history = recordingCollection(w.dispatchHistory);
 
     await collectMilestoneFunnel({
-      since: WINDOW_START, ...aggDeps(w), dispatchQueue: recording(), dispatchHistory: recording()
+      since: WINDOW_START, ...aggDeps(w), dispatchQueue: queue, dispatchHistory: history
     });
 
+    const seen = [...queue.__record.finds, ...history.__record.finds].map(f => f.options?.projection ?? null);
     assert.ok(seen.length >= 1, 'the aggregate read the dispatch collections');
     for (const projection of seen) {
       assert.equal(projection.prompt, undefined, 'prompt must never be projected');

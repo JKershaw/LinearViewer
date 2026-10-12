@@ -13,7 +13,7 @@
  *
  * Run with: node --test tests/unit/scan-routes.test.js
  */
-import { test, describe, before, beforeEach } from 'node:test';
+import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'http';
 import express from 'express';
@@ -24,46 +24,13 @@ import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
 import { dueBasisHashFromContext } from '../../lib/scan-fingerprint.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
-// Mirrors tests/unit/task-decisions-store.test.js's mock collection.
-function createMockCollection() {
-  const docs = [];
-  function matches(doc, query) {
-    if (query._id !== undefined && doc._id !== query._id) return false;
-    if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
-    if (query.issueId !== undefined && doc.issueId !== query.issueId) return false;
-    return true;
-  }
-  return {
-    _docs: docs,
-    async insertOne(doc) { docs.push(doc); return { insertedId: doc._id }; },
-    async findOne(query) { return docs.find(d => matches(d, query)) || null; },
-    find(query = {}) {
-      const results = docs.filter(d => matches(d, query));
-      return { async toArray() { return results.slice(); } };
-    },
-    async deleteOne(query) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx >= 0) { docs.splice(idx, 1); return { deletedCount: 1 }; }
-      return { deletedCount: 0 };
-    },
-    async updateOne(query, update, opts = {}) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx >= 0) {
-        Object.assign(docs[idx], update.$set || {});
-        return { matchedCount: 1, modifiedCount: 1, upsertedId: null };
-      }
-      if (opts.upsert) {
-        const doc = { ...(update.$set || {}) };
-        docs.push(doc);
-        return { matchedCount: 0, modifiedCount: 0, upsertedId: doc._id };
-      }
-      return { matchedCount: 0, modifiedCount: 0, upsertedId: null };
-    }
-  };
-}
+const harness = createMangoTmpdir('lin-3526-scan-routes-');
+before(() => harness.connect());
+after(() => harness.close());
 
 let collection, taskDecisionsStore, app;
 
@@ -99,7 +66,7 @@ function buildApp(extra = {}) {
 }
 
 beforeEach(() => {
-  collection = createMockCollection();
+  collection = harness.freshDb().collection('task-decisions');
   taskDecisionsStore = new TaskDecisionsStore({ collection });
   app = buildApp();
 });
@@ -193,7 +160,7 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     const second = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(second.body.id, first.body.id);
 
-    const rows = collection._docs.filter(d => d.issueId === '66666666-6666-6666-6666-666666666666');
+    const rows = await collection.find({ issueId: '66666666-6666-6666-6666-666666666666' }).toArray();
     assert.equal(rows.length, 1, 'refreshed in place, never duplicated');
   });
 
@@ -201,7 +168,7 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     const posted = await post(`/workspace/test-workspace/api/scan/${NON_UUID_ISSUE}`);
     assert.equal(posted.status, 422);
     assert.equal(posted.body.code, 'CANONICAL_ID_REQUIRED');
-    assert.equal(collection._docs.length, 0);
+    assert.equal(await collection.countDocuments({}), 0);
 
     const got = await get(`/workspace/test-workspace/api/scan/${NON_UUID_ISSUE}`);
     assert.equal(got.status, 422);
@@ -222,8 +189,7 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     // Simulate "ordinary task activity" moving the content hash — same
     // externally-observable effect as an unrelated comment/description
     // edit, without needing to mutate the fixture's own content.
-    const row = collection._docs.find(d => d._id === posted.body.id);
-    row.inputHash = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+    await collection.updateOne({ _id: posted.body.id }, { $set: { inputHash: 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' } });
 
     const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(got.status, 200);
@@ -242,8 +208,7 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     const posted = await post(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}`);
     assert.equal(posted.body.decision, null);
 
-    const row = collection._docs.find(d => d._id === posted.body.id);
-    row.inputHash = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+    await collection.updateOne({ _id: posted.body.id }, { $set: { inputHash: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' } });
 
     const got = await get(`/workspace/test-workspace/api/scan/${ZERO_FINDING_ISSUE}`);
     assert.equal(got.status, 200);
@@ -260,8 +225,7 @@ describe('GET/POST /workspace/:urlKey/api/scan/:issueId', () => {
     const dismissed = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}/dismiss`, { id: posted.body.id });
     assert.equal(dismissed.body.outcome, 'dismissed');
 
-    const row = collection._docs.find(d => d._id === posted.body.id);
-    row.inputHash = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+    await collection.updateOne({ _id: posted.body.id }, { $set: { inputHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' } });
 
     const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(got.status, 200);
@@ -404,10 +368,8 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     // The legacy-row path: every ruling raised before this landed. Reporting
     // `false` would assert a check that never happened.
     const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
-    const doc = collection._docs.find(d => d._id === posted.body.id);
-    assert.ok(doc, 'the scan row was written');
-    delete doc.basisHash;
-    delete doc.basisVersion;
+    assert.ok(await collection.findOne({ _id: posted.body.id }), 'the scan row was written');
+    await collection.updateOne({ _id: posted.body.id }, { $unset: { basisHash: '', basisVersion: '' } });
 
     const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(got.body.basisChanged, null);
@@ -417,9 +379,7 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     // The mass-false-positive guard, at the route boundary: bumping the
     // projection must not flag every pending ruling at once.
     const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
-    const doc = collection._docs.find(d => d._id === posted.body.id);
-    doc.basisVersion = 999;
-    doc.basisHash = 'a-hash-from-another-projection';
+    await collection.updateOne({ _id: posted.body.id }, { $set: { basisVersion: 999, basisHash: 'a-hash-from-another-projection' } });
 
     const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(got.body.basisChanged, null);
@@ -428,7 +388,7 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
   test('POST records a basisHash and the current basisVersion together', async () => {
     const { BASIS_VERSION } = await import('../../lib/scan-fingerprint.js');
     const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
-    const doc = collection._docs.find(d => d._id === posted.body.id);
+    const doc = await collection.findOne({ _id: posted.body.id });
     assert.ok(doc.basisHash, 'a basis digest is recorded at raise time');
     assert.equal(doc.basisVersion, BASIS_VERSION, 'stored beside the hash that produced it');
   });
@@ -441,7 +401,7 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
   test('POST records a dueBasisHash alongside basisHash, live, with NO harbourCommentsStore mounted — the [C-3] null-guard fail-open path', async () => {
     const { BASIS_VERSION } = await import('../../lib/scan-fingerprint.js');
     const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
-    const doc = collection._docs.find(d => d._id === posted.body.id);
+    const doc = await collection.findOne({ _id: posted.body.id });
 
     assert.ok(doc.dueBasisHash, 'a due-basis digest is recorded at raise time');
     // LIN-2665 L1: basisVersion and dueBasisVersion are SEPARATE fields — they
@@ -508,7 +468,7 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
       const withoutLedger = dueBasisHashFromContext(context, { recordedCommentIds: new Set() });
       assert.notEqual(withLedger, withoutLedger, 'sanity: the fixture makes exclusion observable in the hash');
 
-      const doc = collection._docs.find(d => d._id === posted.body.id);
+      const doc = await collection.findOne({ _id: posted.body.id });
       assert.equal(doc.dueBasisHash, withLedger, 'dueBasisHash computed with the Harbour comment excluded');
       assert.notEqual(doc.dueBasisHash, withoutLedger);
     } finally {
@@ -537,10 +497,11 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     // cross-version mismatch — stored beside its own `basisVersion: 1`.
     // `dueBasisHash: null` forces the [F-2] patch to fire on the next scan
     // (fresh !== stored).
-    const doc = collection._docs.find(d => d._id === posted.body.id);
-    doc.basisHash = 'frozen-v1-digest-not-equal-to-current-projection';
-    doc.basisVersion = 1;
-    doc.dueBasisHash = null;
+    await collection.updateOne({ _id: posted.body.id }, { $set: {
+      basisHash: 'frozen-v1-digest-not-equal-to-current-projection',
+      basisVersion: 1,
+      dueBasisHash: null
+    } });
 
     const before = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(before.body.basisChanged, null, 'sanity: the honest pre-refresh row already reads null via the version-mismatch branch');
@@ -549,8 +510,11 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     // [F-2] branch, which must touch ONLY dueBasisHash (+ its own version),
     // never tier-1's basisHash/basisVersion pairing.
     await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
-    assert.ok(doc.dueBasisHash, 'sanity: the due-basis refresh actually fired');
-    assert.equal(doc.basisHash, 'frozen-v1-digest-not-equal-to-current-projection', 'basisHash must stay frozen — tier-1 invariant');
+    // R2': re-read at the assertion — a reference bound before the re-scan would
+    // be a pre-call snapshot on the real engine and compare the row with itself.
+    const refreshed = await collection.findOne({ _id: posted.body.id });
+    assert.ok(refreshed.dueBasisHash, 'sanity: the due-basis refresh actually fired');
+    assert.equal(refreshed.basisHash, 'frozen-v1-digest-not-equal-to-current-projection', 'basisHash must stay frozen — tier-1 invariant');
 
     const after = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(after.body.basisChanged, null, 'LIN-2665 L1: a frozen v1 basisHash must never read as a current-version match after a due-basis-only refresh');
@@ -592,8 +556,7 @@ describe('scan routes — outcomeReason/outcomeBasisHash projection (LIN-2650 WS
 
   test('GET · stale carries outcomeReason/outcomeBasisHash for a self-resolved row whose content has since changed', async () => {
     const scanned = await selfResolvedRow();
-    const row = collection._docs.find(d => d._id === scanned.body.id);
-    row.inputHash = 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd';
+    await collection.updateOne({ _id: scanned.body.id }, { $set: { inputHash: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd' } });
 
     const got = await get(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
     assert.equal(got.body.status, 'stale');
@@ -873,7 +836,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
   const CACHE_URL_KEY = 'test-workspace';
 
   function buildCrossRouterApp() {
-    const localCollection = createMockCollection();
+    const localCollection = harness.freshDb().collection('task-decisions');
     const localTaskDecisionsStore = new TaskDecisionsStore({ collection: localCollection });
     let historyReads = 0;
     const dispatchQueueStore = {
@@ -946,9 +909,14 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     }
   }
 
-  async function assertInvalidatesAndBounded(app, historyReads, doWrite) {
+  // `openRulings` is how many standing (open, decision-bearing) rows the seed
+  // leaves for the rulings read to return. The mock collection could not evaluate
+  // the `{ urlKey: { $in }, outcome: null, decision: { $ne: null } }` query, so it
+  // always returned 0 and this used to be a hard-coded 0 even for an open seed row;
+  // the real engine returns the seeded row (LIN-3526 finding).
+  async function assertInvalidatesAndBounded(app, historyReads, doWrite, openRulings = 0) {
     const warm = await getRulings(app);
-    assert.equal(warm.count, 0);
+    assert.equal(warm.count, openRulings);
     assert.equal(historyReads(), 1, 'sanity: the first poll always reconstructs');
 
     const stillWarm = await getRulings(app);
@@ -974,7 +942,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     await assertInvalidatesAndBounded(app, historyReads, async () => {
       const result = await postLocal(app, `/workspace/${CACHE_URL_KEY}/api/scan/${DECISION_ISSUE}/dismiss`, { id: seeded.id });
       assert.equal(result.status, 200, 'the dismiss itself must succeed');
-    });
+    }, 1);
   });
 
   test('scan retire (workspace-api.js:2877) invalidates the rulings cache — witness 1+3', async () => {
@@ -988,7 +956,7 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
       const result = await postLocal(app, `/workspace/${CACHE_URL_KEY}/api/scan/${ZERO_FINDING_ISSUE}/retire`, { id: seeded.id });
       assert.equal(result.status, 200);
       assert.equal(result.body.retired, true, 'sanity: the retire itself must succeed');
-    });
+    }, 1);
   });
 
   test('scan unretire (workspace-api.js:2986) invalidates the rulings cache — witness 1+3', async () => {
