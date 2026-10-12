@@ -16,20 +16,24 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { recordWakeShadow, readWakeShadowTally, wakeShadowVerdictId } from '../../lib/wake-shadow.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-wake-shadow-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 
 function makeStore({ shadow = true } = {}) {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
-  const wakeShadowCollection = shadow ? createMockCollection() : null;
+  const collection = harness.freshDb().collection('dispatch-queue');
+  const historyCollection = harness.freshDb().collection('dispatch-history');
+  const wakeShadowCollection = shadow ? harness.freshDb().collection('wake-shadow') : null;
   const store = new DispatchQueueStore({ collection, historyCollection, wakeShadowCollection });
   return { store, collection, historyCollection, wakeShadowCollection };
 }
@@ -47,9 +51,9 @@ async function takenChild(store, overrides = {}) {
   return child;
 }
 
-function wakeRows(collection, historyCollection) {
-  const active = collection._docs.filter(d => d.kind === 'wake');
-  const archived = historyCollection ? historyCollection._docs.filter(d => d.kind === 'wake') : [];
+async function wakeRows(collection, historyCollection) {
+  const active = (await collection.find({}).toArray()).filter(d => d.kind === 'wake');
+  const archived = historyCollection ? (await historyCollection.find({}).toArray()).filter(d => d.kind === 'wake') : [];
   return [...active, ...archived];
 }
 
@@ -57,7 +61,7 @@ function wakeRows(collection, historyCollection) {
 
 describe('lib/wake-shadow.js — record + read', () => {
   test('records a verdict, bumps the tally, and stores the edge prior', async () => {
-    const c = createMockCollection();
+    const c = harness.freshDb().collection('wake-shadow');
     const day = new Date('2026-10-02T12:00:00.000Z');
     const verdict = await recordWakeShadow(c, {
       urlKey: URL_KEY,
@@ -70,32 +74,32 @@ describe('lib/wake-shadow.js — record + read', () => {
     });
     assert.deepEqual(verdict, { wouldSkip: false, reason: 'first-pause' });
 
-    const verdictDoc = c._docs.find(d => d._id === wakeShadowVerdictId('wake-1'));
+    const verdictDoc = (await c.find({}).toArray()).find(d => d._id === wakeShadowVerdictId('wake-1'));
     assert.ok(verdictDoc, 'a verdict doc is written');
     assert.equal(verdictDoc.wouldSkip, false);
     assert.equal(verdictDoc.reason, 'first-pause');
     assert.equal(verdictDoc.day, '2026-10-02');
 
-    const tally = c._docs.find(d => d._id === 'tally:acme:2026-10-02');
+    const tally = (await c.find({}).toArray()).find(d => d._id === 'tally:acme:2026-10-02');
     assert.equal(tally.minted, 1);
     assert.equal(tally.wouldSkip, 0);
     assert.equal(tally.byReason['first-pause'], 1);
   });
 
   test('a second identical pause marks wouldSkip with the repeat reason', async () => {
-    const c = createMockCollection();
+    const c = harness.freshDb().collection('wake-shadow');
     const now = new Date('2026-10-02T12:00:00.000Z');
     await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'w1', edgeId: 'e1', marker: 'pending', message: '[pending] waiting 12 min', now });
     const verdict = await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'w2', edgeId: 'e1', marker: 'pending', message: '[pending] waiting 15 min', now });
     assert.deepEqual(verdict, { wouldSkip: true, reason: 'repeat-same-message' });
-    const tally = c._docs.find(d => d._id === 'tally:acme:2026-10-02');
+    const tally = (await c.find({}).toArray()).find(d => d._id === 'tally:acme:2026-10-02');
     assert.equal(tally.minted, 2);
     assert.equal(tally.wouldSkip, 1);
     assert.equal(tally.byReason['repeat-same-message'], 1);
   });
 
   test('a terminal wake resets the prior, so the next pause is first-pause', async () => {
-    const c = createMockCollection();
+    const c = harness.freshDb().collection('wake-shadow');
     const now = new Date('2026-10-02T12:00:00.000Z');
     await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'w1', edgeId: 'e1', marker: 'pending', message: '[pending] waiting', now });
     const terminal = await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'w2', edgeId: 'e1', marker: 'done', message: '[done] shipped', now });
@@ -105,7 +109,7 @@ describe('lib/wake-shadow.js — record + read', () => {
   });
 
   test('readWakeShadowTally buckets by UTC day and applies the days window', async () => {
-    const c = createMockCollection();
+    const c = harness.freshDb().collection('wake-shadow');
     await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'a', edgeId: 'e1', marker: 'done', message: '[done] x', now: new Date('2026-09-30T12:00:00.000Z') });
     await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'b', edgeId: 'e1', marker: 'pending', message: '[pending] wait', now: new Date('2026-10-01T12:00:00.000Z') });
     await recordWakeShadow(c, { urlKey: URL_KEY, wakeRowId: 'c', edgeId: 'e1', marker: 'pending', message: '[pending] wait', now: new Date('2026-10-02T12:00:00.000Z') });
@@ -140,7 +144,7 @@ describe('addFeedback — shadow recording at mint time', () => {
     const res = await store.addFeedback(child._id, URL_KEY, { message: '[pending] waiting on LIN-3257' }, 'token-a');
     assert.ok(res && res.success);
 
-    const [wake] = wakeRows(collection, historyCollection);
+    const [wake] = await wakeRows(collection, historyCollection);
     assert.ok(wake, 'the wake was minted');
     const shadow = await store.getWakeShadow(URL_KEY, wake._id);
     assert.deepEqual(shadow, { wouldSkip: false, reason: 'first-pause' });
@@ -157,7 +161,7 @@ describe('addFeedback — shadow recording at mint time', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] not done - waiting 12 min' }, 'token-a');
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] Not done - waiting 15 min' }, 'token-a');
 
-    const wakes = wakeRows(collection, historyCollection);
+    const wakes = await wakeRows(collection, historyCollection);
     assert.equal(wakes.length, 2, 'every pause mints a wake (no suppression)');
     const shadows = await Promise.all(wakes.map(w => store.getWakeShadow(URL_KEY, w._id)));
     assert.deepEqual(shadows.map(s => s.wouldSkip), [false, true]);
@@ -171,7 +175,7 @@ describe('addFeedback — shadow recording at mint time', () => {
     const child = await takenChild(store);
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] waiting on LIN-1' }, 'token-a');
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] waiting on LIN-2' }, 'token-a');
-    const wakes = wakeRows(collection, historyCollection);
+    const wakes = await wakeRows(collection, historyCollection);
     const shadow = await store.getWakeShadow(URL_KEY, wakes[1]._id);
     assert.deepEqual(shadow, { wouldSkip: false, reason: 'target-changed' });
   });
@@ -182,7 +186,7 @@ describe('addFeedback — shadow recording at mint time', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] waiting' }, 'token-a');
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] waiting again' }, 'token-a');
-    const wakes = wakeRows(collection, historyCollection);
+    const wakes = await wakeRows(collection, historyCollection);
     const byReason = await Promise.all(wakes.map(w => store.getWakeShadow(URL_KEY, w._id)));
     assert.deepEqual(byReason.map(s => s.reason), ['first-pause', 'terminal', 'first-pause']);
   });
@@ -196,7 +200,7 @@ describe('addFeedback — shadow recording at mint time', () => {
     const noShadow = makeStore({ shadow: false });
     const c2 = await takenChild(noShadow.store);
     await noShadow.store.addFeedback(c2._id, URL_KEY, { message: '[pending] wait' }, 'token-a');
-    const [wake] = wakeRows(noShadow.collection, noShadow.historyCollection);
+    const [wake] = await wakeRows(noShadow.collection, noShadow.historyCollection);
     assert.equal(await noShadow.store.getWakeShadow(URL_KEY, wake._id), null, 'no collection → null');
   });
 });
@@ -242,7 +246,7 @@ describe('no-suppression characterization', () => {
     const res = await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     assert.deepEqual(res, { success: true, feedbackCount: 1 }, 'delivery result is unaffected');
     assert.equal(calls.length, 1, 'the wake was still enqueued');
-    assert.equal(wakeRows(collection, historyCollection).length, 1);
+    assert.equal((await wakeRows(collection, historyCollection)).length, 1);
   });
 
   test('the shadow never suppresses: every pause on an everything edge still mints a wake', async () => {
@@ -251,7 +255,7 @@ describe('no-suppression characterization', () => {
     for (const msg of ['[pending] waiting 1 min', '[pending] waiting 2 min', '[pending] waiting 3 min']) {
       await store.addFeedback(child._id, URL_KEY, { message: msg }, 'token-a');
     }
-    const wakes = wakeRows(collection, historyCollection);
+    const wakes = await wakeRows(collection, historyCollection);
     assert.equal(wakes.length, 3, 'all three repeats were delivered');
     const shadows = await Promise.all(wakes.map(w => store.getWakeShadow(URL_KEY, w._id)));
     assert.deepEqual(shadows.map(s => s.wouldSkip), [false, true, true], 'the shadow marks but does not suppress');
@@ -320,7 +324,7 @@ describe('proxy wake-shadow reads (LIN-3257)', () => {
     const { store } = makeStore();
     const child = await takenChild(store);
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] waiting on LIN-3257' }, 'token-a');
-    const [wake] = wakeRows(store.collection, store.historyCollection);
+    const [wake] = await wakeRows(store.collection, store.historyCollection);
 
     const app = buildProxyApp({ dispatchQueueStore: store });
     const wakeRes = await get(app, `/api/proxy/dispatch/${wake._id}`);
@@ -344,11 +348,11 @@ describe('proxy wake-shadow reads (LIN-3257)', () => {
     const { store, wakeShadowCollection } = makeStore();
     const child = await takenChild(store);
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
-    const before = wakeShadowCollection._docs.length;
+    const before = (await wakeShadowCollection.find({}).toArray()).length;
     const app = buildProxyApp({ dispatchQueueStore: store });
     const { status, body } = await get(app, '/api/proxy/wake-shadow?days=9999');
     assert.equal(status, 200);
     assert.ok(body.totals.minted >= 1);
-    assert.equal(wakeShadowCollection._docs.length, before, 'the read wrote nothing');
+    assert.equal((await wakeShadowCollection.find({}).toArray()).length, before, 'the read wrote nothing');
   });
 });

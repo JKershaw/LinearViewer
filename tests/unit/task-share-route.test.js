@@ -6,11 +6,15 @@
  *
  * Run with: node --test tests/unit/task-share-route.test.js
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createTaskShareRoutes } from '../../routes/task-share.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-task-share-');
+before(() => harness.connect());
+after(() => harness.close());
 import { TaskShareStore } from '../../lib/task-share-store.js';
 import { FIXTURE_SECRETS as F } from '../fixtures/secret-scan-fixtures.js';
 import { renderTaskPage, contextSignature, renderTaskContext } from '../../lib/render-task-page.js';
@@ -370,7 +374,7 @@ describe('the loader cache', () => {
 
 describe('TaskShareStore integration on the owner surface', () => {
   test('create → list → revoke → list over a real store', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('task-shares');
     const store = new TaskShareStore({ collection, now: () => NOW });
     const { base, close } = await build({ store });
     try {

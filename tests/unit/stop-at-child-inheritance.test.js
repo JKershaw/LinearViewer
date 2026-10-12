@@ -16,17 +16,21 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-stop-at-child-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function makeStore() {
-  return new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  return new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
 }
 
 function buildApp({ dispatchQueueStore }) {

@@ -1,10 +1,14 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-halt-store-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
@@ -29,19 +33,19 @@ function holdFindOneWithSnapshot(collection) {
 
 describe('WorkspaceHaltStore', () => {
   test('setWorkspaceHalt upserts the full document shape', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
     await store.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now });
 
-    assert.deepStrictEqual(collection._docs, [
+    assert.deepStrictEqual(await collection.find({}).toArray(), [
       { _id: URL_KEY, mode: 'pause', setAt: now, setBy: 'alice' }
     ]);
   });
 
   test('a second set overwrites mode/setAt/setBy (last write wins)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const firstNow = new Date('2026-01-01T00:00:00.000Z');
     const secondNow = new Date('2026-01-02T00:00:00.000Z');
@@ -49,20 +53,20 @@ describe('WorkspaceHaltStore', () => {
     await store.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now: firstNow });
     await store.setWorkspaceHalt(URL_KEY, { mode: 'stop', setBy: 'bob', now: secondNow });
 
-    assert.deepStrictEqual(collection._docs, [
+    assert.deepStrictEqual(await collection.find({}).toArray(), [
       { _id: URL_KEY, mode: 'stop', setAt: secondNow, setBy: 'bob' }
     ]);
   });
 
   test('getWorkspaceHalt returns null when unset', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
 
     assert.strictEqual(await store.getWorkspaceHalt(URL_KEY), null);
   });
 
   test('getWorkspaceHalt returns the doc shape when set', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -73,7 +77,7 @@ describe('WorkspaceHaltStore', () => {
   });
 
   test('clearWorkspaceHalt removes the document', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -84,7 +88,7 @@ describe('WorkspaceHaltStore', () => {
   });
 
   test('clearWorkspaceHalt on an unset key is harmless', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
 
     await assert.doesNotReject(() => store.clearWorkspaceHalt(URL_KEY));
@@ -92,7 +96,7 @@ describe('WorkspaceHaltStore', () => {
   });
 
   test('getWorkspaceHalt propagates a store error', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const sentinel = new Error('sentinel: findOne failed');
     collection.findOne = async () => { throw sentinel; };
     const store = new WorkspaceHaltStore({ collection });
@@ -101,7 +105,7 @@ describe('WorkspaceHaltStore', () => {
   });
 
   test('setWorkspaceHalt propagates a store error', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const sentinel = new Error('sentinel: updateOne failed');
     collection.updateOne = async () => { throw sentinel; };
     const store = new WorkspaceHaltStore({ collection });
@@ -110,7 +114,7 @@ describe('WorkspaceHaltStore', () => {
   });
 
   test('clearWorkspaceHalt propagates a store error', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const sentinel = new Error('sentinel: deleteOne failed');
     collection.deleteOne = async () => { throw sentinel; };
     const store = new WorkspaceHaltStore({ collection });
@@ -147,14 +151,14 @@ describe('WorkspaceHaltStore', () => {
 
 describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   test('getLastKnownHalt is cold (null) before any get/set', () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
 
     assert.strictEqual(store.getLastKnownHalt(URL_KEY), null);
   });
 
   test('a successful setWorkspaceHalt warms the cache with no prior read (write-only warming)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -164,7 +168,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('the warmed cache entry has no _id (contract-shaped projection)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -174,7 +178,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('a successful getWorkspaceHalt also warms the cache', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
     await collection.updateOne(
@@ -189,7 +193,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('set → clear → cache is null (a successful clear records null)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -200,7 +204,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('set → clear → a failing read still leaves the cache at null (omits the key)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -214,7 +218,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('two urlKeys are cached in isolation', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
 
@@ -225,7 +229,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('a late read cannot overwrite a newer clear (ordering guard)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
     await store.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now });
@@ -243,7 +247,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('a late read cannot overwrite a newer write (ordering guard)', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const firstNow = new Date('2026-01-01T00:00:00.000Z');
     const secondNow = new Date('2026-01-02T00:00:00.000Z');
@@ -262,7 +266,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('getWorkspaceHalt still propagates a store error even with the cache seam in place', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const sentinel = new Error('sentinel: findOne failed');
     collection.findOne = async () => { throw sentinel; };
     const store = new WorkspaceHaltStore({ collection });
@@ -272,7 +276,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('setWorkspaceHalt still propagates a store error and does not warm the cache', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const sentinel = new Error('sentinel: updateOne failed');
     collection.updateOne = async () => { throw sentinel; };
     const store = new WorkspaceHaltStore({ collection });
@@ -282,7 +286,7 @@ describe('WorkspaceHaltStore last-known cache seam (LIN-3024)', () => {
   });
 
   test('clearWorkspaceHalt still propagates a store error and does not clear the cache', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halt');
     const store = new WorkspaceHaltStore({ collection });
     const now = new Date('2026-01-01T00:00:00.000Z');
     await store.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now });

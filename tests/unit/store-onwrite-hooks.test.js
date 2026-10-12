@@ -3,18 +3,41 @@
  * AgentStatusStore (LIN-623). The seam must be byte-identical by default (no-op)
  * and fire-and-forget — never blocking or failing the write it rides on.
  */
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-onwrite-hooks-');
+before(() => harness.connect());
+after(() => harness.close());
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 
 const URL_KEY = 'acme';
-// Drain the fire-and-forget microtask the hook schedules.
-const drain = () => new Promise(resolve => setImmediate(resolve));
+// Drain the fire-and-forget work the hook schedules. `_notifyWriteForDoc` is not
+// awaited by the write it rides on, and on a followUpTo chain it resolves the
+// root through history reads — real I/O on MangoDB, so a single setImmediate
+// tick no longer outlasts it. Every store built here records the promise each
+// notify returns, and drain() awaits them, so "fired" and "did NOT fire" are
+// both asserted after the resolution has actually finished.
+const pendingNotifies = [];
+function makeDispatchStore(opts) {
+  const store = new DispatchQueueStore(opts);
+  const notify = store._notifyWriteForDoc.bind(store);
+  store._notifyWriteForDoc = (...args) => {
+    const done = notify(...args);
+    pendingNotifies.push(done);
+    return done;
+  };
+  return store;
+}
+const drain = async () => {
+  while (pendingNotifies.length) await pendingNotifies.shift();
+  await new Promise(resolve => setImmediate(resolve));
+};
 
 test('DispatchQueueStore default: no onWrite, writes succeed unchanged', async () => {
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
   const doc = await store.addItem(URL_KEY, { prompt: 'hi', issueIdentifier: 'LIN-1', sessionId: 'S1' });
   await drain();
   assert.ok(doc._id, 'addItem still returns the created doc with no hook wired');
@@ -22,7 +45,7 @@ test('DispatchQueueStore default: no onWrite, writes succeed unchanged', async (
 
 test('addItem fires onWrite for an autopilot kickoff with sessionId = its own id', async () => {
   const calls = [];
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history'), onWrite: p => calls.push(p) });
   const doc = await store.addItem(URL_KEY, { prompt: 'kickoff', kind: 'autopilot', issueIdentifier: 'LIN-1' });
   await drain();
   assert.equal(calls.length, 1);
@@ -31,7 +54,7 @@ test('addItem fires onWrite for an autopilot kickoff with sessionId = its own id
 
 test('addItem fires onWrite for a worker with its forwarded sessionId', async () => {
   const calls = [];
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history'), onWrite: p => calls.push(p) });
   await store.addItem(URL_KEY, { prompt: 'work', kind: 'implementation', issueIdentifier: 'LIN-2', sessionId: 'S1' });
   await drain();
   assert.deepEqual(calls, [{ urlKey: URL_KEY, sessionId: 'S1', issueIdentifier: 'LIN-2' }]);
@@ -39,7 +62,7 @@ test('addItem fires onWrite for a worker with its forwarded sessionId', async ()
 
 test('addItem does NOT fire for a sessionless manual dispatch (not in the feed)', async () => {
   const calls = [];
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history'), onWrite: p => calls.push(p) });
   await store.addItem(URL_KEY, { prompt: 'manual', kind: 'implementation', issueIdentifier: 'LIN-3' });
   await drain();
   assert.equal(calls.length, 0);
@@ -47,7 +70,7 @@ test('addItem does NOT fire for a sessionless manual dispatch (not in the feed)'
 
 test('_archiveItem (via takeItem) fires onWrite for a sessioned dispatch', async () => {
   const calls = [];
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history'), onWrite: p => calls.push(p) });
   const doc = await store.addItem(URL_KEY, { prompt: 'work', kind: 'implementation', issueIdentifier: 'LIN-2', sessionId: 'S1' });
   calls.length = 0; // ignore the addItem fire
   await store.takeItem(doc._id, URL_KEY, 'token-a');
@@ -57,7 +80,7 @@ test('_archiveItem (via takeItem) fires onWrite for a sessioned dispatch', async
 
 test('addFeedback fires onWrite for the fed-back session', async () => {
   const calls = [];
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: p => calls.push(p) });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history'), onWrite: p => calls.push(p) });
   const doc = await store.addItem(URL_KEY, { prompt: 'work', kind: 'implementation', issueIdentifier: 'LIN-2', sessionId: 'S1' });
   await store.takeItem(doc._id, URL_KEY, 'token-a');
   calls.length = 0;
@@ -75,11 +98,11 @@ test('addFeedback fires onWrite for the fed-back session', async () => {
 
 test('addItem with followUpTo pointing at a stamped worker fires onWrite for the worker\'s owning session (LIN-1307)', async () => {
   const calls = [];
-  const historyCollection = createMockCollection();
+  const historyCollection = harness.freshDb().collection('dispatch-history');
   // Seed the finalized worker row this follow-up resumes (kind !== 'autopilot',
   // carries its spawning session's sessionId).
-  historyCollection._docs.push({ _id: 'W1', urlKey: URL_KEY, kind: 'implementation', sessionId: 'S1', followUpTo: null });
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection, onWrite: p => calls.push(p) });
+  await historyCollection.insertOne({ _id: 'W1', urlKey: URL_KEY, kind: 'implementation', sessionId: 'S1', followUpTo: null });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection, onWrite: p => calls.push(p) });
 
   await store.addItem(URL_KEY, { prompt: 'reply', followUpTo: 'W1', issueIdentifier: 'LIN-9' });
   await drain();
@@ -89,9 +112,9 @@ test('addItem with followUpTo pointing at a stamped worker fires onWrite for the
 
 test('addItem with followUpTo pointing at an autopilot anchor fires onWrite with the anchor\'s own id (LIN-1307)', async () => {
   const calls = [];
-  const historyCollection = createMockCollection();
-  historyCollection._docs.push({ _id: 'S1', urlKey: URL_KEY, kind: 'autopilot', sessionId: null, followUpTo: null });
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection, onWrite: p => calls.push(p) });
+  const historyCollection = harness.freshDb().collection('dispatch-history');
+  await historyCollection.insertOne({ _id: 'S1', urlKey: URL_KEY, kind: 'autopilot', sessionId: null, followUpTo: null });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection, onWrite: p => calls.push(p) });
 
   await store.addItem(URL_KEY, { prompt: 'reply', followUpTo: 'S1', issueIdentifier: 'LIN-9' });
   await drain();
@@ -101,10 +124,10 @@ test('addItem with followUpTo pointing at an autopilot anchor fires onWrite with
 
 test('addItem with followUpTo resolving to a standalone/manual root does NOT fire onWrite (stays live-only, LIN-1307)', async () => {
   const calls = [];
-  const historyCollection = createMockCollection();
+  const historyCollection = harness.freshDb().collection('dispatch-history');
   // A standalone dispatch: not autopilot, no sessionId — the M1 case.
-  historyCollection._docs.push({ _id: 'M1', urlKey: URL_KEY, kind: 'implementation', sessionId: null, followUpTo: null });
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection, onWrite: p => calls.push(p) });
+  await historyCollection.insertOne({ _id: 'M1', urlKey: URL_KEY, kind: 'implementation', sessionId: null, followUpTo: null });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection, onWrite: p => calls.push(p) });
 
   await store.addItem(URL_KEY, { prompt: 'reply', followUpTo: 'M1', issueIdentifier: 'LIN-9' });
   await drain();
@@ -114,11 +137,11 @@ test('addItem with followUpTo resolving to a standalone/manual root does NOT fir
 
 test('addItem with a CHAINED followUpTo resolves through intermediate follow-ups to the ultimate root session (LIN-1307)', async () => {
   const calls = [];
-  const historyCollection = createMockCollection();
-  historyCollection._docs.push({ _id: 'W1', urlKey: URL_KEY, kind: 'implementation', sessionId: 'S1', followUpTo: null });
+  const historyCollection = harness.freshDb().collection('dispatch-history');
+  await historyCollection.insertOne({ _id: 'W1', urlKey: URL_KEY, kind: 'implementation', sessionId: 'S1', followUpTo: null });
   // F1 is itself a follow-up of W1, already archived (a prior reply-box round).
-  historyCollection._docs.push({ _id: 'F1', urlKey: URL_KEY, kind: 'implementation', sessionId: null, followUpTo: 'W1' });
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection, onWrite: p => calls.push(p) });
+  await historyCollection.insertOne({ _id: 'F1', urlKey: URL_KEY, kind: 'implementation', sessionId: null, followUpTo: 'W1' });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection, onWrite: p => calls.push(p) });
 
   // A second follow-up, resuming F1 (not W1 directly) — the chained case.
   await store.addItem(URL_KEY, { prompt: 'reply 2', followUpTo: 'F1', issueIdentifier: 'LIN-9' });
@@ -129,9 +152,9 @@ test('addItem with a CHAINED followUpTo resolves through intermediate follow-ups
 
 test('followUpTo-only writes fire the same way through _archiveItem/takeItem and addFeedback (LIN-1307)', async () => {
   const calls = [];
-  const historyCollection = createMockCollection();
-  historyCollection._docs.push({ _id: 'W1', urlKey: URL_KEY, kind: 'implementation', sessionId: 'S1', followUpTo: null });
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection, onWrite: p => calls.push(p) });
+  const historyCollection = harness.freshDb().collection('dispatch-history');
+  await historyCollection.insertOne({ _id: 'W1', urlKey: URL_KEY, kind: 'implementation', sessionId: 'S1', followUpTo: null });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection, onWrite: p => calls.push(p) });
 
   const doc = await store.addItem(URL_KEY, { prompt: 'reply', followUpTo: 'W1', issueIdentifier: 'LIN-9' });
   await drain();
@@ -149,7 +172,7 @@ test('followUpTo-only writes fire the same way through _archiveItem/takeItem and
 });
 
 test('a throwing onWrite never breaks the dispatch write (fire-and-forget)', async () => {
-  const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection(), onWrite: () => { throw new Error('boom'); } });
+  const store = makeDispatchStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history'), onWrite: () => { throw new Error('boom'); } });
   const doc = await store.addItem(URL_KEY, { prompt: 'work', kind: 'autopilot', issueIdentifier: 'LIN-1' });
   await drain();
   assert.ok(doc._id, 'write succeeded despite the hook throwing');
@@ -157,12 +180,12 @@ test('a throwing onWrite never breaks the dispatch write (fire-and-forget)', asy
 
 test('AgentStatusStore fires onWrite with the issue identifier; default is a no-op', async () => {
   const calls = [];
-  const store = new AgentStatusStore({ collection: createMockCollection(), onWrite: p => calls.push(p) });
+  const store = new AgentStatusStore({ collection: harness.freshDb().collection('agent-status'), onWrite: p => calls.push(p) });
   await store.recordStatus({ urlKey: URL_KEY, taskIdentifier: 'LIN-5', action: 'review', status: 'completed', summary: 'ok', dispatchId: 'W9' });
   await drain();
   assert.deepEqual(calls, [{ urlKey: URL_KEY, issueIdentifier: 'LIN-5', dispatchId: 'W9' }]);
 
-  const plain = new AgentStatusStore({ collection: createMockCollection() });
+  const plain = new AgentStatusStore({ collection: harness.freshDb().collection('agent-status') });
   const doc = await plain.recordStatus({ urlKey: URL_KEY, taskIdentifier: 'LIN-5', action: 'review', status: 'completed', summary: 'ok' });
   await drain();
   assert.ok(doc._id, 'recordStatus still works with no hook wired');
