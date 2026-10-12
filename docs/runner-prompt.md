@@ -119,8 +119,7 @@ or a token. Decisions are made **before** any take, in this order:
 2. **Harness.** Claude Code only.
 3. **Owner.** This runner runs only items the workspace owner enqueued, and wakes of the
    owner's own dispatches. Anything else is left queued. The owner-only rule is permanent — it
-   is this runner's own boundary, independent of how dispatch grants are enforced server-side;
-   see §7.
+   is this runner's own boundary, independent of how dispatch grants are enforced server-side.
 4. **Halt** (§6).
 5. **Credential life.** With less than {{FRESH_TAKE_MIN_TOKEN_LIFE_HOURS}}h left on the runner
    credential, fresh items are left queued; follow-ups, wakes and aborts still flow.
@@ -244,8 +243,6 @@ Halts ({{HALT_MODES}}) are binding here, with Simple Dispatcher's meaning.
   rests in a credential file (mode 600, in a mode-700 directory) and each item's broker listens on
   a same-user socket, so any process of the same OS user, subagents included, could read that
   file or use a live broker. Run only work you'd run yourself.
-- **Owner-only, always** (§3): a permanent boundary of this runner, independent of how dispatch
-  grants are enforced server-side.
 
 ## 8. End summary
 
