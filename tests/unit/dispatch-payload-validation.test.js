@@ -12,7 +12,20 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDispatchPayload } from '../../lib/dispatch-validation.js';
+import {
+  validateDispatchPayload,
+  abortFollowUpError,
+  abortToError,
+  cascadeAbortError,
+  dispatchKindError,
+  periodicalIdError,
+  isValidAutopilotVariant,
+  targetError,
+  followUpToError,
+} from '../../lib/dispatch-validation.js';
+import { DISPATCH_TARGETS, POLLED_TARGETS } from '../../lib/dispatch-targets.js';
+import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
+import { getPeriodicals } from '../../lib/periodicals.js';
 
 const UUID = '11111111-2222-4333-8444-555555555555';
 
@@ -311,5 +324,145 @@ describe('validateDispatchPayload — check ORDER (first error is load-bearing)'
     // and sessionId must still surface the issueId error first.
     const r = validateDispatchPayload({ prompt: 'x', issueId: 'no pe!', sessionId: '__meta__' });
     assert.deepEqual(r, { error: 'Invalid issueId format' });
+  });
+});
+
+// LIN-3487: the entrance checks the routes used to restate, now declared once.
+// Each returns the exact message the entrances always sent, or null.
+describe('abortFollowUpError', () => {
+  const MSG = 'abort and followUpTo are mutually exclusive';
+  test('abort with a followUpTo is rejected with the exact message', () => {
+    assert.equal(abortFollowUpError({ isAbort: true, followUpTo: UUID }), MSG);
+  });
+  test('null and undefined followUpTo are absent; no abort is never rejected', () => {
+    assert.equal(abortFollowUpError({ isAbort: true, followUpTo: undefined }), null);
+    assert.equal(abortFollowUpError({ isAbort: true, followUpTo: null }), null);
+    assert.equal(abortFollowUpError({ isAbort: false, followUpTo: UUID }), null);
+  });
+});
+
+describe('abortToError', () => {
+  const REQUIRED = 'abortTo is required and must be a UUID when abort is true';
+  const REQUIRES_ABORT = 'abortTo requires abort to be true';
+  test('with abort: a missing or non-UUID abortTo gets the required message', () => {
+    for (const bad of [undefined, null, '', 'nope', 42, `${UUID}x`]) {
+      assert.equal(abortToError({ isAbort: true, abortTo: bad }), REQUIRED, String(bad));
+    }
+  });
+  test('with abort: a UUID is accepted', () => {
+    assert.equal(abortToError({ isAbort: true, abortTo: UUID }), null);
+  });
+  test('without abort: abortTo is rejected, but undefined and null are absent', () => {
+    assert.equal(abortToError({ isAbort: false, abortTo: UUID }), REQUIRES_ABORT);
+    assert.equal(abortToError({ isAbort: false, abortTo: '' }), REQUIRES_ABORT);
+    assert.equal(abortToError({ isAbort: false, abortTo: undefined }), null);
+    assert.equal(abortToError({ isAbort: false, abortTo: null }), null);
+  });
+});
+
+describe('cascadeAbortError', () => {
+  test('cascade: true without abort is rejected with the exact message', () => {
+    assert.equal(cascadeAbortError({ isAbort: false, cascade: true }), 'cascade requires abort to be true');
+  });
+  test('cascade with abort, or not true, is accepted (the boolean type check is validateRunField)', () => {
+    assert.equal(cascadeAbortError({ isAbort: true, cascade: true }), null);
+    assert.equal(cascadeAbortError({ isAbort: false, cascade: false }), null);
+    assert.equal(cascadeAbortError({ isAbort: false, cascade: undefined }), null);
+  });
+});
+
+describe('dispatchKindError', () => {
+  test('rejects an unknown kind with the exact text listing DISPATCH_KINDS', () => {
+    assert.equal(dispatchKindError('nope'), `kind must be one of: ${DISPATCH_KINDS.join(', ')}`);
+    assert.match(dispatchKindError('nope'), /^kind must be one of: /);
+  });
+  test('undefined is absent; null is rejected', () => {
+    assert.equal(dispatchKindError(undefined), null);
+    assert.match(dispatchKindError(null), /^kind must be one of: /);
+  });
+  test('every declared kind is accepted', () => {
+    for (const kind of DISPATCH_KINDS) assert.equal(dispatchKindError(kind), null, kind);
+  });
+});
+
+describe('periodicalIdError', () => {
+  const MSG = 'periodicalId must be one of the known periodical template ids';
+  test('a registered id and undefined are accepted', () => {
+    assert.equal(periodicalIdError(undefined), null);
+    for (const { id } of getPeriodicals()) assert.equal(periodicalIdError(id), null, id);
+  });
+  test('an unknown id, null and the empty string are rejected with the exact message', () => {
+    for (const bad of ['no-such-periodical', null, '', 0]) {
+      assert.equal(periodicalIdError(bad), MSG, String(bad));
+    }
+  });
+});
+
+describe('isValidAutopilotVariant', () => {
+  test('accepts exactly standard and stepper', () => {
+    assert.equal(isValidAutopilotVariant('standard'), true);
+    assert.equal(isValidAutopilotVariant('stepper'), true);
+    for (const bad of ['', 'Standard', 'other', null, undefined, 1, ['standard']]) {
+      assert.equal(isValidAutopilotVariant(bad), false, String(bad));
+    }
+  });
+});
+
+describe('targetError', () => {
+  test('DISPATCH list: local is allowed; unknown and null are rejected with the exact text', () => {
+    const msg = 'target must be one of: cli, web, dash, local';
+    for (const ok of ['cli', 'web', 'dash', 'local', undefined]) {
+      assert.equal(targetError(ok, DISPATCH_TARGETS), null, String(ok));
+    }
+    for (const bad of ['nope', 'CLI', '', null, 0]) {
+      assert.equal(targetError(bad, DISPATCH_TARGETS), msg, String(bad));
+    }
+  });
+  test('POLLED list: local is rejected; the text lists cli, web, dash', () => {
+    const msg = 'target must be one of: cli, web, dash';
+    for (const ok of ['cli', 'web', 'dash', undefined]) {
+      assert.equal(targetError(ok, POLLED_TARGETS), null, String(ok));
+    }
+    for (const bad of ['local', 'nope', null]) {
+      assert.equal(targetError(bad, POLLED_TARGETS), msg, String(bad));
+    }
+  });
+});
+
+describe('followUpToError', () => {
+  const BAD_FORMAT = 'Invalid followUpTo format';
+  const BAD_TARGET = 'followUpTo is only supported for cli/web targets';
+  test('undefined and null followUpTo are absent whatever the target', () => {
+    for (const followUpTo of [undefined, null]) {
+      assert.equal(followUpToError({ followUpTo, target: 'dash' }), null);
+      assert.equal(followUpToError({ followUpTo, target: 'local' }), null);
+    }
+  });
+  test('a non-UUID is the format error, checked before the target', () => {
+    for (const bad of ['', 'nope', 42, `${UUID}x`, false]) {
+      assert.equal(followUpToError({ followUpTo: bad, target: 'dash' }), BAD_FORMAT, String(bad));
+    }
+  });
+  test('a UUID is accepted for cli, web and an absent or empty target (defaults to cli)', () => {
+    for (const target of ['cli', 'web', undefined, null, '']) {
+      assert.equal(followUpToError({ followUpTo: UUID, target }), null, String(target));
+    }
+  });
+  test('a UUID with dash or local is the cli/web error', () => {
+    for (const target of ['dash', 'local']) {
+      assert.equal(followUpToError({ followUpTo: UUID, target }), BAD_TARGET, target);
+    }
+  });
+  test('validateDispatchPayload still returns it as { error } at the same position', () => {
+    assert.deepEqual(validateDispatchPayload({ followUpTo: 'nope', target: 'dash' }), { error: BAD_FORMAT });
+    assert.deepEqual(validateDispatchPayload({ followUpTo: UUID, target: 'dash' }), { error: BAD_TARGET });
+  });
+});
+
+describe('validateDispatchPayload — force goes through the declared rule', () => {
+  test('a non-boolean force keeps its message, and null is still rejected', () => {
+    for (const bad of ['true', 1, null, {}]) {
+      assert.deepEqual(validateDispatchPayload({ force: bad }), { error: 'force must be a boolean' }, String(bad));
+    }
   });
 });

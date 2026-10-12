@@ -86,6 +86,16 @@ test('a member revoking a grant-bearing runner credential gets 403 RUNNER_OWNER_
   assert.equal(s.collection._docs().length, 1);
 });
 
+test('LIN-3491: a member revoking a dispatch-only agent-prompt-dispatch token gets 403 RUNNER_OWNER_ONLY and it survives', async (t) => {
+  const s = await setup({ ownerCheck: async () => ({ status: 'not-owner' }) });
+  t.after(s.close);
+  const agent = seedRunner(s.collection, { label: 'agent-prompt-dispatch', grants: ['dispatch'] });
+  const res = await s.del(agent._id);
+  assert.equal(res.status, 403);
+  assert.equal(res.body.code, 'RUNNER_OWNER_ONLY');
+  assert.equal(s.collection._docs().length, 1);
+});
+
 test('the owner revokes a grant-bearing runner credential', async (t) => {
   const s = await setup({ ownerCheck: async ({ accountId }) => ({ status: accountId === 'account-A' ? 'owner' : 'not-owner' }), accountId: 'account-A' });
   t.after(s.close);

@@ -1465,6 +1465,92 @@ describe('getRecommendation abort (LIN-346 gap #2)', () => {
 });
 
 // =============================================================================
+// Pre-aborted signal: getRecommendationStream / getRecommendation (LIN-2854)
+// =============================================================================
+// Same class as LIN-2637: an already-aborted signal fires no future `abort`
+// event, so listener-only wiring lets the call reach the transport. These pin
+// that the transport is never invoked (not merely that the call rejects).
+describe('recommendation calls with a pre-aborted signal (LIN-2854)', () => {
+  let savedProxyEnv;
+  const ISSUE = {
+    identifier: 'LIN-1', title: 'A leaf task', description: 'Do the thing.',
+    url: 'https://linear.app/test/issue/LIN-1', state: { name: 'In Progress', type: 'started' }
+  };
+  const CONTEXT = { parent: null, siblings: [], project: { description: '' }, children: [], comments: [], focusedChild: null };
+
+  beforeEach(() => {
+    savedProxyEnv = {
+      HTTPS_PROXY: process.env.HTTPS_PROXY, HTTP_PROXY: process.env.HTTP_PROXY,
+      https_proxy: process.env.https_proxy, http_proxy: process.env.http_proxy
+    };
+    delete process.env.HTTPS_PROXY; delete process.env.HTTP_PROXY;
+    delete process.env.https_proxy; delete process.env.http_proxy;
+  });
+
+  afterEach(() => {
+    setFetchImpl(null);
+    for (const [k, v] of Object.entries(savedProxyEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
+
+  function countingTransport() {
+    const state = { calls: 0 };
+    setFetchImpl(() => { state.calls++; throw new Error('transport must not be invoked'); });
+    return state;
+  }
+
+  test('getRecommendationStream with an already-aborted signal issues NO upstream request', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const transport = countingTransport();
+    const events = [];
+
+    await assert.rejects(
+      getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }, (type, data) => events.push({ type, data })),
+      /OpenRouter request timed out/
+    );
+    assert.strictEqual(transport.calls, 0, 'no request is made for a pre-aborted signal');
+    assert.strictEqual(events.length, 0, 'no events are emitted for a pre-aborted signal');
+  });
+
+  test('an abort landing during getRecommendationStream setup is caught before the transport', async () => {
+    const ac = new AbortController();
+    const transport = countingTransport();
+
+    const pending = getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }, () => {});
+    ac.abort();
+    await assert.rejects(pending, /OpenRouter request timed out/);
+    assert.strictEqual(transport.calls, 0, 'no transport call when the abort lands during setup');
+  });
+
+  test('getRecommendationStream proxy fallback with an already-aborted signal issues NO request', async () => {
+    process.env.HTTPS_PROXY = 'http://127.0.0.1:9';
+    const ac = new AbortController();
+    ac.abort();
+    const transport = countingTransport();
+
+    await assert.rejects(
+      getRecommendationStream(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }, () => {}),
+      /OpenRouter request timed out/
+    );
+    assert.strictEqual(transport.calls, 0);
+  });
+
+  test('getRecommendation with an already-aborted signal issues NO upstream request', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const transport = countingTransport();
+
+    await assert.rejects(
+      getRecommendation(ISSUE, CONTEXT, { apiKey: 'test-key', signal: ac.signal }),
+      /OpenRouter request timed out/
+    );
+    assert.strictEqual(transport.calls, 0, 'no request is made for a pre-aborted signal');
+  });
+});
+
+// =============================================================================
 // Injectable transport seam (LIN-1848)
 // =============================================================================
 // getRecommendation's transport is `customFetch` under a configured proxy — a

@@ -121,6 +121,18 @@ describe('LIN-3136 S7 — runner rows are the take holders only', () => {
     assert.doesNotMatch(rowOf('plain-1'), /\+dispatch/);
   });
 
+  test('LIN-3491: an agent-prompt-dispatch token lists as an ordinary row marked +dispatch', async () => {
+    const now = Date.now();
+    const page = loadProxyPage([{
+      tokenId: 'agent-work', label: 'agent-prompt-dispatch', scope: 'readWrite', kind: 'standard', singleUse: false,
+      consumed: false, hasOwner: true, grants: ['dispatch'], parentTokenId: 'agent-boot', createdAt: iso(now - 1000),
+      lastUsedAt: null, expiresAt: iso(now + 47 * 3600e3)
+    }]);
+    const html = await ordinaryListHtml(page);
+    assert.match(html, /data-token-id="agent-work"/);
+    assert.match(html, /\[\+dispatch\]/);
+  });
+
   test('a consumed grant-bearing bootstrap is hidden (its revoke would kill the live lineage)', async () => {
     const page = loadProxyPage(fixtures());
     const html = await ordinaryListHtml(page);
@@ -147,18 +159,29 @@ describe('LIN-3136 S7 — runner rows are the take holders only', () => {
 });
 
 describe('LIN-3136 — the Settings "Generate agent prompt" states that a readWrite token cannot enqueue', () => {
-  function agentPrompt(scope) {
+  // `respond` is the mint response (scope/grants come from it, never the picker);
+  // `fail` makes the mint reject with that error; `toggle` is window.ProxyToggle.
+  function agentPrompt(pick, { respond, fail, toggle } = {}) {
     const generateBtn = makeEl({ closest: () => ({ dataset: { urlKey: 'acme' } }) });
-    const scopeSelect = makeEl({ value: scope });
+    const scopeSelect = makeEl({ value: pick });
     const promptOutput = makeEl();
     const feedback = makeEl();
     const copied = [];
+    const requests = [];
+    const defaultRespond = { token: 'BOOT', tokens: [], providerDisplayName: null, scope: pick, grants: [] };
+    const win = {
+      location: { origin: 'https://harbour.test' },
+      relativeTime: () => 'just now',
+      api: async (url, opts) => {
+        if (!url.includes('/api/proxy/tokens')) return {};
+        requests.push(JSON.parse(opts.body));
+        if (fail) throw fail;
+        return respond || defaultRespond;
+      }
+    };
+    if (toggle) win.ProxyToggle = toggle;
     const sandbox = {
-      window: {
-        location: { origin: 'https://harbour.test' },
-        relativeTime: () => 'just now',
-        api: async (url) => (url.includes('/api/proxy/tokens') ? { token: 'BOOT', tokens: [], providerDisplayName: null } : {})
-      },
+      window: win,
       document: {
         getElementById: (id) => ({
           'proxy-generate-btn': generateBtn, 'proxy-scope-select': scopeSelect,
@@ -176,18 +199,84 @@ describe('LIN-3136 — the Settings "Generate agent prompt" states that a readWr
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
     vm.runInContext(PROXY_SRC, sandbox, { filename: 'proxy.js' });
-    return { generateBtn, copied };
+    return { generateBtn, copied, requests, feedback };
   }
+
+  const CANNOT = 'It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.';
+  const CAN = 'It also holds the dispatch grant, so it can enqueue work (`POST /dispatch`, `/recommend-and-dispatch`, `/autopilot/kickoff`)';
+  const click = async (h) => { assert.ok(h.generateBtn._handlers.click, 'the generate button is wired'); await h.generateBtn._handlers.click[0](); await flush(); };
 
   test('readWrite: the prompt ends with the cannot-enqueue clause; read: unchanged', async () => {
     for (const [scope, expectClause] of [['readWrite', true], ['read', false]]) {
-      const { generateBtn, copied } = agentPrompt(scope);
-      assert.ok(generateBtn._handlers.click, 'the generate button is wired');
-      await generateBtn._handlers.click[0]();
-      await flush();
-      const text = copied[0] || '';
+      const h = agentPrompt(scope);
+      await click(h);
+      const text = h.copied[0] || '';
       assert.ok(text.includes(`Your token scope is: ${scope}.`), `${scope}: ${text.slice(-200)}`);
-      assert.equal(text.includes('It cannot enqueue work: the dispatch routes return 403 `DISPATCH_GRANT_REQUIRED`.'), expectClause, scope);
+      assert.equal(text.includes(CANNOT), expectClause, scope);
+      assert.ok(!text.includes(CAN), scope);
+      assert.deepEqual(h.requests[0], { label: 'agent-prompt', scope, bootstrap: true }, 'the old request is unchanged');
     }
+  });
+
+  test('read-write + dispatch: sends exactly { purpose: "agent" } and the prompt says it can enqueue', async () => {
+    const h = agentPrompt('readWriteDispatch', {
+      respond: { token: 'BOOT', providerDisplayName: 'Linear', scope: 'readWrite', grants: ['dispatch'] }
+    });
+    await click(h);
+    assert.deepEqual(h.requests, [{ purpose: 'agent' }]);
+    const text = h.copied[0] || '';
+    assert.ok(text.includes('Your token scope is: readWrite.'), text.slice(-300));
+    assert.ok(text.includes(CAN), text.slice(-300));
+    assert.ok(!text.includes(CANNOT));
+    assert.ok(!text.includes('`take`') && !text.includes('/dispatch/take'), 'the prompt never offers the runner routes');
+    assert.ok(text.includes('currently backed by Linear'));
+  });
+
+  test('the prompt follows the response, not the picker: dispatch picked, no grant returned', async () => {
+    const h = agentPrompt('readWriteDispatch', { respond: { token: 'BOOT', scope: 'readWrite', grants: [] } });
+    await click(h);
+    const text = h.copied[0] || '';
+    assert.ok(text.includes(CANNOT));
+    assert.ok(!text.includes(CAN));
+  });
+
+  describe('refusals', () => {
+    const MAPPED = { GRANT_OWNER_ONLY: 'MAPPED owner only', NETWORK: 'MAPPED network', RATE_LIMITED: 'MAPPED rate', UNKNOWN: 'MAPPED unknown' };
+    const toggle = { DRIVER_COPY_ERROR_COPY: MAPPED };
+    const refusal = (code, status = 403) => Object.assign(new Error('raw server message'), { status, body: { code } });
+
+    test('dispatch pick + GRANT_OWNER_ONLY shows the mapped text and copies nothing', async () => {
+      const h = agentPrompt('readWriteDispatch', { fail: refusal('GRANT_OWNER_ONLY'), toggle });
+      await click(h);
+      assert.equal(h.feedback.textContent, 'MAPPED owner only');
+      assert.equal(h.copied.length, 0);
+    });
+
+    test('dispatch pick: no status is NETWORK, a code-less 429 is RATE_LIMITED, other is UNKNOWN', async () => {
+      const cases = [
+        [new TypeError('Failed to fetch'), 'MAPPED network'],
+        [Object.assign(new Error('slow down'), { status: 429 }), 'MAPPED rate'],
+        [Object.assign(new Error('boom'), { status: 500 }), 'MAPPED unknown']
+      ];
+      for (const [fail, want] of cases) {
+        const h = agentPrompt('readWriteDispatch', { fail, toggle });
+        await click(h);
+        assert.equal(h.feedback.textContent, want);
+      }
+    });
+
+    test('dispatch pick without window.ProxyToggle falls back to err.message', async () => {
+      const h = agentPrompt('readWriteDispatch', { fail: refusal('GRANT_OWNER_ONLY') });
+      await click(h);
+      assert.equal(h.feedback.textContent, 'raw server message');
+    });
+
+    test('read / readWrite failures keep err.message even when the map is present', async () => {
+      for (const pick of ['read', 'readWrite']) {
+        const h = agentPrompt(pick, { fail: refusal('GRANT_OWNER_ONLY'), toggle });
+        await click(h);
+        assert.equal(h.feedback.textContent, 'raw server message', pick);
+      }
+    });
   });
 });

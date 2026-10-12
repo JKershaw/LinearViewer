@@ -128,14 +128,7 @@ is owed, and it is blocked on this milestone. (LIN-3163 supplies the ruling for 
 *evidence* stores — they are lifetime-retained — but that is a different surface from the user's
 code and transcripts, so LIN-2954's note is still owed.)
 
-**One run's SESSION COUNT is now capped on a single ticket (LIN-2934, shipped 2026-09-25); its
-SPEND is not, on either path, and the instrument that would cap spend is off.** `maxTasks` counts
-*distinct issue identifiers*: ten worker sessions on one ticket is a count of one, so a scoped run
-on one ticket had no bound of its own — the exact shape `docs/v1.md`'s Go puts in front of a
-stranger. LIN-2934 closed that gap with a sibling bound, `maxSessionsPerTask`, enforced at the
-same seam and shown as "n of N" in the feed; the north star's clause ("no autonomous run starts
-without a declared task budget, enforced at the seam") is now met for that run shape, on session
-count. It is still not met on **money**: worse for a cap keyed on that axis, the usage relay that carries
+**Go has no cap, by design (John, 9 Oct, LIN-3388); a run's SPEND is not bounded on either path, and the instrument that would measure spend is off.** `maxTasks` counts *distinct issue identifiers*: ten worker sessions on one ticket is a count of one, so a Go run on one ticket has no budget of its own — the exact shape `docs/v1.md`'s Go puts in front of a stranger. That is the decision, not a gap awaiting a default: Go just runs, and the person watches what it costs, the same as CI/CD. (LIN-2934's per-run `maxSessionsPerTask` was removed by LIN-3461; what remains is a fixed runaway failsafe, `MAX_FRESH_SESSIONS_PER_TASK` = 30, that refuses the 31st fresh worker session on one task within a run — a guard against a loop, not a budget.) The north star's clause ("no autonomous run starts without a declared task budget, enforced at the seam") is therefore not met for Go, and is not meant to be. Nor is a money bound: worse for a cap keyed on that axis, the usage relay that carries
 cost back is default-OFF (`config.js@d0e809e3:1100-1102`), and `MODEL_PRICING`
 (`lib/model-pricing.js@d249ec51:108-134`) carries rows for Claude, GPT and `gpt-5.4-mini` and **no
 cheap-model row at all** — no DeepSeek, no GLM, no Gemini Flash — so a table-priced fold of a cheap
@@ -159,9 +152,9 @@ minutes is **$0.01 (Fly) to $0.055 (E2B/Cloud Run)** plus a ~$12/month control-p
 structural.** Every figure above comes from the operator's OpenRouter export or a per-platform
 price list — not from Harbour's own telemetry — and `cheap-implementer.md` says so in terms ("a
 reading Harbour's own relay cannot make"). Three things stand between that and a cap that tracks
-real money: the relay is default-off; the pricing table has no cheap rows; and `maxTasks`/
-`maxSessionsPerTask` count tickets and sessions, not dollars, so neither can be made into a spend
-cap by tuning — LIN-2934 shows spend in the hand-back/feed but does not enforce it, by design. The
+real money: the relay is default-off; the pricing table has no cheap rows; and `maxTasks` and the
+session failsafe count tickets and sessions, not dollars, so neither can be made into a spend
+cap by tuning — Harbour shows spend in the hand-back/feed but does not enforce it, by design. The
 one path that does work
 needs no new pricing: `reduceLineageCost`'s `opencode` branch sums the harness's own reported
 `costUsd` — OpenRouter's real figure — and marks `fullyPriced: false` when any row fails to price
@@ -222,7 +215,7 @@ are what cost money.
 **And the cheapest reading of all the evidence is that this milestone is not really about the
 runner.** Five of six questions need identical work on both paths, and that work is a credential
 principal (LIN-1892/LIN-1234), a dispatch scope (LIN-2884), a machine record (LIN-2883), a per-task
-clone, a spend bound (LIN-2934) and a retention note (LIN-2954) — one of which is a host decision
+clone and a retention note (LIN-2954) — one of which is a host decision
 and none of which a host delivers. If that reading is right, LIN-2940 should be re-scoped from
 "build the runner" to "build the per-task clone and the lane, on whatever host is cheapest to
 stand up", and the box wins by being cheapest to stand up rather than by being right.
@@ -236,7 +229,7 @@ stand up", and the box wins by being cheapest to stand up rather than by being r
 | **3. Isolation** | *Exists:* per-session clone dir (LIN-558), per-session `TMPDIR` (LIN-1701), one non-root service user (`provision.sh:16,75`). *Left:* the temp dir is not `0700` (LIN-1712), all sessions share one Unix user, and every launch is `--dangerously-skip-permissions`. No per-account boundary at all. | *Exists:* nothing. *Designed:* container-per-task, which is a real boundary by construction and the one place this path is strictly better. *Left:* the runtime is undecided (Docker → Fargate / Cloud Run / K8s / Fly). |
 | **4. Hostile input** | Same three controls both paths inherit: `--strict-mcp-config` blocks the repo's own MCP servers (`executors.js:427-431`), `AskUserQuestion` denied, auto-updates off. Against them: the repo's own code runs in bypass mode, and the localhost broker accepts unauthenticated `/api/proxy/*` calls from anything in the session (`harbour-token-mcp-server.js:19-24,232-235`). Box-specific: CVE-2026-64600 local privesc, mitigated only by a reboot window; port 22 at `0.0.0.0/0` with the upstream firewall parked (LIN-2421). | The same three controls and the same broker hole. The container bounds the blast radius of what the repo's code can reach on the host — the one improvement — but it must then hold push credentials, which `remote-execution-epic.md` calls "the single most underestimated piece of P1". |
 | **5. Retention** | *Exists:* never delete (`clones.js:5-11`); a daily orphan reap on the box; transcripts persist under `~/.claude/projects/` by design, because the reboot recovery depends on it. Harbour side: 24h queue, dispatch history now lifetime-retained (was 30d; LIN-3157 B+D, LIN-3163). *Left:* a written policy for the user's code and transcripts — none exists (LIN-2954, LIN-1635). | *Exists:* nothing. *By construction:* the container dies with the task, which answers the question for code but not for transcripts or feedback; feedback still lands in Harbour, now lifetime-retained. *Left:* the same written policy. |
-| **6. Spend** | *Exists:* `maxTasks` (distinct issue identifiers) plus the sibling `maxSessionsPerTask` (LIN-2934), which does bound a one-task run's worker-session count, shown in the feed. Fixed cost €16.49/mo. *Left:* a MONEY bound — the telemetry to enforce one is default-off (`config.js:1100-1102`) with no cheap-model pricing rows, and LIN-2934 deliberately shows spend without enforcing it. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent money cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
+| **6. Spend** | *Exists:* `maxTasks` (distinct issue identifiers), which Go does not set — Go has no cap, by design (LIN-3388) — plus a fixed runaway failsafe of 30 fresh worker sessions per task (LIN-3461), which is a loop guard, not a budget. Fixed cost €16.49/mo. *Left:* a MONEY bound — the telemetry to enforce one is default-off (`config.js:1100-1102`) with no cheap-model pricing rows, and Harbour deliberately shows spend without enforcing it. On the `claude-code` lane `costUsd` is null, so a money cap is not buildable there. | The same absent money cap, plus per-minute compute that is directly metered ($0.01–$0.055 a 20-minute run). On the `opencode` lane the harness reports OpenRouter's own USD (`opencode-runner.js:409-430`) and `reduceLineageCost` sums it with an explicit `fullyPriced` flag — so a real money cap **is** buildable, on either host, if the harness is `opencode`. |
 
 ## The recommendation
 
@@ -249,13 +242,12 @@ per-task `git clone <url>@<ref>` with the account's token, dropped after the run
 in a container, and take LIN-1302's `RuntimeProfile` refactor first so the seam exists to build
 against.
 
-Three things must land with it rather than after it, because a stranger reaches them on the first
-run: the `dispatch` scope (LIN-2884), so a triage token cannot start a session; a per-run spend
-bound with the usage relay on (LIN-2934); and `0700` on the session temp dir (LIN-1712). The
-machine record (LIN-2883) is needed before a *second* account, not before the dress rehearsal.
+Two things must land with it rather than after it, because a stranger reaches them on the first
+run: the `dispatch` scope (LIN-2884), so a triage token cannot start a session; and `0700` on the
+session temp dir (LIN-1712). (Go has no spend cap, by design, LIN-3388.) The machine record (LIN-2883) is needed before a *second* account, not before the dress rehearsal.
 
 **What it costs to be wrong, by what is wrong.** *Wrong about the host:* about $18 and a
-provisioning week. The clone, the secrets, the scope and the cap all sit above the `RuntimeProfile`
+provisioning week. The clone, the secrets and the scope all sit above the `RuntimeProfile`
 seam and move to a container unchanged — which is the whole point of taking LIN-1302 first.
 *Wrong about the harness:* moderate. Choosing `claude-code` on the box is defensible now that tmux
 is measured, but it forfeits the only real-money cost reading Harbour has, and a spend cap on that
@@ -353,7 +345,7 @@ contract itself (`docs/dispatch-protocol.md`), which LIN-1301's principle 1 exis
 **Consumers of this answer.** Bounded by relations plus a tracker search on the milestone's own
 identifiers. Seven: LIN-2938 (the conversation that decides), LIN-2940 (the build), LIN-2954 (the
 hardening pass, which reads this paper's isolation, hostile-input and retention answers by name),
-LIN-2934 (the spend bound), LIN-2883 and LIN-2884 (machine record and dispatch scope), LIN-1892
+LIN-2934 (the per-task session bound, since replaced by LIN-3461's failsafe), LIN-2883 and LIN-2884 (machine record and dispatch scope), LIN-1892
 (the account root everything credential-shaped is deferred to).
 
 **One class could not be bounded: the retention policy.** No document states what is kept of a

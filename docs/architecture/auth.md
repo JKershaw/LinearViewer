@@ -210,7 +210,9 @@ it); `503 GRANT_OWNERLESS` is a session with no account. Any signed-in member ma
 runner credentials from the Proxy page, and revoking one revokes its whole lineage. `dispatch` is
 **enforced** on the three enqueue routes (`requireGrant('dispatch')`, LIN-2884 T3 / LIN-3136): the
 runner copy carries it, as do the owner's driver copies (`{ "purpose": "driver" }`, `['dispatch']`
-only, the 48h `worker` profile) and the orchestrators the server declares it for (kickoff child,
+only, the 48h `worker` profile), the Proxy page's "read-write + dispatch" Agent Prompt
+(`{ "purpose": "agent" }`, `['dispatch']` only, the 48h `worker` profile, label
+`agent-prompt-dispatch`) and the orchestrators the server declares it for (kickoff child,
 owner Autopilot dispatch, feedback autopilot).
 
 The same owner edge also gates the **legacy dispatch-token mint** (LIN-3137 / LIN-2884 J5). A

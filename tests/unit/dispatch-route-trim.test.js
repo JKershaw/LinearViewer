@@ -86,6 +86,17 @@ describe('PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim (LIN-2147)', () 
     assert.equal(res3.status, 400);
   });
 
+  test('pins the trim messages: undefined is "required", anything else invalid is "a positive integer" (LIN-3487)', async () => {
+    const app = buildApp({ dispatchQueueStore: makeStore() });
+    const url = `/workspace/acme/api/dispatch/${UUID}/trim`;
+    assert.equal((await call(app, 'patch', url, {})).body.error, 'maxTasks is required');
+    for (const bad of [null, 'two', 0, -1, 2.5]) {
+      const res = await call(app, 'patch', url, { maxTasks: bad });
+      assert.equal(res.status, 400, String(bad));
+      assert.equal(res.body.error, 'maxTasks must be a positive integer', String(bad));
+    }
+  });
+
   test('404s an unknown run', async () => {
     const app = buildApp({ dispatchQueueStore: makeStore() });
     const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${UUID}/trim`, { maxTasks: 2 });

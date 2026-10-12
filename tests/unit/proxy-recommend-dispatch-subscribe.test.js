@@ -254,7 +254,7 @@ describe('LIN-2075 — recommend-and-dispatch repo validation messages', () => {
     assert.equal(captured.item, undefined, 'nothing is dispatched on a rejected repo');
   });
 
-  test('an explicit repo is accepted and wins over the project-derived repo (LIN-537)', async () => {
+  test('an explicit repo is accepted and stored verbatim (LIN-537; nothing project-derived exists to compete with it, LIN-3333)', async () => {
     const captured = {};
     const app = buildApp(captured);
     const res = await call(app, 'post', '/api/proxy/recommend-and-dispatch', {

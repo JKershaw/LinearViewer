@@ -1819,6 +1819,14 @@ describe('review template', () => {
     assert.ok(/Approve.*Request Changes.*Needs Discussion/s.test(result.prompt), 'lists the three verdicts');
   });
 
+  test('cannot-close re-close condition is capability-gated: CI green or, with no CI, the recorded substitute (LIN-1965)', () => {
+    const result = generatePrompt('review', mockIssue, mockContext);
+    const line = result.prompt.split('\n').find(l => /The task stays open until it is fixed/.test(l));
+    assert.ok(line, 'the re-close condition line is present');
+    assert.ok(/CI is green \(or, with no CI, the two-branch substitute re-run and recorded\)/.test(line),
+      'the re-close condition accepts the no-CI substitute, not CI-green alone');
+  });
+
   test('Close-Out Gate cannot-close branch keeps a surfaced problem in this task and routes to the stage that fixes it (LIN-3291)', () => {
     const result = generatePrompt('review', mockIssue, mockContext);
     assert.ok(/cannot-close branch/i.test(result.prompt), 'names the cannot-close branch');

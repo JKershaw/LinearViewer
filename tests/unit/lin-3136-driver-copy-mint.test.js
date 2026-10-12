@@ -256,9 +256,9 @@ describe('LIN-3136 S5 — the runner alias and the default path are unchanged', 
 });
 
 describe('LIN-3136 S5 — the closed purpose table', () => {
-  test('frozen, exactly runner and driver; driver is [dispatch] on worker, runner is RUNNER_GRANTS on runner', () => {
+  test('frozen, exactly agent, driver and runner; driver is [dispatch] on worker, runner is RUNNER_GRANTS on runner', () => {
     assert.ok(Object.isFrozen(COPY_PURPOSES));
-    assert.deepEqual(Object.keys(COPY_PURPOSES).sort(), ['driver', 'runner']);
+    assert.deepEqual(Object.keys(COPY_PURPOSES).sort(), ['agent', 'driver', 'runner']);
     for (const row of Object.values(COPY_PURPOSES)) {
       assert.ok(Object.isFrozen(row));
       assert.ok(Object.isFrozen(row.grants));
@@ -268,6 +268,12 @@ describe('LIN-3136 S5 — the closed purpose table', () => {
     assert.equal(COPY_PURPOSES.driver.label, 'prompt-driver');
     assert.equal(COPY_PURPOSES.driver.subject, 'a driver credential');
     assert.equal(COPY_PURPOSES.driver.providerIdentity, true);
+    assert.deepEqual([...COPY_PURPOSES.agent.grants], ['dispatch']);
+    assert.equal(COPY_PURPOSES.agent.profile, 'worker');
+    assert.equal(COPY_PURPOSES.agent.label, 'agent-prompt-dispatch');
+    assert.notEqual(COPY_PURPOSES.agent.label, COPY_PURPOSES.driver.label);
+    assert.equal(COPY_PURPOSES.agent.subject, 'an agent credential');
+    assert.equal(COPY_PURPOSES.agent.providerIdentity, true);
     assert.deepEqual([...COPY_PURPOSES.runner.grants], [...RUNNER_GRANTS]);
     assert.equal(COPY_PURPOSES.runner.profile, 'runner');
     assert.equal(COPY_PURPOSES.runner.providerIdentity, false);
