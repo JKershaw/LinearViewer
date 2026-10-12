@@ -4621,6 +4621,12 @@ ${goal}`
 
     const { prUrl, headSha, dispatchId } = req.body || {};
     try {
+      // LIN-3395: once the PR's merge is on record, a press (e.g. from a stale
+      // tab after a self-merge) is refused before anything is written, so the
+      // next check cannot add a second `close-out` event or a second Done write.
+      if (closeOutEventsStore && await closeOutEventsStore.hasMergedEvent({ urlKey: workspace.urlKey, prUrl })) {
+        return jsonError(res, 409, 'This pull request is already merged; the close-out press was not recorded', { code: 'CLOSE_OUT_ALREADY_MERGED' });
+      }
       const event = closeOutEventsStore
         ? await closeOutEventsStore.record({
           accountId: req.session.accountId,
