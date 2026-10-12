@@ -15,12 +15,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-route-poll-halt-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const PATH = '/api/dispatch/poll';
 const TOKEN = 'good-token';
@@ -97,7 +101,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: no halt store / no halt set', () 
   });
 
   test('a real store with nothing ever set -> exact raw {items} body', async () => {
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore });
     const res = await call(app);
 
@@ -108,7 +112,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: no halt store / no halt set', () 
 
 describe('LIN-3024 — GET /api/dispatch/poll: live halt', () => {
   test('a halt set on the store -> exact projected {mode,setAt,setBy}, no _id', async () => {
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const setAt = new Date('2026-01-01T00:00:00.000Z');
     await workspaceHaltStore.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now: setAt });
 
@@ -126,7 +130,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: live halt', () => {
 
 describe('LIN-3024 — GET /api/dispatch/poll: halt-read failure fallback', () => {
   test('warm cache (via a prior successful read) + a failing read -> cached halt, 200', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halts');
     const workspaceHaltStore = new WorkspaceHaltStore({ collection });
     const setAt = new Date('2026-01-01T00:00:00.000Z');
     await workspaceHaltStore.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice', now: setAt });
@@ -141,7 +145,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: halt-read failure fallback', () =
   });
 
   test('write-only warming: setWorkspaceHalt alone (no prior poll) still warms the fallback', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halts');
     const workspaceHaltStore = new WorkspaceHaltStore({ collection });
     const setAt = new Date('2026-01-01T00:00:00.000Z');
     await workspaceHaltStore.setWorkspaceHalt(URL_KEY, { mode: 'stop', setBy: 'bob', now: setAt });
@@ -155,7 +159,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: halt-read failure fallback', () =
   });
 
   test('set -> clear -> a failing read omits the key (200, exact {items})', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halts');
     const workspaceHaltStore = new WorkspaceHaltStore({ collection });
     await workspaceHaltStore.setWorkspaceHalt(URL_KEY, { mode: 'pause', setBy: 'alice' });
     await workspaceHaltStore.clearWorkspaceHalt(URL_KEY);
@@ -169,7 +173,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: halt-read failure fallback', () =
   });
 
   test('cold cache + a failing read -> 200, key omitted', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halts');
     collection.findOne = async () => { throw new Error('sentinel: findOne failed'); };
     const workspaceHaltStore = new WorkspaceHaltStore({ collection });
 
@@ -181,7 +185,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: halt-read failure fallback', () =
   });
 
   test('urlKey isolation: a failing read only falls back for the workspace that was warmed', async () => {
-    const collection = createMockCollection();
+    const collection = harness.freshDb().collection('workspace-halts');
     const workspaceHaltStore = new WorkspaceHaltStore({ collection });
     const setAt = new Date('2026-01-01T00:00:00.000Z');
     await workspaceHaltStore.setWorkspaceHalt('workspace-a', { mode: 'pause', setBy: 'alice', now: setAt });
@@ -227,7 +231,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: bounded timeout', () => {
   test('a slow pollAvailable is NOT timed out by the (short) halt-read bound', async () => {
     const SLOW_MS = 150;
     const pollAvailable = () => new Promise(resolve => setTimeout(() => resolve(ITEMS), SLOW_MS));
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore, haltReadTimeoutMs: 20, pollAvailable });
 
     const res = await call(app);
@@ -273,7 +277,7 @@ describe('LIN-3024 — GET /api/dispatch/poll: halt read runs in parallel with p
 describe('LIN-3024 — GET /api/dispatch/poll: pollAvailable failure is untouched', () => {
   test('pollAvailable rejecting still returns 500, regardless of the halt store', async () => {
     const pollAvailable = async () => { throw new Error('boom'); };
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore, pollAvailable });
 
     const res = await call(app);

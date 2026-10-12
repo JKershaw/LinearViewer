@@ -16,7 +16,7 @@
  * (lib/dispatch-terminal.js), loop reconstruction (_buildLoops), session
  * terminality (routes/dashboard.js sessionIsTerminal), and the store expansion.
  */
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   deriveTerminalStatus,
@@ -28,15 +28,20 @@ import {
 import { __internal as pipeline } from '../../lib/pipeline-loops.js';
 import { sessionIsTerminal } from '../../routes/dashboard.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-skipped-marker-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const SKIPPED_MSG = '[skipped] human-continued session 7b3f2a10 (implementation).';
 const skippedFeedback = [{ message: SKIPPED_MSG, timestamp: '2026-07-03T12:00:00.000Z' }];
 
 function makeStore() {
+  const db = harness.freshDb();
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
   });
 }
 

@@ -3,8 +3,8 @@
  * (LIN-2147, graceful trim).
  *
  * Mirrors the buildApp/call scaffolding in dispatch-route-preset-crud.test.js,
- * with a REAL DispatchQueueStore (backed by the shared mock-collection
- * fixture) rather than a fake, since the route delegates straight to
+ * with a REAL DispatchQueueStore (backed by a real MangoDB
+ * collection from tests/fixtures/mango-tmpdir.js) rather than a fake, since the route delegates straight to
  * `trimSessionBudget` and the point of this file is proving the HTTP
  * surface (status codes, body validation, session attribution) wired onto
  * that store method correctly — the method's own logic is covered in
@@ -12,12 +12,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-route-trim-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore, accountId = 'account-1' } = {}) {
   const app = express();
@@ -61,9 +65,10 @@ async function call(app, method, path, body) {
 }
 
 function makeStore() {
+  const db = harness.freshDb();
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
   });
 }
 

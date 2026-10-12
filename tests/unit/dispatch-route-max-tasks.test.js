@@ -11,12 +11,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-route-max-tasks-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp(captured) {
   const app = express();
@@ -150,7 +154,8 @@ describe('LIN-1737 Beat 1 — POST /workspace/:urlKey/api/dispatch maxTasks', ()
 
 describe('LIN-3461 — the runaway failsafe, relayed by the session dispatch route', () => {
   async function seedRun() {
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+    const db = harness.freshDb();
+    const store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: db.collection('dispatch-history') });
     const app = buildRealApp(store);
     const kickoff = await call(app, 'post', PATH, { prompt: 'launch the runner', kind: 'custom', target: 'cli' });
     assert.equal(kickoff.status, 201, JSON.stringify(kickoff.body));

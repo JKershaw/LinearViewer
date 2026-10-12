@@ -23,12 +23,16 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { MongoClient } from 'mongodb';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
 import { AgentStatusStore } from '../../lib/agent-status-store.js';
 import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
 import { collectUnansweredDecisions, isDecisionWithdrawn } from '../../lib/unanswered-decisions.js';
 import { _findDecisionWithdrawal } from '../../lib/digest-feedback.js';
+
+const harness = createMangoTmpdir('lin-3527-decision-withdrawal-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 
@@ -45,8 +49,9 @@ describe('FEEDBACK_ENTRY_KINDS membership (LIN-2891/LIN-3035)', () => {
 // ─── Mock-store behavior ────────────────────────────────────────────────────
 
 function makeStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const db = harness.freshDb();
+  const collection = db.collection('dispatch-queue');
+  const historyCollection = db.collection('dispatch-history');
   const store = new DispatchQueueStore({ collection, historyCollection });
   return { store, collection, historyCollection };
 }
@@ -312,7 +317,7 @@ describe('read-side adversarial: item-scoped withdrawal discharge (LIN-3036)', (
   }
 
   async function loopsForWorkspace(store, urlKey = URL_KEY) {
-    const agentStatusStore = new AgentStatusStore({ collection: createMockCollection() });
+    const agentStatusStore = new AgentStatusStore({ collection: harness.freshDb().collection('agent-status') });
     const loops = await getLoopsForWorkspace(urlKey, { dispatchStore: store, agentStatusStore, lean: true });
     return loops.map((l) => ({ ...l, workspaceUrlKey: urlKey }));
   }

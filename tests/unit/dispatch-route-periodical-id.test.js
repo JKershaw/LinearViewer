@@ -17,18 +17,22 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, beforeEach, afterEach } from 'node:test';
+import { test, describe, beforeEach, afterEach, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
 import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
 import { setFetchImpl } from '../../lib/openrouter.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
 import { guardNetwork } from '../fixtures/network-guard.js';
+
+const harness = createMangoTmpdir('lin-3527-route-periodical-id-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const KNOWN_ID = 'documentation-review';
 const UNKNOWN_ID = 'not-a-real-template';
@@ -205,9 +209,10 @@ function buildProxyAppWithRealStore(store) {
 
 describe('LIN-1825 Beat 2 — direct proxy dispatch (no UI) round-trips through the real store', () => {
   test('a bare readWrite proxy-token POST with { kind: "periodical", periodicalId, prompt } survives to listItems()', async () => {
+    const db = harness.freshDb();
     const store = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection()
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history')
     });
     const app = buildProxyAppWithRealStore(store);
 
