@@ -690,7 +690,6 @@ describe('mergeLineageFeedback — order-independent ties (LIN-1465)', () => {
       { _id: 'row-a', feedback: [entry('a1', T)] },
     ];
     const out = msgs([], rows);
-    assert.deepEqual(out.filter(m => m.startsWith('a1') || m.startsWith('b1')), ['a1', 'b1']);
-    assert.deepEqual(out.filter(m => m.startsWith('anon')), ['anon-1', 'anon-2']);
+    assert.deepEqual(out, ['a1', 'b1', 'anon-1', 'anon-2']);
   });
 });
