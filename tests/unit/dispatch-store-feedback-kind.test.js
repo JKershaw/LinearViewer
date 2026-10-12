@@ -6,16 +6,21 @@
  * present when truthy, absent (not null) when omitted, so a POST that omits
  * them yields a byte-identical entry to pre-LIN-1297 behavior.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { DispatchQueueStore, FEEDBACK_ENTRY_KINDS } from '../../lib/dispatch-store.js';
+
+const harness = createMangoTmpdir('lin-3527-feedback-kind-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 
 function makeStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const db = harness.freshDb();
+  const collection = db.collection('dispatch-queue');
+  const historyCollection = db.collection('dispatch-history');
   return new DispatchQueueStore({ collection, historyCollection });
 }
 
@@ -43,7 +48,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     );
 
     assert.ok(res && res.success);
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.equal(doc.feedback[0].kind, 'heartbeat');
     assert.equal(doc.feedback[0].rootItemId, rootItemId);
   });
@@ -54,7 +59,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
 
     await store.addFeedback(item._id, URL_KEY, { message: 'plain feedback' }, 'token-a');
 
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.deepEqual(doc.feedback[0], {
       message: 'plain feedback',
       url: null,
@@ -76,7 +81,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
       'token-a'
     );
 
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.equal(doc.feedback[0].kind, 'not-a-real-kind');
     assert.equal(doc.feedback[0].rootItemId, 'not-a-uuid');
   });
@@ -99,7 +104,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     );
 
     assert.ok(res && res.success);
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.equal(doc.feedback[0].kind, 'usage');
     assert.equal(doc.feedback[0].rootItemId, rootItemId);
     assert.equal(doc.feedback[0].message, message);
@@ -127,7 +132,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     );
 
     assert.ok(res && res.success);
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.equal(doc.feedback[0].kind, 'decision');
     assert.equal(doc.feedback[0].rootItemId, rootItemId);
     assert.equal(doc.feedback[0].message, message);
@@ -168,7 +173,7 @@ describe('addFeedback persists kind/rootItemId (LIN-1297)', () => {
     );
 
     assert.ok(res && res.success);
-    const doc = store.historyCollection._docs.find(d => d._id === item._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === item._id);
     assert.equal(doc.feedback[0].kind, 'refusal');
     assert.equal(doc.feedback[0].rootItemId, rootItemId);
     assert.equal(doc.feedback[0].message, message);

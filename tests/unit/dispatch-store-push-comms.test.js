@@ -11,16 +11,21 @@
  * consumer reads: addItem persistence, the _formatItem seam poll/take hand to the
  * consumer, and the history records.
  */
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { DEFAULT_SUBSCRIPTION } from '../../lib/dispatch-wake.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-push-comms-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function makeStore() {
+  const db = harness.freshDb();
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
   });
 }
 

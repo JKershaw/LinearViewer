@@ -19,10 +19,14 @@
  * explicit "must not invent either" acceptance clause and the shared
  * `isFreshDigest` predicate's absent-vs-null distinction.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-feedback-digest-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function storeUnderTest() {
   // The formatter is a pure projection over a doc — exercise it directly,
@@ -112,9 +116,10 @@ describe('LIN-3010 — _formatHistoryItem carries feedbackVersion/feedbackDigest
 
 describe('LIN-3010 — _archiveItem seeds feedbackVersion/feedbackDigest on every new history row', () => {
   function makeStore() {
+    const db = harness.freshDb();
     return new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection(),
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history'),
     });
   }
 
@@ -123,7 +128,7 @@ describe('LIN-3010 — _archiveItem seeds feedbackVersion/feedbackDigest on ever
     const created = await store.addItem('acme', { prompt: 'do the thing' });
     await store.takeItem(created._id, 'acme');
 
-    const doc = store.historyCollection._docs.find(d => d._id === created._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === created._id);
     assert.ok(doc, 'the history row exists');
     assert.strictEqual(doc.feedbackVersion, 0);
     assert.strictEqual(doc.feedbackDigest, null);
@@ -134,7 +139,7 @@ describe('LIN-3010 — _archiveItem seeds feedbackVersion/feedbackDigest on ever
     const created = await store.addItem('acme', { prompt: 'cancel me' });
     await store.removeItem('acme', created._id);
 
-    const doc = store.historyCollection._docs.find(d => d._id === created._id);
+    const doc = (await store.historyCollection.find({}).toArray()).find(d => d._id === created._id);
     assert.ok(doc, 'the history row exists');
     assert.strictEqual(doc.feedbackVersion, 0);
     assert.strictEqual(doc.feedbackDigest, null);
