@@ -466,6 +466,8 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     // The header says waiting on the person, and the page says it is merge-ready.
     await expect(page.locator('[data-testid="task-page-sentence"]')).toContainText('Approved. PR #41 is ready to merge.');
     await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-merge-ready', 'true');
+    // The server renders the ready header the client paints on an idle poll (LIN-3448).
+    await expect(page.locator('[data-testid="task-page"]')).toHaveAttribute('data-ready-header', /ready to merge/);
     // The description and comments are visible (and markdown-upgraded).
     await expect(page.locator('[data-testid="task-page-description"]')).toBeVisible();
     await expect(page.locator('[data-testid="task-page-comments"]')).toContainText('Comments (2)');

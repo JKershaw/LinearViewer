@@ -467,12 +467,14 @@
   }
 
   /**
-   * Keep the load-time "approved, ready to merge" answer while the stored-data
-   * poll reports `idle` (it can't see the ready state) and the box is still
-   * ready. A polled running/waiting — a close-out session started — overrides.
+   * Whether an idle poll paints the server-rendered ready header (`<main
+   * data-ready-header>`, LIN-3448). The state endpoint is stored-data only, so
+   * it can never report "ready"; while the page is merge-ready and the poll
+   * finds nothing running, the authoritative answer is the ready sentence, not
+   * whatever header happens to be painted. A polled running/waiting overrides.
    * Pure.
    */
-  function shouldKeepReady(mergeReadyAttr, stateStatus) {
+  function paintsReadyHeader(mergeReadyAttr, stateStatus) {
     return mergeReadyAttr === 'true' && stateStatus === 'idle';
   }
 
@@ -543,19 +545,28 @@
 
     // The close-out box lives outside every repainted mount, so only the
     // merge-ready attribute needs to track it: a check (or a poll) that moves
-    // the box off `ready` clears the load-time answer's retention.
+    // the box off `ready` clears the flag, and the ready header is no longer
+    // painted.
     function syncMergeReady() {
       var box = closeOutBox;
       if (box && box.getAttribute('data-state') !== 'ready') main.setAttribute('data-merge-ready', 'false');
     }
 
+    // The last polled status, seeded from the load. A running -> idle edge is a
+    // session end: one close-out check then (never per poll), so a close-out
+    // that merged and set Done reloads the page via `doneNow` without waiting
+    // for a tab focus. `runCheck` owns the eligibility gate.
+    var lastPolled = main.getAttribute('data-status') || 'idle';
+
     function apply(state) {
-      // The state endpoint can't see the tracker, so it never reports ready.
-      // Keep the load-time "approved, ready to merge" answer while the polled
-      // status is idle and the box is still ready; a polled running/waiting (a
-      // close-out session started) overrides it.
-      var keepReady = shouldKeepReady(main.getAttribute('data-merge-ready'), state.status);
-      if (answer && typeof state.headerHtml === 'string' && !keepReady) repaintHeader(answer, state.headerHtml);
+      // Read the box first: a check may have moved it off `ready` since the
+      // last poll, and then the ready header must not be painted.
+      syncMergeReady();
+      var readyHtml = paintsReadyHeader(main.getAttribute('data-merge-ready'), state.status) ? main.getAttribute('data-ready-header') : null;
+      var headerHtml = typeof readyHtml === 'string' && readyHtml ? readyHtml : state.headerHtml;
+      if (answer && typeof headerHtml === 'string') repaintHeader(answer, headerHtml);
+      var painted = answer && answer.querySelector ? answer.querySelector('[data-testid="task-page-status"]') : null;
+      var paintedStatus = painted && painted.getAttribute ? painted.getAttribute('data-status') : null;
       if (trackMount && typeof state.trackHtml === 'string') {
         var checkIns = openCheckIns(trackMount);
         trackMount.innerHTML = state.trackHtml;
@@ -567,10 +578,13 @@
         enhanceContextMarkdown(contextMount);
       }
       applyOpenMemory(rows(), memory);
-      syncMergeReady();
-      main.setAttribute('data-status', keepReady ? 'waiting' : state.status);
+      main.setAttribute('data-status', readyHtml ? (paintedStatus || 'waiting') : state.status);
       main.setAttribute('data-live', state.live ? 'true' : 'false');
       tickClocks(main);
+      if (lastPolled === 'running' && state.status === 'idle' && closeOutBox && window.CloseOut && typeof window.CloseOut.runCheck === 'function') {
+        window.CloseOut.runCheck(closeOutBox, doc);
+      }
+      lastPolled = state.status;
     }
 
     var initial = { status: main.getAttribute('data-status') || 'idle', live: main.getAttribute('data-live') === 'true' };
@@ -614,7 +628,7 @@
       repaintHeader: repaintHeader,
       isGuestStateUrl: isGuestStateUrl,
       goneHandlerFor: goneHandlerFor,
-      shouldKeepReady: shouldKeepReady,
+      paintsReadyHeader: paintsReadyHeader,
       contextNeedsRepaint: contextNeedsRepaint,
       enhanceMarkdown: enhanceMarkdown,
       enhanceContextMarkdown: enhanceContextMarkdown,
