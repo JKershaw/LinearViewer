@@ -8,18 +8,22 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import {
   deriveLifecycleStatus, deriveWireStatus, deriveWireTerminal, closedProjection, isRowClosed
 } from '../../lib/dispatch-terminal.js';
 import { recentRuns } from '../../lib/recent-runs.js';
 import { normalizeDispatchRow } from '../../lib/effort-readout.js';
 import { NO_ATTEMPT_STATUSES } from '../../lib/plan-review-round-trips.js';
+
+const harness = createMangoTmpdir('lin-3527-closed-row-wire-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const TOKEN = 'consumer-1';
 const URLKEY = 'acme';
@@ -135,7 +139,10 @@ async function call(app, path) {
   }
 }
 
-const makeStore = () => new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+const makeStore = () => {
+  const db = harness.freshDb();
+  return new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: db.collection('dispatch-history') });
+};
 
 async function dispatchTaken(store, message) {
   const doc = await store.addItem(URLKEY, { prompt: 'p', issueIdentifier: 'LIN-1' });

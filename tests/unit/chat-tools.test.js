@@ -8,7 +8,7 @@
 // closure, never accepted from the model), validate ids with `isValidIssueId`,
 // and are read-only in V1.
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { createChatToolCatalog, CHAT_TOOL_SCHEMAS, CHAT_TOOL_SCOPE_TIERS, CHAT_TOOL_RESULT_BUDGETS, FOLLOW_UP_TOOL_SCHEMA, REMEMBER_TOOL_SCHEMA, PLAYBOOK_MAX_CHARS, deriveFollowUpDispatch, projectActiveSession } from '../../lib/chat-tools.js';
 import { TOOL_RESULT_MAX_CHARS } from '../../lib/openrouter.js';
@@ -22,7 +22,11 @@ import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { collectUnansweredDecisions, answeredDecisionIdsByLineage } from '../../lib/unanswered-decisions.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { sessionIsTerminal } from '../../routes/dashboard.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-chat-tools-');
+before(() => harness.connect());
+after(() => harness.close());
 
 // A recording fake of the pass-1 provider read surface. Every method records
 // the scope it was called with so tests can assert workspace-scoping, and
@@ -2701,21 +2705,20 @@ describe('pass-4 fleet read — list_pending_decisions (LIN-2617)', () => {
 
 // LIN-2704: the pending-set exit is the acceptance criterion, not "a tap
 // posts" (§4 of the plan). Unlike the rest of this describe block, these
-// tests wire a REAL TaskDecisionsStore (tests/fixtures/mock-collection.js)
+// tests wire a REAL TaskDecisionsStore over a real MangoDB collection
 // rather than the listUnansweredForWorkspaces-only stub above, because the
 // thing being proven is the real `markOutcome` path the projected ids feed —
 // a stub that only ever returns the seeded array can't demonstrate a row
 // actually leaving the pending set.
 describe('pass-4 fleet read — list_pending_decisions pending-set exit (LIN-2704)', () => {
-  function makeRealTaskDecisionsStore(fixtureTaskDecisions) {
-    const collection = createMockCollection();
-    for (const entry of fixtureTaskDecisions) {
-      collection._docs.push({
-        _id: entry.id, urlKey: entry.urlKey, issueId: entry.issueId,
-        issueIdentifier: entry.issueIdentifier, decision: entry.decision,
-        scannedAt: new Date(entry.scannedAt), outcome: entry.outcome ?? null, outcomeAt: null,
-      });
-    }
+  async function makeRealTaskDecisionsStore(fixtureTaskDecisions) {
+    const collection = harness.freshDb().collection('task-decisions');
+    const rows = fixtureTaskDecisions.map(entry => ({
+      _id: entry.id, urlKey: entry.urlKey, issueId: entry.issueId,
+      issueIdentifier: entry.issueIdentifier, decision: entry.decision,
+      scannedAt: new Date(entry.scannedAt), outcome: entry.outcome ?? null, outcomeAt: null,
+    }));
+    if (rows.length) await collection.insertMany(rows);
     return new TaskDecisionsStore({ collection });
   }
 
@@ -2731,7 +2734,7 @@ describe('pass-4 fleet read — list_pending_decisions pending-set exit (LIN-270
 
   test('stamping a task-bound decision with the projected ids removes it from the next listing — the real markOutcome path', async () => {
     const fixture = decisionsFixture();
-    const taskDecisionsStore = makeRealTaskDecisionsStore(fixture.taskDecisions);
+    const taskDecisionsStore = await makeRealTaskDecisionsStore(fixture.taskDecisions);
     const stores = makeMockSessionStores({ history: fixture.history });
     const { executeTool } = createChatToolCatalog({
       provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,
@@ -2770,7 +2773,7 @@ describe('pass-4 fleet read — list_pending_decisions pending-set exit (LIN-270
     // real UUID.
     const fixture = decisionsFixture();
     const nonUuidTaskDecisions = [{ ...fixture.taskDecisions[0], id: 'td-2', issueId: 'uuid-802' }];
-    const taskDecisionsStore = makeRealTaskDecisionsStore(nonUuidTaskDecisions);
+    const taskDecisionsStore = await makeRealTaskDecisionsStore(nonUuidTaskDecisions);
     const stores = makeMockSessionStores({ history: fixture.history });
     const { executeTool } = createChatToolCatalog({
       provider: makeFakeProvider(), scope: SCOPE, urlKey: URL_KEY,

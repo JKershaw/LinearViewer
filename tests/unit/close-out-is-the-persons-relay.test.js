@@ -19,7 +19,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
@@ -27,17 +27,22 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-close-out-relay-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function makeSpiedStore() {
-  const collection = createMockCollection();
+  const db = harness.freshDb();
+  const collection = db.collection('dispatch-queue');
   let insertCount = 0;
   const originalInsertOne = collection.insertOne.bind(collection);
   collection.insertOne = async (...args) => {
     insertCount++;
     return originalInsertOne(...args);
   };
-  const store = new DispatchQueueStore({ collection, historyCollection: createMockCollection() });
+  const store = new DispatchQueueStore({ collection, historyCollection: db.collection('dispatch-history') });
   return { store, getInsertCount: () => insertCount };
 }
 

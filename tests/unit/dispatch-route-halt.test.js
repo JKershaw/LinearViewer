@@ -16,12 +16,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-route-halt-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 const PATH = `/workspace/${URL_KEY}/api/dispatch/halt`;
@@ -92,7 +96,7 @@ async function call(app, method, path = PATH, body) {
 
 describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (composed router)', () => {
   test('GET returns { halt: null } when unset, reflects a POST with no _id leak, then DELETE clears it back to null', async () => {
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore });
 
     const before = await call(app, 'GET');
@@ -121,7 +125,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
   });
 
   test('POST mode: "stop" succeeds with the same shape', async () => {
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore });
     const { status, body } = await call(app, 'POST', PATH, { mode: 'stop' });
     assert.equal(status, 200);
@@ -150,7 +154,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
 
   describe('setBy attribution', () => {
     test('session with accountId -> setBy is that accountId', async () => {
-      const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+      const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
       const app = buildApp({ workspaceHaltStore, accountId: 'acct-42' });
       const { body } = await call(app, 'POST', PATH, { mode: 'pause' });
       assert.equal(body.halt.setBy, 'acct-42');
@@ -159,7 +163,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
     // LIN-3398: a halt needs a checkable owner, so a session with no accountId
     // is refused (fail closed) instead of recording `setBy: null`.
     test('session without accountId -> refused 503 GRANT_OWNERLESS, no halt written', async () => {
-      const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+      const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
       const app = buildApp({ workspaceHaltStore, accountId: null });
       const { status, body } = await call(app, 'POST', PATH, { mode: 'pause' });
       assert.equal(status, 503);
@@ -175,7 +179,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
   // a route that bypassed the store and wrote the collection directly would
   // still pass the GET round-trip test above, but not this one.
   test('POST and DELETE update the shared store\'s last-known cache (the poll fallback\'s source)', async () => {
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore });
     assert.equal(workspaceHaltStore.getLastKnownHalt(URL_KEY), null);
 
@@ -193,7 +197,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
   });
 
   test('DELETE is idempotent: clearing an already-unset halt still returns { success: true }', async () => {
-    const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
     const app = buildApp({ workspaceHaltStore });
     const { status, body } = await call(app, 'DELETE');
     assert.equal(status, 200);
@@ -206,7 +210,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
   // `DELETE .../dispatch/:itemId` route registered just below it.
   describe('DELETE .../dispatch/halt is not captured by DELETE .../dispatch/:itemId', () => {
     test('set a halt, DELETE it: exact success body, the queue item-delete path is never reached, follow-up GET is null', async () => {
-      const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+      const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
       let removeItemCalls = 0;
       const app = buildApp({
         workspaceHaltStore,
@@ -230,7 +234,7 @@ describe('LIN-3026: GET/POST/DELETE /workspace/:urlKey/api/dispatch/halt (compos
     // without it, a broken ordering fix could accidentally make EVERY DELETE
     // succeed and the positive witness above would false-pass.
     test('negative control: DELETE .../dispatch/not-a-uuid still 400s on the :itemId route\'s own UUID guard', async () => {
-      const workspaceHaltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+      const workspaceHaltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halts') });
       const app = buildApp({ workspaceHaltStore });
       const { status, body } = await call(app, 'DELETE', `/workspace/${URL_KEY}/api/dispatch/not-a-uuid`);
       assert.equal(status, 400);

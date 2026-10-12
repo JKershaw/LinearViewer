@@ -11,7 +11,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -23,7 +23,11 @@ import {
 } from '../../lib/dispatch-fields.js';
 import { SUBSCRIPTION_LEVELS, DEFAULT_SUBSCRIPTION } from '../../lib/dispatch-wake.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-fields-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const FIELD_NAMES = [
   'kind', 'target', 'repo', 'model', 'harness', 'terminal', 'effort',
@@ -198,8 +202,9 @@ describe('validateRunField', () => {
 
 describe('DispatchQueueStore.resolveFollowUpRoot (only pin; shares the kind / sessionId defaults)', () => {
   function makeStore() {
-    const historyCollection = createMockCollection();
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection });
+    const db = harness.freshDb();
+    const historyCollection = db.collection('dispatch-history');
+    const store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection });
     return { store, historyCollection };
   }
 

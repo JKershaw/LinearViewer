@@ -5,7 +5,7 @@
  * plus the lean-loop carries-the-stamp test and the stage-bar render test.
  * Mutation check for each: remove the reader's `isRowClosed` call.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { isLoopActive, deriveLoopLanes, buildTimeline, packTimelineRows } from '../../lib/live-console.js';
 import { sweepOneWorkspace } from '../../lib/liveness-alarm-sweep.js';
@@ -16,8 +16,12 @@ import { deriveFollowUpDispatch } from '../../lib/chat-tools.js';
 import { runStatusMeta, renderStepFace } from '../../lib/render-run-steps.js';
 import { buildRunView } from '../../lib/run-view.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { getLoopsForWorkspace } from '../../lib/pipeline-loops.js';
+
+const harness = createMangoTmpdir('lin-3527-closed-row-readers-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const CLOSED_AT = '2026-08-02T00:00:00.000Z';
 const STAMP = { at: CLOSED_AT, by: null, reason: 'handed-on' };
@@ -115,7 +119,8 @@ describe('LIN-3364 readers honour the stamp', () => {
   });
 
   test('the lean loop carries the stamp (pipeline-loops)', async () => {
-    const store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+    const db = harness.freshDb();
+    const store = new DispatchQueueStore({ collection: db.collection('dispatch-queue'), historyCollection: db.collection('dispatch-history') });
     const doc = await store.addItem('acme', { prompt: 'p', issueIdentifier: 'LIN-50' });
     await store.takeItem(doc._id, 'acme', 'tok');
     await store.historyCollection.updateOne({ _id: doc._id, urlKey: 'acme' }, { $set: { bookkeeping: { at: new Date(CLOSED_AT), by: null, reason: 'handed-on' } } });

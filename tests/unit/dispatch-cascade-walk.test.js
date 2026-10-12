@@ -13,15 +13,20 @@
  * The maybe-interactive / human-continued skip is the runner's job (LIN-951) and
  * the `[skipped]` token handling is beat 3 — not exercised here.
  */
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-cascade-walk-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function makeStore() {
+  const db = harness.freshDb();
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
   });
 }
 
@@ -63,10 +68,10 @@ test('collectCascadeTargets is cycle-safe (mutual + self reference terminate)', 
   const future = new Date(Date.now() + 1_000_000);
 
   // A ⇄ B mutual reference: A's child list contains B and B's contains A.
-  store.collection._docs.push(
+  await store.collection.insertMany([
     { _id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', urlKey: 'acme', kind: 'autopilot', sessionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', expiresAt: future },
     { _id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', urlKey: 'acme', kind: 'autopilot', sessionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', expiresAt: future }
-  );
+  ]);
   const cycle = await store.collectCascadeTargets('acme', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   assert.deepEqual([...cycle].sort(), [
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -74,9 +79,9 @@ test('collectCascadeTargets is cycle-safe (mutual + self reference terminate)', 
   ].sort());
 
   // Self reference: an autopilot whose own worker points back at itself.
-  store.collection._docs.push(
+  await store.collection.insertMany([
     { _id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', urlKey: 'acme', kind: 'autopilot', sessionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', expiresAt: future }
-  );
+  ]);
   const selfCycle = await store.collectCascadeTargets('acme', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc');
   assert.deepEqual(selfCycle, ['cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
 });

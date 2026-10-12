@@ -16,19 +16,24 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-feedback-kind-sanitize-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 
 function makeStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const db = harness.freshDb();
+  const collection = db.collection('dispatch-queue');
+  const historyCollection = db.collection('dispatch-history');
   const store = new DispatchQueueStore({ collection, historyCollection });
   return { store, collection, historyCollection };
 }
@@ -79,35 +84,35 @@ async function takenItemViaToken({ dispatchQueueStore, dispatchTokenStore }) {
   return { token, itemId: item._id };
 }
 
-function storedFeedbackEntry(collection, historyCollection, itemId) {
-  const doc = [...collection._docs, ...historyCollection._docs].find(d => d._id === itemId);
+async function storedFeedbackEntry(collection, historyCollection, itemId) {
+  const doc = [...await collection.find({}).toArray(), ...await historyCollection.find({}).toArray()].find(d => d._id === itemId);
   return doc?.feedback?.[0];
 }
 
 describe('LIN-2180 — routes/dispatch.js feedback kind sanitize (accept path)', () => {
   test('kind:"decision" survives the sanitize step and persists on the stored feedback entry', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
     const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`, { message: '[decision] ruling: proceed', kind: 'decision' }, token);
 
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    const entry = storedFeedbackEntry(collection, historyCollection, itemId);
+    const entry = await storedFeedbackEntry(collection, historyCollection, itemId);
     assert.equal(entry.kind, 'decision', 'the sanitize step must accept "decision", not drop it to undefined');
   });
 
   test('an unrecognized kind is still silently dropped (existing behavior preserved)', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
     const res = await call(app, 'post', `/api/dispatch/feedback/${itemId}`, { message: 'plain feedback', kind: 'not-a-real-kind' }, token);
 
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    const entry = storedFeedbackEntry(collection, historyCollection, itemId);
+    const entry = await storedFeedbackEntry(collection, historyCollection, itemId);
     assert.ok(!('kind' in entry), 'an unrecognized kind must not be persisted');
   });
 });
@@ -122,7 +127,7 @@ describe('LIN-2180 — routes/dispatch.js feedback kind sanitize (accept path)',
 describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" validation gate', () => {
   test('a well-formed decision-withdrawn message succeeds end to end and persists', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
@@ -131,14 +136,14 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
       token);
 
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    const entry = storedFeedbackEntry(collection, historyCollection, itemId);
+    const entry = await storedFeedbackEntry(collection, historyCollection, itemId);
     assert.equal(entry.kind, 'decision-withdrawn');
     assert.deepEqual(JSON.parse(entry.message), { decision_id: 'd-1', reason: 'superseded by LIN-99' });
   });
 
   test('a missing reason returns 400, not a silent drop', async () => {
     const { store: dispatchQueueStore, collection, historyCollection } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
@@ -147,12 +152,12 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
       token);
 
     assert.equal(res.status, 400, JSON.stringify(res.body));
-    assert.equal(storedFeedbackEntry(collection, historyCollection, itemId), undefined, 'nothing must be persisted on a 400');
+    assert.equal(await storedFeedbackEntry(collection, historyCollection, itemId), undefined, 'nothing must be persisted on a 400');
   });
 
   test('an empty (whitespace-only) reason returns 400', async () => {
     const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
@@ -165,7 +170,7 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
 
   test('an empty decision_id returns 400', async () => {
     const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
@@ -178,7 +183,7 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
 
   test('a malformed (non-JSON) message returns 400', async () => {
     const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const app = buildApp({ dispatchQueueStore, dispatchTokenStore });
@@ -191,7 +196,7 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
 
   test('a successful decision-withdrawn add clears sessionsFeedCache for this urlKey', async () => {
     const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const cleared = [];
@@ -207,7 +212,7 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
 
   test('a 400 (missing reason) does NOT clear sessionsFeedCache', async () => {
     const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const cleared = [];
@@ -229,7 +234,7 @@ describe('LIN-2891/LIN-3035 — routes/dispatch.js kind:"decision-withdrawn" val
   // is the negative witness for a successful write of a DIFFERENT kind.
   test('a successful non-withdrawal feedback write does NOT clear sessionsFeedCache', async () => {
     const { store: dispatchQueueStore } = makeStore();
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { token, itemId } = await takenItemViaToken({ dispatchQueueStore, dispatchTokenStore });
 
     const cleared = [];
