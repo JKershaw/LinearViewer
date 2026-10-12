@@ -573,6 +573,7 @@ test.describe('Roadmap Pipeline UI', () => {
     await expect(select).toHaveValue('');
     await expect(price).toHaveText('');
     await expect(price).toBeHidden();
+    await expect(price).toHaveCSS('display', 'none');
     // Pricing lives in the hint, never in option text.
     await expect(select.locator('option', { hasText: 'per 1M tokens' })).toHaveCount(0);
 
@@ -589,6 +590,7 @@ test.describe('Roadmap Pipeline UI', () => {
     await select.selectOption('');
     await expect(price).toHaveText('');
     await expect(price).toBeHidden();
+    await expect(price).toHaveCSS('display', 'none');
   });
 
   test('idle digest shows a placeholder hint before any reading exists', async ({ page }) => {
