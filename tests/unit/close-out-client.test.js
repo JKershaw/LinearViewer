@@ -214,3 +214,31 @@ describe('close-out.js: the check', () => {
     assert.equal(reloads, 1);
   });
 });
+
+describe('close-out.js: applyCloseOutState repaints a merge neutrally', () => {
+  // LIN-3426: a merged PR reads the same for every viewer, so the repaint never
+  // claims the viewer merged it.
+  test('a ready → merged transition paints the neutral line, never "merged by you"', () => {
+    const document = {
+      createElement() { return { setAttribute(k, v) { this[k] = v; }, textContent: '' }; },
+      addEventListener() {},
+    };
+    const { applyCloseOutState } = load({ document });
+    const appended = [];
+    const attrs = { 'data-state': 'ready' };
+    const b = {
+      firstChild: null,
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      setAttribute(k, v) { attrs[k] = v; },
+      appendChild(child) { appended.push(child); },
+      removeChild() {},
+    };
+    applyCloseOutState(b, { status: 'merged', message: 'PR #12 merged' });
+    assert.equal(attrs['data-state'], 'merged');
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]['data-testid'], 'run-evidence-closeout-neutral');
+    assert.equal(appended[0].textContent, 'PR #12 merged');
+    assert.doesNotMatch(appended[0].textContent, /merged by you|you merged/i);
+    assert.doesNotMatch(String(appended[0]['data-testid']), /merged-by-you/);
+  });
+});

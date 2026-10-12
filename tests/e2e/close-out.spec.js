@@ -4,7 +4,7 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-3248 (P3 of LIN-2949): the close-out box on a finished stop-at-PR run.
 // Ready (standard and stepped, for N2), the "or merge it yourself" link, the
-// merged-by-you state with open ledger items marked "open at merge", and no
+// neutral merged state with open ledger items marked "open at merge", and no
 // straggler flags at the top of the page.
 //
 // GitHub is stubbed hermetically through `/test/seed-pr-status` (as P2's
