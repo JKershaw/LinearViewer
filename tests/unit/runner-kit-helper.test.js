@@ -1110,6 +1110,45 @@ async function fakeHarbour() {
   };
 }
 
+describe('openItems (LIN-3213)', () => {
+  const row = (state, over = {}) => ({ itemId: `${state}-1`, rootItemId: `${state}-1`, state, ...over });
+  const ledger = (...rs) => ({ items: Object.fromEntries(rs.map((r) => [r.itemId, r])) });
+  const cases = [
+    { name: 'a running row is listed', ledger: ledger(row('running')), ids: ['running-1'] },
+    { name: 'done is not listed', ledger: ledger(row('done')), ids: [] },
+    { name: 'lost is not listed', ledger: ledger(row('lost')), ids: [] },
+    { name: 'stopped is not listed', ledger: ledger(row('stopped')), ids: [] },
+    { name: 'only the running rows of a mixed ledger are listed', ledger: ledger(row('running'), row('done'), row('lost'), row('stopped')), ids: ['running-1'] },
+    { name: 'an empty ledger lists nothing', ledger: { items: {} }, ids: [] },
+    { name: 'a missing ledger lists nothing', ledger: undefined, ids: [] }
+  ];
+  for (const c of cases) {
+    test(c.name, () => assert.deepEqual(runnerKit.openItems(c.ledger).map((r) => r.itemId), c.ids));
+  }
+});
+
+describe('debounceWork (LIN-3213)', () => {
+  const W = 120_000;
+  const NOW = 1_000_000_000;
+  const cases = [
+    { name: 'new id is reported and recorded', ids: ['a'], seen: {}, report: ['a'], next: { a: NOW } },
+    { name: 'young entry is suppressed and nothing is written', ids: ['a'], seen: { a: NOW - 1000 }, report: [], next: null },
+    { name: 'entry exactly at the window is reported again', ids: ['a'], seen: { a: NOW - W }, report: ['a'], next: { a: NOW } },
+    { name: 'expired entry is reported again and refreshed', ids: ['a'], seen: { a: NOW - W - 1 }, report: ['a'], next: { a: NOW } },
+    { name: 'expired entries for other ids are dropped on write', ids: ['b'], seen: { a: NOW - W - 1, c: NOW - 5 }, report: ['b'], next: { c: NOW - 5, b: NOW } },
+    { name: 'mixed: young suppressed, new reported', ids: ['a', 'b'], seen: { a: NOW - 5 }, report: ['b'], next: { a: NOW - 5, b: NOW } },
+    { name: 'nothing reported means no write', ids: ['a'], seen: { a: NOW - 5 }, report: [], next: null }
+  ];
+  for (const c of cases) {
+    test(c.name, () => {
+      const r = runnerKit.debounceWork(c.ids, c.seen, NOW, W);
+      assert.deepEqual(r.report, c.report);
+      assert.deepEqual(r.next, c.next);
+    });
+  }
+  test('the window is 2 minutes', () => assert.equal(runnerKit.WAIT_DEBOUNCE_MS, 2 * 60 * 1000));
+});
+
 describe('commands (against a fake Harbour)', () => {
   let home, harbour, outputs;
   const run = async (argv, extra = {}) => {
@@ -1339,6 +1378,47 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(r.reason, 'cap');
   });
 
+  describe('wait debounce (LIN-3213)', () => {
+    const seenFile = () => join(home, 'acme', 'wait-seen.json');
+    const quick = { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 80 };
+
+    test('wait returns work, and an immediate second wait returns cap, not work', TIMEOUT, async () => {
+      harbour.state.queue.length = 0;
+      rmSync(seenFile(), { force: true });
+      const a = harbour.enqueue();
+      const first = await run(['wait'], quick);
+      assert.equal(first.reason, 'work');
+      assert.deepEqual(first.items, [a.id]);
+      assert.ok(typeof JSON.parse(readFileSync(seenFile(), 'utf8'))[a.id] === 'number');
+      const second = await run(['wait'], quick);
+      assert.equal(second.reason, 'cap');
+    });
+
+    test('a different id is still reported while the first is suppressed', TIMEOUT, async () => {
+      const a = harbour.state.queue[0];
+      const b = harbour.enqueue();
+      const r = await run(['wait'], quick);
+      assert.equal(r.reason, 'work');
+      assert.deepEqual(r.items, [b.id]);
+      assert.ok(!r.items.includes(a.id));
+    });
+
+    test('after the window the same id is reported again', TIMEOUT, async () => {
+      const skew = runnerKit.WAIT_DEBOUNCE_MS + 1000;
+      const r = await run(['wait'], { ...quick, now: () => Date.now() + skew });
+      assert.equal(r.reason, 'work');
+      assert.deepEqual([...r.items].sort(), harbour.state.queue.map((q) => q.id).sort());
+    });
+
+    test('a corrupt wait-seen.json reads as empty', TIMEOUT, async () => {
+      writeFileSync(seenFile(), '{ not json');
+      const r = await run(['wait'], quick);
+      assert.equal(r.reason, 'work');
+      assert.equal(r.items.length, harbour.state.queue.length);
+      harbour.state.queue.length = 0;
+    });
+  });
+
   test('status reports heartbeat staleness', TIMEOUT, async () => {
     const hb = join(home, 'acme', 'runner.heartbeat');
     writeFileSync(hb, '');
@@ -1423,6 +1503,46 @@ describe('commands (against a fake Harbour)', () => {
   test('ledger prints ids and states only', TIMEOUT, async () => {
     const r = await run(['ledger']);
     assert.ok(Object.keys(r.items).length > 0);
+  });
+
+  describe('open (LIN-3213)', () => {
+    const ledgerFile = () => join(home, 'acme', 'ledger.json');
+    const rows = {
+      aaaaaaaa: { itemId: 'aaaaaaaa', rootItemId: 'aaaaaaaa', agentId: 'ag-1', state: 'running' },
+      bbbbbbbb: { itemId: 'bbbbbbbb', rootItemId: 'bbbbbbbb', agentId: 'ag-2', state: 'done' }
+    };
+    let saved;
+    before(() => { saved = readFileSync(ledgerFile(), 'utf8'); });
+    after(() => { writeFileSync(ledgerFile(), saved); });
+
+    test('prints each open id and the options text exactly once', TIMEOUT, async () => {
+      writeFileSync(ledgerFile(), JSON.stringify({ items: { ...rows, cccccccc: { itemId: 'cccccccc', rootItemId: 'cccccccc', state: 'running' } } }));
+      const r = await run(['open']);
+      assert.deepEqual(r.open.map((x) => x.itemId).sort(), ['aaaaaaaa', 'cccccccc']);
+      assert.equal(r.options.split(runnerKit.OPEN_OPTIONS_COPY).length - 1, 1);
+      assert.ok(r.options.includes(runnerKit.ORPHAN_COPY));
+      assert.match(r.options, /follow-up/);
+      assert.match(r.options, /abort/);
+      assert.match(r.options, /\[blocked\]/);
+      assert.ok(!/DELETE/.test(r.options));
+    });
+
+    test('with nothing open it lists nothing and prints no options', TIMEOUT, async () => {
+      writeFileSync(ledgerFile(), JSON.stringify({ items: { bbbbbbbb: rows.bbbbbbbb } }));
+      const r = await run(['open']);
+      assert.deepEqual(r, { open: [] });
+    });
+
+    test('ledger output is unchanged by open', TIMEOUT, async () => {
+      const ledger = { items: rows };
+      writeFileSync(ledgerFile(), JSON.stringify(ledger));
+      await run(['open']);
+      assert.deepEqual(await run(['ledger']), ledger);
+    });
+
+    test('the usage string lists open', TIMEOUT, async () => {
+      await assert.rejects(() => run(['no-such-command']), /\|open\|/);
+    });
   });
 
   test('no command\'s output ever contains a bootstrap or working token', () => {

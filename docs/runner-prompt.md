@@ -90,7 +90,7 @@ changes, a subagent stalls, another consumer appears, or after {{WAIT_CAP_MIN}} 
 Code re-invokes you when a background command exits. Every time that happens, **re-arm** `wait`
 first, then act on the `reason` it printed:
 
-- `work` → run `runner poll` and handle it (§3).
+- `work` → run `runner poll` and handle it (§3). An id already reported isn't reported again for a short window while still queued.
 - `halt` → run `runner poll` (it applies the halt, §6).
 - `stall` → handle each entry (§5).
 - `abort` → another consumer is polling (§3).
@@ -254,7 +254,7 @@ let running subagents finish or stop them, and report:
 
 - each item taken, with its dispatch id, subagent and outcome;
 - items left queued, with the reason poll gave;
-- orphans or rows left `taken`, and what the owner should do (re-dispatch);
+- run `runner open`; include its list and options verbatim, and name any `unposted` entries a stop, halt or abort printed;
 - anything still running.
 
 ## Markers, exactly as Harbour reads them

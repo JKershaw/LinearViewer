@@ -589,3 +589,107 @@ describe('mergeLineageFeedback — null is missing, not epoch 0 (LIN-3453)', () 
     assert.deepEqual(merged.map(e => e.message), ['early', 'sib-ok', 'late', 'null-ts']);
   });
 });
+
+// ── LIN-1465: mergeLineageFeedback's tie order is the sibling rows' KEY order ──
+// The callers hand siblings over in four different orders (store: natural,
+// list/task-cost: resolvedAt desc, effort-readout: live-then-history), so the
+// merge itself must not depend on input order.
+describe('mergeLineageFeedback — characterization (green before and after LIN-1465)', () => {
+  const ANCHOR = 'root-1';
+  const SINCE = '2026-08-20T00:00:00.000Z';
+  const T = '2026-08-20T02:00:00.000Z';
+  const entry = (message, timestamp, extra = {}) => ({ message, timestamp, rootItemId: ANCHOR, ...extra });
+
+  test('own feedback precedes a sibling entry at the same timestamp', () => {
+    const own = [entry('own', T)];
+    const siblings = [{ _id: 'a', feedback: [entry('sib', T)] }];
+    assert.deepEqual(mergeLineageFeedback(own, siblings, ANCHOR, SINCE).map(e => e.message), ['own', 'sib']);
+  });
+
+  test('valid timestamps sort ahead of missing/unparseable, across own and sibling entries', () => {
+    const own = [entry('own-junk', undefined), entry('own-late', '2026-08-20T05:00:00.000Z')];
+    const siblings = [{ _id: 'a', feedback: [entry('sib-early', T)] }];
+    assert.deepEqual(
+      mergeLineageFeedback(own, siblings, ANCHOR, SINCE).map(e => e.message),
+      ['sib-early', 'own-late', 'own-junk']
+    );
+  });
+
+  test('sibling entries carrying another (or no) rootItemId are dropped', () => {
+    const siblings = [{ _id: 'a', feedback: [entry('mine', T), entry('other', T, { rootItemId: 'root-2' }), { message: 'untagged', timestamp: T }] }];
+    assert.deepEqual(mergeLineageFeedback([], siblings, ANCHOR, SINCE).map(e => e.message), ['mine']);
+  });
+
+  test('does not mutate own feedback, sibling rows, or their feedback arrays', () => {
+    const own = [entry('own', T)];
+    const siblings = [
+      { _id: 'b', feedback: [entry('b1', T)] },
+      { _id: 'a', feedback: [entry('a1', T)] },
+    ];
+    const snapshot = JSON.stringify({ own, siblings });
+    mergeLineageFeedback(own, siblings, ANCHOR, SINCE);
+    assert.equal(JSON.stringify({ own, siblings }), snapshot);
+    assert.deepEqual(siblings.map(s => s._id), ['b', 'a'], 'caller array order untouched');
+  });
+
+  test('with no ties, output is timestamp order regardless of sibling order', () => {
+    const rows = [
+      { _id: 'a', feedback: [entry('a1', '2026-08-20T03:00:00.000Z')] },
+      { _id: 'b', feedback: [entry('b1', '2026-08-20T01:00:00.000Z')] },
+    ];
+    const msgs = r => mergeLineageFeedback([], r, ANCHOR, SINCE).map(e => e.message);
+    assert.deepEqual(msgs(rows), ['b1', 'a1']);
+    assert.deepEqual(msgs([...rows].reverse()), ['b1', 'a1']);
+  });
+
+  test('a row\'s own entries keep their stored order on a tie', () => {
+    const siblings = [{ _id: 'a', feedback: [entry('a-first', T), entry('a-second', T)] }];
+    assert.deepEqual(mergeLineageFeedback([], siblings, ANCHOR, SINCE).map(e => e.message), ['a-first', 'a-second']);
+  });
+});
+
+describe('mergeLineageFeedback — order-independent ties (LIN-1465)', () => {
+  const ANCHOR = 'root-1';
+  const SINCE = '2026-08-20T00:00:00.000Z';
+  const T = '2026-08-20T02:00:00.000Z';
+  const entry = (message, timestamp) => ({ message, timestamp, rootItemId: ANCHOR });
+  // Missing-timestamp sibling entries are excluded by the forward-only filter, so
+  // the "both invalid" tie is exercised through OWN feedback (below); sibling ties
+  // are equal valid timestamps.
+  const rowsWith = (key) => [
+    { [key]: 'row-a', feedback: [entry('a1', T), entry('a2', T)] },
+    { [key]: 'row-b', feedback: [entry('b1', T)] },
+    { [key]: 'row-c', feedback: [entry('c1', T)] },
+  ];
+  const msgs = (own, rows) => mergeLineageFeedback(own, rows, ANCHOR, SINCE).map(e => e.message);
+
+  for (const key of ['_id', 'id']) {
+    test(`equal-timestamp siblings come out in row-key order for every input order (${key})`, () => {
+      const rows = rowsWith(key);
+      const expected = ['own', 'a1', 'a2', 'b1', 'c1'];
+      const [a, b, c] = rows;
+      for (const perm of [[a, b, c], [c, b, a], [b, c, a], [b, a, c], [c, a, b], [a, c, b]]) {
+        assert.deepEqual(msgs([entry('own', T)], perm), expected, perm.map(r => r[key]).join(','));
+      }
+    });
+  }
+
+  test('own entries with missing timestamps stay last and in stored order, whatever the sibling order', () => {
+    const own = [entry('own-junk-1', undefined), entry('own-junk-2', 'not-a-date')];
+    const rows = rowsWith('_id');
+    const expected = ['a1', 'a2', 'b1', 'c1', 'own-junk-1', 'own-junk-2'];
+    assert.deepEqual(msgs(own, rows), expected);
+    assert.deepEqual(msgs(own, [...rows].reverse()), expected);
+  });
+
+  test('rows without a key keep their relative input order after keyed rows are ordered', () => {
+    const rows = [
+      { feedback: [entry('anon-1', T)] },
+      { _id: 'row-b', feedback: [entry('b1', T)] },
+      { feedback: [entry('anon-2', T)] },
+      { _id: 'row-a', feedback: [entry('a1', T)] },
+    ];
+    const out = msgs([], rows);
+    assert.deepEqual(out, ['a1', 'b1', 'anon-1', 'anon-2']);
+  });
+});

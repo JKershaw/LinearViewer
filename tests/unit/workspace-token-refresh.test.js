@@ -727,7 +727,7 @@ describe('refreshOwnerWorkspaceToken (LIN-1499, Block D — GitHub-family routin
 
   test('D5 [LIN-1524 close-out replacement assertion — no Linear contamination]: a GitHub-family re-mint never creates (or touches) a durable Linear credential record', async () => {
     // The original D5 ("a GitHub workspace never gains a refreshToken") is a
-    // VACUITY TRAP after LIN-1524: since updateWorkspaceTokens no longer
+    // VACUITY TRAP after LIN-1524: since the session-side token writer no longer
     // writes refreshToken for ANYONE (Linear included), that assertion would
     // now pass even if a GitHub-family re-mint accidentally started calling
     // `refreshAccessToken` or writing a durable record — it protects nothing

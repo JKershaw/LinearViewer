@@ -271,6 +271,7 @@ describe('LIN-3341 — Go is one press', () => {
   test('the started line takes the task-state header sentence and stops polling when not live', async () => {
     const queue = [
       { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' }, // mount read
+      { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' }, // press-time read (LIN-3446)
       { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 12:00.</p></div>' }, // first poll
       { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No session running.</p></div>' } // second poll
     ];
@@ -298,8 +299,17 @@ describe('LIN-3341 — Go is one press', () => {
     const dup = await mount({ dispatch: async () => { const e = new Error('dup'); e.status = 409; e.body = { code: 'DUPLICATE_DISPATCH' }; throw e; } });
     await dup.container.click({ action: 'go', rung: 'run-task' });
     await dup.flush();
-    assert.match(dup.container.innerHTML, /Already running/);
-    assert.match(dup.container.innerHTML, /data-testid="opened-task-go"/, 'Go returns to ready');
+    // LIN-3446: a duplicate refusal means a run IS live — no pressable Go, the
+    // slot is in the running/watch state, and the poll is running.
+    assert.doesNotMatch(dup.container.innerHTML, /data-testid="opened-task-go"/, 'no pressable Go after a duplicate refusal');
+    assert.doesNotMatch(dup.container.innerHTML, /data-action="go"/, 'no Go action after a duplicate refusal');
+    assert.match(dup.container.innerHTML, /data-go-status="running"/, 'the slot is in the running state');
+    assert.match(dup.container.innerHTML, /href="\/workspace\/ws\/task\/LIN-42"[^>]*data-testid="opened-task-started-link"/, 'with the watch link');
+    assert.equal(dup.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
+    // (d) a second press after the refusal cannot send a second dispatch.
+    await dup.container.click({ action: 'go', rung: 'run-task' });
+    await dup.flush();
+    assert.equal(dup.calls.dispatch.length, 1, 'no second dispatch after the refusal');
 
     const limited = await mount({ dispatch: async () => { const e = new Error('429'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; } });
     await limited.container.click({ action: 'go', rung: 'run-task' });
@@ -407,6 +417,56 @@ describe('LIN-3341 — Go is one press', () => {
       await h.flush();
       assert.doesNotMatch(c.innerHTML, /data-testid="opened-task-started"/, 'the post-destroy read does not paint');
       assert.match(c.innerHTML, /data-rung="run-task"[^>]*data-action="go"/, 'the pre-destroy render is untouched');
+    });
+
+    // LIN-3446: the press reads the state afresh; the mount read is not trusted.
+    const IDLE = { live: false, status: 'idle', headerHtml: '<div class="task-status"><p class="task-sentence">No sessions yet.</p></div>' };
+    const stateReads = (m) => m.calls.api.filter((u) => String(u).includes('/api/task/')).length;
+
+    test('mount says idle, press-time read says live: no dispatch, running line, poll started', async () => {
+      const queue = [IDLE, { live: true, status: 'running', headerHtml: '<div class="task-status"><p class="task-sentence">Autopilot running since 09:00.</p></div>' }];
+      const m = await mount({}, {}, { stateApi: async () => queue.shift() || IDLE });
+      assert.match(m.container.innerHTML, /data-action="go"/, 'Go rendered from the idle mount read');
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(m.calls.dispatch.length, 0, 'no dispatch');
+      assert.equal(m.calls.kickoff.length, 0, 'no kickoff');
+      assert.doesNotMatch(m.container.innerHTML, /data-action="go"/);
+      assert.match(m.container.innerHTML, /Autopilot running since 09:00\./);
+      assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
+    });
+
+    test('mount says idle, press-time read says waiting: no dispatch, running line', async () => {
+      const queue = [IDLE, { live: false, status: 'waiting', headerHtml: '<div class="task-status"><p class="task-sentence">Waiting for your answer.</p></div>' }];
+      const m = await mount({}, {}, { stateApi: async () => queue.shift() || IDLE });
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(m.calls.dispatch.length, 0, 'no dispatch');
+      assert.doesNotMatch(m.container.innerHTML, /data-action="go"/);
+      assert.match(m.container.innerHTML, /Waiting for your answer\./);
+      assert.equal(m.timers.filter((t) => !t.cancelled).length, 1, 'the poll is running');
+    });
+
+    test('a press reads the state again even when the mount read already resolved', async () => {
+      const m = await mount({}, {}, { stateApi: async () => IDLE });
+      const before = stateReads(m);
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(stateReads(m), before + 1, 'one fresh read at press time');
+      assert.equal(m.calls.dispatch.length, 1, 'idle at press time still dispatches once');
+    });
+
+    test('a failed press-time read proceeds: the read is best-effort, the server duplicate guard stays the backstop', async () => {
+      let n = 0;
+      const m = await mount({}, {}, { stateApi: async () => { n += 1; if (n > 1) throw new Error('offline'); return IDLE; } });
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(m.calls.dispatch.length, 1, 'a failed read is not a block');
+      assert.match(m.container.innerHTML, /data-testid="opened-task-started"/);
     });
 
     test('a press while the read is in flight waits, then dispatches when the read is not live', async () => {

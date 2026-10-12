@@ -85,7 +85,6 @@
   --z-base: 1;
   --z-sticky: 100;
   --z-overlay: 1000;
-  --z-modal: 2000;
 
   /* Sticky shared-header clearance (LIN-984). The reserved height used as the
      `scroll-margin-top` for interactive controls so scroll-into-view settles
@@ -139,9 +138,8 @@
      media query can neutralize them in one place; keyframes defined below. */
   --motion-fast: 120ms;
   --motion-base: 240ms;
-  --motion-slow: 480ms;
   /* Running-dot pulse cadence (theme spec §7). Distinct from the motion scale
-     above so repointing it never corrupts fast/base/slow. */
+     above so repointing it never corrupts fast/base. */
   --motion-pulse: 1.6s;
 }
 

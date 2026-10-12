@@ -10,7 +10,7 @@
  * (lib/token-refresh.js, unstubbed) against a local, controllable token
  * endpoint via its new `tokenUrl` seam (LIN-1373), composed with the real
  * `refreshOwnerWorkspaceToken` + `selectExpiredOwnerRow` +
- * `selectOwnerWorkspaceToken` + `updateWorkspaceTokens`, over a Mongo-shaped
+ * `selectOwnerWorkspaceToken`, over a Mongo-shaped
  * in-memory sessions collection using the exact TTL-preserving persist-back
  * server.js's `resolveWorkspaceAccess` uses (`updateOne({_id:sid},
  * {$set:{session}})` — never `MongoSessionStore.set`, which would roll
