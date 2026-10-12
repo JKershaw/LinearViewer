@@ -381,7 +381,7 @@
     // run this step; the run allowance moved into the Go block above.
     // "run on my machine ›" is not a rung: since S4b it sits on the card that
     // opens the task (runnerLinkHtml), so it is not repeated here.
-    return `<div class="opened-task-ladder" data-testid="opened-task-ladder">${rungs.join('')}</div>`;
+    return `<div class="opened-task-ladder" data-testid="opened-task-ladder" data-ladder-slot>${rungs.join('')}</div>`;
   }
 
   /**
@@ -717,6 +717,17 @@
       if (destroyed) return;
       const slot = container.querySelector && container.querySelector('[data-go-slot]');
       if (slot) slot.outerHTML = renderGo(opts, state);
+      else render();
+    }
+
+    // LIN-3267: the ladder twin of paintGo(). A post-press quota read changes only
+    // the allowance count and the run rungs' disabled state, so it repaints just
+    // [data-ladder-slot] and leaves the pressed button's feedback, the dispatch
+    // disclosure and its selects alone (falling back to a full render when absent).
+    function paintLadder() {
+      if (destroyed) return;
+      const slot = container.querySelector && container.querySelector('[data-ladder-slot]');
+      if (slot) slot.outerHTML = renderLadder(opts, state);
       else render();
     }
 
@@ -1120,6 +1131,8 @@
         if (destroyed) return;
         applyGoRefusal(error);
       }
+      // LIN-3267: the press has settled either way — re-read the allowance.
+      await refreshRunQuota();
     }
 
     function handleClick(e) {
@@ -1344,10 +1357,14 @@
         if (typeof window.toast === 'function') window.toast(error.message, { type: 'error' });
         btn.textContent = 'err';
       } finally {
+        // LIN-3267: the press has settled either way. The allowance is re-read
+        // only once the 2s feedback window closes and the button is restored,
+        // so the repaint cannot cut short the ✓/err or the double-press guard.
         setTimeout(() => {
           if (destroyed) return;
           btn.textContent = originalText;
           btn.disabled = false;
+          refreshRunQuota();
         }, 2000);
       }
     }
@@ -1362,9 +1379,19 @@
     // instance-wide. It is a read, never a spend. Only consulted when the caller
     // marks the workspace free-tier, so other consumers/units never touch the
     // network from init.
-    if (opts.freeTier) {
+    //
+    // LIN-3267: this is the ONE place the ladder's run state is decided from the
+    // quota. Load calls it, and so does every settled ladder press (Go and the
+    // run-step rung, success or failure), so the count and the disabled rungs
+    // track the press — including a RUN_LIMIT_REACHED 429, whose exhausted state
+    // comes from this read, never from a hand-set flag. An unreadable response
+    // leaves the last known value untouched. Only the load-time call
+    // (`initial`) rebuilds the component; a press repaints the Go and ladder
+    // slots, never the whole container (LIN-3341's paintGo contract).
+    function refreshRunQuota({ initial = false } = {}) {
+      if (!opts.freeTier) return Promise.resolve();
       const quotaPrefix = opts.urlKey ? `/workspace/${encodeURIComponent(opts.urlKey)}` : '';
-      Promise.resolve()
+      return Promise.resolve()
         .then(() => window.api(`${quotaPrefix}/api/dispatch/quota`, { on401: false }))
         .then((data) => {
           if (destroyed) return;
@@ -1372,13 +1399,17 @@
             && typeof data.remaining === 'number' && typeof data.limit === 'number') {
             state.runQuota = { remaining: data.remaining, limit: data.limit, runsUsed: data.runsUsed };
           }
-          render();
         })
-        .catch(() => {
+        .catch(() => {})
+        .then(() => {
           if (destroyed) return;
-          render();
+          if (!initial) { paintGo(); paintLadder(); return; }
+          // A ✦ stream in flight owns [data-prompt-body] (N4): repaint only Go.
+          if (state.result && state.result.streaming) paintGo();
+          else render();
         });
     }
+    refreshRunQuota({ initial: true });
 
     // LIN-3341 finding 7: on mount, ask once whether a run is already live on
     // this task, so a reopened task shows the running/waiting line instead of a

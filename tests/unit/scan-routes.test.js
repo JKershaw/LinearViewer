@@ -22,6 +22,8 @@ import { createDashboardRoutes } from '../../routes/dashboard.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { createSessionsFeedCache } from '../../lib/sessions-feed-cache.js';
 import { InMemoryRunSummaryCacheStore } from '../../lib/run-summary-cache.js';
+import { dueBasisHashFromContext } from '../../lib/scan-fingerprint.js';
+import { testMockData } from '../../lib/sample-data/mock-data.js';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
@@ -65,12 +67,12 @@ function createMockCollection() {
 
 let collection, taskDecisionsStore, app;
 
-beforeEach(() => {
-  collection = createMockCollection();
-  taskDecisionsStore = new TaskDecisionsStore({ collection });
-  app = express();
-  app.use(express.json());
-  app.use(createWorkspaceApiRoutes({
+// `extra` carries optional route dependencies (e.g. a stub harbourCommentsStore);
+// omitted, createWorkspaceApiRoutes defaults the ledger store to null.
+function buildApp(extra = {}) {
+  const built = express();
+  built.use(express.json());
+  built.use(createWorkspaceApiRoutes({
     workspaceFromUrl: (req, _res, next) => {
       // test-token: NODE_ENV=test flips BOTH the data mock (testMockData
       // fixtures) and the AI mock (shouldMockAi) on for this workspace.
@@ -91,7 +93,15 @@ beforeEach(() => {
     promptTraceStore: {},
     proxyTokenStore: {},
     taskDecisionsStore,
+    ...extra,
   }));
+  return built;
+}
+
+beforeEach(() => {
+  collection = createMockCollection();
+  taskDecisionsStore = new TaskDecisionsStore({ collection });
+  app = buildApp();
 });
 
 async function request(method, path, body) {
@@ -447,6 +457,64 @@ describe('GET /workspace/:urlKey/api/scan/:issueId — basisChanged (LIN-2241)',
     // NOTHING, so a later comparison against a dueBasisHash computed WITH the
     // ledger present can only ever read as MORE due, never less.
     assert.equal(doc.dueBasisHash, doc.basisHash);
+  });
+
+  // LIN-2698: the scan-time PRODUCER twin of scan-due-route.test.js's
+  // ledger-present test. Every other test here mounts no ledger store, so the
+  // `harbourCommentsStore ? await wereRecordedByHarbour(...) : new Set()` guard
+  // in the scan handler only ever ran its null arm. Disabling the present arm
+  // left the whole suite green — yet if the producer stops excluding
+  // Harbour-written comments while scan-due still excludes them, the stored and
+  // current due-basis hashes diverge and the task reads a spurious dueStatus: true.
+  test('POST excludes ledger-recorded Harbour comments from the persisted dueBasisHash — the [C-3] ledger-present branch', async () => {
+    const mockIssue = testMockData.issues.find(i => i.identifier === DECISION_ISSUE);
+    const hadComments = Object.prototype.hasOwnProperty.call(mockIssue, 'comments');
+    const originalComments = mockIssue.comments;
+    const HARBOUR_COMMENT_ID = 'harbour-authored-comment';
+    mockIssue.comments = { nodes: [
+      { id: HARBOUR_COMMENT_ID, body: 'Harbour recap posted by the ledger', createdAt: '2024-02-01T00:00:00Z', user: { name: 'Harbour' } },
+      { id: 'human-comment', body: 'A person weighed in', createdAt: '2024-02-02T00:00:00Z', user: { name: 'Alice' } },
+    ] };
+    try {
+      const ledgerCalls = [];
+      const harbourCommentsStore = {
+        async wereRecordedByHarbour(urlKey, comments) {
+          ledgerCalls.push({ urlKey, comments });
+          return new Set([HARBOUR_COMMENT_ID]);
+        },
+      };
+      app = buildApp({ harbourCommentsStore });
+
+      const posted = await post(`/workspace/test-workspace/api/scan/${DECISION_ISSUE}`);
+      assert.equal(posted.status, 200);
+
+      // (1) the ledger is consulted exactly once, with (urlKey, the context's comments)
+      assert.equal(ledgerCalls.length, 1, 'ledger consulted exactly once per scan');
+      assert.equal(ledgerCalls[0].urlKey, 'test-workspace');
+      assert.deepEqual(
+        ledgerCalls[0].comments.map(c => c.id),
+        [HARBOUR_COMMENT_ID, 'human-comment'],
+        'called with the context comments, not an empty or reordered list'
+      );
+
+      // (2) the persisted dueBasisHash is the one computed with the Harbour
+      // comment excluded — and is NOT the one an empty ledger would produce.
+      const context = {
+        issue: { title: mockIssue.title, description: mockIssue.description, state: mockIssue.state },
+        comments: ledgerCalls[0].comments,
+        children: [],
+      };
+      const withLedger = dueBasisHashFromContext(context, { recordedCommentIds: new Set([HARBOUR_COMMENT_ID]) });
+      const withoutLedger = dueBasisHashFromContext(context, { recordedCommentIds: new Set() });
+      assert.notEqual(withLedger, withoutLedger, 'sanity: the fixture makes exclusion observable in the hash');
+
+      const doc = collection._docs.find(d => d._id === posted.body.id);
+      assert.equal(doc.dueBasisHash, withLedger, 'dueBasisHash computed with the Harbour comment excluded');
+      assert.notEqual(doc.dueBasisHash, withoutLedger);
+    } finally {
+      if (hadComments) mockIssue.comments = originalComments;
+      else delete mockIssue.comments;
+    }
   });
 
   // LIN-2665 L1 (John's ruling, 2026-09-05): the [F-2] terminal-row due-basis
