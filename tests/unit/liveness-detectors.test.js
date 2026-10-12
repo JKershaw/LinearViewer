@@ -12,9 +12,9 @@ import {
   detectStoppedOrCircularWait,
   isParentAddressed,
   extractDispatchIds,
-  DISPATCHER_SILENT_MS,
   WAKE_DELIVERY_GRACE_MS
 } from '../../lib/liveness-detectors.js';
+import { NOBODY_LISTENING_MS, buildConsumerPollWarning } from '../../lib/consumer-poll-warning.js';
 
 const MIN = 60 * 1000;
 
@@ -54,8 +54,19 @@ describe('Rule S: detectDispatcherSilent', () => {
   });
 
   test('does not fire at exactly 20 minutes or less', () => {
-    const now = Date.parse(dispatchedAt) + DISPATCHER_SILENT_MS;
+    const now = Date.parse(dispatchedAt) + NOBODY_LISTENING_MS;
     assert.equal(detectDispatcherSilent({ now, lastSeenAt: dispatchedAt, liveItems: [{ status: 'queued' }] }).firing, false);
+  });
+
+  test('agrees with buildConsumerPollWarning at the same age (one shared limit)', () => {
+    const items = [{ status: 'queued' }];
+    for (const [ageMs, stale] of [[NOBODY_LISTENING_MS, false], [NOBODY_LISTENING_MS + 1, true]]) {
+      const now = Date.parse(dispatchedAt) + ageMs;
+      const alarm = detectDispatcherSilent({ now, lastSeenAt: dispatchedAt, liveItems: items }).firing;
+      const warning = buildConsumerPollWarning(dispatchedAt, { now: new Date(now) }) !== null;
+      assert.equal(alarm, stale);
+      assert.equal(warning, stale);
+    }
   });
 
   test('does not fire with no queued/taken item', () => {

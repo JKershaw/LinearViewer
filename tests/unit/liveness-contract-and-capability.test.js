@@ -51,9 +51,11 @@ describe('LIN-3258 contract pin: WAITING_WAKE_MARKERS', () => {
 });
 
 describe('LIN-3258 static-import boundary', () => {
-  test('lib/liveness-detectors.js is pure — imports only dispatch-terminal', () => {
+  test('lib/liveness-detectors.js is pure — imports only dispatch-terminal and the NOBODY_LISTENING_MS constant', () => {
     const specifiers = importSpecifiers(readSrc('lib/liveness-detectors.js')).sort();
-    assert.deepEqual(specifiers, ['./dispatch-terminal.js']);
+    // LIN-3503: the one shared stale limit lives in consumer-poll-warning.js;
+    // the detector gains a numeric constant, still no store or I/O import.
+    assert.deepEqual(specifiers, ['./consumer-poll-warning.js', './dispatch-terminal.js']);
   });
 
   test('lib/liveness-alarm-sweep.js imports no dispatch-store / provider / write path', () => {
