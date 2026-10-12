@@ -188,7 +188,7 @@ subagent to add `--unix-socket <path>` to every curl. Its value wins over any
    With no outcome line, ask the subagent once; then post `"[failed] subagent ended without an outcome line"`.
 
 `runner feedback <id> <kind> <message>`: `kind` is one of {{FEEDBACK_ENTRY_KINDS}}; you need
-`status` and `recap`. Every post carries the lineage's first item as `rootItemId`, so a
+`status`, `recap`, `decision`. Every post carries the lineage's first item as `rootItemId`, so a
 subagent's cumulative usage counts once however many wakes it runs.
 
 **Abort rows.** An item with `abort: true` names a session to cancel. `runner take` handles the
