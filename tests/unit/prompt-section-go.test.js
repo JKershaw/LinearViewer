@@ -22,8 +22,9 @@ const SRC = readFileSync(join(__dirname, '../../public/prompt-section.js'), 'utf
 
 // Replace the element carrying `data-go-slot` (a <div>) in a flat HTML string,
 // honouring nested <div>s. Setter-only: this is the one write Go makes.
-function replaceGoSlot(html, replacement) {
-  const open = /<div\b[^>]*\bdata-go-slot\b[^>]*>/.exec(html);
+function replaceGoSlot(html, replacement) { return replaceSlot(html, 'data-go-slot', replacement); }
+function replaceSlot(html, attr, replacement) {
+  const open = new RegExp(`<div\\b[^>]*\\b${attr}\\b[^>]*>`).exec(html);
   if (!open) return html;
   const start = open.index;
   let depth = 1;
@@ -54,6 +55,12 @@ function makeContainer() {
       if (sel === '[data-go-slot]') {
         return {
           set outerHTML(v) { self._html = replaceGoSlot(self._html, v); },
+          get outerHTML() { return ''; },
+        };
+      }
+      if (sel === '[data-ladder-slot]') {
+        return {
+          set outerHTML(v) { self._html = replaceSlot(self._html, 'data-ladder-slot', v); },
           get outerHTML() { return ''; },
         };
       }
@@ -104,7 +111,11 @@ function loadPromptSection(overrides = {}) {
   };
   window.api = async (url, opts) => {
     calls.api.push(url);
-    if (String(url).includes('/api/dispatch/quota')) return overrides.quota || null;
+    if (String(url).includes('/api/dispatch/quota')) {
+      calls.quotaReads = (calls.quotaReads || 0) + 1;
+      // LIN-3267: a function yields the allowance at each read.
+      return (typeof overrides.quota === 'function' ? overrides.quota() : overrides.quota) || null;
+    }
     if (String(url).includes('/api/task/')) {
       if (overrides.stateApi) return overrides.stateApi(url, opts);
       return {};
@@ -343,6 +354,44 @@ describe('LIN-3341 — Go is one press', () => {
     assert.equal(m.calls.records.length, 1, 'the press is recorded');
     assert.equal(m.calls.records[0].opts.body.includes('"rung":"run-task"'), true);
     assert.equal(m.calls.records[0].opts.body.includes('"ready":false'), true);
+  });
+
+  describe('LIN-3267 — Go re-reads the run quota after the press settles', () => {
+    const Q = (remaining) => ({ limited: true, runsUsed: 10 - remaining, limit: 10, remaining });
+    const seq = (...qs) => { let i = 0; return () => qs[Math.min(i++, qs.length - 1)]; };
+    const goTag = (m) => m.container.innerHTML.match(/<button[^>]*data-testid="opened-task-go"[^>]*>/)[0];
+
+    test('a successful Go press shows the re-read allowance and disables Go at zero', async () => {
+      const m = await mount({}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+      assert.match(m.container.innerHTML, /1 of 10 runs left today/);
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(m.calls.quotaReads, 2, 'one load read, one post-press read');
+      assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+    });
+
+    test('a Go press repaints only the Go and ladder slots, never the whole container', async () => {
+      const m = await mount({}, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+      const before = m.container._fullRenders;
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.equal(m.container._fullRenders, before, 'no whole-container write after the press');
+      assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+      assert.match(m.container.innerHTML, /data-ladder-slot/, 'the ladder slot is still there');
+    });
+
+    test('a RUN_LIMIT_REACHED 429 leaves Go exhausted via the quota read', async () => {
+      const dispatch = async () => { const e = new Error('429'); e.status = 429; e.body = { code: 'RUN_LIMIT_REACHED' }; throw e; };
+      const m = await mount({ dispatch }, { freeTier: true }, { quota: seq(Q(1), Q(0)) });
+      await m.container.click({ action: 'go', rung: 'run-task' });
+      await m.flush();
+      await m.flush();
+      assert.match(goTag(m), /disabled/);
+      assert.match(goTag(m), /daily run limit reached/);
+      assert.match(m.container.innerHTML, /0 of 10 runs left today/);
+    });
   });
 
   test('a run-limited Go is disabled while ✦ next step stays enabled', async () => {
