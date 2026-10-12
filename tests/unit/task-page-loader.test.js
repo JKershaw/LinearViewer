@@ -16,7 +16,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
@@ -608,4 +608,18 @@ describe('briefCurrentSection (LIN-3356)', () => {
   test('the last section ends at the end of the body, and a preamble is skipped', () => {
     assert.equal(briefCurrentSection('Here is the brief:\n\n## Current\nOnly this.'), 'Only this.');
   });
+});
+
+describe('deriveReadyHeader: the one owner of the ready-to-merge answer (LIN-3448)', () => {
+  const cases = [
+    ['ready with a PR number → the waiting header', { status: 'ready', pr: { number: 41 } }, { status: 'waiting', sentence: 'Approved. PR #41 is ready to merge.' }],
+    ['ready without a PR number → null', { status: 'ready', pr: {} }, null],
+    ['ready without a pr → null', { status: 'ready' }, null],
+    ['not-ready → null', { status: 'not-ready', pr: { number: 41 } }, null],
+    ['merged → null', { status: 'merged', pr: { number: 41 } }, null],
+    ['null close-out (guest / state endpoint) → null', null, null],
+  ];
+  for (const [name, closeOut, expected] of cases) {
+    test(name, () => assert.deepEqual(deriveReadyHeader(closeOut), expected));
+  }
 });

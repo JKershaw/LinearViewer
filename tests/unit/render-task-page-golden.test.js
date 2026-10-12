@@ -367,6 +367,42 @@ describe('task page structure', () => {
   });
 });
 
+// LIN-3448: `data-merge-ready` and `data-ready-header` both come from
+// `model.readyHeader`, so the header HTML is present exactly when the flag is.
+describe('data-ready-header (LIN-3448)', () => {
+  const attrs = (html) => ({
+    flag: (html.match(/data-merge-ready="(true|false)"/) || [])[1],
+    header: (html.match(/data-ready-header="([^"]*)"/) || [])[1],
+  });
+  const opts = (viewer) => ({ viewer, urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+
+  test('a ready close-out renders the flag and the ready header HTML, without a summary', () => {
+    const { flag, header } = attrs(renderTaskPage(model('running-blocked-repeat'), opts('owner')));
+    assert.equal(flag, 'true');
+    assert.match(header, /Approved\. PR #41 is ready to merge\./);
+    assert.match(header, /data-status=&quot;waiting&quot;/);
+    assert.doesNotMatch(header, /task-summary/, 'the load-time summary is carried by the client, not duplicated here');
+  });
+
+  test('not ready, no evidence, or a guest load (never ready): no flag, no header', () => {
+    const m = model('running-blocked-repeat');
+    const notReady = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, now: NOW, loops: RUNNING_LOOPS, ctx: ctx(),
+      evidence: { ...EVIDENCE, closeOut: { ...EVIDENCE.closeOut, status: 'not-ready', reason: 'runner-not-set-up', owner: false } } });
+    for (const [name, mdl, viewer] of [['not-ready', notReady, 'guest'], ['no evidence', model('no-sessions'), 'owner'], ['guest render of an owner-ready model', { ...m, readyHeader: null }, 'guest']]) {
+      const a = attrs(renderTaskPage(mdl, opts(viewer)));
+      assert.equal(a.flag, 'false', name);
+      assert.equal(a.header, undefined, `${name}: no data-ready-header`);
+    }
+  });
+
+  test('present exactly when data-merge-ready is true, across every fixture', () => {
+    for (const name of CASES) {
+      const a = attrs(render(name));
+      assert.equal(a.header !== undefined, a.flag === 'true', name);
+    }
+  });
+});
+
 describe('viewer isolation', () => {
   for (const name of CASES) {
     test(`${name}: owner minus renderOwnerControls === guest`, () => {
