@@ -47,7 +47,7 @@ function makeSession(initial = {}) {
 }
 
 function makeLogoutHandler(evictWorkspaceToken) {
-  const router = createAuthRoutes({ ...withResolver(), sessionStore: { cleanup: async () => {} }, evictWorkspaceToken });
+  const router = createAuthRoutes({ ...withResolver(), evictWorkspaceToken });
   return getHandler(router, 'get', '/logout');
 }
 
@@ -74,7 +74,7 @@ describe('routes/auth.js — /logout eviction (LIN-1507, witness D(i))', () => {
 
   test('captures accountId + workspaces BEFORE destroy() — survives a destroy() that wipes session data first', () => {
     const evicted = [];
-    const router = createAuthRoutes({ ...withResolver(), sessionStore: { cleanup: async () => {} }, evictWorkspaceToken: (key) => evicted.push(key) });
+    const router = createAuthRoutes({ ...withResolver(), evictWorkspaceToken: (key) => evicted.push(key) });
     const handler = getHandler(router, 'get', '/logout');
     // A destroy() that synchronously clears session fields BEFORE invoking its
     // callback, mirroring a real store's post-destroy state — this would
@@ -160,7 +160,6 @@ describe('routes/auth.js — /logout is explicitly NOT a durable-deletion site (
 
     const evicted = [];
     const router = createAuthRoutes({ ...withResolver(),
-      sessionStore: { cleanup: async () => {} },
       evictWorkspaceToken: (key) => evicted.push(key),
       ownerCredentialStore, // deliberately unused by /logout — passed to prove it's ignored, not merely absent
     });

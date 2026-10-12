@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { createProviderAuthRouter } from '../../routes/provider-auth-routers.js';
 import { getAllProviders, getProvider } from '../../lib/providers/index.js';
 
-const deps = () => ({ sessionStore: { cleanup: async () => {} }, userPreferencesStore: null });
+const deps = () => ({ userPreferencesStore: null });
 
 describe('createProviderAuthRouter', () => {
   test('Linear resolves to an Express router', () => {

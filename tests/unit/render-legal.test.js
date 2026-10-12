@@ -55,6 +55,14 @@ describe('privacy page', () => {
     assert.match(text, /does not revoke/);
   });
 
+  // LIN-3424: the hourly cleanup loop (lib/hourly-cleanup.js) now removes
+  // expired session rows, so the page must say that and not the old "can stay
+  // in the database until it is next read".
+  test('says the hourly cleanup deletes an expired session record', () => {
+    assert.match(text, /A session stops working after 30 days, but the expired session record, with its tokens, is deleted by an hourly cleanup\./);
+    assert.doesNotMatch(text, /expired session record[^.]*can stay in the database/);
+  });
+
   test('does not use the public issues tracker as the deletion contact', () => {
     assert.doesNotMatch(html, /github\.com\/JKershaw\/LinearViewer\/issues/);
   });

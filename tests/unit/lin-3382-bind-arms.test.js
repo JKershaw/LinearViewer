@@ -571,7 +571,7 @@ describe('Linear (stable id = org id; key stays org.urlKey || org.name)', () => 
   });
   const ACME = { id: 'org-1', name: 'Acme', urlKey: 'acme' };
   const mountAuth = (world, p, { resolve = world.resolve } = {}) => createAuthRoutes({
-    provider: p, sessionStore: { cleanup: async () => {} },
+    provider: p, 
     accountStore: world.accountStore, accountWorkspaceStore: world.accountWorkspaceStore,
     ownerCredentialStore: world.ownerCredentialStore, connectionStore: world.connectionStore,
     ...(resolve === null ? {} : { resolveWorkspaceUrlKey: resolve })

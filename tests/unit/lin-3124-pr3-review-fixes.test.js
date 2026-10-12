@@ -415,7 +415,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
           accountId: acct._id, workspaces: [container], activeWorkspaceId: 'org-a', oauthState: 'st',
           save(cb) { cb && cb(); }, regenerate(cb) { for (const k of Object.keys(this)) if (typeof this[k] !== 'function') delete this[k]; cb(); },
         };
-        const router = createAuthRoutes({ ...withResolver(), provider: linearProvider(), sessionStore: { cleanup: async () => {} }, ...s });
+        const router = createAuthRoutes({ ...withResolver(), provider: linearProvider(), ...s });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);
         assert.equal(res.redirectedTo, '/workspace/org-a/');
@@ -514,7 +514,7 @@ describe('LIN-3124 PR3 review fixes (verdict 71b71694)', () => {
           save(cb) { cb && cb(); },
         };
         const provider = { name: 'linear', completeAuth: async () => ({ access_token: 'B-new', refresh_token: 'RB', expires_in: 86400 }), fetchOrganization: async () => ({ id: 'org-b', name: 'Org B', urlKey: 'org-b' }), fetchViewer: async () => ({ id: 'viewer-b' }) };
-        const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
+        const router = createAuthRoutes({ ...withResolver(), provider, accountStore: s.accountStore, accountWorkspaceStore: s.accountWorkspaceStore, ...spiedStores(s, log) });
         const res = makeRes();
         await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);
         assert.equal(res.redirectedTo, '/workspace/org-a/settings?provider_ok=linear');

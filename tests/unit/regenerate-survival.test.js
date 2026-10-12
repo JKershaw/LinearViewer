@@ -210,7 +210,7 @@ describe('durable preferences survive session.regenerate() (LIN-1353 S8+S9)', ()
   // ---------------------------------------------------------------------------
 
   test('Linear OAuth callback: workspace config survives regenerate', async () => {
-    const router = createAuthRoutes({ ...withResolver(), provider: fakeLinearProvider(), sessionStore: { cleanup: async () => {} }, ...freshDeps() });
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeLinearProvider(), ...freshDeps() });
     const handler = getHandler(router, 'get', '/auth/callback');
     const res = makeRes();
     const priorWs = { id: 'prior-1', name: 'Prior', urlKey: 'prior', accessToken: 'tok' };
