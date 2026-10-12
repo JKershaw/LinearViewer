@@ -12,16 +12,21 @@
  *     task but keeps admitting the current one's continuation — the
  *     "describe('trim + the LIN-1751 guard, end-to-end')" block below.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-trim-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function makeStore() {
+  const db = harness.freshDb();
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
   });
 }
 
@@ -153,9 +158,10 @@ describe('trimSessionBudget — notifies the materialized feed on success (LIN-2
 
   test('a successful trim on a QUEUED anchor fires onWrite with sessionId = the anchor id', async () => {
     const calls = [];
+    const db = harness.freshDb();
     const store = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection(),
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history'),
       onWrite: p => calls.push(p)
     });
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', issueIdentifier: 'LIN-1', maxTasks: 10 });
@@ -171,9 +177,10 @@ describe('trimSessionBudget — notifies the materialized feed on success (LIN-2
 
   test('a successful trim on an ARCHIVED anchor fires onWrite with sessionId = the anchor id', async () => {
     const calls = [];
+    const db = harness.freshDb();
     const store = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection(),
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history'),
       onWrite: p => calls.push(p)
     });
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', issueIdentifier: 'LIN-2', maxTasks: 10 });
@@ -190,9 +197,10 @@ describe('trimSessionBudget — notifies the materialized feed on success (LIN-2
 
   test('a REFUSED trim (not-downward) does NOT fire onWrite — nothing changed', async () => {
     const calls = [];
+    const db = harness.freshDb();
     const store = new DispatchQueueStore({
-      collection: createMockCollection(),
-      historyCollection: createMockCollection(),
+      collection: db.collection('dispatch-queue'),
+      historyCollection: db.collection('dispatch-history'),
       onWrite: p => calls.push(p)
     });
     const created = await store.addItem('acme', { prompt: 'run me', kind: 'autopilot', issueIdentifier: 'LIN-3', maxTasks: 5 });

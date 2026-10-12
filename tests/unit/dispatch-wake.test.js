@@ -17,11 +17,15 @@
  *    `followUpTo`+`force` drip) still wakes again, and a wake follow-up never
  *    begets another wake (the structural kind:'wake' loop guard, trap #1).
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWakeFollowUp, classifyWake, wakeFingerprint } from '../../lib/dispatch-wake.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3527-wake-');
+before(() => harness.connect());
+after(() => harness.close());
 
 // A child dispatch: a parent edge (sessionId), a distinct id (not self), an
 // ordinary kind, no followUpTo. `subscription` defaults to 'terminal-only' (the
@@ -205,8 +209,9 @@ const URL_KEY = 'acme';
 const drain = () => new Promise(resolve => setImmediate(resolve));
 
 function makeStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const db = harness.freshDb();
+  const collection = db.collection('dispatch-queue');
+  const historyCollection = db.collection('dispatch-history');
   const store = new DispatchQueueStore({ collection, historyCollection });
   return { store, collection, historyCollection };
 }
@@ -214,9 +219,9 @@ function makeStore() {
 // Count every wake dispatch ever created (kind:'wake'), across BOTH the active
 // queue and history — a taken wake is archived out of the active collection, so
 // counting only `active` would under-count after a take.
-function wakeItems(collection, historyCollection) {
-  const active = collection._docs.filter(d => d.kind === 'wake');
-  const archived = historyCollection ? historyCollection._docs.filter(d => d.kind === 'wake') : [];
+async function wakeItems(collection, historyCollection) {
+  const active = (await collection.find({}).toArray()).filter(d => d.kind === 'wake');
+  const archived = historyCollection ? (await historyCollection.find({}).toArray()).filter(d => d.kind === 'wake') : [];
   return [...active, ...archived];
 }
 
@@ -242,7 +247,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await drain();
 
     assert.ok(res && res.success);
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'exactly one wake enqueued');
     assert.equal(wakes[0].followUpTo, 'parent-S1');
     assert.equal(wakes[0].sessionId, 'parent-S1');
@@ -258,7 +263,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await drain();
 
     assert.ok(res && res.success);
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'a pause wakes the parent exactly once on an everything edge');
     assert.equal(wakes[0].followUpTo, 'parent-S1');
     assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'the wake says paused, not done');
@@ -272,7 +277,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[done] still done, re-reported' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'still exactly one wake despite a second terminal event');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'still exactly one wake despite a second terminal event');
 
     // The durable terminal witness is on the edge (here == child) history doc — a
     // terminal-scoped signal ("the parent WAS told the child terminated"), NOT the
@@ -291,7 +296,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'a terminal bubbles on a terminal-only edge');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'a terminal bubbles on a terminal-only edge');
   });
 
   test('a terminal-only child does NOT wake on [pending] (the one gated row, §5)', async () => {
@@ -301,11 +306,11 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] paused' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'PENDING is silent on a terminal-only edge');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 0, 'PENDING is silent on a terminal-only edge');
     // And the guard is NOT burned — a later terminal still wakes once.
     await store.addFeedback(child._id, URL_KEY, { message: '[done] now done' }, 'token-a');
     await drain();
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the later terminal still bubbles');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'the later terminal still bubbles');
   });
 
   test('a top-level kickoff (kind:autopilot, no parent sessionId) never self-enqueues a wake', async () => {
@@ -321,7 +326,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(kickoff._id, URL_KEY, { message: '[done] run complete' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'a parent-less kickoff produces no wake');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 0, 'a parent-less kickoff produces no wake');
   });
 
   test('a CHILD autopilot (kind:autopilot, sessioned to a distinct coordinator) wakes it exactly once (LIN-813)', async () => {
@@ -338,7 +343,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(childAp._id, URL_KEY, { message: '[done] task landed' }, 'token-a');
     await drain();
 
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'the child autopilot wakes its coordinator exactly once');
     assert.equal(wakes[0].followUpTo, 'head-S1', 'addressed up-chain to the coordinator');
     assert.equal(wakes[0].kind, 'wake', 'the wake is kind:wake — the loop guard');
@@ -353,7 +358,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(manual._id, URL_KEY, { message: '[done] finished' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 0);
+    assert.equal((await wakeItems(collection, historyCollection)).length, 0);
   });
 
   test('a non-terminal heartbeat does not enqueue and does not burn the guard', async () => {
@@ -362,7 +367,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
 
     await store.addFeedback(child._id, URL_KEY, { message: '[working] heartbeat' }, 'token-a');
     await drain();
-    assert.equal(wakeItems(collection, historyCollection).length, 0, 'no wake for a heartbeat');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 0, 'no wake for a heartbeat');
 
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
     assert.ok(!(childDoc.terminalWakeItems || []).includes(child._id), 'terminal witness not set by a non-terminal event');
@@ -370,7 +375,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     // A later terminal event still wakes once.
     await store.addFeedback(child._id, URL_KEY, { message: '[done] now done' }, 'token-a');
     await drain();
-    assert.equal(wakeItems(collection, historyCollection).length, 1);
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1);
   });
 
   test('the enqueued wake follow-up itself never produces a second wake (structural kind:wake loop guard)', async () => {
@@ -379,7 +384,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     await drain();
-    const [wake] = wakeItems(collection, historyCollection);
+    const [wake] = await wakeItems(collection, historyCollection);
     assert.ok(wake, 'a wake was enqueued');
     assert.equal(wake.kind, 'wake');
 
@@ -388,7 +393,7 @@ describe('addFeedback wake enqueue (effect + once-only)', () => {
     await store.addFeedback(wake._id, URL_KEY, { message: '[done] parent reacted' }, 'token-b');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the wake did not beget another wake');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'the wake did not beget another wake');
   });
 });
 
@@ -430,8 +435,8 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
   // `kind:'wake'` item (the repoint target) is itself a wake doc, so a raw
   // wakeItems() count would include it; the real up-chain wakes are the ones
   // addressed to the grandparent.
-  const wakesTo = (collection, historyCollection, target) =>
-    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+  const wakesTo = async (collection, historyCollection, target) =>
+    (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === target);
 
   test('the stepper terminal, POSTed to the repointed kind:wake item, wakes the GRANDPARENT via the root edge', async () => {
     const { store, collection, historyCollection } = makeStore();
@@ -441,7 +446,7 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
     await store.addFeedback(repointId, URL_KEY, { message: '[done] LIN-1046 merged 6db03c9' }, 'token-b');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, grandparent);
+    const wakes = await wakesTo(collection, historyCollection, grandparent);
     assert.equal(wakes.length, 1, 'the terminal is NOT swallowed — one wake bubbles up-chain');
     assert.equal(wakes[0].followUpTo, grandparent, 'addressed to the GRANDPARENT (root edge), not the repointed sessionId');
     assert.equal(wakes[0].sessionId, grandparent);
@@ -465,13 +470,13 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
     // the real run).
     await store.addFeedback(rootId, URL_KEY, { message: '[pending] beat 1/3 done, standing by' }, 'token-a');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, grandparent).length, 1, 'the pre-repoint pending beat wakes the grandparent');
+    assert.equal((await wakesTo(collection, historyCollection, grandparent)).length, 1, 'the pre-repoint pending beat wakes the grandparent');
 
     // POST-repoint: the terminal is posted to the repointed item — under the old
     // code this was silently lost; now it still bubbles to the grandparent.
     await store.addFeedback(repointId, URL_KEY, { message: '[done] all beats complete' }, 'token-b');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, grandparent).length, 2, 'the post-repoint terminal ALSO wakes the grandparent (the fixed edge)');
+    assert.equal((await wakesTo(collection, historyCollection, grandparent)).length, 2, 'the post-repoint terminal ALSO wakes the grandparent (the fixed edge)');
   });
 
   test('an `everything` edge wakes on EVERY beat + the terminal — the once-ever cap is gone (LIN-1059 secondary)', async () => {
@@ -487,7 +492,7 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
     await store.addFeedback(child._id, URL_KEY, { message: '[done] task complete' }, 'token-a');
     await drain();
 
-    assert.equal(wakeItems(collection, historyCollection).length, 4, 'three beats + the terminal each wake the parent');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 4, 'three beats + the terminal each wake the parent');
   });
 
   test('a later non-wake heartbeat never re-fires the last wake event (per-event firing)', async () => {
@@ -499,7 +504,7 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
     await drain();
 
     // Only the pending fired; the heartbeat did not re-fire the (still-last) pending.
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the heartbeat did not re-fire the earlier pending wake');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'the heartbeat did not re-fire the earlier pending wake');
   });
 });
 
@@ -514,8 +519,8 @@ describe('addFeedback wake — edge ownership across a follow-up repoint (LIN-10
 // staying SELECTIVE so LIN-1059's repoint edge (a subscribed child's outcome
 // riding on a kind:'wake' carrier) still bubbles to its DISTINCT ancestor.
 describe('addFeedback wake — LIN-1165 self-loop guard', () => {
-  const wakesTo = (collection, historyCollection, target) =>
-    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+  const wakesTo = async (collection, historyCollection, target) =>
+    (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === target);
 
   // The exact LIN-1165 self-loop topology. A received wake item W (the doc that
   // RECEIVES the terminal feedback) whose followUpTo resolves to a REAL root R —
@@ -549,7 +554,7 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
     assert.ok(res && res.success, 'the terminal feedback is recorded and the session finalizes');
     // No wake addressed back into the producing item — the self-loop is broken.
     // (On the pre-fix code the resolved root R minted a wake with followUpTo === W.)
-    assert.equal(wakesTo(collection, historyCollection, wakeId).length, 0,
+    assert.equal((await wakesTo(collection, historyCollection, wakeId)).length, 0,
       'no fresh wake is minted back into the producing wake item');
   });
 
@@ -559,7 +564,7 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] merged abc123' }, 'token-a');
     await drain();
-    assert.equal(wakeItems(collection, historyCollection).length, 1, 'the terminal fires exactly one wake');
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1, 'the terminal fires exactly one wake');
 
     // A stale / superseded re-report from the SAME producing item on the
     // already-witnessed edge — this is the case the per-item witness must still
@@ -567,7 +572,7 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
     // must wake — see the LIN-1357 regression block below).
     await store.addFeedback(child._id, URL_KEY, { message: '[done] merged abc123 (re-reported)' }, 'token-a');
     await drain();
-    assert.equal(wakeItems(collection, historyCollection).length, 1,
+    assert.equal((await wakeItems(collection, historyCollection)).length, 1,
       'no second wake for the same item re-reporting on the already-handled edge');
 
     const childDoc = await store.historyCollection.findOne({ _id: child._id });
@@ -583,7 +588,7 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[done] LIN-42 shipped' }, 'token-a');
     await drain();
 
-    const wakes = wakeItems(collection, historyCollection);
+    const wakes = await wakeItems(collection, historyCollection);
     assert.equal(wakes.length, 1, 'a real child terminal still wakes its parent');
     assert.equal(wakes[0].followUpTo, 'parent-S1', 'bubbles up-chain to the orchestrator — not severed');
   });
@@ -612,7 +617,7 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
     await store.addFeedback(repoint._id, URL_KEY, { message: '[pending] beat 2/4 done, standing by' }, 'token-b');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, GP);
+    const wakes = await wakesTo(collection, historyCollection, GP);
     assert.equal(wakes.length, 1, 'the PENDING beat still bubbles to the grandparent via the resolved root edge');
     assert.match(wakes[0].prompt, /paused \(pending\), not done/i, 'and is a labelled pause, not a terminal');
   });
@@ -631,8 +636,8 @@ describe('addFeedback wake — LIN-1165 self-loop guard', () => {
 // terminal even with the bug fully present) — the real regression pin is a
 // SECOND terminal from a DISTINCT item on the SAME edge.
 describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witness', () => {
-  const wakesTo = (collection, historyCollection, target) =>
-    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+  const wakesTo = async (collection, historyCollection, target) =>
+    (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === target);
 
   // beat1 IS the edge (no followUpTo, subscribed up to PARENT). beat2 and beat3
   // are DISTINCT dispatches resumed into the same warm session via
@@ -673,11 +678,11 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
 
     await store.addFeedback(beat1Id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 1, "beat 1's terminal wakes the parent once");
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 1, "beat 1's terminal wakes the parent once");
 
     await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 2,
       'beat 2 — a DISTINCT item on the SAME edge — wakes the parent a SECOND time. Fails on the old per-edge boolean witness, passes on the per-item set.');
   });
 
@@ -691,15 +696,15 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
 
     await store.addFeedback(beat1Id, URL_KEY, { message: '[done] beat 1 complete' }, 'token-1');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 1, 'beat 1 → wake 1');
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 1, 'beat 1 → wake 1');
 
     await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete' }, 'token-2');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 2, 'beat 2 → wake 2');
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 2, 'beat 2 → wake 2');
 
     await store.addFeedback(beat3Id, URL_KEY, { message: '[done] beat 3 complete' }, 'token-3');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 3,
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 3,
       'beat 3 — a THIRD distinct item on the SAME edge — wakes the parent again. Pins the per-item witness at the arity production actually runs.');
 
     const edgeDoc = await store.historyCollection.findOne({ _id: beat1Id });
@@ -716,11 +721,11 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
 
     await store.addFeedback(beat1Id, URL_KEY, { message: '[blocked] beat 1 needs input' }, 'token-1');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 1, "beat 1's [blocked] wakes the parent once");
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 1, "beat 1's [blocked] wakes the parent once");
 
     await store.addFeedback(beat2Id, URL_KEY, { message: '[blocked] beat 2 needs input' }, 'token-2');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 2,
       '[blocked] shares the terminal path with [done]/[failed], so a distinct beat item wakes again the same way');
   });
 
@@ -733,7 +738,7 @@ describe('addFeedback wake — LIN-1357 per-(edge, producing item) terminal witn
     await store.addFeedback(beat2Id, URL_KEY, { message: '[done] beat 2 complete (re-reported)' }, 'token-2');
     await drain();
 
-    assert.equal(wakesTo(collection, historyCollection, parent).length, 2,
+    assert.equal((await wakesTo(collection, historyCollection, parent)).length, 2,
       'still exactly two wakes — beat 1 + beat 2 — the re-report of beat 2 is suppressed');
   });
 
@@ -787,7 +792,7 @@ describe('addFeedback wake — LIN-2078 abort-row exclusion', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-child');
     await drain();
 
-    const wakes = wakeItems(collection, historyCollection).filter(w => w.followUpTo === PARENT);
+    const wakes = (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === PARENT);
     assert.equal(wakes.length, 1,
       'exactly one wake mints — a test only asserting "one wake exists" would pass with the WRONG wake surviving, which is precisely the bug');
     assert.equal(wakes[0].producingItemId, child._id,
@@ -813,7 +818,7 @@ describe('addFeedback wake — LIN-2078 abort-row exclusion', () => {
     await store.addFeedback(abortItem._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-abort');
     await drain();
 
-    const wakes = wakeItems(collection, historyCollection).filter(w => w.followUpTo === PARENT);
+    const wakes = (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === PARENT);
     assert.equal(wakes.length, 1, 'still exactly one wake regardless of which row posts first');
     assert.equal(wakes[0].producingItemId, child._id, "the surviving wake is still the child's");
   });
@@ -832,7 +837,7 @@ describe('addFeedback wake — LIN-2078 abort-row exclusion', () => {
     await store.addFeedback(abortItem._id, URL_KEY, { message: '[failed] no live session to resume' }, 'token-abort');
     await drain();
 
-    const wakes = wakeItems(collection, historyCollection).filter(w => w.followUpTo === PARENT);
+    const wakes = (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === PARENT);
     assert.equal(wakes.length, 0, 'the gone-target abort-rejection produces no wake — this silence is intentional, not a bug (plan-review Note A)');
   });
 });
@@ -849,8 +854,8 @@ describe('addFeedback wake — LIN-2078 abort-row exclusion', () => {
 // blocked wake. `producingItemId` on the minted row stays the bare id — it is
 // row attribution, not guard identity.
 describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
-  const wakesTo = (collection, historyCollection, target) =>
-    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+  const wakesTo = async (collection, historyCollection, target) =>
+    (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === target);
 
   test('THE PIN — [blocked] then [done] on the SAME producing item mints a SECOND wake, not suppressed', async () => {
     const { store, collection, historyCollection } = makeStore();
@@ -859,13 +864,13 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
 
     await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1,
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 1,
       "the child's [blocked] wakes the parent once — fails pre-fix if the guard suppresses even the FIRST wake");
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock' }, 'token-a');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, PARENT);
+    const wakes = await wakesTo(collection, historyCollection, PARENT);
     assert.equal(wakes.length, 2,
       'a SECOND wake mints from the SAME row for the genuine [done] terminal — this is the bug this ticket fixes: pre-fix, the [blocked] wake already burned the guard slot and this [done] is dropped as already-woke-for-this-item');
 
@@ -885,7 +890,7 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[blocked] still need a human' }, 'token-a');
     await drain();
 
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1,
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 1,
       'a repeated [blocked] on the same row is still suppressed — same-class suppression (LIN-1357) must survive the class-aware re-key');
   });
 
@@ -897,12 +902,12 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
     await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock' }, 'token-a');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 2, 'blocked + done — two distinct classes, two wakes');
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 2, 'blocked + done — two distinct classes, two wakes');
 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] finished after unblock (re-reported)' }, 'token-a');
     await drain();
 
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 2,
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 2,
       'still exactly two wakes — the re-reported [done] is suppressed by the bare-key guard even though this row also carries a suffixed #blocked key, confirming the bare-key path was not accidentally widened');
   });
 
@@ -914,7 +919,7 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
 
     await store.addFeedback(child._id, URL_KEY, { message: '[blocked] need a human' }, 'token-a');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1, "the child's [blocked] wakes the parent once");
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 1, "the child's [blocked] wakes the parent once");
 
     // LIN-2078/LIN-1471 abort topology: an abort item posts its own [aborted]
     // (excluded, LIN-2078), and the aborted child's OWN row also posts
@@ -928,7 +933,7 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
     await store.addFeedback(child._id, URL_KEY, { message: '[aborted] cancelled by operator' }, 'token-a');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, PARENT);
+    const wakes = await wakesTo(collection, historyCollection, PARENT);
     assert.equal(wakes.length, 2,
       "a SECOND wake mints from the child's own [aborted] mirror — pre-fix, the earlier [blocked] wake already burned the guard slot and the LIN-1471 abort mirror is silently dropped, so the parent is never told its blocked branch was cancelled");
     assert.equal(wakes[1].producingItemId, child._id, "the surviving abort wake's producing row is the child's, not the abort item's");
@@ -963,8 +968,8 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
 
     // Scan both collections directly (mirrors the wakeItems() helper above).
     const allWakes = [
-      ...store.collection._docs.filter(d => d.kind === 'wake' && d.producingItemId === child._id),
-      ...store.historyCollection._docs.filter(d => d.kind === 'wake' && d.producingItemId === child._id)
+      ...(await store.collection.find({}).toArray()).filter(d => d.kind === 'wake' && d.producingItemId === child._id),
+      ...(await store.historyCollection.find({}).toArray()).filter(d => d.kind === 'wake' && d.producingItemId === child._id)
     ];
     const blockedWakeRow = allWakes.find(w => /\[blocked\]/.test(w.prompt));
     const doneWakeRow = allWakes.find(w => /\[done\]/.test(w.prompt));
@@ -1024,8 +1029,8 @@ describe('addFeedback wake — LIN-2297 class-aware once-only guard', () => {
 // is untouched by this ticket (see LIN-2414 for the one remaining excluded
 // carrier, the stall-failsafe refire over a blocked hold).
 describe('addFeedback wake — LIN-2331 regression: two-row production topology', () => {
-  const wakesTo = (collection, historyCollection, target) =>
-    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+  const wakesTo = async (collection, historyCollection, target) =>
+    (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === target);
 
   test('re-block across a follow-up repoint: R1 [blocked], resume onto R2 (followUpTo=R1), R2 [blocked] — TWO wakes, guard keys R1#blocked / R2#blocked', async () => {
     const { store, collection, historyCollection } = makeStore();
@@ -1039,7 +1044,7 @@ describe('addFeedback wake — LIN-2331 regression: two-row production topology'
 
     await store.addFeedback(r1._id, URL_KEY, { message: '[blocked] need a human' }, 'token-r1');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1, 'R1 [blocked] wakes the parent once');
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 1, 'R1 [blocked] wakes the parent once');
 
     // Production repoint (dispatcher.js resumeSession/signalFollowUp): the
     // resumed session's feedback now lands on a NEW follow-up row, not back
@@ -1053,7 +1058,7 @@ describe('addFeedback wake — LIN-2331 regression: two-row production topology'
     await store.addFeedback(r2._id, URL_KEY, { message: '[blocked] blocked on something NEW' }, 'token-r2');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, PARENT);
+    const wakes = await wakesTo(collection, historyCollection, PARENT);
     assert.equal(wakes.length, 2,
       'the re-block on the follow-up row mints a SECOND wake — the collision reported against a single row does not reproduce under the two-row production topology');
     assert.match(wakes[1].prompt, /Outcome:\s*\[blocked\] blocked on something NEW/,
@@ -1095,7 +1100,7 @@ describe('addFeedback wake — LIN-2331 regression: two-row production topology'
     await store.addFeedback(r3._id, URL_KEY, { message: '[blocked] blocked on something ELSE AGAIN' }, 'token-r3');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, PARENT);
+    const wakes = await wakesTo(collection, historyCollection, PARENT);
     assert.equal(wakes.length, 3,
       'a third re-block, on a third follow-up row, mints a THIRD wake — the once-only witness does not saturate past two blocked rows');
     assert.match(wakes[2].prompt, /Outcome:\s*\[blocked\] blocked on something ELSE AGAIN/,
@@ -1120,8 +1125,8 @@ describe('addFeedback wake — LIN-2331 regression: two-row production topology'
 // `[done]` -> `[failed]` case (LIN-1357's own suppression, correctly
 // unchanged) that the single-row probe conflated it with.
 describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed contract', () => {
-  const wakesTo = (collection, historyCollection, target) =>
-    wakeItems(collection, historyCollection).filter(w => w.followUpTo === target);
+  const wakesTo = async (collection, historyCollection, target) =>
+    (await wakeItems(collection, historyCollection)).filter(w => w.followUpTo === target);
 
   test('lineage sibling: R1 [done], R2 (followUpTo=R1) [failed] — TWO wakes, bare guard keys R1 / R2', async () => {
     const { store, collection, historyCollection } = makeStore();
@@ -1135,7 +1140,7 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
 
     await store.addFeedback(r1._id, URL_KEY, { message: '[done] shipped' }, 'token-r1');
     await drain();
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1, 'R1 [done] wakes the parent once');
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 1, 'R1 [done] wakes the parent once');
 
     const r2 = await store.addItem(URL_KEY, {
       prompt: 'follow-up after done', kind: 'implementation', issueIdentifier: 'LIN-42',
@@ -1146,7 +1151,7 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
     await store.addFeedback(r2._id, URL_KEY, { message: '[failed] the follow-up failed' }, 'token-r2');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, PARENT);
+    const wakes = await wakesTo(collection, historyCollection, PARENT);
     assert.equal(wakes.length, 2,
       'a lineage-sibling [failed] after [done] mints a SECOND wake — distinct rows, distinct guard keys, matching the documented read-layer contract');
     assert.match(wakes[1].prompt, /Outcome:\s*\[failed\] the follow-up failed/,
@@ -1188,7 +1193,7 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
     await store.addFeedback(r3._id, URL_KEY, { message: '[done] the retry shipped' }, 'token-r3');
     await drain();
 
-    const wakes = wakesTo(collection, historyCollection, PARENT);
+    const wakes = await wakesTo(collection, historyCollection, PARENT);
     assert.equal(wakes.length, 3,
       'a third lineage sibling on a third row mints a THIRD wake — the once-only witness does not saturate past two bare-keyed rows');
     assert.match(wakes[2].prompt, /Outcome:\s*\[done\] the retry shipped/,
@@ -1211,7 +1216,7 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped (re-reported)' }, 'token-a');
     await drain();
 
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 1,
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 1,
       "LIN-1357's original purpose survives: a genuine re-report of the SAME row's terminal is still suppressed, not re-derived into a second wake");
   });
 
@@ -1224,7 +1229,7 @@ describe('addFeedback wake — LIN-2331 regression: lineage-sibling done->failed
     await store.addFeedback(child._id, URL_KEY, { message: '[pending] beat 2 done' }, 'token-a');
     await drain();
 
-    assert.equal(wakesTo(collection, historyCollection, PARENT).length, 2,
+    assert.equal((await wakesTo(collection, historyCollection, PARENT)).length, 2,
       'PENDING-external stays deliberately unguarded (LIN-843) — this must not be swept up by any re-keying of the terminal/blocked guard');
 
     const edgeDoc = await store.historyCollection.findOne({ _id: child._id });
@@ -1262,7 +1267,7 @@ describe('buildWakeFollowUp / addFeedback — LIN-2121 issue-scoped wake rows', 
     await store.addFeedback(child._id, URL_KEY, { message: '[done] shipped' }, 'token-a');
     await drain();
 
-    const [wake] = wakeItems(collection, historyCollection);
+    const [wake] = await wakeItems(collection, historyCollection);
     assert.ok(wake, 'a wake was enqueued');
     assert.equal(wake.issueIdentifier, 'LIN-42',
       'THE PIN: the minted wake row carries the scoping field — pre-fix this is null and the two reads below miss it');
