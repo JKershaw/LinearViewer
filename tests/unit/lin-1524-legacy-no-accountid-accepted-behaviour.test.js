@@ -14,7 +14,7 @@
  * paths through the linkIdentity seam") that has no `accountId` — because
  * nothing backfills one onto an already-signed-in session; `establishAccount`
  * only ever fires at fresh sign-in — still carries a real, currently-working
- * `refreshToken` on its session row (pre-cutover `updateWorkspaceTokens` kept
+ * `refreshToken` on its session row (the pre-cutover session-side token writer kept
  * rotating and re-persisting it on every successful refresh). Pre-LIN-1524,
  * such a session refreshed successfully forever, because `ensureValidToken`/
  * `handleUnauthorizedError` read that session-side `refreshToken` directly,

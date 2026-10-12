@@ -316,8 +316,8 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
           // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
           // above — never before, or a refused workspace would leave a durable
           // credential behind. `workspace` was already fully populated by
-          // linkProvider earlier in this handler; there is no updateWorkspaceTokens
-          // call to wrap here, so this reaches persistOwnerCredential directly.
+          // linkProvider earlier in this handler, so this reaches
+          // persistOwnerCredential directly.
           // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
           // longer carries one (linkProvider above was deliberately not given it).
           await persistOwnerCredential(established.accountId, workspace, ownerCredentialStore, data.refresh_token)
@@ -443,8 +443,7 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
               // LIN-1523: durable dual-write, AFTER the limit-check + establishAccount
               // above — never before, or a refused workspace would leave a durable
               // credential behind. `workspace` was already fully populated by
-              // linkProvider earlier in this handler; there is no
-              // updateWorkspaceTokens call to wrap here, so this reaches
+              // linkProvider earlier in this handler, so this reaches
               // persistOwnerCredential directly.
               // LIN-1524: `data.refresh_token` passed explicitly — `workspace` no
               // longer carries one (linkProvider above was deliberately not given it).
