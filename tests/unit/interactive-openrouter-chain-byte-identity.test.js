@@ -91,7 +91,7 @@
  *     human confirmation — LIN-2427 INVERTED this: it now resolves the
  *     TOKEN CREATOR's key via `getWorkspaceOpenRouterKey` and feeds it to
  *     `resolveChatCredential`). The pin below asserts it imports the shared
- *     resolver and that `resolveProxyLLM` is gone.
+ *     resolver.
  *   - A new pin (research's recommendation, `tests/unit/task-chat-route.test.js`'s
  *     existing "once per turn, never per hop" idiom) asserts `checkFreeTierGate`
  *     is called exactly once per full-adopt site across this sweep's files —
