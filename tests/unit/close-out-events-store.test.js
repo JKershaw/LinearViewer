@@ -251,3 +251,32 @@ describe('CloseOutEventsStore.hasMergedEvent (LIN-3395)', () => {
     assert.strictEqual(await failing.hasMergedEvent({ urlKey: 'ws', prUrl: PR_URL }), false);
   });
 });
+
+describe('CloseOutEventsStore.findMergedByPr (LIN-3395)', () => {
+  let store;
+  beforeEach(() => {
+    store = new CloseOutEventsStore({ collection: harness.freshDb().collection('close-out-events') });
+  });
+
+  test('returns the merged document for that urlKey + prUrl, at any head and by anyone', async () => {
+    await store.record(pressEvent());
+    await store.record(personMerge({ headSha: 'one' }));
+    const found = await store.findMergedByPr({ urlKey: 'ws', prUrl: PR_URL });
+    assert.strictEqual(found.merged, true);
+    assert.strictEqual(found.by, 'person');
+    assert.strictEqual(found.headSha, 'one');
+  });
+
+  test('null for another prUrl, another urlKey, and a press-only PR', async () => {
+    await store.record(personMerge());
+    await store.record(pressEvent({ prUrl: 'https://github.com/JKershaw/LinearViewer/pull/78' }));
+    assert.strictEqual(await store.findMergedByPr({ urlKey: 'ws', prUrl: 'https://github.com/JKershaw/LinearViewer/pull/78' }), null);
+    assert.strictEqual(await store.findMergedByPr({ urlKey: 'other-ws', prUrl: PR_URL }), null);
+  });
+
+  test('null on invalid input or a failing collection (never throws)', async () => {
+    assert.strictEqual(await store.findMergedByPr(), null);
+    const failing = new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); }, findOne: () => { throw new Error('db down'); } } });
+    assert.strictEqual(await failing.findMergedByPr({ urlKey: 'ws', prUrl: PR_URL }), null);
+  });
+});

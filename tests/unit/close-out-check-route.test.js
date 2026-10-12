@@ -520,6 +520,30 @@ describe('LIN-3395: close-out-press after a merged event exists', () => {
     assert.equal(stored[0].by, 'person');
   });
 
+  test('/check: a press row inserted next to a recorded merge (race or pre-deploy row) records no second event and no second markDone', async () => {
+    const built = makeRouter({ comments: mergedComments(), statuses: { 41: mergedStatus(41) } });
+    const first = await check(built);
+    assert.equal(first.jsonBody.recorded[0].by, 'person');
+    assert.equal(built.calls.markDone, 1);
+
+    // Inserted directly: models both the race past the press-route guard and a
+    // press row stored before the guard shipped.
+    await built.collection.insertOne({
+      urlKey: 'ws', issueIdentifier: 'LIN-1', by: 'press', prUrl: PR_A, headSha: 'aaaaaaa',
+      merged: false, dispatchId: 'd-stale', at: new Date(),
+    });
+
+    const again = await check(built);
+    assert.equal(again.statusCode, 200, JSON.stringify(again.jsonBody));
+    assert.equal(again.jsonBody.recorded.length, 1);
+    assert.equal(again.jsonBody.recorded[0].by, 'person');
+    assert.notEqual(again.jsonBody.state.mergedBy, 'close-out');
+    assert.equal(built.calls.markDone, 1);
+    const merged = (await rows(built.collection)).filter(e => e.merged === true);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].by, 'person');
+  });
+
   test('characterization: a press before any merge is still recorded (201)', async () => {
     const built = makeRouter({ comments: mergedComments(), statuses: { 41: openStatus(41) } });
     await check(built);
