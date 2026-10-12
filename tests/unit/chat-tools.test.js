@@ -21,6 +21,7 @@ import { DEFAULT_LANE_STALE_MS } from '../../lib/live-console.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 import { collectUnansweredDecisions, answeredDecisionIdsByLineage } from '../../lib/unanswered-decisions.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
+import { sessionIsTerminal } from '../../routes/dashboard.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 // A recording fake of the pass-1 provider read surface. Every method records
@@ -1210,28 +1211,13 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
 
 // LIN-1486: `send_follow_up` must target the TAIL of the anchor's own lineage
 // (not the session root) and derive `force` from that tail's own terminality
-// (not an aggregate across the whole session). The `sessionIsTerminal` mock
-// used by the OTHER send_follow_up tests above is intentionally a loose
-// "any loop done" stub — fine for those tests, but it doesn't reproduce the
-// real bug (root-anchored, anchor-first-then-all()). This block injects a
-// FAITHFUL mirror of the real `sessionIsTerminal`/`loopIsTerminal`
-// (routes/dashboard.js:160-185) so the RED failures below are for the right
-// reason — root-targeting and anchor-only force — not an artifact of a loose
-// test double.
-const MOCK_TERMINAL_AGENT_STATES = new Set(['complete', 'error']);
-const MOCK_MARKER_TO_AGENT_STATE = { done: 'complete', failed: 'error', aborted: 'error', skipped: 'complete' };
-function mockLoopIsTerminal(l) {
-  if (!l) return false;
-  if (MOCK_TERMINAL_AGENT_STATES.has(l.agentState)) return true;
-  return l.terminalStatus ? MOCK_TERMINAL_AGENT_STATES.has(MOCK_MARKER_TO_AGENT_STATE[l.terminalStatus]) : false;
-}
-function mockSessionIsTerminal(session) {
-  const loops = session.loops || [];
-  const anchor = loops.find(l => l.kind === 'autopilot');
-  if (anchor) return mockLoopIsTerminal(anchor);
-  return loops.length > 0 && loops.every(mockLoopIsTerminal);
-}
-
+// (not an aggregate across the whole session). The injected real
+// `sessionIsTerminal` from routes/dashboard.js only satisfies send_follow_up's
+// configuration guard (lib/chat-tools.js, a `typeof` check); it is not the
+// decision under test. `followUpTo`/`force` come from deriveFollowUpDispatch
+// (anchorLineageTail + isLoopTerminal(tail)), which is what these tests pin.
+// Use the real function here, never a hand copy, so no test-only terminality
+// logic exists.
 describe('LIN-1486: send_follow_up targets the lineage tail, not the session root', () => {
   function makeFakeDispatchQueueStore(history) {
     const calls = [];
@@ -1253,7 +1239,7 @@ describe('LIN-1486: send_follow_up targets the lineage tail, not the session roo
     const { executeTool } = createChatToolCatalog({
       provider, scope: SCOPE, urlKey: URL_KEY,
       dispatchQueueStore, agentStatusStore: { async listStatus() { return { items: [], total: 0 }; } },
-      sessionIsTerminal: mockSessionIsTerminal,
+      sessionIsTerminal: sessionIsTerminal,
       followUpEnabled: true,
       enqueueGuard: async () => null, // LIN-3383: the owner
     });
