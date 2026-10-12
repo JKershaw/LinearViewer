@@ -216,13 +216,6 @@ describe('public/llms.txt prompt catalog stays in sync with PROMPT_TEMPLATES', (
 //   - docs/lin-260-prompt-scaling-research.md — a Status-marked RESEARCH doc,
 //     not a dated audit report. Same reasoning (a point-in-time artifact), but
 //     it is not the same kind of document, and saying so was wrong.
-//   - content/landing.md:18 ("14 deterministic templates") — undated, current
-//     state, and PUBLIC (parsed at boot by server.js and served
-//     unauthenticated), so it is squarely this class and NOT excluded on
-//     principle. It is excluded because it is already owned by LIN-2392, and
-//     absorbing another ticket's instance is the scope creep LIN-313 forbids.
-//     That file carries adjacent provider drift too (line 13 lists the backends
-//     and omits Jira and github-projects), which is the same ticket's business.
 // ==============================================================================
 
 describe('current-state docs keep the prompt-template count in sync with PROMPT_TEMPLATES', () => {
@@ -231,6 +224,7 @@ describe('current-state docs keep the prompt-template count in sync with PROMPT_
   const CURRENT_STATE_DOCS = [
     { file: 'docs/architecture/source-map.md', pattern: /Prompt template definitions \((\d+) templates\)/ },
     { file: 'docs/executive-summary.md', pattern: /\| (\d+) prompt templates with `route`/ },
+    { file: 'content/landing.md', pattern: /(\d+) deterministic templates/ },
   ];
 
   for (const { file, pattern } of CURRENT_STATE_DOCS) {
