@@ -89,7 +89,6 @@ describe('H1 hops: the resolver is reached through each real factory path', () =
       const run = async (resolver) => {
         const stores = memoryStores();
         const router = createProviderAuthRouter(provider, {
-          sessionStore: { cleanup: async () => {} },
           accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, ownerCredentialStore: stores.ownerCredentialStore,
           ...(resolver ? { resolveWorkspaceUrlKey: resolver } : {})
         });
@@ -197,7 +196,6 @@ describe('H1 hops: the resolver is reached through each real factory path', () =
     const run = async (resolver) => {
       const stores = memoryStores();
       const router = createProviderAuthRouter(provider, {
-        sessionStore: { cleanup: async () => {} },
         accountStore: stores.accountStore, accountWorkspaceStore: stores.accountWorkspaceStore, ownerCredentialStore: stores.ownerCredentialStore,
         ...(resolver ? { resolveWorkspaceUrlKey: resolver } : {})
       });

@@ -465,6 +465,18 @@ describe('GitHub auth routes', () => {
     }
   }
 
+  // LIN-3424: the GitHub start used to sweep sessions behind an OPTIONAL guard
+  // (`sessionStore?.cleanup`), so a leftover call passes every test that omits
+  // the store. Hand it a recording store and require zero calls.
+  test('GET /auth/github never sweeps sessions (LIN-3424)', async () => {
+    const sessionStore = { calls: [], cleanup: async () => { sessionStore.calls.push('cleanup'); } };
+    const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), sessionStore, ...freshAccountStores() });
+    const res = makeRes();
+    await getHandler(router, 'get', '/auth/github')({ query: {}, session: makeSession() }, res);
+    assert.ok(res.redirectedTo, 'the start route got past the config gate and redirected');
+    assert.deepStrictEqual(sessionStore.calls, []);
+  });
+
   test('GET /auth/github 503s when GitHub App env is not configured', async () => {
     delete process.env.GITHUB_APP_ID;
     const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });

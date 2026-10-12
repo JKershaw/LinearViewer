@@ -42,7 +42,6 @@ describe('S3-4 end-to-end witness (D3): stale email-only P re-proofs, then the L
     harness = await startEmailAuthHarness({
       mount: (app, stores) => app.use(createAuthRoutes({ ...withResolver(),
         provider: fakeProvider(),
-        sessionStore: { cleanup: async () => {} },
         accountStore: stores.accountStore,
         accountWorkspaceStore: stores.accountWorkspaceStore,
         ownerCredentialStore: stores.ownerCredentialStore,

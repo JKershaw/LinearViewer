@@ -42,7 +42,6 @@ const BOARD_SLUG_REGEX = /^[\w.-]+\/\d+$/
 /**
  * Create the GitHub Projects auth routes.
  * @param {Object} options
- * @param {Object} [options.sessionStore] - Session store with cleanup() (optional).
  * @param {Object} options.provider - The GitHubProjects provider (injected by createProviderAuthRouter).
  * @param {import('../lib/account-store.js').AccountStore} options.accountStore - LIN-1329: find-or-create the durable account for the signing-in identity.
  * @param {import('../lib/account-workspace-store.js').AccountWorkspaceStore} options.accountWorkspaceStore - LIN-1329: bind the account to the workspace.
@@ -51,9 +50,9 @@ const BOARD_SLUG_REGEX = /^[\w.-]+\/\d+$/
  * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver, forwarded to the install flow. No default.
  * @returns {Router} Express router
  */
-export function createGitHubProjectsAuthRoutes({ sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore, listAuthorizedAccountConnections, connectionBackedWritesEnabled, resolveWorkspaceUrlKey } = {}) {
+export function createGitHubProjectsAuthRoutes({ provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore, listAuthorizedAccountConnections, connectionBackedWritesEnabled, resolveWorkspaceUrlKey } = {}) {
   return createGitHubInstallFlowRoutes({
-    sessionStore, provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore,
+    provider, accountStore, accountWorkspaceStore, userPreferencesStore, connectionStore,
     // LIN-3125 Phase 3 (C1): the held-entry hook's injected reads/D11 predicate.
     listAuthorizedAccountConnections, connectionBackedWritesEnabled,
     // LIN-3382: the one urlKey resolver (no default; absent fails the bind arms closed).

@@ -23,7 +23,6 @@ import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-c
 /**
  * Create auth routes with required dependencies.
  * @param {Object} options
- * @param {Object} options.sessionStore - Session store with cleanup() method
  * @param {Object} options.userPreferencesStore - User preferences store for loading saved preferences
  * @param {Object} [options.provider] - The provider this auth router serves. Injected by the
  *   mounting provider (createProviderAuthRouter passes the provider instance); falls back to the Linear
@@ -35,7 +34,7 @@ import { respondToAccountConflict, reproofUrlForAccount } from '../lib/account-c
  * @param {function(Object): Promise<Object>} [options.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: the callback fails closed (503 retry page, nothing written) without it.
  * @returns {Router} Express router
  */
-export function createAuthRoutes({ sessionStore, userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey }) {
+export function createAuthRoutes({ userPreferencesStore, provider, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey }) {
   const router = Router()
 
   const OAUTH_ENV_VARS = ['LINEAR_CLIENT_ID', 'LINEAR_CLIENT_SECRET', 'LINEAR_REDIRECT_URI'];
@@ -63,9 +62,6 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         `Linear OAuth is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
       ));
     }
-
-    // Clean up expired sessions before proceeding
-    await sessionStore.cleanup()
 
     // Generate random state token to prevent CSRF attacks. `state` stays an
     // opaque CSRF nonce — intent (new container vs. add-source) lives server-side
@@ -115,8 +111,6 @@ export function createAuthRoutes({ sessionStore, userPreferencesStore, provider,
         `Linear OAuth is not available. Missing environment variables: ${missing.join(', ')}. See .env.example for setup instructions.`
       ));
     }
-
-    await sessionStore.cleanup()
 
     const { code, state, error } = req.query
 

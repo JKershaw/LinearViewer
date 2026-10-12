@@ -450,7 +450,7 @@ describe('LIN-3124 PR3 checkpoint E — convertToConnectionBacked', () => {
   }
 
   async function linearLogin(s, session, provider = linearProvider()) {
-    const router = createAuthRoutes({ ...withResolver(), provider, sessionStore: { cleanup: async () => {} }, ...s });
+    const router = createAuthRoutes({ ...withResolver(), provider, ...s });
     const res = makeRes();
     session.oauthState = 'st';
     await getHandler(router, 'get', '/auth/callback')({ query: { code: 'c', state: 'st' }, session }, res);

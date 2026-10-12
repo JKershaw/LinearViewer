@@ -73,6 +73,7 @@ import { createObserverSweepRun } from './lib/observer-sweep.js'
 import { createObserverPassRun } from './lib/observer-pass.js'
 import { ObserverShadowLogStore } from './lib/observer-shadow-log.js'
 import { createCredentialInvariantSweepRun } from './lib/credential-invariant-sweep.js'
+import { createHourlyCleanupRun } from './lib/hourly-cleanup.js'
 import { createPricingConformanceSweepRun } from './lib/pricing-conformance-sweep.js'
 import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
@@ -1402,7 +1403,7 @@ app.use((req, res, next) => {
 const listAuthorizedAccountConnectionsFor = createAuthorizedAccountConnectionReader({ connectionStore })
 
 for (const provider of getAllProviders()) {
-  const authRouter = createProviderAuthRouter(provider, { sessionStore, userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey })
+  const authRouter = createProviderAuthRouter(provider, { userPreferencesStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, accountMergeLogStore, connectionStore, listAuthorizedAccountConnections: listAuthorizedAccountConnectionsFor, connectionBackedWritesEnabled, resolveWorkspaceUrlKey })
   if (authRouter) app.use(authRouter)
 }
 // LIN-2304: the merge confirm/decline routes are shared across every
@@ -4510,64 +4511,17 @@ const server = app.listen(PORT, () => {
 
   // Start periodic cleanup of expired items (every hour)
   const CLEANUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
-  cleanupTimer = setInterval(async () => {
-    try {
-      const removedCount = await dispatchQueueStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Dispatch queue cleanup: removed ${removedCount} expired items`)
-      }
-    } catch (err) {
-      console.error('Dispatch queue cleanup error:', err)
-    }
-    try {
-      const removedCount = await freeTierStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Free tier cleanup: removed ${removedCount} expired records`)
-      }
-    } catch (err) {
-      console.error('Free tier cleanup error:', err)
-    }
-    try {
-      const removedCount = await proxyTokenStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Proxy token cleanup: removed ${removedCount} expired/consumed tokens`)
-      }
-    } catch (err) {
-      console.error('Proxy token cleanup error:', err)
-    }
-    try {
-      const removedCount = await observationSessionsStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Observation sessions cleanup: removed ${removedCount} expired derived docs`)
-      }
-    } catch (err) {
-      console.error('Observation sessions cleanup error:', err)
-    }
-    try {
-      const removedCount = await harbourFeedbackTokenStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Harbour feedback token cleanup: removed ${removedCount} expired tokens`)
-      }
-    } catch (err) {
-      console.error('Harbour feedback token cleanup error:', err)
-    }
-    try {
-      const removedCount = await observerStateStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Observer state cleanup: removed ${removedCount} decommissioned instance(s)`)
-      }
-    } catch (err) {
-      console.error('Observer state cleanup error:', err)
-    }
-    try {
-      const removedCount = await observerShadowLogStore.cleanup()
-      if (removedCount > 0) {
-        console.log(`Observer shadow log cleanup: removed ${removedCount} aged entries`)
-      }
-    } catch (err) {
-      console.error('Observer shadow log cleanup error:', err)
-    }
-  }, CLEANUP_INTERVAL_MS)
+  const runHourlyCleanup = createHourlyCleanupRun({
+    dispatchQueueStore,
+    freeTierStore,
+    proxyTokenStore,
+    observationSessionsStore,
+    harbourFeedbackTokenStore,
+    observerStateStore,
+    observerShadowLogStore,
+    sessionStore
+  })
+  cleanupTimer = setInterval(runHourlyCleanup, CLEANUP_INTERVAL_MS)
 })
 
 // Graceful shutdown (LIN-1691). Previously there was no SIGTERM/SIGINT
