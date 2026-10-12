@@ -1356,6 +1356,8 @@ describe('TaskDecisionsStore basisHash (LIN-2241 tier 1)', () => {
     const status = await store.getStatus('ws-a', ISSUE_ID, HASH_A);
     assert.strictEqual(status.decision, null);
     assert.strictEqual(status.outcome, null);
+    assert.strictEqual(status.outcomeAt, null);
+    assert.strictEqual(status.ticketClosedAt, null);
   });
 
   test('a legacy row with no basisHash field at all reads as null, not undefined', async () => {
@@ -1779,10 +1781,10 @@ describe('TaskDecisionsStore ticketClosed marker (LIN-3366)', () => {
 
   test('without the flag ticketClosedAt stays null (existing callers are unchanged), and the flag is ignored for other outcomes', async () => {
     const rec = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: id(), outcome: 'self-resolved', outcomeReason: 'r', outcomeBasisHash: HASH_B });
-    assert.equal(rec.ticketClosedAt, null);
+    assert.strictEqual(rec.ticketClosedAt, null);
     const { _id } = await store.recordScan({ urlKey: URL_KEY, issueId: ISSUE_ID, inputHash: HASH_B, decision: sampleDecision({ decision_id: 'x' }) }) || {};
     const other = await store.markOutcome({ urlKey: URL_KEY, issueId: ISSUE_ID, id: TaskDecisionsStore.buildId(ISSUE_ID, HASH_B), outcome: 'dismissed', ticketClosed: true });
-    assert.equal(other.ticketClosedAt, null);
+    assert.strictEqual(other.ticketClosedAt, null);
   });
 
   test('reverseOutcome clears the outcome fields but NOT ticketClosedAt (an open row carrying it was un-retired by a human)', async () => {
