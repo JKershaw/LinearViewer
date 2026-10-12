@@ -4521,12 +4521,19 @@ ${goal}`
           // F1/F4: a press recorded for this PR at ANY head means the close-out
           // worker merged it — not "by you". (Dropping the head constraint: a
           // push between the press and the merge must not hide the press.)
+          // LIN-3395: one stored merged event per merge. If this PR's merge is
+          // already on record, reuse it — re-deriving `by` here would flip it
+          // (a press row stored after the merge) and, since `by` is part of the
+          // idempotency key, record a second merged event and a second Done write.
+          const existing = closeOutEventsStore
+            ? await closeOutEventsStore.findMergedByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url })
+            : null;
           let by = 'person';
-          if (closeOutEventsStore) {
+          if (closeOutEventsStore && !existing) {
             const press = await closeOutEventsStore.findAnyByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url, by: 'press' });
             if (press) by = 'close-out';
           }
-          const event = closeOutEventsStore
+          const event = existing || (closeOutEventsStore
             ? await closeOutEventsStore.record({
               accountId,
               urlKey: workspace.urlKey,
@@ -4538,7 +4545,7 @@ ${goal}`
               merged: true,
               openItems,
             })
-            : null;
+            : null);
           if (event) {
             recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
             if (!mergedEvent) { mergedEvent = event; mergedPrIndex = i; }
@@ -4621,6 +4628,12 @@ ${goal}`
 
     const { prUrl, headSha, dispatchId } = req.body || {};
     try {
+      // LIN-3395: once the PR's merge is on record, a press (e.g. from a stale
+      // tab after a self-merge) is refused before anything is written, so the
+      // next check cannot add a second `close-out` event or a second Done write.
+      if (closeOutEventsStore && await closeOutEventsStore.hasMergedEvent({ urlKey: workspace.urlKey, prUrl })) {
+        return jsonError(res, 409, 'This pull request is already merged; the close-out press was not recorded', { code: 'CLOSE_OUT_ALREADY_MERGED' });
+      }
       const event = closeOutEventsStore
         ? await closeOutEventsStore.record({
           accountId: req.session.accountId,
