@@ -17,11 +17,12 @@ process.env.NODE_ENV = 'test';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { validateFeedbackBody } from '../../lib/dispatch-feedback-validation.js';
 import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 import { findTerminalFeedback, findWakeEvent } from '../../lib/dispatch-terminal.js';
-import { parseUsage } from '../../lib/session-telemetry.js';
+import { parseUsage, parseDecision, parseDecisions } from '../../lib/session-telemetry.js';
 import {
-  handoffMessage, recoverAction, resolveFollowUp, abortAction, haltSweep, watchdogAction, postTakeCheck, promptDigest
+  feedbackBody, handoffMessage, recoverAction, resolveFollowUp, abortAction, haltSweep, watchdogAction, postTakeCheck, promptDigest
 } from '../../lib/runner-kit/runner.mjs';
 
 const prompt = buildRunnerKickoff({ baseUrl: 'https://harbour.example' });
@@ -35,6 +36,7 @@ const at = (message, kind = 'status') => [{ message, kind, timestamp: '2026-09-2
 
 // The intended classification of each marker family, by leading prefix.
 const CLASSES = [
+  { prefix: 'DECISION:', terminal: null, wake: null, decision: true },
   { prefix: '[handoff]', terminal: null, wake: null },
   { prefix: '[usage]', terminal: null, wake: null, usage: true },
   { prefix: '[done]', terminal: 'done', wake: 'done' },
@@ -57,7 +59,7 @@ describe('the prompt\'s markers block', () => {
   for (const c of CLASSES) {
     test(`${c.prefix} → terminal ${c.terminal}, wake ${c.wake}`, () => {
       for (const line of lines.filter((l) => l.startsWith(c.prefix))) {
-        const kind = c.usage ? 'usage' : 'status';
+        const kind = c.usage ? 'usage' : c.decision ? 'decision' : 'status';
         assert.equal(findTerminalFeedback(at(line, kind))?.status ?? null, c.terminal, line);
         assert.equal(findWakeEvent(at(line, kind))?.marker ?? null, c.wake, line);
       }
@@ -154,5 +156,67 @@ describe('S6: the enqueue 403 marker', () => {
   test('the prose quotes it, so the block and the prose cannot drift', () => {
     const body = prompt.replace(/```markers[\s\S]*?```/, '');
     assert.match(body, /\[failed\] enqueue blocked: DISPATCH_GRANT_REQUIRED/);
+  });
+});
+
+// LIN-3505: a kit worker's `DECISION:` line (before its `BLOCKED:`) becomes a
+// ruling. The runner posts the JSON as-is as a `decision` entry, then the
+// `[blocked]` marker; Harbour's own parseDecision reads it.
+describe('LIN-3505: a runner decision + [blocked] is a ruling', () => {
+  const line = lines.find((l) => l.startsWith('DECISION:'));
+  const json = line && line.slice('DECISION:'.length).trim();
+  const ledger = { items: { [K]: { rootItemId: K } } };
+  const blocked = lines.find((l) => l.startsWith('[blocked] Waiting'));
+
+  test('the markers block carries a DECISION: example that parseDecision reads', () => {
+    assert.ok(line, 'a DECISION: line in the markers block');
+    const d = parseDecision(json);
+    assert.equal(d.decision_id, 'keep-schema');
+    assert.equal(d.options.length, 2);
+    assert.equal(d.recommended, 'a');
+  });
+
+  test('the closing contract allows DECISION: before the one outcome line', () => {
+    assert.match(prompt, /end your final message with exactly one outcome line/);
+    assert.match(prompt, /`DECISION:` line just before the `BLOCKED:` line/);
+  });
+
+  test('the prose tells the runner to post the decision before the [blocked] marker', () => {
+    assert.match(prompt, /runner feedback <id> decision '<the JSON>'/);
+    // the decision step sits in the same list item that precedes the marker step
+    assert.ok(prompt.indexOf("decision '<the JSON>'") < prompt.indexOf('"[blocked] <what it needs>"'));
+  });
+
+  test('the kit posts a decision entry unchanged, and the server validator accepts it', () => {
+    const body = feedbackBody(ledger, K, 'decision', json);
+    assert.equal(body.kind, 'decision');
+    assert.equal(body.message, json);
+    assert.equal(body.rootItemId, K);
+    const v = validateFeedbackBody(body);
+    assert.equal(v.error, undefined);
+    assert.equal(v.value.kind, 'decision');
+    assert.equal(v.value.message, json);
+  });
+
+  test('decision then [blocked] reads as one ruling and a blocked wake, not terminal', () => {
+    const feedback = [
+      { ...feedbackBody(ledger, K, 'decision', json), timestamp: '2026-09-29T12:00:00.000Z' },
+      { ...feedbackBody(ledger, K, 'status', blocked), timestamp: '2026-09-29T12:00:01.000Z' }
+    ];
+    const rulings = parseDecisions(feedback);
+    assert.equal(rulings.length, 1);
+    assert.equal(rulings[0].decision_id, 'keep-schema');
+    assert.equal(findWakeEvent(feedback.slice(1)).marker, 'blocked');
+    assert.equal(findTerminalFeedback(feedback), null);
+  });
+
+  test('re-posting the same decision_id: the last one wins', () => {
+    const second = JSON.stringify({ ...JSON.parse(json), question: 'Revised?' });
+    const rulings = parseDecisions([
+      { kind: 'decision', message: json },
+      { kind: 'decision', message: second }
+    ]);
+    assert.equal(rulings.length, 1);
+    assert.equal(rulings[0].question, 'Revised?');
   });
 });
