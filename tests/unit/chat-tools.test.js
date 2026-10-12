@@ -1211,12 +1211,13 @@ describe('pass-3 write tool — send_follow_up (LIN-1073)', () => {
 
 // LIN-1486: `send_follow_up` must target the TAIL of the anchor's own lineage
 // (not the session root) and derive `force` from that tail's own terminality
-// (not an aggregate across the whole session). The `sessionIsTerminal` mock
-// used by the OTHER send_follow_up tests above is intentionally a loose
-// "any loop done" stub — fine for those tests, but it doesn't reproduce the
-// real bug (root-anchored, anchor-first-then-all()). This block injects the
-// REAL `sessionIsTerminal` from routes/dashboard.js so the decision under test
-// can't drift from a hand-written copy.
+// (not an aggregate across the whole session). The injected real
+// `sessionIsTerminal` from routes/dashboard.js only satisfies send_follow_up's
+// configuration guard (lib/chat-tools.js, a `typeof` check); it is not the
+// decision under test. `followUpTo`/`force` come from deriveFollowUpDispatch
+// (anchorLineageTail + isLoopTerminal(tail)), which is what these tests pin.
+// Use the real function here, never a hand copy, so no test-only terminality
+// logic exists.
 describe('LIN-1486: send_follow_up targets the lineage tail, not the session root', () => {
   function makeFakeDispatchQueueStore(history) {
     const calls = [];
