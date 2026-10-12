@@ -19,10 +19,15 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const mango = createMangoTmpdir('lin-3528-3491-agent-prompt-');
 before(() => mango.connect());
-after(() => mango.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await mango.close();
+});
 import { renderProxyPage } from '../../lib/render-proxy.js';
 
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';

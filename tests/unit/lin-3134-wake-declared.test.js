@@ -36,10 +36,15 @@ import { buildWakeCredentialProvisioner } from '../../lib/wake-credential.js';
 // the export exists.
 import * as dispatchWake from '../../lib/dispatch-wake.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-wake-declared-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
 import { createProxyRoutes } from '../../routes/proxy.js';

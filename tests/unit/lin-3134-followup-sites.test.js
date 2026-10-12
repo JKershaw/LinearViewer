@@ -44,10 +44,15 @@ installHermeticLinearTransport();
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { ProxyTokenStore, BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-followup-sites-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';

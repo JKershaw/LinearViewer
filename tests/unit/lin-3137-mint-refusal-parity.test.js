@@ -22,10 +22,15 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-3137-mint-refusal-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 
 const WORKSPACE = { urlKey: 'acme', id: 'ws-1', provider: 'linear' };
 const RUNNER_PATH = '/workspace/acme/api/proxy/tokens';

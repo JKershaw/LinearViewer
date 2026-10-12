@@ -31,10 +31,15 @@ import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { applyDefaultDispatchHarness, shouldUseMcpTokenField } from '../../lib/proxy-preamble.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-wake-credential-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 
 const URL_KEY = 'acme';
 

@@ -34,10 +34,15 @@ import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { renderPage } from '../../lib/render.js';
 import { PERIODICAL_AUTOPILOT_TAIL } from '../../lib/periodicals.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-m2-session-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 import { testMockPeriodicalsTree } from '../../lib/sample-data/mock-data.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

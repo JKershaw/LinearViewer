@@ -29,10 +29,15 @@ import { COPY_PURPOSES } from '../../routes/proxy-tokens-admin.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const mango = createMangoTmpdir('lin-3528-driver-copy-mint-');
 before(() => mango.connect());
-after(() => mango.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await mango.close();
+});
 
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
 const HOURS_48 = 48 * 3600;

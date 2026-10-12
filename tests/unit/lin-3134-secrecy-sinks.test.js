@@ -39,6 +39,7 @@ import { mintDispatchWriter } from './lib/dispatch-writer.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
@@ -48,7 +49,11 @@ import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
 
 const harness = createMangoTmpdir('lin-3528-secrecy-sinks-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 
 const URL_KEY = 'acme';
 const POSTER = 'poster-B';

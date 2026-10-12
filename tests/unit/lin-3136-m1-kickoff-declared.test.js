@@ -27,10 +27,15 @@ import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-m1-kickoff-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 
 const OWNER = 'account-A';
 const WS = 'ws-1';

@@ -24,10 +24,15 @@ import {
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+import { trackTokenStoreCleanup } from '../fixtures/settle-token-cleanup.js';
 
 const harness = createMangoTmpdir('lin-3528-g1-inert-prep-');
 before(() => harness.connect());
-after(() => harness.close());
+const tokenCleanup = trackTokenStoreCleanup(ProxyTokenStore);
+after(async () => {
+  await tokenCleanup.settle();
+  await harness.close();
+});
 import { mintDispatchWriter, armDispatchWriterOnce } from './lib/dispatch-writer.js';
 
 const R3_DISPATCH_COPY =
