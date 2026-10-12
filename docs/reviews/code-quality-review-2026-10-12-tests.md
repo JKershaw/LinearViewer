@@ -46,6 +46,7 @@ Every finding is recorded, promoted or not. "Minted" findings have follow-up tic
 | 15 | T-shims | LOW-MED | `FakeElement` ×9 (none identical); the `prompt-section` vm harness copied verbatim; 6 tests duplicated between `dispatch-page.spec` and `dispatch.spec`; `opencode-runner` `fakeFs` ×10 (only one has `mkdirSync`, which the runner calls) and `fakeChild` ×11. | A DOM or fs behaviour the code starts to use is missing from most copies. | Recorded |
 | 16 | T-vacuous | LOW-MED | `chat-tools:692-700` cannot fail (asserts `length >= 0`); `interactions.spec:254,497` skip on fixture drift; SD `hook-decision:855-869` "→ defer" tests never assert the type; ORD `makeTaskBoundRow` leaves `effect` undefined. | Fixture drift reads as a skip or a pass. | Recorded |
 | 17 | T-unrun | LOW | `scripts/eval/jev-progress.test.mjs` and `jev-routing-state.test.mjs` run in no npm script and no workflow; `tests/visual/` has no script or workflow (5 of 7 specs have no `expect`); the two Playwright configs have drifted env. | Tests that never run protect nothing and age silently. | Recorded |
+| 18 | T-census-parser | MED | Added by the second-read. `tests/unit/lin-3134-declared-mint-census.test.js` (840 lines, 11 commits since 09-26) carries a hand-written regex JS tokenizer for production source (`maskSource` :208, `matchClose` :238, `enclosingConstruct` :252, `topLevelProp` :263, `scanDispatchCalls` :290, `scanMintSites` :420) and hard-coded lists that are second copies of which production sites mint or declare grants (`MECHANISM_MODULES` :25, `F3_WRITERS` :84, `FOLLOWUP_SITES` :327, `NON_FOLLOWUP_CALLS` :337, `KICKOFF` :454). | Test infrastructure that needs its own correctness proof; every new mint site is an edit to a list that rots (LIN-3384, LIN-3436, LIN-3438 each touched it). Same family, not read closely: `lin-3134-default-path-characterization` (983 lines), `runner-kit-helper` (1,556), `owner-backfill` (1,226). Graded for maintainability only (LIN-3201). | Recorded |
 
 **Clean or verified:** `listen` bind (0 hostless sites; enforced by `test-server-listen-bind.test.js`); no leaked servers; `e2e-smoke` and `hook-decision` (SD); `flight-companion-client` and `observation-ruling-delivery` (well factored in-file); `fixed-overlay-sweep.js`; `test-base.js`; hard-coded urlKeys (LIN-625). The unit suite running twice in CI is deliberate (LIN-1880/2992) and not a finding.
 
@@ -186,4 +187,15 @@ Should the LIN-3449 child rule say **"tests go in the home module's own test fil
 
 ## Adversarial Second-Read
 
-SECOND_READ_PLACEHOLDER
+**Tier:** 2 (fresh-context sub-agent, read-only, no memory of the report-writing turn; it looked at the test directories first, then read the report).
+
+**Question (verbatim):** "what is the largest item in this window that this report missed or misfiled?"
+
+**Reader's answer (in full, condensed only of file-list repetition):** The largest missed item is `tests/unit/lin-3134-declared-mint-census.test.js` (840 lines): a hand-written regex tokenizer for production JS plus five hard-coded lists that copy production mint/declare sites, edited by 10+ commits in the window; the report folded it into "pins, LIN-3201" and has no finding for the parser-in-a-test complexity class. Three same-family files were not read closely (`lin-3134-default-path-characterization`, `runner-kit-helper`, `owner-backfill`). The largest churn by naive ranking (`lin-3126-proxy-selector`, `lin-3126-residual-forwarding`) was deleted at HEAD (`7b832382`), which the report ignores correctly but does not say. T-mutants is the right top finding (it eyeballed the `reapers.js` anchors); T-mockcoll second; it would rate T-mirror MED rather than HIGH, because the mirror is a deliberate injected double (`chat-tools.test.js:1219-1256`), though the divergence from the real function is real.
+
+**Handling:** I verified the census file's size, helpers and lists (840 lines; the named functions and lists exist at the cited lines; 11 commits since 09-26) and added it as finding 18. T-mirror stays HIGH (small) because the double exists to reproduce the real bug and has diverged from the function it claims to be faithful to; the reader's MED is noted. Not promoted: the cap is full and LIN-3201 constrains the pin class.
+
+Adversarial second-read verdict: AGREE
+Differed from top finding: NO
+Disposition: fixed in place
+
