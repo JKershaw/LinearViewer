@@ -763,20 +763,11 @@
 
   function applyCloseOutState(box, state) {
     if (!box || !state || !state.status) return;
-    var prevYou = box.getAttribute('data-merged-by-you') === 'true';
-    var nextYou = !!state.mergedByYou;
-    // Repaint when the state or the "by you" claim changes (F1: a close-out
-    // merge found on check replaces the server-rendered "merged by you").
-    if (box.getAttribute('data-state') === state.status && prevYou === nextYou) return;
+    if (box.getAttribute('data-state') === state.status) return;
     box.setAttribute('data-state', state.status);
-    box.setAttribute('data-merged-by-you', nextYou ? 'true' : 'false');
     if (state.status === 'ready') return;
     if (state.status === 'merged' || state.status === 'partial') {
-      if (nextYou) {
-        paintCloseOut(box, 'run-evidence-closeout-merged', '✓ merged by you' + (state.message ? ' · ' + state.message : ''));
-      } else {
-        paintCloseOut(box, 'run-evidence-closeout-neutral', state.message || 'the pull request is already merged');
-      }
+      paintCloseOut(box, 'run-evidence-closeout-neutral', state.message || 'the pull request is already merged');
     } else if (state.status === 'not-ready' || state.status === 'no-pr' || state.status === 'multiple-prs' || state.status === 'closed') {
       paintCloseOut(box, 'run-evidence-closeout-setup', '○ set up ›');
     } else {

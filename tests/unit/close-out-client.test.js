@@ -150,7 +150,7 @@ describe('close-out.js: the check', () => {
   test('a done result reloads so the tracker Finished header shows', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });
@@ -167,7 +167,7 @@ describe('close-out.js: the check', () => {
   test('a done result from an already-recorded merge (doneNow:false) makes 0 reloads', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: false }, done: true, doneNow: false }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: false }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });
@@ -183,7 +183,7 @@ describe('close-out.js: the check', () => {
   test('a doneNow result on a page already showing done makes 0 reloads', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck, pageAlreadyDone } = load({ window });
@@ -205,7 +205,7 @@ describe('close-out.js: the check', () => {
   test('a doneNow result reloads once on a page not yet done (In Progress → Done)', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });

@@ -4589,9 +4589,8 @@ ${goal}`
           }
         }
 
-        // F1: show a press-then-merge as a close-out merge, not "by you".
+        // Show a press-then-merge as a close-out merge.
         if (mergedEvent && mergedEvent.by === 'close-out') {
-          state.mergedByYou = false;
           state.mergedBy = 'close-out';
           state.message = 'the pull request was merged by close-out';
         }
