@@ -16,7 +16,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTaskPageLoader, buildTaskPageModel, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, fmtWhen } from '../../lib/task-page-loader.js';
+import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
@@ -342,6 +342,51 @@ describe('session rows', () => {
     assert.equal(followed.sessions[0].state, 'continued', 'superseded: ended when the follow-up took over, not waiting and not running');
     assert.equal(followed.sessions[0].loop.terminalStatus, 'continued', 'the face reads it too');
     assert.equal(followed.status, 'idle', 'a replied-to block never drives the header');
+  });
+
+  describe('sessionMessage: the [blocked] question shows only while waiting (LIN-3504)', () => {
+    const question = { loopId: 'b1', wakeMarker: 'blocked', waitingMessage: '[blocked] need a key', feedback: [{ message: '[blocked] need a key' }] };
+    const msgs = (loops) => buildTaskPageModel({ identifier: 'LIN-50', loops, enrichLoop, deriveSessionWaiting, now: NOW }).sessions;
+
+    test('waiting: shows the question', () => {
+      const [s] = msgs([loop(question)]);
+      assert.equal(s.state, 'waiting');
+      assert.equal(s.message, 'need a key');
+    });
+
+    test('continued after an answer: does not show the question', () => {
+      const [s] = msgs([loop(question), done({ loopId: 'f1', followUpTo: 'b1' })]);
+      assert.equal(s.state, 'continued');
+      assert.equal(s.message, null, 'renderer falls back to "no message recorded"');
+    });
+
+    test('continued after an answer: shows its closing line when it has one', () => {
+      const [s] = msgs([loop({ ...question, agentSummary: 'wrapped up' }), done({ loopId: 'f1', followUpTo: 'b1' })]);
+      assert.equal(s.message, 'wrapped up');
+    });
+
+    test('done: shows its closing line', () => {
+      const [s] = msgs([done()]);
+      assert.equal(s.state, 'done');
+      assert.equal(s.message, 'landed it');
+    });
+
+    test('running after a resume: does not show the question', () => {
+      const resumed = loop({ ...question, wakeMarker: null, feedback: [{ message: '[blocked] need a key' }, { message: '[working] Session resumed.' }] });
+      const [s] = msgs([resumed]);
+      assert.equal(s.state, 'running');
+      assert.equal(s.message, null);
+    });
+
+    test('ended after a block without its own end marker: does not show the question', () => {
+      const [s] = msgs([loop({ ...question, bookkeeping: { by: 'close-out' } })]);
+      assert.equal(s.state, 'closed');
+      assert.equal(s.message, null);
+    });
+
+    test('sessionMessage never falls back to waitingMessage', () => {
+      assert.equal(sessionMessage(loop({ waitingMessage: '[blocked] stale' }), 'done'), null);
+    });
   });
 
   test('evidence is task-level on the model; no session hosts an evidence slot', () => {
