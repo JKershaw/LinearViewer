@@ -7,17 +7,21 @@
  * dual lookup, scope isolation, and the read-modify-write array mutations
  * (comments/labels/relations) that use $set rather than $push.
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { createLocalStore } from '../fixtures/local-harness.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
+const harness = createMangoTmpdir('lin-3526-local-store-');
+before(() => harness.connect());
+after(() => harness.close());
 const SCOPE = 'ws-1';
 
 describe('LocalStore', () => {
   let store;
 
   beforeEach(() => {
-    ({ store } = createLocalStore());
+    ({ store } = createLocalStore(harness.freshDb()));
   });
 
   test('creates an issue with a generated identifier and canonical defaults', async () => {

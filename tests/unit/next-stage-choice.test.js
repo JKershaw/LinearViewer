@@ -9,7 +9,7 @@
  *
  * Run with: node --test tests/unit/next-stage-choice.test.js
  */
-import { test, describe, mock } from 'node:test';
+import { test, describe, mock, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { GraphQLClient } from 'graphql-request';
 import {
@@ -23,6 +23,11 @@ import { isRequestChangesRound } from '../../lib/prompts/revision-brief.js';
 import { fetchIssueContext } from '../../lib/providers/linear/index.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3526-next-stage-choice-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const RC = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\nFinding.\n\n**Verdict: Request Changes.**` });
 const ND = (at, id = at) => ({ id, createdAt: at, body: `### Plan Review Verdict\n\n**Verdict: Needs Discussion.**` });
@@ -84,7 +89,7 @@ describe('relations reach the router (LIN-3309 S1)', () => {
   });
 
   test('Local reads both encodings: outgoing blocked-by and inverse blocks', async () => {
-    const { provider, store } = createLocalProvider();
+    const { provider, store } = createLocalProvider(harness.freshDb());
     await store.seed('ws', {
       issues: [
         { id: 'i1', identifier: 'LOCAL-1', title: 'Blocker via blocks', state: { name: 'In Progress', type: 'started' }, relations: [{ type: 'blocks', relatedIssueId: 'i3' }] },

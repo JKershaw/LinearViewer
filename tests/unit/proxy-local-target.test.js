@@ -14,12 +14,13 @@
  * this is the focused proof that B1's seam works.
  */
 
-import { test, before } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { localProvider } from '../../lib/providers/local/index.js';
 import { createLocalStore } from '../fixtures/local-harness.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 // Must match TEST_LOCAL_URL_KEY in routes/proxy.js (and LOCAL_WORKSPACE_URL_KEY).
 const LOCAL_URL_KEY = 'local-workspace';
@@ -27,8 +28,12 @@ const UUID = '11111111-1111-1111-1111-111111111111';
 
 before(() => { process.env.NODE_ENV = 'test'; });
 
+const harness = createMangoTmpdir('lin-3526-proxy-local-target-');
+before(() => harness.connect());
+after(() => harness.close());
+
 async function buildLocalApp() {
-  const { store } = createLocalStore();
+  const { store } = createLocalStore(harness.freshDb());
   await store.seed(LOCAL_URL_KEY, {
     projects: [{ id: 'p1', name: 'Alpha', content: 'a', sortOrder: 1 }],
     issues: [

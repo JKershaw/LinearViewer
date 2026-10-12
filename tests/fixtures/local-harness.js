@@ -6,8 +6,12 @@
  * `NODE_ENV === 'test' && accessToken === 'test-token'` mock short-circuit
  * (which returns `testMockData`). Two consumers share ONE canonical seed:
  *
- *   - Unit tests: createLocalStore() / createLocalProvider() build an in-memory
- *     LocalStore (+ provider) over the mock collection — no server, no session.
+ *   - Unit tests: createLocalStore(db) / createLocalProvider(db) build a
+ *     LocalStore (+ provider) over `db.collection('local-store')` — no server, no
+ *     session. `db` is the caller's `freshDb()` from tests/fixtures/mango-tmpdir.js
+ *     (a REAL MangoDB database, LIN-3519): the caller owns the
+ *     `createMangoTmpdir` + `connect()` in `before()` and the close in `after()`,
+ *     so this harness stays free of a MangoDB import.
  *   - Playwright E2E: seedLocalWorkspace(page, seed?) POSTs the seed to
  *     /test/set-local-session, which seeds the REAL LocalStore and establishes a
  *     `provider: 'local'` session whose token is its own urlKey. The dashboard
@@ -70,7 +74,6 @@
  */
 import { LocalStore } from '../../lib/local-store.js';
 import { LocalProvider } from '../../lib/providers/local/index.js';
-import { createMockCollection } from './mock-collection.js';
 import { swimSampleProjects, swimSampleIssues } from '../../lib/sample-data/swim-sample-data.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
 
@@ -356,24 +359,26 @@ export const searchLocalSeed = localSeedFromLinearFixture({
 });
 
 // ---------------------------------------------------------------------------
-// Unit-side helpers — in-memory collection + LocalStore (no server/session).
+// Unit-side helpers — LocalStore over a caller-supplied real MangoDB database.
 // ---------------------------------------------------------------------------
 
 /**
- * Build a LocalStore over a fresh in-memory mock collection.
+ * Build a LocalStore over `db.collection('local-store')`.
+ * @param {object} db - a `freshDb()` result from `createMangoTmpdir()`
  * @returns {{ store: LocalStore, collection: object }}
  */
-export function createLocalStore() {
-  const collection = createMockCollection();
+export function createLocalStore(db) {
+  const collection = db.collection('local-store');
   return { store: new LocalStore({ collection }), collection };
 }
 
 /**
- * Build a LocalProvider wired to a fresh in-memory LocalStore.
+ * Build a LocalProvider wired to a LocalStore over `db`.
+ * @param {object} db - a `freshDb()` result from `createMangoTmpdir()`
  * @returns {{ provider: LocalProvider, store: LocalStore, collection: object }}
  */
-export function createLocalProvider() {
-  const { store, collection } = createLocalStore();
+export function createLocalProvider(db) {
+  const { store, collection } = createLocalStore(db);
   return { provider: new LocalProvider({ store }), store, collection };
 }
 

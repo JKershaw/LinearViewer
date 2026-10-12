@@ -8,7 +8,7 @@
  * byte-identical with the middleware / sanitizer / lifecycle wired in. Each case
  * here fails loudly if a legacy shape ever starts being touched.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
@@ -18,6 +18,11 @@ import {
   collectSessionConnectionIds,
 } from '../../lib/connection-credential.js';
 import { MongoSessionStore } from '../../lib/session-store.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3526-pr2-inertness-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const LEGACY_SESSION = () => ({
   accountId: 'acct-legacy',
@@ -75,9 +80,11 @@ describe('LIN-3124 PR2 — legacy inertness', () => {
   test('MongoSessionStore.set persists a legacy session byte-identically', async () => {
     const session = LEGACY_SESSION();
     const before = JSON.parse(JSON.stringify(session));
-    let written;
-    const store = new MongoSessionStore({ collection: { async updateOne(_f, update) { written = update.$set.session; } } });
+    const collection = harness.freshDb().collection('sessions');
+    const store = new MongoSessionStore({ collection });
     await new Promise((resolve, reject) => store.set('sid', session, (err) => err ? reject(err) : resolve()));
+    // R4b: read the persisted document back from the real collection — no capture stub.
+    const written = (await collection.findOne({ _id: 'sid' })).session;
     assert.deepStrictEqual(written, before);
   });
 

@@ -7,15 +7,20 @@
  * flip the parity of one dispatch, so the order test below is the acceptance
  * witness: it fails under history-first and under simultaneous reads.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3526-pilot-count-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function makeStore() {
+  const db = harness.freshDb();
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
   });
 }
 
@@ -78,16 +83,29 @@ describe('countPilotEligible — read order (M3 acceptance witness)', () => {
       _id: 'mover-1', urlKey: 'acme', kind: 'implementation', issueIdentifier: 'LIN-7',
       followUpTo: null, abort: false, dispatchedAt: new Date()
     };
-    let phase = 0;
+    // R4c: both collections are REAL. The row starts in the real queue; the race
+    // hook does the external take for real (deleteOne from the queue, insertOne
+    // into history) right after the queue's first read resolves its rows.
+    const db = harness.freshDb();
+    const realQueue = db.collection('dispatch-queue');
+    const realHistory = db.collection('dispatch-history');
+    await realQueue.insertOne(row);
+
+    let moved = false;
     let queueSettled = false;
     let historyQueryRaisedBeforeQueueSettled = false;
 
     const queue = {
       find(query, opts) {
+        const cursor = realQueue.find(query, opts);
         return {
           async toArray() {
-            const snapshot = phase === 0 ? [row] : [];
-            phase = 1;
+            const snapshot = await cursor.toArray();
+            if (!moved) {
+              moved = true;
+              await realQueue.deleteOne({ _id: row._id });
+              await realHistory.insertOne(row);
+            }
             queueSettled = true;
             return snapshot;
           }
@@ -97,11 +115,7 @@ describe('countPilotEligible — read order (M3 acceptance witness)', () => {
     const history = {
       find(query, opts) {
         historyQueryRaisedBeforeQueueSettled = queueSettled ? historyQueryRaisedBeforeQueueSettled : true;
-        return {
-          async toArray() {
-            return phase === 0 ? [] : [row];
-          }
-        };
+        return realHistory.find(query, opts);
       }
     };
     const store = new DispatchQueueStore({ collection: queue, historyCollection: history });

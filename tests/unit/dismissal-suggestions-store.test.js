@@ -9,58 +9,23 @@
  *
  * Run with: node --test tests/unit/dismissal-suggestions-store.test.js
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { DismissalSuggestionsStore, attachStandingSuggestions } from '../../lib/dismissal-suggestions-store.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
-// Mirrors tests/unit/shelved-rulings-store.test.js's mock.
-function createMockCollection() {
-  const docs = [];
-  function matchesField(docValue, queryValue) {
-    if (queryValue && typeof queryValue === 'object' && Array.isArray(queryValue.$in)) {
-      return queryValue.$in.includes(docValue);
-    }
-    return docValue === queryValue;
-  }
-  function matches(doc, query) {
-    if (query._id !== undefined && doc._id !== query._id) return false;
-    if (query.urlKey !== undefined && !matchesField(doc.urlKey, query.urlKey)) return false;
-    return true;
-  }
-  return {
-    _docs: docs,
-    async findOne(query) { return docs.find(d => matches(d, query)) || null; },
-    find(query = {}) {
-      const results = docs.filter(d => matches(d, query));
-      return { async toArray() { return results.slice(); } };
-    },
-    async deleteMany(query) {
-      let count = 0;
-      for (let i = docs.length - 1; i >= 0; i--) {
-        if (matches(docs[i], query)) { docs.splice(i, 1); count++; }
-      }
-      return { deletedCount: count };
-    },
-    async updateOne(query, update, opts = {}) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx >= 0) {
-        Object.assign(docs[idx], update.$set || {});
-        return { matchedCount: 1, modifiedCount: 1 };
-      }
-      if (opts.upsert) {
-        docs.push({ ...(update.$set || {}) });
-        return { matchedCount: 0, modifiedCount: 0, upsertedId: update.$set?._id };
-      }
-      return { matchedCount: 0, modifiedCount: 0 };
-    }
-  };
-}
+const harness = createMangoTmpdir('lin-3526-dismissal-suggestions-');
+before(() => harness.connect());
+after(() => harness.close());
+
+// Every stored row, read back from the real collection (was the mock's `_docs`).
+const allDocs = (collection) => collection.find({}).toArray();
 
 const NOW = new Date('2026-09-05T12:00:00.000Z');
 const LATER = new Date('2026-09-05T13:00:00.000Z');
 
 function makeStore() {
-  const collection = createMockCollection();
+  const collection = harness.freshDb().collection('dismissal-suggestions');
   return { collection, store: new DismissalSuggestionsStore({ collection }) };
 }
 
@@ -78,8 +43,8 @@ describe('DismissalSuggestionsStore.suggest', () => {
     assert.equal(rec.suggestedBy, 'lane-e');
     assert.equal(rec.withdrawn, false);
     assert.equal(rec.withdrawnAt, null);
-    assert.equal(collection._docs.length, 1);
-    assert.equal(collection._docs[0]._id, 'acme::d-1');
+    assert.equal((await allDocs(collection)).length, 1);
+    assert.equal((await allDocs(collection))[0]._id, 'acme::d-1');
   });
 
   // LIN-2790: the widened shape.
@@ -89,8 +54,8 @@ describe('DismissalSuggestionsStore.suggest', () => {
     });
     assert.equal(rec.proposedOutcome, 'dismissed');
     assert.equal(rec.optionId, null);
-    assert.equal(collection._docs[0].proposedOutcome, 'dismissed');
-    assert.equal(collection._docs[0].optionId, null);
+    assert.equal((await allDocs(collection))[0].proposedOutcome, 'dismissed');
+    assert.equal((await allDocs(collection))[0].optionId, null);
   });
 
   test('an "answered" proposal records its proposedOutcome and optionId', async () => {
@@ -119,14 +84,14 @@ describe('DismissalSuggestionsStore.suggest', () => {
     for (const reason of [undefined, null, '', '   ', 42]) {
       assert.equal(await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason, suggestedBy: 'lane-e' }), null);
     }
-    assert.equal(collection._docs.length, 0, 'nothing is written on a refused proposal');
+    assert.equal((await allDocs(collection)).length, 0, 'nothing is written on a refused proposal');
   });
 
   test('attribution is REQUIRED — an anonymous proposal is refused', async () => {
     for (const suggestedBy of [undefined, null, '', '   ', 7]) {
       assert.equal(await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'done', suggestedBy }), null);
     }
-    assert.equal(collection._docs.length, 0);
+    assert.equal((await allDocs(collection)).length, 0);
   });
 
   test('reason and attribution are trimmed', async () => {
@@ -140,9 +105,9 @@ describe('DismissalSuggestionsStore.suggest', () => {
   test('re-suggesting overwrites in place rather than accumulating rows', async () => {
     await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'first', suggestedBy: 'a', now: NOW });
     await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'second', suggestedBy: 'b', now: LATER });
-    assert.equal(collection._docs.length, 1);
-    assert.equal(collection._docs[0].reason, 'second');
-    assert.equal(collection._docs[0].suggestedBy, 'b');
+    assert.equal((await allDocs(collection)).length, 1);
+    assert.equal((await allDocs(collection))[0].reason, 'second');
+    assert.equal((await allDocs(collection))[0].suggestedBy, 'b');
   });
 
   test('a fresh proposal CLEARS a prior withdrawal', async () => {
@@ -160,8 +125,8 @@ describe('DismissalSuggestionsStore.suggest', () => {
     // same composite-key reasoning lib/shelved-rulings-store.js records.
     await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'a', suggestedBy: 'x', now: NOW });
     await store.suggest({ urlKey: 'other', decisionId: 'd-1', reason: 'b', suggestedBy: 'y', now: NOW });
-    assert.equal(collection._docs.length, 2);
-    assert.deepEqual(collection._docs.map(d => d._id).sort(), ['acme::d-1', 'other::d-1']);
+    assert.equal((await allDocs(collection)).length, 2);
+    assert.deepEqual((await allDocs(collection)).map(d => d._id).sort(), ['acme::d-1', 'other::d-1']);
   });
 
   test('bad workspace/decision input is refused, and an unconfigured store degrades', async () => {
@@ -184,8 +149,8 @@ describe('DismissalSuggestionsStore.withdraw', () => {
     const rec = await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', now: LATER });
     assert.equal(rec.withdrawn, true);
     assert.equal(rec.withdrawnAt, LATER.toISOString());
-    assert.equal(collection._docs.length, 1, 'the row is retained');
-    assert.equal(collection._docs[0].reason, 'r', 'the original reason survives');
+    assert.equal((await allDocs(collection)).length, 1, 'the row is retained');
+    assert.equal((await allDocs(collection))[0].reason, 'r', 'the original reason survives');
   });
 
   test('is idempotent — a second withdrawal does not move the timestamp', async () => {
@@ -197,7 +162,7 @@ describe('DismissalSuggestionsStore.withdraw', () => {
 
   test('withdrawing an absent suggestion is null, not a fabricated row', async () => {
     assert.equal(await store.withdraw({ urlKey: 'acme', decisionId: 'nope' }), null);
-    assert.equal(collection._docs.length, 0);
+    assert.equal((await allDocs(collection)).length, 0);
   });
 
   test('LIN-2766: a decisionLoopId-scoped withdraw falls back to a legacy two-segment doc when no loop-scoped one exists', async () => {
@@ -209,8 +174,8 @@ describe('DismissalSuggestionsStore.withdraw', () => {
     const rec = await store.withdraw({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', now: LATER });
     assert.notEqual(rec, null, 'withdraw must fall back to the legacy doc rather than reporting no match');
     assert.equal(rec.withdrawn, true);
-    assert.equal(collection._docs.length, 1, 'the legacy row is retained (marked, not deleted), not duplicated');
-    assert.equal(collection._docs[0]._id, 'acme::lin2384-f6-gate', 'the legacy _id is what was actually updated');
+    assert.equal((await allDocs(collection)).length, 1, 'the legacy row is retained (marked, not deleted), not duplicated');
+    assert.equal((await allDocs(collection))[0]._id, 'acme::lin2384-f6-gate', 'the legacy _id is what was actually updated');
   });
 
   test('LIN-2766: a loop-scoped withdraw prefers the exact loop-scoped doc over a coexisting legacy one', async () => {
@@ -219,8 +184,8 @@ describe('DismissalSuggestionsStore.withdraw', () => {
 
     await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: LATER });
 
-    const legacy = collection._docs.find(d => d._id === 'acme::d-1');
-    const scoped = collection._docs.find(d => d._id === 'acme::07509b1e::d-1');
+    const legacy = (await allDocs(collection)).find(d => d._id === 'acme::d-1');
+    const scoped = (await allDocs(collection)).find(d => d._id === 'acme::07509b1e::d-1');
     assert.equal(scoped.withdrawn, true, 'the exact loop-scoped doc is the one withdrawn');
     assert.equal(legacy.withdrawn, false, 'the legacy doc must not be touched when a loop-scoped doc exists');
   });
@@ -235,7 +200,7 @@ describe('DismissalSuggestionsStore.withdraw', () => {
       reason: 'r', suggestedBy: 'x', now: NOW
     });
     await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', now: LATER });
-    const doc = collection._docs[0];
+    const doc = (await allDocs(collection))[0];
     for (const forbidden of ['outcome', 'outcomeAt', 'answered', 'answeredDecisionId', 'decision-answer', 'agreed', 'agreedAt', 'acceptedAt']) {
       assert.ok(!(forbidden in doc), `a suggestion row must never carry '${forbidden}'`);
     }
@@ -312,15 +277,15 @@ describe('DismissalSuggestionsStore — per-loop identity (LIN-2756)', () => {
       urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'shipped', suggestedBy: 'lane-e', now: NOW
     });
     assert.equal(rec.decisionLoopId, '07509b1e');
-    assert.equal(collection._docs[0]._id, 'acme::07509b1e::lin2384-f6-gate');
+    assert.equal((await allDocs(collection))[0]._id, 'acme::07509b1e::lin2384-f6-gate');
   });
 
   test('two loops sharing (urlKey, decisionId) get independent suggestion rows', async () => {
     await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '07509b1e', reason: 'review pass done', suggestedBy: 'x', now: NOW });
     await store.suggest({ urlKey: 'acme', decisionId: 'lin2384-f6-gate', decisionLoopId: '0c912018', reason: 'close-out pass done', suggestedBy: 'x', now: NOW });
 
-    assert.equal(collection._docs.length, 2, 'each loop must keep its own row, not collapse onto one shared (urlKey, decisionId) key');
-    assert.deepEqual(collection._docs.map(d => d._id).sort(), ['acme::07509b1e::lin2384-f6-gate', 'acme::0c912018::lin2384-f6-gate']);
+    assert.equal((await allDocs(collection)).length, 2, 'each loop must keep its own row, not collapse onto one shared (urlKey, decisionId) key');
+    assert.deepEqual((await allDocs(collection)).map(d => d._id).sort(), ['acme::07509b1e::lin2384-f6-gate', 'acme::0c912018::lin2384-f6-gate']);
   });
 
   test('withdrawing one loop’s suggestion leaves the other loop’s standing', async () => {
@@ -338,7 +303,7 @@ describe('DismissalSuggestionsStore — per-loop identity (LIN-2756)', () => {
   test('omitting decisionLoopId keeps the legacy, workspace-wide two-segment shape — back-compat, not a refusal', async () => {
     const rec = await store.suggest({ urlKey: 'acme', decisionId: 'd-1', reason: 'r', suggestedBy: 'x', now: NOW });
     assert.equal(rec.decisionLoopId, null);
-    assert.equal(collection._docs[0]._id, 'acme::d-1');
+    assert.equal((await allDocs(collection))[0]._id, 'acme::d-1');
   });
 
   test('LIN-2766: a legacy suggestion attached to a loop-backed row via the read-side fallback is ACTUALLY withdrawn by that row\'s Keep — crossed read/write', async () => {
@@ -379,7 +344,7 @@ describe('DismissalSuggestionsStore — per-loop identity (LIN-2756)', () => {
 
     await store.withdraw({ urlKey: 'acme', decisionId: 'd-1', decisionLoopId: '07509b1e', now: LATER }); // Keep #2
 
-    const legacy = collection._docs.find(d => d._id === 'acme::d-1');
+    const legacy = (await allDocs(collection)).find(d => d._id === 'acme::d-1');
     assert.equal(legacy.withdrawn, true, 'the standing legacy doc — the one the banner actually displayed — must be the one withdrawn');
 
     const after = attachStandingSuggestions([row], await store.listForWorkspaces(['acme']));

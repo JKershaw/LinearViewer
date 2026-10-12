@@ -23,12 +23,16 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3526-watch-lineage-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const TOKEN = 'consumer-1';
 const URLKEY = 'acme';
@@ -72,10 +76,26 @@ async function call(app, path) {
   }
 }
 
-const makeStore = () => new DispatchQueueStore({
-  collection: createMockCollection(),
-  historyCollection: createMockCollection()
-});
+const makeStore = () => {
+  const db = harness.freshDb();
+  return new DispatchQueueStore({
+    collection: db.collection('dispatch-queue'),
+    historyCollection: db.collection('dispatch-history')
+  });
+};
+
+// Backdate a finished run (feedback timestamps AND dispatchedAt) by `ms`, as a
+// real write (R2). Under the old mock this was written through the shallow copy
+// `findOne` returned: the feedback timestamps mutated entries shared with the
+// store and persisted, but `dispatchedAt` was a top-level assignment on the copy
+// and silently never persisted. On the real engine both land (LIN-3526 finding).
+async function backdateRun(store, item, ms) {
+  const raw = await store.historyCollection.findOne({ _id: item._id, urlKey: URLKEY });
+  const feedback = raw.feedback.map(f => ({ ...f, timestamp: new Date(Date.parse(f.timestamp) - ms) }));
+  const dispatchedAt = new Date(Date.parse(raw.dispatchedAt) - ms);
+  await store.historyCollection.updateOne({ _id: item._id, urlKey: URLKEY }, { $set: { feedback, dispatchedAt } });
+  return store.historyCollection.findOne({ _id: item._id, urlKey: URLKEY });
+}
 
 const tick = (ms = 25) => new Promise(r => setTimeout(r, ms));
 
@@ -102,9 +122,7 @@ describe('LIN-1480 — :id watch seam lineage merge is forward-only', () => {
     // reply box / autopilot's "follow up only after a flawless session" both
     // dispatch the follow-up long after the predecessor finished).
     const TEN_MIN = 10 * 60 * 1000;
-    const aRaw = await store.historyCollection.findOne({ _id: a._id, urlKey: URLKEY });
-    for (const f of aRaw.feedback) f.timestamp = new Date(Date.parse(f.timestamp) - TEN_MIN);
-    aRaw.dispatchedAt = new Date(Date.parse(aRaw.dispatchedAt) - TEN_MIN);
+    const aRaw = await backdateRun(store, a, TEN_MIN);
 
     await tick(); // ensure B is dispatched strictly AFTER A completed
 
@@ -139,9 +157,7 @@ describe('LIN-1480 — :id watch seam lineage merge is forward-only', () => {
     await store.addFeedback(a._id, URLKEY,
       { message: '[done] Task completed in 45s', rootItemId: a._id }, TOKEN);
     const TEN_MIN = 10 * 60 * 1000;
-    const aRaw = await store.historyCollection.findOne({ _id: a._id, urlKey: URLKEY });
-    for (const f of aRaw.feedback) f.timestamp = new Date(Date.parse(f.timestamp) - TEN_MIN);
-    aRaw.dispatchedAt = new Date(Date.parse(aRaw.dispatchedAt) - TEN_MIN);
+    const aRaw = await backdateRun(store, a, TEN_MIN);
 
     await tick();
 
@@ -260,9 +276,7 @@ describe('LIN-1480 — :id watch seam lineage merge is forward-only', () => {
     await store.addFeedback(a._id, URLKEY,
       { message: '[done] Task completed', rootItemId: a._id }, TOKEN);
     const TEN_MIN = 10 * 60 * 1000;
-    const aRaw = await store.historyCollection.findOne({ _id: a._id, urlKey: URLKEY });
-    for (const f of aRaw.feedback) f.timestamp = new Date(Date.parse(f.timestamp) - TEN_MIN);
-    aRaw.dispatchedAt = new Date(Date.parse(aRaw.dispatchedAt) - TEN_MIN);
+    const aRaw = await backdateRun(store, a, TEN_MIN);
 
     await tick();
 
@@ -293,9 +307,7 @@ describe('LIN-1480 — :id watch seam lineage merge is forward-only', () => {
     await store.addFeedback(a._id, URLKEY,
       { message: '[done] Task completed in 45s', rootItemId: a._id }, TOKEN);
     const TEN_MIN = 10 * 60 * 1000;
-    const aRaw = await store.historyCollection.findOne({ _id: a._id, urlKey: URLKEY });
-    for (const f of aRaw.feedback) f.timestamp = new Date(Date.parse(f.timestamp) - TEN_MIN);
-    aRaw.dispatchedAt = new Date(Date.parse(aRaw.dispatchedAt) - TEN_MIN);
+    const aRaw = await backdateRun(store, a, TEN_MIN);
 
     await tick();
 

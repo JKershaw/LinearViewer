@@ -16,49 +16,50 @@
  *   - a limited read with `{prompt:0}` still carries `feedback[]` (the endpoint
  *     derives status/completedAt/count from it — it must NOT be over-projected out).
  */
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir, recordingCollection } from '../fixtures/mango-tmpdir.js';
 
-// Wrap a history collection so we can assert which cursor modifiers (sort/skip/
-// limit) and countDocuments reached the query — the proof the limit is a real
-// query bound, not a JS slice over an already-fully-read set.
-function spyingHistory() {
-  const mock = createMockCollection();
-  const calls = { sort: [], skip: [], limit: [], counts: 0 };
-  const collection = {
-    ...mock,
-    find(query, opts) {
-      const cursor = mock.find(query, opts);
-      const wrapped = {
-        sort(spec) { calls.sort.push(spec); cursor.sort(spec); return wrapped; },
-        skip(n) { calls.skip.push(n); cursor.skip(n); return wrapped; },
-        limit(n) { calls.limit.push(n); cursor.limit(n); return wrapped; },
-        toArray() { return cursor.toArray(); }
-      };
-      return wrapped;
-    },
-    async countDocuments(query) { calls.counts++; return mock.countDocuments(query); }
+const harness = createMangoTmpdir('lin-3526-bounded-history-');
+before(() => harness.connect());
+after(() => harness.close());
+
+// Wrap a REAL history collection so we can assert which cursor modifiers (sort/
+// skip/limit) and countDocuments reached the query — the proof the limit is a
+// real query bound, not a JS slice over an already-fully-read set. The real
+// engine does the sorting, skipping, limiting and counting.
+function spyingHistory(db) {
+  const real = db.collection('dispatch-history');
+  const collection = recordingCollection(real);
+  const record = collection.__record;
+  // Same shape the assertions below read, folded over every history find().
+  const calls = {
+    get sort() { return record.cursors.flatMap(c => c.sorts); },
+    get skip() { return record.cursors.flatMap(c => c.skips); },
+    get limit() { return record.cursors.flatMap(c => c.limits); },
+    get counts() { return record.countDocuments.length; }
   };
-  return { collection, calls, docs: mock._docs };
+  return { collection, calls, real };
 }
 
 function makeStore() {
-  const history = spyingHistory();
+  const db = harness.freshDb();
+  const history = spyingHistory(db);
   const store = new DispatchQueueStore({
-    collection: createMockCollection(),
+    collection: db.collection('dispatch-queue'),
     historyCollection: history.collection
   });
-  return { store, calls: history.calls, docs: history.docs };
+  return { store, calls: history.calls, history: history.real };
 }
 
 // Seed `n` resolved history rows for `acme`, oldest → newest by resolvedAt, each
 // carrying a prompt and a feedback transcript so over-fetch/projection is visible.
-function seed(docs, urlKey, n) {
+async function seed(history, urlKey, n) {
+  const rows = [];
   for (let i = 0; i < n; i++) {
     const resolvedAt = new Date(Date.UTC(2026, 5, i + 1)); // Jun 1, Jun 2, ...
-    docs.push({
+    rows.push({
       _id: `d${i}`,
       urlKey,
       issueIdentifier: `LIN-${i}`,
@@ -69,11 +70,12 @@ function seed(docs, urlKey, n) {
       resolvedAt
     });
   }
+  await history.insertMany(rows);
 }
 
 test('a limited read pushes sort+skip+limit into the query (not a JS post-slice)', async () => {
-  const { store, calls, docs } = makeStore();
-  seed(docs, 'acme', 5);
+  const { store, calls, history } = makeStore();
+  await seed(history, 'acme', 5);
 
   const result = await store.listHistory('acme', { limit: 2 });
 
@@ -91,8 +93,8 @@ test('a limited read pushes sort+skip+limit into the query (not a JS post-slice)
 });
 
 test('a limited read with an offset paginates via skip+limit', async () => {
-  const { store, calls, docs } = makeStore();
-  seed(docs, 'acme', 5);
+  const { store, calls, history } = makeStore();
+  await seed(history, 'acme', 5);
 
   const result = await store.listHistory('acme', { limit: 2, offset: 2 });
 
@@ -104,8 +106,8 @@ test('a limited read with an offset paginates via skip+limit', async () => {
 });
 
 test('the unlimited path is unchanged: whole set, JS-sorted, no limit pushed', async () => {
-  const { store, calls, docs } = makeStore();
-  seed(docs, 'acme', 4);
+  const { store, calls, history } = makeStore();
+  await seed(history, 'acme', 4);
 
   const result = await store.listHistory('acme');
 
@@ -120,8 +122,8 @@ test('the unlimited path is unchanged: whole set, JS-sorted, no limit pushed', a
 test('a limited read with {prompt:0} still carries feedback[] (derivation payload)', async () => {
   // Mirrors the /api/proxy/dispatch call: prompt excluded (never returned), but
   // feedback is what status/completedAt/count are derived from — it must survive.
-  const { store, docs } = makeStore();
-  seed(docs, 'acme', 3);
+  const { store, history } = makeStore();
+  await seed(history, 'acme', 3);
 
   const result = await store.listHistory('acme', { limit: 3, projection: { prompt: 0 } });
 

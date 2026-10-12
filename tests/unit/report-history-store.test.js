@@ -3,48 +3,21 @@
  *
  * Run with: node --test tests/unit/report-history-store.test.js
  *
- * Exercises the real ReportHistoryStore against an in-memory mock of the
- * MongoDB/MangoDB collection surface, so the production save/list/cap logic
- * (not a simplified stand-in) is what's under test.
+ * Exercises the real ReportHistoryStore against a real MangoDB collection
+ * (tests/fixtures/mango-tmpdir.js), so the production save/list/cap logic is
+ * what's under test, not a simplified stand-in.
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { ReportHistoryStore } from '../../lib/report-history-store.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
-// Minimal in-memory mock of the collection surface the store uses.
-function createMockCollection() {
-  const docs = [];
-  function matches(doc, query) {
-    if (query._id !== undefined && doc._id !== query._id) return false;
-    if (query.urlKey !== undefined && doc.urlKey !== query.urlKey) return false;
-    return true;
-  }
-  return {
-    _docs: docs,
-    async insertOne(doc) {
-      docs.push(doc);
-      return { insertedId: doc._id };
-    },
-    async findOne(query) {
-      return docs.find(d => matches(d, query)) || null;
-    },
-    find(query = {}) {
-      const results = docs.filter(d => matches(d, query));
-      return { async toArray() { return results.slice(); } };
-    },
-    async deleteOne(query) {
-      const idx = docs.findIndex(d => matches(d, query));
-      if (idx >= 0) { docs.splice(idx, 1); return { deletedCount: 1 }; }
-      return { deletedCount: 0 };
-    },
-    async deleteMany(query) {
-      let count = 0;
-      for (let i = docs.length - 1; i >= 0; i--) {
-        if (matches(docs[i], query)) { docs.splice(i, 1); count++; }
-      }
-      return { deletedCount: count };
-    }
-  };
+const harness = createMangoTmpdir('lin-3526-report-history-');
+before(() => harness.connect());
+after(() => harness.close());
+
+function createCollection() {
+  return harness.freshDb().collection('report-history');
 }
 
 function sampleNarrative(tag = '') {
@@ -59,7 +32,7 @@ function sampleNarrative(tag = '') {
 
 describe('ReportHistoryStore.save', () => {
   let store;
-  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createCollection() }); });
 
   test('save returns the stored record (ISO timestamp, defaults applied)', async () => {
     const saved = await store.save('ws-1', {
@@ -108,11 +81,11 @@ describe('ReportHistoryStore.save', () => {
 
 describe('ReportHistoryStore.list', () => {
   let store;
-  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createCollection() }); });
 
   test('returns newest-first', async () => {
     const a = await store.save('ws-1', { model: 'm', narrative: sampleNarrative('a') });
-    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: a.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     const b = await store.save('ws-1', { model: 'm', narrative: sampleNarrative('b') });
 
     const { items, total } = await store.list('ws-1');
@@ -146,7 +119,7 @@ describe('ReportHistoryStore.list', () => {
 
 describe('ReportHistoryStore.get', () => {
   let store;
-  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createCollection() }); });
 
   test('returns the full record (narrative + orientation)', async () => {
     const saved = await store.save('ws-1', {
@@ -171,14 +144,14 @@ describe('ReportHistoryStore.get', () => {
 
 describe('ReportHistoryStore.getLatest', () => {
   let store;
-  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createCollection() }); });
 
   test('returns the newest full record (with orientation bearings)', async () => {
     const a = await store.save('ws-1', {
       model: 'm', northStar: 'old', narrative: sampleNarrative('a'),
       orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: a.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     const b = await store.save('ws-1', {
       model: 'm', northStar: 'new', narrative: sampleNarrative('b'),
       orientation: [{ identifier: 'LIN-2', bearing: 'N', reason: 'r', archived: false }]
@@ -203,14 +176,14 @@ describe('ReportHistoryStore.getLatest', () => {
 
 describe('ReportHistoryStore.getLatestWithOrientation', () => {
   let store;
-  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createCollection() }); });
 
   test('falls back to an older report when the newest has no bearings (LIN-1228)', async () => {
     const a = await store.save('ws-1', {
       model: 'm', northStar: 'old', narrative: sampleNarrative('a'),
       orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: a.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     // Newer report, but a degraded run (no north star / free tier / parse
     // failure) that saved no bearings — getLatest() would return this one.
     await store.save('ws-1', {
@@ -227,7 +200,7 @@ describe('ReportHistoryStore.getLatestWithOrientation', () => {
       model: 'm', northStar: 'old', narrative: sampleNarrative('a'),
       orientation: [{ identifier: 'LIN-1', bearing: 'S', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: a.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     const b = await store.save('ws-1', {
       model: 'm', northStar: 'new', narrative: sampleNarrative('b'),
       orientation: [{ identifier: 'LIN-2', bearing: 'N', reason: 'r', archived: false }]
@@ -258,7 +231,7 @@ describe('ReportHistoryStore.getLatestWithOrientation', () => {
 
 describe('ReportHistoryStore capacity cap', () => {
   test('prunes to the newest N when the cap is exceeded', async () => {
-    const store = new ReportHistoryStore({ collection: createMockCollection(), maxReports: 3 });
+    const store = new ReportHistoryStore({ collection: createCollection(), maxReports: 3 });
     const ids = [];
     for (let i = 0; i < 5; i++) {
       const r = await store.save('ws-1', { model: 'm', narrative: sampleNarrative(String(i)) });
@@ -278,7 +251,7 @@ describe('ReportHistoryStore capacity cap', () => {
 
 describe('ReportHistoryStore.clear', () => {
   test('removes all docs for a workspace only', async () => {
-    const store = new ReportHistoryStore({ collection: createMockCollection() });
+    const store = new ReportHistoryStore({ collection: createCollection() });
     await store.save('ws-1', { model: 'm', narrative: sampleNarrative() });
     await store.save('ws-2', { model: 'm', narrative: sampleNarrative() });
     await store.clear('ws-1');
@@ -289,19 +262,19 @@ describe('ReportHistoryStore.clear', () => {
 
 describe('ReportHistoryStore.listFull', () => {
   let store;
-  beforeEach(() => { store = new ReportHistoryStore({ collection: createMockCollection() }); });
+  beforeEach(() => { store = new ReportHistoryStore({ collection: createCollection() }); });
 
   test('returns newest-first order', async () => {
     const a = await store.save('ws-1', {
       model: 'm', northStar: 'first', narrative: sampleNarrative('a'),
       orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 20000);
+    await store.collection.updateOne({ _id: a.id }, { $set: { generatedAt: new Date(Date.now() - 20000) } });
     const b = await store.save('ws-1', {
       model: 'm', northStar: 'second', narrative: sampleNarrative('b'),
       orientation: [{ identifier: 'LIN-2', bearing: 'S', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === b.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: b.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     const c = await store.save('ws-1', {
       model: 'm', northStar: 'third', narrative: sampleNarrative('c'),
       orientation: [{ identifier: 'LIN-3', bearing: 'E', reason: 'r', archived: false }]
@@ -319,7 +292,7 @@ describe('ReportHistoryStore.listFull', () => {
       model: 'm', northStar: 'old', narrative: sampleNarrative('old'),
       orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === older.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: older.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     // Newest run — but saved with no bearings (degraded: no north star / free tier / stream failure)
     const newest = await store.save('ws-1', {
       model: 'm', northStar: 'new', narrative: sampleNarrative('new'), orientation: []
@@ -366,7 +339,7 @@ describe('ReportHistoryStore.listFull', () => {
       model: 'm', northStar: 'ws1', narrative: sampleNarrative('ws1'),
       orientation: [{ identifier: 'LIN-1', bearing: 'N', reason: 'r', archived: false }]
     });
-    store.collection._docs.find(d => d._id === a.id).generatedAt = new Date(Date.now() - 10000);
+    await store.collection.updateOne({ _id: a.id }, { $set: { generatedAt: new Date(Date.now() - 10000) } });
     const b = await store.save('ws-1', {
       model: 'm', northStar: 'ws1b', narrative: sampleNarrative('ws1b'),
       orientation: [{ identifier: 'LIN-2', bearing: 'S', reason: 'r', archived: false }]
