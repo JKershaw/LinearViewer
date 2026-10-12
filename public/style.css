@@ -85,7 +85,6 @@
   --z-base: 1;
   --z-sticky: 100;
   --z-overlay: 1000;
-  --z-modal: 2000;
 
   /* Sticky shared-header clearance (LIN-984). The reserved height used as the
      `scroll-margin-top` for interactive controls so scroll-into-view settles
