@@ -582,7 +582,18 @@
       main.setAttribute('data-live', state.live ? 'true' : 'false');
       tickClocks(main);
       if (lastPolled === 'running' && state.status === 'idle' && closeOutBox && window.CloseOut && typeof window.CloseOut.runCheck === 'function') {
-        window.CloseOut.runCheck(closeOutBox, doc);
+        // The check may move the box off `ready` without Done (so no reload):
+        // then the ready header just painted is stale, and the polled one is
+        // repainted unless a newer poll has already applied.
+        var polled = state;
+        Promise.resolve(window.CloseOut.runCheck(closeOutBox, doc)).then(function () {
+          if (lastPolled !== polled.status) return;
+          syncMergeReady();
+          if (main.getAttribute('data-merge-ready') !== 'true' && answer && typeof polled.headerHtml === 'string') {
+            repaintHeader(answer, polled.headerHtml);
+            main.setAttribute('data-status', polled.status);
+          }
+        });
       }
       lastPolled = state.status;
     }

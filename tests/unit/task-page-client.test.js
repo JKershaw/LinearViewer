@@ -483,6 +483,26 @@ describe('apply(): the header after a session ends on a merge-ready page (LIN-34
     assert.equal(page.answer.innerHTML, IDLE_HTML);
     assert.equal(page.attrs['data-status'], 'idle');
   });
+
+  test('(f) the session-end check moves the box to merged without Done: the polled header is repainted, not "ready"', async () => {
+    // Check 1 is the load-time one (ready); check 2 is the edge one (merged, no doneNow, so no reload).
+    const page = makePage({ realCloseOut: true, loadStatus: 'waiting', polls: [poll('running', RUNNING), poll('idle', IDLE_HTML)],
+      checkResult: (n) => (n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: false }) });
+    await page.pollOnce();
+    await page.pollOnce();
+    await flush();
+    assert.equal(page.answer.innerHTML, IDLE_HTML);
+    assert.equal(page.attrs['data-merge-ready'], 'false');
+    assert.equal(page.attrs['data-status'], 'idle');
+    assert.equal(page.reloads.length, 0);
+  });
+
+  test('(g) a ready load seeds the edge as not-running: the first idle poll fires no check', async () => {
+    const page = makePage({ loadStatus: 'waiting', polls: [poll('idle', IDLE_HTML)] });
+    await page.pollOnce();
+    assert.equal(page.runCheckSpy.length, 0);
+    assert.equal(page.answer.innerHTML, READY);
+  });
 });
 
 // LIN-3340 G1/F2 (review `388f4246`): the owner's brief/recap widgets must be

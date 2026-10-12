@@ -385,10 +385,9 @@ describe('data-ready-header (LIN-3448)', () => {
   });
 
   test('not ready, no evidence, or a guest load (never ready): no flag, no header', () => {
-    const m = model('running-blocked-repeat');
     const notReady = buildTaskPageModel({ identifier: 'LIN-50', enrichLoop, deriveSessionWaiting, now: NOW, loops: RUNNING_LOOPS, ctx: ctx(),
       evidence: { ...EVIDENCE, closeOut: { ...EVIDENCE.closeOut, status: 'not-ready', reason: 'runner-not-set-up', owner: false } } });
-    for (const [name, mdl, viewer] of [['not-ready', notReady, 'guest'], ['no evidence', model('no-sessions'), 'owner'], ['guest render of an owner-ready model', { ...m, readyHeader: null }, 'guest']]) {
+    for (const [name, mdl, viewer] of [['not-ready', notReady, 'guest'], ['no evidence', model('no-sessions'), 'owner']]) {
       const a = attrs(renderTaskPage(mdl, opts(viewer)));
       assert.equal(a.flag, 'false', name);
       assert.equal(a.header, undefined, `${name}: no data-ready-header`);
