@@ -196,17 +196,17 @@ describe('createPoller', () => {
   });
 });
 
-// LIN-3340: the poll must not wipe the load-time ready header, and a guest's
+// LIN-3340: the poll must not leave a stale header on a merge-ready page, and a guest's
 // client-side markdown must survive an unchanged brief.
 describe('poll safety (LIN-3340)', () => {
-  const { shouldKeepReady, contextNeedsRepaint } = load();
+  const { paintsReadyHeader, contextNeedsRepaint } = load();
 
-  test('the ready-to-merge header is kept only across an idle poll', () => {
-    assert.equal(shouldKeepReady('true', 'idle'), true);
-    assert.equal(shouldKeepReady('true', 'running'), false, 'a started close-out overrides');
-    assert.equal(shouldKeepReady('true', 'waiting'), false);
-    assert.equal(shouldKeepReady('false', 'idle'), false);
-    assert.equal(shouldKeepReady(null, 'idle'), false);
+  test('the ready-to-merge header is painted only across an idle poll', () => {
+    assert.equal(paintsReadyHeader('true', 'idle'), true);
+    assert.equal(paintsReadyHeader('true', 'running'), false, 'a started close-out overrides');
+    assert.equal(paintsReadyHeader('true', 'waiting'), false);
+    assert.equal(paintsReadyHeader('false', 'idle'), false);
+    assert.equal(paintsReadyHeader(null, 'idle'), false);
   });
 
   test('the context mount repaints only on a changed signature, and never once widgets mount', () => {
@@ -331,6 +331,177 @@ describe('init() wires the 404 gate (LIN-3447)', () => {
     assert.deepEqual(fetched, [OWNER]);
     assert.equal(main.innerHTML, '<p>the task</p>');
     assert.equal(timers.length, 1, 'the poll loop backs off and carries on');
+  });
+});
+
+// LIN-3448: drive the shipped apply() from a page that did not load on the
+// ready header, through init() and its own poller (the LIN-3447 harness shape).
+describe('apply(): the header after a session ends on a merge-ready page (LIN-3448)', () => {
+  const STATE_URL = '/workspace/acme/api/task/LIN-50/state?issueId=abc';
+  const CHECK_URL = '/workspace/acme/api/run-evidence/LIN-50/check';
+  const statusHtml = (status, sentence) => `<div class="task-status" data-testid="task-page-status" data-status="${status}"><p>${sentence}</p></div>`;
+  const READY = statusHtml('waiting', 'Approved. PR #41 is ready to merge.');
+  const RUNNING = statusHtml('running', 'Close-out running since 17:54.');
+  const poll = (status, headerHtml) => ({ status, live: status === 'running', headerHtml });
+  const IDLE_HTML = statusHtml('idle', 'No session running.');
+
+  /**
+   * One page: `<main>` (+ its answer mount and, unless `box: false`, the
+   * close-out box), the real task-page.js, and `window.api` serving the queued
+   * poll states for the state URL. `realCloseOut` loads public/close-out.js into
+   * the same context (case d); otherwise `window.CloseOut` is a stub whose
+   * `runCheck` is a spy.
+   */
+  function makePage({ mergeReady = 'true', readyHeader = READY, loadStatus = 'running', boxState = 'ready', box = true, polls = [], realCloseOut = false, checkResult = null } = {}) {
+    const timers = [];
+    let onReady = null;
+    const attrs = { 'data-state-url': STATE_URL, 'data-status': loadStatus, 'data-live': String(loadStatus === 'running'), 'data-merge-ready': mergeReady };
+    if (readyHeader != null) attrs['data-ready-header'] = readyHeader;
+    const main = {
+      innerHTML: '',
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      setAttribute: (k, v) => { attrs[k] = v; },
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+    const answer = {
+      innerHTML: loadStatus === 'running' ? RUNNING : statusHtml(loadStatus, 'x'),
+      querySelector(sel) {
+        if (sel !== '[data-testid="task-page-status"]') return null;
+        const m = /data-testid="task-page-status" data-status="([^"]*)"/.exec(this.innerHTML);
+        return m ? { getAttribute: () => m[1] } : null;
+      },
+    };
+    const boxAttrs = { 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': boxState };
+    const boxEl = {
+      getAttribute: (k) => (k in boxAttrs ? boxAttrs[k] : null),
+      setAttribute: (k, v) => { boxAttrs[k] = v; },
+      querySelector: () => null,
+      firstChild: null, removeChild() {}, appendChild() {},
+    };
+    const doc = {
+      hidden: false,
+      querySelector: (sel) => {
+        if (sel === '[data-testid="task-page"][data-state-url]' || sel === '[data-testid="task-page"]') return main;
+        if (sel === '[data-testid="task-page-answer"]') return answer;
+        if (sel === '[data-testid="run-evidence-closeout"]') return box ? boxEl : null;
+        return null;
+      },
+      querySelectorAll: () => [],
+      addEventListener: (type, fn) => { if (type === 'DOMContentLoaded') onReady = fn; },
+    };
+    const queue = [...polls];
+    const checkCalls = [];
+    const reloads = [];
+    const window = {
+      addEventListener() {},
+      location: { reload: () => reloads.push(1) },
+      api: async (url, opts) => {
+        if (url === STATE_URL) return queue.shift();
+        if (url === CHECK_URL) {
+          checkCalls.push(url);
+          return typeof checkResult === 'function' ? checkResult(checkCalls.length, attrs) : { state: { status: boxState } };
+        }
+        throw new Error('unexpected url ' + url);
+      },
+    };
+    const runCheckSpy = [];
+    if (!realCloseOut) {
+      window.CloseOut = { init: () => (box ? boxEl : null), runCheck: (b, d) => { runCheckSpy.push({ box: b, doc: d }); return Promise.resolve(null); } };
+    }
+    const ctx = {
+      module: { exports: {} }, window, Set, Math, Promise, Date, String, isNaN, Array, URLSearchParams, encodeURIComponent, JSON,
+      document: { createElement: () => ({ setAttribute() {}, textContent: '' }) },
+      setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+      clearTimeout: () => {},
+      setInterval: () => 0,
+    };
+    ctx.document.addEventListener = () => {};
+    if (realCloseOut) vm.runInNewContext(readFileSync(join(__dirname, '../../public/close-out.js'), 'utf8'), ctx);
+    vm.runInNewContext(SRC, Object.assign(ctx, { document: Object.assign(doc, { createElement: ctx.document.createElement }) }));
+    onReady();
+    return {
+      attrs, answer, boxAttrs, runCheckSpy, checkCalls, reloads,
+      async pollOnce() { timers.shift().fn(); await flush(); await flush(); },
+    };
+  }
+
+  test('(a) load running + merge-ready, poll idle: the ready sentence, not the running one; one check', async () => {
+    const page = makePage({ polls: [poll('idle', IDLE_HTML)] });
+    await page.pollOnce();
+    assert.equal(page.answer.innerHTML, READY);
+    assert.doesNotMatch(page.answer.innerHTML, /running/);
+    assert.equal(page.attrs['data-status'], 'waiting');
+    assert.equal(page.runCheckSpy.length, 1, 'the running -> idle edge runs one check');
+  });
+
+  test('(b) load ready, poll running then idle: ready again, one check; a second idle adds none', async () => {
+    const page = makePage({ loadStatus: 'waiting', polls: [poll('running', RUNNING), poll('idle', IDLE_HTML), poll('idle', IDLE_HTML)] });
+    await page.pollOnce();
+    assert.equal(page.answer.innerHTML, RUNNING, 'running paints the polled sentence');
+    assert.equal(page.runCheckSpy.length, 0, 'no check while running');
+    await page.pollOnce();
+    assert.equal(page.answer.innerHTML, READY);
+    assert.equal(page.attrs['data-status'], 'waiting');
+    assert.equal(page.runCheckSpy.length, 1);
+    await page.pollOnce();
+    assert.equal(page.answer.innerHTML, READY);
+    assert.equal(page.runCheckSpy.length, 1, 'never per poll');
+  });
+
+  test('(c) control: merge-ready false repaints the polled header; a page with no box makes no check', async () => {
+    const page = makePage({ mergeReady: 'false', readyHeader: null, polls: [poll('idle', IDLE_HTML)] });
+    await page.pollOnce();
+    assert.equal(page.answer.innerHTML, IDLE_HTML);
+    assert.equal(page.attrs['data-status'], 'idle');
+    const noBox = makePage({ mergeReady: 'false', readyHeader: null, box: false, polls: [poll('idle', IDLE_HTML)] });
+    await noBox.pollOnce();
+    assert.equal(noBox.runCheckSpy.length, 0, 'a guest page has no box, so no check');
+    assert.equal(noBox.answer.innerHTML, IDLE_HTML);
+  });
+
+  test('(d) the real close-out.js: running -> idle reloads once when the check wrote Done, never when the page is already done', async () => {
+    // Check 1 is the load-time one (no Done); check 2 is the edge-triggered one.
+    const page = makePage({ realCloseOut: true, polls: [poll('idle', IDLE_HTML)],
+      checkResult: (n) => (n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: true }) });
+    await page.pollOnce();
+    assert.equal(page.checkCalls.length, 2, 'one load check + one session-end check');
+    assert.equal(page.reloads.length, 1, 'doneNow reloads through the existing path');
+
+    const already = makePage({ realCloseOut: true, polls: [poll('idle', IDLE_HTML)],
+      checkResult: (n, attrs) => { if (n > 1) attrs['data-status'] = 'done'; return n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: true }; } });
+    await already.pollOnce();
+    assert.equal(already.checkCalls.length, 2);
+    assert.equal(already.reloads.length, 0, 'pageAlreadyDone guard holds');
+  });
+
+  test('(e) ordering: a box moved off ready (merged, not Done) means the idle poll paints the polled header, not ready', async () => {
+    const page = makePage({ polls: [poll('idle', IDLE_HTML)] });
+    page.boxAttrs['data-state'] = 'merged'; // a /check moved it between polls
+    await page.pollOnce();
+    assert.equal(page.attrs['data-merge-ready'], 'false');
+    assert.equal(page.answer.innerHTML, IDLE_HTML);
+    assert.equal(page.attrs['data-status'], 'idle');
+  });
+
+  test('(f) the session-end check moves the box to merged without Done: the polled header is repainted, not "ready"', async () => {
+    // Check 1 is the load-time one (ready); check 2 is the edge one (merged, no doneNow, so no reload).
+    const page = makePage({ realCloseOut: true, loadStatus: 'waiting', polls: [poll('running', RUNNING), poll('idle', IDLE_HTML)],
+      checkResult: (n) => (n === 1 ? { state: { status: 'ready' } } : { state: { status: 'merged' }, doneNow: false }) });
+    await page.pollOnce();
+    await page.pollOnce();
+    await flush();
+    assert.equal(page.answer.innerHTML, IDLE_HTML);
+    assert.equal(page.attrs['data-merge-ready'], 'false');
+    assert.equal(page.attrs['data-status'], 'idle');
+    assert.equal(page.reloads.length, 0);
+  });
+
+  test('(g) a ready load seeds the edge as not-running: the first idle poll fires no check', async () => {
+    const page = makePage({ loadStatus: 'waiting', polls: [poll('idle', IDLE_HTML)] });
+    await page.pollOnce();
+    assert.equal(page.runCheckSpy.length, 0);
+    assert.equal(page.answer.innerHTML, READY);
   });
 });
 
