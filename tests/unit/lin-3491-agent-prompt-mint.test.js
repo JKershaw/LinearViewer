@@ -11,14 +11,18 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const mango = createMangoTmpdir('lin-3528-3491-agent-prompt-');
+before(() => mango.connect());
+after(() => mango.close());
 import { renderProxyPage } from '../../lib/render-proxy.js';
 
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
@@ -27,7 +31,7 @@ const HOURS_48 = 48 * 3600;
 const OWNER = async () => ({ status: 'owner' });
 
 function harness({ ownerCheck = OWNER } = {}) {
-  const collection = createMockCollection();
+  const collection = mango.freshDb().collection('proxy-tokens');
   const proxyTokenStore = new ProxyTokenStore({ collection });
   if (ownerCheck !== null) proxyTokenStore.setOwnerCheck(ownerCheck);
   return { collection, proxyTokenStore };
@@ -109,10 +113,10 @@ describe('LIN-3491 — purpose:agent mints the owner-checked "read-write + dispa
     const ttl = (new Date(res.body.expiresAt).getTime() - before) / 1000;
     assert.ok(ttl > HOURS_48 - 5 && ttl <= HOURS_48 + 5, `worker bootstrap TTL is 48h, got ${ttl}s`);
 
-    assert.equal(collection._docs.length, 1);
-    assert.equal(collection._docs[0].label, 'agent-prompt-dispatch');
-    assert.equal(collection._docs[0].createdBy, 'account-A');
-    assert.deepEqual(collection._docs[0].grants, ['dispatch']);
+    assert.equal((await collection.find({}).toArray()).length, 1);
+    assert.equal((await collection.find({}).toArray())[0].label, 'agent-prompt-dispatch');
+    assert.equal((await collection.find({}).toArray())[0].createdBy, 'account-A');
+    assert.deepEqual((await collection.find({}).toArray())[0].grants, ['dispatch']);
   });
 
   test('the driver purpose keeps its own label and "Driver bootstrap created." message', async () => {
@@ -175,7 +179,7 @@ describe('LIN-3491 — agent refusals use the agent subject and write nothing', 
       if (code === 'GRANT_OWNER_ONLY') {
         assert.equal(res.body.error, "Only this workspace's owner can mint an agent credential");
       }
-      assert.equal(collection._docs.length, 0);
+      assert.equal((await collection.find({}).toArray()).length, 0);
     });
   }
 
@@ -184,7 +188,7 @@ describe('LIN-3491 — agent refusals use the agent subject and write nothing', 
     const res = await mint(buildApp({ proxyTokenStore, session: session({ accountId: null }) }), { purpose: 'agent' });
     assert.equal(res.status, 503, JSON.stringify(res.body));
     assert.equal(res.body.code, 'GRANT_OWNERLESS');
-    assert.equal(collection._docs.length, 0);
+    assert.equal((await collection.find({}).toArray()).length, 0);
   });
 });
 
@@ -194,7 +198,7 @@ describe('LIN-3491 — validation on the agent purpose', () => {
     const res = await mint(buildApp({ proxyTokenStore, session: session() }), { purpose: 'agent', grants: ['dispatch'] });
     assert.equal(res.status, 400, JSON.stringify(res.body));
     assert.equal(res.body.code, 'GRANTS_NOT_CLIENT_SETTABLE');
-    assert.equal(collection._docs.length, 0);
+    assert.equal((await collection.find({}).toArray()).length, 0);
   });
 
   test('an unknown purpose → 400 INVALID_PURPOSE, nothing written', async () => {
@@ -202,7 +206,7 @@ describe('LIN-3491 — validation on the agent purpose', () => {
     const res = await mint(buildApp({ proxyTokenStore, session: session() }), { purpose: 'agent-dispatch' });
     assert.equal(res.status, 400);
     assert.equal(res.body.code, 'INVALID_PURPOSE');
-    assert.equal(collection._docs.length, 0);
+    assert.equal((await collection.find({}).toArray()).length, 0);
   });
 });
 

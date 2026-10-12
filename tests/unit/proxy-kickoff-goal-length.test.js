@@ -18,7 +18,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 // Same refusal as the sibling kickoff suites: never reach api.linear.app.
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
@@ -29,7 +29,11 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-kickoff-goal-length-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const KICKOFF = '/api/proxy/autopilot/kickoff';
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -106,8 +110,8 @@ async function call(app, method, path, body) {
 
 function makeStore() {
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: harness.freshDb().collection('dispatch-queue'),
+    historyCollection: harness.freshDb().collection('dispatch-history')
   });
 }
 

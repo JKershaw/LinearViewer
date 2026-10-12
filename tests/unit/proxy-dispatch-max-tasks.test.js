@@ -8,14 +8,14 @@
  * accepted, ignored, and never persisted.
  *
  * Scaffolded like proxy-kickoff-max-tasks.test.js (installHermeticLinearTransport
- * + a real DispatchQueueStore over createMockCollection + the `test-token`
+ * + a real DispatchQueueStore over a real MangoDB collection + the `test-token`
  * sentinel so the LIN-2886 repo guard's fail-open path is exercised rather
  * than a live Linear call), but targets POST /api/proxy/dispatch itself
  * rather than the kickoff verb.
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 // LIN-1880: see proxy-kickoff-max-tasks.test.js's identical note — never
 // restored for the life of this file, so the dispatch referent guard stays
@@ -25,7 +25,11 @@ installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-dispatch-max-tasks-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore, recordedEvents = null }) {
   const app = express();
@@ -74,17 +78,17 @@ async function call(app, method, path, body) {
 
 const DISPATCH = '/api/proxy/dispatch';
 
-// Wraps a mock collection's insertOne with a call counter, so a 400 test can
+// Wraps a real collection's insertOne with a call counter, so a 400 test can
 // assert addItem never wrote anything (LIN-2975's pre-write-guard placement).
 function makeSpiedStore() {
-  const collection = createMockCollection();
+  const collection = harness.freshDb().collection('dispatch-queue');
   let insertCount = 0;
   const originalInsertOne = collection.insertOne.bind(collection);
   collection.insertOne = async (...args) => {
     insertCount++;
     return originalInsertOne(...args);
   };
-  const store = new DispatchQueueStore({ collection, historyCollection: createMockCollection() });
+  const store = new DispatchQueueStore({ collection, historyCollection: harness.freshDb().collection('dispatch-history') });
   return { store, getInsertCount: () => insertCount };
 }
 
@@ -176,8 +180,8 @@ describe('LIN-2975 — end-to-end: a custom run declares a pool through the prox
 // relayDispatchRefusal -> logEvent). The 409 body's `bound` is pinned
 // there, so the note's own `bound` interpolation was only pinned indirectly.
 function makeBudgetReadFailureStore() {
-  const collection = createMockCollection();
-  const historyCollection = createMockCollection();
+  const collection = harness.freshDb().collection('dispatch-queue');
+  const historyCollection = harness.freshDb().collection('dispatch-history');
   const originalFind = collection.find.bind(collection);
   // Target ONLY countDistinctTasksForSession's own query shape (dispatch-store.js:
   // `issueIdentifier: { $ne: null }`) — never findRecentFreshDispatch's (the

@@ -13,7 +13,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 // LIN-1880: this file opened a live TLS connection to api.linear.app on every
 // run. Never restored — the refusal stands for the whole file, which also
@@ -23,7 +23,11 @@ installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-kickoff-max-tasks-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore }) {
   const app = express();
@@ -78,8 +82,8 @@ const DISPATCH = '/api/proxy/dispatch';
 
 function makeStore() {
   return new DispatchQueueStore({
-    collection: createMockCollection(),
-    historyCollection: createMockCollection()
+    collection: harness.freshDb().collection('dispatch-queue'),
+    historyCollection: harness.freshDb().collection('dispatch-history')
   });
 }
 

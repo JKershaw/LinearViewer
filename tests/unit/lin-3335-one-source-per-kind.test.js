@@ -19,7 +19,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { registerProvider } from '../../lib/providers/registry.js';
@@ -29,7 +29,11 @@ import { buildWakeFollowUp } from '../../lib/dispatch-wake.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-3335-one-source-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const FUTURE = Date.now() + 3_600_000;
 const LINEAR_TOKEN = 'lin-active-token';
@@ -131,7 +135,7 @@ function buildSessionApp(workspace, store) {
 }
 
 function freshStore() {
-  return new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  return new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
 }
 
 async function withServer(app, fn) {
@@ -169,7 +173,7 @@ describe('LIN-3335 — a Jira task on a Linear-primary workspace', () => {
     }));
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.deepEqual(calls.linearGuard, [], 'the referent guard must not probe the active Linear binding');
-    const doc = store.collection._docs[0];
+    const doc = (await store.collection.find({}).toArray())[0];
     assert.equal(doc.issueSource, 'jira', 'the kind-only source is stamped on the row');
     assert.ok(!('issueBindingScope' in doc), 'the pair-era scope is gone');
   });
@@ -186,7 +190,7 @@ describe('LIN-3335 — a Jira task on a Linear-primary workspace', () => {
     assert.equal(res.status, 422, JSON.stringify(res.body));
     assert.equal(res.body.code, 'ISSUE_NOT_FOUND');
     assert.equal(calls.linearGuard.length, 1, 'the unstamped dispatch probes the active Linear binding');
-    assert.equal(store.collection._docs.length, 0, 'a refused dispatch enqueues nothing');
+    assert.equal((await store.collection.find({}).toArray()).length, 0, 'a refused dispatch enqueues nothing');
   });
 
   test('its wake descriptor carries the kind-only source (no pair)', () => {

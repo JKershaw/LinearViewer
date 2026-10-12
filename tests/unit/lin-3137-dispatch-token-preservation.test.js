@@ -13,7 +13,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +21,11 @@ import { dirname, join } from 'node:path';
 import express from 'express';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-3137-token-preservation-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO = join(__dirname, '../..');
@@ -69,7 +73,7 @@ describe('LIN-3137 — legacy tokens keep authenticating after the mint gate', (
     ['createdBy a NON-owner account', 'account-someone-else']
   ]) {
     test(`${desc} still polls 200 while the same app refuses a non-owner mint`, async () => {
-      const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+      const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
       const { token } = await dispatchTokenStore.createToken('acme', 'legacy', createdBy);
       const app = buildApp({ dispatchTokenStore });
 
@@ -88,7 +92,7 @@ describe('LIN-3137 — legacy tokens keep authenticating after the mint gate', (
 
 describe('LIN-3137 — GET list is unchanged for a non-owner; DELETE revoke is owner-only (LIN-3398)', () => {
   test('a non-owner session can list but not revoke (LIN-3398 reverses "a mint gate, not revocation")', async () => {
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { tokenId } = await dispatchTokenStore.createToken('acme', 'existing', 'account-someone-else');
     const app = buildApp({ dispatchTokenStore });
 
@@ -106,7 +110,7 @@ describe('LIN-3137 — GET list is unchanged for a non-owner; DELETE revoke is o
   });
 
   test('the owner can still revoke', async () => {
-    const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+    const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
     const { tokenId } = await dispatchTokenStore.createToken('acme', 'existing', 'account-A');
     const app = buildApp({ dispatchTokenStore, workspaceOwnerCheck: async () => ({ status: 'owner' }) });
     const del = await call(app, 'DELETE', `${TOKENS_PATH}/${tokenId}`);

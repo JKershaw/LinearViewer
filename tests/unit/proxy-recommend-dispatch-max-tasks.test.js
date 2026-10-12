@@ -10,21 +10,25 @@
  * /dispatch handler already exposed it on.
  *
  * Scaffolded like proxy-dispatch-max-tasks.test.js (a REAL DispatchQueueStore
- * over createMockCollection, so the dispatch-factory budget guard actually
+ * over a real MangoDB collection, so the dispatch-factory budget guard actually
  * runs) plus proxy-recommend-dispatch-subscribe.test.js's `kind` (override) /
  * no-`kind` (recommendation-derived, TEST-14 test-token descent, no live
  * OpenRouter call) split for exercising BOTH 201 arms.
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-recommend-max-tasks-');
+before(() => harness.connect());
+after(() => harness.close());
 
 function buildApp({ dispatchQueueStore, recordedEvents = null }) {
   const app = express();
@@ -53,7 +57,7 @@ function buildApp({ dispatchQueueStore, recordedEvents = null }) {
 }
 
 function makeStore() {
-  return new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  return new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
 }
 
 async function call(app, method, path, body) {

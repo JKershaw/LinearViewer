@@ -7,20 +7,24 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { validateDispatchPayload } from '../../lib/dispatch-validation.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ACME, buildApp, call } from './lib/proxy-fake-deps.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-3438-if-parked-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const TARGET = '11111111-1111-4111-8111-111111111111';
 const ERROR = 'ifParked is no longer supported: the parked-only abort was retired (LIN-3438)';
 
 function makeStore() {
-  return new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  return new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
 }
 
 function workspaceApp(store) {

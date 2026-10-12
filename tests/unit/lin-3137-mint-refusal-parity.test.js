@@ -14,21 +14,25 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-3137-mint-refusal-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const WORKSPACE = { urlKey: 'acme', id: 'ws-1', provider: 'linear' };
 const RUNNER_PATH = '/workspace/acme/api/proxy/tokens';
 const DISPATCH_PATH = '/workspace/acme/api/dispatch/tokens';
 
 function buildRunnerApp({ ownerCheck, session }) {
-  const proxyTokenStore = new ProxyTokenStore({ collection: createMockCollection() });
+  const proxyTokenStore = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
   if (ownerCheck) proxyTokenStore.setOwnerCheck(ownerCheck);
   const app = express();
   app.use(express.json());
@@ -51,7 +55,7 @@ function buildRunnerApp({ ownerCheck, session }) {
 }
 
 function buildDispatchApp({ ownerCheck, session }) {
-  const dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+  const dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
