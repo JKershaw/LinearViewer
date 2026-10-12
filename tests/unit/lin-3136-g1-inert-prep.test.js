@@ -14,7 +14,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { requireGrant, GRANT_REFUSAL_COPY } from '../../lib/require-grant.js';
@@ -23,7 +23,11 @@ import {
 } from '../../lib/proxy-preamble.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-g1-inert-prep-');
+before(() => harness.connect());
+after(() => harness.close());
 import { mintDispatchWriter, armDispatchWriterOnce } from './lib/dispatch-writer.js';
 
 const R3_DISPATCH_COPY =
@@ -148,7 +152,7 @@ async function grantBearingToken(store, workspaceId = 'ws-1') {
 
 describe('LIN-3136 Finding A — the caller token\'s workspaceId reaches the request', () => {
   test('validateToken returns the stored workspaceId of a grant-bearing working token', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     const working = await grantBearingToken(store, 'ws-1');
     const validated = await store.validateToken(working.token);
     assert.equal(validated.workspaceId, 'ws-1');
@@ -156,7 +160,7 @@ describe('LIN-3136 Finding A — the caller token\'s workspaceId reaches the req
   });
 
   test('validateToken returns workspaceId null for a token stored without one', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     const { token } = await store.createToken('acme', { scope: 'readWrite', createdBy: 'account-A' });
     const validated = await store.validateToken(token);
     assert.ok(Object.prototype.hasOwnProperty.call(validated, 'workspaceId'));
@@ -164,7 +168,7 @@ describe('LIN-3136 Finding A — the caller token\'s workspaceId reaches the req
   });
 
   test('authenticateProxyToken stamps req.proxyWorkspaceId from the token, never from the request', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     const working = await grantBearingToken(store, 'ws-1');
     const { app, captured } = buildStampApp(store);
     const status = await probeInstructions(app, working.token, '?workspaceId=ws-from-query');
@@ -173,7 +177,7 @@ describe('LIN-3136 Finding A — the caller token\'s workspaceId reaches the req
   });
 
   test('a token with no stored workspaceId stamps null', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     const { token } = await store.createToken('acme', { scope: 'readWrite', createdBy: 'account-A' });
     const { app, captured } = buildStampApp(store);
     assert.equal(await probeInstructions(app, token), 200);
@@ -183,7 +187,7 @@ describe('LIN-3136 Finding A — the caller token\'s workspaceId reaches the req
 
 describe('LIN-3136 B2 — the dispatch-writer fixture', () => {
   test('mints readWrite + [dispatch] through the production path, valid on the test store', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     const working = await mintDispatchWriter(store, { urlKey: 'acme', ownerAccountId: 'poster-B' });
     const validated = await store.validateToken(working.token);
     assert.equal(validated.scope, 'readWrite');
@@ -194,7 +198,7 @@ describe('LIN-3136 B2 — the dispatch-writer fixture', () => {
   });
 
   test('leaves the test store\'s owner-check seam untouched', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     await mintDispatchWriter(store, { urlKey: 'acme', ownerAccountId: 'poster-B' });
     // The test store never had a seam wired, so its own grant mint still fails closed.
     await assert.rejects(
@@ -204,7 +208,7 @@ describe('LIN-3136 B2 — the dispatch-writer fixture', () => {
   });
 
   test('armDispatchWriterOnce swaps exactly the next createToken, then restores the real one', async () => {
-    const store = new ProxyTokenStore({ collection: createMockCollection() });
+    const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
     armDispatchWriterOnce(store, { ownerAccountId: 'account-A' });
     const first = await store.createToken('acme', { scope: 'readWrite', createdBy: 'account-A' });
     const second = await store.createToken('acme', { scope: 'readWrite', createdBy: 'account-A' });

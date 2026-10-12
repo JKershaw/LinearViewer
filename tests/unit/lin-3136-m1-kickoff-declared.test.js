@@ -18,7 +18,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
@@ -26,7 +26,11 @@ import crypto from 'crypto';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-m1-kickoff-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const OWNER = 'account-A';
 const WS = 'ws-1';
@@ -35,7 +39,7 @@ const KICKOFF = '/api/proxy/autopilot/kickoff';
 const PROXY_ATTACH_FAILED_MESSAGE = 'Proxy context was requested but a proxy token could not be created (LIN-1175) — refusing to launch a credential-less session; you may have hit the token rate limit, wait a minute and retry.';
 
 function world({ ownerCheck } = {}) {
-  const store = new ProxyTokenStore({ collection: createMockCollection() });
+  const store = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
   const state = { owners: { [WS]: OWNER }, fault: false };
   store.setOwnerCheck(ownerCheck || (async ({ workspaceId, accountId }) => {
     if (state.fault) throw new Error('owner store down');

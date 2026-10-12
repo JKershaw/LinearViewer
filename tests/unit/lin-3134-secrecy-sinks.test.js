@@ -24,7 +24,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe, before } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
@@ -38,13 +38,17 @@ import { mintDispatchWriter } from './lib/dispatch-writer.js';
 // /fixture:LIN-3136
 import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createProxyRunnerRoutes } from '../../routes/proxy-runner.js';
 import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';
 import { createChatToolCatalog } from '../../lib/chat-tools.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+
+const harness = createMangoTmpdir('lin-3528-secrecy-sinks-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const URL_KEY = 'acme';
 const POSTER = 'poster-B';
@@ -106,9 +110,9 @@ async function callApp(app, method, path, body, bearer) {
 
 const world = {};
 
-function rawDoc(id) {
-  return world.store.collection._docs.find(d => d._id === id)
-    || world.store.historyCollection._docs.find(d => d._id === id);
+async function rawDoc(id) {
+  return (await world.store.collection.find({}).toArray()).find(d => d._id === id)
+    || (await world.store.historyCollection.find({}).toArray()).find(d => d._id === id);
 }
 
 function proxyApp() {
@@ -182,12 +186,12 @@ function fcApp() {
 }
 
 before(async () => {
-  world.store = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
-  world.tokenStore = new ProxyTokenStore({ collection: createMockCollection() });
+  world.store = new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
+  world.tokenStore = new ProxyTokenStore({ collection: harness.freshDb().collection('proxy-tokens') });
   world.tokenStore.setOwnerCheck(async ({ workspaceId, accountId }) => (
     { status: workspaceId === RESUMABLE_RECORD.workspaceId && accountId === RESUMABLE_RECORD.ownerAccountId ? 'owner' : 'not-owner' }
   ));
-  world.dispatchTokenStore = new DispatchTokenStore({ collection: createMockCollection() });
+  world.dispatchTokenStore = new DispatchTokenStore({ collection: harness.freshDb().collection('dispatch-tokens') });
   world.consumerToken = (await world.dispatchTokenStore.createToken(URL_KEY, 'consumer', POSTER)).token;
   world.posterToken = (await world.tokenStore.createToken(URL_KEY, { kind: 'standard', scope: 'readWrite', label: 'poster', createdBy: POSTER })).token;
   // fixture:LIN-3136: the poster holds the dispatch grant (the enqueue mounts require it)
@@ -249,7 +253,7 @@ describe('F2 (7) create-path sinks — follow-ups to a declared parent', () => {
     test(label, async () => {
       const res = await callApp(proxyApp(), 'post', path, body(), world.posterToken);
       assert.equal(res.status, 201, JSON.stringify(res.body));
-      assert.deepEqual(rawDoc(res.body.id).grantDeclaration, RESUMABLE_RECORD, 'the created row really is declared');
+      assert.deepEqual((await rawDoc(res.body.id)).grantDeclaration, RESUMABLE_RECORD, 'the created row really is declared');
       assertClean(label, res.body);
       world.created[label] = res.body.id;
     });
@@ -258,14 +262,14 @@ describe('F2 (7) create-path sinks — follow-ups to a declared parent', () => {
   test('dispatch.js session route 201', async () => {
     const res = await callApp(sessionApp(), 'post', '/workspace/acme/api/dispatch', { prompt: 'next beat', followUpTo: world.parentId, target: 'cli' });
     assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.deepEqual(rawDoc(res.body.item.id).grantDeclaration, RESUMABLE_RECORD);
+    assert.deepEqual((await rawDoc(res.body.item.id)).grantDeclaration, RESUMABLE_RECORD);
     assertClean('dispatch.js 201', res.body);
   });
 
   test('flight-companion approve-follow-up 200', async () => {
     const res = await callApp(fcApp(), 'post', '/workspace/acme/api/flight-companion/approve-follow-up', { sessionId: world.parentId, prompt: 'next beat' });
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.deepEqual(rawDoc(res.body.itemId).grantDeclaration, RESUMABLE_RECORD);
+    assert.deepEqual((await rawDoc(res.body.itemId)).grantDeclaration, RESUMABLE_RECORD);
     assertClean('approve-follow-up 200', res.body);
   });
 
@@ -280,13 +284,13 @@ describe('F2 (7) create-path sinks — follow-ups to a declared parent', () => {
     });
     const result = await executeTool({ name: 'send_follow_up', arguments: { sessionId: world.parentId, prompt: 'next beat' } });
     assert.equal(result.queued, true);
-    assert.deepEqual(rawDoc(result.itemId).grantDeclaration, RESUMABLE_RECORD);
+    assert.deepEqual((await rawDoc(result.itemId)).grantDeclaration, RESUMABLE_RECORD);
     assertClean('send_follow_up result', result);
   });
 
-  test('the factory return and addItem return (the raw-return sources) are stripped', () => {
-    assert.deepEqual(rawDoc(world.factoryId).grantDeclaration, FACTORY_RECORD, 'the factory row really is declared');
-    assert.equal(rawDoc(world.refusalId).grantRefusal, REFUSAL, 'the refusal row really carries a refusal');
+  test('the factory return and addItem return (the raw-return sources) are stripped', async () => {
+    assert.deepEqual((await rawDoc(world.factoryId)).grantDeclaration, FACTORY_RECORD, 'the factory row really is declared');
+    assert.equal((await rawDoc(world.refusalId)).grantRefusal, REFUSAL, 'the refusal row really carries a refusal');
     assertClean('createDispatchItem return', world.factoryReturn);
     assertClean('addItem return', world.refusalReturn);
   });
@@ -343,7 +347,7 @@ describe('F2 (7) read-path sinks', () => {
     const runnerTake = await callApp(runnerApp(), 'post', `/api/proxy/runner/take/${world.refusalId}`, {}, 'x');
     assert.equal(runnerTake.status, 200, JSON.stringify(runnerTake.body));
     assertClean('POST /api/proxy/runner/take/:id', runnerTake.body);
-    assert.ok(rawDoc(world.factoryId).grantDeclaration, 'the archived row still carries its record');
+    assert.ok((await rawDoc(world.factoryId)).grantDeclaration, 'the archived row still carries its record');
   });
 
   test('history: getItemStatus, listHistory, the history route, watch/prompt, stampBookkeeping', async () => {

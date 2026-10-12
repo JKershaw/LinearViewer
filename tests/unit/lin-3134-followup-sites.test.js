@@ -32,7 +32,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 
@@ -43,7 +43,11 @@ installHermeticLinearTransport();
 
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { ProxyTokenStore, BOOTSTRAP_TOKEN_TTL_SECONDS } from '../../lib/proxy-tokens.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-followup-sites-');
+before(() => harness.connect());
+after(() => harness.close());
 import { createProxyRoutes } from '../../routes/proxy.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { createFlightCompanionRoutes } from '../../routes/flight-companion.js';
@@ -82,9 +86,9 @@ const sha256 = (token) => crypto.createHash('sha256').update(token).digest('hex'
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function makeWorld({ proxyTokenStore: tokenStoreOverride } = {}) {
-  const tokenCollection = createMockCollection();
+  const tokenCollection = harness.freshDb().collection('proxy-tokens');
   const tokenStore = new ProxyTokenStore({ collection: tokenCollection });
-  const dispatchStore = new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  const dispatchStore = new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
 
   const world = {
     tokenStore,
@@ -193,14 +197,14 @@ async function seedParent(world, { record = null, harness = 'claude-code', issue
   return parent._id;
 }
 
-function rowById(world, id) {
-  return world.dispatchStore.collection._docs.find(d => d._id === id)
-    || world.dispatchStore.historyCollection._docs.find(d => d._id === id)
+async function rowById(world, id) {
+  return (await world.dispatchStore.collection.find({}).toArray()).find(d => d._id === id)
+    || (await world.dispatchStore.historyCollection.find({}).toArray()).find(d => d._id === id)
     || null;
 }
 
-function tokenDoc(world, token) {
-  return world.tokenCollection._docs.find(d => d.tokenHash === sha256(token)) || null;
+async function tokenDoc(world, token) {
+  return (await world.tokenCollection.find({}).toArray()).find(d => d.tokenHash === sha256(token)) || null;
 }
 
 async function callRoute(app, method, path, body, bearer = 'anything') {
@@ -375,17 +379,17 @@ const ATTACH_BRANCHES = BRANCHES.filter(b => b.mode === 'attach');
 // Shared assertions
 // ─────────────────────────────────────────────────────────────────────────────
 
-function assertNothingEnqueued(world, out) {
+async function assertNothingEnqueued(world, out) {
   assert.equal(out.ok, false, `expected a refusal, got ${JSON.stringify(out)}`);
-  assert.equal(world.dispatchStore.collection._docs.length, 0, 'nothing enqueued (the parent is in history)');
+  assert.equal((await world.dispatchStore.collection.find({}).toArray()).length, 0, 'nothing enqueued (the parent is in history)');
   assert.equal(world.spy.issued.length, 0, 'mint spy 0: no token issued');
   assert.equal(world.spy.plain.length, 0, 'no plain mint attempted');
 }
 
-function assertDeclaredMint(world, out, label = 'dispatch-bootstrap') {
+async function assertDeclaredMint(world, out, label = 'dispatch-bootstrap') {
   assert.equal(out.ok, true, `expected success, got ${JSON.stringify(out)}`);
   assert.equal(world.spy.plain.length, 0,
-    `a declared resume never mints plain; saw ${JSON.stringify(world.spy.plain)} and grant mints ${JSON.stringify(world.spy.grant)}; row grantDeclaration=${JSON.stringify(rowById(world, out.itemId)?.grantDeclaration ?? null)}`);
+    `a declared resume never mints plain; saw ${JSON.stringify(world.spy.plain)} and grant mints ${JSON.stringify(world.spy.grant)}; row grantDeclaration=${JSON.stringify((await rowById(world, out.itemId))?.grantDeclaration ?? null)}`);
   assert.equal(world.spy.grant.length, 1, 'exactly one grant mint');
   assert.deepEqual(world.spy.grant[0], {
     urlKey: URL_KEY, workspaceId: RECORDED_WORKSPACE, ownerAccountId: RECORDED_OWNER,
@@ -395,19 +399,19 @@ function assertDeclaredMint(world, out, label = 'dispatch-bootstrap') {
   assert.notEqual(world.spy.grant[0].workspaceId, POSTER_WORKSPACE, 'never the poster\'s workspace');
   assert.equal(world.spy.issued.length, 1);
   const issued = world.spy.issued[0].token;
-  const doc = tokenDoc(world, issued);
+  const doc = await tokenDoc(world, issued);
   assert.ok(doc, 'the issued token is persisted');
   assert.deepEqual(doc.grants, ['dispatch'], 'grant-bearing resume');
   assert.equal(doc.createdBy, RECORDED_OWNER);
   assert.equal(doc.workspaceId, RECORDED_WORKSPACE);
   assert.equal(doc.lifetimeProfile, 'worker');
-  const row = rowById(world, out.itemId);
+  const row = await rowById(world, out.itemId);
   assert.ok(row, 'the follow-up row is enqueued');
   assert.deepEqual(row.grantDeclaration, RECORD, 'the record is carried forward onto the row (C4)');
   return { row, issued };
 }
 
-function assertPlainMint(world, out, createdBy) {
+async function assertPlainMint(world, out, createdBy) {
   assert.equal(out.ok, true, `expected success, got ${JSON.stringify(out)}`);
   assert.equal(world.spy.grant.length, 0, 'a leaf resume never mints a grant');
   assert.equal(world.spy.plain.length, 1, 'exactly one plain mint');
@@ -416,8 +420,8 @@ function assertPlainMint(world, out, createdBy) {
     opts: { kind: 'bootstrap', scope: 'readWrite', label: 'dispatch-bootstrap', ttl: BOOTSTRAP_TOKEN_TTL_SECONDS, createdBy }
   });
   const issued = world.spy.issued[0].token;
-  assert.deepEqual(tokenDoc(world, issued).grants, [], 'grant-less even though the poster holds dispatch');
-  const row = rowById(world, out.itemId);
+  assert.deepEqual((await tokenDoc(world, issued)).grants, [], 'grant-less even though the poster holds dispatch');
+  const row = await rowById(world, out.itemId);
   assert.ok(row, 'the follow-up row is enqueued');
   assert.equal('grantDeclaration' in row, false, 'a leaf row carries no record');
   return { row, issued };
@@ -489,7 +493,7 @@ for (const branch of BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const out = await branch.run(world, parentId);
-      const { row, issued } = assertDeclaredMint(world, out);
+      const { row, issued } = await assertDeclaredMint(world, out);
       assert.equal(row.bootstrapToken, issued, 'MCP: the grant token travels as the field');
       if (branch.mode === 'attach') {
         assert.ok(row.prompt.includes(PROXY_MARKER), 'attach appends the block');
@@ -504,7 +508,7 @@ for (const branch of BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: null });
       const out = await branch.run(world, parentId);
-      const { row, issued } = assertPlainMint(world, out, branch.plainCreatedBy);
+      const { row, issued } = await assertPlainMint(world, out, branch.plainCreatedBy);
       assert.equal(row.bootstrapToken, issued);
       if (branch.mode === 'attach') {
         assert.ok(row.prompt.includes(PROXY_MARKER));
@@ -518,7 +522,7 @@ for (const branch of BRANCHES) {
       world.lookupFault = true;
       const out = await branch.run(world, parentId);
       TRANSIENT[branch.family](out);
-      assertNothingEnqueued(world, out);
+      await assertNothingEnqueued(world, out);
       assert.equal(world.spy.grant.length, 0, 'a failed read never reaches the mint');
     });
 
@@ -528,7 +532,7 @@ for (const branch of BRANCHES) {
       world.ownerCheckFault = true;
       const out = await branch.run(world, parentId);
       TRANSIENT[branch.family](out);
-      assertNothingEnqueued(world, out);
+      await assertNothingEnqueued(world, out);
     });
 
     test(`${branch.id} structural (owner transferred A -> B): GRANT_OWNER_ONLY, nothing enqueued, spy 0`, async () => {
@@ -537,7 +541,7 @@ for (const branch of BRANCHES) {
       world.owners[RECORDED_WORKSPACE] = POSTER;
       const out = await branch.run(world, parentId);
       structural('GRANT_OWNER_ONLY', 403)[branch.family](out);
-      assertNothingEnqueued(world, out);
+      await assertNothingEnqueued(world, out);
       assert.ok(world.spy.grant.length <= 1);
       for (const call of world.spy.grant) {
         assert.equal(call.ownerAccountId, RECORDED_OWNER, 'the refused attempt still names the recorded owner, never B');
@@ -556,7 +560,7 @@ for (const branch of ATTACH_BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const out = await branch.run(world, parentId, { harness: 'opencode' });
-      const { row, issued } = assertDeclaredMint(world, out);
+      const { row, issued } = await assertDeclaredMint(world, out);
       assert.ok(row.prompt.includes(PROXY_MARKER));
       assert.ok(row.prompt.includes(issued), 'prose embeds the grant token');
       assert.strictEqual(row.bootstrapToken, null, 'one credential, one channel');
@@ -567,7 +571,7 @@ for (const branch of ATTACH_BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: null });
       const out = await branch.run(world, parentId, { harness: 'opencode' });
-      const { row, issued } = assertPlainMint(world, out, branch.plainCreatedBy);
+      const { row, issued } = await assertPlainMint(world, out, branch.plainCreatedBy);
       assert.ok(row.prompt.includes(issued));
       assert.strictEqual(row.bootstrapToken, null);
       assertBriefAndProvider(branch, row.prompt, { mcp: false });
@@ -577,13 +581,13 @@ for (const branch of ATTACH_BRANCHES) {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const first = await branch.run(world, parentId);
-      assertDeclaredMint(world, first);
+      await assertDeclaredMint(world, first);
 
       world.spy.grant.length = 0;
       world.spy.plain.length = 0;
       world.spy.issued.length = 0;
       const second = await branch.runDefault(world, first.itemId);
-      const { row } = assertDeclaredMint(world, second);
+      const { row } = await assertDeclaredMint(world, second);
       assert.ok(!row.prompt.includes(PROXY_MARKER), 'the default follow-up suppresses the prose (LIN-805)');
     });
   });
@@ -600,7 +604,7 @@ describe('dispatch.js proxyAttachFailed guard on the follow-up attach arm (LIN-1
     const out = await viaSession(world, { prompt: 'next beat', followUpTo: parentId, target: 'cli', attachProxy: true, harness: 'opencode' });
     assert.equal(out.status, 503, JSON.stringify(out.body));
     assert.deepEqual(out.body, { error: SESSION_ATTACH_FAILED_MESSAGE });
-    assertNothingEnqueued(world, out);
+    await assertNothingEnqueued(world, out);
   });
 });
 
@@ -612,7 +616,7 @@ describe('NB2 — approve-follow-up maps only the coded refusal to 503', () => {
     const out = await viaFc(world, parentId);
     assert.equal(out.status, 500, JSON.stringify(out.body));
     assert.deepEqual(out.body, { error: 'Failed to approve follow-up' });
-    assert.equal(world.dispatchStore.collection._docs.length, 0);
+    assert.equal((await world.dispatchStore.collection.find({}).toArray()).length, 0);
   });
 
   test('a structural refusal is 422 and never 403 (WORKSPACE_OWNER_UNSET)', async () => {
@@ -621,7 +625,7 @@ describe('NB2 — approve-follow-up maps only the coded refusal to 503', () => {
     delete world.owners[RECORDED_WORKSPACE];
     const out = await viaFc(world, parentId);
     structural('WORKSPACE_OWNER_UNSET', 409).fc(out);
-    assertNothingEnqueued(world, out);
+    await assertNothingEnqueued(world, out);
   });
 });
 
@@ -636,12 +640,12 @@ describe('N3 — a thrown history re-read (parent row not yet visible) is transi
       const missingParent = crypto.randomUUID();
       // Session discovery still names the (not yet visible) parent.
       await seedParent(world, { record: null });
-      world.dispatchStore.historyCollection._docs.length = 0;
+      await world.dispatchStore.historyCollection.deleteMany({});
       world.sessionRows[0].id = missingParent;
       world.lookupFault = 'reread';
       const out = await branch.run(world, missingParent);
       TRANSIENT[branch.family](out);
-      assertNothingEnqueued(world, out);
+      await assertNothingEnqueued(world, out);
       assert.ok(world.lookupCalls.some(c => c.itemId === missingParent), 'the lookup ran');
     });
   }
@@ -664,7 +668,7 @@ describe('N2 — a corrupt record at every branch shape: tabled status and code,
         const parentId = await seedParent(world, { record: c.record });
         const out = await branch.run(world, parentId);
         structural(c.code, c.status, `declared resume record is unusable (${c.code})`)[branch.family](out);
-        assertNothingEnqueued(world, out);
+        await assertNothingEnqueued(world, out);
         assert.equal(world.spy.grant.length, 0, 'refused before any mint');
       });
     }
@@ -677,10 +681,10 @@ describe('N2 — a corrupt record at every branch shape: tabled status and code,
 // follow-up into a mint)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function assertCarriedNoMint(world, out) {
+async function assertCarriedNoMint(world, out) {
   assert.equal(out.ok, true, `expected success, got ${JSON.stringify(out)}`);
   assert.equal(world.spy.grant.length + world.spy.plain.length, 0, 'mint spy 0');
-  const row = rowById(world, out.itemId);
+  const row = await rowById(world, out.itemId);
   assert.ok(row, 'the follow-up row is enqueued');
   assert.deepEqual(row.grantDeclaration, RECORD, 'the row still carries the record');
   assert.strictEqual(row.bootstrapToken, null);
@@ -695,7 +699,7 @@ describe('N4 — carry-forward truth table (declared parent)', () => {
       const world = await makeWorld();
       const parentId = await seedParent(world, { record: RECORD });
       const out = await byId(id).run(world, parentId, { appendProxyContext: false });
-      const row = assertCarriedNoMint(world, out);
+      const row = await assertCarriedNoMint(world, out);
       assert.ok(!row.prompt.includes(PROXY_MARKER), 'nothing appended');
     });
   }
@@ -719,7 +723,7 @@ describe('N4 — carry-forward truth table (declared parent)', () => {
       test(`${id}: ${label} -> spy 0, record carried`, async () => {
         const world = await makeWorld();
         const parentId = await seedParent(world, { record: RECORD, harness });
-        assertCarriedNoMint(world, await byId(id).run(world, parentId));
+        await assertCarriedNoMint(world, await byId(id).run(world, parentId));
       });
     }
   }
@@ -727,12 +731,12 @@ describe('N4 — carry-forward truth table (declared parent)', () => {
   test('A1 attach mode off and pbt guard off (appendProxyContext:false) -> spy 0, record carried', async () => {
     const world = await makeWorld();
     const parentId = await seedParent(world, { record: RECORD });
-    assertCarriedNoMint(world, await byId('B1').run(world, parentId, { appendProxyContext: false, harness: 'claude-code' }));
+    await assertCarriedNoMint(world, await byId('B1').run(world, parentId, { appendProxyContext: false, harness: 'claude-code' }));
   });
 
   test('A4 attach selector false (attachProxy:false) and pbt guard false (prose) -> spy 0, record carried', async () => {
     const world = await makeWorld();
     const parentId = await seedParent(world, { record: RECORD });
-    assertCarriedNoMint(world, await byId('B4').run(world, parentId, { attachProxy: false, harness: 'opencode' }));
+    await assertCarriedNoMint(world, await byId('B4').run(world, parentId, { attachProxy: false, harness: 'opencode' }));
   });
 });

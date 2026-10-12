@@ -19,7 +19,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { installHermeticLinearTransport } from '../fixtures/hermetic-linear.js';
 installHermeticLinearTransport();
@@ -28,7 +28,11 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { COPY_PURPOSES } from '../../routes/proxy-tokens-admin.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const mango = createMangoTmpdir('lin-3528-driver-copy-mint-');
+before(() => mango.connect());
+after(() => mango.close());
 
 const TOKENS_PATH = '/workspace/acme/api/proxy/tokens';
 const HOURS_48 = 48 * 3600;
@@ -36,7 +40,7 @@ const HOURS_48 = 48 * 3600;
 const OWNER = async () => ({ status: 'owner' });
 
 function harness({ ownerCheck = OWNER } = {}) {
-  const collection = createMockCollection();
+  const collection = mango.freshDb().collection('proxy-tokens');
   const proxyTokenStore = new ProxyTokenStore({ collection });
   if (ownerCheck !== null) proxyTokenStore.setOwnerCheck(ownerCheck);
   return { collection, proxyTokenStore };
@@ -119,7 +123,7 @@ describe('LIN-3136 S5 — purpose:driver mints the owner-checked driver bootstra
     const ttl = (new Date(res.body.expiresAt).getTime() - before) / 1000;
     assert.ok(ttl > HOURS_48 - 5 && ttl <= HOURS_48 + 5, `worker bootstrap TTL is 48h, got ${ttl}s`);
 
-    const docs = collection._docs;
+    const docs = await collection.find({}).toArray();
     assert.equal(docs.length, 1);
     assert.equal(docs[0].createdBy, 'account-A');
     assert.equal(docs[0].workspaceId, 'ws-1');
@@ -185,7 +189,7 @@ describe('LIN-3136 S5 — driver refusals use the driver subject and write nothi
       if (code === 'GRANT_OWNER_ONLY') {
         assert.equal(res.body.error, "Only this workspace's owner can mint a driver credential");
       }
-      assert.equal(collection._docs.length, 0, 'a refused driver copy writes no token');
+      assert.equal((await collection.find({}).toArray()).length, 0, 'a refused driver copy writes no token');
     });
   }
 
@@ -195,7 +199,7 @@ describe('LIN-3136 S5 — driver refusals use the driver subject and write nothi
     const res = await mint(app, { purpose: 'driver' });
     assert.equal(res.status, 503, JSON.stringify(res.body));
     assert.equal(res.body.code, 'GRANT_OWNERLESS');
-    assert.equal(collection._docs.length, 0);
+    assert.equal((await collection.find({}).toArray()).length, 0);
   });
 });
 
@@ -206,7 +210,7 @@ describe('LIN-3136 S5 — purpose validation', () => {
       const res = await mint(buildApp({ proxyTokenStore, session: session() }), body);
       assert.equal(res.status, 400, JSON.stringify(res.body));
       assert.equal(res.body.code, 'GRANTS_NOT_CLIENT_SETTABLE');
-      assert.equal(collection._docs.length, 0);
+      assert.equal((await collection.find({}).toArray()).length, 0);
     }
   });
 
@@ -223,7 +227,7 @@ describe('LIN-3136 S5 — purpose validation', () => {
       assert.equal(res.status, 400, JSON.stringify(res.body));
       assert.equal(res.body.code, 'INVALID_PURPOSE');
       assert.equal(res.body.retryable, false);
-      assert.equal(collection._docs.length, 0);
+      assert.equal((await collection.find({}).toArray()).length, 0);
     });
   }
 });
@@ -239,7 +243,7 @@ describe('LIN-3136 S5 — the runner alias and the default path are unchanged', 
       assert.deepEqual(Object.keys(res.body).sort(), RUNNER_KEYS);
       assert.deepEqual(res.body.grants, ['take', 'dispatch']);
       assert.equal(res.body.lifetimeProfile, 'runner');
-      assert.equal(collection._docs[0].label, res.body.label, 'the runner arm still passes no label of its own');
+      assert.equal((await collection.find({}).toArray())[0].label, res.body.label, 'the runner arm still passes no label of its own');
       assert.notEqual(res.body.label, 'prompt-driver');
     });
   }
@@ -251,7 +255,7 @@ describe('LIN-3136 S5 — the runner alias and the default path are unchanged', 
     assert.deepEqual(Object.keys(res.body).sort(),
       ['kind', 'label', 'message', 'providerDisplayName', 'scope', 'singleUse', 'success', 'token', 'tokenId']);
     assert.equal(res.body.label, 'prompt-proxy');
-    assert.deepEqual(collection._docs[0].grants ?? [], []);
+    assert.deepEqual((await collection.find({}).toArray())[0].grants ?? [], []);
   });
 });
 

@@ -16,13 +16,17 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { ACME, buildApp, call } from './lib/proxy-fake-deps.js';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { WorkspaceHaltStore } from '../../lib/workspace-halt.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-runner-routes-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const RUNNER_POLL = '/api/proxy/runner/poll';
 const TAKE_ID = '00000000-0000-4000-8000-000000000000';
@@ -347,7 +351,7 @@ describe('LIN-3130 S2a — /api/dispatch/* regression (consumer routes untouched
   });
 
   test('GET /api/dispatch/poll stays exactly { items, halt } when a halt is set', async () => {
-    const haltStore = new WorkspaceHaltStore({ collection: createMockCollection() });
+    const haltStore = new WorkspaceHaltStore({ collection: harness.freshDb().collection('workspace-halt') });
     const setAt = new Date('2026-01-01T00:00:00.000Z');
     await haltStore.setWorkspaceHalt(ACME, { mode: 'pause', setBy: 'alice', now: setAt });
 

@@ -23,7 +23,7 @@
  */
 process.env.NODE_ENV = 'test';
 
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -33,7 +33,11 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { renderPage } from '../../lib/render.js';
 import { PERIODICAL_AUTOPILOT_TAIL } from '../../lib/periodicals.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-m2-session-');
+before(() => harness.connect());
+after(() => harness.close());
 import { testMockPeriodicalsTree } from '../../lib/sample-data/mock-data.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -48,7 +52,8 @@ const stripSrc = APP_SRC.slice(APP_SRC.indexOf('function stripCodeBlockFences(')
 const stripCodeBlockFences = new Function(`${stripSrc}; return stripCodeBlockFences;`)();
 
 function world({ ownerCheck, session } = {}) {
-  const store = new ProxyTokenStore({ collection: createMockCollection() });
+  const collection = harness.freshDb().collection('proxy-tokens');
+  const store = new ProxyTokenStore({ collection });
   const state = { owners: { [WS]: OWNER } };
   if (ownerCheck !== null) {
     store.setOwnerCheck(ownerCheck || (async ({ workspaceId, accountId }) => {
@@ -89,7 +94,7 @@ function world({ ownerCheck, session } = {}) {
     workspacePreferencesStore: undefined,
     dispatchPresetsStore: undefined
   }));
-  return { store, state, spy, items, app, docs: () => store.collection._docs };
+  return { store, state, spy, items, app, docs: () => collection.find({}).toArray() };
 }
 
 async function post(app, body) {
@@ -171,7 +176,7 @@ describe('LIN-3136 M2 — refusals: nothing enqueued, no token, human text', () 
         assert.equal(res.status, status, JSON.stringify(res.body));
         assert.deepEqual(res.body, body);
         assert.equal(w.items.length, 0, 'nothing enqueued');
-        assert.equal(w.docs().length, 0, 'no token written');
+        assert.equal((await w.docs()).length, 0, 'no token written');
         assert.equal(w.spy.plain.length, 0, 'never degrades to a grant-less mint');
       });
     }

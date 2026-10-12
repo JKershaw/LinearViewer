@@ -11,11 +11,15 @@
  *   - N6 injection (Decision 11): a caller's `fields` carrying both keys, and an
  *     anchor row carrying both, persist NEITHER.
  */
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDispatchItem } from '../../lib/dispatch-factory.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { createMockCollection } from '../fixtures/mock-collection.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
+
+const harness = createMangoTmpdir('lin-3528-factory-grant-');
+before(() => harness.connect());
+after(() => harness.close());
 
 const MARKER = {
   grants: ['dispatch'],
@@ -28,7 +32,7 @@ const MARKER = {
 const MARKER_VALUES = ['owner-MARKER', 'ws-MARKER', 'site-MARKER', '2026-09-29T00:00:00.000Z'];
 
 function makeStore() {
-  return new DispatchQueueStore({ collection: createMockCollection(), historyCollection: createMockCollection() });
+  return new DispatchQueueStore({ collection: harness.freshDb().collection('dispatch-queue'), historyCollection: harness.freshDb().collection('dispatch-history') });
 }
 
 describe('S4 — F2(7) factory half (real factory + real store)', () => {
@@ -50,12 +54,12 @@ describe('S4 — F2(7) factory half (real factory + real store)', () => {
     assert.ok(!serialized.includes('"grants"'));
 
     // Persisted on the queue document.
-    assert.deepEqual(store.collection._docs[0].grantDeclaration, MARKER);
+    assert.deepEqual((await store.collection.find({}).toArray())[0].grantDeclaration, MARKER);
 
     // Persisted through take → archive, and readable from history.
     await store.takeItem(returned._id, 'acme');
-    assert.equal(store.collection._docs.length, 0);
-    assert.deepEqual(store.historyCollection._docs[0].grantDeclaration, MARKER);
+    assert.equal((await store.collection.find({}).toArray()).length, 0);
+    assert.deepEqual((await store.historyCollection.find({}).toArray())[0].grantDeclaration, MARKER);
     const decl = await store.getGrantDeclaration('acme', returned._id);
     assert.deepEqual(decl, { state: 'record', record: MARKER });
   });
@@ -69,8 +73,8 @@ describe('S4 — F2(7) factory half (real factory + real store)', () => {
       finalizePrompt: async () => ({ prompt: 'final', bootstrapToken: null }),
       fields: { promptName: 'Prompt', issueIdentifier: 'LIN-1' }
     });
-    assert.equal('grantDeclaration' in store.collection._docs[0], false);
-    assert.equal('grantRefusal' in store.collection._docs[0], false);
+    assert.equal('grantDeclaration' in (await store.collection.find({}).toArray())[0], false);
+    assert.equal('grantRefusal' in (await store.collection.find({}).toArray())[0], false);
     assert.equal('grantDeclaration' in returned, false);
   });
 });
@@ -95,8 +99,8 @@ describe('S4 — D11 the finalized record is pinned after every spread', () => {
     assert.equal(args.length, 1);
     assert.deepEqual(args[0].grantDeclaration, MARKER, 'the factory\'s own finalize record wins');
     assert.equal(Object.keys(args[0]).at(-1), 'grantDeclaration', 'the record is re-added after every spread (Decision 11)');
-    assert.deepEqual(store.collection._docs[0].grantDeclaration, MARKER);
-    assert.ok(!JSON.stringify(store.collection._docs[0]).includes('HACK'));
+    assert.deepEqual((await store.collection.find({}).toArray())[0].grantDeclaration, MARKER);
+    assert.ok(!JSON.stringify((await store.collection.find({}).toArray())[0]).includes('HACK'));
   });
 });
 
@@ -115,7 +119,7 @@ describe('S4 — N6 injection persists neither key', () => {
         grantRefusal: 'HACK_REFUSAL'
       }
     });
-    const doc = store.collection._docs[0];
+    const doc = (await store.collection.find({}).toArray())[0];
     assert.equal('grantDeclaration' in doc, false, 'caller-injected record must not persist');
     assert.equal('grantRefusal' in doc, false, 'caller-injected refusal must not persist');
     assert.ok(!JSON.stringify(doc).includes('HACK'));
@@ -135,7 +139,7 @@ describe('S4 — N6 injection persists neither key', () => {
       finalizePrompt: async () => ({ prompt: 'follow', bootstrapToken: null }),
       fields: { promptName: 'Prompt', followUpTo: anchor._id }
     });
-    const doc = store.collection._docs[1];
+    const doc = (await store.collection.find({}).toArray())[1];
     assert.equal('grantDeclaration' in doc, false);
     assert.equal('grantRefusal' in doc, false);
     assert.ok(!JSON.stringify(doc).includes('ANCHOR_HACK'));
