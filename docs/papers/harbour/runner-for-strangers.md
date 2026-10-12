@@ -215,7 +215,7 @@ are what cost money.
 **And the cheapest reading of all the evidence is that this milestone is not really about the
 runner.** Five of six questions need identical work on both paths, and that work is a credential
 principal (LIN-1892/LIN-1234), a dispatch scope (LIN-2884), a machine record (LIN-2883), a per-task
-clone, a spend bound (LIN-2934) and a retention note (LIN-2954) — one of which is a host decision
+clone and a retention note (LIN-2954) — one of which is a host decision
 and none of which a host delivers. If that reading is right, LIN-2940 should be re-scoped from
 "build the runner" to "build the per-task clone and the lane, on whatever host is cheapest to
 stand up", and the box wins by being cheapest to stand up rather than by being right.
@@ -242,13 +242,12 @@ per-task `git clone <url>@<ref>` with the account's token, dropped after the run
 in a container, and take LIN-1302's `RuntimeProfile` refactor first so the seam exists to build
 against.
 
-Three things must land with it rather than after it, because a stranger reaches them on the first
-run: the `dispatch` scope (LIN-2884), so a triage token cannot start a session; a per-run spend
-bound with the usage relay on (LIN-2934); and `0700` on the session temp dir (LIN-1712). The
-machine record (LIN-2883) is needed before a *second* account, not before the dress rehearsal.
+Two things must land with it rather than after it, because a stranger reaches them on the first
+run: the `dispatch` scope (LIN-2884), so a triage token cannot start a session; and `0700` on the
+session temp dir (LIN-1712). (Go has no spend cap, by design, LIN-3388.) The machine record (LIN-2883) is needed before a *second* account, not before the dress rehearsal.
 
 **What it costs to be wrong, by what is wrong.** *Wrong about the host:* about $18 and a
-provisioning week. The clone, the secrets, the scope and the cap all sit above the `RuntimeProfile`
+provisioning week. The clone, the secrets and the scope all sit above the `RuntimeProfile`
 seam and move to a container unchanged — which is the whole point of taking LIN-1302 first.
 *Wrong about the harness:* moderate. Choosing `claude-code` on the box is defensible now that tmux
 is measured, but it forfeits the only real-money cost reading Harbour has, and a spend cap on that
@@ -346,7 +345,7 @@ contract itself (`docs/dispatch-protocol.md`), which LIN-1301's principle 1 exis
 **Consumers of this answer.** Bounded by relations plus a tracker search on the milestone's own
 identifiers. Seven: LIN-2938 (the conversation that decides), LIN-2940 (the build), LIN-2954 (the
 hardening pass, which reads this paper's isolation, hostile-input and retention answers by name),
-LIN-2934 (the spend bound), LIN-2883 and LIN-2884 (machine record and dispatch scope), LIN-1892
+LIN-2934 (the per-task session bound, since replaced by LIN-3461's failsafe), LIN-2883 and LIN-2884 (machine record and dispatch scope), LIN-1892
 (the account root everything credential-shaped is deferred to).
 
 **One class could not be bounded: the retention policy.** No document states what is kept of a
