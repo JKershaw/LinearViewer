@@ -2,7 +2,7 @@
 
 **Grounding.** Measured at `LinearViewer` `e24f8d12c47891eab16c25c2be3bd6d6e20624f9` / `simple-dispatcher` `3dc08b5b587b897fa83e4c76cbdb23cd6eec2e82`. Both were fetched from `origin/main` before measuring, and neither moved after this task was created (`git log --since=2026-10-12T06:50Z` is empty in both). `simple-dispatcher` has **0 commits** since the previous edition. Every baseline figure below was re-measured at `15990905` (the 10-11 post-batch grounding) with the same command, not copied from that edition's prose.
 
-**Why this edition exists.** It is the post-batch-3 gauge reading for **LIN-3449** (the coherence loop), and the "places per decision" reading for **LIN-3490**. In the window `15990905..e24f8d12`, LinearViewer took 45 commits (PRs #1834–#1877). Batch 3 is 13 decisions in 14 PRs, #1835–#1850. Production (`lib/`, `routes/`, `server.js`, `public/`): 74 files, +2,129 / −1,428. Tests: 110 files, +3,627 / −991.
+**Why this edition exists.** It is the post-batch-3 gauge reading for **LIN-3449** (the coherence loop), and the "places per decision" reading for **LIN-3490**. In the window `15990905..e24f8d12`, LinearViewer took 45 commits (PRs #1834–#1877). Batch 3 is 13 decisions in 15 PRs: #1835–#1850, except #1845 (the LIN-3463 paper). Production (`lib/`, `routes/`, `server.js`, `public/`): 74 files, +2,129 / −1,428. Tests: 110 files, +3,627 / −991.
 - **New modules:** `lib/dispatch-fields.js`, `lib/dispatch-refusal.js`, `lib/dispatch-targets.js`, `lib/recommendation-input.js` and `lib/hourly-cleanup.js`.
 - **Moved:** the three sample-data files went from `tests/fixtures/` to `lib/sample-data/`.
 - **Module counts:** `lib/*.js` 270 → 275; `routes/*.js` 49 → 49.
@@ -21,10 +21,10 @@
   - The rest of the credential decision did not move: 6 copies, 7 choosers, expiry ranking ×3, 7 persist seams.
   - One wrong-answer path remains, and LIN-3464 widened its reach. The refresh *writer* rotates the first binding of the provider, while the readers pick the binding by token. That path now carries the headless lane too.
 - **The highest-severity row is now the runner contract** (High, unchanged since 10-11). The kit moved alone, and LIN-3505 let it raise a ruling. It does so through a prose-only producer that is a **third dialect** beside SD's `hook.js` grammar, read by one tolerant Harbour parser.
-- **No new import edge, cycle or production→test import.** Tarjan: 0 SCCs over 393 nodes / 1,476 edges.
+- **No new upward edge, cycle or production→test import.** Tarjan: 0 SCCs over 393 nodes / 1,476 edges. The +41 edges are downward imports of the new leaves; LIN-3503, for example, added `liveness-detectors.js` → `consumer-poll-warning.js`.
 
 **Places-per-decision reading (for LIN-3490):**
-> *12 Oct, post-batch 3: all 13 batch-3 decisions now reach one authority (11 by both the old command and a shape count; 2 partial by design or by shape); 7 ledger rows resolved and 0 regressed in the window; 25 decision rows are still held in more than one place (2 High, 1 Medium-High, 4 Medium, 10 Low-Medium/Medium-Low, 8 Low). 5 of the 25 are recorded for the first time: 2 were born in the window and 3 are older LIN-3339 candidates.*
+> *12 Oct, post-batch 3: all 13 batch-3 decisions now reach one authority (11 by both the old command and a shape count; 2 partial by design or by shape); 7 ledger rows resolved and 0 regressed in the window; 23 distinct decisions are still held in more than one place (25 ledger rows, of which 2 are sub-rows of another row): 1 High, 1 Medium-High, 3 Medium, 10 Low-Medium/Medium-Low, 8 Low. 3 of the 23 were born or grew in the window: the kit's decision dialect, the close-out refusal, and the "waiting on a person" rule, which LIN-3504 extended.*
 
 **Method notes (read before comparing counts).**
 1. **Old commands are kept verbatim** next to every shape-based count. A row counts as *resolved* only when both agree.
@@ -72,7 +72,7 @@
 
 ### 1. `runner-contract-semantics-cross-repo` — **HIGH — UNCHANGED**, plus new sub-row `decision-dialect-split` (MEDIUM) (LIN-3451, Backlog)
 
-**The kit moved alone; SD did not.** `git log 15990905..e24f8d12 -- lib/runner-kit docs/runner-prompt.md` shows LIN-3213 (#1869) and LIN-3505 (#1870). LIN-3505 touched **only** `docs/runner-prompt.md` and one test, as its ticket intended: "the kit has no parser of its own". SD has 0 commits.
+**The kit moved alone; SD did not.** `git log 15990905..e24f8d12 -- lib/runner-kit docs/runner-prompt.md` shows 3 commits: LIN-3213 (#1869), LIN-3505 (#1870) and LIN-3503 (#1871). LIN-3503 re-anchored the kit's `OTHER_CONSUMER_RECENT_MS` bound to Harbour's `NOBODY_LISTENING_MS` in a comment (`runner.mjs:62`), and `runner-kit-helper.test.js` pins that relation. LIN-3505 touched **only** `docs/runner-prompt.md` and one test, as its ticket intended: "the kit has no parser of its own". SD has 0 commits.
 
 **Unchanged rows** (all line moves re-verified):
 - **Halt, 4 ways:**
@@ -137,18 +137,19 @@ The parity claim is **still false**. It has moved to `docs/runner-prompt.md:216`
 
 **Ticket.** **LIN-2150 updated** for the whole decision. The writer/reader binding rule is **not minted**. Its scenario (two bindings of one provider on one workspace) already has a named owner: **LIN-2188** (Backlog, "Same-provider multi-binding: binding-instance identifier"). LIN-2188 records the scenario as an accepted limitation, to be scheduled "when it becomes real". LIN-2188 is updated with the writer residue, which is a second consequence of the same scenario. If John wants it in batch 4, the single decision is: "the refresh writer rotates the binding whose token matches the pre-refresh token (the readers' rule); with no match, keep first-of-provider".
 
-### 3. `human-wait-derivation-split` — **MEDIUM — NEW row** (pre-existing; LIN-3339 candidate 2, "waiting for a person")
+### 3. `human-wait-derivation-split` — **MEDIUM — NEW row** (pre-existing, and **grew in the window** through LIN-3504; LIN-3339 candidate 2, "waiting for a person")
 
 **The decision:** which run state means "waiting on a person", and from which channel.
-- **Marker set.** The authority is the exported `WAITING_WAKE_MARKERS` (`lib/digest-feedback.js:56`). Two copies carry "keep in parity" comments: `lib/render-run-steps.js:159` (whose comment still points at `routes/dashboard.js` and `pipeline-loops.js`) and `routes/dashboard.js:338`. Five more places inline `=== 'blocked'`: `run-view.js:232`, `task-page-loader.js:148`, `dispatch-terminal.js:225`, `unanswered-decisions.js:71` and `observer-sweep.js:97`.
+- **Marker set.** The authority is the exported `WAITING_WAKE_MARKERS` (`lib/digest-feedback.js:56`). Two copies carry "keep in parity" comments: `lib/render-run-steps.js:159` (whose comment still points at `routes/dashboard.js` and `pipeline-loops.js`) and `routes/dashboard.js:338`. Five more places inline `=== 'blocked'`: `run-view.js:232`, `task-page-loader.js:148`, `dispatch-terminal.js:225`, `unanswered-decisions.js:71` and `observer-sweep.js:97`. Two more decide the channel or the label: `pipeline-loops.js:312` maps agent-status `blocked` to `agentState: 'waiting'` (the root of the banner/clock split below), and `recent-runs.js:39` labels a run "waiting on a person" from the wire status.
 - **Channel, where the sites diverge:**
   - The session banner (`routes/dashboard.js:354-363` `loopIsWaiting`) treats `agentState === 'waiting'` **or** a `[blocked]` marker as waiting.
   - The run-page waiting clock (`lib/run-view.js:226-243` `waitingClock`) reads the feedback marker **only**.
   - So a run that reports `blocked` through agent-status alone shows "waiting on you" in the banner and no clock on the run page.
   - `observer-sweep.js:97` takes the union, like the banner. `live-console.js:122` maps the agent-status words `pending` and `waiting` to `blocked`, a third mapping, on the console only.
-- **Measured against the paper.** `one-job-many-paths.md` §2 recorded this as a high-priority candidate. LIN-3468 consolidated the *regex* but not the *set* or the *channel*. In this window the only change to these files was LIN-3468's regex import.
+- **Measured against the paper.** `one-job-many-paths.md` §2 recorded this as a high-priority candidate. LIN-3468 consolidated the *regex* but not the *set* or the *channel*.
+- **It grew in the window** (corrected after the second read). LIN-3504 (#1868, "answered/ended session stops showing its [blocked] question") **created** `task-page-loader.js:148`: `const stale = wake && wake.marker === 'blocked' && state !== 'waiting'`. That line is absent at `15990905`. It is a new inline copy of the marker set and a **third "is the question still open" rule**, on the task page only, beside the wire's resume-marker rule (`dispatch-terminal.js:219-227`) and `loopIsWaiting`/`deriveSessionWaiting` (`routes/dashboard.js:354-412`). Its own JSDoc (`:139-140`) says `loop.waitingMessage` keeps the stale line for other pages. LIN-3448 (#1876) also touched this file.
 - **Cost.**
-  - Changing who counts as waiting is a 3-copy plus 5-inline edit across server and presentation.
+  - Changing who counts as waiting means 3 set copies, 5 inline checks, the agent-status mapping, the recent-runs label and 3 staleness rules, across server and presentation. Ordinary feature PRs are still adding copies (LIN-3504).
   - The banner and the clock already answer differently for one input.
   - Whether agent-status should start a clock is an open behaviour question (paper §2), so a ticket needs that ruling first.
 - **Ticket.** **LIN-3339 updated**: the candidate holds, with current sites. Not minted, because the behaviour choice (does agent-status start a clock?) has to be settled before a child ticket can be written in LIN-3449's style.
@@ -247,7 +248,7 @@ Covered in the batch table. **Remaining, by design:** the wire re-projection tha
 
 | ticket | result |
 |---|---|
-| LIN-3503 | clean: one `NOBODY_LISTENING_MS` (`consumer-poll-warning.js:26`), imported by `liveness-detectors.js:70`; the old names have 0 references. The kit's `OTHER_CONSUMER_RECENT_MS` (10 min) is a deliberately separate decision. |
+| LIN-3503 | clean: one `NOBODY_LISTENING_MS` (`consumer-poll-warning.js:26`), imported by `liveness-detectors.js:70`; the old names have 0 references. The kit's `OTHER_CONSUMER_RECENT_MS` (10 min) is a separate, narrower value, but it is **coupled** to Harbour's: `runner.mjs:62` states the bound, and `runner-kit-helper.test.js` pins `OTHER_CONSUMER_RECENT_MS <= NOBODY_LISTENING_MS`. That is a cross-party pin, not drift. |
 | LIN-3447 | clean: pure extraction, 1 caller |
 | LIN-3424 | clean, apart from the mechanism note above |
 | LIN-3269 | clean: one `runsUsed >= limit` (`free-tier-store.js:320`). The client copies of the "runs exhausted" check (`public/prompt-section.js:240-243,346-349`) pre-date the window. |
@@ -288,7 +289,7 @@ Covered in the batch table. **Remaining, by design:** the wire re-projection tha
 | batch-3 decisions | LIN-3449's 11 Oct 23:36Z log table | 13: LIN-3464, 3465, 3466, 2427, 3467, 3468, 3469, 3470, 3471 (3486/3487/3488), 3472, 2663, 3473, 3474 |
 | decision producers of `[decision]` rulings | read every writer of kind `decision` plus the kit prompt | 2 producers (SD `hook.js`, kit prose); 1 reader (`parseDecision`, 4 call sites) |
 | binding choosers | named-function grep plus 2 shape greps at both SHAs | 7 named + 5 token-equality + 4 first-of-provider (the writer at `workspace.js:372` is one) |
-| "waiting on a person" deciders | grep for `WAITING_WAKE_MARKERS` and `'blocked'` comparisons over `lib/`, `routes/`, `public/` | 1 authority, 2 set copies, 5 inline checks, 2 channel rules (banner union vs clock feedback-only) |
+| "waiting on a person" deciders | grep for `WAITING_WAKE_MARKERS` and `'blocked'` comparisons over `lib/`, `routes/`, `public/`, widened by the second read | 1 authority, 2 set copies, 5 inline checks (1 born in the window, `task-page-loader.js:148`), the agent-status mapping `pipeline-loops.js:312`, the label `recent-runs.js:39`, 2 channel rules (banner union vs clock feedback-only), 3 staleness rules |
 | AI "not configured" gates | the 13 from 10-11 plus a grep for the not-configured 503 shape | 19: 13 behind `isAiUnavailable`, 6 outside |
 | error-body producers outside `lib/errors.js` | grep for `{ status, body:` and the free-tier producer | 9 producers, 16 forwarding sites |
 | run-row wire projections | `agentB` renorm script over the 23 names | 8 blocks (6 `proxy-dispatch`, 1 `proxy-kickoff`, 1 `pipeline-loops`) |
@@ -399,7 +400,57 @@ Finding 3 also needs a behaviour ruling before a child ticket can be written in 
 
 ## Adversarial Second-Read
 
-_Pending; filled in after the report and follow-ups are written._
+**Tier used: Tier 2.** The reader was a fresh-context sub-agent with no memory of the report-writing turn. Tier 1, a separately dispatched session, was unavailable: this session's proxy token carries no `dispatch` grant (the `/instructions` grants line reads "(none)").
+
+**Question asked:** "What is the largest item in this window that this report missed or misfiled?" The reader got only that question, the report path and PR #1878, both SHAs and the window bounds (`15990905..e24f8d12`, SD `3dc08b5`).
+
+**Fields:** `Adversarial second-read verdict: DISAGREE` · `Differed from top finding: NO` · `Disposition: fixed in place`
+
+**Reader's full answer:**
+
+1. *Verdict: DISAGREE.* The top finding holds. Finding 3 has a material provenance error, and there are three smaller factual errors.
+2. *Differs from the report's top finding: NO.* Every runner-contract citation the reader checked matches source, and nothing it found outranks a High cross-repo contract split.
+3. *Largest missed/misfiled item: `human-wait-derivation-split` (finding 3) is filed as pre-existing, but it changed in the window.*
+   - The report said "In this window the only change to these files was LIN-3468's regex import", the ledger said "pre-existing", and the LIN-3490 reading said only 2 rows were "born in the window".
+   - `git log --oneline 15990905..e24f8d12 --` over the finding's own files returns 8 commits, including LIN-3504 (5cb05987, #1868) and LIN-3448 (6575161b, #1876).
+   - **`task-page-loader.js:148` was created in the window by LIN-3504:** `const stale = wake && wake.marker === 'blocked' && state !== 'waiting';`. A grep for `=== 'blocked'` at `15990905` has no hit in that file; at `e24f8d12` it does. It is a new inline copy of the marker set, not an import of `WAITING_WAKE_MARKERS`.
+   - It is also a new rule for "is the question stale", on the task page only. Its own JSDoc (`:139-140`) says `loop.waitingMessage` "stays on the loop for other pages… it mirrors the stale `[blocked]` line".
+   - That makes at least three rules for "is the question still open":
+     - the wire's resume-marker rule (`deriveBlockedStatus`, `dispatch-terminal.js:219-227`)
+     - `loopIsWaiting`/`deriveSessionWaiting` (`routes/dashboard.js:354-412`)
+     - LIN-3504's task-page rule
+   - The class bound also misses `lib/pipeline-loops.js:312` (`if (agentStatus === 'blocked') return 'waiting';`), the root of the banner-vs-clock split, and `lib/recent-runs.js:39`, which labels "waiting on a person".
+   - Cost: the row is growing through ordinary feature PRs, not sitting still. The LIN-3490 reading should say 3 rows were born or grew in the window, and the edit cost is larger than 3 + 5.
+4. *Factual errors:*
+   - (a) "Batch 3 is 13 decisions in 14 PRs": there are 15 batch PRs (#1835–#1844, #1846–#1850); #1845 is the LIN-3463 paper.
+   - (b) Finding 1's `git log … -- lib/runner-kit docs/runner-prompt.md` returns 3 commits, not 2. a0d9c0de (LIN-3503) edits `runner.mjs:62` to bound the kit's window by Harbour's `NOBODY_LISTENING_MS`, pinned by `runner-kit-helper.test.js`. Calling it "a deliberately separate decision" is loose.
+   - (c) The headline says "No new import edge" while edges go 1,435 → 1,476; LIN-3503 added `liveness-detectors.js` → `consumer-poll-warning.js`. The intended claim is "no new upward edge".
+   - (d) The "2 High" in the LIN-3490 reading are one decision (`cross-repo-halt-vocabulary` is a sub-row of `runner-contract-semantics-cross-repo`), and `cross-repo-sentinel-decision-marker-vocabulary` overlaps `decision-dialect-split`. So "25 decision rows" overstates distinct decisions by 1–2.
+5. *Checked and correct:*
+   - window size and diff stats; new modules; 0 upward and 0 production→test imports
+   - `keepalive` 74 → 0 and `keepaliveError` 75; `htmlError` 6 → 0; `sendSSE` 3 → 1; `getWorkspaceMirrorToken` → 0
+   - `dispatch-targets` 9 and `dispatch-fields` 6 importers; `prepareRecommendationInput` at all 4 entrances
+   - the 8 keepalive forwarding sites; its regex finds 9, but the 9th, `proxy-flight-companion.js:324`, is a 200/429, not a pre-built error body
+   - the 6 not-configured gates outside `isAiUnavailable`
+   - every finding-1 citation; no Harbour reader keys on the `[decision] ` prefix (`FEEDBACK_ENTRY_KINDS`, `dispatch-store.js:89`); marker tests 16 → 22
+   - finding 2's writer and lane; finding 6's client order and 409
+   - 53 + 6 ledger rows; LIN-3486's poll rows unchanged except for key order
+   - nothing larger in the other non-batch PRs. LIN-2392's unguarded "17 templates" at `render-landing.js:373` is Documentation's.
+
+**Disposition: fixed in place.** I re-checked each item at HEAD before applying it:
+- `git grep "'blocked'" 15990905 -- lib/task-page-loader.js` is empty, and `git log` shows LIN-3504 and LIN-3448 on that file.
+- `pipeline-loops.js:312` and `recent-runs.js:39` are as quoted.
+- The runner-kit log shows 3 commits.
+- The PR list covers #1835–#1850 with #1845 being the paper.
+
+The changes:
+- Finding 3 now says the row grew in the window through LIN-3504, and its class bound and cost add the agent-status mapping, the label and the 3 staleness rules.
+- The headline says "no new upward edge".
+- The PR count is 15.
+- Finding 1 and the LIN-3503 row record the kit↔Harbour bound and its pin.
+- The LIN-3490 reading counts **23 distinct decisions** (25 rows; halt and the decision dialect are sub-rows), now 1 High / 1 Medium-High / 3 Medium / 10 Low-Medium or Medium-Low / 8 Low, with **3** born or grown in the window.
+
+The top finding, the severity order and the follow-up set are unchanged. Finding 3 stays Medium. Its ticket path is unchanged too: LIN-3339 is updated, because a behaviour ruling is still needed first.
 
 ---
 
@@ -418,7 +469,7 @@ _Pending; filled in after the report and follow-ups are written._
 | `provider-resolution-incantation` | low | 4 sites | not recovered | 16 sites | **17 sites** (18 raw incl. canonical helper body) | **18 sites** (21 raw lines); new `superseded-selection.js:53` written to evade the count pin | 09-26 command **2** raw lines (leaf + exempt referent) = 0 hand-rolled; **shape: 5** (`workspace-urlkey.js:196,240,256,258`, `live-console.js:58`); pin replaced by a name-keyed guard | old command **2** raw (leaf + exempt referent); shape **3**, all compound predicates in the key-deciding module (`workspace-urlkey.js:197,257,259`); plain lookups 0 (LIN-3474); finder importers 10→13 | **improved** (5→3 by shape) |
 | `ui-divergences-registry-staleness` | low | — | not recovered | registry 4 / actual 6 | registry 4 / actual **9** | native `confirm()` **9→10** (`proxy.js:389`) | native `confirm()` 10 | native `confirm(` **10** by the 10-11 method (comment lines excluded); loose grep 21 | unchanged |
 | `simple-dispatcher-api-base-duplication` | low | — | not recovered | 2 | 2 | 2 (kit takes `baseUrl` from server) | 2 | SD 2 (`config.js:17`, `feedback.js:5`); Harbour inline `${req.protocol}://${req.get('host')}` 30 | unchanged |
-| `cross-repo-halt-vocabulary` | **high** | — | not recovered | — | independently-defined `{pause,stop}` / `{mode,setAt,setBy}`; LIN-3074 | value single-authority; **meaning diverges 4 ways** SD↔kit; docs claim parity; LIN-3074 covers copy only | meaning diverges 4 ways (SD 0 commits, kit diff empty); `runner-prompt.md:219` parity claim stands | meaning diverges 4 ways (unknown mode SD fail-open `dispatcher.js:1654` / kit fail-closed `runner.mjs:214`; abort under stop; stop text `:605` vs `:253`; pause + follow-up `followup.js:40` vs `runner.mjs:209-212`); parity claim now `runner-prompt.md:216` | unchanged |
+| `cross-repo-halt-vocabulary` | **high** (sub-row of `runner-contract-semantics-cross-repo`) | — | not recovered | — | independently-defined `{pause,stop}` / `{mode,setAt,setBy}`; LIN-3074 | value single-authority; **meaning diverges 4 ways** SD↔kit; docs claim parity; LIN-3074 covers copy only | meaning diverges 4 ways (SD 0 commits, kit diff empty); `runner-prompt.md:219` parity claim stands | meaning diverges 4 ways (unknown mode SD fail-open `dispatcher.js:1654` / kit fail-closed `runner.mjs:214`; abort under stop; stop text `:605` vs `:253`; pause + follow-up `followup.js:40` vs `runner.mjs:209-212`); parity claim now `runner-prompt.md:216` | unchanged |
 | `cross-repo-sentinel-decision-marker-vocabulary` | **medium** | — | not recovered | — | grammar split clean; word vocabulary duplicated | kit cannot emit `[pending]`/`[decision]`; wake regex ×3 un-imported; 1 cross-party pin | kit cannot emit `[pending]`/`[decision]`; wake regex authority `dispatch-terminal.js:63`, 3 copies; SD cite 10 lines stale | kit can now raise a ruling (LIN-3505) through a prose-only third producer form (see `decision-dialect-split`); `[pending]`/withdrawal still absent from kit; LV wake copies 0; SD restates the wake regex at `feedback.js:22` and still cites `:53` (now `:63`) | improved (capability); new dialect sub-row |
 | `target-vocabulary` | medium-low | — | not recovered | — | 3 disagreeing LinearViewer lists + inline copies; SD owns runner set | LV 17 lines / 9 files (+`runner-owner-gate.js:22`); 3 lists persist; kit/Harbour poll unfiltered vs SD `cli`/`web` | 7 bracketed lists unchanged; 16 lines / 9 files (this run's method; 10-11's 17 not reproducible) | LV: one declaration `lib/dispatch-targets.js:17-27` (bracketed lists 7→3, all inside it; named lists 4→0; 9 importers). Default `'cli'` still restated ~18 server + ~10 client lines (`RUN_FIELDS.target` `dispatch-fields.js:53` does not import the declaration). SD `targets.js:15-18` {cli,web}; kit reads none; runner poll unfiltered (`proxy-runner.js:94`→`dispatch-store.js:924`) | **improved** (LV); cross-repo unchanged |
 | `sse-frame-writer-duplication` | resolved | — | not recovered | — | 2 byte-identical copies of canonical `lib/sse.js:23 sendSSE` | 2 copies; **LIN-2663** tracks (not minted) | 2 copies (LIN-2663) | `function sendSSE` **1** (`lib/sse.js:23`); hand-written frames outside it 2→0; 9 hand-written `text/event-stream` header preambles remain (LIN-3475, Backlog) | **resolved** (LIN-2663); preamble residue owned by LIN-3475 |
@@ -462,8 +513,8 @@ _Pending; filled in after the report and follow-ups are written._
 | `loose-json-consolidation` | — | — | not recovered | — | — | — | 1 owner, 8 importers; no brace-slice elsewhere (LIN-3114) | 1 owner, 8 importers | held |
 | `ai-mock-predicate-consolidation` | — | — | not recovered | — | — | — | `shouldMockAi` 1 definition, 8 importers (LIN-3459) | `shouldMockAi` 1 definition | held |
 | `batch-guard-residue` | informational | — | not recovered | — | — | — | 3 batch-1 source-scan guards (lin-2389, lin-3452, loose-json); batch 2 added none | batch 3 added **0** new guard files, but re-pinned 2 count pins instead of deleting them (`lin-3124-pr1-count-pins.test.js:175` 4→3, `lin-3124-pr2-credential-census.test.js:41` 13→12), re-keyed 2 scans, and added 1 `readFileSync` scan (`run-limit-gating.test.js:262`); outside the batch #1872 and #1852 added scans; the 3 batch-1 guards are unchanged | slightly **worsened** (pins re-pinned, not removed) |
-| `decision-dialect-split` | **medium** | — | not recovered | — | — | — | — | kit `DECISION:` is a prose-only producer (`runner-prompt.md:170-181`: raw JSON, only before `BLOCKED:`, no prefix, validation, dedupe or withdrawal) beside SD's `hook.js:588-659` (`[decision] ` + re-serialised JSON, any sentinel, 2000-char gate incl. prefix, dedupe, `WITHDRAW:`); one tolerant reader `parseDecision` (`session-telemetry.js:669`) | **new row** (LIN-3505) |
-| `human-wait-derivation-split` | **medium** | — | not recovered | — | — | — | — | "which marker means waiting on a person": exported `WAITING_WAKE_MARKERS` (`digest-feedback.js:56`) + 2 copies "keep in parity" (`render-run-steps.js:159`, `routes/dashboard.js:338`) + inline `'blocked'` checks (`run-view.js:232`, `task-page-loader.js:148`, `dispatch-terminal.js:225`, `unanswered-decisions.js:71`, `observer-sweep.js:97`); banner unions `agentState === 'waiting'` (`dashboard.js:356`), clock reads feedback only (`run-view.js:226-243`) | **new row** (LIN-3339 candidate; pre-existing) |
+| `decision-dialect-split` | **medium** (sub-row of `cross-repo-sentinel-decision-marker-vocabulary`) | — | not recovered | — | — | — | — | kit `DECISION:` is a prose-only producer (`runner-prompt.md:170-181`: raw JSON, only before `BLOCKED:`, no prefix, validation, dedupe or withdrawal) beside SD's `hook.js:588-659` (`[decision] ` + re-serialised JSON, any sentinel, 2000-char gate incl. prefix, dedupe, `WITHDRAW:`); one tolerant reader `parseDecision` (`session-telemetry.js:669`) | **new row** (LIN-3505) |
+| `human-wait-derivation-split` | **medium** | — | not recovered | — | — | — | — | "which marker means waiting on a person": exported `WAITING_WAKE_MARKERS` (`digest-feedback.js:56`) + 2 copies "keep in parity" (`render-run-steps.js:159`, `routes/dashboard.js:338`) + 5 inline `'blocked'` checks (`run-view.js:232`, `task-page-loader.js:148` (new, LIN-3504), `dispatch-terminal.js:225`, `unanswered-decisions.js:71`, `observer-sweep.js:97`) + agent-status mapping `pipeline-loops.js:312`; banner unions `agentState === 'waiting'` (`dashboard.js:356`), clock reads feedback only (`run-view.js:226-243`); 3 staleness rules | **new row** (LIN-3339 candidate; pre-existing, grew in the window via LIN-3504) |
 | `decision-stamp-classifier-copies` | low-medium | — | not recovered | — | — | — | — | `isDecisionLifecycleStampEntry` (`digest-feedback.js:86`) + 5 membership copies (`run-view.js:129`, `session-telemetry.js:60`, `wall-clock-summary.js:64`, `public/dispatch.js:1132`, `public/session.js:283`); parity test lists 4, not `run-view.js` | **new row** (LIN-3339 candidate; pre-existing) |
 | `provider-write-field-contract` | low-medium | — | not recovered | — | — | — | — | GitHub inherits `ui.priority: true` (`providers/interface.js:250`) but `updateIssue` drops priority (`providers/github/index.js:834-854`); the proxy catalogue documents the drop | **new row** (LIN-3339 candidate; pre-existing) |
 | `close-out-merged-refusal-split` | low-medium | — | not recovered | — | — | — | — | "this PR is already merged" refuses the close-out *record* (`workspace-api.js:4631-4636`, LIN-3395) but the client enqueues first (`public/close-out.js:116` then `:128`); `closeOutRefusal` (`dispatch-factory.js:739`) does not check it; `run-evidence.js:102` decides "merged" from live PR state | **new row** (LIN-3395) |
