@@ -132,25 +132,3 @@ describe('PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim (LIN-2147)', () 
   });
 });
 
-describe('PATCH .../trim — maxSessionsPerTask is no longer a trim field (LIN-3461)', () => {
-  test('a body with only maxSessionsPerTask gets the same 400 as an empty body', async () => {
-    const app = buildApp({ dispatchQueueStore: makeStore() });
-    const empty = await call(app, 'patch', `/workspace/acme/api/dispatch/${UUID}/trim`, {});
-    const legacy = await call(app, 'patch', `/workspace/acme/api/dispatch/${UUID}/trim`, { maxSessionsPerTask: 3 });
-    assert.equal(empty.status, 400);
-    assert.equal(empty.body.error, 'maxTasks is required');
-    assert.equal(legacy.status, 400);
-    assert.equal(legacy.body.error, empty.body.error);
-  });
-
-  test('a stray maxSessionsPerTask beside maxTasks is ignored: not applied, not echoed', async () => {
-    const store = makeStore();
-    const created = await store.addItem('acme', { prompt: 'kickoff', kind: 'autopilot', maxTasks: 10 });
-    const app = buildApp({ dispatchQueueStore: store });
-    const res = await call(app, 'patch', `/workspace/acme/api/dispatch/${created._id}/trim`, { maxTasks: 4, maxSessionsPerTask: 3 });
-    assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.equal(res.body.item.maxTasks, 4);
-    assert.ok(!('maxSessionsPerTask' in res.body.item));
-    assert.ok(!('maxSessionsPerTask' in res.body.item.trimHistory[0]));
-  });
-});

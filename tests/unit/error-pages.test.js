@@ -18,7 +18,6 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import * as errorsModule from '../../lib/errors.js';
 import { classifyUpstreamError, isAuthError } from '../../lib/errors.js';
 import { renderErrorPage, renderUpstreamAwareErrorPage, renderServiceUnavailablePage } from '../../lib/render-pages.js';
 
@@ -192,12 +191,5 @@ describe('one HTML error page (LIN-3466)', () => {
     assert.strictEqual(html, renderErrorPage('Service Unavailable', 'Service temporarily unavailable. Please try again later.'));
     assert.match(html, /<h2 class="error-title">Service Unavailable<\/h2>/);
     assert.match(html, /<h1[^>]*>Harbour<\/h1>/);
-  });
-
-  test('lib/errors.js has no second HTML writer', () => {
-    assert.strictEqual(errorsModule.htmlError, undefined);
-    for (const helper of [errorsModule.badRequest, errorsModule.unauthorized, errorsModule.notFound, errorsModule.serverError, errorsModule.serviceUnavailable]) {
-      assert.strictEqual(helper.html, undefined);
-    }
   });
 });

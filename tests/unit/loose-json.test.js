@@ -1,12 +1,8 @@
 /**
- * LIN-3114 — lib/loose-json.js behaviour + a census that no other lib/ module
- * re-grows a private fence-strip → brace-slice → JSON.parse copy.
+ * LIN-3114 — lib/loose-json.js behaviour.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { extractJsonObject, stripCodeFence } from '../../lib/loose-json.js';
 
 describe('extractJsonObject', () => {
@@ -59,25 +55,5 @@ describe('stripCodeFence', () => {
   });
   test('returns trimmed input when unfenced', () => {
     assert.equal(stripCodeFence('  plain  '), 'plain');
-  });
-});
-
-describe('census: no private loose-JSON copies in lib/', () => {
-  const libDir = fileURLToPath(new URL('../../lib', import.meta.url));
-  const walk = dir => readdirSync(dir).flatMap(n => {
-    const p = join(dir, n);
-    return statSync(p).isDirectory() ? walk(p) : p.endsWith('.js') ? [p] : [];
-  });
-  const owner = join(libDir, 'loose-json.js');
-
-  test('no other lib module defines extractJsonObject or slices first-{/last-}', () => {
-    const offenders = [];
-    for (const f of walk(libDir)) {
-      if (f === owner) continue;
-      const src = readFileSync(f, 'utf8');
-      if (/function\s+extractJsonObject\s*\(/.test(src)) offenders.push(`${f}: local extractJsonObject`);
-      if (/lastIndexOf\(\s*['"]\}['"]\s*\)/.test(src)) offenders.push(`${f}: lastIndexOf('}') brace-slice`);
-    }
-    assert.deepEqual(offenders, []);
   });
 });

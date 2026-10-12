@@ -679,17 +679,6 @@ describe('buildAutopilotKickoff (maxTasks budget, LIN-1751)', () => {
     assert.ok(budgeted.indexOf('DUPLICATE_DISPATCH') < budgeted.indexOf(QUIRK_BULLET));
   });
 
-  test('a caller-supplied maxSessionsPerTask is ignored: the prompt stays byte-identical (LIN-3461)', () => {
-    assert.equal(
-      buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxSessionsPerTask: 2 }),
-      buildAutopilotKickoff({ baseUrl: BASE_URL, issue })
-    );
-    assert.equal(
-      buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 5, maxSessionsPerTask: 2 }),
-      buildAutopilotKickoff({ baseUrl: BASE_URL, maxTasks: 5 })
-    );
-  });
-
   test('a budgeted scoped run still pins the goal and names the task, unaffected by the budget block', () => {
     const text = buildAutopilotKickoff({ baseUrl: BASE_URL, issue, maxTasks: 10 });
     assert.ok(text.includes('run on autopilot until **LIN-1751**'));

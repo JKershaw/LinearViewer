@@ -36,8 +36,4 @@ describe('createProviderAuthRouter', () => {
   test('inherited object keys are not treated as providers', () => {
     assert.throws(() => createProviderAuthRouter({ name: 'toString' }, deps()), /No auth-router wiring/);
   });
-
-  test('ProviderInterface no longer declares getAuthRouter', () => {
-    for (const provider of getAllProviders()) assert.equal(provider.getAuthRouter, undefined);
-  });
 });

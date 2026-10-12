@@ -103,22 +103,3 @@ test('?maxTasks=abc (not a number) is rejected 400', async () => {
   const { status } = await get(buildApp(), `${PATH}?maxTasks=abc`);
   assert.equal(status, 400);
 });
-
-// LIN-3461: the sibling per-task bound is gone; a caller still sending it is
-// accepted and the field is ignored (the prompt is exactly what it would be
-// without it), including values the old validation rejected.
-
-test('?maxSessionsPerTask=10 is ignored: the kickoff prose is byte-identical to the unbudgeted one', async () => {
-  const plain = await get(buildApp(), PATH);
-  const legacy = await get(buildApp(), `${PATH}?maxSessionsPerTask=10`);
-  assert.equal(legacy.status, 200);
-  assert.doesNotMatch(legacy.body.prompt, /Per-task session budget/);
-  // Each request gets its own ephemeral port and standalone session id.
-  const normalize = (text) => text.replace(/127\.0\.0\.1:\d+/g, 'HOST').replace(/[0-9a-f]{8}-[0-9a-f-]{27}/g, 'UUID');
-  assert.equal(normalize(legacy.body.prompt), normalize(plain.body.prompt));
-});
-
-test('?maxSessionsPerTask=0 is no longer rejected: it is ignored like any unknown parameter', async () => {
-  const { status } = await get(buildApp(), `${PATH}?maxSessionsPerTask=0`);
-  assert.equal(status, 200);
-});

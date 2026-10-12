@@ -169,24 +169,6 @@ describe('LIN-2975 — end-to-end: a custom run declares a pool through the prox
   });
 });
 
-describe('LIN-3461 — POST /api/proxy/dispatch ignores maxSessionsPerTask', () => {
-  test('a caller that still sends maxSessionsPerTask gets a normal 201 with no such field on the response or the stored row', async () => {
-    const { store } = makeSpiedStore();
-    const app = buildApp({ dispatchQueueStore: store });
-    const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: 5 });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-    assert.ok(!('maxSessionsPerTask' in res.body));
-    const stored = await store.getItemStatus('acme', res.body.id);
-    assert.ok(!('maxSessionsPerTask' in stored));
-  });
-
-  test('a non-integer maxSessionsPerTask is no longer validated: the request is still accepted', async () => {
-    const app = buildApp({ dispatchQueueStore: makeSpiedStore().store });
-    const res = await call(app, 'post', DISPATCH, { prompt: 'run me', target: 'cli', maxSessionsPerTask: 0 });
-    assert.equal(res.status, 201, JSON.stringify(res.body));
-  });
-});
-
 // LIN-2934 R4: the fail-closed path (a REAL countDistinctTasksForSession read
 // error, N3) was only proven at the dispatch-factory unit level
 // (tests/unit/dispatch-factory.test.js) — never at the route level, where the

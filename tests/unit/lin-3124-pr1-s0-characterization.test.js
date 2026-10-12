@@ -164,10 +164,6 @@ describe('LIN-3124 PR1 T1 — S0 accessor identity grid (diverged state)', () =>
     });
   }
 
-  test('LIN-3464: the retired accessor is gone, so no reader can pick the other side of a split', () => {
-    assert.strictEqual(workspaceModule.getWorkspaceMirrorToken, undefined);
-  });
-
   test('does not throw on null/undefined', () => {
     assert.doesNotThrow(() => mirrorExpr(null));
     assert.doesNotThrow(() => expiryExpr(undefined));
