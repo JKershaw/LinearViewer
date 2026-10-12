@@ -10,21 +10,27 @@
  *   - the A⇄D interaction (fetchTeams → [] rather than a throw);
  *   - the write path round-tripping through the store.
  */
-import { test, describe, beforeEach } from 'node:test';
+import { test, describe, beforeEach, before, after } from 'node:test';
 import assert from 'node:assert';
 import { LocalProvider, localProvider } from '../../lib/providers/local/index.js';
 import { NotImplementedError } from '../../lib/providers/interface.js';
 import { getProvider } from '../../lib/providers/registry.js';
 import { createLocalProvider } from '../fixtures/local-harness.js';
+import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const SCOPE = 'ws-1'; // token == store partition key for the local provider
 
+const harness = createMangoTmpdir('lin-3526-local-provider-');
+before(() => harness.connect());
+after(() => harness.close());
+
 function makeProvider() {
-  return createLocalProvider(); // { provider, store, collection }
+  return createLocalProvider(harness.freshDb()); // { provider, store, collection }
 }
 
 describe('LocalProvider capability profile (LIN-356 step D)', () => {
-  const { provider } = makeProvider();
+  let provider;
+  beforeEach(() => { ({ provider } = makeProvider()); });
 
   test('ui surface has the declared profile', () => {
     assert.deepEqual(provider.ui, {
@@ -564,7 +570,8 @@ describe('LocalProvider no-soft-delete boundary (LIN-582)', () => {
 // instead of bubbling NotImplementedError into a 500). LocalProvider deliberately
 // leaves part of the declared surface unimplemented; this pins which.
 describe('LocalProvider capability declines (LIN-582)', () => {
-  const { provider } = makeProvider();
+  let provider;
+  beforeEach(() => { ({ provider } = makeProvider()); });
 
   // Surface methods LocalProvider does NOT override → inherit the base throw.
   // updateComment/deleteComment moved OUT of this list under LIN-1160 — Local
