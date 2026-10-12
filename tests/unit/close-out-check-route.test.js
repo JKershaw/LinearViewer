@@ -327,7 +327,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
     assert.equal(res.jsonBody.recorded.length, 1);
     assert.equal(res.jsonBody.recorded[0].by, 'close-out');
-    assert.equal(res.jsonBody.state.mergedByYou, false);
+    assert.ok(!('mergedByYou' in res.jsonBody.state));
     assert.match(res.jsonBody.state.message, /merged by close-out/);
     // R1's Done path is unchanged for this case.
     assert.equal(res.jsonBody.done, true);
@@ -410,7 +410,7 @@ describe('POST /api/run-evidence/:issueIdentifier/check', () => {
     assert.equal(res.statusCode, 200, JSON.stringify(res.jsonBody));
     assert.equal(res.jsonBody.recorded.length, 1);
     assert.equal(res.jsonBody.recorded[0].by, 'close-out');
-    assert.equal(res.jsonBody.state.mergedByYou, false);
+    assert.ok(!('mergedByYou' in res.jsonBody.state));
   });
 
   // LIN-3340 F4 (review `388f4246`): the route-level wiring from

@@ -279,7 +279,7 @@ describe('B4 merger rule', () => {
   });
 });
 
-describe('B4 owner load: a press merge is never "merged by you" (review F1)', () => {
+describe('B4 owner load: a press merge reads as a close-out merge (review F1)', () => {
   const PRESS = [{ by: 'press', prUrl: PR_URL, merged: true, at: '2026-10-08T18:05:00.000Z' }];
 
   async function ownerPage({ stateType, events = PRESS, comments }) {
@@ -292,21 +292,22 @@ describe('B4 owner load: a press merge is never "merged by you" (review F1)', ()
     test(`owner, press event, task ${stateType}: the page text never says the owner merged`, async () => {
       const { model, html } = await ownerPage({ stateType });
       assert.equal(model.evidence.closeOut.mergedBy, 'close-out');
-      assert.equal(model.evidence.closeOut.mergedByYou, false);
+      assert.ok(!('mergedByYou' in model.evidence.closeOut));
       assert.doesNotMatch(pageText(body(html)), /You merged|merged by you/i);
       // finished: the third-person merger sentence; not finished: the neutral lead and the owner box's close-out wording
       assert.match(pageText(body(html)), stateType === 'completed' ? /merged by Harbour's close-out/ : /PR #41 is merged\..*the pull request was merged by close-out/);
     });
   }
 
-  test('a press event for another PR leaves the owner self-merge claim alone', async () => {
-    const { model } = await ownerPage({ stateType: 'started', events: [{ by: 'press', prUrl: OTHER_PR_URL, merged: true }] });
+  test('a press event for another PR leaves the merge unattributed, and the line neutral', async () => {
+    const { model, html } = await ownerPage({ stateType: 'started', events: [{ by: 'press', prUrl: OTHER_PR_URL, merged: true }] });
     assert.equal(model.evidence.closeOut.mergedBy, null);
-    assert.equal(model.evidence.closeOut.mergedByYou, true);
+    assert.match(pageText(body(html)), /PR #41 is merged\./);
+    assert.doesNotMatch(pageText(body(html)), /You merged|merged by you/i);
   });
 
   test('partial merge with a press event: the owner box does not claim it either', async () => {
-    const partial = { status: 'partial', pr: { number: 41, url: PR_URL }, mergedByYou: true, message: 'PR #41 merged · 1 more PR open' };
+    const partial = { status: 'partial', pr: { number: 41, url: PR_URL }, message: 'PR #41 merged · 1 more PR open' };
     const loader = createTaskPageLoader({
       dispatchStore: {}, agentStatusStore: {}, briefCacheStore: { async get() { return null; } }, recapCacheStore: { async get() { return null; } },
       closeOutEventsStore: { async listForIssue() { return PRESS; } },
@@ -317,16 +318,19 @@ describe('B4 owner load: a press merge is never "merged by you" (review F1)', ()
     const access = { provider: { async fetchRecommendationContext() { return ctxFor({ stateType: 'started' }); } }, callScope: 'tok' };
     const { model } = await loader.loadTaskPage({ urlKey: 'ws', identifier: 'LIN-51', access, viewerIsOwner: true });
     assert.equal(model.evidence.closeOut.mergedBy, 'close-out');
-    assert.equal(model.evidence.closeOut.mergedByYou, false);
+    assert.ok(!('mergedByYou' in model.evidence.closeOut));
   });
 });
 
-describe('deriveCloseOutState: "merged by you" belongs to the owner only', () => {
+describe('deriveCloseOutState: a merged PR reads the same for every viewer (LIN-3426)', () => {
   const merged = { readable: true, state: 'closed', merged: true, head: { sha: 'a' } };
   const run = (owner) => deriveCloseOutState({ prs: [{ url: PR_URL, repo: 'acme/app', number: 41 }], prStatuses: [merged], review: null, owner, stopAt: 'pr' });
-  test('owner keeps it, a guest never gets it', () => {
-    assert.equal(run(true).mergedByYou, true);
-    assert.equal(run(false).mergedByYou, false);
+  test('owner and guest get the same merged message and no merger flag', () => {
+    const { owner: _o1, ...asOwner } = run(true);
+    const { owner: _o2, ...asGuest } = run(false);
+    assert.deepEqual(asOwner, asGuest);
+    assert.ok(!('mergedByYou' in asOwner));
+    assert.doesNotMatch(JSON.stringify(asOwner), /you merged|merged by you/i);
   });
 });
 

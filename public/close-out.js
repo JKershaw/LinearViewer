@@ -81,18 +81,11 @@
   /** Reflect a check result's state on the box. */
   function applyCloseOutState(box, state) {
     if (!box || !state || !state.status) return;
-    const prevYou = box.getAttribute('data-merged-by-you') === 'true';
-    const nextYou = !!state.mergedByYou;
-    if (box.getAttribute('data-state') === state.status && prevYou === nextYou) return;
+    if (box.getAttribute('data-state') === state.status) return;
     box.setAttribute('data-state', state.status);
-    box.setAttribute('data-merged-by-you', nextYou ? 'true' : 'false');
     if (state.status === 'ready') return;
     if (state.status === 'merged' || state.status === 'partial') {
-      if (nextYou) {
-        paint(box, 'run-evidence-closeout-merged', '✓ merged by you' + (state.message ? ' · ' + state.message : ''));
-      } else {
-        paint(box, 'run-evidence-closeout-neutral', state.message || 'the pull request is already merged');
-      }
+      paint(box, 'run-evidence-closeout-neutral', state.message || 'the pull request is already merged');
     } else if (state.status === 'not-ready' || state.status === 'no-pr' || state.status === 'multiple-prs' || state.status === 'closed') {
       paint(box, 'run-evidence-closeout-setup', '○ set up ›');
     } else {

@@ -150,7 +150,7 @@ describe('close-out.js: the check', () => {
   test('a done result reloads so the tracker Finished header shows', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });
@@ -167,7 +167,7 @@ describe('close-out.js: the check', () => {
   test('a done result from an already-recorded merge (doneNow:false) makes 0 reloads', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: false }, done: true, doneNow: false }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: false }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });
@@ -183,7 +183,7 @@ describe('close-out.js: the check', () => {
   test('a doneNow result on a page already showing done makes 0 reloads', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck, pageAlreadyDone } = load({ window });
@@ -205,12 +205,40 @@ describe('close-out.js: the check', () => {
   test('a doneNow result reloads once on a page not yet done (In Progress → Done)', async () => {
     let reloads = 0;
     const window = {
-      api() { return Promise.resolve({ state: { status: 'merged', mergedByYou: true }, done: true, doneNow: true }); },
+      api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
       location: { reload() { reloads++; } },
     };
     const { runCheck } = load({ window });
     const doc = { querySelector: () => ({ getAttribute: () => 'running' }) };
     await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
     assert.equal(reloads, 1);
+  });
+});
+
+describe('close-out.js: applyCloseOutState repaints a merge neutrally', () => {
+  // LIN-3426: a merged PR reads the same for every viewer, so the repaint never
+  // claims the viewer merged it.
+  test('a ready → merged transition paints the neutral line, never "merged by you"', () => {
+    const document = {
+      createElement() { return { setAttribute(k, v) { this[k] = v; }, textContent: '' }; },
+      addEventListener() {},
+    };
+    const { applyCloseOutState } = load({ document });
+    const appended = [];
+    const attrs = { 'data-state': 'ready' };
+    const b = {
+      firstChild: null,
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      setAttribute(k, v) { attrs[k] = v; },
+      appendChild(child) { appended.push(child); },
+      removeChild() {},
+    };
+    applyCloseOutState(b, { status: 'merged', message: 'PR #12 merged' });
+    assert.equal(attrs['data-state'], 'merged');
+    assert.equal(appended.length, 1);
+    assert.equal(appended[0]['data-testid'], 'run-evidence-closeout-neutral');
+    assert.equal(appended[0].textContent, 'PR #12 merged');
+    assert.doesNotMatch(appended[0].textContent, /merged by you|you merged/i);
+    assert.doesNotMatch(String(appended[0]['data-testid']), /merged-by-you/);
   });
 });

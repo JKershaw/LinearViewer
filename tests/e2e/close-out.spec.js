@@ -4,7 +4,7 @@ import { seedWorkspaceOwnership } from '../fixtures/workspace-ownership.js';
 
 // LIN-3248 (P3 of LIN-2949): the close-out box on a finished stop-at-PR run.
 // Ready (standard and stepped, for N2), the "or merge it yourself" link, the
-// merged-by-you state with open ledger items marked "open at merge", and no
+// neutral merged state with open ledger items marked "open at merge", and no
 // straggler flags at the top of the page.
 //
 // GitHub is stubbed hermetically through `/test/seed-pr-status` (as P2's
@@ -181,7 +181,7 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toBeVisible();
   });
 
-  test('merged by you: a reload records the self-merge (check fires for merged) and sets Done', async ({ page }) => {
+  test('a merged PR reads neutrally: a reload records the self-merge (check fires for merged) and sets Done', async ({ page }) => {
     await seedLocalWorkspaceWithEvidence(page);
     await seedFinishedRun(page);
     await page.request.post('/test/seed-pr-status', {
@@ -200,7 +200,8 @@ test.describe('Close-out box on the session page (LIN-3248)', () => {
     expect(checkBody.done, 'R1 sets Done within its bounds').toBe(true);
 
     await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="merged"]')).toBeVisible();
-    await expect(page.locator('[data-testid="run-evidence-closeout-merged"]')).toContainText('merged by you');
+    await expect(page.locator('[data-testid="run-evidence-closeout-neutral"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout"]')).not.toContainText(/merged by you|you merged/i);
 
     // Open items are NOT hoisted: they stay in the collapsed ledger, marked.
     const ledger = page.locator('[data-testid="run-evidence-ledger"]');

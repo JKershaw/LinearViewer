@@ -183,13 +183,13 @@ describe('deriveCloseOutState — truth table', () => {
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.PARTIAL);
     assert.strictEqual(state.mergedCount, 1);
     assert.strictEqual(state.openCount, 1);
-    assert.strictEqual(state.mergedByYou, true);
+    assert.ok(!('mergedByYou' in state));
     assert.strictEqual(state.setDone, false);
     assert.strictEqual(state.pr.number, 41);
     assert.match(state.message, /PR #41 merged · 1 more PR open/);
   });
 
-  test('F1: a non-stop-at-PR merged run reads neutrally — mergedByYou false, main\'s copy', () => {
+  test('F1: a non-stop-at-PR merged run reads neutrally — main\'s copy', () => {
     const state = deriveCloseOutState({
       prs: [pr(41)],
       prStatuses: [mergedStatus()],
@@ -200,11 +200,11 @@ describe('deriveCloseOutState — truth table', () => {
       byPersonCheck: true,
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
-    assert.strictEqual(state.mergedByYou, false);
+    assert.ok(!('mergedByYou' in state));
     assert.match(state.message, /the pull request is already merged/);
   });
 
-  test('F1: a non-stop-at-PR partial merge also reads mergedByYou false', () => {
+  test('F1: a non-stop-at-PR partial merge also carries no viewer-specific merger flag', () => {
     const state = deriveCloseOutState({
       prs: [pr(41), pr(42)],
       prStatuses: [mergedStatus(), openStatus()],
@@ -214,7 +214,7 @@ describe('deriveCloseOutState — truth table', () => {
       stopAt: null,
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.PARTIAL);
-    assert.strictEqual(state.mergedByYou, false);
+    assert.ok(!('mergedByYou' in state));
   });
 
   test('a partial merge with two remaining PRs pluralises the remainder', () => {
@@ -269,7 +269,7 @@ describe('deriveCloseOutState — truth table', () => {
       byPersonCheck: true,
     });
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
-    assert.strictEqual(state.mergedByYou, true);
+    assert.ok(!('mergedByYou' in state));
     assert.strictEqual(state.setDone, true);
   });
 
