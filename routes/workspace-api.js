@@ -49,7 +49,7 @@ const DUE_CHECK_CONCURRENCY = 5;
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
-import { validateRunField } from '../lib/dispatch-fields.js'
+import { validateRunField } from '../lib/dispatch-fields.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
