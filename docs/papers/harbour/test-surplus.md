@@ -30,7 +30,7 @@ So John's 90% does not hold. The surplus is real, but it is concentrated:
   files catch one between them, never alone, and they are the files the record shows being
   bumped.
 - **377 files (47%) caught none of the 599 sampled faults.** Most of them guard code the
-  sample did not hit, but 324 of them also execute no production line that another file does
+  sample did not hit, but 200 of them also execute no production line that another file does
   not.
 
 Most of the cost is not surplus tests but the habit around them. Product PRs now bring about
@@ -63,8 +63,9 @@ grew by a quarter in two weeks, yet it runs faster in parallel than on 30 Septem
 reason is LIN-3158, which cleared the 25-second timer in `routes/proxy.js` that held four
 files open (`routes/proxy.js:397`). The estate is still overwhelmingly behavioural. Its growth
 since 30 September is behavioural tests, many of them LIN-3449's swap tests written into new
-ticket-named files. Two commits have landed since `ebf93bd9`: LIN-3550 adds one test file,
-`scripts/code-shape/seams.test.mjs`, and both edit `periodicals.test.js`. Neither changes a
+ticket-named files. Two commits have landed since `ebf93bd9`: LIN-3550 (#1887) adds one test file,
+`scripts/code-shape/seams.test.mjs`, and edits `periodicals.test.js`, `lib/periodicals.js` and
+`routes/proxy-compute.js`; LIN-3552 (#1888) is docs and evidence only. Neither changes a
 finding.
 
 ### How much of the suite is needed?
@@ -74,8 +75,9 @@ finding.
   159 of A's 299 valid mutants and 145 of B's 300.
 - Of the 304 caught, 178 (59%) are caught by exactly one test file. The median is one file,
   and nine in ten are caught by five files or fewer.
-- Going down to single tests does not change this. The median caught mutant fails three
-  tests, and 30% fail exactly one.
+- Going down to single tests does not change this. Counting, in each killing file, only its
+  deepest failing tests (so a describe block's own failure does not count beside the test
+  inside it), the median caught mutant fails three tests, and 30% (91 of 304) fail exactly one.
 - The redundancy that exists sits inside files, a few tests each re-checking the same thing.
   It is not spread across files.
 
@@ -226,7 +228,7 @@ assertions.
   (`docs/reviews/code-quality-review-2026-10-12-tests.md:39`).
 - **Ticket-named regressions.**
   - **Catch rate:** they catch a sampled fault about as often as other files (49% against
-    54%), but are the only catcher a third as often (7% against 17%). Each one re-drives a seam
+    54%), but are the only catcher less than half as often (7% against 17%). Each one re-drives a seam
     the home module's own file already covers.
   - **Where they matter:** the code-quality review found 18 production modules tested only by
     ticket-named files (`:184`), and those carry unique protection.
@@ -327,7 +329,7 @@ test-first reds across both repos' retained sessions.
   - no real fault caught in CI since June;
   - 295 of 599 sampled one-line faults (49%) not caught at all.
 
-  The suite's value is concentrated. 104 of the 117 sole catchers are files named after a module,
+  The suite's value is concentrated. 105 of the 117 sole catchers are files named after a module,
   not a ticket, and mostly behavioural, and a few guards are the only check of their property.
 
 ### What a lean suite would look like
@@ -427,6 +429,11 @@ number above comes from the data files named in the front matter.
     catches;
   - estimates, with Chapman's form of Lincoln–Petersen, how many files are the only catcher of
     some fault, from the overlap of sole catchers between the two samples.
+
+  It runs on the committed data: `node test-surplus-scripts/analyse.mjs
+  test-surplus-mutants.json#A test-surplus-mutants.json#B` (add `--level test` for single
+  tests, counting only each file's deepest failing tests). The kill matrix itself is not
+  re-creatable from this page.
 
   `classify.mjs` joins each file's coverage, classifier output and catches.
 - **Real catches.**

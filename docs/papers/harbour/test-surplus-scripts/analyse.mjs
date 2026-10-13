@@ -1,14 +1,29 @@
 // Smallest sufficient set: greedy set cover of killing test files on one mutant sample, checked on another.
-// Usage: node analyse.mjs <select.json[,more]> <check.json[,more]> [--level file|test] [--json out.json]
+// Usage: node analyse.mjs <select.json[#sample][,more]> <check.json[#sample][,more]> [--level file|test] [--json out.json]
+// Committed layout: node analyse.mjs ../test-surplus-mutants.json#A ../test-surplus-mutants.json#B   (COV defaults to ../test-surplus-coverage.json)
+// At --level test a killing file counts only its deepest-depth failing tests (the `::depth::` field of a killTests entry), so a
+// describe block's own failure does not count beside the test inside it.
 import { readFileSync, writeFileSync } from 'fs';
 
 // A killed mutant whose kills all failed to confirm is re-labelled survived.
-const load = (ps) => ps.split(',').flatMap((p) => Object.values(JSON.parse(readFileSync(p, 'utf8')))).map((m) => (m.outcome === 'killed' && m.confirmedFiles && !m.confirmedFiles.length ? { ...m, outcome: 'survived' } : m));
+const here = (p) => new URL(p, import.meta.url);
+const confirmed = (m) => m.confirmedFiles || m.killers || m.killFiles;
+// `file#A` reads samples.A of the committed layout; a bare file is a flat object or array of mutants.
+const load = (ps) => ps.split(',').flatMap((spec) => {
+  const [p, sample] = spec.split('#');
+  const j = JSON.parse(readFileSync(p, 'utf8'));
+  return Object.values(sample ? j.samples[sample] : (j.samples || j));
+}).map((m) => (m.outcome === 'killed' && confirmed(m) && !confirmed(m).length ? { ...m, outcome: 'survived' } : m));
 const level = process.argv.includes('--level') ? process.argv[process.argv.indexOf('--level') + 1] : 'file';
 const jsonOut = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
 const TOTAL_FILES = 804;
 // Confirmed kills only (a file that failed again on a second run with the mutant applied); tests are the confirmed failing tests.
-const killers = (m) => (level === 'file' ? (m.confirmedFiles || m.killFiles) : [...new Set(m.confirmedTests || m.killTests)]);
+const deepest = (tests) => {
+  const byFile = new Map();
+  for (const t of tests) { const [f, d] = t.split('::'); const b = byFile.get(f) || { d: -1, ts: [] }; if (+d > b.d) { b.d = +d; b.ts = []; } if (+d === b.d) b.ts.push(t); byFile.set(f, b); }
+  return [...byFile.values()].flatMap((b) => b.ts);
+};
+const killers = (m) => (level === 'file' ? confirmed(m) : [...new Set(deepest(m.confirmedTests || m.killTests))]);
 
 function summarise(name, ms) {
   const k = ms.filter((m) => m.outcome === 'killed'), s = ms.filter((m) => m.outcome === 'survived');
@@ -64,10 +79,10 @@ for (const k of [1, 5, 10, 20, 40, 60, 80, 100, 120, 160, 200, order.length]) {
 }
 console.log('\nkept (greedy order) → % of select kills, % of check kills'); for (const c of curve) console.log(`  ${c.k}\t${c.selPct}\t${c.chkPct}`);
 
-// Files that are ever a sole killer, in each sample, and their overlap (Lincoln-Petersen estimate of files that are the sole killer of some fault).
+// Files that are ever a sole killer, in each sample, and their overlap (Chapman estimate of files that are the sole killer of some fault).
 const sole = (ks) => new Set(ks.filter((m) => killers(m).length === 1).map((m) => killers(m)[0]));
 const a = sole(sel), b = sole(chk); const both = [...a].filter((f) => b.has(f)).length;
-console.log(`\nsole killers: select ${a.size}, check ${b.size}, both ${both}; Lincoln-Petersen estimate ${both ? Math.round((a.size * b.size) / both) : 'n/a'}`);
+console.log(`\nsole killers: select ${a.size}, check ${b.size}, both ${both}; Chapman estimate ${((a.size + 1) * (b.size + 1) / (both + 1) - 1).toFixed(1)}`);
 const allKillers = new Set([...sel, ...chk].flatMap(killers));
 console.log(`distinct ${level}s that kill anything across both samples: ${allKillers.size}`);
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify({ level, set: S, missed: missed.map((m) => m.id), curve, soleSelect: [...a], soleCheck: [...b], order }, null, 1));
@@ -86,8 +101,8 @@ if (jsonOut) writeFileSync(jsonOut, JSON.stringify({ level, set: S, missed: miss
   console.log('\nsaturation (killed mutants → files in greedy+pruned cover):', sat.map((s) => `${s.n}:${s.files}`).join('  '));
   const S2 = cover(pool);
   const allFiles = [...new Set(pool.flatMap(killers))];
-  const testFiles = JSON.parse(readFileSync(process.env.COV || 'cov-lv.json', 'utf8'));
-  const universe = Object.keys(testFiles);
+  const testFiles = JSON.parse(readFileSync(process.env.COV || here('../test-surplus-coverage.json'), 'utf8'));
+  const universe = Object.keys(testFiles.files || testFiles);
   const trials = Array.from({ length: 200 }, () => { const keep = new Set(shuffle(universe).slice(0, S2.length)); return pool.filter((m) => killers(m).some((f) => keep.has(f))).length / pool.length; }).sort((a, b) => a - b);
   console.log(`pooled cover: ${S2.length} ${level}s; a random ${S2.length}-file set kills ${(100 * trials[100]).toFixed(1)}% median (5th-95th ${(100 * trials[10]).toFixed(1)}-${(100 * trials[190]).toFixed(1)}%) of the pooled kills; distinct killers ${allFiles.length}`);
   if (jsonOut) { const j = JSON.parse(readFileSync(jsonOut, 'utf8')); j.saturation = sat; j.pooledSet = S2; writeFileSync(jsonOut, JSON.stringify(j, null, 1)); }
