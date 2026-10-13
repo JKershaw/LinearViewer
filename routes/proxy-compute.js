@@ -913,7 +913,7 @@ export function createComputeRoutes({
    * ~30 minutes, reading every template as `never`). This endpoint must fail
    * toward `recent`, never toward a false `never` — a false `never` would make
    * the (unbuilt) LIN-1629 consumer read "nothing has ever run" and over-dispatch
-   * all 15 templates at once.
+   * all 16 templates at once.
    *
    * `now` is route-supplied (`Date.now()`), never a request parameter — no
    * `?days=`, which keeps the fold's `unknown` state unreachable via any
