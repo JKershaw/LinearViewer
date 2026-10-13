@@ -92,5 +92,6 @@
   "which-rules-pay": "Eight of the 24 distinct rules have led a finding that changed production code. Most such changes came from three of them and from reviewer judgement that no rule names. In the last 100 Done tickets that went through code review (completed…",
   "why-legs-repeat": "A leg repeats because a gate asked for changes. 827 of the 2,252 plan, plan-review, review and close-out sessions on Done tickets since 1 August are repeats, a few dozen fewer in fact, because some of August's earlier legs were triage,…",
   "why-throughput-halved": "Mostly because June was a different regime, not because the same work was counted or split differently. The measure holds up. In both periods about nine in ten commits on main named a ticket, and a correct change was the same size: a…",
-  "writing-length": "Yes, by about 1.6×. Over three months the length of Harbour's reviews roughly tripled while the count of distinct things they say roughly doubled. The gap between those two numbers is the part of the writing with no idea behind it."
+  "writing-length": "Yes, by about 1.6×. Over three months the length of Harbour's reviews roughly tripled while the count of distinct things they say roughly doubled. The gap between those two numbers is the part of the writing with no idea behind it.",
+  "test-surplus": "Partly, but not the way the 90% guess supposes. Harbour's unit suite is not a thick blanket in which most tests repeat each other. It is a thin, wide net. Most of the faults it catches are caught by one test file only, usually the file…"
 }
