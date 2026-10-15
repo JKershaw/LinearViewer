@@ -63,3 +63,33 @@ Then: "Let's go with both. And sure, we can fix bugs. Folding into 2b is a good 
 - **Models.** Experiment 1's arm B ran on this session's default sub-agent model, Opus 5.5. 2a asks for an Opus sub-agent. Harbour's stage models vary: in LIN-3556, plan, implementation and close-out ran on Sonnet 5.5, review on Opus 5.5.
 - **One run per arm.** 2a's raw output is effectively a second sample of the clean room, so it gives a first look at run-to-run variance.
 - **The base moved.** `main` now holds arm A's `adf.js`, which is behaviourally identical to the original on all 59,718 replayed calls (`../rebuild-exp1/results.md`). So "today's code" and "the original" agree for replay purposes.
+
+## 15 Oct: the fresh-reader check of the 2a ticket, and the changes made
+
+**The blocker:** the audit falsely flagged well-behaved calls, and the ticket said any violation means stop. Fixed in the tool:
+
+- it scans string values unescaped, not `JSON.stringify` output;
+- it accepts a quoted `cd` and one with a trailing slash;
+- it allows ToolSearch and the Task tools;
+- it doesn't scan text the call *writes*.
+
+Re-tested on 15 synthetic calls (good and bad) and on arm B's real transcript, which still shows 0 violations.
+
+**Other changes to the ticket:**
+
+- **Finding the transcript:** by the Agent tool's `agentId`, not "the newest file".
+- **The room:** extracted alone. The tools live elsewhere, and experiment 1's solutions are kept away from it.
+- **Today's code:** pinned to `269a6189`.
+- **Classes made checkable.**
+  - "Malformed" means invalid ADF by Atlassian's schema, or non-string Markdown.
+  - New throws and hangs count as regressions, and so does a new gate refusal of a non-lossy document.
+  - Classification is by behaviour change.
+- **Two replays:** the raw output and the final code.
+- **Records:** the raw blob hash; the sub-agent's model, times and report; its added tests run on `today.js` (the brief's "They will later be run against the original module" was restored).
+- **The empty-text-node question settled up front, as the Flight Companion's call under John's "sure, we can fix bugs"** (to be confirmed with John): the writer may stop emitting empty text nodes, which ADF forbids, but the gate keeps permitting stored documents that contain them, wherever today's gate does. The reasoning: a new refusal is a loss of utility.
+
+**Corrections for comparability:**
+
+- The packed public corpus is 8,916 inputs, or 53,496 calls. The 1,037 private real texts are replayed here, after the run.
+- Arm B's public-only baseline is 3,477 cells in 338 groups. The 3,479 / 340 quoted before included 2 private cells.
+- The sub-agent sees the repository's `CLAUDE.md`. Arm B, a sub-agent of this session, also had project instructions in context. Minor.

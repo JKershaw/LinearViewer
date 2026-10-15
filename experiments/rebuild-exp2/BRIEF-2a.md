@@ -34,7 +34,7 @@ The code that does it should be cleaner. The owner, John, defines cleaner as "co
   Change nothing else on purpose. The tests are the evidence of equivalence; don't build a comparison harness.
 - **Keep the reasons a reader needs, with their ticket or ruling references, beside the code they govern.** The history of how the code got there can go.
 - **Don't change or delete any existing test.** If one looks wrong, leave it and report it.
-- **New tests are optional.** If you add any, put them at the end of the test file. They must pin behaviour the spec or the existing tests already describe; don't add new behaviour.
+- **New tests are optional.** If you add any, put them at the end of the test file. They must pin behaviour the spec or the existing tests already describe; don't add new behaviour. They will later be run against the original module.
 - **If the spec and the tests seem to disagree, or leave something open, the tests win.** Note every such point.
 - Don't edit the stub. Run the tests with `node --test tests/unit/*.test.js` from the folder.
 
