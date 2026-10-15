@@ -169,3 +169,35 @@ The prediction is in `2b/prediction-2b1.md`.
 - One label replaces two: "not pinned: reason", plus "deferred: LIN-3558".
 - The evidence is a unit test through `marked.parse`; no live check is needed.
 - The test count was dropped. The kit reports 145, `node --test` counts differently from the earlier "138".
+
+## 15 Oct: 2b part 1 launched
+
+LIN-3561 (High, under LIN-3549). Autopilot `8b80c7b8`. Ticket and gap list as committed at `c9855073`.
+
+## 15 Oct: how much the clean room matters, and what comes next (discussion with John)
+
+**Evidence so far** (n is small: one module, two clean-room runs, one informed run):
+
+- The simplification came from the clean room.
+- Informed rebuilding anchors on the old code. Arm A was told to rewrite as a whole, kept the old shape anyway, and built an oracle despite being told not to.
+- The clean room's regressions mark holes in the contract.
+
+**The working pattern:** "build blind, check sighted".
+
+**John's question:** would a better prompt work, or is it the nature of the LLM? **My view (inference):** a prompt can reduce the pull but not remove it. Content in context shapes what comes out, and "same behaviour" plus a visible original rewards copying. Testable cheaply.
+
+**John's idea:** Harbour could dispatch to a "projected" repo with specific files only. **My view:** a good, general fit for Harbour's lane, because it's task context control. It isolates by construction, enforces seams (only neighbours' public interfaces are visible), and is cheaper.
+
+**Agreed (John):** "Agreed, let's keep going with these experiments. We won't add supporting features until we know more. And I think we have a reasonable ladder of options for future experiments."
+
+**The ladder of options:**
+
+- **Next rung:** run the clean room alongside an "informed, design-first prompt" arm, with the same kit. Does prompting match the clean room's structure?
+- **If the clean room keeps winning:** projected repos as a Harbour feature. Not before.
+- **Later rungs:**
+  - a page renderer (`lib/render-roadmap.js`);
+  - a whole provider (Jira, which re-rebuilds `adf.js` as part of it);
+  - GitHub Projects;
+  - a proxy sub-router.
+
+  The UI is "tidy until swappable".
