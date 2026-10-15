@@ -949,3 +949,44 @@ describe('markdownToAdf: rule and closing fence tolerate trailing whitespace (LI
     })
   }
 })
+
+// LIN-3557 review R1/R2: block forms the writer must match as loosely as the
+// code it replaced, or the input falls through to a paragraph.
+describe('markdownToAdf: unclosed fence and indented rule (LIN-3557 review)', () => {
+  test('an unclosed fence stays a code block, body verbatim', () => {
+    const md = 'Repro:\n\n```python\nclass A:\n    def __init__(self, *args, **kw):\n        pass\n\nA()\n```'
+    const doc = markdownToAdf(md)
+    assert.equal(doc.content[1].type, 'codeBlock')
+    assert.deepEqual(doc.content[1].content, [
+      { type: 'text', text: 'class A:\n    def __init__(self, *args, **kw):\n        pass' },
+    ])
+  })
+
+  test('an unclosed fence without a language is a code block the gate permits', () => {
+    const doc = markdownToAdf('```js\nconst a = 1')
+    assert.deepEqual(doc.content, [
+      { type: 'codeBlock', attrs: { language: 'js' }, content: [{ type: 'text', text: 'const a = 1' }] },
+    ])
+    assert.equal(adfHasUnrenderableContent(doc), false)
+  })
+
+  test('a lone fence line stays text', () => {
+    assert.deepEqual(markdownToAdf('```').content.map(n => n.type), ['paragraph'])
+  })
+
+  for (const md of [' ---', '\t---', 'a\n\n ---']) {
+    test(`rule with leading whitespace ${JSON.stringify(md)}`, () => {
+      const doc = markdownToAdf(md)
+      assert.equal(doc.content.at(-1).type, 'rule')
+      assert.equal(adfHasUnrenderableContent(doc), false)
+    })
+  }
+
+  test('a stored paragraph that looks like an indented rule round-trips', () => {
+    // Not first: a leading space at the document's own edge is trimmed (and gated).
+    const para = text => ({ type: 'paragraph', content: [{ type: 'text', text }] })
+    const doc = { type: 'doc', version: 1, content: [para('a'), para(' ---')] }
+    assert.equal(adfToMarkdown(doc), 'a\n\n \\---')
+    assert.deepEqual(markdownToAdf(adfToMarkdown(doc)), doc)
+  })
+})
