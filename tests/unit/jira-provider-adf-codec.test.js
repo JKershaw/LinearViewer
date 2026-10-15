@@ -1112,7 +1112,8 @@ describe('code spans: what a reader sees, and what a typed span stores', () => {
     ['a trailing backslash does not escape the fence', '`dir\\`', [adfPara(adfText('dir\\', [{ type: 'code' }]))]],
     ['a double fence holds a backtick', '`` a`b ``', [adfPara(adfText('a`b', [{ type: 'code' }]))]],
     ['one padding space is stripped from each side', '` a `', [adfPara(adfText('a', [{ type: 'code' }]))]],
-    ['no run of the same length is left: plain text', '``a`', [adfPara(adfText('``a`'))]],
+    ['a longer run inside does not close the span', '`a``b`', [adfPara(adfText('a``b', [{ type: 'code' }]))]],
+    ['no run of the same length is left: plain text','``a`', [adfPara(adfText('``a`'))]],
     ['the opening run is the whole run, not its tail', '```a`b`', [adfPara(adfText('```a'), adfText('b', [{ type: 'code' }]))]],
     ['text after an unclosed run still parses', '``a `b`', [adfPara(adfText('``a '), adfText('b', [{ type: 'code' }]))]],
   ]
