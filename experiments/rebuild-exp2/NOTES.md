@@ -98,3 +98,38 @@ Re-tested on 15 synthetic calls (good and bad) and on arm B's real transcript, w
 
 - **Ticket:** LIN-3557, under LIN-3549 (High; Quality, Periodicals & Measurement). Autopilot `d1c1166c`.
 - **Inputs:** the room, brief, audit and prediction as committed at `e1530200` (prediction `f19efc24`).
+
+## 15 Oct, 16:57Z: John relaxes the empty-text-node rule
+
+John: "I'm happy to drop edge cases like that for the sake of simplicity."
+
+LIN-3557's description was edited in place: whether the gate keeps permitting stored empty text nodes no longer matters, and an edge case like that that would cost simplicity is dropped and listed in the PR.
+
+**Timing:** the edit landed about 30 seconds after the implementation worker started (16:56:32). It may not see the change, but review and close-out will. The running worker was not interrupted. Steering rule: new instructions go to fresh sessions.
+
+**For the notebook (inference):** this sharpens the success definition. Simplicity beats edge-case fidelity when the two conflict. That's worth carrying into 2b's test review: pin what matters to users, not every edge.
+
+## 15 Oct, ~18:10Z: 2a done and scored
+
+Full results are in `results-2a.md`.
+
+**Facts:**
+
+- The clean room went through Harbour cleanly: audit 10/0, and review re-ran it independently.
+- It merged as `e7f7bd57`, about 53 minutes after kickoff.
+- On structure it's the flattest version: 110 decision points, worst function 12.
+- The pipeline caught 3 regressions: 1 in implementation, 2 in review. R1 shows up on real data.
+- The pipeline missed the bracket-link display regression, which also appeared in arm B. **It's live on `main`.**
+- Close-out is blocked on a post-deploy Jira check that review asked for. Both copies of the ruling are pre-filled "accept without" for John.
+
+**Inference:**
+
+- The pipeline corrects; it doesn't damage.
+- The weak link is classifying differences without seeing the output as users see it.
+- The contract (spec and tests) has no notion of display. The same gap appeared in two independent clean rooms.
+
+**For 2b's test review:**
+
+- pin Harbour's displayed output (through `marked`) for every decision, links with brackets first;
+- carry John's "drop edge cases for simplicity";
+- give the classification step a render check.
