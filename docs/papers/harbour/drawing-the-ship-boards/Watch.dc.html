@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Morning Watch</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;0,6..72,800;1,6..72,400;1,6..72,600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f4efe4}
+a{color:#151311}a:hover{color:#a8410d}
+:focus-visible{outline:2px solid #a8410d;outline-offset:2px}
+</style>
+</helmet>
+<div style="width:100%; max-width:1440px; box-sizing:border-box; margin:0 auto; padding:22px clamp(16px,2.5vw,36px) 24px; background:#f4efe4; color:#151311; font-family:'Newsreader', Georgia, 'Times New Roman', serif; font-optical-sizing:auto;">
+
+  <!-- ============ MASTHEAD ============ -->
+  <header style="display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px 32px; padding-bottom:12px;">
+    <div style="flex:1 1 220px; max-width:300px; display:flex; gap:12px; align-items:flex-start;">
+      <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" style="flex:none; margin-top:2px;">
+        <circle cx="18" cy="18" r="16.5" fill="none" stroke="#151311" stroke-width="1"></circle>
+        <path d="M9.5 9.5 L26.5 26.5 M26.5 9.5 L9.5 26.5" stroke="#151311" stroke-width="0.8" fill="none"></path>
+        <path d="M18 2.5 L20.4 15.6 L33.5 18 L20.4 20.4 L18 33.5 L15.6 20.4 L2.5 18 L15.6 15.6 Z" fill="#151311"></path>
+        <circle cx="18" cy="18" r="1.8" fill="#f4efe4"></circle>
+      </svg>
+      <p style="margin:0; font-size:13px; line-height:1.4; color:#4a443c;"><span style="display:block; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#151311;">The map, as a front page</span>Written overnight from the code, the backlog, the review ledger and 16 periodicals.</p>
+    </div>
+    <div style="flex:0 1 auto; text-align:center; min-width:0;">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.32em; text-transform:uppercase; margin-bottom:4px;">Harbour</div>
+      <h1 style="margin:0; font-size:clamp(44px,5.1vw,74px); line-height:0.95; font-weight:800; letter-spacing:-0.025em;">The Morning Watch</h1>
+    </div>
+    <div style="flex:1 1 220px; max-width:300px; text-align:right;">
+      <p style="margin:0; font-size:13px; line-height:1.4; color:#4a443c;"><span style="display:block; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#151311;">How to read it</span>Every line links to its source and is grounded at a commit. A paragraph whose area has since moved says so: <span style="display:inline-block; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#a8410d; border:1px dashed #a8410d; border-radius:2px; padding:0 5px; white-space:nowrap;">stale</span></p>
+    </div>
+  </header>
+
+  <div style="border-top:3px solid #151311; padding-top:2px;">
+    <div style="border-top:1px solid #151311; border-bottom:1px solid #151311; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:4px 24px; padding:7px 0; font-size:13.5px;">
+      <span style="font-weight:700;">Wednesday, 14 October 2026</span>
+      <span>Grounded at commit <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12px;">[sha]</span> · 11 areas surveyed overnight</span>
+      <span style="font-style:italic; color:#4a443c;">Read in two minutes, then sign once.</span>
+    </div>
+  </div>
+
+  <!-- ============ BODY COLUMNS ============ -->
+  <div style="overflow:hidden; margin:22px -4px 0; padding:0 4px 4px;">
+    <div style="display:flex; flex-wrap:wrap; row-gap:32px; margin:0 -24px 0 -25px;">
+
+      <!-- ===== COLUMN A: lead + orders ===== -->
+      <div style="flex:1.45 1 520px; min-width:0; box-sizing:border-box; padding:0 24px; border-left:1px solid #cfc5b2;">
+
+        <article aria-labelledby="lead-h">
+          <div style="border-top:3px solid #151311; padding-top:8px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:4px 16px;">
+            <span style="font-size:11.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#a8410d;">The one thing</span>
+            <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358;">filed 14 Oct 2026 · grounded at [sha]</span>
+          </div>
+          <h2 id="lead-h" style="margin:10px 0 12px; font-size:clamp(32px,3.2vw,44px); line-height:1.02; font-weight:800; letter-spacing:-0.02em;">Harbour can’t read its own headline</h2>
+          <p style="margin:0; font-size:16px; line-height:1.55;"><span style="font-size:0.8em; font-weight:700; letter-spacing:0.07em; text-transform:uppercase;">The pricing table</span> has no rows for Opus 5.5 or Sonnet 5.5, the two models now doing nearly all the fleet’s work. <a href="#src-model-pricing" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11.5px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:1px 5px; text-decoration:none; white-space:nowrap;">lib/model-pricing.js</a> Without a price the cost endpoint returns null, so cost per verified task, the headline reading, is blank; the last one anyone could read was $19.63, in August. <a href="#src-cost" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11.5px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:1px 5px; text-decoration:none; white-space:nowrap;">/cost</a> And the hourly pricing sweep reports clean, because it only checks rows that exist; the open ticket covers Opus 5.5, not Sonnet 5.5. <a href="#src-lin-3094" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11.5px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:1px 5px; text-decoration:none; white-space:nowrap;">LIN-3094</a></p>
+
+          <button type="button" onClick="{{toggleFull}}" aria-expanded="{{fullAria}}" aria-controls="lead-more" style="margin-top:10px; display:inline-flex; align-items:center; gap:6px; background:none; border:0; border-bottom:1px solid #151311; padding:3px 0; font-family:inherit; font-size:14px; font-weight:700; color:#151311; cursor:pointer;">{{fullLabel}}
+            <sc-if value="{{notFull}}" hint-placeholder-val="{{true}}">
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 L6 8 L9.5 4.5" fill="none" stroke="#151311" stroke-width="1.5"></path></svg>
+            </sc-if>
+            <sc-if value="{{full}}" hint-placeholder-val="{{false}}">
+              <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 7.5 L6 4 L9.5 7.5" fill="none" stroke="#151311" stroke-width="1.5"></path></svg>
+            </sc-if>
+          </button>
+
+          <sc-if value="{{full}}" hint-placeholder-val="{{false}}">
+            <div id="lead-more" style="margin-top:12px; padding-top:10px; border-top:1px solid #cfc5b2;">
+              <h3 style="margin:0 0 6px; font-size:11.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;">The thread, end to end</h3>
+              <ol style="list-style:none; margin:0 0 10px; padding:0; display:grid; gap:3px; font-size:14.5px; line-height:1.4;">
+                <li style="display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358; padding-top:2px;">code</span><span><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">lib/model-pricing.js</span> has no row for Opus 5.5 or Sonnet 5.5</span></li>
+                <li style="display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358; padding-top:2px;">endpoint</span><span><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">/cost</span> returns null</span></li>
+                <li style="display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358; padding-top:2px;">reading</span><span>Cost per verified task: unreadable; last known $19.63, August</span></li>
+                <li style="display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358; padding-top:2px;">monitor</span><span>Hourly pricing sweep: clean, because it checks only rows that exist</span></li>
+                <li style="display:grid; grid-template-columns:76px minmax(0,1fr); gap:10px;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358; padding-top:2px;">ticket</span><span><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">LIN-3094</span> covers Opus 5.5, not Sonnet 5.5</span></li>
+              </ol>
+              <p style="margin:0; font-size:15px; line-height:1.55;">Nothing here would fail a test. The sweep audits the table, not the traffic: every row it holds is right, and it holds none for the models doing the work. Order 1 below prices both.</p>
+            </div>
+          </sc-if>
+        </article>
+
+        <!-- ===== THE ORDERS: one batched approval ===== -->
+        <section aria-labelledby="orders-h" style="margin-top:22px; border:3px double #151311; background:#fbf8f1; padding:14px 18px 14px;">
+          <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:2px 16px;">
+            <h2 id="orders-h" style="margin:0; font-size:26px; line-height:1.1; font-weight:800; letter-spacing:-0.01em;">Your orders for the day</h2>
+            <span style="font-size:11.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#a8410d;">One approval</span>
+          </div>
+          <p style="margin:4px 0 8px; font-size:14px; line-height:1.4; font-style:italic; color:#4a443c;">Five moves, ranked by what they unblock. All are ticked; untick any you would rather hold. Nothing moves until you sign.</p>
+
+          <ol style="list-style:none; margin:0; padding:0;">
+            <sc-for list="{{orders}}" as="o" hint-placeholder-count="5">
+              <li style="border-top:1px solid #d9cfbc; padding:8px 0;">
+                <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+                  <input type="checkbox" checked="{{o.on}}" disabled="{{o.locked}}" onClick="{{o.toggle}}" style="flex:none; width:18px; height:18px; margin:3px 0 0; accent-color:#151311; cursor:pointer;">
+                  <span style="display:block; flex:1 1 auto; min-width:0;">
+                    <span style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+                      <span style="display:block; min-width:0; font-size:16px; line-height:1.3; font-weight:700;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12px; font-weight:600; color:#6b6358; margin-right:6px;">{{o.n}}</span>{{o.t1}}<span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13.5px;">{{o.tc}}</span>{{o.t2}}</span>
+                      <sc-if value="{{o.on}}">
+                        <span style="flex:none; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11.5px; color:#4a443c; white-space:nowrap;">{{o.cost}}</span>
+                      </sc-if>
+                      <sc-if value="{{o.held}}">
+                        <span style="flex:none; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11.5px; color:#a8410d; white-space:nowrap;">held back</span>
+                      </sc-if>
+                    </span>
+                    <span style="display:block; margin-top:2px; font-size:14px; line-height:1.4; color:#4a443c;">{{o.w1}}<span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12px; color:#151311;">{{o.wc}}</span>{{o.w2}}</span>
+                  </span>
+                </label>
+                <sc-if value="{{o.showRuling}}">
+                  <div role="radiogroup" aria-label="Your ruling: does a blocked agent start the waiting clock?" style="margin:6px 0 0 30px; display:flex; flex-wrap:wrap; align-items:center; gap:4px 18px; font-size:13.5px;">
+                    <span style="font-weight:700;">Your ruling:</span>
+                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="radio" name="clock-ruling" checked="{{o.rYes}}" disabled="{{o.locked}}" onClick="{{o.pickYes}}" style="margin:0; accent-color:#151311;">Yes, it starts the clock</label>
+                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="radio" name="clock-ruling" checked="{{o.rNo}}" disabled="{{o.locked}}" onClick="{{o.pickNo}}" style="margin:0; accent-color:#151311;">No, it does not</label>
+                  </div>
+                </sc-if>
+              </li>
+            </sc-for>
+          </ol>
+
+          <sc-if value="{{notGiven}}" hint-placeholder-val="{{true}}">
+            <div style="border-top:1px solid #151311; padding-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px;">
+              <sc-if value="{{some}}" hint-placeholder-val="{{true}}">
+                <button type="button" onClick="{{give}}" style="background:#a8410d; color:#fbf8f1; border:0; border-radius:2px; padding:11px 20px; font-family:inherit; font-size:17px; font-weight:700; letter-spacing:0.005em; cursor:pointer;">{{giveLabel}}</button>
+              </sc-if>
+              <sc-if value="{{none}}" hint-placeholder-val="{{false}}">
+                <button type="button" disabled="disabled" style="background:#e3dccd; color:#4a443c; border:0; border-radius:2px; padding:11px 20px; font-family:inherit; font-size:17px; font-weight:700; cursor:not-allowed;">No orders ticked</button>
+              </sc-if>
+              <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; line-height:1.5; color:#6b6358;">[n] sessions in all · window cap 50<br>budget resets Thu 15 Oct</span>
+            </div>
+            <sc-if value="{{showErr}}" hint-placeholder-val="{{false}}">
+              <p role="alert" style="margin:8px 0 0; font-size:14px; font-weight:600; color:#a8410d;">Order 4 is a ruling: choose yes or no, or untick it, then sign.</p>
+            </sc-if>
+          </sc-if>
+          <sc-if value="{{given}}" hint-placeholder-val="{{false}}">
+            <div role="status" style="border-top:1px solid #151311; padding-top:12px; display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 16px;">
+              <p style="margin:0; font-size:16px; line-height:1.4;"><span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-weight:600;" aria-hidden="true">✓</span> <span style="font-weight:700;">{{givenLine}}</span> <span style="color:#4a443c;">{{rulingLine}}</span></p>
+              <button type="button" onClick="{{undo}}" style="background:none; border:0; border-bottom:1px solid #151311; padding:2px 0; font-family:inherit; font-size:14px; font-weight:600; color:#151311; cursor:pointer;">Take them back</button>
+            </div>
+          </sc-if>
+        </section>
+        <p style="margin:10px 0 0; font-size:14.5px; font-style:italic; color:#4a443c;">Nothing else needs you today. Rulings waiting: <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-style:normal; font-size:12.5px; color:#151311;">0</span>.</p>
+      </div>
+
+      <!-- ===== COLUMN B: the shipping forecast ===== -->
+      <section aria-labelledby="fc-h" style="flex:1.15 1 420px; min-width:0; box-sizing:border-box; padding:0 24px; border-left:1px solid #cfc5b2;">
+        <div style="border-top:3px solid #151311; padding-top:8px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:4px 12px;">
+          <span style="font-size:11.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;">Eleven areas, browser inward</span>
+          <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#6b6358;">✓ ready · ◐ fair · ○ not yet</span>
+        </div>
+        <h2 id="fc-h" style="margin:8px 0 6px; font-size:26px; line-height:1.1; font-weight:800; letter-spacing:-0.01em;">The shipping forecast</h2>
+        <p style="margin:0 0 8px; font-size:14px; line-height:1.45; font-style:italic; color:#4a443c;">Issued by the map at commit <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-style:normal; font-size:12px;">[sha]</span>. Visibility is readiness: how well each area could be rebuilt behind a seam. Read in fixed order, like the coast.</p>
+        <p style="margin:0 0 10px; font-size:14.5px; line-height:1.45;"><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">General synopsis.</span> Four hundred and twenty-nine files. Nineteen two-way area pairs; one knot holds nine of eleven areas. No file-level import cycles.</p>
+
+        <ul style="list-style:none; margin:0; padding:0; border-top:1px solid #151311;">
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-browser" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; color:#6b6358;">○</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Front end: browser code.</span> Thirty-six files round one hub, <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">public/common.js</span>: forty-six window assignments. <span style="font-weight:700;">Poor; unmeasurable.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-pages" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">◐</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Front end: server pages.</span> Sixty-eight files. Ordering logic adrift in a renderer, <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">render-swipe</span>. <span style="font-weight:700;">Moderate.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-routes" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">◐</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Web routes.</span> Twenty-one files. Routes used as libraries; <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">routes/dashboard.js</span> exports. <span style="font-weight:700;">Moderate.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-proxy" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">◐</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Agent API.</span> Thirty files. Fifty-nine dead imports in <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">routes/proxy.js</span>; <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">RefResolutionError</span> pulled up by Providers. <span style="font-weight:700;">Moderate.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-auth" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">◐</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Auth, accounts &amp; workspaces.</span> Fifty-two files. Knotted to the pages, <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">auth↔pages 12/15</span>. <span style="font-weight:700;">Moderate.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-runs" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">◐</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Runs &amp; dispatch.</span> Eighty-nine files, the largest; seventy-eight entry files, a wide door. Back edge from <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">chat-tools</span>. <span style="font-weight:700;">Moderate, occasionally poor.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-llm" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">◐</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">LLM &amp; prompts.</span> <span style="color:#4a443c;">Sixty-four files, two layers in one name. <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">chat-tools ↔ Runs</span>: ten of seventeen edges from one file. <span style="font-weight:700;">Moderate.</span></span> <span style="display:inline-block; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; line-height:1.5; color:#a8410d; border:1px dashed #a8410d; border-radius:2px; padding:0 5px; white-space:nowrap;">stale — area moved since [sha]</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-providers" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">✓</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Providers.</span> Thirty-five files: Linear, GitHub, Jira, local. Seams clear, three upward edges. Spec written five times. <span style="font-weight:700;">Good. Ready to rebuild.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-platform" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">✓</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Platform &amp; plumbing.</span> Twenty-four files. KPI readers mislabelled into it. <span style="font-weight:700;">Good.</span></span></a>
+          </li>
+          <li style="border-bottom:1px solid #d9cfbc;">
+            <a href="#area-other" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px;">✓</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Other features.</span> Nine files, small. <span style="font-weight:700;">Good.</span></span></a>
+          </li>
+          <li>
+            <a href="#area-wiring" style="display:grid; grid-template-columns:16px minmax(0,1fr); gap:0 8px; padding:7px 0; text-decoration:none; font-size:14.5px; line-height:1.42;"><span aria-hidden="true" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; color:#6b6358;">○</span><span><span style="font-size:0.8em; font-weight:700; letter-spacing:0.09em; text-transform:uppercase;">Wiring.</span> One file, <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">server.js</span>. Loads <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:12.5px;">routes/test.js</span> in production. <span style="font-weight:700;">Not forecast.</span></span></a>
+          </li>
+        </ul>
+      </section>
+
+      <!-- ===== COLUMN C: readings + threads ===== -->
+      <div style="flex:1 1 340px; min-width:0; box-sizing:border-box; padding:0 24px; border-left:1px solid #cfc5b2;">
+        <div style="display:flex; flex-wrap:wrap; gap:26px 32px;">
+
+          <section aria-labelledby="rd-h" style="flex:1 1 280px; min-width:0;">
+            <div style="border-top:3px solid #151311; padding-top:8px; font-size:11.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;">Readings</div>
+            <h2 id="rd-h" style="margin:8px 0 8px; font-size:21px; line-height:1.15; font-weight:800; letter-spacing:-0.01em;">Leaner per ticket; the cost gauge is dark</h2>
+            <dl style="margin:0; border-top:1px solid #151311;">
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Cost per verified task</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600; color:#a8410d;">unreadable</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">last read $19.63 · Aug · see lead</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Correct, complete changes</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">~47/wk</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">baseline since mid-July · 95/wk in June</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Sessions per ticket, median</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">8 → 5</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">late Sep → 11–13 Oct</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Sessions per ticket, p90</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">16 → 8</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">review rounds 1.46 → 1.00</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Places per decision</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">23</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">held in &gt;1 place · 3 new this week</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Open pile</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">1,229</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">316 are review residue</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Window cap</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">50</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">a 20-session day ≈ 27% of weekly quota</dd>
+              </div>
+              <div style="display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0 12px; padding:5px 0; border-bottom:1px solid #d9cfbc;">
+                <dt style="font-size:14px; line-height:1.35;">Budget resets</dt>
+                <dd style="margin:0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:13px; font-weight:600;">Thu 15 Oct</dd>
+                <dd style="grid-column:1 / -1; margin:1px 0 0; font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:10.5px; color:#6b6358;">coherence batch 4 waits on it</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section aria-labelledby="th-h" style="flex:1 1 280px; min-width:0;">
+            <div style="border-top:3px solid #151311; padding-top:8px; font-size:11.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;" id="th-h">Threads worth pulling</div>
+            <p style="margin:6px 0 8px; font-size:13.5px; line-height:1.4; font-style:italic; color:#4a443c;">Found today, each followed across layers.</p>
+
+            <article style="border-top:1px solid #151311; padding:8px 0;">
+              <h3 style="margin:0 0 3px; font-size:17px; line-height:1.2; font-weight:700;"><a href="#thread-lin-3504" style="text-decoration:none;">A sibling filed instead of fixed</a></h3>
+              <p style="margin:0; font-size:13.5px; line-height:1.5; color:#4a443c;"><a href="#src-lin-3504" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:0 4px; text-decoration:none; white-space:nowrap;">LIN-3504</a> re-decided “is it still waiting?” inline at <a href="#src-task-page-loader" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:0 4px; text-decoration:none; white-space:nowrap;">lib/task-page-loader.js:148</a>; review filed <a href="#src-lin-3513" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:0 4px; text-decoration:none; white-space:nowrap;">LIN-3513</a> rather than fix it. Parked on order 4.</p>
+            </article>
+
+            <article style="border-top:1px solid #d9cfbc; padding:8px 0;">
+              <h3 style="margin:0 0 3px; font-size:17px; line-height:1.2; font-weight:700;"><a href="#thread-rulings" style="text-decoration:none;">One question reached you three times</a></h3>
+              <p style="margin:0; font-size:13.5px; line-height:1.5; color:#4a443c;">Rulings are kept per session, not per decision, so the window-cap question came back 3 times. About 1 in 10 of 275 rulings repeats. <a href="#src-lin-3502" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:0 4px; text-decoration:none; white-space:nowrap;">LIN-3502</a></p>
+            </article>
+
+            <article style="border-top:1px solid #d9cfbc; padding:8px 0 0;">
+              <h3 style="margin:0 0 3px; font-size:17px; line-height:1.2; font-weight:700;"><a href="#thread-coherence-seams" style="text-decoration:none;">Coherence and seams pull apart</a></h3>
+              <p style="margin:0; font-size:13.5px; line-height:1.5; color:#4a443c;">Batch 3 raised cross-area links 255 → 310: “one place per decision” put the place in another area. Nobody owns the tension; see order 5. <a href="#src-lin-3449" style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; background:#e9e2d3; border:1px solid #d3c8b3; border-radius:2px; padding:0 4px; text-decoration:none; white-space:nowrap;">LIN-3449</a></p>
+            </article>
+          </section>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ FOOTER ============ -->
+  <footer style="margin-top:24px; border-top:1px solid #151311; padding-top:9px; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:6px 24px; font-size:12.5px; line-height:1.45;">
+    <p style="margin:0; max-width:760px; color:#4a443c;">Written by the map from the code at <span style="font-family:'JetBrains Mono', ui-monospace, Menlo, monospace; font-size:11px; color:#151311;">[sha]</span>, the backlog, the review ledger and 16 periodicals. Summaries never replace sources; every chip opens one.</p>
+    <nav aria-label="Elsewhere in the map" style="display:flex; flex-wrap:wrap; gap:4px 18px;">
+      <a href="#yesterday">Yesterday’s Watch</a>
+      <a href="#archive">The Archive</a>
+      <a href="#periodicals">All 16 periodicals</a>
+    </nav>
+  </footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var self = this;
+    var s = this.state || {};
+    var off = s.off || {};
+    var given = !!s.given;
+    var ruling = s.ruling || '';
+    var full = !!s.full;
+
+    var base = [
+      { id: 'price', t1: 'Price Opus 5.5 and Sonnet 5.5', tc: '', t2: '',
+        w1: 'Unblocks the headline number. ', wc: 'LIN-3094', w2: ' covers Opus only.',
+        cost: '[n] sessions' },
+      { id: 'spike', t1: 'Spike ', tc: 'LIN-3404', t2: ' against a test installation',
+        w1: 'Gates inviting anyone: the install callback trusts ', wc: 'installation_id', w2: '.',
+        cost: '[n] sessions' },
+      { id: 'suite', t1: 'Extract one provider conformance suite', tc: '', t2: '',
+        w1: 'First, before any rebuild: the Providers spec is written five times.', wc: '', w2: '',
+        cost: '[n] sessions' },
+      { id: 'rule', t1: 'Rule: do blocked agents start the waiting clock?', tc: '', t2: '',
+        w1: 'Unparks “waiting on a person”: 3 copies, 5 inline checks, ', wc: 'LIN-3513', w2: '.',
+        cost: 'your ruling' },
+      { id: 'seams', t1: 'Read Seams with Drift before each consolidation', tc: '', t2: '',
+        w1: 'Batch 3 put the one place in other areas: cross-area links ', wc: '255 → 310', w2: '.',
+        cost: 'rides batch 4' }
+    ];
+
+    var setOff = function (id, val) {
+      var cur = Object.assign({}, (self.state && self.state.off) || {});
+      cur[id] = val;
+      self.setState({ off: cur, err: false });
+    };
+
+    var orders = base.map(function (o, i) {
+      var on = !off[o.id];
+      return Object.assign({}, o, {
+        n: String(i + 1),
+        on: on,
+        held: !on,
+        locked: given,
+        showRuling: o.id === 'rule' && on,
+        rYes: ruling === 'yes',
+        rNo: ruling === 'no',
+        toggle: function () { if (!given) { setOff(o.id, on); } },
+        pickYes: function () { if (!given) { self.setState({ ruling: 'yes', err: false }); } },
+        pickNo: function () { if (!given) { self.setState({ ruling: 'no', err: false }); } }
+      });
+    });
+
+    var count = orders.filter(function (o) { return o.on; }).length;
+    var ruleOn = !off.rule;
+    var needsRuling = ruleOn && !ruling;
+    var noun = count === 1 ? 'order' : 'orders';
+
+    var rulingLine = '';
+    if (ruleOn && ruling === 'yes') { rulingLine = 'Ruling recorded: a blocked agent starts the waiting clock.'; }
+    if (ruleOn && ruling === 'no') { rulingLine = 'Ruling recorded: a blocked agent does not start the waiting clock.'; }
+
+    return {
+      full: full,
+      notFull: !full,
+      fullAria: full ? 'true' : 'false',
+      fullLabel: full ? 'Fold the story' : 'Read in full',
+      toggleFull: function () { self.setState({ full: !full }); },
+
+      orders: orders,
+      some: count > 0,
+      none: count === 0,
+      giveLabel: 'Give the fleet ' + count + ' ' + noun,
+      given: given,
+      notGiven: !given,
+      showErr: !!s.err && needsRuling && !given,
+      givenLine: count + ' ' + noun + ' given to the fleet. They report back as evidence in tomorrow’s Watch.',
+      rulingLine: rulingLine,
+      give: function () {
+        if (count === 0) { return; }
+        if (needsRuling) { self.setState({ err: true }); return; }
+        self.setState({ given: true, err: false });
+      },
+      undo: function () { self.setState({ given: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

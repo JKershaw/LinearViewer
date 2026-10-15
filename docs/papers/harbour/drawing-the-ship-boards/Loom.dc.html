@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Loom</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F5F2EA}
+a{color:#17306B}a:hover{color:#7A2E6E}
+</style>
+</helmet>
+<div style="width:100%;max-width:1440px;box-sizing:border-box;margin:0 auto;min-height:1150px;padding:22px clamp(16px,3vw,32px) 26px;background:#F5F2EA;color:#1D1F24;font-family:'Newsreader',Georgia,'Times New Roman',serif;display:flex;flex-direction:column;gap:16px">
+
+  <header style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 32px;padding-bottom:14px;border-bottom:1px solid #D6CFBF">
+    <div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 360px">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span style="font-size:22px;font-weight:600;letter-spacing:-0.01em">Harbour</span>
+        <span aria-hidden="true" style="font-size:22px;color:#8F8878">/</span>
+        <h1 style="margin:0;font-size:22px;font-weight:500;font-style:italic">The Loom</h1>
+      </div>
+      <p style="margin:0;font-size:14.5px;line-height:1.35;color:#3E4149">Dashboards show the layers. The loom follows one finding across them, and ties it off as one decision for you.</p>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B">as of 14 Oct 2026 · grounded at [commit] · 5 threads · 27 knots · 6 layers</span>
+    </div>
+    <div role="group" aria-label="North-star readings" style="display:flex;flex-wrap:wrap;gap:10px 26px;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <span style="font-size:12.5px;color:#5F626B">Correct changes / week</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;line-height:1.2">~47</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B">95 in June</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <span style="font-size:12.5px;color:#5F626B">Sessions / ticket</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;line-height:1.2">5 · p90 8</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B">late Sep 8 · p90 16</span>
+      </div>
+      <button type="button" onClick="{{goD}}" aria-label="Places per decision: 23. Follow the coherence versus seams thread." style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-align:left">
+        <span style="font-size:12.5px;color:#5F626B">Places per decision</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;line-height:1.2">23</span>
+        <span style="display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B"><span aria-hidden="true" style="display:inline-block;width:14px;height:2px;background:#1B6F69"></span>3 new or grown this week</span>
+      </button>
+      <button type="button" onClick="{{goA}}" aria-label="Rulings waiting: 0. Follow the thread with a decision parked behind a ruling." style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-align:left">
+        <span style="font-size:12.5px;color:#5F626B">Rulings waiting</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;line-height:1.2">0</span>
+        <span style="display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B"><span aria-hidden="true" style="display:inline-block;width:14px;height:2px;background:#17306B"></span>yet 1 decision parked</span>
+      </button>
+      <button type="button" onClick="{{goC}}" aria-label="Cost per verified task: unreadable. Follow the unpriced models thread." style="display:flex;flex-direction:column;align-items:flex-start;gap:1px;background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;text-align:left">
+        <span style="font-size:12.5px;color:#5F626B">Cost / verified task</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;line-height:1.2;color:#A3410A">UNREADABLE</span>
+        <span style="display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B"><span aria-hidden="true" style="display:inline-block;width:14px;height:2px;background:#B08008"></span>last $19.63 · Aug</span>
+      </button>
+    </div>
+  </header>
+
+  <nav aria-label="Threads" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+    <span style="font-size:13.5px;color:#5F626B;margin-right:6px">Follow a thread</span>
+    <sc-for list="{{threads}}" as="t" hint-placeholder-count="5">
+      <button type="button" onClick="{{t.pick}}" aria-pressed="{{t.pressed}}" style="{{t.btnStyle}}">
+        <svg width="26" height="10" viewBox="0 0 26 10" aria-hidden="true"><path d="M1 7 C7 7 9 3 14 3 S21 7 25 7" fill="none" stroke="{{t.color}}" stroke-width="2" stroke-linecap="round"></path><circle cx="14" cy="3" r="2.6" fill="{{t.color}}"></circle></svg>
+        <span style="display:flex;flex-direction:column;align-items:flex-start;gap:1px">
+          <span style="font-size:14.5px;line-height:1.15">{{t.title}}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;line-height:1.3;color:#5F626B">{{t.meta}}</span>
+        </span>
+      </button>
+    </sc-for>
+  </nav>
+
+  <section tabindex="0" aria-label="The loom: five threads across six layers, 1 to 14 October" style="border:1px solid #D6CFBF;border-radius:8px;background:#F8F6F0;overflow-x:auto">
+    <div style="min-width:1120px;display:grid;grid-template-columns:150px minmax(0,1fr) 264px;grid-template-rows:30px 504px">
+
+      <div style="grid-column:1;grid-row:1;box-sizing:border-box;border-right:1px solid #D6CFBF;border-bottom:1px solid #D6CFBF;display:flex;align-items:center;padding:0 10px 0 14px;font-family:'JetBrains Mono',monospace;font-size:10px;color:#5F626B">layer ↓ · time →</div>
+
+      <div style="grid-column:2;grid-row:1;box-sizing:border-box;position:relative;border-bottom:1px solid #D6CFBF">
+        <sc-for list="{{days}}" as="dy" hint-placeholder-count="14">
+          <span style="{{dy.style}}">{{dy.label}}</span>
+        </sc-for>
+      </div>
+
+      <div style="grid-column:3;grid-row:1;box-sizing:border-box;border-bottom:1px solid #D6CFBF;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 12px 0 14px">
+        <span style="font-size:13.5px;font-weight:600">Knots to tie</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#5F626B">one decision each</span>
+      </div>
+
+      <div style="grid-column:1;grid-row:2;box-sizing:border-box;border-right:1px solid #D6CFBF">
+        <sc-for list="{{lanes}}" as="l" hint-placeholder-count="6">
+          <div style="height:84px;box-sizing:border-box;padding:0 10px 0 14px;display:flex;flex-direction:column;justify-content:center;gap:3px;border-bottom:1px solid #E2DCCF">
+            <span style="{{l.nameStyle}}"><span aria-hidden="true" style="{{l.markStyle}}"></span>{{l.name}}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.3;color:#5F626B">{{l.sub}}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.3;color:#5F626B">{{l.count}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="grid-column:2;grid-row:2;position:relative;height:504px">
+        <svg viewBox="0 0 1000 504" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:0">
+          <rect x="924" y="0" width="76" height="504" fill="#EFEBE1"></rect>
+          <path d="M40 0V504M108 0V504M176 0V504M244 0V504M312 0V504M380 0V504M448 0V504M516 0V504M584 0V504M652 0V504M720 0V504M788 0V504M856 0V504" fill="none" stroke="#E3DDD0" stroke-width="1" stroke-dasharray="1 5" vector-effect="non-scaling-stroke"></path>
+          <path d="M0 20H1000M0 31H1000M0 42H1000M0 53H1000M0 64H1000M0 104H1000M0 115H1000M0 126H1000M0 137H1000M0 148H1000M0 188H1000M0 199H1000M0 210H1000M0 221H1000M0 232H1000M0 272H1000M0 283H1000M0 294H1000M0 305H1000M0 316H1000M0 356H1000M0 367H1000M0 378H1000M0 389H1000M0 400H1000M0 440H1000M0 451H1000M0 462H1000M0 473H1000M0 484H1000" fill="none" stroke="#E9E4D8" stroke-width="0.75" vector-effect="non-scaling-stroke"></path>
+          <path d="M0 84H1000M0 168H1000M0 252H1000M0 336H1000M0 420H1000" fill="none" stroke="#D9D2C3" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+          <path d="M924 0V504" fill="none" stroke="#9C927C" stroke-width="1" vector-effect="non-scaling-stroke"></path>
+        </svg>
+        <span style="position:absolute;left:92.4%;top:4px;margin-left:5px;font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:12px;color:#5F626B;z-index:1">today</span>
+        <span style="position:absolute;left:27%;top:368px;padding:1px 6px;background:#F8F6F0;font-size:13px;line-height:18px;font-style:italic;color:#5F626B;white-space:nowrap;z-index:1">No paper is tied into these threads yet · [research index]</span>
+        <span style="position:absolute;right:6px;top:488px;font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:12px;color:#5F626B;white-space:nowrap;z-index:1">budget resets Thu 15 Oct →</span>
+
+        <sc-for list="{{drawThreads}}" as="w" hint-placeholder-count="5">
+          <svg viewBox="0 0 1000 504" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none;z-index:2">
+            <path d="{{w.path}}" style="{{w.haloStyle}}" vector-effect="non-scaling-stroke"></path>
+            <path d="{{w.path}}" style="{{w.lineStyle}}" vector-effect="non-scaling-stroke"></path>
+            <path d="{{w.f1}}" style="{{w.frayStyle}}" vector-effect="non-scaling-stroke"></path>
+            <path d="{{w.f2}}" style="{{w.frayStyle}}" vector-effect="non-scaling-stroke"></path>
+            <path d="{{w.f3}}" style="{{w.frayStyle}}" vector-effect="non-scaling-stroke"></path>
+          </svg>
+        </sc-for>
+
+        <sc-for list="{{labels}}" as="lb" hint-placeholder-count="6">
+          <span style="{{lb.style}}">{{lb.text}}</span>
+        </sc-for>
+
+        <sc-for list="{{knots}}" as="k" hint-placeholder-count="27">
+          <button type="button" onClick="{{k.pick}}" aria-pressed="{{k.pressed}}" aria-label="{{k.aria}}" style="{{k.style}}"><span aria-hidden="true" style="{{k.dotStyle}}"></span></button>
+        </sc-for>
+      </div>
+
+      <div style="grid-column:3;grid-row:2;position:relative;height:504px">
+        <sc-for list="{{cards}}" as="c" hint-placeholder-count="5">
+          <div style="{{c.wrapStyle}}">
+            <span aria-hidden="true" style="{{c.markStyle}}"></span>
+            <div style="{{c.cardStyle}}">
+              <div style="display:flex;justify-content:space-between;gap:6px;font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:13px;letter-spacing:0.05em;text-transform:uppercase;color:#5F626B">
+                <span>Knot to tie</span>
+                <span style="{{c.statusStyle}}">{{c.status}}</span>
+              </div>
+              <button type="button" onClick="{{c.pick}}" aria-label="{{c.pickAria}}" style="background:none;border:0;padding:0;margin:0;font:inherit;font-size:13.5px;line-height:1.22;color:#1D1F24;text-align:left;cursor:pointer">{{c.short}}</button>
+              <div style="margin-top:auto;display:flex;flex-wrap:wrap;gap:5px;align-items:center">
+                <sc-if value="{{c.showChoices}}" hint-placeholder-val="{{false}}">
+                  <sc-for list="{{c.choiceBtns}}" as="ch" hint-placeholder-count="2">
+                    <button type="button" onClick="{{ch.pick}}" aria-pressed="{{ch.pressed}}" style="{{ch.style}}">{{ch.label}}</button>
+                  </sc-for>
+                </sc-if>
+                <sc-if value="{{c.showHand}}" hint-placeholder-val="{{true}}">
+                  <button type="button" onClick="{{c.toggle}}" aria-pressed="{{c.pressed}}" aria-label="{{c.handAria}}" style="{{c.handStyle}}">{{c.handLabel}}</button>
+                </sc-if>
+                <sc-if value="{{c.isSent}}" hint-placeholder-val="{{false}}">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#1D1F24">{{c.sentLabel}}</span>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+    </div>
+  </section>
+
+  <div style="display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;font-size:12.5px;color:#5F626B;margin-top:-6px">
+    <span style="display:inline-flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4" fill="#1D1F24"></circle></svg>knot: one artefact; select it to follow its thread</span>
+    <span style="display:inline-flex;align-items:center;gap:6px"><svg width="28" height="12" viewBox="0 0 28 12" aria-hidden="true"><path d="M1 9 C10 9 14 3 27 3" fill="none" stroke="#1D1F24" stroke-width="1.6"></path></svg>thread: runs left to right through time</span>
+    <span style="display:inline-flex;align-items:center;gap:6px"><svg width="28" height="14" viewBox="0 0 28 14" aria-hidden="true"><path d="M1 7 H12" fill="none" stroke="#1D1F24" stroke-width="1.6"></path><path d="M12 7 C17 7 20 3 27 2 M12 7 C18 7 21 9 27 9 M12 7 C16 8 19 12 24 13" fill="none" stroke="#1D1F24" stroke-width="1" stroke-dasharray="2 2"></path></svg>frayed end: loose, no owner</span>
+    <span style="display:inline-flex;align-items:center;gap:6px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="2.5" y="2.5" width="7" height="7" transform="rotate(45 6 6)" fill="#1D1F24"></rect></svg>tied off: one decision for you</span>
+    <span style="display:inline-flex;align-items:center;gap:6px"><span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#1D1F24">[9 Oct]</span>placeholder date, until read from the artefact</span>
+  </div>
+
+  <section aria-label="Thread reader" style="display:flex;flex-wrap:wrap;gap:20px 28px;align-items:flex-start">
+    <article style="flex:1 1 560px;min-width:0">
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#5F626B">Thread reader</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#5F626B">{{reader.meta}}</span>
+      </div>
+      <h2 style="margin:4px 0 4px;font-size:25px;line-height:1.15;font-weight:500;display:flex;align-items:center;gap:10px"><span aria-hidden="true" style="{{reader.swatchStyle}}"></span>{{reader.title}}</h2>
+      <p style="margin:0 0 10px;font-size:15.5px;line-height:1.4;font-style:italic;color:#3E4149;max-width:68ch">{{reader.why}}</p>
+      <ol style="list-style:none;margin:0;padding:0;border-bottom:1px solid #E2DCCF">
+        <sc-for list="{{reader.story}}" as="r" hint-placeholder-count="6">
+          <li style="{{r.rowStyle}}">
+            <span style="flex:0 0 76px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.4;color:#5F626B;padding-top:2px">{{r.date}}</span>
+            <span style="flex:1 1 300px;min-width:0;font-size:15.5px;line-height:1.38">{{r.text}}</span>
+            <button type="button" onClick="{{r.pick}}" aria-pressed="{{r.pressed}}" aria-label="{{r.aria}}" style="{{r.chipStyle}}"><span aria-hidden="true" style="{{r.dotStyle}}"></span>{{r.chip}}</button>
+          </li>
+        </sc-for>
+      </ol>
+    </article>
+
+    <aside aria-label="Knot to tie for the selected thread" style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:12px">
+      <div style="{{reader.panelStyle}}">
+        <div style="display:flex;justify-content:space-between;gap:10px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.05em;text-transform:uppercase;color:#5F626B">
+          <span>Knot to tie</span>
+          <span style="{{reader.statusStyle}}">{{reader.status}}</span>
+        </div>
+        <p style="margin:8px 0 10px;font-size:22px;line-height:1.22;font-weight:500">{{reader.decision}}</p>
+        <p style="margin:0 0 10px;font-size:14.5px;line-height:1.45;color:#3E4149"><span style="font-weight:600;color:#1D1F24">If you hand it over: </span>{{reader.plan}}</p>
+        <div style="display:flex;flex-wrap:wrap;gap:4px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5F626B;margin-bottom:12px">
+          <span>{{reader.ownerLine}}</span>
+          <span>{{reader.note}}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <sc-if value="{{reader.showChoices}}" hint-placeholder-val="{{true}}">
+            <sc-for list="{{reader.choiceBtns}}" as="rc" hint-placeholder-count="2">
+              <button type="button" onClick="{{rc.pick}}" aria-pressed="{{rc.pressed}}" style="{{rc.style}}">{{rc.label}}</button>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{reader.showHand}}" hint-placeholder-val="{{false}}">
+            <button type="button" onClick="{{reader.toggle}}" aria-pressed="{{reader.pressed}}" style="{{reader.handStyle}}">{{reader.handLabel}}</button>
+          </sc-if>
+          <sc-if value="{{reader.isSent}}" hint-placeholder-val="{{false}}">
+            <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#1D1F24">{{reader.sentLabel}}</span>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="border:1px solid #D6CFBF;border-radius:8px;background:#FBFAF6;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+          <span style="font-size:15px;font-weight:600">Batch for one approval</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#5F626B">{{batchCountLabel}}</span>
+        </div>
+        <sc-if value="{{batchEmpty}}" hint-placeholder-val="{{true}}">
+          <p style="margin:0;font-size:14px;line-height:1.4;color:#3E4149">Nothing queued. Tie knots on the loom; they go to the fleet together, on one approval you read once.</p>
+        </sc-if>
+        <sc-if value="{{batchHas}}" hint-placeholder-val="{{false}}">
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{batchItems}}" as="bi" hint-placeholder-count="2">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 8px;border:1px solid #CFC8B8;border-radius:4px;background:#FFFFFF"><span aria-hidden="true" style="{{bi.dotStyle}}"></span>{{bi.text}}</span>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+            <button type="button" onClick="{{approve}}" style="font:inherit;font-size:14px;font-weight:600;padding:7px 14px;border-radius:5px;border:1px solid #17306B;background:#17306B;color:#FFFFFF;cursor:pointer">{{approveLabel}}</button>
+            <button type="button" onClick="{{clearBatch}}" style="font:inherit;font-size:14px;padding:7px 12px;border-radius:5px;border:1px solid #CFC8B8;background:transparent;color:#1D1F24;cursor:pointer">Clear</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{sentHas}}" hint-placeholder-val="{{false}}">
+          <p style="margin:0;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5;color:#5F626B">{{sentSummary}}</p>
+        </sc-if>
+      </div>
+    </aside>
+  </section>
+
+  <footer style="display:flex;flex-wrap:wrap;gap:6px 20px;justify-content:space-between;align-items:baseline;font-size:12.5px;color:#5F626B;border-top:1px solid #D6CFBF;padding-top:10px">
+    <span>Each knot is one artefact and names its source; the reader never replaces it. Bracketed dates and ids are [placeholders] until read from the artefact itself.</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px">harbour.cat · map · loom</span>
+  </footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150},"startThread":"a"}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const p = this.props || {};
+    const focus = s.focus || '';
+    const batch = s.batch || {};
+    const sent = s.sent || {};
+    const upd = (patch) => this.setState(Object.assign({}, this.state || {}, patch));
+
+    const MONO = "'JetBrains Mono',ui-monospace,Menlo,monospace";
+    const INK = '#1D1F24';
+    const MUTED = '#5F626B';
+    const WARN = '#A3410A';
+    const LOOM = '#F8F6F0';
+    const laneY = (i) => 42 + i * 84;
+    const dayX = (d) => 40 + (d - 1) * 68;
+    const OFF = { a: -22, b: -11, c: 0, d: 11, e: 22 };
+    const CARD_Y = { c: 48, e: 150, d: 252, a: 354, b: 456 };
+    const ORDER = ['a', 'b', 'c', 'd', 'e'];
+
+    const LANES = [
+      { name: 'Code', sub: '429 files · 11 areas' },
+      { name: 'Tickets', sub: '1,229 open · 316 residue' },
+      { name: 'Reviews & periodicals', sub: '16 periodicals' },
+      { name: 'Rulings', sub: '275 in history · 0 open' },
+      { name: 'Research (papers)', sub: 'none tied in yet' },
+      { name: 'Money & capacity', sub: 'cap 50 · resets Thu 15 Oct' }
+    ];
+
+    const T = [
+      {
+        id: 'a', color: '#17306B', title: 'Sibling filed, not fixed', ref: 'LIN-3504',
+        why: 'A clean fix re-decided its neighbour inline; review filed the neighbour instead of fixing it, and the decision is now parked on you.',
+        knots: [
+          { id: 'a1', lane: 1, day: 9, label: 'LIN-3504', anchor: 'bl', date: '[9 Oct]', text: 'LIN-3504 fixes the task page’s stale question, done right in the new ticket style.', chip: 'LIN-3504 ✓' },
+          { id: 'a2', lane: 0, day: 10, label: 'task-page-loader.js:148', anchor: 'bl', date: '[10 Oct]', text: 'On the way, it re-decides a neighbour, “is it still waiting?”, inline.', chip: 'lib/task-page-loader.js:148' },
+          { id: 'a3', lane: 2, day: 11, label: 'review · [report]', anchor: 'bl', date: '[11 Oct]', text: 'Review sees the neighbour and files it, rather than fixing it.', chip: 'review · [report id]' },
+          { id: 'a4', lane: 1, day: 12, label: 'LIN-3513', anchor: 'br', date: '[12 Oct]', text: 'The sibling becomes LIN-3513.', chip: 'LIN-3513' },
+          { id: 'a5', lane: 0, day: 13, label: 'waiting on a person', anchor: 'bl', date: '[13 Oct]', text: '“Waiting on a person” now stands in 3 copies, with 5 inline checks.', chip: '3 copies · 5 inline checks' },
+          { id: 'a6', lane: 3, day: 14, label: 'ruling · blocked-agent clock', anchor: 'bl', date: '14 Oct', text: 'It is parked behind a ruling from you, while rulings waiting reads 0.', chip: 'rulings open: 0' }
+        ],
+        short: 'Rule: does a blocked agent start the waiting clock?',
+        decision: 'Does a blocked agent start the waiting clock?',
+        plan: 'once you rule, the fleet brings “waiting on a person” to one place (three copies and five inline checks become one) and folds LIN-3513 into it.',
+        owner: 'you, by ruling',
+        status: 'needs your ruling',
+        note: 'unparks 1 of 23',
+        choices: ['Yes, it starts', 'No, it waits'],
+        batchLabel: 'ruling'
+      },
+      {
+        id: 'b', color: '#C8590F', title: 'One question, three asks', ref: 'LIN-3502', enter: true,
+        why: 'Rulings are remembered per session, not per decision, so a settled question keeps finding its way back to you.',
+        knots: [
+          { id: 'b1', lane: 3, day: 1, label: 'rulings · per session', anchor: 'br', date: '[≤1 Oct]', text: 'Rulings are stored against the session that asked, not the decision.', chip: 'rulings · per session' },
+          { id: 'b2', lane: 1, day: 4, label: 'LIN-3502 · window cap', anchor: 'ar', date: '[4 Oct]', text: 'LIN-3502 raises a question about the window cap.', chip: 'LIN-3502' },
+          { id: 'b3', lane: 3, day: 5, label: 'ask 1', anchor: 'b', date: '[5 Oct]', text: 'The question reaches you.', chip: 'ask 1 of 3' },
+          { id: 'b4', lane: 3, day: 7, label: 'ask 2', anchor: 'b', date: '[7 Oct]', text: 'A new session asks it again; the answer was filed under the old one.', chip: 'ask 2 of 3' },
+          { id: 'b5', lane: 3, day: 10, label: 'ask 3', anchor: 'b', date: '[10 Oct]', text: 'And a third time.', chip: 'ask 3 of 3' },
+          { id: 'b6', lane: 5, day: 14, label: 'false-escalation KPI', anchor: 'al', date: '14 Oct', text: 'Of 275 rulings, about 1 in 10 repeated an earlier question: the false-escalation KPI.', chip: '275 rulings · ~1 in 10' }
+        ],
+        short: 'Key rulings to the decision, not the session.',
+        decision: 'Key each ruling to its decision, not to the session that asked.',
+        plan: 'the fleet looks rulings up by decision, so LIN-3502’s question, and every repeat like it, reaches you once.',
+        owner: '[placeholder]',
+        status: 'owner [placeholder]',
+        note: '~1 in 10 rulings a repeat',
+        batchLabel: 'rulings keyed per decision'
+      },
+      {
+        id: 'c', color: '#B08008', title: 'The unpriced models', ref: 'model-pricing.js', enter: true,
+        why: 'The two models doing nearly all the work have no price, so the headline cost can’t be read, and the check that should notice reports clean.',
+        knots: [
+          { id: 'c0', lane: 5, x: 14, label: '$19.63 · Aug', anchor: 'ar', date: 'Aug', text: 'Cost per verified task last read $19.63.', chip: '$19.63 · Aug' },
+          { id: 'c1', lane: 0, day: 3, label: 'model-pricing.js', anchor: 'ar', date: '[3 Oct]', text: 'Opus 5.5 and Sonnet 5.5 now do nearly all the work; the pricing table has no row for either.', chip: 'lib/model-pricing.js' },
+          { id: 'c2', lane: 5, day: 5, label: '/cost → null', anchor: 'b', date: '[5 Oct]', text: '/cost returns null.', chip: '/cost → null' },
+          { id: 'c3', lane: 5, day: 8, label: 'headline: unreadable', anchor: 'b', date: '[8 Oct]', text: 'The north-star headline goes unreadable.', chip: 'cost / verified task' },
+          { id: 'c4', lane: 2, day: 10, label: 'pricing sweep · clean', anchor: 'ar', date: '[10 Oct]', text: 'The hourly pricing sweep checks only rows that exist, so it reports clean.', chip: 'hourly sweep · clean' },
+          { id: 'c5', lane: 1, day: 13, label: 'LIN-3094 · Opus only', anchor: 'al', date: '[13 Oct]', text: 'LIN-3094 covers Opus 5.5. Sonnet 5.5 is still untied.', chip: 'LIN-3094' }
+        ],
+        frays: ['M856 126 C872 126 880 146 896 156'],
+        frayLabel: { x: 896, y: 156, anchor: 'bl', text: 'Sonnet 5.5 · untied' },
+        short: 'Price Opus 5.5 and Sonnet 5.5.',
+        decision: 'Price Opus 5.5 and Sonnet 5.5.',
+        plan: 'the fleet adds both rows, widening LIN-3094 to Sonnet 5.5, and makes the hourly sweep flag any model in use that has no row. The headline comes back.',
+        owner: 'LIN-3094 (Opus 5.5 only)',
+        status: 'half-tied',
+        note: 'unblocks the headline',
+        batchLabel: 'price Opus 5.5 + Sonnet 5.5'
+      },
+      {
+        id: 'd', color: '#1B6F69', title: 'Coherence vs seams', ref: 'LIN-3449', loose: true,
+        why: 'Bringing each decision to one place raised the links between areas; each gauge’s rules hand the tension to the other, and nobody owns it.',
+        knots: [
+          { id: 'd1', lane: 1, day: 6, label: 'LIN-3449 · batch 3', anchor: 'br', date: '[6 Oct]', text: 'The coherence loop’s batch 3 brings more decisions to one place.', chip: 'LIN-3449 · batch 3' },
+          { id: 'd2', lane: 0, day: 8, label: 'links 255 → 310', anchor: 'ar', date: '[8 Oct]', text: 'Cross-area links rise from 255 to 310: “one place per decision” put the place in another area.', chip: 'cross-area links 255 → 310' },
+          { id: 'd3', lane: 2, day: 13, label: 'Seams & Tangles', anchor: 'bl', date: '13 Oct', text: 'Seams & Tangles, new that day, names a cross-review tension.', chip: 'Seams & Tangles' },
+          { id: 'd4', lane: 2, day: 14, label: 'Drift & Coherence', anchor: 'al', date: '[14 Oct]', text: 'Drift & Coherence defers it back to Seams.', chip: 'Drift & Coherence' }
+        ],
+        endLine: { date: '14 Oct', text: 'Each gauge hands the tension to the other; nobody owns it. Batch 4 waits for Thursday’s budget.', chip: 'owner: none' },
+        frays: ['M956 228 C970 228 980 222 997 224', 'M956 228 C972 230 984 240 998 247', 'M956 228 C968 232 976 252 989 262'],
+        looseEnd: { x: 956, y: 228 },
+        short: 'Read Seams with Drift when choosing each one place.',
+        decision: 'Read the Seams gauge with Drift when choosing each consolidation’s one place.',
+        plan: 'coherence batch 4 picks each decision’s place with both gauges open, and the tension gets an owner, before batch 4 runs on the budget that resets Thu 15 Oct.',
+        owner: 'none',
+        status: 'loose · no owner',
+        note: 'tie before Thu 15 Oct',
+        batchLabel: 'Seams read with Drift'
+      },
+      {
+        id: 'e', color: '#7A2E6E', title: 'The front door', ref: 'LIN-3108', enter: true,
+        why: 'What a newcomer meets first: a check that cannot fail, a login that 503s, and docs that describe an older product.',
+        knots: [
+          { id: 'e1', lane: 0, day: 1, label: 'scripts/env-check.sh', anchor: 'ar', date: '[≤1 Oct]', text: 'scripts/env-check.sh can never fail.', chip: 'scripts/env-check.sh' },
+          { id: 'e2', lane: 1, day: 2, label: 'LIN-2386 · Backlog', anchor: 'ar', date: '[2 Oct]', text: 'Its ticket, LIN-2386, sits in Backlog.', chip: 'LIN-2386 · Backlog' },
+          { id: 'e3', lane: 2, day: 8, label: 'Onboarding · run 2', anchor: 'ar', date: '[8 Oct]', text: 'Onboarding & Cold-Start’s second run reads the front door cold.', chip: 'Onboarding & Cold-Start · run 2' },
+          { id: 'e4', lane: 0, day: 9, label: 'README · llms.txt', anchor: 'al', date: '[9 Oct]', text: 'README and llms.txt still describe “a collapsible tree”.', chip: 'README · llms.txt' },
+          { id: 'e5', lane: 1, day: 11, label: 'LIN-3108', anchor: 'ar', date: '[11 Oct]', text: '“Log in with Linear” 503s on an unconfigured self-host.', chip: 'LIN-3108' }
+        ],
+        endLine: { date: '14 Oct', text: 'Separately, LIN-3404 (High) gates any invite: the GitHub install callback trusts installation_id without checking access.', chip: 'LIN-3404 · High' },
+        short: 'Fix the front door before the first invite.',
+        decision: 'Fix the front door before anyone is invited.',
+        plan: 'the fleet makes env-check able to fail (LIN-2386), turns the 503 into a setup message (LIN-3108), and rewrites README and llms.txt. LIN-3404 stays its own gate: spike it against a test installation.',
+        owner: 'LIN-2386 · LIN-3108',
+        status: 'ticketed',
+        note: 'LIN-3404 gates invites too',
+        batchLabel: 'front door'
+      }
+    ];
+
+    T.forEach((t) => {
+      t.knots.forEach((k) => {
+        if (k.x === undefined) { k.x = dayX(k.day); }
+        k.y = laneY(k.lane) + OFF[t.id];
+      });
+    });
+    const byId = {};
+    T.forEach((t) => { byId[t.id] = t; });
+    const wanted = s.sel || p.startThread || 'a';
+    const selId = byId[wanted] ? wanted : 'a';
+    const cur = byId[selId];
+
+    const pick = (id) => () => upd({ sel: id, focus: '' });
+    const focusOn = (id, fid) => () => {
+      const was = (this.state || {}).focus || '';
+      upd({ sel: id, focus: was === fid ? '' : fid });
+    };
+    const toggle = (id, val) => () => {
+      const b = Object.assign({}, (this.state || {}).batch || {});
+      if (b[id] === val) { delete b[id]; } else { b[id] = val; }
+      upd({ batch: b, sel: id });
+    };
+    const approve = () => {
+      const st = this.state || {};
+      upd({ sent: Object.assign({}, st.sent || {}, st.batch || {}), batch: {} });
+    };
+    const clearBatch = () => upd({ batch: {} });
+
+    const curve = (pts) => {
+      let d = 'M' + pts[0].x + ' ' + pts[0].y;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1];
+        const b = pts[i];
+        const h = (b.x - a.x) / 2;
+        d += ' C' + (a.x + h) + ' ' + a.y + ' ' + (b.x - h) + ' ' + b.y + ' ' + b.x + ' ' + b.y;
+      }
+      return d;
+    };
+
+    const labelStyle = (x, y, anchor, color, on) => {
+      const above = anchor.charAt(0) === 'a';
+      const side = anchor.charAt(1);
+      const tx = side === 'l' ? 'translateX(calc(-100% + 6px))' : (side === 'r' ? 'translateX(-6px)' : 'translateX(-50%)');
+      const top = above ? y - 25 : y + 8;
+      return 'position:absolute;left:' + (x / 10) + '%;top:' + top + 'px;transform:' + tx + ';white-space:nowrap;font-family:' + MONO + ';font-size:10.5px;line-height:15px;padding:1px 5px;border-radius:3px;border:1px solid ' + (on ? color : 'transparent') + ';background:' + (on ? '#FFFFFF' : LOOM) + ';color:' + INK + ';pointer-events:none;z-index:3';
+    };
+
+    const btnStyle = (on, big) => 'display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:' + (big ? 14 : 12) + 'px;line-height:1.2;padding:' + (big ? '6px 13px' : '3px 8px') + ';border-radius:' + (big ? 5 : 4) + 'px;cursor:pointer;border:1px solid ' + INK + ';background:' + (on ? INK : 'transparent') + ';color:' + (on ? '#FFFFFF' : INK);
+
+    const isLoose = (t) => !!t.loose && !sent[t.id];
+    const sentText = (t, short) => {
+      if (t.choices) { return 'Ruled: ' + String(sent[t.id]).toLowerCase() + (short ? ' ✓' : ' · handed to the fleet ✓'); }
+      return short ? 'Handed ✓' : 'Handed to the fleet ✓ · [session ids]';
+    };
+
+    const threads = T.map((t) => {
+      const on = t.id === selId;
+      return {
+        title: t.title,
+        color: t.color,
+        meta: t.ref + ' · ' + t.knots.length + ' knots' + (isLoose(t) ? ' · loose' : '') + (sent[t.id] ? ' · handed' : ''),
+        pressed: on ? 'true' : 'false',
+        pick: pick(t.id),
+        btnStyle: 'display:inline-flex;align-items:center;gap:9px;padding:7px 12px 7px 10px;border-radius:6px;cursor:pointer;font:inherit;color:' + INK + ';text-align:left;background:' + (on ? '#FFFFFF' : 'transparent') + ';border:1.5px solid ' + (on ? INK : '#D6CFBF') + ';box-shadow:' + (on ? '0 1px 0 rgba(29,31,36,0.08)' : 'none')
+      };
+    });
+
+    const drawAll = T.map((t) => {
+      const on = t.id === selId;
+      const loose = isLoose(t);
+      const first = t.knots[0];
+      const pts = (t.enter ? [{ x: 0, y: first.y }] : []).concat(t.knots.map((k) => ({ x: k.x, y: k.y })));
+      pts.push(loose && t.looseEnd ? t.looseEnd : { x: 1000, y: CARD_Y[t.id] });
+      const fr = (t.frays || []).concat(['M0 0', 'M0 0', 'M0 0']).slice(0, 3);
+      const fo = (t.frays && !sent[t.id]) ? (on ? 0.95 : 0.3) : 0;
+      return {
+        on: on,
+        path: curve(pts),
+        haloStyle: 'fill:none;stroke:' + LOOM + ';stroke-width:8;stroke-linecap:round;stroke-linejoin:round;opacity:' + (on ? 1 : 0),
+        lineStyle: 'fill:none;stroke:' + t.color + ';stroke-width:' + (on ? 2.75 : 1.25) + ';stroke-linecap:round;stroke-linejoin:round;opacity:' + (on ? 1 : 0.3),
+        f1: fr[0], f2: fr[1], f3: fr[2],
+        frayStyle: 'fill:none;stroke:' + t.color + ';stroke-width:' + (on ? 1.6 : 1) + ';stroke-dasharray:3 3;stroke-linecap:round;opacity:' + fo
+      };
+    });
+    const drawThreads = drawAll.filter((w) => !w.on).concat(drawAll.filter((w) => w.on));
+
+    const knotsOff = [];
+    const knotsOn = [];
+    T.forEach((t) => {
+      const on = t.id === selId;
+      t.knots.forEach((k) => {
+        const f = focus === k.id;
+        const size = f ? 13 : (on ? 10 : 7);
+        const item = {
+          style: 'position:absolute;left:' + (k.x / 10) + '%;top:' + k.y + 'px;width:24px;height:24px;margin:-12px 0 0 -12px;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:' + (on ? 5 : 4),
+          dotStyle: 'display:block;width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + t.color + ';opacity:' + (on ? 1 : 0.45) + ';box-shadow:0 0 0 2px ' + LOOM + (f ? ',0 0 0 4px ' + t.color : ''),
+          aria: k.label + ', ' + k.date + ', on the thread “' + t.title + '”',
+          pressed: f ? 'true' : 'false',
+          pick: focusOn(t.id, k.id)
+        };
+        if (on) { knotsOn.push(item); } else { knotsOff.push(item); }
+      });
+    });
+    const knots = knotsOff.concat(knotsOn);
+
+    const labels = cur.knots.map((k) => ({ text: k.label, style: labelStyle(k.x, k.y, k.anchor, cur.color, focus === k.id) }));
+    if (cur.frayLabel && !sent[cur.id]) {
+      const fl = cur.frayLabel;
+      labels.push({ text: fl.text, style: labelStyle(fl.x, fl.y, fl.anchor, cur.color, false) + ';color:' + MUTED + ';font-style:italic' });
+    }
+
+    const cards = T.map((t) => {
+      const on = t.id === selId;
+      const loose = isLoose(t);
+      const isSent = !!sent[t.id];
+      const inBatch = batch[t.id] !== undefined;
+      const f = focus === t.id + ':end';
+      const cy = CARD_Y[t.id];
+      return {
+        wrapStyle: 'position:absolute;left:0;right:12px;top:' + (cy - 48) + 'px;height:96px',
+        markStyle: 'position:absolute;left:-6px;top:42px;width:11px;height:11px;box-sizing:border-box;transform:rotate(45deg);z-index:2;' + (loose ? 'background:' + LOOM + ';border:1.5px dashed ' + t.color : 'background:' + t.color) + ';opacity:' + (on ? 1 : 0.5),
+        cardStyle: 'height:100%;box-sizing:border-box;padding:7px 10px 8px 14px;display:flex;flex-direction:column;gap:3px;overflow:hidden;border-radius:0 6px 6px 0;background:' + (on ? '#FFFFFF' : '#FBFAF6') + ';border:' + (on ? '1.5px ' : '1px ') + (loose ? 'dashed ' : 'solid ') + (on ? t.color : '#CFC8B8') + (f ? ';outline:2px solid ' + t.color + ';outline-offset:2px' : ''),
+        status: isSent ? 'handed over' : t.status,
+        statusStyle: 'white-space:nowrap;color:' + (loose ? WARN : MUTED),
+        short: t.short,
+        pick: pick(t.id),
+        pickAria: 'Follow the thread “' + t.title + '”: ' + t.short,
+        showChoices: !!t.choices && !isSent,
+        showHand: !t.choices && !isSent,
+        isSent: isSent,
+        sentLabel: isSent ? sentText(t, true) : '',
+        choiceBtns: (t.choices || []).map((c) => ({ label: c, pick: toggle(t.id, c), pressed: batch[t.id] === c ? 'true' : 'false', style: btnStyle(batch[t.id] === c, false) })),
+        toggle: toggle(t.id, true),
+        pressed: inBatch ? 'true' : 'false',
+        handLabel: inBatch ? 'In batch ✓' : 'Hand to fleet',
+        handAria: (inBatch ? 'Remove from the batch: ' : 'Hand to the fleet, add to the batch: ') + t.short,
+        handStyle: btnStyle(inBatch, false)
+      };
+    });
+
+    const lanes = LANES.map((l, i) => {
+      let n = 0;
+      T.forEach((t) => { t.knots.forEach((k) => { if (k.lane === i) { n += 1; } }); });
+      const touched = cur.knots.some((k) => k.lane === i);
+      return {
+        name: l.name,
+        sub: l.sub,
+        count: n + (n === 1 ? ' knot' : ' knots'),
+        nameStyle: 'font-size:13.5px;line-height:1.15;font-weight:' + (touched ? 600 : 500) + ';color:' + (touched ? INK : MUTED),
+        markStyle: 'display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:' + (touched ? cur.color : 'transparent') + ';box-shadow:inset 0 0 0 1px ' + (touched ? cur.color : '#CFC8B8')
+      };
+    });
+
+    const days = [];
+    for (let d = 1; d <= 14; d++) {
+      days.push({
+        label: d === 1 ? '1 Oct' : (d === 14 ? '14 Oct' : String(d)),
+        style: 'position:absolute;top:9px;left:' + (dayX(d) / 10) + '%;transform:translateX(-50%);white-space:nowrap;font-family:' + MONO + ';font-size:10px;line-height:12px;font-weight:' + (d === 14 ? 600 : 400) + ';color:' + (d === 14 ? INK : MUTED)
+      });
+    }
+
+    const storySrc = cur.knots.map((k) => ({ fid: k.id, date: k.date, text: k.text, chip: k.chip }));
+    if (cur.endLine) { storySrc.push({ fid: cur.id + ':end', date: cur.endLine.date, text: cur.endLine.text, chip: cur.endLine.chip }); }
+    const story = storySrc.map((r) => {
+      const f = focus === r.fid;
+      return {
+        date: r.date,
+        text: r.text,
+        chip: r.chip,
+        pick: focusOn(cur.id, r.fid),
+        pressed: f ? 'true' : 'false',
+        aria: 'Show ' + r.chip + ' on the loom',
+        rowStyle: 'display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;padding:8px 10px;border-top:1px solid #E2DCCF;border-radius:4px;background:' + (f ? '#FFFFFF' : 'transparent'),
+        chipStyle: 'display:inline-flex;align-items:center;gap:6px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:' + MONO + ';font-size:11px;line-height:1.3;padding:3px 8px;border-radius:4px;cursor:pointer;color:' + INK + ';border:1px solid ' + (f ? cur.color : '#CFC8B8') + ';background:' + (f ? '#FFFFFF' : '#FBFAF6'),
+        dotStyle: 'display:inline-block;flex:none;width:7px;height:7px;border-radius:50%;background:' + cur.color
+      };
+    });
+
+    const laneSet = {};
+    cur.knots.forEach((k) => { laneSet[k.lane] = true; });
+    const nLanes = Object.keys(laneSet).length;
+    const curLoose = isLoose(cur);
+    const curSent = !!sent[cur.id];
+    const curIn = batch[cur.id] !== undefined;
+    const reader = {
+      title: cur.title,
+      why: cur.why,
+      meta: cur.knots.length + ' knots · crosses ' + nLanes + ' of 6 layers · ' + cur.knots[0].date + ' → ' + cur.knots[cur.knots.length - 1].date,
+      swatchStyle: 'display:inline-block;flex:none;width:26px;height:3px;border-radius:2px;background:' + cur.color,
+      story: story,
+      panelStyle: 'border:1.5px ' + (curLoose ? 'dashed ' : 'solid ') + cur.color + ';border-radius:8px;background:#FFFFFF;padding:14px 16px',
+      status: curSent ? 'handed over' : cur.status,
+      statusStyle: 'white-space:nowrap;color:' + (curLoose ? WARN : MUTED),
+      decision: cur.decision,
+      plan: cur.plan,
+      ownerLine: 'owner: ' + cur.owner,
+      note: cur.note || '',
+      showChoices: !!cur.choices && !curSent,
+      showHand: !cur.choices && !curSent,
+      isSent: curSent,
+      sentLabel: curSent ? sentText(cur, false) : '',
+      choiceBtns: (cur.choices || []).map((c) => ({ label: c, pick: toggle(cur.id, c), pressed: batch[cur.id] === c ? 'true' : 'false', style: btnStyle(batch[cur.id] === c, true) })),
+      toggle: toggle(cur.id, true),
+      pressed: curIn ? 'true' : 'false',
+      handLabel: curIn ? 'In batch ✓ · remove' : 'Hand to fleet · add to batch',
+      handStyle: btnStyle(curIn, true)
+    };
+
+    const queued = ORDER.filter((id) => batch[id] !== undefined);
+    const batchItems = queued.map((id) => {
+      const t = byId[id];
+      return {
+        text: t.choices ? t.batchLabel + ': ' + String(batch[id]).toLowerCase() : t.batchLabel,
+        dotStyle: 'display:inline-block;flex:none;width:7px;height:7px;border-radius:50%;background:' + t.color
+      };
+    });
+    const nSent = ORDER.filter((id) => sent[id] !== undefined).length;
+
+    return {
+      threads: threads,
+      drawThreads: drawThreads,
+      knots: knots,
+      labels: labels,
+      cards: cards,
+      lanes: lanes,
+      days: days,
+      reader: reader,
+      batchItems: batchItems,
+      batchEmpty: queued.length === 0,
+      batchHas: queued.length > 0,
+      batchCountLabel: queued.length + ' queued',
+      approveLabel: 'Approve batch · ' + queued.length + (queued.length === 1 ? ' knot' : ' knots'),
+      approve: approve,
+      clearBatch: clearBatch,
+      sentHas: nSent > 0,
+      sentSummary: nSent + (nSent === 1 ? ' knot' : ' knots') + ' handed to the fleet on one approval · [dispatch receipt]',
+      goA: pick('a'),
+      goC: pick('c'),
+      goD: pick('d')
+    };
+  }
+}
+</script>
+</body>
+</html>

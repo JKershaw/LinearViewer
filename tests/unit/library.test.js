@@ -138,7 +138,7 @@ describe('library catalog', () => {
   });
 
   // Characterization guard: the excerpt skip rule is for the papers folder
-  // only, so it must change the six essays and nothing on the papers or listed
+  // only, so it must change the essays and nothing on the papers or listed
   // shelves. The fixture is the summaries as they were before this change.
   test('the excerpt rule changes only the essays, never a shelf paper or listed doc', () => {
     const before = JSON.parse(readFileSync(
@@ -146,7 +146,7 @@ describe('library catalog', () => {
     for (const doc of [...catalog.papers, ...catalog.listed]) {
       assert.equal(doc.summary, before[doc.slug], `${doc.slug}: summary unchanged`);
     }
-    assert.equal(catalog.essays.length, 6, 'six essays');
+    assert.equal(catalog.essays.length, 7, 'seven essays');
     for (const doc of catalog.essays) {
       assert.notEqual(doc.summary, before[doc.slug], `${doc.slug}: no longer the italic subtitle`);
     }

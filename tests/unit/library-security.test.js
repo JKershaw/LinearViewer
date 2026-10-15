@@ -144,6 +144,19 @@ describe('library response headers and 404s', () => {
     assert.match(res.headers.get('content-type'), /image\/svg\+xml/);
   });
 
+  test('png figures are served as png, script-blocked, with nosniff', async () => {
+    const res = await get('/library/figures/hostile/x.png');
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-security-policy'), FIGURE_CSP);
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(res.headers.get('content-type'), 'image/png');
+  });
+
+  test('only svg and png files under figures/ are served', async () => {
+    const res = await get('/library/figures/hostile/not-a-figure.html');
+    assert.equal(res.status, 404);
+  });
+
   test('wrong-form slugs 404 at the router', async () => {
     const res = await get('/library/doc/hostile');
     assert.equal(res.status, 404);

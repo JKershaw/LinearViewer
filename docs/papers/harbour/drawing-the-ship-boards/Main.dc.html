@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Chart</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#efe9db}
+a{color:#305f7a;text-underline-offset:2px}a:hover{color:#1e2a33}
+</style>
+</helmet>
+<div style="width:100%;max-width:1440px;margin:0 auto;box-sizing:border-box;padding:22px 28px 28px;background:#efe9db;color:#1e2a33;font-family:'EB Garamond',Georgia,'Times New Roman',serif;">
+
+  <header style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 28px;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid #cfc5ad;">
+    <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;">Harbour</span>
+      <h1 style="margin:0;font-size:27px;line-height:1.1;font-weight:500;font-style:italic;">The Chart</h1>
+      <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">harbour.cat · 429 files · 11 areas · 0 file-level cycles</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 20px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">
+      <span>sounded 14 Oct 2026 · commit [sha]</span>
+      <span>fleet cap 50 · budget resets Thu 15 Oct</span>
+      <a href="#flight-companion" style="font-family:'EB Garamond',Georgia,serif;font-size:15px;">Flight Companion →</a>
+    </div>
+  </header>
+
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:24px;">
+
+    <section aria-label="Chart of the code" style="flex:3 1 700px;min-width:0;max-width:960px;">
+      <div style="overflow-x:auto;border:1px solid #1e2a33;background:#f6f1e5;">
+        <div style="position:relative;min-width:700px;">
+          <svg viewBox="0 0 960 860" role="img" aria-label="Nautical chart of the code. Eleven areas drawn as land. A knot of nine tangled areas forms an archipelago joined by narrow two-way straits: Chat-tools Narrows between LLM and prompts and Runs and dispatch, and Auth-Pages Sound with 12 of 15 edges both ways. Providers is a separate, well-formed island with a clear harbour mouth, its front door. Browser code is an unsurveyed coast to the west. Wiring, server.js, is the lighthouse at the entrance. 23 soundings mark decisions held in several places, figured by severity from 1 High to 5 Low, three ringed as new this week. Hazards: rock LIN-3404 in the entrance, three front-door shoals, and the wreck of the cost headline. A plotted course runs through waypoints 1 to 5. The coherence loop's track passes batches 1 to 3; batch 4 lies at anchor until Thursday 15 October." style="display:block;width:100%;height:auto;">
+            <defs>
+              <path id="bA" vector-effect="non-scaling-stroke" d="M0,-96 C34,-104 70,-80 88,-50 C104,-22 92,8 100,34 C108,64 74,92 38,96 C8,100 -18,86 -46,92 C-80,98 -104,64 -98,30 C-94,4 -108,-26 -90,-56 C-72,-86 -36,-90 0,-96 Z"></path>
+              <path id="bB" vector-effect="non-scaling-stroke" d="M-10,-100 C30,-96 52,-78 78,-74 C104,-70 106,-30 96,-4 C88,18 104,46 84,70 C62,96 24,90 -6,100 C-40,108 -72,84 -88,58 C-104,32 -90,6 -100,-22 C-110,-52 -84,-80 -54,-90 C-38,-96 -26,-101 -10,-100 Z"></path>
+              <path id="bD" vector-effect="non-scaling-stroke" d="M0,-100 C50,-96 100,-50 96,0 C92,50 50,100 0,96 C-56,92 -100,48 -96,-6 C-92,-58 -48,-104 0,-100 Z"></path>
+              <path id="bP" vector-effect="non-scaling-stroke" d="M10,-100 C50,-102 86,-74 98,-38 C110,0 100,40 76,72 C52,100 10,104 -24,94 C-48,88 -66,74 -78,56 L-50,44 C-34,38 -26,24 -30,8 C-34,-8 -48,-16 -64,-16 L-92,-14 C-100,-44 -82,-74 -54,-90 C-34,-100 -12,-100 10,-100 Z"></path>
+              <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="7" stroke="#cfc3a2" stroke-width="1"></line>
+              </pattern>
+            </defs>
+
+            <rect x="0" y="0" width="960" height="860" fill="#f6f1e5"></rect>
+
+            <!-- neat line and graduated border -->
+            <rect x="8" y="8" width="944" height="844" fill="none" stroke="#1e2a33" stroke-width="1.2"></rect>
+            <rect x="20" y="20" width="920" height="820" fill="none" stroke="#1e2a33" stroke-width="0.6"></rect>
+            <line x1="20" y1="14" x2="940" y2="14" stroke="#1e2a33" stroke-width="4" stroke-dasharray="40 40"></line>
+            <line x1="20" y1="846" x2="940" y2="846" stroke="#1e2a33" stroke-width="4" stroke-dasharray="40 40"></line>
+            <line x1="14" y1="20" x2="14" y2="840" stroke="#1e2a33" stroke-width="4" stroke-dasharray="40 40"></line>
+            <line x1="946" y1="20" x2="946" y2="840" stroke="#1e2a33" stroke-width="4" stroke-dasharray="40 40"></line>
+            <line x1="20" y1="18.5" x2="940" y2="18.5" stroke="#1e2a33" stroke-width="3" stroke-dasharray="0.6 7.4"></line>
+            <line x1="20" y1="841.5" x2="940" y2="841.5" stroke="#1e2a33" stroke-width="3" stroke-dasharray="0.6 7.4"></line>
+            <line x1="18.5" y1="20" x2="18.5" y2="840" stroke="#1e2a33" stroke-width="3" stroke-dasharray="0.6 7.4"></line>
+            <line x1="941.5" y1="20" x2="941.5" y2="840" stroke="#1e2a33" stroke-width="3" stroke-dasharray="0.6 7.4"></line>
+
+            <!-- the unsurveyed west coast: Front end, browser code -->
+            <path d="M20,20 L150,20 C138,48 156,72 146,104 C136,136 160,160 150,196 C140,232 162,262 152,298 C142,334 166,360 156,396 C146,432 164,462 150,494 C138,522 112,540 80,548 C56,554 36,560 20,566 Z" fill="none" stroke="#dce8ea" stroke-width="30"></path>
+            <path d="M20,20 L150,20 C138,48 156,72 146,104 C136,136 160,160 150,196 C140,232 162,262 152,298 C142,334 166,360 156,396 C146,432 164,462 150,494 C138,522 112,540 80,548 C56,554 36,560 20,566 Z" fill="#ebe2c6"></path>
+            <path d="M20,20 L150,20 C138,48 156,72 146,104 C136,136 160,160 150,196 C140,232 162,262 152,298 C142,334 166,360 156,396 C146,432 164,462 150,494 C138,522 112,540 80,548 C56,554 36,560 20,566 Z" fill="url(#hatch)" stroke="#1e2a33" stroke-width="1" stroke-dasharray="5 4"></path>
+            <text transform="translate(46 172) rotate(-90)" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="12" letter-spacing="5" fill="#4c5a63">UNSURVEYED</text>
+            <text transform="translate(46 452) rotate(-90)" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="11" font-style="italic" fill="#4c5a63">the survey cannot see it</text>
+            <path d="M96,436 L102,446 L90,446 Z" fill="#1e2a33"></path>
+            <text x="108" y="446" font-family="'JetBrains Mono',monospace" font-size="10" fill="#1e2a33">46</text>
+            <text x="96" y="460" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="9" fill="#4c5a63">common.js</text>
+
+            <!-- shallows and depth contours of the knot (denser where decisions scatter) -->
+            <g transform="translate(450 305) scale(0.76)"><use href="#bA" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bA" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(265 215) rotate(20) scale(0.64)"><use href="#bB" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bB" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(575 150) rotate(160) scale(0.62)"><use href="#bA" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bA" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(250 410) rotate(-70) scale(0.56)"><use href="#bB" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bB" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(650 335) rotate(70) scale(0.44)"><use href="#bA" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bA" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(420 495) rotate(120) scale(0.40)"><use href="#bB" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bB" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(395 108) scale(0.36)"><use href="#bD" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bD" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <g transform="translate(712 92) rotate(30) scale(0.22)"><use href="#bA" transform="scale(1.62)" fill="none" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="5 4"></use><use href="#bA" transform="scale(1.3)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+            <!-- Providers: deep, clear water — one contour only -->
+            <g transform="translate(790 490) scale(0.5)"><use href="#bP" transform="scale(1.22)" fill="#dce8ea" stroke="#86a3b3" stroke-width="0.8" stroke-dasharray="1.2 2.6"></use></g>
+
+            <!-- the land -->
+            <g fill="#ebe2c6" stroke="#1e2a33" stroke-width="1">
+              <g transform="translate(450 305) scale(0.76)"><use href="#bA"></use></g>
+              <g transform="translate(265 215) rotate(20) scale(0.64)"><use href="#bB"></use></g>
+              <g transform="translate(575 150) rotate(160) scale(0.62)"><use href="#bA"></use></g>
+              <g transform="translate(250 410) rotate(-70) scale(0.56)"><use href="#bB"></use></g>
+              <g transform="translate(650 335) rotate(70) scale(0.44)"><use href="#bA"></use></g>
+              <g transform="translate(420 495) rotate(120) scale(0.40)"><use href="#bB"></use></g>
+              <g transform="translate(395 108) scale(0.36)"><use href="#bD"></use></g>
+              <g transform="translate(712 92) rotate(30) scale(0.22)"><use href="#bA"></use></g>
+              <g transform="translate(790 490) scale(0.5)"><use href="#bP"></use></g>
+              <g transform="translate(565 575) scale(0.1)"><use href="#bD"></use></g>
+            </g>
+
+            <!-- summits: the heaviest blocker on each landmass, as a count -->
+            <path d="M478,334 L484,344 L472,344 Z" fill="#1e2a33"></path>
+            <text x="489" y="344" font-family="'JetBrains Mono',monospace" font-size="10" fill="#1e2a33">78</text>
+            <path d="M640,360 L646,370 L634,370 Z" fill="#1e2a33"></path>
+            <text x="651" y="370" font-family="'JetBrains Mono',monospace" font-size="10" fill="#1e2a33">59</text>
+
+            <!-- water names -->
+            <g font-family="'EB Garamond',Georgia,serif" fill="#305f7a" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">
+              <text x="540" y="46" text-anchor="middle" font-size="10" letter-spacing="4">THE KNOT</text>
+              <text x="540" y="60" text-anchor="middle" font-size="11.5" font-style="italic">9 of 11 areas · 19 two-way straits</text>
+              <text x="466" y="192" text-anchor="middle" font-size="12.5" font-style="italic" transform="rotate(-8 466 192)">Chat-tools Narrows</text>
+              <text x="232" y="318" text-anchor="middle" font-size="12.5" font-style="italic">Auth–Pages Sound</text>
+              <text x="232" y="330" text-anchor="middle" font-size="9" font-family="'JetBrains Mono',monospace">12/15 both ways</text>
+              <text x="790" y="560" text-anchor="middle" font-size="11.5" font-style="italic">harbour mouth — the front door</text>
+              <text x="790" y="572" text-anchor="middle" font-size="9" font-family="'JetBrains Mono',monospace">registry · models · index</text>
+              <text x="784" y="410" font-size="10.5" font-style="italic">3 upward edges</text>
+              <text x="740" y="812" text-anchor="middle" font-size="10" letter-spacing="4">THE APPROACHES</text>
+              <text x="560" y="812" text-anchor="middle" font-size="10" letter-spacing="4">THE ENTRANCE</text>
+            </g>
+
+            <!-- Providers' three upward edges, as tidal streams -->
+            <g fill="none" stroke="#305f7a" stroke-width="1.1" stroke-linecap="round">
+              <path d="M752,456 L734,440 M734,440 L742,441 M734,440 L736,447"></path>
+              <path d="M768,446 L752,426 M752,426 L759,429 M752,426 L752,434"></path>
+              <path d="M788,440 L776,416 M776,416 L782,421 M776,416 L775,424"></path>
+            </g>
+
+            <!-- soundings: one per decision held in several places, figured by severity (1 High … 5 Low) -->
+            <g font-family="'JetBrains Mono',monospace" font-size="11" font-style="italic" fill="#305f7a" text-anchor="middle" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">
+              <text x="560" y="334" font-weight="600" font-size="12.5">1</text>
+              <text x="330" y="459" font-weight="600" font-size="12">2</text>
+              <text x="560" y="274">3</text><text x="200" y="254">3</text><text x="510" y="504">3</text>
+              <text x="215" y="474">4</text><text x="520" y="399">4</text><text x="625" y="209">4</text><text x="500" y="124">4</text><text x="620" y="399">4</text>
+              <text x="330" y="524">4</text><text x="225" y="124">4</text><text x="770" y="364">4</text><text x="190" y="349">4</text><text x="420" y="569">4</text>
+              <text x="760" y="294">5</text><text x="645" y="104">5</text><text x="205" y="179">5</text><text x="610" y="544">5</text>
+              <text x="870" y="424">5</text><text x="880" y="594">5</text><text x="250" y="564">5</text><text x="440" y="764">5</text>
+              <text x="560" y="347" font-family="'EB Garamond',Georgia,serif" font-size="10">runner contract</text>
+              <text x="330" y="472" font-family="'EB Garamond',Georgia,serif" font-size="10">credentials</text>
+            </g>
+            <g fill="none" stroke="#8e2a5c" stroke-width="1">
+              <circle cx="520" cy="395" r="8.5"></circle>
+              <circle cx="625" cy="205" r="8.5"></circle>
+              <circle cx="500" cy="120" r="8.5"></circle>
+            </g>
+
+            <!-- the coherence loop's track and the fleet -->
+            <polyline points="190,80 300,110 395,165 480,160 640,240 700,250 735,395 585,470 470,630" fill="none" stroke="#305f7a" stroke-width="1" stroke-dasharray="2 3"></polyline>
+            <g font-family="'JetBrains Mono',monospace" font-size="9" fill="#305f7a" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">
+              <text x="196" y="70" font-family="'EB Garamond',Georgia,serif" font-size="11" font-style="italic">coherence loop · LIN-3449</text>
+              <text x="312" y="113">B1 ✓</text>
+              <text x="712" y="253">B2 ✓</text>
+              <text x="573" y="468" text-anchor="end">B3 ✓</text>
+              <text x="573" y="480" text-anchor="end">links 255→310</text>
+            </g>
+            <g fill="none" stroke="#305f7a" stroke-width="1" stroke-linejoin="round">
+              <path d="M292,110 L308,110 L305,114 L295,114 Z M300,110 L300,100 M301,101 L307,109 L301,109 Z"></path>
+              <path d="M692,250 L708,250 L705,254 L695,254 Z M700,250 L700,240 M701,241 L707,249 L701,249 Z"></path>
+              <path d="M577,470 L593,470 L590,474 L580,474 Z M585,470 L585,460 M586,461 L592,469 L586,469 Z"></path>
+            </g>
+            <!-- batch 4 at anchor, waiting on Thursday's tide -->
+            <g stroke="#1e2a33" stroke-width="1.2" fill="none" stroke-linecap="round">
+              <circle cx="470" cy="620" r="2.2"></circle>
+              <path d="M470,622 L470,638 M465,626 L475,626 M462,632 Q470,644 478,632"></path>
+            </g>
+            <path d="M480,624 L496,624 L493,628 L483,628 Z M489,613 L496,623 L489,623 Z" fill="#1e2a33"></path>
+            <path d="M488,624 L488,612" stroke="#1e2a33" stroke-width="1.2"></path>
+            <g font-family="'EB Garamond',Georgia,serif" fill="#1e2a33" text-anchor="end" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">
+              <text x="456" y="616" font-size="12.5" font-style="italic">Coherence Roads</text>
+              <text x="456" y="629" font-size="9" font-family="'JetBrains Mono',monospace">LIN-3449 · batch 4 (tests)</text>
+              <text x="456" y="642" font-size="11" font-style="italic">waits for Thursday’s tide · 15 Oct</text>
+            </g>
+
+            <!-- hazards -->
+            <g fill="none" stroke="#8e2a5c">
+              <circle cx="640" cy="650" r="11" stroke-width="1" stroke-dasharray="1.5 2"></circle>
+              <path d="M634,650 L646,650 M640,644 L640,656" stroke-width="1.4"></path>
+              <g transform="translate(540 690) scale(0.13)"><use href="#bB" stroke-width="1" stroke-dasharray="1.5 2"></use></g>
+              <g transform="translate(760 615) rotate(40) scale(0.12)"><use href="#bA" stroke-width="1" stroke-dasharray="1.5 2"></use></g>
+              <g transform="translate(610 735) rotate(-30) scale(0.12)"><use href="#bD" stroke-width="1" stroke-dasharray="1.5 2"></use></g>
+              <ellipse cx="860" cy="712" rx="17" ry="9" stroke-width="1" stroke-dasharray="1.5 2"></ellipse>
+              <path d="M848,712 L872,712 M854,707 L854,717 M860,706 L860,718 M866,707 L866,717" stroke-width="1.3"></path>
+            </g>
+            <g fill="#8e2a5c"><circle cx="636" cy="646" r="1"></circle><circle cx="644" cy="646" r="1"></circle><circle cx="636" cy="654" r="1"></circle><circle cx="644" cy="654" r="1"></circle></g>
+            <g font-family="'EB Garamond',Georgia,serif" font-size="11" font-style="italic" fill="#1e2a33" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">
+              <text x="656" y="646" font-family="'JetBrains Mono',monospace" font-style="normal" font-size="10" font-weight="600" fill="#8e2a5c">LIN-3404</text>
+              <text x="656" y="659">Rk · the gate on inviting anyone</text>
+              <text x="526" y="708" text-anchor="end" font-family="'JetBrains Mono',monospace" font-style="normal" font-size="9" fill="#8e2a5c">LIN-2386</text>
+              <text x="526" y="720" text-anchor="end" font-size="10.5">env-check can never fail</text>
+              <text x="776" y="612" font-family="'JetBrains Mono',monospace" font-style="normal" font-size="9" fill="#8e2a5c">LIN-3108</text>
+              <text x="776" y="624" font-size="10.5">“Log in with Linear” 503s</text>
+              <text x="610" y="756" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-style="normal" font-size="9" fill="#8e2a5c">README · llms.txt</text>
+              <text x="610" y="768" text-anchor="middle" font-size="10.5">still “a collapsible tree”</text>
+              <text x="930" y="676" text-anchor="end" font-family="'JetBrains Mono',monospace" font-style="normal" font-size="9" fill="#8e2a5c">Wk · /cost → null</text>
+              <text x="930" y="689" text-anchor="end" font-size="11.5">the cost headline, unreadable</text>
+              <text x="930" y="700" text-anchor="end" font-family="'JetBrains Mono',monospace" font-style="normal" font-size="8.5" fill="#4c5a63">model-pricing.js: no Opus/Sonnet 5.5</text>
+            </g>
+
+            <!-- the light: Wiring, server.js -->
+            <path d="M565,575 C566,560 574,548 582,546 C585,552 578,566 565,575 Z" fill="#8e2a5c"></path>
+            <circle cx="565" cy="575" r="2.6" fill="#1e2a33"></circle>
+            <text x="582" y="604" font-family="'JetBrains Mono',monospace" font-size="9" fill="#1e2a33" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">loads routes/test.js in production</text>
+
+            <!-- the parked decision, buoyed for a ruling -->
+            <path d="M304,372 L312,372 L310,362 L306,362 Z" fill="#a24c14"></path>
+            <circle cx="308" cy="358" r="2.2" fill="#a24c14"></circle>
+            <text x="308" y="385" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="10" font-style="italic" fill="#a24c14" paint-order="stroke" stroke="#f6f1e5" stroke-width="3" stroke-linejoin="round">parked</text>
+
+            <!-- the plotted course -->
+            <polyline points="936,800 826,752 612,666 728,508 600,430 480,418 395,395 330,340 352,262 420,205 548,222" fill="none" stroke="#f6f1e5" stroke-width="5" stroke-linejoin="round"></polyline>
+            <polyline points="936,800 826,752 612,666 728,508 600,430 480,418 395,395 330,340 352,262 420,205 548,222" fill="none" stroke="#a24c14" stroke-width="1.8" stroke-dasharray="8 5" stroke-linejoin="round"></polyline>
+            <g fill="#f6f1e5" stroke="#a24c14" stroke-width="1.6">
+              <circle cx="826" cy="752" r="10.5"></circle>
+              <circle cx="612" cy="666" r="10.5"></circle>
+              <circle cx="728" cy="508" r="10.5"></circle>
+              <circle cx="330" cy="340" r="10.5"></circle>
+              <circle cx="548" cy="222" r="10.5"></circle>
+            </g>
+            <g font-family="'JetBrains Mono',monospace" font-size="11" font-weight="600" fill="#a24c14" text-anchor="middle">
+              <text x="826" y="756">1</text>
+              <text x="612" y="670">2</text>
+              <text x="728" y="512">3</text>
+              <text x="330" y="344">4</text>
+              <text x="548" y="226">5</text>
+            </g>
+            <text x="930" y="830" text-anchor="end" font-family="'EB Garamond',Georgia,serif" font-size="11" font-style="italic" fill="#a24c14">course to steer — passage plan below</text>
+
+            <!-- compass rose -->
+            <g fill="none" stroke="#1e2a33">
+              <circle cx="860" cy="130" r="62" stroke-width="0.8"></circle>
+              <circle cx="860" cy="130" r="58" stroke-width="5" stroke-dasharray="0.7 4.3614"></circle>
+              <circle cx="860" cy="130" r="56" stroke-width="9" stroke-dasharray="1 28.32"></circle>
+              <circle cx="860" cy="130" r="50" stroke-width="0.5"></circle>
+              <circle cx="860" cy="130" r="24" stroke-width="0.5" stroke-dasharray="1 2"></circle>
+              <path d="M860,130 L884,106 M860,130 L884,154 M860,130 L836,154 M860,130 L836,106" stroke-width="0.6"></path>
+            </g>
+            <g stroke="#1e2a33" stroke-width="0.6" stroke-linejoin="round">
+              <path d="M860,84 L866,124 L860,130 Z" fill="#1e2a33"></path><path d="M860,84 L854,124 L860,130 Z" fill="#f6f1e5"></path>
+              <path d="M906,130 L866,136 L860,130 Z" fill="#1e2a33"></path><path d="M906,130 L866,124 L860,130 Z" fill="#f6f1e5"></path>
+              <path d="M860,176 L854,136 L860,130 Z" fill="#1e2a33"></path><path d="M860,176 L866,136 L860,130 Z" fill="#f6f1e5"></path>
+              <path d="M814,130 L854,124 L860,130 Z" fill="#1e2a33"></path><path d="M814,130 L854,136 L860,130 Z" fill="#f6f1e5"></path>
+            </g>
+            <text x="860" y="62" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="14" font-weight="600" fill="#1e2a33">N</text>
+            <text x="860" y="206" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="10" font-style="italic" fill="#4c5a63">bearings true</text>
+
+            <!-- scale of breadth -->
+            <text x="860" y="226" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="10" font-style="italic" fill="#4c5a63">breadth of an island, in files</text>
+            <rect x="785" y="232" width="48" height="4" fill="#1e2a33"></rect>
+            <rect x="833" y="232" width="48" height="4" fill="#f6f1e5" stroke="#1e2a33" stroke-width="0.6"></rect>
+            <rect x="881" y="232" width="55" height="4" fill="#1e2a33"></rect>
+            <g font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#1e2a33" text-anchor="middle">
+              <text x="785" y="247">0</text><text x="833" y="247">9</text><text x="881" y="247">36</text><text x="936" y="247" text-anchor="end">89</text>
+            </g>
+
+            <!-- cartouche: the bearings -->
+            <rect x="32" y="660" width="328" height="168" fill="#f6f1e5" stroke="#1e2a33" stroke-width="1"></rect>
+            <rect x="36" y="664" width="320" height="160" fill="none" stroke="#1e2a33" stroke-width="0.5"></rect>
+            <text x="196" y="681" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="10" font-weight="600" letter-spacing="3" fill="#1e2a33">HARBOUR · THE BEARINGS</text>
+            <text x="196" y="698" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="14" font-style="italic" fill="#1e2a33">Is the passage on course?</text>
+            <line x1="48" y1="706" x2="344" y2="706" stroke="#1e2a33" stroke-width="0.5"></line>
+            <g font-family="'EB Garamond',Georgia,serif" font-size="12" fill="#1e2a33">
+              <text x="46" y="722">Correct, complete changes / wk</text>
+              <text x="46" y="738">Sessions per ticket, median</text>
+              <text x="46" y="754">Decisions held in several places</text>
+              <text x="46" y="770">Rulings waiting on you</text>
+              <text x="46" y="786">Cost per verified task · Aug $19.63</text>
+              <text x="46" y="802">Open pile · 316 review residue</text>
+            </g>
+            <g font-family="'JetBrains Mono',monospace" font-size="11" font-weight="600" fill="#1e2a33" text-anchor="end">
+              <text x="346" y="722">~47 · June 95</text>
+              <text x="346" y="738">8→5 · p90 16→8</text>
+              <text x="346" y="754">23</text>
+              <text x="346" y="770">0</text>
+              <text x="346" y="786" fill="#8e2a5c">UNREADABLE</text>
+              <text x="346" y="802">1,229</text>
+            </g>
+            <line x1="48" y1="811" x2="344" y2="811" stroke="#1e2a33" stroke-width="0.5"></line>
+            <text x="196" y="822" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="8.5" fill="#4c5a63">sounded 14 Oct 2026 · at commit [sha]</text>
+          </svg>
+          <sc-for list="{{areas}}" as="a" hint-placeholder-count="11">
+            <button type="button" onClick="{{a.pick}}" aria-pressed="{{a.pressed}}" aria-label="{{a.aria}}" aria-controls="pilots-notes" style="{{a.btnStyle}}">
+              <span style="{{a.nameStyle}}">{{a.plate}}</span>
+              <span style="{{a.metaStyle}}">{{a.meta}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div role="list" aria-label="Key to the chart" style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 22px;margin-top:10px;font-size:14px;line-height:1.3;color:#4c5a63;">
+        <span role="listitem" style="display:inline-flex;align-items:center;gap:7px;">
+          <svg aria-hidden="true" width="26" height="16" viewBox="0 0 26 16"><text x="8" y="12" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="11" font-style="italic" fill="#305f7a">4</text><circle cx="19" cy="8" r="6" fill="none" stroke="#8e2a5c" stroke-width="1"></circle></svg>
+          Sounding: a decision held in several places, figured 1 High … 5 Low; ringed, new this week
+        </span>
+        <span role="listitem" style="display:inline-flex;align-items:center;gap:7px;">
+          <svg aria-hidden="true" width="22" height="16" viewBox="0 0 22 16"><circle cx="11" cy="8" r="6.5" fill="none" stroke="#8e2a5c" stroke-dasharray="1.5 2"></circle><path d="M7,8 L15,8 M11,4 L11,12" stroke="#8e2a5c" stroke-width="1.3"></path></svg>
+          Danger: rock, shoal or wreck, each a ticket
+        </span>
+        <span role="listitem" style="display:inline-flex;align-items:center;gap:7px;">
+          <svg aria-hidden="true" width="34" height="16" viewBox="0 0 34 16"><path d="M0,8 L20,8" stroke="#a24c14" stroke-width="1.8" stroke-dasharray="5 3"></path><circle cx="26" cy="8" r="6" fill="#f6f1e5" stroke="#a24c14" stroke-width="1.4"></circle></svg>
+          Plotted course and waypoints
+        </span>
+        <span role="listitem" style="display:inline-flex;align-items:center;gap:7px;">
+          <svg aria-hidden="true" width="34" height="16" viewBox="0 0 34 16"><path d="M0,10 L16,10" stroke="#305f7a" stroke-dasharray="2 3"></path><path d="M19,11 L33,11 L30,14 L22,14 Z M26,11 L26,2 M27,3 L32,10 L27,10 Z" fill="none" stroke="#305f7a" stroke-linejoin="round"></path></svg>
+          Coherence loop: 3 batches · 26 decisions to one place · −363 lines · 13 of 13 to one owner · 0 regressed
+        </span>
+        <span role="listitem" style="display:inline-flex;align-items:center;gap:7px;">
+          <svg aria-hidden="true" width="14" height="16" viewBox="0 0 14 16"><path d="M7,3 L13,13 L1,13 Z" fill="#1e2a33"></path></svg>
+          Summit: the heaviest blocker, as a count
+        </span>
+        <span role="listitem" style="display:inline-flex;align-items:center;gap:7px;">
+          <svg aria-hidden="true" width="26" height="16" viewBox="0 0 26 16"><path d="M1,8 L25,8" stroke="#1e2a33" stroke-dasharray="5 4"></path></svg>
+          Unsurveyed coast: the tool can’t see it
+        </span>
+      </div>
+
+      <section aria-labelledby="pp-title" style="margin-top:16px;">
+        <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px 20px;padding-top:12px;border-top:1px solid #1e2a33;">
+          <div style="flex:1 1 380px;min-width:0;">
+            <h2 id="pp-title" style="margin:0;font-size:22px;line-height:1.15;font-weight:500;">Passage plan <span style="font-style:italic;font-weight:400;color:#4c5a63;">— five decisions, ranked, one approval</span></h2>
+            <p style="margin:4px 0 0;font-size:15px;line-height:1.35;color:#4c5a63;">{{approveSummary}}</p>
+          </div>
+          <sc-if value="{{notPlotted}}" hint-placeholder-val="{{true}}">
+            <button type="button" onClick="{{plot}}" style="{{plotStyle}}">
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2,15 L7,9 L11,11 L16,3" stroke-dasharray="3 2"></path><circle cx="16" cy="3" r="1.6"></circle></svg>
+              <span>{{plotLabel}}</span>
+            </button>
+          </sc-if>
+          <sc-if value="{{plotted}}" hint-placeholder-val="{{false}}">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;">
+              <span style="font-size:15.5px;line-height:1.35;"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:600;color:#a24c14;">✓</span> {{plottedNote}}</span>
+              <button type="button" onClick="{{unplot}}" style="font-family:inherit;font-size:14px;padding:4px 11px;background:transparent;color:#1e2a33;border:1px solid #8a8170;border-radius:2px;cursor:pointer;">Take it back</button>
+            </div>
+          </sc-if>
+        </div>
+        <ol style="list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;">
+          <sc-for list="{{legs}}" as="g" hint-placeholder-count="5">
+            <li style="{{g.cardStyle}}">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+                <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1.5px solid #a24c14;border-radius:50%;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600;color:#a24c14;box-sizing:border-box;">{{g.no}}</span>
+                <span style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#4c5a63;">{{g.kind}}</span>
+              </div>
+              <div style="font-size:16.5px;line-height:1.2;font-weight:500;">{{g.title}}</div>
+              <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;line-height:1.45;color:#305f7a;">{{g.ev}}</div>
+              <div style="font-size:14.5px;line-height:1.3;font-style:italic;">{{g.un}}</div>
+              <button type="button" onClick="{{g.toggle}}" aria-pressed="{{g.pressed}}" style="{{g.toggleStyle}}">{{g.toggleLabel}}</button>
+            </li>
+          </sc-for>
+        </ol>
+      </section>
+    </section>
+    <aside id="pilots-notes" aria-labelledby="notes-title" aria-live="polite" style="flex:1 1 340px;min-width:0;box-sizing:border-box;background:#fbf8f0;border:1px solid #cfc5ad;padding:18px 20px 22px;">
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 10px;">
+        <span style="font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#4c5a63;">Pilot’s notes</span>
+        <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#4c5a63;">{{n.idx}}</span>
+      </div>
+      <h2 id="notes-title" style="margin:8px 0 3px;font-size:29px;line-height:1.08;font-weight:500;">{{n.name}}</h2>
+      <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">{{n.sub}}</div>
+      <p style="margin:10px 0 0;font-size:17px;line-height:1.38;font-style:italic;">{{n.verdict}}</p>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:10px;">
+        <sc-if value="{{n.stale}}" hint-placeholder-val="{{false}}">
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#a24c14;border:1px solid #a24c14;border-radius:2px;padding:2px 7px;">stale since [commit] · re-sound before acting</span>
+        </sc-if>
+        <sc-if value="{{n.fresh}}" hint-placeholder-val="{{true}}">
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#4c5a63;">current · sounded at [sha] · 14 Oct 2026</span>
+        </sc-if>
+      </div>
+
+      <dl style="display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:baseline;gap:9px 16px;margin:16px 0 0;padding:12px 0;border-top:1px solid #cfc5ad;border-bottom:1px solid #cfc5ad;font-size:15px;">
+        <dt style="color:#4c5a63;">Files</dt>
+        <dd style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;">{{n.files}}</dd>
+        <dt style="color:#4c5a63;">Readiness</dt>
+        <dd style="margin:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;">
+          <span aria-hidden="true" style="display:inline-flex;gap:3px;">
+            <sc-for list="{{n.rungs}}" as="r" hint-placeholder-count="5"><span style="{{r.style}}"></span></sc-for>
+          </span>
+          <span>{{n.ready}}</span>
+        </dd>
+        <dt style="color:#4c5a63;">Coupling</dt>
+        <dd style="margin:0;line-height:1.35;">{{n.coupling}}</dd>
+      </dl>
+
+      <h3 style="margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#4c5a63;">What blocks it</h3>
+      <p style="margin:0;font-size:15.5px;line-height:1.4;">{{n.blocks}}</p>
+
+      <h3 style="margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#4c5a63;">Decisions held in several places</h3>
+      <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;">
+        <sc-for list="{{n.decisions}}" as="d" hint-placeholder-count="1">
+          <li style="font-size:15px;line-height:1.35;"><span>{{d.t}}</span><br><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:#305f7a;">{{d.s}}</span></li>
+        </sc-for>
+      </ul>
+
+      <h3 style="margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#4c5a63;">Dangers</h3>
+      <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;">
+        <sc-for list="{{n.warnings}}" as="w" hint-placeholder-count="1">
+          <li style="display:flex;gap:9px;align-items:flex-start;font-size:15px;line-height:1.35;">
+            <svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" style="flex:none;margin-top:3px;"><circle cx="7" cy="7" r="6" fill="none" stroke="#8e2a5c" stroke-dasharray="1.5 1.8"></circle><path d="M4,7 L10,7 M7,4 L7,10" stroke="#8e2a5c" stroke-width="1.2"></path></svg>
+            <span><span>{{w.t}}</span><br><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:#8e2a5c;">{{w.s}}</span></span>
+          </li>
+        </sc-for>
+      </ul>
+
+      <h3 style="margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#4c5a63;">Threads through here</h3>
+      <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;">
+        <sc-for list="{{n.threads}}" as="t" hint-placeholder-count="1">
+          <li style="font-size:14.5px;line-height:1.45;padding:6px 9px;border:1px dotted #8a8170;">{{t.t}}</li>
+        </sc-for>
+      </ul>
+
+      <h3 style="margin:16px 0 6px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#4c5a63;">Sources</h3>
+      <ul style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px 16px;">
+        <sc-for list="{{n.links}}" as="l" hint-placeholder-count="2">
+          <li><a href="{{l.href}}" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;">{{l.label}}</a></li>
+        </sc-for>
+      </ul>
+
+      <sc-if value="{{n.onCourse}}" hint-placeholder-val="{{true}}">
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:10px 12px;border:1px solid #a24c14;">
+          <span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1.5px solid #a24c14;border-radius:50%;box-sizing:border-box;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600;color:#a24c14;">{{n.wp}}</span>
+          <span style="font-size:15px;line-height:1.35;">On the plotted course: {{n.wpText}}</span>
+        </div>
+      </sc-if>
+
+      <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 12px;margin-top:16px;font-size:15px;">
+        <a href="#flight-companion">Take this area to the Flight Companion →</a>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const sel = s.sel || 'providers';
+    const out = s.out || {};
+    const plotted = !!s.plotted;
+    const MONO = "font-family:'JetBrains Mono',ui-monospace,monospace;";
+
+    const A = [
+      { id: 'browser', plate: 'Browser code', meta: '36 files', x: 8.854, y: 34.884, narrow: true, unmeasured: true,
+        name: 'Front end: browser code', sub: 'public/ · outside the import graph',
+        verdict: 'An unsurveyed coast: the survey cannot see browser code, so nothing here is measured.',
+        files: 36, ready: 'Low / unmeasurable', level: 1,
+        coupling: 'Not in the graph. Its edges to the rest are uncounted, not absent.',
+        blocks: 'public/common.js is a global hub — 46 window.* assignments.',
+        decisions: [{ t: 'Not surveyed: decisions held here are uncounted.', s: '[survey of public/ pending]' }],
+        warnings: [{ t: 'README and llms.txt still describe “a collapsible tree” — the first thing a newcomer reads.', s: 'README · llms.txt' }],
+        threads: ['Survey blind spot → 46 window.* globals unmeasured → readiness unreadable until the tool can see public/'],
+        links: [{ label: 'public/common.js', href: '#src-public-common-js' }, { label: 'Design & Interface', href: '#periodical-design-interface' }, { label: 'Onboarding & Cold-Start', href: '#periodical-onboarding' }],
+        stale: false, wp: 0, wpText: '' },
+      { id: 'pages', plate: 'Server-rendered pages', meta: '68 files · Medium', x: 27.604, y: 25,
+        name: 'Front end: server-rendered pages', sub: 'renderers · task pages',
+        verdict: 'Joined to Auth by a sound that runs both ways.',
+        files: 68, ready: 'Medium', level: 3,
+        coupling: 'Two-way with Auth, accounts & workspaces: 12/15 edges (Auth–Pages Sound).',
+        blocks: 'Ordering logic lives in a renderer (render-swipe).',
+        decisions: [{ t: '“Waiting on a person” — 3 copies, 5 inline checks; parked behind your ruling.', s: 'lib/task-page-loader.js:148' }],
+        warnings: [{ t: 'LIN-3504 was done right, but re-decided “is it still waiting?” inline; the reviewer filed the sibling as LIN-3513 instead of fixing it.', s: 'LIN-3504 · LIN-3513' }],
+        threads: ['LIN-3504 → re-decided inline at task-page-loader.js:148 → sibling filed as LIN-3513 → decision parked behind a ruling → waypoint 4'],
+        links: [{ label: 'LIN-3504', href: '#LIN-3504' }, { label: 'LIN-3513', href: '#LIN-3513' }, { label: 'task-page-loader.js:148', href: '#src-task-page-loader-148' }, { label: 'Drift & Coherence', href: '#periodical-drift-coherence' }],
+        stale: true, wp: 4, wpText: 'rule on “does a blocked agent start the waiting clock?” — it unparks this decision.' },
+      { id: 'agent', plate: 'Agent API', meta: '30 files · Medium', x: 67.708, y: 38.953,
+        name: 'Agent API (proxy)', sub: 'routes/proxy.js',
+        verdict: 'Small, but carrying dead weight and an edge pulled up from Providers.',
+        files: 30, ready: 'Medium', level: 3,
+        coupling: 'RefResolutionError is pulled up from here by Providers — one of its 3 upward edges.',
+        blocks: 'RefResolutionError pulled up by Providers; 59 dead imports in routes/proxy.js.',
+        decisions: [{ t: 'Runner contract — the one High decision still held in more than one place.', s: '[files: placeholder]' }],
+        warnings: [{ t: '59 dead imports.', s: 'routes/proxy.js' }],
+        threads: ['Providers needs RefResolutionError → imports up into the proxy → the seam Providers would rebuild behind is crossed here'],
+        links: [{ label: 'routes/proxy.js', href: '#src-routes-proxy-js' }, { label: 'Seams & Tangles · 13 Oct', href: '#periodical-seams-tangles' }, { label: 'Code Quality', href: '#periodical-code-quality' }],
+        stale: false, wp: 0, wpText: '' },
+      { id: 'runs', plate: 'Runs & dispatch', meta: '89 files · Low–med', x: 46.875, y: 35.465,
+        name: 'Runs & dispatch', sub: 'the largest landmass',
+        verdict: 'The largest area, and the hardest to move.',
+        files: 89, ready: 'Low–medium', level: 2,
+        coupling: 'Two-way with LLM & prompts through chat-tools (Chat-tools Narrows).',
+        blocks: 'Largest area: 78 entry files, and a chat-tools back edge.',
+        decisions: [{ t: 'Runner contract — High.', s: '[files: placeholder]' }],
+        warnings: [{ t: 'Rulings are stored per session, not per decision — the window-cap question reached you 3 times.', s: 'LIN-3502' }],
+        threads: ['Rulings stored per session → LIN-3502 asked 3 times → about 1 in 10 of 275 rulings was a repeat → the false-escalation reading'],
+        links: [{ label: 'LIN-3502', href: '#LIN-3502' }, { label: 'LIN-3449 · coherence loop', href: '#LIN-3449' }, { label: 'Stability', href: '#periodical-stability' }],
+        stale: false, wp: 5, wpText: 'read the Seams gauge with Drift when choosing each consolidation’s one place.' },
+      { id: 'llm', plate: 'LLM & prompts', meta: '64 files · Medium', x: 59.896, y: 17.442,
+        name: 'LLM & prompts', sub: 'two layers, one name',
+        verdict: 'Two layers under one name, narrowly joined to Runs.',
+        files: 64, ready: 'Medium', level: 3,
+        coupling: 'chat-tools ↔ Runs: 10 of 17 edges come from one file.',
+        blocks: 'Two layers in one name; chat-tools ↔ Runs (10 of 17 edges from one file).',
+        decisions: [{ t: '[which of the 23 lie here — placeholder]', s: '' }],
+        warnings: [{ t: 'No price rows for Opus 5.5 or Sonnet 5.5, so /cost returns null. The hourly sweep only checks rows that exist, so it reports clean. LIN-3094 covers Opus 5.5, not Sonnet 5.5.', s: 'lib/model-pricing.js · LIN-3094' }],
+        threads: ['Missing price rows → /cost returns null → cost headline unreadable → the sweep reports clean → waypoint 1'],
+        links: [{ label: 'lib/model-pricing.js', href: '#src-model-pricing-js' }, { label: 'LIN-3094', href: '#LIN-3094' }, { label: 'Recent Headwinds', href: '#periodical-headwinds' }],
+        stale: false, wp: 1, wpText: 'price Opus 5.5 & Sonnet 5.5 — unblocks the headline number.' },
+      { id: 'auth', plate: 'Auth & accounts', meta: '52 files · Medium', x: 26.042, y: 47.674,
+        name: 'Auth, accounts & workspaces', sub: 'sign-in · accounts · workspaces',
+        verdict: 'Holds the gate on inviting anyone.',
+        files: 52, ready: 'Medium', level: 3,
+        coupling: 'Two-way with server-rendered pages: 12/15 edges.',
+        blocks: 'Auth ↔ pages: 12/15 edges run both ways.',
+        decisions: [{ t: 'Credentials — Medium-High.', s: '[files: placeholder]' }],
+        warnings: [
+          { t: 'The GitHub install callback trusts installation_id without checking access. High; gates inviting anyone.', s: 'LIN-3404' },
+          { t: '“Log in with Linear” 503s on an unconfigured self-host.', s: 'LIN-3108' }
+        ],
+        threads: ['GitHub install callback → installation_id trusted unchecked → LIN-3404 (High) → gates inviting anyone → waypoint 2'],
+        links: [{ label: 'LIN-3404', href: '#LIN-3404' }, { label: 'LIN-3108', href: '#LIN-3108' }, { label: 'Onboarding & Cold-Start', href: '#periodical-onboarding' }],
+        stale: false, wp: 2, wpText: 'spike LIN-3404 against a test installation.' },
+      { id: 'providers', plate: 'Providers', meta: '35 files · Highest', x: 86.98, y: 56.51,
+        name: 'Providers', sub: 'Linear · GitHub · Jira · local',
+        verdict: 'The readiest to rebuild: a well-formed island with one clear harbour mouth.',
+        files: 35, ready: 'Highest', level: 5,
+        coupling: 'Only 3 upward edges. Front door: registry · models · index.',
+        blocks: 'Its spec is written five times — one test file per provider, and no shared conformance suite.',
+        decisions: [{ t: 'The provider contract — its spec written 5 times, once per provider test file.', s: 'one test file per provider · no shared suite' }],
+        warnings: [{ t: 'RefResolutionError is pulled up from the Agent API — one of the 3 upward edges.', s: '[file:line placeholder]' }],
+        threads: ['Spec written 5 times → no conformance suite → extract one (waypoint 3) → then rebuild behind the front door'],
+        links: [{ label: 'registry · models · index', href: '#src-providers-front-door' }, { label: 'LIN-3404', href: '#LIN-3404' }, { label: 'Seams & Tangles · 13 Oct', href: '#periodical-seams-tangles' }, { label: '[conformance-suite ticket]', href: '#placeholder' }],
+        stale: false, wp: 3, wpText: 'extract one provider conformance suite before rewriting Providers.' },
+      { id: 'platform', plate: 'Platform', meta: '24 files · High', x: 43.75, y: 57.558,
+        name: 'Platform & plumbing', sub: 'scripts · shared plumbing',
+        verdict: 'Ready to rebuild once the KPI readers filed here are sorted out.',
+        files: 24, ready: 'High', level: 4,
+        coupling: '[edges: placeholder]',
+        blocks: 'KPI readers are mislabelled into it.',
+        decisions: [{ t: '[which of the 23 lie here — placeholder]', s: '' }],
+        warnings: [{ t: 'scripts/env-check.sh can never fail.', s: 'LIN-2386 · Backlog' }],
+        threads: ['env-check can never fail → a newcomer’s first check always passes → a shoal at the entrance'],
+        links: [{ label: 'LIN-2386', href: '#LIN-2386' }, { label: 'scripts/env-check.sh', href: '#src-env-check' }, { label: 'Stability', href: '#periodical-stability' }],
+        stale: false, wp: 0, wpText: '' },
+      { id: 'routes', plate: 'Web routes', meta: '21 files · Medium', x: 41.146, y: 12.558,
+        name: 'Web routes', sub: 'routes/',
+        verdict: 'Routes that other code imports as libraries.',
+        files: 21, ready: 'Medium', level: 3,
+        coupling: '[edges: placeholder]',
+        blocks: 'Routes are used as libraries — routes/dashboard.js exports.',
+        decisions: [{ t: '[which of the 23 lie here — placeholder]', s: '' }],
+        warnings: [{ t: 'Other areas import routes/dashboard.js for its exports.', s: 'routes/dashboard.js' }],
+        threads: ['[none traced yet]'],
+        links: [{ label: 'routes/dashboard.js', href: '#src-routes-dashboard-js' }, { label: 'Seams & Tangles · 13 Oct', href: '#periodical-seams-tangles' }],
+        stale: false, wp: 0, wpText: '' },
+      { id: 'other', plate: 'Other', meta: '9 files · High', x: 74.167, y: 10.698,
+        name: 'Other features', sub: 'small features',
+        verdict: 'Small and loosely held.',
+        files: 9, ready: 'High (small)', level: 4,
+        coupling: '[edges: placeholder]',
+        blocks: '[nothing recorded]',
+        decisions: [{ t: '[which of the 23 lie here — placeholder]', s: '' }],
+        warnings: [{ t: '[none recorded]', s: '' }],
+        threads: ['[none traced yet]'],
+        links: [{ label: 'Drift & Coherence', href: '#periodical-drift-coherence' }],
+        stale: false, wp: 0, wpText: '' },
+      { id: 'wiring', plate: 'Wiring', meta: 'server.js · Fl · 1 file', x: 60.625, y: 66.977, left: true,
+        name: 'Wiring (server.js)', sub: 'the light at the entrance',
+        verdict: 'The lighthouse: one file, lit before anything else.',
+        files: 1, ready: 'n/a', level: 0,
+        coupling: 'Wires the areas together at start-up.',
+        blocks: 'Not a rebuild candidate — one file.',
+        decisions: [{ t: '[none recorded]', s: '' }],
+        warnings: [{ t: 'Loads routes/test.js in production.', s: 'server.js' }],
+        threads: ['[none traced yet]'],
+        links: [{ label: 'server.js', href: '#src-server-js' }, { label: 'Stability', href: '#periodical-stability' }, { label: 'Onboarding & Cold-Start', href: '#periodical-onboarding' }],
+        stale: false, wp: 0, wpText: '' }
+    ];
+
+    const pickState = (id) => this.setState({ sel: id, out: out, plotted: plotted });
+
+    const areas = A.map((a) => {
+      const on = a.id === sel;
+      let st = 'position:absolute;left:' + a.x + '%;top:' + a.y + '%;' +
+        'transform:' + (a.left ? 'translate(0,-50%)' : 'translate(-50%,-50%)') + ';' +
+        'display:flex;flex-direction:column;align-items:' + (a.left ? 'flex-start' : 'center') + ';gap:1px;' +
+        'max-width:' + (a.narrow ? 118 : 150) + 'px;padding:3px 7px 4px;border-radius:2px;cursor:pointer;' +
+        'font-family:inherit;line-height:1.15;text-align:' + (a.left ? 'left' : 'center') + ';';
+      st += on
+        ? 'background:#1e2a33;color:#f6f1e5;border:1px solid #1e2a33;box-shadow:0 0 0 3px rgba(246,241,229,0.9);'
+        : 'background:rgba(246,241,229,0.84);color:#1e2a33;border:1px ' + (a.unmeasured ? 'dashed #4c5a63' : 'solid transparent') + ';';
+      return {
+        plate: a.plate,
+        meta: a.meta,
+        pressed: on ? 'true' : 'false',
+        aria: a.name + ', ' + a.files + (a.files === 1 ? ' file' : ' files') + ', readiness ' + a.ready + '. Show pilot’s notes.',
+        btnStyle: st,
+        nameStyle: 'font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;',
+        metaStyle: MONO + 'font-size:10px;color:' + (on ? '#e6dfcc' : '#4c5a63') + ';',
+        pick: () => pickState(a.id)
+      };
+    });
+
+    const ci = Math.max(0, A.findIndex((a) => a.id === sel));
+    const c = A[ci];
+    const rungs = [0, 1, 2, 3, 4].map((i) => {
+      const filled = i < c.level;
+      let st = 'display:inline-block;width:18px;height:8px;box-sizing:border-box;';
+      if (filled && c.unmeasured) st += 'background:transparent;border:1px dashed #1e2a33;';
+      else if (filled) st += 'background:#1e2a33;border:1px solid #1e2a33;';
+      else st += 'background:transparent;border:1px solid #b5ab93;';
+      return { style: st };
+    });
+    const n = {
+      idx: 'area ' + (ci + 1) + ' of 11',
+      name: c.name,
+      sub: c.sub,
+      verdict: c.verdict,
+      files: c.files + (c.files === 1 ? ' file' : ' files'),
+      ready: c.ready,
+      rungs: rungs,
+      coupling: c.coupling,
+      blocks: c.blocks,
+      decisions: c.decisions,
+      warnings: c.warnings,
+      threads: c.threads.map((t) => ({ t: t })),
+      links: c.links,
+      stale: !!c.stale,
+      fresh: !c.stale,
+      onCourse: !!c.wp,
+      wp: c.wp ? String(c.wp) : '',
+      wpText: c.wpText
+    };
+
+    const L = [
+      { id: '1', type: 'fleet', kind: 'Fleet task', title: 'Price Opus 5.5 & Sonnet 5.5', ev: 'lib/model-pricing.js · LIN-3094 covers Opus only', un: 'Unblocks the cost headline.' },
+      { id: '2', type: 'fleet', kind: 'Fleet spike', title: 'Spike LIN-3404 against a test installation', ev: 'LIN-3404 · High · installation_id unchecked', un: 'Gates inviting anyone.' },
+      { id: '3', type: 'fleet', kind: 'Fleet task', title: 'Extract one provider conformance suite', ev: 'spec written 5× · one test file per provider', un: 'Clears Providers for a rebuild.' },
+      { id: '4', type: 'ruling', kind: 'Your ruling', title: 'Does a blocked agent start the waiting clock?', ev: 'task-page-loader.js:148 · LIN-3513', un: 'Unparks “waiting on a person”.' },
+      { id: '5', type: 'order', kind: 'Standing order', title: 'Read Seams with Drift for each one place', ev: 'LIN-3449 · batch 3: links 255→310', un: 'Gives the gauges’ tension an owner.' }
+    ];
+    const inc = L.filter((l) => !out[l.id]);
+    const fleet = inc.filter((l) => l.type === 'fleet').length;
+    const ruling = inc.some((l) => l.type === 'ruling');
+    const order = inc.some((l) => l.type === 'order');
+    const parts = [];
+    if (fleet) parts.push(fleet + (fleet === 1 ? ' task' : ' tasks') + ' to the fleet');
+    if (ruling) parts.push('1 ruling for you');
+    if (order) parts.push('1 standing order to the coherence loop');
+
+    const legs = L.map((l) => {
+      const isIn = !out[l.id];
+      return {
+        no: l.id,
+        kind: l.kind,
+        title: l.title,
+        ev: l.ev,
+        un: l.un,
+        pressed: isIn ? 'true' : 'false',
+        toggleLabel: isIn ? 'In the course' : 'Left out — add back',
+        cardStyle: 'display:flex;flex-direction:column;gap:6px;padding:10px 11px 11px;box-sizing:border-box;' +
+          (isIn ? 'background:#fbf8f0;border:1px solid #cfc5ad;' : 'background:transparent;border:1px dashed #8a8170;'),
+        toggleStyle: 'margin-top:auto;align-self:flex-start;font-family:inherit;font-size:13.5px;padding:3px 9px;border-radius:2px;cursor:pointer;' +
+          (isIn ? 'background:#1e2a33;color:#f6f1e5;border:1px solid #1e2a33;' : 'background:transparent;color:#1e2a33;border:1px solid #8a8170;'),
+        toggle: () => {
+          const o = Object.assign({}, out);
+          o[l.id] = !o[l.id];
+          this.setState({ sel: sel, out: o, plotted: false });
+        }
+      };
+    });
+
+    const any = inc.length > 0;
+    return {
+      areas: areas,
+      n: n,
+      legs: legs,
+      approveSummary: any
+        ? 'One approval covers ' + parts.join(' · ') + '. Fleet window cap 50 · [n] sessions free · weekly budget resets Thu 15 Oct.'
+        : 'Every leg is left out — nothing to approve.',
+      plotLabel: any ? 'Plot this course · ' + inc.length + (inc.length === 1 ? ' leg' : ' legs') : 'Nothing to plot',
+      plotStyle: 'display:inline-flex;align-items:center;gap:8px;font-family:inherit;font-size:16.5px;padding:8px 16px;border-radius:2px;cursor:pointer;' +
+        (any ? 'background:#a24c14;color:#fbf8f0;border:1px solid #a24c14;' : 'background:transparent;color:#4c5a63;border:1px dashed #8a8170;'),
+      notPlotted: !plotted,
+      plotted: plotted,
+      plottedNote: 'Course handed over in one approval: ' + parts.join(' · ') + (ruling ? '. Leg 4 waits on your ruling in the Flight Companion.' : '.'),
+      plot: () => { if (any) this.setState({ sel: sel, out: out, plotted: true }); },
+      unplot: () => this.setState({ sel: sel, out: out, plotted: false })
+    };
+  }
+}
+</script>
+</body>
+</html>
