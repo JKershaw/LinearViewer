@@ -1,0 +1,1084 @@
+{
+  "meta": {
+    "mutants": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/2b1/mutants.json",
+    "impl": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/2b1/adf.js",
+    "implSha256": "c0b67997523eb9adf208de0062a0d6c3d5dcc1a1b531ec390302dd995784e65c",
+    "testFiles": [
+      "tests/unit/jira-provider-adf-codec.test.js"
+    ],
+    "corpus": {
+      "tests-adf": {
+        "domain": "adf",
+        "items": 1496,
+        "sha256": "81215c99e50b4a3d4d57764391bfe2acdaab98b8dcb9f1a891df48ebeaff37ba",
+        "private": false
+      },
+      "tests-md": {
+        "domain": "md",
+        "items": 1420,
+        "sha256": "e2ff7ce0a9a7cf3665e1dd80d6be57534229c0af3df860434c0ca85379451e96",
+        "private": false
+      },
+      "gen-adf": {
+        "domain": "adf",
+        "items": 3000,
+        "sha256": "ccca06109dfca0edb4b224735bd22ccfc2697072114c06649ee0f00c5cf8cc94",
+        "private": false
+      },
+      "gen-md": {
+        "domain": "md",
+        "items": 3000,
+        "sha256": "c42275119831e721bbcba22298b47b35f0c4e025d7bf85639b3f73373e726652",
+        "private": false
+      }
+    },
+    "batchTimeouts": 0,
+    "ms": 80173,
+    "node": "v22.22.0"
+  },
+  "totals": {
+    "survivors": 48,
+    "distinguished": 11,
+    "distinguishedByPublicCorpus": 11,
+    "hangOrCrashOnSomeBatch": 0,
+    "distinguishedOnlyByPrivateCorpus": 0,
+    "undistinguished": 37
+  },
+  "survivors": [
+    {
+      "id": "M0014",
+      "owner": "<module:DELIMITED_MARKS>",
+      "line": 95,
+      "operator": "string-empty",
+      "original": "'*'",
+      "replacement": "''",
+      "distinguished": true,
+      "publicCells": 819,
+      "publicInputs": 455,
+      "byFn": {
+        "rt_adf": 91,
+        "m2a": 364,
+        "rt_md": 364
+      },
+      "bySource": {
+        "gen-adf": 91,
+        "gen-md": 728
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#1041",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "+␠aua␠***au***",
+        "size": 20,
+        "input": "+ naïve ***café***"
+      }
+    },
+    {
+      "id": "M0019",
+      "owner": "<module:DELIMITED_MARKS>",
+      "line": 97,
+      "operator": "string-empty",
+      "original": "'~'",
+      "replacement": "''",
+      "distinguished": true,
+      "publicCells": 97,
+      "publicInputs": 94,
+      "byFn": {
+        "rt_adf": 91,
+        "m2a": 3,
+        "rt_md": 3
+      },
+      "bySource": {
+        "gen-adf": 91,
+        "gen-md": 6
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#1672",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "~~~a␍␠␠␠␠a␍a␠(a)␠{␍-␠a␠a␍␠␠␠␠a␍~~~␍␍>␠␠~~a~~␠a␠a␠a␠a␠**a␠a_a…",
+        "size": 324,
+        "input": "~~~json\r    indented\rif (x) {\r- not list\r    indented\r~~~\r\r>  ~~CI~~ retry on CI build **retry snake_case_name the**\r> _Fix camelCase_ on on the Fix ok x ok camelCase\r\r> `npm test` 42 on on CI snake_case_name x\r>```\r>code\r>```\r> 日本語\r\r*the TODO: café*the user_id\r=\r\r\r```text\r```\r  y()\r\tTAB\r```\r```"
+      }
+    },
+    {
+      "id": "M0062",
+      "owner": "NODE_RENDERERS.mention",
+      "line": 156,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 270,
+      "publicInputs": 135,
+      "byFn": {
+        "a2m": 135,
+        "rt_adf": 135
+      },
+      "bySource": {
+        "gen-adf": 270
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2007",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph{localId}(mention,text[subsup]:\"a␠\",unsupportedInline(text[null]:\"u␠a␠ua\")))",
+        "size": 300,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "mention"
+                },
+                {
+                  "type": "text",
+                  "text": "alpha ",
+                  "marks": [
+                    {
+                      "type": "subsup",
+                      "attrs": {
+                        "type": "sup"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "unsupportedInline",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "👍🏽 NOTE 日本語eps",
+                      "marks": null
+                    }
+                  ]
+                }
+              ],
+              "attrs": {
+                "localId": "88a-845b"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0065",
+      "owner": "NODE_RENDERERS.emoji",
+      "line": 157,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 216,
+      "publicInputs": 108,
+      "byFn": {
+        "a2m": 108,
+        "rt_adf": 108
+      },
+      "bySource": {
+        "gen-adf": 216
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1905",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph(text:\"+␠a\",emoji{},text[backgroundColor+underline]:\"a␠0␠a⏎!\",text[em+code]:\"⍽⏎a\"))",
+        "size": 323,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "+ plus"
+                },
+                {
+                  "type": "emoji",
+                  "attrs": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Delta 42 id\n!",
+                  "marks": [
+                    {
+                      "type": "backgroundColor",
+                      "attrs": {
+                        "color": "red"
+                      }
+                    },
+                    {
+                      "type": "underline"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " \nx",
+                  "marks": [
+                    {
+                      "type": "em"
+                    },
+                    {
+                      "type": "code"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0067",
+      "owner": "NODE_RENDERERS.inlineCard",
+      "line": 158,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 606,
+      "publicInputs": 303,
+      "byFn": {
+        "a2m": 303,
+        "rt_adf": 303
+      },
+      "bySource": {
+        "gen-adf": 606
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1771",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph(inlineCard{data}))",
+        "size": 144,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "inlineCard",
+                  "attrs": {
+                    "data": {
+                      "@type": "Document",
+                      "name": "Doc"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0069",
+      "owner": "NODE_RENDERERS.blockCard",
+      "line": 159,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0073",
+      "owner": "renderNode",
+      "line": 163,
+      "operator": "return-value",
+      "original": "''",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0074",
+      "owner": "renderNode",
+      "line": 163,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 328,
+      "publicInputs": 164,
+      "byFn": {
+        "a2m": 164,
+        "rt_adf": 164
+      },
+      "bySource": {
+        "gen-adf": 328
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#581",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(#0)",
+        "size": 40,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0091",
+      "owner": "escapeBlockLeader",
+      "line": 198,
+      "operator": "regex-anchor",
+      "original": "/^(\\d+)\\./",
+      "replacement": "/(\\d+)\\./",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0097",
+      "owner": "renderTextRun",
+      "line": 205,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 448,
+      "publicInputs": 224,
+      "byFn": {
+        "a2m": 224,
+        "rt_adf": 224
+      },
+      "bySource": {
+        "gen-adf": 448
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2581",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(bulletList(string),paragraph{localId}(text[link]))",
+        "size": 219,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "bulletList",
+              "content": "not an array"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "#anchor"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "attrs": {
+                "localId": "46de-d26e"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0103",
+      "owner": "renderTextRun",
+      "line": 208,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 308,
+      "publicInputs": 154,
+      "byFn": {
+        "a2m": 154,
+        "rt_adf": 154
+      },
+      "bySource": {
+        "gen-adf": 308
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1677",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(multiBodiedExtension(blockquote(paragraph(emoji{},text[link],text:\"**␠0.␠a␠a⏎⏎a0\",text:\"aua␠```a⏎a0␠a␠#######␠a`…\")),paragraph()))",
+        "size": 382,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "multiBodiedExtension",
+              "content": [
+                {
+                  "type": "blockquote",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "emoji",
+                          "attrs": {}
+                        },
+                        {
+                          "type": "text",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {}
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "** 10. ten NOTE\n\nv2"
+                        },
+                        {
+                          "type": "text",
+                          "text": "Deltanaïve ```js\nv2 alpha ####### TODO```js "
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "content": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0116",
+      "owner": "headingLevel",
+      "line": 218,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0122",
+      "owner": "codeBody",
+      "line": 232,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 268,
+      "publicInputs": 134,
+      "byFn": {
+        "a2m": 134,
+        "rt_adf": 134
+      },
+      "bySource": {
+        "gen-adf": 268
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2258",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(codeBlock(hardBreak))",
+        "size": 92,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "hardBreak"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0169",
+      "owner": "parseBlock",
+      "line": 300,
+      "operator": "index-swap",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0209",
+      "owner": "parseInline",
+      "line": 355,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0211",
+      "owner": "parseInline",
+      "line": 355,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0242",
+      "owner": "constructAt",
+      "line": 387,
+      "operator": "return-value",
+      "original": "null",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0245",
+      "owner": "linkAt",
+      "line": 392,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0248",
+      "owner": "linkAt",
+      "line": 393,
+      "operator": "boundary",
+      "original": "<",
+      "replacement": "<=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0249",
+      "owner": "linkAt",
+      "line": 393,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0250",
+      "owner": "linkAt",
+      "line": 393,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0257",
+      "owner": "linkAt",
+      "line": 393,
+      "operator": "return-value",
+      "original": "null",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0260",
+      "owner": "linkAt",
+      "line": 394,
+      "operator": "number-shift",
+      "original": "2",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0263",
+      "owner": "linkAt",
+      "line": 395,
+      "operator": "boundary",
+      "original": "<",
+      "replacement": "<=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0264",
+      "owner": "linkAt",
+      "line": 395,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0266",
+      "owner": "linkAt",
+      "line": 395,
+      "operator": "return-value",
+      "original": "null",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0279",
+      "owner": "findUnescaped",
+      "line": 408,
+      "operator": "boundary",
+      "original": "<",
+      "replacement": "<=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0292",
+      "owner": "findUnescaped",
+      "line": 414,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0293",
+      "owner": "findUnescaped",
+      "line": 414,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0294",
+      "owner": "findUnescaped",
+      "line": 416,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0308",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 457,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0311",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 458,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0322",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 461,
+      "operator": "string-empty",
+      "original": "'text'",
+      "replacement": "''",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0330",
+      "owner": "WRITER_ATTRS.level",
+      "line": 476,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0351",
+      "owner": "attrsAreRebuildable",
+      "line": 492,
+      "operator": "string-empty",
+      "original": "'heading'",
+      "replacement": "''",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0354",
+      "owner": "attrsAreRebuildable",
+      "line": 493,
+      "operator": "return-value",
+      "original": "false",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0355",
+      "owner": "attrsAreRebuildable",
+      "line": 493,
+      "operator": "bool-flip",
+      "original": "false",
+      "replacement": "true",
+      "distinguished": true,
+      "publicCells": 3,
+      "publicInputs": 3,
+      "byFn": {
+        "gate": 3
+      },
+      "bySource": {
+        "gen-adf": 3
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1683",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(heading{null}(text:\"0)␠a␠{␠0\",text[null]:\"\"))",
+        "size": 160,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "heading",
+              "attrs": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "2) eps { 42"
+                },
+                {
+                  "type": "text",
+                  "text": "",
+                  "marks": [
+                    null
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0360",
+      "owner": "attrsAreRebuildable",
+      "line": 500,
+      "operator": "return-value",
+      "original": "false",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0364",
+      "owner": "attrsAreRebuildable",
+      "line": 501,
+      "operator": "string-empty",
+      "original": "'heading'",
+      "replacement": "''",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0366",
+      "owner": "attrsAreRebuildable",
+      "line": 503,
+      "operator": "boundary",
+      "original": ">",
+      "replacement": ">=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0368",
+      "owner": "attrsAreRebuildable",
+      "line": 503,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0388",
+      "owner": "SHAPE_RULES.codeBlock",
+      "line": 555,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 1,
+      "publicInputs": 1,
+      "byFn": {
+        "gate": 1
+      },
+      "bySource": {
+        "gen-adf": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2258",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(hardBreak))",
+        "size": 92,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "hardBreak"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0403",
+      "owner": "SHAPE_RULES.text",
+      "line": 561,
+      "operator": "return-value",
+      "original": "true",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0404",
+      "owner": "SHAPE_RULES.text",
+      "line": 561,
+      "operator": "bool-flip",
+      "original": "true",
+      "replacement": "false",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0445",
+      "owner": "hasAdjacentUnmarkedRuns",
+      "line": 588,
+      "operator": "boundary",
+      "original": ">",
+      "replacement": ">=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0447",
+      "owner": "hasAdjacentUnmarkedRuns",
+      "line": 588,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0464",
+      "owner": "isUnrebuildable",
+      "line": 596,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0477",
+      "owner": "isUnrebuildable",
+      "line": 602,
+      "operator": "return-value",
+      "original": "false",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    }
+  ]
+}

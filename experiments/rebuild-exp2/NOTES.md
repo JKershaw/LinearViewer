@@ -201,3 +201,30 @@ LIN-3561 (High, under LIN-3549). Autopilot `8b80c7b8`. Ticket and gap list as co
   - a proxy sub-router.
 
   The UI is "tidy until swappable".
+
+## 15 Oct, ~21:10Z: 2b part 1 done and scored
+
+LIN-3561 merged as `bf6f7507` (PR #1893) at 20:46Z, about 40 minutes after kickoff; Done at 20:55Z, with no rulings.
+
+**Facts:**
+
+- **The fix:** one code line (`HREF` escapes and unescapes both brackets), plus the two corrected comments.
+- **Tests:** +78 lines, all in the codec test file: three table-driven groups (display through `marked`, per-node display, stored ADF) and 11 rows added to the existing gate tables. No existing test edited.
+- **The 46 gap rows:** 35 covered, 9 "not pinned" (4 malformed ADF, 2 inputs with no realistic source, 3 behaviours shared with `269a6189`), 2 deferred to LIN-3558.
+- **Independent check (here):** re-planted all 46 rows into `e7f7bd57`'s code with only the `HREF` line fixed, and ran the new test file on each. The result matches the PR's table exactly: 35 fail (2 of them by hanging), 11 pass.
+- **Planted-fault sweep on `bf6f7507`, new tests:** 490 mutants, 430 killed, 12 timeouts, 48 survive. Score 90.2% (was 83.1%).
+- **Survivor probe:** of the 48 survivors, **11 change some output** on the corpus (was 46), and they are exactly the 11 rows the PR labelled. The other 37 change nothing observable.
+- **Follow-ups the PR lists (not fixed):** F1 to F8. It recommends one ticket for F1 (inline code with a backslash or backtick displays wrong) and F2 (a hand-typed link with balanced brackets is stored cut short).
+- **Real-data counts (here, private corpus, counts only):**
+  - F1: after a Jira round trip, inline code shows extra backslashes in **137 of 1,037** real texts (13%). These are Linear texts, used as a stand-in for Jira content.
+  - F2: 0 of 1,037 real texts contain a link with balanced brackets in its URL.
+
+**Against `2b/prediction-2b1.md`:** merged without John ✓; about 40 minutes and one review round ✓; a one-line bracket fix ✓; 35 rows covered (predicted 25–40) ✓; 78 test lines, table-driven (40–150) ✓; no other behaviour fixed (0–3) ✓; score 90.2% (90–95%) ✓, at the bottom of the range; no scope creep and no near-duplicate pile ✓.
+
+**One wrinkle, which matters for part 2:** the corrected escaping comment now calls F1 "a known, accepted display cost". Nobody accepted it; the PR itself recommends fixing it. Room-2b's `SPEC.md` is generated from these comments, so as written the next clean room would be told to keep F1. That's the second time a comment has steered a clean room (the `HREF` comment was the first).
+
+**Inference:**
+
+- A test review bounded by a computed gap list works well and stays small: 78 lines closed 35 of 46 gaps, with no sprawl.
+- In this method, comments are part of the contract. A wrong comment is a wrong spec.
+- F1 is the realistic display bug left in this module; F2 isn't, on this data.

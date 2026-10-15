@@ -1,0 +1,24 @@
+[mutate] 490 mutants (490 sites, 0 duplicates dropped) from ../arms/2b1/adf.js
+[mutate] 4 worker trees under /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/tree-2b.mutate-work
+[mutate] baseline passes (179 tests), runs 325/327/353 ms; per-mutant timeout 10000 ms
+[mutate] 25/490 (6s)
+[mutate] 50/490 (9s)
+[mutate] 75/490 (13s)
+[mutate] 100/490 (16s)
+[mutate] 125/490 (19s)
+[mutate] 150/490 (23s)
+[mutate] 175/490 (26s)
+[mutate] 200/490 (30s)
+[mutate] 225/490 (41s)
+[mutate] 250/490 (47s)
+[mutate] 275/490 (55s)
+[mutate] 300/490 (70s)
+[mutate] 325/490 (75s)
+[mutate] 350/490 (79s)
+[mutate] 375/490 (82s)
+[mutate] 400/490 (86s)
+[mutate] 425/490 (90s)
+[mutate] 450/490 (93s)
+[mutate] 475/490 (97s)
+[mutate] 490/490 (99s)
+[mutate] done in 99.0s: 430 killed, 48 survived, 12 timeout, 0 invalid; kill rate 0.8776
