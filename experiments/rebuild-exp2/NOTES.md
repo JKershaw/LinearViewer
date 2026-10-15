@@ -93,3 +93,8 @@ Re-tested on 15 synthetic calls (good and bad) and on arm B's real transcript, w
 - The packed public corpus is 8,916 inputs, or 53,496 calls. The 1,037 private real texts are replayed here, after the run.
 - Arm B's public-only baseline is 3,477 cells in 338 groups. The 3,479 / 340 quoted before included 2 private cells.
 - The sub-agent sees the repository's `CLAUDE.md`. Arm B, a sub-agent of this session, also had project instructions in context. Minor.
+
+## 15 Oct, 16:52Z: 2a launched
+
+- **Ticket:** LIN-3557, under LIN-3549 (High; Quality, Periodicals & Measurement). Autopilot `d1c1166c`.
+- **Inputs:** the room, brief, audit and prediction as committed at `e1530200` (prediction `f19efc24`).
