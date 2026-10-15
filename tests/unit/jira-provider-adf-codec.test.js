@@ -295,6 +295,14 @@ const WRITER_UNSAFE_ADF = {
   'codeBlock with a leading newline': adfDoc({ type: 'codeBlock', content: [adfText('\na')] }),
   'codeBlock with a trailing newline': adfDoc({ type: 'codeBlock', content: [adfText('a\n')] }),
   'empty codeBlock': adfDoc({ type: 'codeBlock', content: [] }),
+  // Adjacent code runs (LIN-3564): their fences touch, and CommonMark reads
+  // ``a``b`` as ONE span. The same two runs with a different mark between them
+  // are fine.
+  'two adjacent code runs': adfDoc(adfPara(adfText('a', [{ type: 'code' }]), adfText('b', [{ type: 'code' }]))),
+  // A code span cannot be escaped, so one that opens a multi-line paragraph
+  // with a fence would read back as a code block.
+  'a paragraph opening with a fence-length code span, then a line break':
+    adfDoc(adfPara(adfText('``x', [{ type: 'code' }]), { type: 'hardBreak' }, adfText('y'))),
   // Marks: INLINE_PATTERN is a single non-nesting scan, so two marks on one run
   // render as `_**x**_` and re-parse as ONE em run whose text is literally `**x**`.
   'text carrying strong + em': adfDoc(adfPara(adfText('x', [{ type: 'strong' }, { type: 'em' }]))),
@@ -795,6 +803,9 @@ const ADVERSARIAL_TEXTS = [
   '```js', '```', '~~~',
   '| a | b |', '<html>&amp;', 'emoji 🙂 and — dashes',
   'mixed `code` and _em_ and [l](u) and **b**',
+  // Code-span payloads (LIN-3564): they reach the code-mark slot, where text is
+  // fenced rather than escaped.
+  'dir\\', 'a\\\\b', 'a`b', '`x', 'x`', 'x`  ', 'a`b``', '`', '``', ' a ', ' ', '  ', ' `a` ',
   // Whitespace and newlines: these mostly drive the REFUSAL side of the
   // property (a `.trim()` or a block split destroys them), so they are here to
   // prove the refusals are earned rather than blanket.
@@ -1067,4 +1078,43 @@ describe('markdownToAdf: what a write stores in Jira', () => {
   test('an unclosed link stays text', () => {
     assert.deepEqual(markdownToAdf('see [draft](https://x'), adfDoc(adfPara(adfText('see [draft](https://x'))))
   })
+})
+
+// LIN-3564: a code span shows exactly its own text, and a typed one stores its
+// content as CommonMark defines it.
+describe('code spans: what a reader sees, and what a typed span stores', () => {
+  const code = text => adfDoc(adfPara(adfText(text, [{ type: 'code' }])))
+  const escapeHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const shown = [
+    ['a backslash', 'C:\\dir', '`C:\\dir`'],
+    ['a trailing backslash', 'dir\\', '`dir\\`'],
+    ['a double backslash', 'a\\\\b', '`a\\\\b`'],
+    ['a backtick inside', 'a`b', '``a`b``'],
+    ['a leading backtick', '`x', '`` `x ``'],
+    ['a trailing backtick then spaces', 'x`  ', '``x`  ``'],
+    ['a backtick and a double backtick', 'a`b``', '``` a`b`` ```'],
+    ['a lone backtick', '`', '`` ` ``'],
+    ['spaces on both edges', ' a ', '`  a  `'],
+    ['one space', ' ', '` `'],
+    ['two spaces', '  ', '`  `'],
+  ]
+  for (const [name, text, md] of shown) {
+    test(`code with ${name}`, () => {
+      assert.equal(adfToMarkdown(code(text)), md)
+      assert.equal(marked.parse(md), `<p><code>${escapeHtml(text)}</code></p>\n`)
+      assert.deepEqual(markdownToAdf(md), code(text))
+      assert.equal(adfHasUnrenderableContent(code(text)), false)
+    })
+  }
+
+  const stored = [
+    ['a double backslash is kept', '`a\\\\b`', [adfPara(adfText('a\\\\b', [{ type: 'code' }]))]],
+    ['a trailing backslash does not escape the fence', '`dir\\`', [adfPara(adfText('dir\\', [{ type: 'code' }]))]],
+    ['a double fence holds a backtick', '`` a`b ``', [adfPara(adfText('a`b', [{ type: 'code' }]))]],
+    ['one padding space is stripped from each side', '` a `', [adfPara(adfText('a', [{ type: 'code' }]))]],
+    ['no run of the same length is left: plain text', '``a`', [adfPara(adfText('``a`'))]],
+    ['the opening run is the whole run, not its tail', '```a`b`', [adfPara(adfText('```a'), adfText('b', [{ type: 'code' }]))]],
+    ['text after an unclosed run still parses', '``a `b`', [adfPara(adfText('``a '), adfText('b', [{ type: 'code' }]))]],
+  ]
+  for (const [name, md, content] of stored) test(`typed: ${name}`, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
 })
