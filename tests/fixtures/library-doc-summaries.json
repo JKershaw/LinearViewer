@@ -93,5 +93,6 @@
   "why-legs-repeat": "A leg repeats because a gate asked for changes. 827 of the 2,252 plan, plan-review, review and close-out sessions on Done tickets since 1 August are repeats, a few dozen fewer in fact, because some of August's earlier legs were triage,…",
   "why-throughput-halved": "Mostly because June was a different regime, not because the same work was counted or split differently. The measure holds up. In both periods about nine in ten commits on main named a ticket, and a correct change was the same size: a…",
   "writing-length": "Yes, by about 1.6×. Over three months the length of Harbour's reviews roughly tripled while the count of distinct things they say roughly doubled. The gap between those two numbers is the part of the writing with no idea behind it.",
-  "test-surplus": "Partly, but not the way the 90% guess supposes. Harbour's unit suite is not a thick blanket in which most tests repeat each other. It is a thin, wide net. Most of the faults it catches are caught by one test file only, usually the file…"
+  "test-surplus": "Partly, but not the way the 90% guess supposes. Harbour's unit suite is not a thick blanket in which most tests repeat each other. It is a thin, wide net. Most of the faults it catches are caught by one test file only, usually the file…",
+  "theseus": "Yes for one block, the read and write half of Providers, once its spec is written down. That takes a schema, a Linear fake and one conformance suite, none of which changes behaviour, plus one internal change that makes write results agree.…"
 }

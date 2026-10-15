@@ -1,0 +1,222 @@
+{
+ "commit": "38fc3b5c59836331bb9f362643bcb78489af9bc6",
+ "tangles": [
+  {
+   "pair": "Agent API (proxy)|Front end: server-rendered pages",
+   "edges": 3,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/render-runner-setup.js>lib/proxy-scopes.js"
+   ]
+  },
+  {
+   "pair": "Agent API (proxy)|LLM & prompts",
+   "edges": 39,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/chat-tools.js>lib/proxy-fetch.js",
+    "lib/chat-tools.js>lib/proxy-preamble.js",
+    "lib/prompts/runner-kickoff.js>lib/proxy-scopes.js",
+    "lib/yap-client.js>lib/proxy-fetch.js"
+   ]
+  },
+  {
+   "pair": "Agent API (proxy)|Providers (Linear, GitHub, Jira, local)",
+   "edges": 24,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/github-pr-status.js>lib/proxy-fetch.js",
+    "lib/linear-fetch.js>lib/proxy-fetch.js",
+    "lib/pr-state-store.js>lib/proxy-fetch.js",
+    "lib/providers/github/index.js>lib/proxy-ref-resolver.js",
+    "lib/providers/jira/index.js>lib/proxy-ref-resolver.js",
+    "lib/providers/linear/index.js>lib/proxy-wire.js"
+   ]
+  },
+  {
+   "pair": "Agent API (proxy)|Runs & dispatch",
+   "edges": 51,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/consumer-poll-warning.js>lib/proxy-scopes.js",
+    "lib/dispatch-factory.js>lib/proxy-preamble.js",
+    "lib/follow-up-dispatch.js>lib/proxy-preamble.js",
+    "lib/wake-credential.js>lib/proxy-preamble.js",
+    "routes/dispatch.js>lib/proxy-preamble.js",
+    "routes/dispatch.js>lib/proxy-scopes.js",
+    "routes/dispatch.js>lib/proxy-tokens.js"
+   ]
+  },
+  {
+   "pair": "Agent API (proxy)|Web routes (pages & workspace API)",
+   "edges": 8,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "routes/proxy-flight-companion.js>routes/dashboard.js",
+    "routes/proxy-flight-companion.js>routes/flight-companion.js",
+    "routes/proxy-rulings.js>routes/dashboard.js"
+   ]
+  },
+  {
+   "pair": "Auth, accounts & workspaces|Front end: server-rendered pages",
+   "edges": 27,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/account-conflict.js>lib/render-pages.js",
+    "lib/github-install-flow.js>lib/render-pages.js",
+    "lib/pat-session.js>lib/guest-task-path.js",
+    "routes/account-merge.js>lib/render-pages.js",
+    "routes/auth.js>lib/render.js",
+    "routes/email-auth.js>lib/render-account-home.js",
+    "routes/email-auth.js>lib/render-email-auth.js",
+    "routes/github-auth.js>lib/render-pages.js",
+    "routes/github-projects-auth.js>lib/render-pages.js",
+    "routes/held-connection.js>lib/render-pages.js",
+    "routes/jira-auth.js>lib/render-pages.js",
+    "routes/openrouter-auth.js>lib/render.js"
+   ]
+  },
+  {
+   "pair": "Auth, accounts & workspaces|LLM & prompts",
+   "edges": 7,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/workspace-preferences.js>lib/openrouter.js",
+    "lib/workspace-preferences.js>lib/prompt-templates.js"
+   ]
+  },
+  {
+   "pair": "Auth, accounts & workspaces|Providers (Linear, GitHub, Jira, local)",
+   "edges": 9,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/providers/jira/oauth.js>lib/token-refresh.js"
+   ]
+  },
+  {
+   "pair": "Front end: server-rendered pages|LLM & prompts",
+   "edges": 22,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/audit.js>lib/tree.js",
+    "lib/openrouter.js>lib/tree.js",
+    "lib/prompt-templates.js>lib/tree.js",
+    "lib/recommend-recurse.js>lib/tree.js",
+    "lib/recommendation-facts.js>lib/tree.js",
+    "lib/roadmap.js>lib/render-swipe.js",
+    "lib/roadmap.js>lib/tree.js"
+   ]
+  },
+  {
+   "pair": "Front end: server-rendered pages|Providers (Linear, GitHub, Jira, local)",
+   "edges": 25,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/providers/jira/index.js>lib/tree.js",
+    "lib/providers/linear/index.js>lib/tree.js",
+    "lib/providers/local/index.js>lib/tree.js",
+    "lib/sample-data/mock-data.js>lib/tree.js"
+   ]
+  },
+  {
+   "pair": "Front end: server-rendered pages|Runs & dispatch",
+   "edges": 14,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/render-kpis.js>lib/weekly-budget.js",
+    "lib/render-run-steps.js>lib/dispatch-terminal.js",
+    "lib/render-run-steps.js>lib/run-view.js",
+    "lib/render-session.js>lib/loop-supersede.js",
+    "lib/render-session.js>lib/run-view.js",
+    "lib/render-task-page.js>lib/task-page-loader.js"
+   ]
+  },
+  {
+   "pair": "LLM & prompts|Other features",
+   "edges": 4,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/agent-turn.js>lib/flight-companion-gate.js",
+    "lib/prompts/ship-biscuit-editor.js>lib/ship-biscuit.js"
+   ]
+  },
+  {
+   "pair": "LLM & prompts|Platform & plumbing",
+   "edges": 16,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/pricing-conformance-sweep.js>lib/model-pricing.js",
+    "lib/pricing-conformance-sweep.js>lib/openrouter-catalog.js",
+    "lib/scan-public-pages.js>lib/library-metadata.js"
+   ]
+  },
+  {
+   "pair": "LLM & prompts|Providers (Linear, GitHub, Jira, local)",
+   "edges": 6,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/providers/linear/index.js>lib/openrouter.js"
+   ]
+  },
+  {
+   "pair": "LLM & prompts|Runs & dispatch",
+   "edges": 40,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/dispatch-factory.js>lib/file-pointer.js",
+    "lib/dispatch-factory.js>lib/prompt-templates.js",
+    "lib/dispatch-validation.js>lib/prompt-templates.js",
+    "lib/dispatch-validation.js>lib/prompts/autopilot-kickoff.js",
+    "lib/follow-up-dispatch.js>lib/chat-tools.js",
+    "lib/observer-state-store.js>lib/recap-cache.js",
+    "lib/recent-runs.js>lib/prompt-templates.js",
+    "lib/run-paragraph.js>lib/openrouter.js",
+    "lib/run-summary.js>lib/openrouter.js",
+    "lib/session-summary.js>lib/openrouter.js",
+    "lib/session-telemetry.js>lib/model-pricing.js",
+    "lib/task-page-loader.js>lib/brief-cache.js",
+    "routes/dispatch.js>lib/chat-request.js",
+    "routes/dispatch.js>lib/prompt-templates.js",
+    "routes/runner-kit.js>lib/prompts/runner-kickoff.js",
+    "routes/runner-setup.js>lib/prompts/runner-kickoff.js"
+   ]
+  },
+  {
+   "pair": "Other features|Platform & plumbing",
+   "edges": 5,
+   "thinDirection": "b>a",
+   "thinEdges": [
+    "lib/kpi-stats.js>lib/report-history-store.js"
+   ]
+  },
+  {
+   "pair": "Other features|Runs & dispatch",
+   "edges": 3,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/periodicals.js>lib/periodical-report-gate.js"
+   ]
+  },
+  {
+   "pair": "Platform & plumbing|Runs & dispatch",
+   "edges": 50,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/kpi-stats.js>lib/dispatch-lineage.js",
+    "lib/kpi-stats.js>lib/dispatch-terminal.js",
+    "lib/kpi-stats.js>lib/session-telemetry.js",
+    "lib/kpi-stats.js>lib/terminal-marked-task-cost.js",
+    "lib/kpi-stats.js>lib/weekly-budget.js",
+    "lib/milestone-funnel.js>lib/dispatch-store.js"
+   ]
+  },
+  {
+   "pair": "Providers (Linear, GitHub, Jira, local)|Runs & dispatch",
+   "edges": 8,
+   "thinDirection": "a>b",
+   "thinEdges": [
+    "lib/pr-state-store.js>lib/run-evidence.js"
+   ]
+  }
+ ]
+}
