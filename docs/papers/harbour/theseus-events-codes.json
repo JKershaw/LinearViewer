@@ -1,0 +1,274 @@
+{
+ "coder": "Claude, one reading of each commit subject, ticket title and closing edge; not second-coded",
+ "codes": {
+  "feature": "adds a capability",
+  "consolidation": "brings copies or call sites to one place",
+  "fix": "repairs behaviour",
+  "upkeep": "routine data or config change",
+  "removal": "deletes a feature or function",
+  "inversion": "moves code so an import direction disappears"
+ },
+ "events": [
+  {
+   "sha": "ade043e3",
+   "pair": "LLM & prompts|Runs & dispatch",
+   "kind": "born",
+   "ticket": null,
+   "title": null,
+   "code": "feature",
+   "note": "Review-tag handling (PR #17), before the tracker was in use; audit imports queue config."
+  },
+  {
+   "sha": "856d4ad6",
+   "pair": "LLM & prompts|Runs & dispatch",
+   "kind": "dissolved",
+   "ticket": "LIN-100",
+   "title": "Remove labels",
+   "code": "removal",
+   "note": "Removing labels deleted the audit’s imports of the run config."
+  },
+  {
+   "sha": "8d7dbf9f",
+   "pair": "Front end: server-rendered pages|LLM & prompts",
+   "kind": "born",
+   "ticket": null,
+   "title": null,
+   "code": "feature",
+   "note": "Swim-lane task ordering (PR #208); the roadmap reached into the swipe renderer."
+  },
+  {
+   "sha": "f5354783",
+   "pair": "LLM & prompts|Runs & dispatch",
+   "kind": "born",
+   "ticket": "LIN-319",
+   "title": "Dispatch verbs carry no structured `kind` field",
+   "code": "feature",
+   "note": "Dispatch verbs gained a structured kind; the dispatch route imports the prompt templates."
+  },
+  {
+   "sha": "5c6c2201",
+   "pair": "Front end: server-rendered pages|Providers (Linear, GitHub, Jira, local)",
+   "kind": "born",
+   "ticket": "LIN-175",
+   "title": "Phase 1: Canonical Models & State Mapping",
+   "code": "consolidation",
+   "note": "Canonical models and state mapping: one place for issue shape, placed where the tree renderer and Linear reader meet."
+  },
+  {
+   "sha": "5c6c2201",
+   "pair": "LLM & prompts|Providers (Linear, GitHub, Jira, local)",
+   "kind": "born",
+   "ticket": "LIN-175",
+   "title": "Phase 1: Canonical Models & State Mapping",
+   "code": "consolidation",
+   "note": "Same commit: prompt formatters import the new canonical models."
+  },
+  {
+   "sha": "45bf490a",
+   "pair": "Auth, accounts & workspaces|Providers (Linear, GitHub, Jira, local)",
+   "kind": "born",
+   "ticket": "LIN-331",
+   "title": "Consumers: migrate dashboard call sites + getAuthRouter",
+   "code": "consolidation",
+   "note": "Call sites migrated to the provider registry; the auth route imports it."
+  },
+  {
+   "sha": "8d48dfe5",
+   "pair": "Agent API (proxy)|LLM & prompts",
+   "kind": "born",
+   "ticket": "LIN-450",
+   "title": "Collective yap experiment",
+   "code": "feature",
+   "note": "Collective experiment; its client reuses the proxy fetch."
+  },
+  {
+   "sha": "e3f942b7",
+   "pair": "Front end: server-rendered pages|Platform & plumbing",
+   "kind": "born",
+   "ticket": "LIN-481",
+   "title": "Migrate errors.js htmlError() onto renderPage() — the residual hand-rolled document",
+   "code": "consolidation",
+   "note": "htmlError moved onto the shared page shell, so plumbing imports a page component."
+  },
+  {
+   "sha": "d5d4d565",
+   "pair": "Agent API (proxy)|Providers (Linear, GitHub, Jira, local)",
+   "kind": "born",
+   "ticket": null,
+   "title": null,
+   "code": "fix",
+   "note": "Retry and timeout on the Linear read path, by reusing the proxy fetch’s classifier."
+  },
+  {
+   "sha": "50f9df31",
+   "pair": "Auth, accounts & workspaces|LLM & prompts",
+   "kind": "born",
+   "ticket": "LIN-989",
+   "title": "[catalog] Read-only, workspace-scoped tool catalog (lib/chat-tools.js)",
+   "code": "feature",
+   "note": "Read-only tool catalog; workspace preferences import the model client."
+  },
+  {
+   "sha": "acb6361f",
+   "pair": "Auth, accounts & workspaces|Front end: server-rendered pages",
+   "kind": "born",
+   "ticket": "LIN-1145",
+   "title": "Allow per-task model selection in workspace AI settings",
+   "code": "feature",
+   "note": "Per-task model selection in workspace settings."
+  },
+  {
+   "sha": "8a4a2cfd",
+   "pair": "Agent API (proxy)|Runs & dispatch",
+   "kind": "born",
+   "ticket": "LIN-1139",
+   "title": "Extract createDispatchItem factory (server DRY)",
+   "code": "consolidation",
+   "note": "Dispatch item factory extracted (DRY); it imports the proxy preamble."
+  },
+  {
+   "sha": "32eb225e",
+   "pair": "Front end: server-rendered pages|Runs & dispatch",
+   "kind": "born",
+   "ticket": "LIN-1478",
+   "title": "S2b: Lineage-continuous rendering (one continuous loop)",
+   "code": "feature",
+   "note": "Lineage-continuous rendering of a run."
+  },
+  {
+   "sha": "8963dd02",
+   "pair": "Platform & plumbing|Runs & dispatch",
+   "kind": "born",
+   "ticket": "LIN-1596",
+   "title": "Feedback: On the KPIs page: The gap I notice: this page counts activit",
+   "code": "feature",
+   "note": "KPI page change from feedback; KPI stats import dispatch terminal state."
+  },
+  {
+   "sha": "9ad101e1",
+   "pair": "LLM & prompts|Other features",
+   "kind": "born",
+   "ticket": "LIN-1684",
+   "title": "LIN-1675 P2: waypoint-derivation library (lib/ship-journey.js)",
+   "code": "feature",
+   "note": "Waypoint-derivation library for the ship view."
+  },
+  {
+   "sha": "18843e64",
+   "pair": "Other features|Runs & dispatch",
+   "kind": "born",
+   "ticket": "LIN-694",
+   "title": "Periodical self-conclusion: block Done until the report PR is persisted (4/11 reports in t",
+   "code": "feature",
+   "note": "Periodical self-conclusion gate."
+  },
+  {
+   "sha": "40428b26",
+   "pair": "LLM & prompts|Platform & plumbing",
+   "kind": "born",
+   "ticket": "LIN-2384",
+   "title": "Sonnet-5 pricing expires 2026-08-31: update lib/model-pricing.js from live catalog + add a",
+   "code": "upkeep",
+   "note": "Model pricing update; audit and prompt formatters import workflow config."
+  },
+  {
+   "sha": "ad97bcf7",
+   "pair": "Agent API (proxy)|Web routes (pages & workspace API)",
+   "kind": "born",
+   "ticket": "LIN-2444",
+   "title": "Rulings feed: operator/agent may PROPOSE a dismissal (one-click Agree in the UI, bulk-agre",
+   "code": "feature",
+   "note": "Rulings feed lets an agent propose a dismissal; a proxy route imports a dashboard route."
+  },
+  {
+   "sha": "26014544",
+   "pair": "Agent API (proxy)|Front end: server-rendered pages",
+   "kind": "born",
+   "ticket": "LIN-3098",
+   "title": "The runner prompt: Harbour serves the prompt that turns a person's Claude Code session int",
+   "code": "feature",
+   "note": "The runner prompt page imports the proxy scope list."
+  },
+  {
+   "sha": "cd25bce5",
+   "pair": "Providers (Linear, GitHub, Jira, local)|Runs & dispatch",
+   "kind": "born",
+   "ticket": "LIN-3311",
+   "title": "LIN-2950 P1: PR-state store lift, run loader split + settle predicate, owner golden pin",
+   "code": "feature",
+   "note": "PR-state store lifted out of a route as part of a feature phase; borderline consolidation."
+  },
+  {
+   "sha": "e655e73e",
+   "pair": "Front end: server-rendered pages|Other features",
+   "kind": "born",
+   "ticket": "LIN-3312",
+   "title": "LIN-2950 P2: guest run projection, guest render mode on the run page, scan guard (library ",
+   "code": "feature",
+   "note": "Guest run projection for share links."
+  },
+  {
+   "sha": "e655e73e",
+   "pair": "Other features|Platform & plumbing",
+   "kind": "born",
+   "ticket": "LIN-3312",
+   "title": "LIN-2950 P2: guest run projection, guest render mode on the run page, scan guard (library ",
+   "code": "feature",
+   "note": "Share-link secret scan reuses the platform secret scanner."
+  },
+  {
+   "sha": "c517b442",
+   "pair": "Front end: server-rendered pages|Web routes (pages & workspace API)",
+   "kind": "born",
+   "ticket": "LIN-2944",
+   "title": "The first screen: your backlog, the top task, Go, and the prompt underneath",
+   "code": "feature",
+   "note": "The first screen: the swipe renderer imports a workspace route."
+  },
+  {
+   "sha": "dcfbf7fa",
+   "pair": "Front end: server-rendered pages|Other features",
+   "kind": "dissolved",
+   "ticket": "LIN-3325",
+   "title": "Remove share links",
+   "code": "removal",
+   "note": "Share links removed; their guest-run edge went with them."
+  },
+  {
+   "sha": "dcfbf7fa",
+   "pair": "Other features|Platform & plumbing",
+   "kind": "dissolved",
+   "ticket": "LIN-3325",
+   "title": "Remove share links",
+   "code": "removal",
+   "note": "Share links removed; the share scan’s edge went with them."
+  },
+  {
+   "sha": "566b89be",
+   "pair": "Other features|Platform & plumbing",
+   "kind": "born",
+   "ticket": "LIN-3455",
+   "title": "LIN-3453 B: stores and rankers that returned 0 or raw NaN (11 files)",
+   "code": "consolidation",
+   "note": "Coherence loop batch: stores that returned NaN; KPI stats import the report history store."
+  },
+  {
+   "sha": "39ca28a6",
+   "pair": "Front end: server-rendered pages|Web routes (pages & workspace API)",
+   "kind": "dissolved",
+   "ticket": "LIN-675",
+   "title": "Hoist provider auth-router factories under lib/ (remove both lib/ → routes/ edges)",
+   "code": "inversion",
+   "note": "Provider auth wiring inverted (providers drop getAuthRouter; server.js mounts routes/provider-auth-routers.js) and the starter seed moved from routes/workspace.js to lib/starter-seed.js, removing every lib/ → routes/ import, including the swipe renderer’s."
+  },
+  {
+   "sha": "ab227381",
+   "pair": "Front end: server-rendered pages|Platform & plumbing",
+   "kind": "dissolved",
+   "ticket": "LIN-3466",
+   "title": "One HTML error page: retire htmlError in favour of renderErrorPage",
+   "code": "removal",
+   "note": "htmlError retired in favour of one error page."
+  }
+ ]
+}

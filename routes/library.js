@@ -5,7 +5,7 @@
  *   GET /library                 — index, or results when `?q=`
  *   GET /library/doc/:slug(.md)  — a listed document (registered before the paper form)
  *   GET /library/:slug(.md)      — a paper or essay
- *   GET /library/figures/*       — the 64 SVGs, script-blocked
+ *   GET /library/figures/*       — the SVG and PNG figures, script-blocked
  *
  * Canonical URL per document: papers at `/library/<slug>`, listed docs at
  * `/library/doc/<slug>` only (the other form 404s). Slug lookup is a Map, so a
@@ -14,16 +14,17 @@
  * Every response carries `X-Content-Type-Options: nosniff`; HTML pages pin
  * their one inline theme script by hash (`script-src 'sha256-…'`, no
  * `'self'`); `.md` is `text/markdown; charset=utf-8` under a sandbox CSP;
- * figures are `image/svg+xml` under a script-blocking CSP.
+ * figures are `image/svg+xml` or `image/png` under a script-blocking CSP.
  *
  * `docsRoot` is injectable so the security fixture can be rendered without
  * touching the real tree.
  */
 
+import { extname } from 'node:path';
 import { Router } from 'express';
 import { renderErrorPage } from '../lib/render.js';
 import { themePrepaintScriptHash } from '../lib/components/page.js';
-import { DEFAULT_DOCS_ROOT, loadLibrary } from '../lib/library.js';
+import { DEFAULT_DOCS_ROOT, FIGURE_TYPES, loadLibrary } from '../lib/library.js';
 import { renderLibraryDoc, renderLibraryIndex } from '../lib/render-library.js';
 import { isPublicLibraryPath } from '../lib/guest-task-path.js';
 
@@ -168,7 +169,7 @@ export function createLibraryRouter({ docsRoot = DEFAULT_DOCS_ROOT } = {}) {
     if (!abs) return notFound(res);
     res.set('Content-Security-Policy', FIGURE_CSP);
     res.set('Cache-Control', 'public, max-age=3600');
-    res.type('image/svg+xml');
+    res.type(FIGURE_TYPES[extname(abs)]);
     return res.sendFile(abs);
   });
 

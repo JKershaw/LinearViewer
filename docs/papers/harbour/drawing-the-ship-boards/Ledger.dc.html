@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decision Field</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F4F1EA}
+a{color:#1F3F6B}a:hover{color:#9A4612}
+button:focus-visible{outline:2px solid #1F3F6B;outline-offset:3px}
+</style>
+</helmet>
+<div style="width:100%;max-width:1440px;box-sizing:border-box;margin:0 auto;padding:26px 28px 32px;background:#F4F1EA;color:#1C2733;font-family:'Newsreader',Georgia,'Times New Roman',serif;min-height:1150px">
+
+  <header style="display:flex;flex-wrap:wrap;gap:18px 36px;align-items:flex-end;padding-bottom:18px;border-bottom:1px solid #CFC7B6">
+    <div style="flex:1 1 280px;min-width:0">
+      <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;color:#56606C">HARBOUR · MAP · PLATE IV</div>
+      <h1 style="margin:6px 0 6px;font-size:38px;font-weight:600;letter-spacing:-.01em;line-height:1.02">The Decision Field</h1>
+      <p style="margin:0;font-size:16px;line-height:1.4;color:#3E4855;max-width:36ch">The code drawn as its decisions: where each one is held, and in how many places.</p>
+      <div style="margin-top:8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#56606C">as of 14 Oct 2026 · grounded at [commit]</div>
+    </div>
+    <div role="list" aria-label="North-star readings" style="flex:3 1 700px;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 0;border-top:1px solid #1C2733;padding-top:10px">
+      <div role="listitem" style="padding:0 14px;border-left:1px solid #DDD5C6">
+        <button type="button" onClick="{{showScattered}}" style="background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:block;width:100%">
+          <span style="display:block;font-size:13.5px;color:#3E4855">Places per decision</span>
+          <span style="display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:32px;font-weight:600;line-height:1.15;color:#9A4612">23</span>
+          <span style="display:block;font-size:12.5px;line-height:1.35;color:#56606C">held in more than one place · 3 born or grew this week</span>
+        </button>
+      </div>
+      <div role="listitem" style="padding:0 14px;border-left:1px solid #DDD5C6">
+        <button type="button" onClick="{{showHome}}" style="background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:block;width:100%">
+          <span style="display:block;font-size:13.5px;color:#3E4855">Brought to one place</span>
+          <span style="display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:32px;font-weight:600;line-height:1.15;color:#1F3F6B">26</span>
+          <span style="display:block;font-size:12.5px;line-height:1.35;color:#56606C">in 3 batches · 13 of 13 latest reach one owner · 0 regressed</span>
+        </button>
+      </div>
+      <div role="listitem" style="padding:0 14px;border-left:1px solid #DDD5C6">
+        <span style="display:block;font-size:13.5px;color:#3E4855">Product code</span>
+        <span style="display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:32px;font-weight:600;line-height:1.15">−363</span>
+        <span style="display:block;font-size:12.5px;line-height:1.35;color:#56606C">lines, from the coherence loop (LIN-3449)</span>
+      </div>
+      <div role="listitem" style="padding:0 14px;border-left:1px solid #DDD5C6">
+        <span style="display:block;font-size:13.5px;color:#3E4855">Sessions per ticket</span>
+        <span style="display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:32px;font-weight:600;line-height:1.15">5 <span style="font-size:15px;font-weight:400;color:#56606C">p90 8</span></span>
+        <span style="display:block;font-size:12.5px;line-height:1.35;color:#56606C">11–13 Oct · was 8 / 16 in late Sep</span>
+      </div>
+      <div role="listitem" style="padding:0 14px;border-left:1px solid #DDD5C6">
+        <button type="button" onClick="{{goPricing}}" style="background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;text-align:left;cursor:pointer;display:block;width:100%">
+          <span style="display:block;font-size:13.5px;color:#3E4855">Cost per verified task</span>
+          <span style="display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:21px;font-weight:600;line-height:1.75;letter-spacing:.04em;color:#9A4612">UNREADABLE</span>
+          <span style="display:block;font-size:12.5px;line-height:1.35;color:#56606C">no price rows for Opus 5.5 or Sonnet 5.5 · last known $19.63 (Aug) · <span style="text-decoration:underline;text-underline-offset:2px">trace the decision</span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;margin-top:18px">
+
+    <section aria-label="The decision field" style="flex:3 1 720px;min-width:0">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;margin:0 0 10px">
+        <div role="group" aria-label="Field view" style="display:inline-flex;border:1px solid #1C2733;flex:0 0 auto">
+          <button type="button" aria-pressed="{{pressS}}" onClick="{{showScattered}}" style="{{tabS}}">Scattered now <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px">23</span></button>
+          <button type="button" aria-pressed="{{pressH}}" onClick="{{showHome}}" style="{{tabH}}">Brought home <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px">26</span></button>
+        </div>
+        <div style="flex:1 1 320px;min-width:0">
+          <div style="font-size:16px;font-weight:600;line-height:1.25">{{fieldHeading}}</div>
+          <div style="font-size:13.5px;line-height:1.4;color:#3E4855">{{fieldNote}}</div>
+        </div>
+      </div>
+
+      <div style="overflow-x:auto;border:1px solid #CFC7B6;background:#FBFAF6">
+        <div role="group" aria-label="Decision field: 11 code areas sized by file count, each decision placed in its area" style="position:relative;min-width:680px;width:100%;aspect-ratio:1000/720">
+          <svg aria-hidden="true" viewBox="0 0 1000 720" preserveAspectRatio="none" style="position:absolute;left:0;top:0;width:100%;height:100%">
+            <g stroke="#ECE6DA" stroke-width="1" vector-effect="non-scaling-stroke">
+              <line x1="100" y1="0" x2="100" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="200" y1="0" x2="200" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="300" y1="0" x2="300" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="400" y1="0" x2="400" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="500" y1="0" x2="500" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="600" y1="0" x2="600" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="700" y1="0" x2="700" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="800" y1="0" x2="800" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="900" y1="0" x2="900" y2="720" vector-effect="non-scaling-stroke"></line>
+              <line x1="0" y1="120" x2="1000" y2="120" vector-effect="non-scaling-stroke"></line>
+              <line x1="0" y1="240" x2="1000" y2="240" vector-effect="non-scaling-stroke"></line>
+              <line x1="0" y1="360" x2="1000" y2="360" vector-effect="non-scaling-stroke"></line>
+              <line x1="0" y1="480" x2="1000" y2="480" vector-effect="non-scaling-stroke"></line>
+              <line x1="0" y1="600" x2="1000" y2="600" vector-effect="non-scaling-stroke"></line>
+            </g>
+            <g stroke="#B9AF9C" stroke-width="1">
+              <line x1="0" y1="360" x2="10" y2="360" vector-effect="non-scaling-stroke"></line>
+              <line x1="990" y1="360" x2="1000" y2="360" vector-effect="non-scaling-stroke"></line>
+              <line x1="500" y1="0" x2="500" y2="12" vector-effect="non-scaling-stroke"></line>
+              <line x1="500" y1="708" x2="500" y2="720" vector-effect="non-scaling-stroke"></line>
+            </g>
+          </svg>
+
+          <sc-for list="{{areas}}" as="a" hint-placeholder-count="11">
+            <div aria-hidden="true" style="{{a.shape}}"></div>
+          </sc-for>
+          <sc-for list="{{areas}}" as="a" hint-placeholder-count="11">
+            <div style="{{a.labelStyle}}">
+              <div style="font-size:13px;font-weight:600;line-height:1.2;color:#2E3946">{{a.name}}</div>
+              <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;line-height:1.3;color:#56606C">{{a.files}}</div>
+            </div>
+          </sc-for>
+
+          <div style="{{kitWrap}}">
+            <svg aria-hidden="true" viewBox="0 0 1000 720" preserveAspectRatio="none" style="position:absolute;left:0;top:0;width:100%;height:100%">
+              <line x1="657" y1="330" x2="938" y2="330" stroke="#B4561C" stroke-opacity=".55" stroke-width="1" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"></line>
+            </svg>
+            <div aria-hidden="true" style="position:absolute;left:91.3%;top:41.39%;width:7.4%;height:8.89%;border:1px dashed #BDB29F;border-radius:50%;box-sizing:border-box"></div>
+            <div aria-hidden="true" style="position:absolute;left:95%;top:45.83%;width:22px;height:22px;margin:-11px 0 0 -11px;border:1px solid #B4561C;border-radius:50%;box-sizing:border-box"></div>
+            <div aria-hidden="true" style="position:absolute;left:95%;top:45.83%;width:15px;height:15px;margin:-7.5px 0 0 -7.5px;background:#B4561C;border-radius:50%"></div>
+          </div>
+          <div style="position:absolute;right:1%;top:51.4%;text-align:right">
+            <div style="font-size:12.5px;font-weight:600;line-height:1.2;color:#2E3946">runner kit</div>
+            <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;line-height:1.3;color:#56606C">other repo</div>
+          </div>
+
+          <sc-for list="{{glyphs}}" as="g" hint-placeholder-count="12">
+            <button type="button" onClick="{{g.pick}}" aria-label="{{g.aria}}" aria-pressed="{{g.pressed}}" style="{{g.btnStyle}}">
+              <sc-for list="{{g.lines}}" as="l" hint-placeholder-count="2"><span aria-hidden="true" style="{{l.style}}"></span></sc-for>
+              <sc-for list="{{g.dots}}" as="d" hint-placeholder-count="3"><span aria-hidden="true" style="{{d.style}}"></span></sc-for>
+              <sc-if value="{{g.selected}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="{{g.ringStyle}}"></span></sc-if>
+              <sc-if value="{{g.showLabel}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="{{g.labelStyle}}">{{g.label}} <span style="{{g.numStyle}}">{{g.num}}</span></span></sc-if>
+            </button>
+          </sc-for>
+
+          <div style="position:absolute;left:1.2%;top:1.4%;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.06em;color:#5F6976">PLATE IV · 11 AREAS SIZED BY FILES (429) · EACH DECISION IN ITS AREA</div>
+          <div style="position:absolute;left:1.2%;bottom:1.6%;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.04em;color:#5F6976">19 two-way area pairs · one knot of 9 of 11 areas · 0 file-level import cycles</div>
+        </div>
+      </div>
+
+      <sc-if value="{{isHome}}" hint-placeholder-val="{{false}}">
+        <p style="margin:10px 0 0;font-size:14px;line-height:1.45;color:#2E3946;max-width:80ch"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.08em;color:#9A4612">TENSION</span> Batch 3 raised cross-area links <span style="font-family:'JetBrains Mono',ui-monospace,monospace">255 → 310</span>: “one place per decision” put the place in another area. Each gauge hands the tension to the other; nobody owns it. Batch 4 (tests) waits for Thursday’s budget, which resets Thu 15 Oct.</p>
+      </sc-if>
+
+      <div style="display:flex;flex-wrap:wrap;gap:18px 32px;margin-top:16px;padding-top:14px;border-top:1px solid #DDD5C6">
+        <section aria-labelledby="key-h" style="flex:1 1 330px;min-width:0">
+          <h3 id="key-h" style="margin:0 0 8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.12em;color:#56606C">KEY</h3>
+          <ul style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 18px;font-size:13px;line-height:1.3">
+            <li style="display:flex;gap:8px;align-items:center"><svg width="34" height="24" viewBox="0 0 34 24" aria-hidden="true"><circle cx="17" cy="12" r="5" fill="#1F3F6B"></circle></svg><span>One place, one owner (blue)</span></li>
+            <li style="display:flex;gap:8px;align-items:center"><svg width="34" height="24" viewBox="0 0 34 24" aria-hidden="true"><line x1="6" y1="15" x2="16" y2="6" stroke="#B4561C" stroke-opacity=".5"></line><line x1="16" y1="6" x2="28" y2="14" stroke="#B4561C" stroke-opacity=".5"></line><circle cx="6" cy="15" r="3.5" fill="#B4561C"></circle><circle cx="16" cy="6" r="3.5" fill="#B4561C"></circle><circle cx="28" cy="14" r="3.5" fill="#B4561C"></circle></svg><span>Held in N places: N joined dots (orange)</span></li>
+            <li style="display:flex;gap:8px;align-items:center"><svg width="34" height="24" viewBox="0 0 34 24" aria-hidden="true"><circle cx="17" cy="12" r="10" fill="none" stroke="#7D95B4" stroke-dasharray="2 2"></circle><circle cx="17" cy="12" r="4" fill="#1F3F6B"></circle></svg><span>Ghost ring: how many places it was in</span></li>
+            <li style="display:flex;gap:8px;align-items:center"><svg width="34" height="24" viewBox="0 0 34 24" aria-hidden="true"><rect x="4.5" y="9.5" width="5" height="5" fill="#FBFAF6" stroke="#B4561C"></rect><rect x="14.5" y="4.5" width="5" height="5" fill="#FBFAF6" stroke="#B4561C"></rect><rect x="24.5" y="13.5" width="5" height="5" fill="#FBFAF6" stroke="#B4561C"></rect></svg><span>Inline check that re-decides it</span></li>
+            <li style="display:flex;gap:8px;align-items:center"><svg width="34" height="24" viewBox="0 0 34 24" aria-hidden="true"><line x1="9" y1="10" x2="25" y2="15" stroke="#B4561C" stroke-opacity=".3" stroke-dasharray="2 2"></line><circle cx="9" cy="10" r="3.5" fill="#FBFAF6" stroke="#CC9873" stroke-width="1.25"></circle><circle cx="25" cy="15" r="3.5" fill="#FBFAF6" stroke="#CC9873" stroke-width="1.25"></circle></svg><span>[decision]: unnamed placeholder, position illustrative</span></li>
+            <li style="display:flex;gap:8px;align-items:center"><svg width="92" height="26" viewBox="0 0 92 26" aria-hidden="true"><circle cx="6" cy="13" r="3.5" fill="#B4561C"></circle><circle cx="19" cy="13" r="4.5" fill="#B4561C"></circle><circle cx="34" cy="13" r="5.5" fill="#B4561C"></circle><circle cx="53" cy="13" r="10" fill="none" stroke="#B4561C"></circle><circle cx="53" cy="13" r="6.5" fill="#B4561C"></circle><circle cx="78" cy="13" r="11" fill="none" stroke="#B4561C"></circle><circle cx="78" cy="13" r="7.5" fill="#B4561C"></circle></svg><span>Size and halo carry the grade, Low to High</span></li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="moves-h" style="flex:1 1 330px;min-width:0">
+          <h3 id="moves-h" style="margin:0 0 8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:400;letter-spacing:.12em;color:#56606C">MOVES ON THIS PLATE, RANKED</h3>
+          <ol style="list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:14px;line-height:1.35">
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:baseline"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#56606C">1</span><span><button type="button" onClick="{{goPricing}}" style="background:none;border:0;padding:0;font:inherit;color:#1C2733;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:#B9AF9C;text-underline-offset:3px">Price Opus 5.5 &amp; Sonnet 5.5</button> <span style="color:#56606C">unblocks the headline number</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:baseline"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#56606C">2</span><span>Spike <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px">LIN-3404</span> against a test installation <span style="color:#56606C">gates inviting anyone; a security gate, not a decision on this plate</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:baseline"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#56606C">3</span><span><button type="button" onClick="{{goSpec}}" style="background:none;border:0;padding:0;font:inherit;color:#1C2733;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:#B9AF9C;text-underline-offset:3px">Extract one provider conformance suite</button> <span style="color:#56606C">before rewriting Providers</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:baseline"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#56606C">4</span><span><button type="button" onClick="{{goWaiting}}" style="background:none;border:0;padding:0;font:inherit;color:#1C2733;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:#B9AF9C;text-underline-offset:3px">Rule on “does a blocked agent start the waiting clock?”</button> <span style="color:#56606C">unparks a decision</span></span></li>
+            <li style="display:grid;grid-template-columns:20px 1fr;gap:6px;align-items:baseline"><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#56606C">5</span><span><button type="button" onClick="{{goSeams}}" style="background:none;border:0;padding:0;font:inherit;color:#1C2733;text-align:left;cursor:pointer;text-decoration:underline;text-decoration-color:#B9AF9C;text-underline-offset:3px">Read the Seams gauge with Drift</button> <span style="color:#56606C">when choosing each consolidation’s one place</span></span></li>
+          </ol>
+        </section>
+      </div>
+    </section>
+
+    <aside aria-label="Decision card" style="flex:1 1 340px;min-width:0">
+      <div aria-live="polite" style="border:1px solid #CFC7B6;background:#FFFEFB;padding:20px 22px 18px">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 12px">
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;letter-spacing:.14em;color:#56606C">DECISION CARD · {{card.kind}}</span>
+          <span style="{{card.statusStyle}}">{{card.statusLabel}}</span>
+        </div>
+        <h2 style="margin:10px 0 2px;font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.005em">{{card.name}}</h2>
+        <div style="font-size:14.5px;line-height:1.35;color:#3E4855">{{card.area}}</div>
+
+        <dl style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:0;margin:14px 0 0;border-top:1px solid #1C2733;border-bottom:1px solid #DDD5C6">
+          <div style="padding:7px 10px 8px 0">
+            <dt style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;color:#56606C">GRADE</dt>
+            <dd style="margin:2px 0 0;font-size:14.5px;line-height:1.3">{{card.grade}}</dd>
+          </div>
+          <div style="padding:7px 10px 8px 10px;border-left:1px solid #DDD5C6">
+            <dt style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;color:#56606C">COPIES</dt>
+            <dd style="margin:2px 0 0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;line-height:1.35">{{card.copies}}</dd>
+          </div>
+          <div style="padding:7px 0 8px 10px;border-left:1px solid #DDD5C6">
+            <dt style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;letter-spacing:.1em;color:#56606C">OWNER</dt>
+            <dd style="margin:2px 0 0;font-size:14.5px;line-height:1.3">{{card.owner}}</dd>
+          </div>
+        </dl>
+
+        <h3 style="margin:16px 0 6px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:400;letter-spacing:.12em;color:#56606C">HELD IN</h3>
+        <ul style="list-style:none;margin:0;padding:0;display:grid;gap:5px">
+          <sc-for list="{{card.where}}" as="w" hint-placeholder-count="3">
+            <li style="display:flex;flex-wrap:wrap;gap:0 10px;align-items:baseline">
+              <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;color:#1C2733">{{w.loc}}</span>
+              <span style="font-size:13.5px;line-height:1.35;color:#56606C">{{w.note}}</span>
+            </li>
+          </sc-for>
+        </ul>
+
+        <h3 style="margin:16px 0 8px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:400;letter-spacing:.12em;color:#56606C">ITS LIFE</h3>
+        <div style="position:relative">
+          <div aria-hidden="true" style="position:absolute;left:3px;top:7px;bottom:12px;width:0;border-left:1px solid #CFC7B6"></div>
+          <ol style="list-style:none;margin:0;padding:0;position:relative">
+            <sc-for list="{{card.life}}" as="s" hint-placeholder-count="4">
+              <li style="display:grid;grid-template-columns:7px 62px 1fr;gap:0 9px;align-items:baseline;padding:0 0 8px">
+                <span aria-hidden="true" style="display:inline-block;width:7px;height:7px;border-radius:50%;border:1px solid #1C2733;background:#FFFEFB;box-sizing:border-box"></span>
+                <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.06em;color:#56606C">{{s.k}}</span>
+                <span style="font-size:14px;line-height:1.38">{{s.v}}</span>
+              </li>
+            </sc-for>
+          </ol>
+        </div>
+
+        <h3 style="margin:12px 0 4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:400;letter-spacing:.12em;color:#56606C">MADE IT vs ONLY READ IT</h3>
+        <p style="margin:0 0 8px;font-size:13.5px;line-height:1.4;font-style:italic;color:#3E4855">A ticket can own its own decision perfectly and still re-decide one it only reads.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 16px">
+          <div style="border-top:1px solid #1C2733;padding-top:6px">
+            <div style="display:flex;gap:6px;align-items:center;font-size:13.5px;font-weight:600"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="4" fill="#1C2733"></circle></svg>Made it <span style="font-weight:400;color:#56606C">· owns the decision</span></div>
+            <ul style="list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px">
+              <sc-for list="{{card.made}}" as="m" hint-placeholder-count="1">
+                <li><span style="display:block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px">{{m.id}}</span><span style="display:block;font-size:13px;line-height:1.35;color:#56606C">{{m.note}}</span></li>
+              </sc-for>
+            </ul>
+          </div>
+          <div style="border-top:1px dashed #1C2733;padding-top:6px">
+            <div style="display:flex;gap:6px;align-items:center;font-size:13.5px;font-weight:600"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" fill="none" stroke="#1C2733"></circle></svg>Only read it <span style="font-weight:400;color:#56606C">· should not re-decide</span></div>
+            <ul style="list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px">
+              <sc-for list="{{card.read}}" as="r" hint-placeholder-count="2">
+                <li><span style="{{r.idStyle}}">{{r.id}}</span><span style="display:block;font-size:13px;line-height:1.35;color:#56606C">{{r.note}}</span></li>
+              </sc-for>
+            </ul>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;padding-top:12px;border-top:1px solid #DDD5C6">
+          <h3 style="margin:0 0 4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:400;letter-spacing:.12em;color:#56606C">RECOMMENDED</h3>
+          <p style="margin:0 0 10px;font-size:15px;line-height:1.42">{{card.action}}</p>
+          <sc-if value="{{card.canHand}}" hint-placeholder-val="{{true}}">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px">
+              <button type="button" onClick="{{card.hand}}" aria-pressed="{{card.inBatch}}" style="{{card.handStyle}}">{{card.handLabel}}</button>
+              <span style="font-size:12.5px;line-height:1.35;color:#56606C;flex:1 1 160px">Joins one batch. Nothing dispatches until you approve the batch, once.</span>
+            </div>
+          </sc-if>
+          <sc-if value="{{card.noHand}}" hint-placeholder-val="{{false}}">
+            <p style="margin:0;font-size:13.5px;line-height:1.4;color:#56606C">{{card.noHandText}}</p>
+          </sc-if>
+        </div>
+
+        <div style="margin-top:14px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;line-height:1.5;color:#56606C">sources · {{card.source}}</div>
+      </div>
+
+      <div style="margin-top:14px;border:1px solid #CFC7B6;background:#FBFAF6;padding:12px 16px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;letter-spacing:.12em;color:#56606C">BATCH FOR ONE APPROVAL</span>
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px">{{batchCount}}</span>
+        </div>
+        <sc-if value="{{batchEmpty}}" hint-placeholder-val="{{true}}">
+          <p style="margin:6px 0 0;font-size:13.5px;line-height:1.4;color:#3E4855">Nothing batched yet. “Hand to the fleet” adds a move here; you approve the moves together in the Flight Companion, never one click at a time.</p>
+        </sc-if>
+        <sc-if value="{{batchHas}}" hint-placeholder-val="{{false}}">
+          <ul style="list-style:none;margin:8px 0 10px;padding:0;display:grid;gap:5px">
+            <sc-for list="{{batchItems}}" as="b" hint-placeholder-count="2">
+              <li style="font-size:14px;line-height:1.35"><span style="font-weight:600">{{b.name}}</span> <span style="color:#56606C">· {{b.move}}</span></li>
+            </sc-for>
+          </ul>
+          <button type="button" onClick="{{clearBatch}}" style="background:none;border:1px solid #1C2733;padding:5px 12px;font-family:'Newsreader',Georgia,serif;font-size:14px;color:#1C2733;cursor:pointer">Clear the batch</button>
+        </sc-if>
+      </div>
+    </aside>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1150},"view":"scattered"}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const pr = this.props || {};
+    const view = st.view || (pr.view === 'home' ? 'home' : 'scattered');
+    const isHome = view === 'home';
+    const selId = st.sel || 'waiting';
+    const batch = st.batch || [];
+    const put = (o) => this.setState(Object.assign({}, st, { view: view, sel: selId, batch: batch }, o));
+
+    const MONO = "font-family:'JetBrains Mono',ui-monospace,monospace;";
+    const SERIF = "font-family:'Newsreader',Georgia,serif;";
+    const OR = '#B4561C', ORD = '#9A4612', ORP = '#CC9873', BL = '#1F3F6B', BLG = '#7D95B4', BLP = '#9DAFC7', PAPER = '#FBFAF6', INK = '#1C2733';
+    const RAD = { 'High': 7.5, 'Medium-High': 6.5, 'Medium': 5.5, 'Low-Medium': 4.5, 'Low': 3.5 };
+    const P = [[0, 0], [17, -11], [28, 5], [12, 17], [-13, 13], [-18, -7], [-3, -19]];
+    const Q = [[-33, -6], [32, -14], [-27, 19], [29, 18], [3, -28]];
+    const f = (n) => n.toFixed(1);
+    const pct = (x, y) => 'left:' + (x / 10).toFixed(2) + '%;top:' + (y / 7.2).toFixed(2) + '%;';
+    const dot = (x, y, r, bg, bd) => ({ style: 'position:absolute;left:' + f(x - r) + 'px;top:' + f(y - r) + 'px;width:' + f(2 * r) + 'px;height:' + f(2 * r) + 'px;border-radius:50%;box-sizing:border-box;background:' + bg + ';border:' + bd + ';' });
+    const sq = (x, y) => ({ style: 'position:absolute;left:' + f(x - 2.5) + 'px;top:' + f(y - 2.5) + 'px;width:5px;height:5px;box-sizing:border-box;background:' + PAPER + ';border:1px solid ' + OR + ';' });
+    const seg = (a, b, color, dashed) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const len = Math.sqrt(dx * dx + dy * dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      return { style: 'position:absolute;left:' + f(a[0]) + 'px;top:' + f(a[1]) + 'px;width:' + f(len) + 'px;height:0;border-top:1px ' + (dashed ? 'dashed ' : 'solid ') + color + ';transform-origin:0 0;transform:rotate(' + f(ang) + 'deg);' };
+    };
+    const lt = (k, v) => ({ k: k, v: v });
+
+    // Areas: [name, files, cx, cy, w, h, labelX, labelY] in a 1000 x 720 plate; size follows sqrt(file count).
+    const AREAS = [
+      ['Web routes', '21 files', 520, 110, 139, 112, 470, 64],
+      ['LLM & prompts', '64 files', 310, 230, 242, 194, 240, 145],
+      ['Platform & plumbing', '24 files', 90, 110, 148, 119, 40, 62],
+      ['Auth, accounts & workspaces', '52 files', 770, 220, 218, 176, 705, 142],
+      ['Wiring', '1 file · server.js', 935, 80, 46, 40, 868, 108],
+      ['Runs & dispatch', '89 files', 520, 380, 286, 230, 430, 284],
+      ['Server-rendered pages', '68 files', 325, 535, 250, 200, 262, 452],
+      ['Browser code', '36 files', 95, 605, 181, 146, 30, 548],
+      ['Providers', '35 files', 820, 500, 179, 144, 770, 440],
+      ['Agent API (proxy)', '30 files', 640, 625, 166, 133, 590, 568],
+      ['Other features', '9 files', 930, 660, 91, 73, 885, 592]
+    ].map(a => ({
+      name: a[0], files: a[1],
+      shape: 'position:absolute;left:' + ((a[2] - a[4] / 2) / 10).toFixed(2) + '%;top:' + ((a[3] - a[5] / 2) / 7.2).toFixed(2) + '%;width:' + (a[4] / 10).toFixed(2) + '%;height:' + (a[5] / 7.2).toFixed(2) + '%;border:1px solid #D6CEBD;border-radius:50%;background:rgba(31,63,107,.03);box-sizing:border-box;',
+      labelStyle: 'position:absolute;' + pct(a[6], a[7]) + 'max-width:19%;'
+    }));
+
+    // Named decisions still held in several places.
+    const S = [
+      { id: 'runner', name: 'Runner contract', grade: 'High', size: 'High', x: 644, y: 330, n: 1, side: 't', num: '2 repos',
+        status: 'scattered', area: 'Runs & dispatch ↔ runner kit (simple-dispatcher, another repo)',
+        copies: '2 repos · [n] copies', owner: '[owner]: none named',
+        aria: 'Runner contract: held on both sides of a repo boundary; grade High',
+        where: [{ loc: '[file:line]', note: 'Harbour side, Runs & dispatch' }, { loc: '[file:line]', note: 'runner kit side, simple-dispatcher' }],
+        life: [lt('BORN', '[ticket · date]'), lt('COPIES', 'One on each side of the repo boundary'), lt('RULINGS', '[ruling]'), lt('OWNER', '[owner]: none named across the two repos')],
+        made: [{ id: '[ticket]', note: 'wrote the Harbour side' }, { id: '[ticket]', note: 'wrote the runner kit side' }],
+        read: [{ id: '[ticket]', note: 'dispatch work that reads the contract' }],
+        action: 'Name one owner for the runner contract. Write it once; have the other repo read it instead of restating it.',
+        move: 'one owner for the runner contract', src: '[file:line] ×2', canHand: true },
+      { id: 'creds', name: 'Credentials', grade: 'Medium-High', size: 'Medium-High', x: 765, y: 222, n: 6, side: 't', num: '≥6',
+        status: 'scattered', area: 'Auth, accounts & workspaces',
+        copies: '≥6 copies · ≥7 binding choosers', owner: '[owner]: none named',
+        aria: 'Credentials: at least 6 copies and at least 7 binding choosers; grade Medium-High',
+        where: [{ loc: '[file:line] ×6', note: 'copies of the credential decision' }, { loc: '[file:line] ×7', note: 'binding choosers, each choosing which credential binds' }],
+        life: [lt('BORN', '[ticket · date]'), lt('COPIES', 'At least 6 copies; at least 7 places choose the binding'), lt('RULINGS', '[ruling]'), lt('OWNER', '[owner]: none named')],
+        made: [{ id: '[ticket]', note: 'first credential binding' }],
+        read: [{ id: '[ticket] ×[n]', note: 'each binding chooser decides again', flag: true }],
+        action: 'Bring the binding choice to one chooser in Auth; every other place reads it. A candidate for coherence-loop batch [n].',
+        move: 'one credential chooser in Auth', src: '[file:line]', canHand: true },
+      { id: 'waiting', name: 'Waiting on a person', grade: 'Medium', size: 'Medium', x: 432, y: 468, n: 3, checks: 5, side: 'b', num: '×3 +5',
+        status: 'parked', area: 'Server-rendered pages ↔ Runs & dispatch',
+        copies: '3 copies + 5 inline checks', owner: 'None until the ruling lands',
+        aria: 'Waiting on a person: 3 copies plus 5 inline checks; grade Medium; parked behind a ruling',
+        where: [{ loc: 'lib/task-page-loader.js:148', note: 'inline check, re-decided by LIN-3504' }, { loc: '[file:line] ×3', note: 'the three copies' }, { loc: '[file:line] ×4', note: 'the other inline checks' }],
+        life: [lt('BORN', '[ticket · date]: the first answer to “is it still waiting?”'), lt('COPIES', '3 copies, then 5 inline checks; LIN-3504 added one at lib/task-page-loader.js:148'), lt('RULINGS', 'Parked behind John: “Does a blocked agent start the waiting clock?”'), lt('OWNER', 'None yet; the ruling decides where it lives')],
+        made: [{ id: '[ticket]', note: 'first defined “is it still waiting?”' }],
+        read: [{ id: 'LIN-3504', note: 'owns its own decision (the stale question) cleanly, yet re-decided this one inline at :148', flag: true }, { id: 'LIN-3513', note: 'the sibling the reviewer filed instead of fixing' }],
+        action: 'Rule on “does a blocked agent start the waiting clock?”, then hand the 3 copies and 5 inline checks to one owner.',
+        move: 'rule on the waiting clock, then one owner', src: 'LIN-3504 · LIN-3513 · lib/task-page-loader.js:148', canHand: true },
+      { id: 'spec', name: 'Provider spec', grade: '[grade]', size: 'Medium', x: 805, y: 505, n: 5, side: 'b', num: '×5',
+        status: 'scattered', area: 'Providers (Linear, GitHub, Jira, local)',
+        copies: '5 test files', owner: 'None: no shared conformance suite',
+        aria: 'Provider spec: written 5 times, one test file per provider',
+        where: [{ loc: '[test file] ×5', note: 'one per provider, each restating what a provider must do' }],
+        life: [lt('BORN', '[ticket · date]: the first provider test file'), lt('COPIES', '5, one test file per provider'), lt('RULINGS', '[ruling]'), lt('OWNER', 'None: no shared conformance suite')],
+        made: [{ id: '[ticket] ×5', note: 'each provider’s ticket wrote its own spec' }],
+        read: [{ id: '[ticket]', note: 'a Providers rewrite would have to read all five' }],
+        action: 'Extract one provider conformance suite before rewriting Providers, the area most ready to rebuild.',
+        move: 'one provider conformance suite', src: '[test file] ×5', canHand: true },
+      { id: 'pricing', name: 'Model pricing rows', grade: '[grade]', size: 'Medium', x: 178, y: 172, n: 2, side: 'b', num: '×2',
+        status: 'scattered', area: 'Platform & plumbing ↔ LLM & prompts',
+        copies: '2: the table vs live usage', owner: '[owner]',
+        aria: 'Model pricing rows: the pricing table and live usage disagree',
+        where: [{ loc: 'lib/model-pricing.js', note: 'the table; no rows for Opus 5.5 or Sonnet 5.5' }, { loc: '[file:line]', note: 'live usage: the models doing nearly all the work' }, { loc: '/cost', note: 'returns null, so cost per verified task is unreadable' }],
+        life: [lt('BORN', '[ticket · date]'), lt('COPIES', 'The table and live usage drifted apart; last readable cost $19.63 (Aug)'), lt('RULINGS', '[ruling]'), lt('OWNER', '[owner]')],
+        made: [{ id: '[ticket]', note: 'created the pricing table' }],
+        read: [{ id: 'LIN-3094', note: 'covers Opus 5.5, not Sonnet 5.5', flag: true }, { id: 'hourly pricing sweep', note: 'checks only rows that exist, so it reports clean', flag: true }],
+        action: 'Price Opus 5.5 and Sonnet 5.5. It unblocks the headline number; LIN-3094 covers only Opus 5.5 today.',
+        move: 'price Opus 5.5 & Sonnet 5.5', src: 'lib/model-pricing.js · LIN-3094 · /cost', canHand: true }
+    ];
+
+    // 18 unnamed scattered decisions (10 Low-Medium, 8 Low): positions illustrative.
+    const SP = [[110, 130], [240, 250], [380, 190], [420, 410], [600, 455], [300, 615], [80, 640], [680, 195], [875, 490], [760, 292],
+      [580, 120], [140, 620], [240, 520], [690, 665], [930, 680], [750, 520], [400, 265], [868, 225]].map((p, i) => {
+      const gr = i < 10 ? 'Low-Medium' : 'Low';
+      return { id: 'sp' + i, ph: true, name: '[decision]', grade: gr, size: gr, x: p[0], y: p[1], n: 2, side: 'r', num: '',
+        status: 'scattered', area: '[area]: position illustrative', copies: '[n], at least 2', owner: '[owner]',
+        aria: 'Unnamed placeholder decision held in several places, grade ' + gr,
+        where: [{ loc: '[file:line]', note: '[copy]' }, { loc: '[file:line]', note: '[copy]' }],
+        life: [lt('BORN', '[ticket · date]'), lt('COPIES', '[n]'), lt('RULINGS', '[ruling]'), lt('OWNER', '[owner]')],
+        made: [{ id: '[ticket]', note: '[made it]' }], read: [{ id: '[ticket]', note: '[only read it]' }],
+        action: '[recommendation]. One of 18 scattered decisions not yet named on this plate.', canHand: false };
+    });
+
+    // Named decisions the coherence loop brought to one place.
+    const HN = [
+      ['errors', 'Error replies', 93, '93', 'Web routes', 520, 128, 'r'],
+      ['keepalive', 'Keepalive error replies', 74, '74', 'Runs & dispatch', 455, 350, 'l'],
+      ['wslookup', 'Workspace lookups', 18, '18', 'Auth, accounts & workspaces', 705, 262, 'l'],
+      ['targets', 'Dispatch targets', 4, '4 lists', 'Runs & dispatch', 560, 400, 'r'],
+      ['wake', 'Wake-marker regex', 3, '3', 'Runs & dispatch', 505, 452, 'r'],
+      ['recin', 'Recommendation input', 4, '4', 'LLM & prompts', 305, 212, 'r'],
+      ['refusal', 'Dispatch refusal relay', 2, '2', 'Agent API (proxy)', 640, 632, 'r'],
+      ['htmlerr', 'HTML error page', 2, '2', 'Server-rendered pages', 300, 565, 'b'],
+      ['token', 'Current token after refresh', 2, '2', 'Auth, accounts & workspaces', 830, 268, 'b'],
+      ['aiavail', 'AI availability resolver', 0, '[n]', 'LLM & prompts', 365, 282, 'l']
+    ].map(h => ({ id: h[0], name: h[1], wasN: h[2], x: h[5], y: h[6], side: h[7], num: h[3] + '→1',
+      status: 'one', area: h[4], grade: '[grade]', copies: '1 (was ' + h[3] + ')', owner: '[owning module]',
+      aria: h[1] + ': brought to one place, was ' + h[3],
+      where: [{ loc: '[file:line]', note: 'the one place it lives now' }],
+      life: [lt('BORN', '[ticket · date]'), lt('COPIES', h[3] + ' → 1'), lt('RULINGS', '[ruling], if any'), lt('OWNER', '[owning module], brought home by the coherence loop')],
+      made: [{ id: 'LIN-3449', note: 'coherence loop, batch [n]: made the one place' }],
+      read: [{ id: '[ticket]', note: 'now reads it instead of deciding again' }],
+      action: 'Nothing to hand on. Watch for regrowth (0 of 26 regressed), and check the area its one place landed in against the Seams gauge.',
+      src: 'LIN-3449', canHand: false }));
+
+    // 16 unnamed brought-home decisions: positions illustrative.
+    const HP = [[60, 140], [140, 92], [225, 205], [280, 305], [470, 140], [845, 175], [590, 300], [505, 385], [370, 545], [230, 570],
+      [40, 600], [120, 665], [590, 655], [950, 648], [565, 150], [640, 440]].map((p, i) => ({
+      id: 'hp' + i, ph: true, name: '[decision]', wasN: 0, x: p[0], y: p[1], side: 'r', num: '[n]→1',
+      status: 'one', area: '[area]: position illustrative', grade: '[grade]', copies: '1 (was [n])', owner: '[owning module]',
+      aria: 'Unnamed placeholder decision brought to one place',
+      where: [{ loc: '[file:line]', note: '[the one place]' }],
+      life: [lt('BORN', '[ticket · date]'), lt('COPIES', '[n] → 1'), lt('RULINGS', '[ruling]'), lt('OWNER', '[owning module]')],
+      made: [{ id: 'LIN-3449', note: 'coherence loop, batch [n]' }], read: [{ id: '[ticket]', note: '[only read it]' }],
+      action: '[recommendation]. One of 16 brought-home decisions not yet named on this plate.', src: 'LIN-3449', canHand: false }));
+
+    const lookup = {};
+    S.concat(SP).forEach(d => { lookup[d.id] = { d: d, set: 's' }; });
+    HN.concat(HP).forEach(d => { lookup[d.id] = { d: d, set: 'h' }; });
+    const isS = (id) => !!lookup[id] && lookup[id].set === 's';
+
+    const labelStyle = (side, sel) => {
+      const s = 'position:absolute;white-space:nowrap;' + SERIF + 'font-size:13px;line-height:1.25;color:' + INK + ';background:rgba(251,250,246,.9);padding:1px 4px;pointer-events:none;font-weight:' + (sel ? 600 : 400) + ';';
+      if (side === 'l') return s + 'right:calc(100% - 6px);top:50%;transform:translateY(-50%);';
+      if (side === 't') return s + 'bottom:calc(100% - 4px);left:50%;transform:translateX(-50%);';
+      if (side === 'b') return s + 'top:calc(100% - 4px);left:50%;transform:translateX(-50%);';
+      return s + 'left:calc(100% - 6px);top:50%;transform:translateY(-50%);';
+    };
+
+    const build = (d, set) => {
+      const active = set === 's' ? !isHome : isHome;
+      const sel = d.id === selId;
+      const dots = [], lines = [];
+      let W, H;
+      if (set === 's') {
+        W = d.ph ? 40 : 78; H = d.ph ? 34 : 64;
+        const r = RAD[d.size];
+        let pts = d.ph ? [[-8, -3], [8, 4]] : P.slice(0, d.n);
+        const mx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+        const my = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+        pts = pts.map(p => [p[0] - mx + W / 2, p[1] - my + H / 2]);
+        for (let i = 0; i < pts.length - 1; i++) lines.push(seg(pts[i], pts[i + 1], d.ph ? 'rgba(180,86,28,.32)' : 'rgba(180,86,28,.5)', d.ph));
+        if (d.checks) Q.slice(0, d.checks).forEach(q => dots.push(sq(q[0] + W / 2, q[1] + H / 2)));
+        pts.forEach(p => {
+          if (!d.ph && (d.size === 'High' || d.size === 'Medium-High')) dots.push(dot(p[0], p[1], r + 3.5, 'transparent', '1px solid ' + OR));
+          dots.push(d.ph ? dot(p[0], p[1], r, PAPER, '1.25px solid ' + ORP) : dot(p[0], p[1], r, OR, '0'));
+        });
+      } else {
+        W = d.ph ? 26 : 56; H = W;
+        const c = W / 2;
+        const g = d.ph ? 14 : (d.wasN ? Math.min(50, 12 + 4 * Math.sqrt(d.wasN)) : 20);
+        dots.push(dot(c, c, g / 2, 'transparent', '1px dashed ' + (d.ph ? BLP : BLG)));
+        dots.push(d.ph ? dot(c, c, 2.5, BLP, '0') : dot(c, c, 5, BL, '0'));
+      }
+      return {
+        dots: dots, lines: lines, selected: sel, pressed: sel ? 'true' : 'false',
+        showLabel: (!d.ph && active) || sel,
+        aria: d.aria + (active ? '' : ' (dimmed in this view)'),
+        btnStyle: 'position:absolute;' + pct(d.x, d.y) + 'width:' + W + 'px;height:' + H + 'px;margin:' + (-H / 2) + 'px 0 0 ' + (-W / 2) + 'px;padding:0;border:0;background:transparent;cursor:pointer;border-radius:50%;opacity:' + (active || sel ? 1 : (set === 's' ? 0.22 : 0.3)) + ';z-index:' + (sel ? 4 : (active ? (d.ph ? 2 : 3) : 1)) + ';',
+        ringStyle: 'position:absolute;left:-7px;top:-7px;right:-7px;bottom:-7px;border:1.25px solid ' + BL + ';border-radius:50%;',
+        labelStyle: labelStyle(d.side || 'r', sel),
+        label: d.name, num: d.num || '',
+        numStyle: MONO + 'font-size:11px;font-weight:400;color:' + (set === 's' ? ORD : BL) + ';',
+        pick: () => put({ sel: d.id })
+      };
+    };
+
+    const glyphs = HP.concat(HN).map(d => build(d, 'h')).concat(SP.concat(S).map(d => build(d, 's')));
+
+    const curE = lookup[selId] || lookup.waiting;
+    const cur = curE.d;
+    const STATUS = {
+      scattered: ['◐ scattered', 'color:' + ORD + ';border:1px solid ' + OR + ';'],
+      parked: ['○ parked behind a ruling', 'color:' + INK + ';border:1px dashed #56606C;'],
+      one: ['✓ one owner', 'color:' + BL + ';border:1px solid ' + BL + ';']
+    };
+    const stt = STATUS[cur.status];
+    const inBatch = batch.indexOf(cur.id) >= 0;
+    const card = {
+      kind: curE.set === 's' ? 'STILL SCATTERED' : 'BROUGHT HOME',
+      name: cur.name, area: cur.area, grade: cur.grade, copies: cur.copies, owner: cur.owner,
+      where: cur.where, life: cur.life, made: cur.made,
+      read: cur.read.map(r => ({ id: r.id, note: r.note, idStyle: 'display:block;' + MONO + 'font-size:12.5px;color:' + (r.flag ? ORD : INK) + ';' })),
+      action: cur.action,
+      statusLabel: stt[0],
+      statusStyle: MONO + 'font-size:11px;line-height:1.3;padding:3px 8px;background:#FFFEFB;' + stt[1],
+      canHand: !!cur.canHand, noHand: !cur.canHand,
+      noHandText: curE.set === 'h' ? 'Nothing to hand to the fleet: this decision already has one owner.' : 'Name this decision before handing it to the fleet.',
+      inBatch: inBatch ? 'true' : 'false',
+      handLabel: inBatch ? 'In the batch · take it out' : 'Hand to the fleet',
+      handStyle: SERIF + 'font-size:15px;line-height:1.2;padding:8px 16px;cursor:pointer;border:1px solid ' + BL + ';' + (inBatch ? 'background:transparent;color:' + BL + ';' : 'background:' + BL + ';color:#FFFEFB;'),
+      hand: () => put({ batch: inBatch ? batch.filter(x => x !== cur.id) : batch.concat([cur.id]) }),
+      source: (cur.src ? cur.src + ' · ' : '') + 'grounded at [commit] · dated 14 Oct 2026'
+    };
+
+    const batchItems = batch.map(id => {
+      const e = lookup[id];
+      return { name: e ? e.d.name : id, move: e && e.d.move ? e.d.move : '' };
+    });
+
+    const tab = (on) => SERIF + 'font-size:15px;line-height:1.2;padding:8px 14px;border:0;cursor:pointer;' + (on ? 'background:' + INK + ';color:#FBFAF6;' : 'background:transparent;color:' + INK + ';');
+    const showScattered = () => put({ view: 'scattered', sel: isS(selId) ? selId : 'waiting' });
+    const showHome = () => put({ view: 'home', sel: isS(selId) ? 'errors' : selId });
+    const go = (id) => () => put({ view: 'scattered', sel: id });
+
+    return {
+      areas: AREAS,
+      glyphs: glyphs,
+      card: card,
+      kitWrap: 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;opacity:' + (isHome ? 0.25 : 1) + ';',
+      isHome: isHome,
+      pressS: isHome ? 'false' : 'true',
+      pressH: isHome ? 'true' : 'false',
+      tabS: tab(!isHome),
+      tabH: tab(isHome),
+      fieldHeading: isHome ? 'Brought home: 26 decisions now held in one place' : 'Scattered now: 23 decisions held in more than one place',
+      fieldNote: isHome
+        ? 'By the coherence loop (LIN-3449) in 3 batches; product code −363 lines. 10 named, 16 drawn as [decision] points. Each ghost ring shows how many places it was in.'
+        : '1 High · 1 Medium-High · 3 Medium · 10 Low-Medium · 8 Low. 5 named, 18 drawn as [decision] placeholders. 3 born or grew this week: [which three].',
+      showScattered: showScattered,
+      showHome: showHome,
+      goPricing: go('pricing'),
+      goSpec: go('spec'),
+      goWaiting: go('waiting'),
+      goSeams: showHome,
+      batchCount: batch.length + (batch.length === 1 ? ' move' : ' moves'),
+      batchEmpty: batch.length === 0,
+      batchHas: batch.length > 0,
+      batchItems: batchItems,
+      clearBatch: () => put({ batch: [] })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,601 @@
+{
+ "testRun": {
+  "files": 122,
+  "tests": 3020,
+  "pass": 3020,
+  "fail": 0
+ },
+ "surfaceMethods": 33,
+ "implemented": {
+  "linear": 31,
+  "github": 18,
+  "github-projects": 9,
+  "jira": 14,
+  "local": 26
+ },
+ "pairs": 98,
+ "exercised": 89,
+ "unexercised": [
+  "linear.fetchProjectsList",
+  "linear.fetchTeams",
+  "linear.fetchOrganization",
+  "linear.fetchViewer",
+  "linear.fetchIssueComments",
+  "linear.fetchFocusedChild",
+  "linear.viewer",
+  "linear.projects",
+  "github.fetchProjectsList"
+ ],
+ "exercisedBy": {
+  "linear.fetchProjects": 1,
+  "linear.fetchProjectsList": 0,
+  "linear.fetchTeams": 0,
+  "linear.fetchOrganization": 0,
+  "linear.fetchViewer": 0,
+  "linear.fetchIssueContext": 3,
+  "linear.fetchIssueComments": 0,
+  "linear.fetchIssueFields": 1,
+  "linear.fetchFocusedChild": 0,
+  "linear.fetchRecommendationContext": 1,
+  "linear.search": 1,
+  "linear.states": 1,
+  "linear.labels": 1,
+  "linear.cycles": 1,
+  "linear.cycleDetail": 1,
+  "linear.relations": 1,
+  "linear.viewer": 0,
+  "linear.projects": 0,
+  "linear.issues": 1,
+  "linear.issueDetail": 1,
+  "linear.createIssue": 1,
+  "linear.updateIssue": 1,
+  "linear.createComment": 1,
+  "linear.updateComment": 1,
+  "linear.deleteComment": 1,
+  "linear.createRelation": 1,
+  "linear.deleteRelation": 1,
+  "linear.addLabel": 1,
+  "linear.removeLabel": 1,
+  "linear.uploadFile": 1,
+  "linear.fetchAttachment": 1,
+  "github.fetchProjects": 2,
+  "github.fetchProjectsList": 0,
+  "github.fetchTeams": 1,
+  "github.fetchViewer": 2,
+  "github.fetchIssueContext": 2,
+  "github.fetchIssueComments": 2,
+  "github.fetchIssueFields": 3,
+  "github.fetchRecommendationContext": 2,
+  "github.search": 1,
+  "github.states": 2,
+  "github.labels": 2,
+  "github.createIssue": 3,
+  "github.updateIssue": 4,
+  "github.createComment": 3,
+  "github.addLabel": 2,
+  "github.removeLabel": 2,
+  "github.listScopes": 1,
+  "github.listConnectionScopes": 2,
+  "github-projects.fetchProjects": 1,
+  "github-projects.fetchProjectsList": 1,
+  "github-projects.fetchTeams": 1,
+  "github-projects.fetchViewer": 1,
+  "github-projects.fetchIssueContext": 1,
+  "github-projects.fetchIssueFields": 1,
+  "github-projects.fetchRecommendationContext": 1,
+  "github-projects.listScopes": 1,
+  "github-projects.listConnectionScopes": 1,
+  "jira.fetchProjects": 1,
+  "jira.fetchProjectsList": 1,
+  "jira.fetchTeams": 1,
+  "jira.fetchIssueContext": 1,
+  "jira.fetchIssueComments": 1,
+  "jira.fetchIssueFields": 1,
+  "jira.fetchRecommendationContext": 1,
+  "jira.states": 5,
+  "jira.labels": 1,
+  "jira.updateIssue": 2,
+  "jira.createComment": 1,
+  "jira.addLabel": 1,
+  "jira.removeLabel": 1,
+  "jira.listScopes": 1,
+  "local.fetchProjects": 1,
+  "local.fetchProjectsList": 1,
+  "local.fetchTeams": 1,
+  "local.fetchIssueContext": 2,
+  "local.fetchIssueComments": 2,
+  "local.fetchIssueFields": 1,
+  "local.fetchRecommendationContext": 1,
+  "local.search": 1,
+  "local.states": 1,
+  "local.labels": 1,
+  "local.cycles": 2,
+  "local.cycleDetail": 1,
+  "local.relations": 1,
+  "local.viewer": 2,
+  "local.projects": 3,
+  "local.issues": 2,
+  "local.issueDetail": 2,
+  "local.createIssue": 1,
+  "local.updateIssue": 1,
+  "local.createComment": 2,
+  "local.updateComment": 1,
+  "local.deleteComment": 1,
+  "local.createRelation": 1,
+  "local.deleteRelation": 2,
+  "local.addLabel": 1,
+  "local.removeLabel": 1
+ },
+ "shapeRecords": {
+  "local": 107,
+  "github": 87,
+  "github-projects": 15,
+  "jira": 119,
+  "linear": 3
+ },
+ "shapeAgreement": {
+  "addLabel": {
+   "providers": [
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 1,
+   "sharedByAll": 1,
+   "onlyOne": {
+    "github": [],
+    "jira": [],
+    "local": []
+   }
+  },
+  "createComment": {
+   "providers": [
+    "linear",
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 6,
+   "sharedByAll": 0,
+   "onlyOne": {
+    "linear": [
+     ".comment.id",
+     ".success"
+    ],
+    "github": [],
+    "jira": [],
+    "local": []
+   }
+  },
+  "createIssue": {
+   "providers": [
+    "github",
+    "local"
+   ],
+   "paths": 21,
+   "sharedByAll": 19,
+   "onlyOne": {
+    "github": [
+     ".labels.nodes[].name"
+    ],
+    "local": [
+     ".priorityLabel"
+    ]
+   }
+  },
+  "fetchIssueComments": {
+   "providers": [
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 5,
+   "sharedByAll": 4,
+   "onlyOne": {
+    "github": [],
+    "jira": [],
+    "local": []
+   }
+  },
+  "fetchIssueContext": {
+   "providers": [
+    "github",
+    "github-projects",
+    "jira",
+    "local"
+   ],
+   "paths": 83,
+   "sharedByAll": 17,
+   "onlyOne": {
+    "github": [],
+    "github-projects": [],
+    "jira": [
+     ".children[].parent.identifier",
+     ".children[].project",
+     ".children[].state.id",
+     ".children[].team.id",
+     ".children[].team.name",
+     ".issue.state.id"
+    ],
+    "local": [
+     ".children[].priorityLabel",
+     ".children[].project.id",
+     ".children[].project.name",
+     ".issue.blockedBy[]",
+     ".issue.blockedBy[].identifier",
+     ".issue.blockedBy[].state.name",
+     ".issue.blockedBy[].state.type",
+     ".issue.blockedBy[].title",
+     ".parent.state.name",
+     ".parent.state.type",
+     ".siblings[].assignee",
+     ".siblings[].completedAt",
+     ".siblings[].createdAt",
+     ".siblings[].description",
+     ".siblings[].dueDate",
+     ".siblings[].estimate",
+     ".siblings[].id",
+     ".siblings[].identifier",
+     ".siblings[].labels.nodes[]",
+     ".siblings[].parent",
+     ".siblings[].priority",
+     ".siblings[].priorityLabel",
+     ".siblings[].project",
+     ".siblings[].relations.nodes[]",
+     ".siblings[].relations.nodes[].relatedIssue.id",
+     ".siblings[].relations.nodes[].type",
+     ".siblings[].sortOrder",
+     ".siblings[].source",
+     ".siblings[].state.name",
+     ".siblings[].state.type",
+     ".siblings[].title",
+     ".siblings[].url"
+    ]
+   }
+  },
+  "fetchIssueFields": {
+   "providers": [
+    "github",
+    "github-projects",
+    "jira",
+    "local"
+   ],
+   "paths": 30,
+   "sharedByAll": 19,
+   "onlyOne": {
+    "github": [],
+    "github-projects": [],
+    "jira": [
+     ".parent.id",
+     ".parent.identifier",
+     ".state.id",
+     ".team",
+     ".team.id",
+     ".team.name"
+    ],
+    "local": [
+     ".priorityLabel"
+    ]
+   }
+  },
+  "fetchProjects": {
+   "providers": [
+    "github",
+    "github-projects",
+    "jira",
+    "local"
+   ],
+   "paths": 38,
+   "sharedByAll": 25,
+   "onlyOne": {
+    "github": [],
+    "github-projects": [],
+    "jira": [
+     ".issues[].state.id",
+     ".issues[].team.id",
+     ".issues[].team.name",
+     ".projects[]",
+     ".truncated"
+    ],
+    "local": [
+     ".issues[].priorityLabel",
+     ".issues[].relations.nodes[].relatedIssue.id",
+     ".issues[].relations.nodes[].type"
+    ]
+   }
+  },
+  "fetchProjectsList": {
+   "providers": [
+    "github-projects",
+    "jira",
+    "local"
+   ],
+   "paths": 6,
+   "sharedByAll": 5,
+   "onlyOne": {
+    "github-projects": [],
+    "jira": [],
+    "local": [
+     "[]"
+    ]
+   }
+  },
+  "fetchRecommendationContext": {
+   "providers": [
+    "github",
+    "github-projects",
+    "jira",
+    "local"
+   ],
+   "paths": 82,
+   "sharedByAll": 17,
+   "onlyOne": {
+    "github": [
+     ".project"
+    ],
+    "github-projects": [],
+    "jira": [
+     ".children[].parent.identifier",
+     ".children[].project",
+     ".children[].state.id",
+     ".children[].team.id",
+     ".children[].team.name",
+     ".focusedChild.issue.state.id",
+     ".issue.state.id"
+    ],
+    "local": [
+     ".children[].priorityLabel",
+     ".children[].project.id",
+     ".children[].project.name",
+     ".focusedChild.issue.blockedBy[]",
+     ".focusedChild.parent.description",
+     ".focusedChild.parent.state.name",
+     ".focusedChild.parent.state.type",
+     ".issue.blockedBy[]",
+     ".parent.state.name",
+     ".parent.state.type"
+    ]
+   }
+  },
+  "fetchTeams": {
+   "providers": [
+    "github",
+    "github-projects",
+    "jira",
+    "local"
+   ],
+   "paths": 4,
+   "sharedByAll": 0,
+   "onlyOne": {
+    "github": [],
+    "github-projects": [],
+    "jira": [
+     "[].id",
+     "[].key",
+     "[].name"
+    ],
+    "local": []
+   }
+  },
+  "fetchViewer": {
+   "providers": [
+    "github",
+    "github-projects"
+   ],
+   "paths": 3,
+   "sharedByAll": 3,
+   "onlyOne": {
+    "github": [],
+    "github-projects": []
+   }
+  },
+  "labels": {
+   "providers": [
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 3,
+   "sharedByAll": 2,
+   "onlyOne": {
+    "github": [],
+    "jira": [],
+    "local": []
+   }
+  },
+  "listConnectionScopes": {
+   "providers": [
+    "github",
+    "github-projects"
+   ],
+   "paths": 11,
+   "sharedByAll": 1,
+   "onlyOne": {
+    "github": [
+     "[].name",
+     "[].private",
+     "[].slug"
+    ],
+    "github-projects": [
+     "[]",
+     "[].closed",
+     "[].login",
+     "[].number",
+     "[].shortDescription",
+     "[].title",
+     "[].url"
+    ]
+   }
+  },
+  "listScopes": {
+   "providers": [
+    "github",
+    "github-projects",
+    "jira"
+   ],
+   "paths": 11,
+   "sharedByAll": 0,
+   "onlyOne": {
+    "github": [
+     "[].private",
+     "[].slug"
+    ],
+    "github-projects": [
+     "[].closed",
+     "[].login",
+     "[].number",
+     "[].shortDescription",
+     "[].title"
+    ],
+    "jira": [
+     "[].cloudId"
+    ]
+   }
+  },
+  "removeLabel": {
+   "providers": [
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 1,
+   "sharedByAll": 1,
+   "onlyOne": {
+    "github": [],
+    "jira": [],
+    "local": []
+   }
+  },
+  "search": {
+   "providers": [
+    "linear",
+    "github",
+    "local"
+   ],
+   "paths": 24,
+   "sharedByAll": 1,
+   "onlyOne": {
+    "linear": [],
+    "github": [
+     "[].assignee.name"
+    ],
+    "local": [
+     "[]",
+     "[].assignee",
+     "[].labels.nodes[]",
+     "[].priorityLabel"
+    ]
+   }
+  },
+  "states": {
+   "providers": [
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 5,
+   "sharedByAll": 4,
+   "onlyOne": {
+    "github": [],
+    "jira": [
+     "[]"
+    ],
+    "local": []
+   }
+  },
+  "updateIssue": {
+   "providers": [
+    "github",
+    "jira",
+    "local"
+   ],
+   "paths": 28,
+   "sharedByAll": 20,
+   "onlyOne": {
+    "github": [
+     ".assignee.name",
+     ".project.id",
+     ".project.name"
+    ],
+    "jira": [
+     ".state.id",
+     ".team.id",
+     ".team.name"
+    ],
+    "local": [
+     ".priorityLabel"
+    ]
+   }
+  }
+ },
+ "linearConnectionPaths": 69,
+ "linearConnectionPathsByProvider": {
+  "linear": 0,
+  "github": 8,
+  "github-projects": 4,
+  "jira": 8,
+  "local": 69
+ },
+ "testReach": {
+  "surface": 108,
+  "fake": 19,
+  "internal": 19
+ },
+ "testReachTargets": {
+  "lib/providers/registry.js": 40,
+  "lib/providers/github/index.js": 17,
+  "lib/providers/interface.js": 17,
+  "lib/providers/github/fake-client.js": 9,
+  "lib/providers/jira/index.js": 9,
+  "lib/providers/linear/index.js": 9,
+  "lib/providers/github-projects/index.js": 6,
+  "lib/providers/models.js": 6,
+  "lib/providers/jira/fake-client.js": 6,
+  "lib/providers/local/index.js": 6,
+  "lib/providers/github-projects/fake-client.js": 4,
+  "lib/providers/index.js": 4,
+  "lib/providers/state-map.js": 3,
+  "lib/providers/github/app-auth.js": 3,
+  "lib/providers/jira/oauth.js": 2,
+  "lib/providers/jira/client.js": 2,
+  "lib/providers/github-projects/client.js": 1,
+  "lib/providers/github/client.js": 1,
+  "lib/providers/jira/adf.js": 1
+ },
+ "outsideChecks": {
+  "total": 53,
+  "files": 20,
+  "byFile": {
+   "lib/proxy-ref-resolver.js": 9,
+   "lib/workspace.js": 9,
+   "server.js": 7,
+   "lib/connection-credential.js": 5,
+   "lib/workspace-token-refresh.js": 4,
+   "lib/workspace-urlkey.js": 2,
+   "lib/workspace-token-resolver.js": 2,
+   "routes/workspace-api.js": 2,
+   "routes/email-auth.js": 2,
+   "lib/should-mock-ai.js": 1,
+   "lib/refresh-strategy.js": 1,
+   "lib/connection-store.js": 1,
+   "lib/suspect-credential-refresh.js": 1,
+   "lib/urlkey-holders.js": 1,
+   "lib/account-conflict.js": 1,
+   "lib/render-settings.js": 1,
+   "lib/components/navbar.js": 1,
+   "routes/proxy-reads.js": 1,
+   "routes/proxy.js": 1,
+   "routes/jira-auth.js": 1
+  }
+ },
+ "smoothingHelpers": [
+  "lib/proxy-graphql-errors.js:169",
+  "routes/workspace-api.js:4028",
+  "routes/workspace-api.js:4036"
+ ],
+ "commentShare": {
+  "bytes": 473675,
+  "commentBytes": 291373,
+  "share": 0.615
+ }
+}
