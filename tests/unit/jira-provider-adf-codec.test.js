@@ -23,6 +23,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { marked } from 'marked'
 import { adfToMarkdown, markdownToAdf, adfHasUnrenderableContent } from '../../lib/providers/jira/adf.js'
 
 describe('LIN-2399 — the codec extraction stays extracted', () => {
@@ -254,6 +255,7 @@ const WRITER_SAFE_ADF = {
     adfDoc(adfPara(adfText('#'), HARD_BREAK, adfText('1  Scope of works'))),
   'codeBlock whose blank separator line carries a stray space (re-review R3.1)':
     adfDoc({ type: 'codeBlock', attrs: { language: 'python' }, content: [adfText('def a():\n    pass\n \ndef b():\n    pass')] }),
+  'heading at level 6': adfDoc({ type: 'heading', attrs: { level: 6 }, content: [adfText('Six')] }),
 }
 
 /**
@@ -297,6 +299,17 @@ const WRITER_UNSAFE_ADF = {
   // render as `_**x**_` and re-parse as ONE em run whose text is literally `**x**`.
   'text carrying strong + em': adfDoc(adfPara(adfText('x', [{ type: 'strong' }, { type: 'em' }]))),
   'text carrying link + strong': adfDoc(adfPara(adfText('x', [{ type: 'link', attrs: { href: 'https://e.com' } }, { type: 'strong' }]))),
+  // Shapes that are refused wherever they sit, not only at the document's edge.
+  'empty listItem followed by another item': adfDoc({ type: 'bulletList', content: [{ type: 'listItem', content: [] }, adfItem(adfPara(adfText('b')))] }),
+  'empty blockquote between paragraphs': adfDoc(adfPara(adfText('a')), { type: 'blockquote', content: [] }, adfPara(adfText('b'))),
+  'empty heading between paragraphs': adfDoc(adfPara(adfText('a')), { type: 'heading', attrs: { level: 1 }, content: [] }, adfPara(adfText('b'))),
+  'paragraph with a blank line made of two hardBreaks': adfDoc(adfPara(adfText('a'), HARD_BREAK, HARD_BREAK, adfText('b'))),
+  'paragraph split into two plain text runs': adfDoc(adfPara(adfText('a'), adfText('b'))),
+  'codeBlock split into two text runs': adfDoc({ type: 'codeBlock', content: [adfText('const a = '), adfText('1')] }),
+  'codeBlock with a blank language': adfDoc({ type: 'codeBlock', attrs: { language: '' }, content: [adfText('x')] }),
+  'codeBlock with a space-padded language': adfDoc({ type: 'codeBlock', attrs: { language: ' js' }, content: [adfText('x')] }),
+  'codeBlock whose text carries a mark': adfDoc({ type: 'codeBlock', content: [adfText('x', [{ type: 'strong' }])] }),
+  'link whose href contains a newline': adfDoc(adfPara(adfText('x', [{ type: 'link', attrs: { href: 'https://e.com/a\nb' } }]))),
 }
 
 /**
@@ -988,5 +1001,70 @@ describe('markdownToAdf: unclosed fence and indented rule (LIN-3557 review)', ()
     const doc = { type: 'doc', version: 1, content: [para('a'), para(' ---')] }
     assert.equal(adfToMarkdown(doc), 'a\n\n \\---')
     assert.deepEqual(markdownToAdf(adfToMarkdown(doc)), doc)
+  })
+})
+
+// =============================================================================
+// What users see and what Jira stores (LIN-3561)
+//
+// Tests of the codec's user-visible outputs only: the Markdown Harbour shows
+// (and what `marked`, the dashboard renderer, makes of it with default
+// options), and the ADF Harbour writes to Jira. The gate's refuse/allow
+// decision is pinned in WRITER_UNSAFE_ADF / WRITER_SAFE_ADF above.
+// =============================================================================
+
+describe('what a reader sees: adfToMarkdown, and what marked renders from it', () => {
+  const link = (text, href) => adfText(text, [{ type: 'link', attrs: { href } }])
+  const cases = [
+    ['a link whose href contains brackets', adfDoc(adfPara(link('wiki', 'https://en.wikipedia.org/wiki/Foo_(bar)'))),
+      '[wiki](https://en.wikipedia.org/wiki/Foo_\\(bar\\))', '<p><a href="https://en.wikipedia.org/wiki/Foo_(bar)">wiki</a></p>\n'],
+    ['a plain link', adfDoc(adfPara(link('docs', 'https://e.com/docs'))), '[docs](https://e.com/docs)', '<p><a href="https://e.com/docs">docs</a></p>\n'],
+    ['a "]" in link text', adfDoc(adfPara(link('a]b', 'http://x'))), '[a\\]b](http://x)', '<p><a href="http://x">a]b</a></p>\n'],
+    ['each mark', adfDoc(adfPara(adfText('b', [{ type: 'strong' }]), adfText(' '), adfText('i', [{ type: 'em' }]), adfText(' '), adfText('c', [{ type: 'code' }]), adfText(' '), adfText('s', [{ type: 'strike' }]))),
+      '**b** _i_ `c` ~~s~~', '<p><strong>b</strong> <em>i</em> <code>c</code> <del>s</del></p>\n'],
+    ['prose with underscores', p('call foo_bar_baz now'), 'call foo\\_bar\\_baz now', '<p>call foo_bar_baz now</p>\n'],
+    ['prose with asterisks', p('a **b** c'), 'a \\*\\*b\\*\\* c', '<p>a **b** c</p>\n'],
+    ['prose that looks like a link', p('see [1](2) below'), 'see \\[1\\](2) below', '<p>see [1](2) below</p>\n'],
+    ['prose that looks like a heading', p('# not a heading'), '\\# not a heading', '<p># not a heading</p>\n'],
+    ['prose that looks like a numbered list', p('1. not a list'), '1\\. not a list', '<p>1. not a list</p>\n'],
+  ]
+  for (const [name, doc, md, html] of cases) {
+    test(name, () => {
+      assert.equal(adfToMarkdown(doc), md)
+      assert.equal(marked.parse(md), html)
+    })
+  }
+})
+
+describe('adfToMarkdown: what a reader sees for each node', () => {
+  const cases = [
+    ['an emoji with only a shortName shows the shortName', adfDoc(adfPara({ type: 'emoji', attrs: { shortName: ':party:' } })), ':party:'],
+    ['a level-6 heading', adfDoc({ type: 'heading', attrs: { level: 6 }, content: [adfText('Six')] }), '###### Six'],
+    ['a heading above level 6 is shown at level 6', adfDoc({ type: 'heading', attrs: { level: 7 }, content: [adfText('Deep')] }), '###### Deep'],
+    ['a negative heading level is shown at level 1', adfDoc({ type: 'heading', attrs: { level: -2 }, content: [adfText('Neg')] }), '# Neg'],
+    ['a heading without a level is shown at level 1', adfDoc({ type: 'heading', content: [adfText('None')] }), '# None'],
+    ['a code block split into runs shows them joined', adfDoc({ type: 'codeBlock', content: [adfText('const a = '), adfText('1')] }), '```\nconst a = 1\n```'],
+    ['a code block drops its trailing newlines', adfDoc({ type: 'codeBlock', content: [adfText('a\n\n')] }), '```\na\n```'],
+  ]
+  for (const [name, doc, md] of cases) test(name, () => assert.equal(adfToMarkdown(doc), md))
+})
+
+describe('markdownToAdf: what a write stores in Jira', () => {
+  const link = (t, href) => adfText(t, [{ type: 'link', attrs: { href } }])
+  const cases = [
+    ['an escaped bracket in an href is stored without the backslash', '[Foo](https://e.com/wiki/Foo_\\(bar\\))', [adfPara(link('Foo', 'https://e.com/wiki/Foo_(bar)'))]],
+    ['a line with dashes and words is a paragraph, not a rule', '--- draft ---', [adfPara(adfText('--- draft ---'))]],
+    ['a backslash keeps link syntax literal', 'see \\[1](2) below', [adfPara(adfText('see [1](2) below'))]],
+    ['a tag in brackets right before a link', '[WIP][Fix the build](https://x)', [adfPara(adfText('[WIP]'), link('Fix the build', 'https://x'))]],
+    ['brackets not followed by ( stay text', 'see [docs] (soon)', [adfPara(adfText('see [docs] (soon)'))]],
+    ['text after a link keeps its first character', '[docs](https://x) and more', [adfPara(link('docs', 'https://x'), adfText(' and more'))]],
+  ]
+  for (const [name, md, content] of cases) test(name, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
+
+  // No `{ timeout }`: node:test cannot interrupt a synchronous loop, so it
+  // would claim a guard it does not provide. A hang here aborts the process,
+  // which fails the file.
+  test('an unclosed link stays text', () => {
+    assert.deepEqual(markdownToAdf('see [draft](https://x'), adfDoc(adfPara(adfText('see [draft](https://x'))))
   })
 })
