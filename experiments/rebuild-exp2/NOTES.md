@@ -133,3 +133,39 @@ Full results are in `results-2a.md`.
 - pin Harbour's displayed output (through `marked`) for every decision, links with brackets first;
 - carry John's "drop edge cases for simplicity";
 - give the classification step a render check.
+
+## 15 Oct, ~18:30Z: 2b part 1 (test review) prepared
+
+**John:**
+
+- answered both LIN-3557 rulings (LIN-3557 is Done);
+- agreed to fold the live bracket regression into this ticket ("I agree with your recommendation. Let's proceed.").
+
+LIN-3558 stays in Backlog, out of 2b's scope, keeping the ticket bounded.
+
+**The gap list is computed, not judged** (`2b/gap-list.md`). Planting faults on every line of today's code (`e7f7bd57`), with today's 138 tests:
+
+- 490 mutants, score 83.1%;
+- 83 survive;
+- the survivor probe finds that **46 change some output** on the corpus. Those 46 are the test review's to-do list.
+
+**Display check:** Harbour's browser renders issue Markdown with `marked` (`public/common.js`; `marked` ^17.0.1 is a dependency). So tests can assert what users actually see.
+
+**Ticket design:**
+
+- Pin user-visible outputs only: displayed Markdown via `marked`, written ADF, and the gate's boolean.
+- Every gap row is covered, or marked "equivalent" or "edge case dropped".
+- Fix brackets with the smallest change. Prefer table-driven tests, and no mechanism.
+
+The prediction is in `2b/prediction-2b1.md`.
+
+**The fresh reader's 10 findings on the 2b-1 draft, applied:**
+
+- The "fix where display is wrong" clause is bounded: fix brackets only, and list anything else shared with `269a6189` as a follow-up.
+- The gap list is now reproducible: ids, line:col, before → after, full examples in `gap-list.json`, and `plant.mjs`. All 46 rows checked to plant.
+- The misleading `HREF` comment that both clean rooms followed must be rewritten, or the next rebuild will regress again.
+- The bracket bug's write half is named. Verified: today stores `…Foo_\(bar)`, while `269a6189` stored `…Foo_(bar)`.
+- Source 3 (every decision) was dropped as unbounded.
+- One label replaces two: "not pinned: reason", plus "deferred: LIN-3558".
+- The evidence is a unit test through `marked.parse`; no live check is needed.
+- The test count was dropped. The kit reports 145, `node --test` counts differently from the earlier "138".
