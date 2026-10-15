@@ -928,3 +928,24 @@ describe('ADF → markdown → ADF, as a generated property over an adversarial 
     }
   })
 })
+
+// LIN-3557: the writer must never emit a document its own gate refuses. A rule
+// or a closing fence followed by trailing whitespace or a CR (CRLF text) is
+// still a rule / a fence, not a paragraph the gate then blocks with a 422.
+describe('markdownToAdf: rule and closing fence tolerate trailing whitespace (LIN-3557)', () => {
+  for (const md of ['a\n\n---  ', 'a\n\n---\r', 'x\n\n---\r\n']) {
+    test(`rule with trailing whitespace ${JSON.stringify(md)}`, () => {
+      const doc = markdownToAdf(md)
+      assert.deepEqual(doc.content.map(n => n.type), ['paragraph', 'rule'])
+      assert.equal(adfHasUnrenderableContent(doc), false)
+    })
+  }
+
+  for (const md of ['```\nx\n```\r', '```\nx\n``` ']) {
+    test(`closing fence with trailing whitespace ${JSON.stringify(md)}`, () => {
+      const doc = markdownToAdf(md)
+      assert.deepEqual(doc.content, [{ type: 'codeBlock', content: [{ type: 'text', text: 'x' }] }])
+      assert.equal(adfHasUnrenderableContent(doc), false)
+    })
+  }
+})
