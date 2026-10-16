@@ -7,6 +7,16 @@
 //      400 `optionId is required`, not the reason message.
 //   c. each propose route logs under its own endpoint label.
 // Each runs the real createRulingsRoutes over a real DismissalSuggestionsStore.
+//
+// LIN-3576 (LIN-3573 rung 4, writes): one pin per class-(a) fix in the rebuilt
+// routes/proxy-writes.js, driven through the real composer (proxy-fake-deps):
+//   a1. a credential-resolution rejection on a description edit (append, replace,
+//       and the description target of attachments) is mapped like every other
+//       write route's: its mapped status, one audit event on the route's endpoint,
+//       the route's JSON envelope, instead of an unlogged generic 500.
+//   a2. a description write the provider reports as not landed (null or
+//       `{success:false}`) is a 502 logged as 502, not `200 {success:false}`
+//       (docs/proxy-integration.md: never a 2xx with a falsy success).
 import { test, describe, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'http';
@@ -14,6 +24,8 @@ import express from 'express';
 import { createRulingsRoutes } from '../../routes/proxy-rulings.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { installAsyncErrorForwarding } from '../../lib/async-errors.js';
+import { BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
 
 const URL_KEY = 'pins-workspace';
 const DECISION_ID = 'd-1';
@@ -115,5 +127,63 @@ describe('rulings propose pins (LIN-3575)', () => {
     events.length = 0;
     assert.equal((await post('suggest-dismissal', { reason: 'r' })).status, 201);
     assert.deepEqual(events, [{ endpoint: '/api/proxy/rulings/suggest-dismissal', status: 201 }]);
+  });
+});
+
+// ---- writes: description edits (LIN-3576) ----
+
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const DESCRIPTION_FORMS = {
+  append: { path: '/api/proxy/issues/LIN-1/description/append', body: { block: 'more' }, endpoint: '/api/proxy/issues/:id/description/append', resolves: 1 },
+  replace: { path: '/api/proxy/issues/LIN-1/description/replace', body: { oldString: 'existing', newString: 'changed' }, endpoint: '/api/proxy/issues/:id/description/replace', resolves: 1 },
+  // The attachments route resolves once itself, then again inside the description pipeline.
+  attachments: { path: '/api/proxy/issues/LIN-1/attachments', body: { image: PNG, target: 'description' }, endpoint: '/api/proxy/issues/:id/attachments', resolves: 2 },
+};
+
+function descriptionWorld({ rejectResolveAt, updateIssue } = {}) {
+  installAsyncErrorForwarding();
+  const writeEvents = [];
+  let resolves = 0;
+  const provider = makeFakeProvider();
+  provider.issueDescription = async () => ({ description: 'existing' });
+  if (updateIssue) provider.updateIssue = updateIssue;
+  const deps = BASE_DEPS();
+  const app = buildApp({
+    provider,
+    resolveWorkspaceAccess: async (...args) => {
+      resolves += 1;
+      if (resolves === rejectResolveAt) {
+        throw Object.assign(new Error('credential store unreachable'), { response: { status: 429 } });
+      }
+      return deps.resolveWorkspaceAccess(...args);
+    },
+    proxyEventStore: { ...deps.proxyEventStore, recordEvent: async (event) => { writeEvents.push({ endpoint: event.endpoint, status: event.status }); } },
+  });
+  return { app, events: writeEvents };
+}
+
+describe('writes description-edit pins (LIN-3576)', () => {
+  test('a1: a resolution rejection on a description edit is mapped and logged, not a bare 500', async () => {
+    for (const [name, form] of Object.entries(DESCRIPTION_FORMS)) {
+      // Reject the LAST resolution the route makes: the only one for append/replace,
+      // the second (inside the description pipeline) for attachments.
+      const world = descriptionWorld({ rejectResolveAt: form.resolves });
+      const res = await call(world.app, 'post', form.path, { body: form.body });
+      assert.equal(res.status, 429, `${name}: the rejection maps to its own status, got ${res.status} ${JSON.stringify(res.body)}`);
+      assert.equal(typeof res.body.error, 'string', `${name}: the route's JSON error envelope`);
+      assert.deepEqual(world.events, [{ endpoint: form.endpoint, status: 429 }], `${name}: one audit event on the route's endpoint`);
+    }
+  });
+
+  test('a2: a description write the provider reports as not landed is a 502, not 200 {success:false}', async () => {
+    for (const [name, form] of Object.entries(DESCRIPTION_FORMS)) {
+      for (const result of [null, { success: false }]) {
+        const world = descriptionWorld({ updateIssue: async () => result });
+        const res = await call(world.app, 'post', form.path, { body: form.body });
+        assert.equal(res.status, 502, `${name} with ${JSON.stringify(result)}: expected 502, got ${res.status} ${JSON.stringify(res.body)}`);
+        assert.equal(res.body.error, 'Description was not updated');
+        assert.deepEqual(world.events, [{ endpoint: form.endpoint, status: 502 }], `${name}: logged as 502, never as a 200`);
+      }
+    }
   });
 });

@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { applyTrashedSignal, isTrashed, TRASHED_STATE } from '../../lib/trashed-signal.js';
+import { BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
@@ -29,11 +30,6 @@ const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8
 // group-E write-guard assertions until Stage 3b moved those too (see
 // `writesSource` below) — it now carries neither describe block's subject.
 const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
-// LIN-679 Stage 3b / LIN-2537: group E (refuseIfTrashed + its call sites, the
-// write-endpoint 409 guard this file's REFUSE block pins) moved to
-// routes/proxy-writes.js — re-point those assertions here, mirroring the
-// Stage 3a readsSource split above.
-const writesSource = readFileSync(join(__dirname, '../../routes/proxy-writes.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 // LIN-2245: the /api/proxy/instructions catalog (where these doc-side
 // Trashed/trashed/409 mentions actually live) moved out of routes/proxy.js
@@ -152,30 +148,102 @@ describe('REFUSE: context fetcher rejects a trashed target (surfaces 4-6)', () =
 });
 
 describe('REFUSE: write endpoints reject a trashed target with 409 (surfaces 3, 8)', () => {
-  test('a shared refuseIfTrashed guard exists and returns 409', () => {
-    assert.match(writesSource, /async function refuseIfTrashed/);
-    const start = writesSource.indexOf('async function refuseIfTrashed');
-    // 600, not 400: LIN-1559 prepended the missing-read backstop line ahead of
-    // the guard read, pushing the 409 refusal past a 400-char window. The
-    // assertions below are what this test protects; the window is just how far it
-    // reads to find them.
-    const body = writesSource.slice(start, start + 600);
-    assert.match(body, /status\(409\)|jsonError\(res, 409/, 'refusal must be a 409');
-    assert.match(body, /isTrashed\(issue\)/);
+  // LIN-3573: these three tests used to read routes/proxy-writes.js as text (a
+  // `refuseIfTrashed` function, >=3 call sites, >=3 inline blocks), which locked
+  // in the old structure. They now drive every route that refuses a trashed
+  // target through the real composer (tests/unit/lib/proxy-fake-deps.js) and
+  // assert the behaviour the structure only served: a 409 and ZERO provider
+  // writes. The ten URL forms are LIN-3573's class C2.
+  const ISSUE = 'LIN-1';
+  const LABEL = '11111111-1111-4111-8111-111111111111';
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  const WRITES = ['updateIssue', 'createComment', 'uploadFile', 'createRelation', 'updateIssueLabels'];
+  let unique = 0;
+
+  // `endpoint` is the logEvent string each form reports on refusal.
+  const FORMS = {
+    patch: { method: 'patch', path: `/api/proxy/issues/${ISSUE}`, body: () => ({ title: 'new title' }), endpoint: '/api/proxy/issues/:id' },
+    comment: { method: 'post', path: `/api/proxy/issues/${ISSUE}/comments`, body: () => ({ body: `c ${++unique}` }), endpoint: '/api/proxy/issues/comments' },
+    commentAlias: { method: 'post', path: `/api/proxy/comments/${ISSUE}`, body: () => ({ body: `c ${++unique}` }), endpoint: '/api/proxy/issues/comments' },
+    attachComment: { method: 'post', path: `/api/proxy/issues/${ISSUE}/attachments`, body: () => ({ image: PNG, target: 'comment' }), endpoint: '/api/proxy/issues/:id/attachments' },
+    relation: { method: 'post', path: `/api/proxy/issues/${ISSUE}/relations`, body: () => ({ type: 'related', relatedIssueId: 'LIN-2' }), endpoint: '/api/proxy/issues/relations' },
+    labelAdd: { method: 'post', path: `/api/proxy/issues/${ISSUE}/labels`, body: () => ({ labelId: LABEL }), endpoint: '/api/proxy/issues/labels' },
+    labelRemove: { method: 'delete', path: `/api/proxy/issues/${ISSUE}/labels/${LABEL}`, endpoint: '/api/proxy/issues/labels' },
+    append: { method: 'post', path: `/api/proxy/issues/${ISSUE}/description/append`, body: () => ({ block: 'more' }), endpoint: '/api/proxy/issues/:id/description/append' },
+    replace: { method: 'post', path: `/api/proxy/issues/${ISSUE}/description/replace`, body: () => ({ oldString: 'body', newString: 'text' }), endpoint: '/api/proxy/issues/:id/description/replace' },
+    attachDescription: { method: 'post', path: `/api/proxy/issues/${ISSUE}/attachments`, body: () => ({ image: PNG, target: 'description' }), endpoint: '/api/proxy/issues/:id/attachments' },
+  };
+  const GROUP_GUARD_READ = ['patch', 'comment', 'commentAlias', 'attachComment', 'relation'];
+  const GROUP_INLINE = ['labelAdd', 'labelRemove', 'append', 'replace', 'attachDescription'];
+
+  // Every read the write routes make reports the target as trashed; every write
+  // is recorded so a refusal can be shown to have written nothing.
+  function trashedWorld() {
+    const calls = [];
+    const events = [];
+    const trashed = { id: 'i1', trashed: true, description: 'body', labels: { nodes: [] }, state: { type: 'canceled' }, team: { id: 't1' } };
+    const provider = makeFakeProvider();
+    provider.issueWriteGuard = async () => trashed;
+    provider.issueDescription = async () => trashed;
+    provider.issueLabels = async () => trashed;
+    for (const name of WRITES) {
+      const real = provider[name];
+      provider[name] = async (...args) => { calls.push(name); return real(...args); };
+    }
+    const proxyEventStore = { ...BASE_DEPS().proxyEventStore, recordEvent: async (event) => { events.push(event); } };
+    return { app: buildApp({ provider, proxyEventStore }), calls, events };
+  }
+
+  async function sendForm(world, form) {
+    return call(world.app, form.method, form.path, form.body ? { body: form.body() } : {});
+  }
+
+  async function assertRefused(names) {
+    for (const name of names) {
+      const world = trashedWorld();
+      const res = await sendForm(world, FORMS[name]);
+      assert.equal(res.status, 409, `${name}: expected 409, got ${res.status} ${JSON.stringify(res.body)}`);
+      assert.deepEqual(world.calls, [], `${name}: a trashed target must reach no provider write, saw ${world.calls}`);
+    }
+  }
+
+  test('a shared refuseIfTrashed guard exists and returns 409', async () => {
+    // The shared refusal shape on all ten forms: the 409 envelope, and the audit
+    // event carrying the route's own endpoint string.
+    for (const [name, form] of Object.entries(FORMS)) {
+      const world = trashedWorld();
+      const res = await sendForm(world, form);
+      assert.equal(res.status, 409, `${name}: expected 409, got ${res.status}`);
+      assert.deepEqual(res.body, { error: 'Issue is trashed; refusing to modify a deleted issue' }, `${name}: refusal envelope`);
+      const logged = world.events.filter(e => e.status === 409);
+      assert.deepEqual(logged.map(e => e.endpoint), [form.endpoint], `${name}: one 409 audit event on the route's endpoint`);
+      assert.deepEqual(world.calls, [], `${name}: refusal must precede every provider write`);
+    }
+
+    // Control: the four routes that deliberately do NOT guard a trashed target
+    // (removing a stray comment from a dead issue is their use case) reach the
+    // provider. POST /issues has no target at all.
+    const unguarded = [
+      ['post', '/api/proxy/issues', { teamId: LABEL, title: 'new' }, 201],
+      ['delete', `/api/proxy/issues/${ISSUE}/comments/${LABEL}`, undefined, 200],
+      ['patch', `/api/proxy/issues/${ISSUE}/comments/${LABEL}`, { body: 'edited' }, 200],
+      ['delete', `/api/proxy/issues/${ISSUE}/relations/${LABEL}`, undefined, 200],
+    ];
+    for (const [method, path, body, expected] of unguarded) {
+      const res = await call(trashedWorld().app, method, path, body ? { body } : {});
+      assert.equal(res.status, expected, `${method} ${path} must not refuse a trashed target`);
+    }
   });
 
-  test('PATCH, comments, and relation-create call refuseIfTrashed before mutating', () => {
-    // Count the guard call sites in the write handlers (PATCH + comments +
-    // relations = 3 invocations beyond the definition itself).
-    const calls = (writesSource.match(/await refuseIfTrashed\(/g) || []).length;
-    assert.ok(calls >= 3, `expected >=3 refuseIfTrashed call sites, found ${calls}`);
+  test('PATCH, comments, and relation-create call refuseIfTrashed before mutating', async () => {
+    // These read the write guard (issueWriteGuard) before they mutate.
+    await assertRefused(GROUP_GUARD_READ);
   });
 
-  test('label and description-edit handlers refuse trashed inline with 409', () => {
-    // These already read the issue, so they branch on the in-hand flag rather
-    // than paying a second round-trip.
-    const inline409 = (writesSource.match(/isTrashed\(issue\)\) \{\s*\n\s*logEvent\([^\n]*409\)/g) || []).length;
-    assert.ok(inline409 >= 3, `expected >=3 inline 409 refusals (2 label + 1 description), found ${inline409}`);
+  test('label and description-edit handlers refuse trashed inline with 409', async () => {
+    // These read the issue for their own purposes (labels, description), so they
+    // branch on the in-hand flag rather than paying a second round-trip.
+    await assertRefused(GROUP_INLINE);
   });
 
   // LIN-679 Stage 3b / LIN-2537: complementary absence pin (the `937555cd` /
