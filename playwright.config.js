@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 // freshly generated, PEM-valid App key.
 const { privateKey: heldKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const HELD_GITHUB_PEM = heldKey.export({ type: 'pkcs1', format: 'pem' });
-const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN=';
+const UNCONFIGURED_ENV = 'NODE_ENV=test SESSION_SECRET=test-secret-for-playwright OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= FREE_TIER_HOURLY_LIMIT=1000000 PLAN_FEE_MONTHLY_USD= YAP_BASE_URL=http://localhost:3001/test/yap JIRA_CLIENT_ID=test-jira-client JIRA_CLIENT_SECRET=test-jira-secret JIRA_REDIRECT_URI=http://localhost:3001/auth/jira/oauth/callback JIRA_OAUTH_TEST_BASE=http://localhost:3001/test/atlassian EMAIL_TRANSPORT=capture EMAIL_LINK_ORIGIN= MONGODB_URI=';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -76,7 +76,15 @@ export default defineConfig({
     // and local Resend keys can't send real mail (capture wins over Resend).
     // EMAIL_LINK_ORIGIN= (empty, which counts as unset) pins captured links to
     // this server's own origin, whatever a developer's .env points it at.
-    command: `${UNCONFIGURED_ENV} PORT=3001 node server.js`,
+    //
+    // MONGODB_URI= (LIN-3583, empty, which server.js treats as unset) is in
+    // UNCONFIGURED_ENV for the same reason: server.js picks MongoClient when it
+    // is set, so a developer's own MONGODB_URI (.env or shell) would otherwise
+    // receive every e2e server's test workspaces, sessions, tokens and dispatch
+    // rows. HARBOUR_DATA_DIR is pinned below to ./test-results/main-e2e-data so
+    // this server never writes into the developer's own ./data either; the 3002
+    // and 3003 twins already carry their own dirs.
+    command: `${UNCONFIGURED_ENV} PORT=3001 HARBOUR_DATA_DIR=./test-results/main-e2e-data node server.js`,
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
