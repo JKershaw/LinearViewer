@@ -478,3 +478,34 @@ No helper module, and no existing test edited. 4 new pin tests. The redaction ce
 **Side events in the round:**
 - LIN-3579's first implementation worker reported a `simple-dispatcher` checkout, although nothing carried a repo override. It was aborted and relaunched.
 - A fresh-reader check of LIN-3580 found that local e2e loads `.env`. A read-only research dispatch (opencode with a cheap OpenRouter model, under 1¢) found it safe on the operator's machine (`MONGODB_URI` unset), but unguarded. That became LIN-3583.
+
+## 16 Oct ~21:05Z: rung 5b (LIN-3579, the renderer cluster, the Large test) done and scored
+
+Four files rebuilt in one PR (#1903, merged as `1f8010a0`): `render.js`, `render-session.js`, `render-swipe.js` and `render-settings.js`, 2,313 code lines, about 2.5× rung 4.
+
+**Run.** First launch 17:09Z. Merged 20:26Z, Done 20:56Z after two rulings. Harbour didn't split it. What it ran into:
+- **A wrong checkout:** the first implementation worker reported a `simple-dispatcher` checkout, with no repo override set. It was aborted and relaunched at 17:53Z.
+- **A laptop reboot at ~18:25Z.** The operator's laptop froze under three concurrent runs, Spotlight indexing, and the dispatcher's growing per-cycle cost (fixed in LIN-3585). The stall failsafe resumed the worker, but its three background forks were lost. A forced follow-up at 19:50Z told it to finish one part at a time with a lighter replay.
+- **Two rulings at close-out:** a live Periodicals check (skipped: the ticket rules out live checks) and the worker replay's coverage (about 94% strict block, accepted).
+
+**Independent replay** (`experiments/rebuild-rung5b/`, 19,856 inputs, seeds 1 and 7):
+- **(a) fixes, about 470 per seed:**
+  - the details meta line now escapes identifier, assignee and estimate (an assignee of `<b>` used to become a live element);
+  - Periodicals rows are left out of Home's ordering, which restores the top-task mark.
+- **(c) fuzz:**
+  - the same Periodicals change on Swipe, which no caller produces today (the swipe route never passes `urlKey`);
+  - 3,089 Settings pages gain a space between two block-level closing tags. Nothing renders differently.
+- **(b) regressions: 0. Page-contract changes: 0** (424 tokens checked).
+- The run page is byte-identical (2,913 pages).
+- **Real text:** 0 of 1,037 descriptions render differently.
+
+**Shape:**
+- code lines 2,313 → 2,057 with the new helper (−11%);
+- decision points 917 → 693 (−24%, or −20% without removed default parameters);
+- worst functions: `renderDetailsContent` 75 → 33; `renderSessionPage` 75 → 42; `renderPage` stays at 45; the new `renderNodeHtml` is 45.
+
+**PR facts:** one helper, `lib/home-swipe-prompt-opts.js`. 4 new tests (3 fail on the base). No existing test edited, and `llms.txt` unchanged. Source-text pins and the golden pass (540 tests).
+
+**Prediction:** most lines hit. One miss: the two worst functions would both drop below 40 (`renderSessionPage` is 42).
+
+**Verdict.** The method held at 2.5× size in one PR, with no visible regression. The flattening is smaller than on the hot-spot rungs, because the cluster's complexity is spread across many page functions rather than one giant. The Home row and page functions and the run page's main function are still the most complex. Most of the wall-clock went to infrastructure, not the method.

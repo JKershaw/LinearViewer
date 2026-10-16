@@ -1,0 +1,22 @@
+{
+  "commit": "f4749b91ee3e854b164c757c1903b0c5a035da7b",
+  "lib": "/home/user/LinearViewer/lib",
+  "files": {
+    "render.js": {
+      "lines": 1162,
+      "rewrittenImportLines": 26
+    },
+    "render-session.js": {
+      "lines": 738,
+      "rewrittenImportLines": 13
+    },
+    "render-swipe.js": {
+      "lines": 722,
+      "rewrittenImportLines": 14
+    },
+    "render-settings.js": {
+      "lines": 1526,
+      "rewrittenImportLines": 15
+    }
+  }
+}

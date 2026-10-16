@@ -1,0 +1,13 @@
+{
+  "strings": 1037,
+  "renders": 3111,
+  "differingStrings": 0,
+  "differingRenders": 0,
+  "byKindCombo": {},
+  "byRenderPath": {},
+  "bySignature": {},
+  "groups": [],
+  "throws": 0,
+  "contractDiffering": 0,
+  "byKind": {}
+}

@@ -1,0 +1,326 @@
+{
+  "commit": "f4749b91",
+  "generatedBy": "/home/user/LinearViewer/experiments/rebuild-exp1/kit/shape.mjs",
+  "files": {
+    "lib/render.js": {
+      "lines": {
+        "total": 1161,
+        "code": 579,
+        "comment": 471,
+        "blank": 111
+      },
+      "bytes": 63512,
+      "functions": 38,
+      "maxNesting": 5,
+      "cyclomaticTotal": 350,
+      "decisionPoints": 311,
+      "decisionPointsByKind": {
+        "or": 43,
+        "ternary": 62,
+        "if": 51,
+        "catch": 1,
+        "defaultValue": 115,
+        "forOf": 8,
+        "and": 31
+      },
+      "worstByCyclomatic": [
+        {
+          "name": "renderDetailsContent",
+          "line": 811,
+          "cyclomatic": 75,
+          "codeLines": 167
+        },
+        {
+          "name": "renderNode",
+          "line": 636,
+          "cyclomatic": 56,
+          "codeLines": 62
+        },
+        {
+          "name": "renderPage",
+          "line": 236,
+          "cyclomatic": 45,
+          "codeLines": 52
+        },
+        {
+          "name": "renderProject",
+          "line": 429,
+          "cyclomatic": 30,
+          "codeLines": 50
+        },
+        {
+          "name": "renderPromptContainer",
+          "line": 168,
+          "cyclomatic": 24,
+          "codeLines": 15
+        }
+      ],
+      "longestByCodeLines": {
+        "name": "renderDetailsContent",
+        "spanLines": 320,
+        "codeLines": 167,
+        "startLine": 811
+      },
+      "unitsOver10": [
+        "buildHomePromptOpts",
+        "renderPromptContainer",
+        "renderPage",
+        "renderInProgressSection",
+        "renderRecentActivitySection",
+        "renderProject",
+        "renderPeriodicalNode",
+        "renderNode",
+        "renderDetailsContent"
+      ],
+      "exportedNames": [
+        "renderLoginPage",
+        "renderErrorPage",
+        "renderUpstreamAwareErrorPage",
+        "renderWorkspaceNotFoundPage",
+        "renderOpenRouterConsentPage",
+        "PRIORITY_OPTION_LABELS",
+        "priorityOptionsHtml",
+        "renderPage",
+        "renderDisplayLabels",
+        "renderDetailsContent",
+        "formatRelativeTime"
+      ],
+      "imports": 16
+    },
+    "lib/render-session.js": {
+      "lines": {
+        "total": 737,
+        "code": 435,
+        "comment": 260,
+        "blank": 42
+      },
+      "bytes": 42938,
+      "functions": 34,
+      "maxNesting": 2,
+      "cyclomaticTotal": 263,
+      "decisionPoints": 228,
+      "decisionPointsByKind": {
+        "forOf": 3,
+        "ternary": 56,
+        "and": 27,
+        "or": 82,
+        "if": 19,
+        "defaultValue": 40,
+        "nullish": 1
+      },
+      "worstByCyclomatic": [
+        {
+          "name": "renderSessionPage",
+          "line": 539,
+          "cyclomatic": 75,
+          "codeLines": 154
+        },
+        {
+          "name": "renderDecisionCard",
+          "line": 388,
+          "cyclomatic": 23,
+          "codeLines": 25
+        },
+        {
+          "name": "renderQuestionCard",
+          "line": 325,
+          "cyclomatic": 19,
+          "codeLines": 52
+        },
+        {
+          "name": "renderLineageGroup",
+          "line": 283,
+          "cyclomatic": 12,
+          "codeLines": 13
+        },
+        {
+          "name": "renderInlineReplyBox",
+          "line": 131,
+          "cyclomatic": 11,
+          "codeLines": 25
+        }
+      ],
+      "longestByCodeLines": {
+        "name": "renderSessionPage",
+        "spanLines": 199,
+        "codeLines": 154,
+        "startLine": 539
+      },
+      "unitsOver10": [
+        "renderInlineReplyBox",
+        "renderRun",
+        "renderLineageGroup",
+        "renderQuestionCard",
+        "renderDecisionCard",
+        "renderBareBlockedCard",
+        "renderSessionPage"
+      ],
+      "exportedNames": [
+        "renderPrLine",
+        "renderSessionPage"
+      ],
+      "imports": 13
+    },
+    "lib/render-swipe.js": {
+      "lines": {
+        "total": 721,
+        "code": 420,
+        "comment": 234,
+        "blank": 67
+      },
+      "bytes": 30173,
+      "functions": 47,
+      "maxNesting": 5,
+      "cyclomaticTotal": 232,
+      "decisionPoints": 184,
+      "decisionPointsByKind": {
+        "forOf": 28,
+        "or": 56,
+        "if": 37,
+        "and": 13,
+        "nullish": 2,
+        "ternary": 22,
+        "for": 1,
+        "defaultValue": 23,
+        "while": 2
+      },
+      "worstByCyclomatic": [
+        {
+          "name": "renderSwipePage",
+          "line": 616,
+          "cyclomatic": 41,
+          "codeLines": 77
+        },
+        {
+          "name": "orderIssuesForSwipe",
+          "line": 505,
+          "cyclomatic": 24,
+          "codeLines": 68
+        },
+        {
+          "name": "clusterByParent",
+          "line": 365,
+          "cyclomatic": 21,
+          "codeLines": 47
+        },
+        {
+          "name": "flattenTrees",
+          "line": 84,
+          "cyclomatic": 17,
+          "codeLines": 46
+        },
+        {
+          "name": "sortIssuesForSwipe/λ@210",
+          "line": 210,
+          "cyclomatic": 15,
+          "codeLines": 18
+        }
+      ],
+      "longestByCodeLines": {
+        "name": "renderSwipePage",
+        "spanLines": 106,
+        "codeLines": 77,
+        "startLine": 616
+      },
+      "unitsOver10": [
+        "issueToCard",
+        "flattenTrees",
+        "sortIssuesForSwipe/λ@210",
+        "clusterByParent",
+        "buildFilterGroups",
+        "orderIssuesForSwipe",
+        "renderSwipePage"
+      ],
+      "exportedNames": [
+        "computeGraphFeatures",
+        "flattenTrees",
+        "isBoostableBug",
+        "sortIssuesForSwipe",
+        "computeOffPageBlockers",
+        "buildWhy",
+        "applyBlockingOrder",
+        "clusterByParent",
+        "buildFilterGroups",
+        "orderIssuesForSwipe",
+        "renderSwipePage"
+      ],
+      "imports": 14
+    },
+    "lib/render-settings.js": {
+      "lines": {
+        "total": 1525,
+        "code": 879,
+        "comment": 551,
+        "blank": 95
+      },
+      "bytes": 81222,
+      "functions": 51,
+      "maxNesting": 1,
+      "cyclomaticTotal": 246,
+      "decisionPoints": 194,
+      "decisionPointsByKind": {
+        "if": 15,
+        "or": 45,
+        "defaultValue": 54,
+        "ternary": 61,
+        "and": 14,
+        "nullish": 5
+      },
+      "worstByCyclomatic": [
+        {
+          "name": "renderSettingsPage",
+          "line": 1169,
+          "cyclomatic": 39,
+          "codeLines": 273
+        },
+        {
+          "name": "renderDispatchDefaultRow",
+          "line": 307,
+          "cyclomatic": 17,
+          "codeLines": 28
+        },
+        {
+          "name": "renderFeatureToggle",
+          "line": 699,
+          "cyclomatic": 11,
+          "codeLines": 22
+        },
+        {
+          "name": "renderDispatchDefaultsSection",
+          "line": 438,
+          "cyclomatic": 10,
+          "codeLines": 51
+        },
+        {
+          "name": "renderProviderContextDisclosure",
+          "line": 875,
+          "cyclomatic": 10,
+          "codeLines": 40
+        }
+      ],
+      "longestByCodeLines": {
+        "name": "renderSettingsPage",
+        "spanLines": 357,
+        "codeLines": 273,
+        "startLine": 1169
+      },
+      "unitsOver10": [
+        "renderDispatchDefaultRow",
+        "renderFeatureToggle",
+        "renderSettingsPage"
+      ],
+      "exportedNames": [
+        "OPENROUTER_CONSENT_BLAST_RADIUS_COPY",
+        "AI_OPERATION_LABELS",
+        "renderSettingsPage"
+      ],
+      "imports": 14
+    }
+  },
+  "totals": {
+    "code": 2313,
+    "decisionPoints": 917,
+    "cyclomatic": 1091,
+    "functions": 170
+  }
+}

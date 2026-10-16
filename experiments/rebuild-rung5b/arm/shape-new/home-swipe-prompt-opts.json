@@ -1,0 +1,148 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5b/arm/new/lib/home-swipe-prompt-opts.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 52,
+    "code": 24,
+    "comment": 25,
+    "blank": 3
+  },
+  "bytes": 2560,
+  "functions": {
+    "count": 3,
+    "byKind": {
+      "FunctionDeclaration": 1,
+      "ArrowFunctionExpression": 2
+    },
+    "longestBySpan": {
+      "name": "buildPromptOpts",
+      "spanLines": 25,
+      "codeLines": 22,
+      "startLine": 28
+    },
+    "longestByCodeLines": {
+      "name": "buildPromptOpts",
+      "spanLines": 25,
+      "codeLines": 22,
+      "startLine": 28
+    }
+  },
+  "maxNesting": 1,
+  "cyclomatic": {
+    "total": 13,
+    "totalConditionsOnly": 12,
+    "decisionPoints": 9,
+    "decisionPointsByKind": {
+      "defaultValue": 5,
+      "forOf": 1,
+      "and": 1,
+      "ternary": 2
+    },
+    "max": {
+      "name": "buildPromptOpts",
+      "cyclomatic": 10
+    },
+    "unitsOver10": []
+  },
+  "regexLiterals": 0,
+  "regexConstructors": 0,
+  "optionalChains": 0,
+  "stringLiterals": 9,
+  "templateLiterals": 0,
+  "imports": 1,
+  "topLevelDeclarations": {
+    "count": 2,
+    "items": [
+      {
+        "name": "DEFAULT_PROMPT_KEYS",
+        "kind": "const",
+        "exported": false,
+        "line": 14
+      },
+      {
+        "name": "buildPromptOpts",
+        "kind": "function",
+        "exported": true,
+        "line": 28
+      }
+    ]
+  },
+  "exportedNames": [
+    "buildPromptOpts"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 52,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "buildPromptOpts",
+      "kind": "FunctionDeclaration",
+      "startLine": 28,
+      "endLine": 52,
+      "spanLines": 25,
+      "codeLines": 22,
+      "params": 1,
+      "cyclomatic": 10,
+      "cyclomaticConditionsOnly": 9,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "defaultValue": 5,
+        "forOf": 1,
+        "and": 1,
+        "ternary": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "buildPromptOpts/λ@32",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 32,
+      "endLine": 32,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildPromptOpts"
+    },
+    {
+      "name": "buildPromptOpts/λ@50",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 50,
+      "endLine": 50,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildPromptOpts"
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}

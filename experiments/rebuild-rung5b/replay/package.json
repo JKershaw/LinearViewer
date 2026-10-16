@@ -1,0 +1,5 @@
+{
+  "name": "render-cluster-replay",
+  "private": true,
+  "type": "module"
+}
