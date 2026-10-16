@@ -1,0 +1,759 @@
+{
+  "tool": "task-page-loader (rung6a, 16e7ae77 snapshot) behavioural replay",
+  "snapshot": {
+    "sha": "16e7ae77e8fba0874c5776e2421ace6da3b2f474",
+    "dir": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77"
+  },
+  "old": {
+    "spec": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6a/arm/fixed",
+    "files": [
+      {
+        "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6a/arm/fixed/task-page-loader.js",
+        "sha": "57f5b0546c45"
+      }
+    ]
+  },
+  "new": {
+    "spec": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6a/arm/new",
+    "files": [
+      {
+        "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6a/arm/new/task-page-loader.js",
+        "sha": "8b93a078e166"
+      }
+    ],
+    "rewrites": [
+      {
+        "file": "task-page-loader.js",
+        "spec": "./pipeline-loops.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/pipeline-loops.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./loop-supersede.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/loop-supersede.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./dispatch-terminal.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/dispatch-terminal.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./run-view.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/run-view.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./render-run-steps.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/render-run-steps.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./task-run-facts.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/task-run-facts.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./run-evidence.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/run-evidence.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./github-pr-status.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/github-pr-status.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./run-ledger.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/run-ledger.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./effort-readout.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/effort-readout.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./brief-cache.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/brief-cache.js"
+      },
+      {
+        "file": "task-page-loader.js",
+        "spec": "./providers/state-map.js",
+        "to": "file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/16e7ae77/lib/providers/state-map.js"
+      }
+    ]
+  },
+  "options": {
+    "n": 3000,
+    "seed": 7,
+    "now": "2026-10-01T12:00:00.000Z",
+    "tiers": [
+      "test",
+      "edge",
+      "gen"
+    ],
+    "only": null
+  },
+  "totals": {
+    "inputs": 4496,
+    "differing": 0,
+    "withInfoOnly": 0,
+    "byTier": {
+      "test": {
+        "inputs": 1383,
+        "differing": 0
+      },
+      "edge": {
+        "inputs": 113,
+        "differing": 0
+      },
+      "gen": {
+        "inputs": 3000,
+        "differing": 0
+      }
+    },
+    "kinds": {},
+    "seconds": 25.5
+  },
+  "findings": {
+    "old": {
+      "inputs": 0,
+      "groups": []
+    },
+    "new": {
+      "inputs": 0,
+      "groups": []
+    }
+  },
+  "byFamily": {
+    "test:authenticated-pr-reads.test.js": {
+      "inputs": 15,
+      "differing": 0
+    },
+    "test:closed-row-readers.test.js": {
+      "inputs": 5,
+      "differing": 0
+    },
+    "test:render-task-page-golden.test.js": {
+      "inputs": 1024,
+      "differing": 0
+    },
+    "test:task-page-finished-story.test.js": {
+      "inputs": 165,
+      "differing": 0
+    },
+    "test:task-page-loader-pins.test.js": {
+      "inputs": 6,
+      "differing": 0
+    },
+    "test:task-page-loader.test.js": {
+      "inputs": 128,
+      "differing": 0
+    },
+    "test:task-page-route.test.js": {
+      "inputs": 33,
+      "differing": 0
+    },
+    "test:task-share-route.test.js": {
+      "inputs": 7,
+      "differing": 0
+    },
+    "edge:defaults-no-stores": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:defaults-real-loops": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:defaults-state-empty-urlKey": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:factory-no-arg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:factory-no-helpers": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:factory-one-helper": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-access-no-provider": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-basic": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-absent": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-exact-match": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-exact-stale": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-finished-open-children-match": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-finished-open-children-stale": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-inexact-open-match": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-inexact-open-stale": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-no-children-match": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-no-children-stale": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-cache-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-closeout-summary": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-ctx-no-issue": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-evidence-ready": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-evidence-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-evidence-throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-issue-no-identifier": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-loops-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-closeout-by-number": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-events-nonarray": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-events-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-no-pr": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-no-store": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-person": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-person-unmerged": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-merged-press": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-no-access": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-no-issueId": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-null-ctx": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-provider-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-provider-rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-provider-rejectNotFound": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-provider-syncthrow": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-acme/app": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-ACME/App": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-no-pr": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-no-urlKey": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-prstate-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-str": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-real-evidence-x/y": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-runfacts-fake": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-runfacts-real": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-runfacts-real-hop": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-runfacts-reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:load-uuid-open": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:model": {
+      "inputs": 45,
+      "differing": 0
+    },
+    "edge:model-missing-helpers": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:model-missing-helpers-empty": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:model-no-arg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:sessionMessage-table": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:briefCurrentSection": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:buildTaskStages": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:deriveHeader": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:deriveReadyHeader": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:fmtWhen": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:guessStages": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:isNotFoundError": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:small:stageLabel": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:state": {
+      "inputs": 4,
+      "differing": 0
+    },
+    "gen:defaults": {
+      "inputs": 173,
+      "differing": 0
+    },
+    "gen:load": {
+      "inputs": 985,
+      "differing": 0
+    },
+    "gen:model": {
+      "inputs": 1173,
+      "differing": 0
+    },
+    "gen:small": {
+      "inputs": 424,
+      "differing": 0
+    },
+    "gen:state": {
+      "inputs": 245,
+      "differing": 0
+    }
+  },
+  "testTier": {
+    "files": 8,
+    "discovery": null,
+    "callsByExport": {
+      "createTaskPageLoader": 61,
+      "createTaskPageLoader().loadTaskPage": 52,
+      "fmtWhen": 1110,
+      "buildTaskPageModel": 79,
+      "createTaskPageLoader().loadTaskState": 4,
+      "guessStages": 8,
+      "deriveHeader": 12,
+      "sessionMessage": 1,
+      "buildTaskStages": 38,
+      "briefCurrentSection": 12,
+      "deriveReadyHeader": 6
+    },
+    "perFile": [
+      {
+        "file": "tests/unit/authenticated-pr-reads.test.js",
+        "calls": {
+          "old": 15,
+          "new": 15
+        },
+        "tests": {
+          "old": 33,
+          "oldFailing": 0,
+          "new": 33,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 846,
+          "new": 845
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/closed-row-readers.test.js",
+        "calls": {
+          "old": 5,
+          "new": 5
+        },
+        "tests": {
+          "old": 14,
+          "oldFailing": 0,
+          "new": 14,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 540,
+          "new": 528
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/render-task-page-golden.test.js",
+        "calls": {
+          "old": 1024,
+          "new": 1024
+        },
+        "tests": {
+          "old": 35,
+          "oldFailing": 0,
+          "new": 35,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 1048,
+          "new": 1025
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/task-page-finished-story.test.js",
+        "calls": {
+          "old": 165,
+          "new": 165
+        },
+        "tests": {
+          "old": 33,
+          "oldFailing": 0,
+          "new": 33,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 665,
+          "new": 621
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/task-page-loader-pins.test.js",
+        "calls": {
+          "old": 6,
+          "new": 6
+        },
+        "tests": {
+          "old": 4,
+          "oldFailing": 0,
+          "new": 4,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 573,
+          "new": 477
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/task-page-loader.test.js",
+        "calls": {
+          "old": 128,
+          "new": 128
+        },
+        "tests": {
+          "old": 82,
+          "oldFailing": 0,
+          "new": 82,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 683,
+          "new": 630
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/task-page-route.test.js",
+        "calls": {
+          "old": 33,
+          "new": 33
+        },
+        "tests": {
+          "old": 18,
+          "oldFailing": 0,
+          "new": 18,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 663,
+          "new": 634
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/task-share-route.test.js",
+        "calls": {
+          "old": 7,
+          "new": 7
+        },
+        "tests": {
+          "old": 34,
+          "oldFailing": 0,
+          "new": 34,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 731,
+          "new": 676
+        },
+        "oldFailures": []
+      }
+    ]
+  },
+  "groups": [],
+  "infoGroups": [],
+  "exportsDiff": {
+    "old": {
+      "briefCurrentSection": "function/1",
+      "buildTaskPageModel": "function/1",
+      "buildTaskStages": "function/1",
+      "createTaskPageLoader": "function/0",
+      "deriveHeader": "function/0",
+      "deriveReadyHeader": "function/1",
+      "fmtWhen": "function/1",
+      "guessStages": "function/1",
+      "isNotFoundError": "function/1",
+      "sessionMessage": "function/2",
+      "stageLabel": "function/1"
+    },
+    "differences": []
+  },
+  "fnCensus": {
+    "createTaskPageLoader": {
+      "calls": 1520,
+      "modes": {
+        "return": 1517,
+        "throw": 3
+      }
+    },
+    "createTaskPageLoader().loadTaskPage": {
+      "calls": 52,
+      "modes": {
+        "resolve": 52
+      }
+    },
+    "fmtWhen": {
+      "calls": 1206,
+      "modes": {
+        "return": 1206
+      }
+    },
+    "buildTaskPageModel": {
+      "calls": 1300,
+      "modes": {
+        "return": 1282,
+        "throw": 18
+      }
+    },
+    "createTaskPageLoader().loadTaskState": {
+      "calls": 4,
+      "modes": {
+        "resolve": 4
+      }
+    },
+    "guessStages": {
+      "calls": 111,
+      "modes": {
+        "return": 111
+      }
+    },
+    "deriveHeader": {
+      "calls": 135,
+      "modes": {
+        "return": 135
+      }
+    },
+    "sessionMessage": {
+      "calls": 96,
+      "modes": {
+        "return": 96
+      }
+    },
+    "buildTaskStages": {
+      "calls": 144,
+      "modes": {
+        "return": 144
+      }
+    },
+    "briefCurrentSection": {
+      "calls": 116,
+      "modes": {
+        "return": 116
+      }
+    },
+    "deriveReadyHeader": {
+      "calls": 111,
+      "modes": {
+        "return": 111
+      }
+    },
+    "$0.loadTaskPage": {
+      "calls": 1206,
+      "modes": {
+        "reject": 154,
+        "resolve": 1052
+      }
+    },
+    "$0.loadTaskState": {
+      "calls": 415,
+      "modes": {
+        "resolve": 404,
+        "reject": 11
+      }
+    },
+    "isNotFoundError": {
+      "calls": 103,
+      "modes": {
+        "return": 103
+      }
+    },
+    "stageLabel": {
+      "calls": 99,
+      "modes": {
+        "return": 83,
+        "throw": 16
+      }
+    }
+  },
+  "networkAttempts": [],
+  "differing": []
+}

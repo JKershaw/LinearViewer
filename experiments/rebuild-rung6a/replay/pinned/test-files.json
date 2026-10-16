@@ -1,0 +1,24 @@
+{
+ "note": "Unit-test files that call a target export (discovered with the pinned old side). Regenerate with --rediscover-tests.",
+ "candidates": 7,
+ "withCalls": 7,
+ "calls": {
+  "tests/unit/authenticated-pr-reads.test.js": 15,
+  "tests/unit/closed-row-readers.test.js": 5,
+  "tests/unit/render-task-page-golden.test.js": 1024,
+  "tests/unit/task-page-finished-story.test.js": 165,
+  "tests/unit/task-page-loader.test.js": 128,
+  "tests/unit/task-page-route.test.js": 33,
+  "tests/unit/task-share-route.test.js": 7
+ },
+ "failingOnOld": [],
+ "files": [
+  "tests/unit/authenticated-pr-reads.test.js",
+  "tests/unit/closed-row-readers.test.js",
+  "tests/unit/render-task-page-golden.test.js",
+  "tests/unit/task-page-finished-story.test.js",
+  "tests/unit/task-page-loader.test.js",
+  "tests/unit/task-page-route.test.js",
+  "tests/unit/task-share-route.test.js"
+ ]
+}

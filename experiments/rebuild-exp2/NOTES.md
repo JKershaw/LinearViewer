@@ -538,3 +538,22 @@ No helper module, and no existing test edited. Every source-text census passes. 
 **Notes:**
 - Fix 4 nulls the whole consumer stamp when one token store fails, so a response can say "never polled" while the other store has tokens. LIN-3581 is filed for the cause.
 - The PR's own count for `createDispatchItem` (about 25) is low against the kit (48, or 29 without parameter defaults).
+
+## 16 Oct ~23:30Z: rung 6a (LIN-3590, `task-page-loader.js`) done and scored
+
+The first ticket to carry the efficiency wording from launch (no forks, targeted tests, e2e left to CI, a lighter worker replay) and the comment-retention rule. Launched ~21:35Z, merged as #1905 (`16e7ae77`), Done 23:12Z: 96 minutes, no split, no ruling.
+
+**Independent replay** (built on the new shared kit `experiments/replay-kit/`; 4,496 inputs per seed; seeds 1 and 7):
+- **(a) 1 fix:** a null close-out event made `readMergedBy`, documented "Never throws", reject. The page now loads. With that one-token fix patched into the old copy, there are 0 differences.
+- **(b) 0. (c) 0.**
+
+**Shape:**
+- worst function 77 → 13; functions over 10 decision points 7 → 4;
+- decision points 287 → 257 (−10.5%);
+- code lines 441 → **488 (+11%)**; functions 56 → 85.
+
+All 11 ticket references are kept. Golden and link tests pass.
+
+**Prediction:** 7 hits. Misses: both on size (code grew rather than shrank, and the decision-point cut was smaller than predicted).
+
+**Process finding.** The first build push was the old file edited in place, not a rebuild. Code review caught it, along with a regression in that version. The PR says 232 of 414 non-trivial lines still match the old file. Design-first held only because review enforced it. This is the first rung where the "don't copy" instruction was visibly strained, and the first with the lighter, efficiency-first wording. Both may matter. A "rebuilt, not edited" check (a share of lines unchanged from the base) is worth adding to the ticket's Done-when.
