@@ -431,3 +431,19 @@ Merged as `350242d5` (PR #1899) at 14:08Z, about 5 h 17 min after kickoff (08:51
 **Fresh-reader checks:** every ticket this session (LIN-3564, 3565, 3566, 3569, 3570, 3573) had one before filing, and each found problems that were applied (LIN-3564's found 10). Real traps included: the attachments "hang" (really a generic 500 under `server.js`); a helper filename (`routes/proxy-*`) that would crash the DI census; module-level dedupe singletons that would corrupt a replay; and quotes stretched past their use.
 
 **Correction to the rung 4 entry:** the writes child's wait (12:08 → 13:28Z) was the rulings child's close-out held on the record-only `lin3575-citation-scope` ruling until John answered. It wasn't the pipeline failing to resume.
+
+## 16 Oct ~15:30Z: the next round, agreed
+
+John: "If we prevent Harbour using breakdown we'll get better results, given the nature of the task. It feels like there's something new here. A Theseus refactor, if you will. An ideal way to rebuild. Potentially, also to build; fold the change required by the task into the design. But... That may be a discussion for later." Then: "There's a fractal element here too, as the abstractions and seams layer. And I agree, let's run this."
+
+**Evidence on breakdown:**
+- Rung 2a's ticket said "This is one PR. Don't split it", and Harbour didn't split.
+- Rung 4's ticket lacked the line, and Harbour split three ways.
+
+So "no breakdown" is a ticket line, not a Harbour change (inference).
+
+**The next round, from a shape scan of all 392 `lib/` and `routes/` modules:**
+1. `lib/dispatch-factory.js` + `lib/dispatch-validation.js`: worst function 181 decision points, the codebase's worst.
+2. The renderer cluster as one no-breakdown rung, about 2,300 lines: the Large test.
+3. The dispatch entrance (`routes/dispatch.js`, `proxy-dispatch.js`, `proxy-kickoff.js`; worst functions 122, 93, 62).
+- Alongside: `lib/pipeline-loops.js` (113, 76).
