@@ -236,3 +236,45 @@ LIN-3561 merged as `bf6f7507` (PR #1893) at 20:46Z, about 40 minutes after kicko
 - **Private-sample replay here:** inline code showing extra backslashes after a Jira round trip fell from 137 of 1,037 real texts to 8. 0 throws; the codec file passes 200/200. The ruling is pre-filled "accept" for John.
 - **Stall:** the session's worker restarted at about 21:15Z. The LIN-3564 watcher died with it, and my next step waited on a permission prompt until morning. The XS rooms (two repeat clean rooms, and one with tests only) were built in the scratchpad but not run. Nothing else was launched.
 - **Lesson (process):** an overnight run needs a self-check that survives a worker restart, such as a scheduled check-in, not only an in-session background watcher.
+
+## 16 Oct, morning: the XS runs and the prompt arm
+
+**Correction to the overnight entry:** the order was the other way round. The permission prompt came first (about 21:14Z), and the machine was restarted later (boot 05:49:27Z). The restart only cost the watcher.
+
+**The runs, all here and never merged:**
+- **r1 and r2:** two more clean rooms on room-2a. The inputs are identical to B's and 2a raw's: 133 tests plus the comment spec.
+- **tonly:** a clean room with the tests but no spec.
+- **prompt:** a design-first informed arm. A sub-agent in a scratch copy at `c2bc9a65` could see today's code, its 200 tests and the provider tests. It was told to write `DESIGN.md` first, design as if the current code didn't exist, then write the module, with no comparison harness.
+
+All three rooms audited clean (9–11 calls, 0 violations) and ran on Opus 5.5.
+
+**Results.** The replay and shape columns compare with the original behaviour (`arms/A`), except prompt, which compares with today (`c2bc9a65`). "Real texts" means the private 1,037, counting texts whose display after a Jira round trip (`marked.parse(adfToMarkdown(markdownToAdf(md)))`) differs.
+
+| | code | decisions | worst fn | public cells / groups | real texts displayed differently |
+|---|--:|--:|--:|--:|--:|
+| original (A) | 302 | 142 | 26 | — | — |
+| B | 275 | 127 | 24 | 3,479 / 338 | 1 |
+| 2a raw | 282 | 110 | 12 | 3,607 / 140 | 1 |
+| r1 | 281 | 127 | 22 | 3,491 / 349 | 1 (invisible) |
+| r2 | 260 | 125 | 21 | 8,256 / 185 | **345** |
+| tonly | 209 | 88 | 25 | 8,547 / 629 | **317** |
+| today (`c2bc9a65`) | 318 | 129 | 12 | — | — |
+| **prompt** (vs today) | **199** | **90** | 22 | **7 / 4** | **0** |
+
+**What broke, from masked skeletons and synthetic probes (no content):**
+- **r2 parses `*single-star*` emphasis.** Real tickets use it a lot, and the original shows the asterisks literally. That part is a fix: a missing behaviour nobody had pinned. It also produces artefacts (stray `_ _`, and a link inside italics shown as raw `[text](url)`), and loses bold and code in places: −837 `<strong>` and −849 `<code>` across about 110 texts.
+- **tonly needs a blank line between blocks.** A heading followed directly by a list collapses into one paragraph: −2,345 `<li>` and −1,004 `<h3>` across about 225 texts.
+- **Both passed all 133 tests.** Against today's 200 tests they fail roughly the same set as 2a raw (the newer pins), so not even the 200 tests target these two regressions.
+
+**The prompt arm's 4 groups are all gate differences:**
+- it newly refuses a paragraph with an `alignment` mark, and a code block with a `breakout` mark (real Jira marks the round trip would drop);
+- it newly permits `> a\n> \n> b` (the known LIN-3558-class inconsistency) and a malformed empty link in a heading.
+
+Its key move: **the gate runs the round trip and compares**, with the four ruled exceptions as named clauses, instead of modelling the writer in tables. tonly found the same idea on its own. The cost is a 22-decision `render` switch.
+
+**Inference:**
+1. **Run-to-run variance is large.** On identical inputs, 3 clean-room samples (B, 2a raw, r1) were fine on real text and 1 (r2) was badly off. The replay against the old code ("check sighted"), with a real-text display check, is mandatory, not a safeguard.
+2. **The comment spec carries real behaviour.** Without it, block parsing went wrong on real documents.
+3. **The tests, even at 200, don't describe realistic documents.** Every regression here is on everyday Markdown: headings followed directly by lists, `*`-emphasis, links inside emphasis. A small set of realistic synthetic documents, pinned by display, is the missing contract piece. As John put it this morning, missing behaviour found this way is a test to add, then try again.
+4. **The design-first prompt removed the anchoring,** at least once. Arm A (informed, "rewrite as a whole") kept the old shape. The prompt arm, also informed, designed a different structure and is the smallest and most equivalent result so far. One sample, on the stronger contract, with the old code as a behavioural reference. That's the clean room's simplification without its regression risk, at least this time.
+5. **The original codec's own gaps showed up:** `*`-italics are lost. That's a spring-clean candidate (John: missing behaviour is fine to find this way).
