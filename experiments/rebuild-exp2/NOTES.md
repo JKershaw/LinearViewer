@@ -328,3 +328,25 @@ The pipeline's public replay didn't see the real-text list change. The private c
 - On this evidence, the working method for the ladder is: **design-first informed rebuild + an independent replay against the old code, + real-data checks where they exist.**
 
 **Spring-clean gaps (private corpus, counts only):** 483 of 1,037 real texts contain nested lists, and 287 use `*italics*`. Main's codec flattens or loses both on a Jira round trip.
+
+## 16 Oct ~08:50Z: rung 3 (LIN-3569, the Agent API read routes) done and scored
+
+Merged as `06ec62b7` (PR #1897), about an hour after kickoff, with no rulings.
+
+**Independent replay:** 2 seeds × 3,000 requests, 100% line coverage of both versions, 0 socket escapes.
+- **No differences on any successful response.**
+- About 340 requests per seed differ only in server console-log wording (`Proxy /issues error:` became `Proxy /api/proxy/issues error:`). Agents can't see it.
+- **Attachments, provider access rejecting:** the old route sent no handled response (a generic 500 under the server); the new one sends a mapped error. This is the intended class-(a) fix.
+- **Attachments, session expired and provider unsupported:** the old route answered 422 (unsupported) where the new one answers 503 (session expired), and it marks the credential suspect. The old route was the only one of 13 that checked capability before workspace availability, so this is consistency, class (a).
+- **Attachments, upstream 3xx:** the old route relayed a 302 with no `Location` and an error body; the new one answers 400 "Redirects not allowed". A real fetch with `redirect: 'error'` throws first, so this can't arise in practice.
+
+**Shape:** code 448 → 378, decision points 98 → 72, worst function 31 → 22, longest handler 111 → 61.
+
+**Against the prediction:** merged ✓; no ruling ✓; 330–440 lines ✓; attachments fix ✓; 0–3 changes beyond fix and fuzz ✓; no agent-visible regression ✓; worst function ≤15 ✗ (22).
+
+**Inference:** design-first informed rebuilds with an independent replay now have two clean results at two boundary types (an HTML page and an HTTP router). The method holds at about 400 lines, one file.
+
+**Ladder from here:**
+- **Rung 4:** `proxy-writes`, `proxy-rulings` and `proxy-tokens-admin` together. About 1,180 code lines, 3 files, 20 routes, writes-heavy; the first multi-file rebuild.
+- **Rung 5:** the dispatch core (`proxy-dispatch`, `proxy-kickoff`, `proxy-compute`; about 2,330 lines, with worst functions of 93, 62 and 30).
+- **Then the rest of the Agent API.**
