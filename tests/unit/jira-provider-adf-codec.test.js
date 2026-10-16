@@ -1371,8 +1371,12 @@ describe('LIN-3570: nested lists and *italics*, as users see them', () => {
   test('extra spaces after a marker move the content column, up to four', () => {
     const wide = markdownToAdf('-   a\n    - b')
     assert.deepEqual(wide, adfDoc(bullets(item('a', asBullets('b')))))
-    const tooWide = markdownToAdf('-      a\n       - b')
-    assert.equal(tooWide.content[0].content.length, 1, 'six spaces: still one item, the child is at column 6 of 6 caps at 5')
+    // Six spaces after the marker: the cap puts the content column at 6, so a
+    // child indented 6 nests. Without the cap the column would be 7 and the
+    // child would be a sibling item.
+    const tooWide = markdownToAdf('-      a\n      - b')
+    assert.equal(tooWide.content[0].content.length, 1, 'one top-level item, not two siblings')
+    assert.equal(tooWide.content[0].content[0].content.length, 2, 'the item holds its paragraph and the nested list')
   })
 
   test('a 100-level staircase neither throws nor changes on a round trip', () => {
@@ -1425,6 +1429,13 @@ describe('LIN-3570: the reader shows a nested list indented, and everything in a
     assert.equal(marked.parse(adfToMarkdown(doc)).includes('<h2>'), true, 'marked shows a heading')
     assert.deepEqual(markdownToAdf(adfToMarkdown(doc)), doc, 'so the round trip itself would hold')
     assert.equal(adfHasUnrenderableContent(doc), true)
+  })
+
+  test('typed text with an empty first sub-item is stored, then refused on the next edit: an accepted lockout (rare draft input; the alternative stores a description that shows a stray heading)', () => {
+    for (const typed of ['- a\n  - \n  - b', '1. a\n   - \n2. b']) {
+      const stored = markdownToAdf(typed)
+      assert.equal(adfHasUnrenderableContent(stored), true, JSON.stringify(typed))
+    }
   })
 
   test('an empty head over a nested list is permitted when the item is not first', () => {
