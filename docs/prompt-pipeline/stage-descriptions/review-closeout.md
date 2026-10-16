@@ -151,7 +151,7 @@ for each one. The appendix should state them as a format, not as prose rules.
 | The reviewed head commit as a backticked sha, ideally labelled `head` | `findSha` → `review.sha`, compared with the PR head to flag `headMoved` | `lib/run-ledger.js:304-316`; `lib/run-closeout-state.js` `entryFor`. **Today's template doesn't ask for the sha.** |
 | `### Plan Review Verdict` is plan-review's header, so review must not use it | disambiguator for the recommender and the parser | meta-prompt 147, 194; `lib/run-ledger.js:39` |
 | `DECISION:` block (when raising a question for John) | rulings pipeline; format defined in the proxy preamble, not here | `lib/proxy-instructions.js:576, 601`; dedupe `lib/dismissal-suggestions-store.js:77` |
-| API reads used before raising a question or a follow-up: `GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true`, `GET /api/proxy/issues/{id}/relations`, `GET /api/proxy/search` | proxy routes | `routes/proxy-rulings.js:246`; `routes/proxy-reads.js:513, 347` |
+| API reads used before raising a question or a follow-up: `GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true`, `GET /api/proxy/issues/{id}/relations`, `GET /api/proxy/search` | proxy routes | `routes/proxy-rulings.js:403`; `routes/proxy-reads.js:513, 347` |
 | Next-action names: `implementation`, `plan`, `bug`, `blocked`, `review`, `close-out`; relation type `blocks` | the recommender and the dispatch kinds (LLM-read from the trail, not regex-parsed) | meta-prompt routing; `DISPATCH_KINDS` |
 
 A suggested appendix, as code would emit it:
@@ -338,7 +338,7 @@ That's about 4.3 KB against today's ~32 KB across both paths.
 | Description literals that **must survive the prune verbatim**: `fits one session` / `needs multiple sessions`, and a `## Implementation Plan` heading | session-fit reader; follow-on-ratio plan marker; file-pointer pilot | `lib/recommendation-facts.js:49-50` (`/needs?\s+multiple\s+sessions/i`, `/fits?\s+(?:in\s+)?one\s+(?:focused\s+)?session/i`); `lib/follow-on-ratio.js:149` `PLAN_MARKER = /#{1,4}\s*implementation plan\b\|\bfits one session\b\|\bneeds multiple sessions\b/i`; `lib/file-pointer.js:150` `/^##[ \t]+Implementation Plan\b[^\n]*$/gm` |
 | `plan-review due: yes` in the description | `GATE_DUE_MARKER` current-snapshot read for the effort readout | `lib/plan-review-round-trips.js:168, 440`. **Not on today's preserve list, see 5.4.** |
 | Follow-up metadata: `priorityLevel` (ascending, 4 = highest); type label from `GET /api/proxy/labels`; dedupe via `GET /api/proxy/issues/{id}/relations` and `GET /api/proxy/search`; link with a `related` relation | proxy routes | `routes/proxy-reads.js:408, 513, 347`; `routes/proxy-writes.js:838` |
-| Ruling dedupe: `GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true` (covers loop-backed rulings only) and the `DECISION:` block format | rulings pipeline | `routes/proxy-rulings.js:246`; `lib/proxy-instructions.js:576-601` |
+| Ruling dedupe: `GET /api/proxy/rulings?issueIdentifier=<anchor>&includeResolved=true` (covers loop-backed rulings only) and the `DECISION:` block format | rulings pipeline | `routes/proxy-rulings.js:403`; `lib/proxy-instructions.js:576-601` |
 | Next-action names `review`, `implementation`, `bug`, `plan` | recommender | meta-prompt routing |
 
 A suggested appendix:
