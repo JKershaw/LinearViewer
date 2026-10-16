@@ -350,3 +350,22 @@ Merged as `06ec62b7` (PR #1897), about an hour after kickoff, with no rulings.
 - **Rung 4:** `proxy-writes`, `proxy-rulings` and `proxy-tokens-admin` together. About 1,180 code lines, 3 files, 20 routes, writes-heavy; the first multi-file rebuild.
 - **Rung 5:** the dispatch core (`proxy-dispatch`, `proxy-kickoff`, `proxy-compute`; about 2,330 lines, with worst functions of 93, 62 and 30).
 - **Then the rest of the Agent API.**
+
+## 16 Oct ~09:45Z: the codec spring clean (LIN-3570) done and scored
+
+Merged as `e90b94c6` (PR #1898). It took about 2 h 13 min, including a plan-review bound, which John reset with "continue". The change is +173 lines in `adf.js`, +456 lines of tests, and the ENG-16 refusal fixture flipped.
+
+**Correction:** the earlier "483 of 1,037 texts (47%) use nested lists" was over-counted; the pattern also matched texts with two separate lists. The right figure is **261 (25%)**. LIN-3570's description was corrected.
+
+**Private real-text check** (display after a Jira round trip, structure only, counts):
+- `*italics*` kept: 63 → **258 of 287**.
+- Nested lists kept: about 0 → **204 of 261**, with exact nesting in 141.
+- Whole-document structure equal to what was typed: 341 → **462 of 1,037**.
+- 0 gate refusals and 0 throws, before and after.
+
+**Remaining gaps, from first-differing-tag counts and synthetic probes:**
+- marks inside marks: code inside bold, and a link inside italics, about 200 texts;
+- `***` and `___` rules, 89;
+- setext headings (`Text` then `---`).
+
+Tables already survive. Jira's format can't make code bold, so "code inside, bold around" would be the fix.
