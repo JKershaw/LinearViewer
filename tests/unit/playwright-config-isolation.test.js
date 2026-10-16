@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import config from '../../playwright.config.js';
+import visualConfig from '../../playwright.visual.config.js';
 import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../../playwright.config.js', import.meta.url), 'utf8');
@@ -22,4 +23,13 @@ test('every webServer command sets an isolated HARBOUR_DATA_DIR under ./test-res
   }
   const dirs = config.webServer.map((ws) => ws.command.match(/HARBOUR_DATA_DIR=(\S+)/)[1]);
   assert.equal(new Set(dirs).size, dirs.length, 'each server has its own dir');
+});
+
+test('the visual-screenshot config webServer is isolated the same way', () => {
+  const servers = [].concat(visualConfig.webServer);
+  assert.ok(servers.length >= 1);
+  for (const ws of servers) {
+    assert.match(ws.command, /(^| )HARBOUR_DATA_DIR=\.\/test-results\/[\w.-]+( |$)/, ws.url);
+    assert.match(ws.command, /(^| )MONGODB_URI=( |$)/, `${ws.url} pins MONGODB_URI empty`);
+  }
 });

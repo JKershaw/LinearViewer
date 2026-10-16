@@ -42,7 +42,9 @@ export default defineConfig({
     // page instead — and dark would equal light there (the authed shell reads
     // the theme cookie, not prefers-color-scheme). Authenticated captures use
     // /test/set-session (mock fixtures), which is independent of PAT mode.
-    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright LINEAR_ACCESS_TOKEN= OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= node server.js',
+    // LIN-3583: MONGODB_URI= is pinned empty and HARBOUR_DATA_DIR is its own
+    // folder so a developer's .env/shell DB settings and ./data are never touched.
+    command: 'NODE_ENV=test PORT=3001 SESSION_SECRET=test-secret-for-playwright LINEAR_ACCESS_TOKEN= OPENROUTER_API_KEY= OPENROUTER_FREE_TIER_KEY= MONGODB_URI= HARBOUR_DATA_DIR=./test-results/visual-data node server.js',
     url: 'http://localhost:3001',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,
