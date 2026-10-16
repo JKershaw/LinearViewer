@@ -369,3 +369,9 @@ Merged as `e90b94c6` (PR #1898). It took about 2 h 13 min, including a plan-revi
 - setext headings (`Text` then `---`).
 
 Tables already survive. Jira's format can't make code bold, so "code inside, bold around" would be the fix.
+
+## 16 Oct ~11:30Z: pause before rung 5
+
+John: "Let's pause before Rung 5 as I think we'll have a good amount of information to digest, and write up."
+
+Rung 4 (LIN-3573) finishes, since it's already running. Harbour's plan split it into three children: LIN-3574 (the replay harness, done), LIN-3575 (rulings) and LIN-3576 (writes and PR). Then I score it and write up the series. No new rungs.
