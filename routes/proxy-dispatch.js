@@ -1,10 +1,12 @@
 /**
  * Group I dispatch routes (LIN-679 Stage 6 / LIN-2540: extracted from
- * routes/proxy.js, byte-identical handler bodies).
+ * routes/proxy.js, byte-identical handler bodies; rebuilt design-first in LIN-3592:
+ * the same routes, bodies, refusals and audit events, with each body's checks written
+ * down once as an ordered list and the replies the arms share written once).
  *
  * POST /api/proxy/dispatch, POST /api/proxy/recommend-and-dispatch,
  * GET /api/proxy/dispatch, GET /api/proxy/dispatch/:id,
- * GET /api/proxy/dispatch/:id/prompt.
+ * GET /api/proxy/dispatch/:id/prompt, GET /api/proxy/wake-shadow.
  */
 import { Router } from 'express';
 import { armKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
@@ -12,6 +14,7 @@ import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, 
 import { badRequest, jsonError, keepaliveError, notFound } from '../lib/errors.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { MAX_NAME_LENGTH, DANGEROUS_CHARS_REGEX } from '../lib/issue-write-validation.js';
+import { firstFailure, opaqueFieldError } from '../lib/dispatch-entrance.js';
 import { isDanglingReferent, ISSUE_NOT_FOUND_CODE, DANGLING_REFERENT_MESSAGE } from '../lib/dispatch-referent-guard.js';
 import { declaredProviderDisplayName, resolvedProviderUi, graphqlErrorDetail, graphqlErrorExtra } from '../lib/proxy-graphql-errors.js';
 import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
@@ -22,7 +25,7 @@ import { generatePrompt, hasPrompt, isValidDispatchKind, deriveDispatchKind, get
 import { resolvePeriodicalIdFromGateMarker } from '../lib/periodicals.js';
 import { isValidIssueId, dispatchIssueSourceField } from '../lib/workspace.js';
 import {
-  validateOpaqueDispatchField, validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS,
+  validateSessionId, validateDispatchPayload, DISPATCH_EFFORT_LEVELS,
   abortFollowUpError, abortToError, cascadeAbortError, dispatchKindError, periodicalIdError, targetError, followUpToError
 } from '../lib/dispatch-validation.js';
 import { validateRunField } from '../lib/dispatch-fields.js';
@@ -45,6 +48,135 @@ const DISPATCH_WAIT_MAX_S = 50;
 const DISPATCH_WAIT_POLL_MS = 1500;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// The lineage anchor of a history row (LIN-1470): the doc-level rootItemId, else the
+// first OWN feedback entry carrying one, else the row's own id. NEVER sessionId /
+// sessionGroupId: every worker an autopilot spawns shares its orchestrator's sessionId,
+// so grouping on it would collapse all siblings onto one anchor and reinstate the
+// LIN-1461 production bug.
+const anchorFor = item => item.rootItemId ?? item.feedback?.find(f => f.rootItemId)?.rootItemId ?? item.id;
+
+// Everything the list does with the rows it has read, once the lineage siblings are in:
+// the abort attribution, the lineage merge and each row's effective status. Pure — the
+// store reads stay in the handler.
+function resolveListRows(merged, siblingsByAnchor) {
+  // LIN-1261 F2: attribute an abort's terminality to the loop it TARGETS at the
+  // proxy read boundary too (same class as the reconstruction path, different
+  // consumer). Simple Dispatcher posts `[aborted]` to the abort row's OWN
+  // feedback, never to the `abortTo` target's — so without this a lister of the
+  // aborted TARGET reads it non-terminal until the 24h stale cutoff. Harvest the
+  // abort rows already in `merged` (no extra store call) and derive each item's
+  // effective feedback through the SAME shared F1 guard the reconstruction path
+  // uses — never overriding a later genuine terminal or rewinding completedAt.
+  // NOTE: an issue-scoped list (`?issueIdentifier=`) excludes abort rows at the
+  // store (they carry `issueIdentifier: null`), so attribution applies to the
+  // unscoped list; the point-read watch + follow-up gate are deliberately not
+  // reached here (they need a store seam that finds an abort by target; deferred).
+  const abortedTargets = harvestAbortedTargets(merged);
+
+  // Resolve each item's effective status once (terminal marker → done/failed/
+  // aborted, else `blocked` when the lineage is parked on a human, else the
+  // STORED status) so filtering and the response agree. LIN-2079: this one
+  // assignment feeds the reported field, the `?status=` FILTER and `total`,
+  // so deriving `blocked` here is a wire-behaviour change by design —
+  // `?status=taken` no longer returns parked rows, `?status=blocked` does.
+  // LIN-1470: the lineage merge runs BEFORE abort attribution — ordering is
+  // load-bearing, since `feedbackWithHarvestedAbort`'s F1 guard only lets an
+  // abort win when it is strictly later than the existing terminal, so it
+  // must see the true lineage terminal (a later child `[done]`), not just
+  // this row's own. `_lineageFeedback` (own + verified siblings) feeds the
+  // reported `feedbackCount`; `_terminalFeedback` is `_lineageFeedback` PLUS
+  // any harvested abort and feeds `status`/`completedAt` — kept separate so
+  // the synthetic abort entry never inflates `feedbackCount`.
+  //
+  // Review F7: `joinsLineage` (WHICH ROWS may join) says nothing about
+  // WHICH FEEDBACK a joined row may inherit — a still-`taken` follow-up
+  // dispatched AFTER its parent already finished was absorbing the
+  // parent's earlier terminal. The invariant is structural, not another
+  // status carve-out: a row is never reported complete before it was
+  // itself dispatched. `mergeLineageFeedback` enforces this directly by
+  // taking `i.dispatchedAt` as `since` — a sibling entry only counts if
+  // its timestamp is at or after this row's own dispatch time.
+  const resolved = merged.map(i => {
+    // Rows that never ran (queued, cancelled, expired) opt out of the
+    // lineage join entirely (see above) — `lineageFeedback` stays this
+    // row's own (empty) feedback, same as pre-LIN-1470.
+    const joinsLineage = i.status === 'taken';
+    const anchor = joinsLineage ? anchorFor(i) : null;
+    const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
+    const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor, i.dispatchedAt) : (i.feedback || []);
+    const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
+    return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveWireStatus({ feedback: terminalFeedback, bookkeeping: i.bookkeeping }) || i.status };
+  });
+  return resolved;
+}
+
+// A dispatch id as the watch and prompt reads take it from the path: present, short and
+// free of control characters. The store lookup is workspace-scoped on top of this.
+const isBadDispatchId = (id) => !id || id.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(id);
+
+// The proxy-context decision both enqueue verbs make from the same two body fields.
+//
+// Follow-up beats (LIN-805): a followUpTo resumes a warm session that already
+// received the proxy-context block on its FIRST beat, so re-appending it on
+// every later beat is redundant and risks confusing the worker. The prose append
+// defaults OFF when followUpTo is set; an explicit appendProxyContext:true still
+// opts back in. Fresh dispatches keep the default-ON behaviour (opt out with
+// appendProxyContext:false). This is the systemic fix — every follow-up
+// consumer benefits, not just one orchestrator. (`/recommend-and-dispatch`
+// applies the SAME suppression since LIN-2869 made it a follow-up-capable
+// verb.)
+//
+// LIN-1429: this suppression governs the PROSE APPEND only. Whether a
+// credential is PROVISIONED is a separate decision, keyed on the resolved
+// harness (see each finalizePrompt) — the follow-up default here means "don't
+// repeat the prose", never "don't mint a credential". Conflating the two was
+// the LIN-1429 bug: a broker-dependent (claude-code/MCP) follow-up needs a
+// live credential even when the prose is (correctly) suppressed, because the
+// original credential died with the window that held it (LIN-1375/1362).
+//
+// `explicitOptOut` is the caller's own explicit instruction. Distinct from
+// isFollowUp: an opt-out means "I don't want proxy context"; a follow-up
+// default means only "I already have it".
+function proxyContextPolicy(followUpTo, appendProxyContext) {
+  const isFollowUp = followUpTo !== undefined && followUpTo !== null;
+  const explicitOptOut = appendProxyContext === false;
+  const shouldAppendProxyContext = isFollowUp
+    ? appendProxyContext === true
+    : !explicitOptOut;
+  return { isFollowUp, explicitOptOut, shouldAppendProxyContext };
+}
+
+// The 201 header every proxy enqueue answers with (POST /dispatch, and both arms of
+// POST /recommend-and-dispatch): the task header only, never the prompt. `extra` adds
+// what one verb alone reports (abort fields, the override marker, the descent).
+//
+// Consumer poll-recency warning (LIN-2885): the SAME pure function derives it here (at
+// enqueue) and on every later watch (see formatDispatchWatch). Omitted entirely, never
+// `warning: null`, when the workspace is being actively polled.
+//
+// `maxTasks` rides as `?? null` and `budgetPosition` only when the run is budgeted
+// (LIN-2934 R3: the fused verb is the orchestrator's MAIN path, so it must see "n of N"
+// too, not just the /dispatch handler).
+function receiptFor(item, extra = {}) {
+  const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
+  return {
+    success: true,
+    id: item._id,
+    status: 'queued',
+    kind: item.kind,
+    promptName: item.promptName,
+    issueIdentifier: item.issueIdentifier,
+    target: item.target,
+    sessionId: item.sessionId || null,
+    maxTasks: item.maxTasks ?? null,
+    ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
+    dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+    consumerLastSeenAt: item.consumerLastSeenAt || null,
+    ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
+    ...extra
+  };
+}
 
 // Shapes a store item into the watch-endpoint response body. Shared by the
 // immediate short-poll and the long-poll.
@@ -216,6 +348,57 @@ export function createDispatchRoutes({
   // Dispatch Endpoints (proxy-token twin of routes/dispatch.js)
   // ===========================================================================
 
+  // The store is optional in the factory's dependencies; every route answers 503 without it.
+  function storeMissing(req, res, endpoint) {
+    if (dispatchQueueStore) return false;
+    logEvent(req, endpoint, 503);
+    jsonError(res, 503, 'Dispatch is not available');
+    return true;
+  }
+
+  // A 400 for a body or query the caller got wrong: audited, then relayed.
+  function reject400(req, res, endpoint, message) {
+    logEvent(req, endpoint, 400);
+    return badRequest.json(res, message);
+  }
+
+  // The failures every enqueue arm answers the same way, in the order they are told:
+  // a tagged factory refusal (duplicate, run limit, budget, close-out, runaway, so an
+  // orchestrator can branch on `code` and adopt the `id`), a missing out-of-band token
+  // (fail closed, LIN-1175: a claude-code dispatch whose bootstrap token could not be
+  // minted is REFUSED, never launched credential-less), and a declared resume whose grant
+  // cannot be re-issued (LIN-3134: relay the coded refusal's own status and code; a retry
+  // cannot help). A keepalive-armed arm passes its keepalive so every reply rides it: once
+  // the 25s flush has fired the 200 is committed, and the real status travels as
+  // `statusCode` in the body. Returns true when it answered; the caller owns what is left.
+  function relayEnqueueFailure(err, req, res, endpoint, keepalive = null) {
+    const reply = (status, message, extra) => (keepalive
+      ? keepaliveError(keepalive, status, message, extra)
+      : jsonError(res, status, message, extra));
+    if (relayDispatchRefusal(err, req, res, endpoint, keepalive)) return true;
+    if (err && err.proxyAttachFailed) {
+      logEvent(req, endpoint, 503);
+      reply(503, PROXY_ATTACH_FAILED_MESSAGE);
+      return true;
+    }
+    if (isStructuralGrantRefusal(err)) {
+      logEvent(req, endpoint, err.status);
+      reply(err.status, err.message, { code: err.code, retryable: false });
+      return true;
+    }
+    return false;
+  }
+
+  // Free-tier run gate (LIN-3238): the token creator's own OpenRouter key decides free
+  // tier; `buildRunGate` returns null otherwise (and for a null creator). The factory
+  // sees it only on a fresh row (1.55).
+  const runGateFor = (req, isFreeTier) => buildRunGate({
+    isFreeTier,
+    freeTierStore,
+    accountId: req.proxyCreatedBy,
+    accountStore
+  });
+
   /**
    * POST /api/proxy/dispatch
    * Queue a prompt for the workspace's dispatch consumer (the runner).
@@ -226,10 +409,7 @@ export function createDispatchRoutes({
    * write half the autopilot orchestrator uses to dispatch a chosen task.
    */
   router.post('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
-    if (!dispatchQueueStore) {
-      logEvent(req, '/api/proxy/dispatch', 503);
-      return jsonError(res, 503, 'Dispatch is not available');
-    }
+    if (storeMissing(req, res, '/api/proxy/dispatch')) return;
 
     try {
       const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, maxTasks } = req.body || {};
@@ -238,113 +418,66 @@ export function createDispatchRoutes({
       // (named by abortTo) instead of running a prompt — it carries no prompt and
       // skips the prompt-required check. abort and followUpTo are mutually exclusive.
       const isAbort = abort === true;
-      const abortFollowUpMsg = abortFollowUpError({ isAbort, followUpTo });
-      if (abortFollowUpMsg) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, abortFollowUpMsg);
-      }
 
-      if (!isAbort && (!prompt || typeof prompt !== 'string')) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'prompt is required and must be a string');
-      }
-      const targetMsg = targetError(target, POLLED_TARGETS);
-      if (targetMsg) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, targetMsg);
-      }
-
-      // Abort eligibility (LIN-743): the abort item's OWN target must be
-      // poll-eligible — NOT derived from the aborted session's substrate. The
-      // proxy target set (cli/web/dash) is already exactly the poll-eligible set,
-      // so the check above suffices; here we only enforce abortTo's presence/shape.
-      const abortToMsg = abortToError({ isAbort, abortTo });
-      if (abortToMsg) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, abortToMsg);
-      }
-      // Cascade close (LIN-946): a boolean modifier on an abort. When true the
-      // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
-      // one call into an abort per discovered descendant session (the recursive
-      // sessionId-tree walk lands in a later beat). Like abortTo it is only
-      // meaningful alongside abort — reject cascade:true without it rather than
-      // storing an inert flag (mirroring the abortTo-requires-abort guard above).
-      // Stored + forwarded blindly for now; the walk consumes it, not the runner.
-      // This is the proxy-token twin the autopilot actually hits.
-      const cascadeRuleError = validateRunField('cascade', cascade);
-      if (cascadeRuleError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, cascadeRuleError);
-      }
-      const cascadeAbortMsg = cascadeAbortError({ isAbort, cascade });
-      if (cascadeAbortMsg) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, cascadeAbortMsg);
-      }
-      // Validate kind if provided; when omitted it is derived from promptName below.
-      const kindMsg = dispatchKindError(kind);
-      if (kindMsg) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, kindMsg);
-      }
-      // Periodical-template join key (LIN-1825): registry-membership check, not
-      // format validation, so it stays route-local rather than routing through
-      // validateDispatchPayload (deliberately format-only, never against a
-      // model registry). This is the entry point that makes "works from any
-      // entry point, including a bare-token agent POST" true — the id must be
-      // validated here too, not just at the session route.
-      const periodicalIdMsg = periodicalIdError(periodicalId);
-      if (periodicalIdMsg) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, periodicalIdMsg);
-      }
-      // Opt-in completion hold (LIN-797): boolean, default false. Stored +
-      // forwarded blindly — the runner owns the behaviour (see LIN-795).
-      const waitForFollowUpsRuleError = validateRunField('waitForFollowUps', waitForFollowUps);
-      if (waitForFollowUpsRuleError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, waitForFollowUpsRuleError);
-      }
-      // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
-      // exactly like waitForFollowUps/force — no Harbour-side semantics.
-      const queueIfBusyRuleError = validateRunField('queueIfBusy', queueIfBusy);
-      if (queueIfBusyRuleError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, queueIfBusyRuleError);
-      }
-      // Subscription edge declaration (LIN-900 §6): enum, no legacy boolean.
-      const subscriptionRuleError = validateRunField('subscription', subscription);
-      if (subscriptionRuleError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, subscriptionRuleError);
-      }
-      // Task budget (LIN-1751/LIN-1737, LIN-2975): a SCOPE bound on the run — up to
-      // this many distinct tasks — enforced deterministically at the dispatch-factory
-      // seam. Validated here inline, matching routes/dispatch.js's rule and error text
-      // exactly, so a run declared through either seam rejects an invalid budget
-      // identically. Optional; absent/null ⇒ no budget, byte-identical to today.
-      // Placed before any store write or async guard runs (matches every other inline
-      // check on this route).
-      const maxTasksRuleError = validateRunField('maxTasks', maxTasks);
-      if (maxTasksRuleError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, maxTasksRuleError);
-      }
-
-      // Shared payload validation for the two main handlers (LIN-1139): length
-      // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
-      // the issueId/followUpTo/force/sessionId format + combination rules. Lifted
-      // verbatim + in order into validateDispatchPayload so this proxy twin and
-      // the session route can't re-drift. The proxy caller keeps its own
-      // logEvent(..., 400) on reject — the helper only returns the error
-      // structure. The caller-specific checks that DIFFER (prompt-required,
-      // target vocab, abort/cascade/kind/waitForFollowUps/queueIfBusy/subscription)
-      // already ran above, preserving the original interleaving/first-error.
-      const payloadError = validateDispatchPayload(req.body || {});
-      if (payloadError) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, payloadError.error);
-      }
+      // The first thing wrong with the body, in the order the caller is told about it.
+      const failure = await firstFailure([
+        () => abortFollowUpError({ isAbort, followUpTo }),
+        () => (!isAbort && (!prompt || typeof prompt !== 'string') ? 'prompt is required and must be a string' : null),
+        () => targetError(target, POLLED_TARGETS),
+        // Abort eligibility (LIN-743): the abort item's OWN target must be
+        // poll-eligible — NOT derived from the aborted session's substrate. The
+        // proxy target set (cli/web/dash) is already exactly the poll-eligible set,
+        // so the check above suffices; here we only enforce abortTo's presence/shape.
+        () => abortToError({ isAbort, abortTo }),
+        // Cascade close (LIN-946): a boolean modifier on an abort. When true the
+        // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
+        // one call into an abort per discovered descendant session (the recursive
+        // sessionId-tree walk lands in a later beat). Like abortTo it is only
+        // meaningful alongside abort — reject cascade:true without it rather than
+        // storing an inert flag (mirroring the abortTo-requires-abort guard above).
+        // Stored + forwarded blindly for now; the walk consumes it, not the runner.
+        // This is the proxy-token twin the autopilot actually hits.
+        () => validateRunField('cascade', cascade),
+        () => cascadeAbortError({ isAbort, cascade }),
+        // Validate kind if provided; when omitted it is derived from promptName below.
+        () => dispatchKindError(kind),
+        // Periodical-template join key (LIN-1825): registry-membership check, not
+        // format validation, so it stays route-local rather than routing through
+        // validateDispatchPayload (deliberately format-only, never against a
+        // model registry). This is the entry point that makes "works from any
+        // entry point, including a bare-token agent POST" true — the id must be
+        // validated here too, not just at the session route.
+        () => periodicalIdError(periodicalId),
+        // Opt-in completion hold (LIN-797): boolean, default false. Stored +
+        // forwarded blindly — the runner owns the behaviour (see LIN-795).
+        () => validateRunField('waitForFollowUps', waitForFollowUps),
+        // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
+        // exactly like waitForFollowUps/force — no Harbour-side semantics.
+        () => validateRunField('queueIfBusy', queueIfBusy),
+        // Subscription edge declaration (LIN-900 §6): enum, no legacy boolean.
+        () => validateRunField('subscription', subscription),
+        // Task budget (LIN-1751/LIN-1737, LIN-2975): a SCOPE bound on the run — up to
+        // this many distinct tasks — enforced deterministically at the dispatch-factory
+        // seam. Validated here inline, matching routes/dispatch.js's rule and error text
+        // exactly, so a run declared through either seam rejects an invalid budget
+        // identically. Optional; absent/null ⇒ no budget, byte-identical to today.
+        // Placed before any store write or async guard runs (matches every other inline
+        // check on this route).
+        () => validateRunField('maxTasks', maxTasks),
+        // Shared payload validation for the two main handlers (LIN-1139): length
+        // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
+        // the issueId/followUpTo/force/sessionId format + combination rules. Lifted
+        // verbatim + in order into validateDispatchPayload so this proxy twin and
+        // the session route can't re-drift. It gets the RAW body, never a rebuilt
+        // one: it reads fields this list does not name (ifParked, the length caps).
+        // The proxy caller keeps its own logEvent(..., 400) on reject — the helper
+        // only returns the error structure. The caller-specific checks that DIFFER
+        // (prompt-required, target vocab, abort/cascade/kind/waitForFollowUps/
+        // queueIfBusy/subscription) ran above, preserving the original
+        // interleaving/first-error.
+        () => validateDispatchPayload(req.body || {})?.error
+      ]);
+      if (failure) return reject400(req, res, '/api/proxy/dispatch', failure);
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
       // incidental fields. An undeclared edge is `terminal-only`. This deliberately
@@ -425,34 +558,7 @@ export function createDispatchRoutes({
       // Auto-append the proxy context (workspace API access + reporting channel) by
       // default, so the worker can both read context and report its result.
       // Opt out with appendProxyContext:false (e.g. a self-contained prompt).
-      const { appendProxyContext } = req.body || {};
-      let finalPrompt = prompt;
-      // Follow-up beats (LIN-805): a followUpTo resumes a warm session that already
-      // received the proxy-context block on its FIRST beat, so re-appending it on
-      // every later beat is redundant and risks confusing the worker. Default the
-      // append OFF when followUpTo is set; an explicit appendProxyContext:true still
-      // opts back in. Fresh dispatches keep the default-ON behaviour (opt out with
-      // appendProxyContext:false). This is the systemic fix — every follow-up
-      // consumer benefits, not just one orchestrator. (`/recommend-and-dispatch`
-      // applies the SAME suppression since LIN-2869 made it a follow-up-capable
-      // verb — its handler derives `shouldAppendProxyContext` identically.)
-      //
-      // LIN-1429: this suppression governs the PROSE APPEND only. Whether a
-      // credential is PROVISIONED is now a separate decision, keyed on the resolved
-      // harness (see finalizePrompt below) — the follow-up default here means "don't
-      // repeat the prose", never "don't mint a credential". Conflating the two was
-      // the LIN-1429 bug: a broker-dependent (claude-code/MCP) follow-up needs a
-      // live credential even when the prose is (correctly) suppressed, because the
-      // original credential died with the window that held it (LIN-1375/1362).
-      const isFollowUp = followUpTo !== undefined && followUpTo !== null;
-      // The caller's own explicit instruction. Distinct from isFollowUp: an opt-out
-      // means "I don't want proxy context"; a follow-up default means only "I
-      // already have it".
-      const explicitOptOut = appendProxyContext === false;
-      // Prose append: unchanged (LIN-805).
-      const shouldAppendProxyContext = isFollowUp
-        ? appendProxyContext === true
-        : !explicitOptOut;
+      const { isFollowUp, explicitOptOut, shouldAppendProxyContext } = proxyContextPolicy(followUpTo, req.body?.appendProxyContext);
 
       // Create the dispatch item through the shared factory (LIN-1139): it
       // resolves kind, fills blank model/harness from workspace dispatchDefaults
@@ -463,17 +569,9 @@ export function createDispatchRoutes({
       // callback: the factory hands it the resolved harness, it runs the append,
       // and returns { prompt, bootstrapToken } to carry on the item. An abort item
       // carries no prompt, so the append stays guarded on prompt presence (LIN-743).
-      // Free-tier run gate (LIN-3238): the token creator's own OpenRouter key
-      // decides free tier; `buildRunGate` returns null otherwise (and for a null
-      // creator). Built here so the factory sees it only on a fresh row (1.55).
       const dispatchSessionApiKey = await getWorkspaceOpenRouterKey(req.proxyUrlKey, req.proxyCreatedBy);
       const { isFreeTier: dispatchIsFreeTier } = resolveChatCredential({ sessionApiKey: dispatchSessionApiKey });
-      const runGate = buildRunGate({
-        isFreeTier: dispatchIsFreeTier,
-        freeTierStore,
-        accountId: req.proxyCreatedBy,
-        accountStore
-      });
+      const runGate = runGateFor(req, dispatchIsFreeTier);
       const item = await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: req.proxyUrlKey,
@@ -579,7 +677,7 @@ export function createDispatchRoutes({
           // provision-without-append branch was unreachable here (its selector
           // implied the attach above) and now lives in the follow-up gate as
           // the helper's pbt mode (LIN-3134 Decision 7).
-          return { prompt: finalPrompt, bootstrapToken: null };
+          return { prompt, bootstrapToken: null };
         },
         fields: {
           promptName: promptName || 'Prompt',
@@ -613,45 +711,15 @@ export function createDispatchRoutes({
       });
 
       logEvent(req, '/api/proxy/dispatch', 201);
-      // Consumer poll-recency warning (LIN-2885) — see formatDispatchWatch's
-      // comment above for why the SAME pure function derives this both here
-      // (at enqueue) and on every later watch. Omitted entirely, never
-      // `warning: null`, when the workspace is being actively polled.
-      const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
-      res.status(201).json({
-        success: true,
-        id: item._id,
-        status: 'queued',
-        promptName: item.promptName,
-        kind: item.kind,
-        issueIdentifier: item.issueIdentifier,
-        target: item.target,
+      res.status(201).json(receiptFor(item, {
         abort: item.abort === true,
         abortTo: item.abortTo || null,
-        cascade: item.cascade === true,
-        sessionId: item.sessionId || null,
-        maxTasks: item.maxTasks ?? null,
-        ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
-        dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
-        consumerLastSeenAt: item.consumerLastSeenAt || null,
-        ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
-      });
+        cascade: item.cascade === true
+      }));
     } catch (err) {
-      // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
-      // see `relayDispatchRefusal`. Ahead of the generic 500 so an orchestrator can
-      // branch on `code` and adopt the `id`.
-      if (relayDispatchRefusal(err, req, res, '/api/proxy/dispatch')) return;
-      // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
-      if (err && err.proxyAttachFailed) {
-        logEvent(req, '/api/proxy/dispatch', 503);
-        return jsonError(res, 503, PROXY_ATTACH_FAILED_MESSAGE);
-      }
-      // A declared resume whose grant cannot be re-issued (LIN-3134): relay the
-      // coded refusal's own status and code; a retry cannot help.
-      if (isStructuralGrantRefusal(err)) {
-        logEvent(req, '/api/proxy/dispatch', err.status);
-        return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
-      }
+      // Tagged factory refusals, a missing out-of-band token and an unissuable declared
+      // resume are answered by relayEnqueueFailure, ahead of the generic 500.
+      if (relayEnqueueFailure(err, req, res, '/api/proxy/dispatch')) return;
       logEvent(req, '/api/proxy/dispatch', 500);
       console.error('Proxy dispatch error:', err.message);
       jsonError(res, 500, 'Failed to dispatch prompt');
@@ -696,140 +764,80 @@ export function createDispatchRoutes({
    * on both dispatch verbs.
    */
   router.post('/api/proxy/recommend-and-dispatch', proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) => {
-    if (!dispatchQueueStore) {
-      logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-      return jsonError(res, 503, 'Dispatch is not available');
-    }
+    if (storeMissing(req, res, '/api/proxy/recommend-and-dispatch')) return;
 
     try {
       const { issueIdentifier, issueSource, target, repo, model, harness, effort, appendProxyContext, noDescend, kind, sessionId, waitForFollowUps, queueIfBusy, subscription, periodicalId, followUpTo, force } = req.body || {};
 
       // Validate caller-supplied inputs. (Only the server-generated prompt skips
       // the dangerous-char/length checks — see the dispatch step below.)
-      if (!issueIdentifier || typeof issueIdentifier !== 'string') {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'issueIdentifier is required and must be a string');
-      }
-      if (!isValidIssueId(issueIdentifier)) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-      const targetMsg = targetError(target, POLLED_TARGETS);
-      if (targetMsg) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, targetMsg);
-      }
-      if (noDescend !== undefined && typeof noDescend !== 'boolean') {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, 'noDescend must be a boolean');
-      }
-      // Opt-in completion hold (LIN-797): boolean, default false. Threaded through
-      // to the dispatched item and forwarded blindly — the runner owns the behaviour.
-      const waitForFollowUpsRuleError = validateRunField('waitForFollowUps', waitForFollowUps);
-      if (waitForFollowUpsRuleError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, waitForFollowUpsRuleError);
-      }
-      // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
-      // exactly like waitForFollowUps. queueIfBusy is never defaulted here (it is
-      // Harbour-set only on the auto-enqueued wake follow-up); subscription is a
-      // declared enum (LIN-900 §6) that defaults to `terminal-only` when omitted.
-      const queueIfBusyRuleError = validateRunField('queueIfBusy', queueIfBusy);
-      if (queueIfBusyRuleError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, queueIfBusyRuleError);
-      }
-      const subscriptionRuleError = validateRunField('subscription', subscription);
-      if (subscriptionRuleError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, subscriptionRuleError);
-      }
-      const recommendRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
-        maxLength: MAX_NAME_LENGTH,
-        reportReceivedLength: true,
-      });
-      if (recommendRepoValidationError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, recommendRepoValidationError.error);
-      }
-      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
-      // via the shared helper (length + dangerous-chars). NOT a generation-model
-      // registry check — these are the consumer's execution-model/harness fields.
-      const recommendModelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-      if (recommendModelValidationError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, recommendModelValidationError.error);
-      }
-      const recommendHarnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-      if (recommendHarnessValidationError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, recommendHarnessValidationError.error);
-      }
-      // Effort (LIN-2615): same opaque rule, own inline check since this route
-      // validates model/harness itself rather than through validateDispatchPayload.
-      // An out-of-set level is a console.warn only, never a 400.
-      const recommendEffortValidationError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
-      if (recommendEffortValidationError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, recommendEffortValidationError.error);
-      }
-      if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) {
-        console.warn(`Unknown dispatch effort level: ${effort}`);
-      }
-      // Optional verb override (LIN-573). When present, the caller pins the step
-      // and the server still writes the body — "autopilot picks the verb, never
-      // the words." Validate with hasPrompt() (PROMPT_TEMPLATES keys only), NOT
-      // isValidDispatchKind(): the latter admits body-less meta-kinds (defer/
-      // custom/autopilot/periodical) that have no generate() and would dispatch
-      // an empty prompt. The caller never supplies prompt text — only the key.
-      if (kind !== undefined && (typeof kind !== 'string' || !hasPrompt(kind))) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, `kind must be a valid prompt template key: ${Object.keys(PROMPT_TEMPLATES).join(', ')}`);
-      }
-      // Periodical-template join key (LIN-1825/LIN-2385): registry-membership
-      // check, mirroring POST /api/proxy/dispatch's identical guard above and
-      // routes/dispatch.js's. This is the fused verb every autopilot loop
-      // actually uses to continue a tracked task, so it needs the same
-      // stamping capability POST /dispatch already has (LIN-2385 B1) — without
-      // it, a periodical's Stage-2 batch/lane dispatch has no way to stamp
-      // `periodicalId` on the verb it actually takes.
-      const periodicalIdMsg = periodicalIdError(periodicalId);
-      if (periodicalIdMsg) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, periodicalIdMsg);
-      }
-      // Autopilot session reference (LIN-591): the autopilot dispatchId that is
-      // driving this run, stamped onto the spawned worker so the dashboard can
-      // reconstruct the session. This is the verb the autopilot actually drives,
-      // so it is the important one. Optional opaque string (LIN-1118, was
-      // UUID-only); stored + forwarded blindly, no target restriction (sessions
-      // span all targets).
-      const recommendSessionIdError = validateSessionId(sessionId);
-      if (recommendSessionIdError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, recommendSessionIdError.error);
-      }
-      // Follow-up reference (LIN-2869): the fused verb can now express "resume
-      // the prior session" — thread it through under the SAME well-formed-UUID
-      // + cli/web-only rule the main dispatch handlers enforce via
-      // validateDispatchPayload (the server-generated prompt never reaches
-      // validateDispatchPayload, so the rule is mirrored here).
-      const followUpToMsg = followUpToError({ followUpTo, target });
-      if (followUpToMsg) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, followUpToMsg);
-      }
-      // Force flag (LIN-2872): boolean only. On this verb `force: true` is
-      // ALWAYS meaningful — `issueIdentifier` is required above, so the
-      // duplicate guard in `createDispatchItem` always has a key to override
-      // (the operator rescue hatch). No followUpTo/abort combination check is
-      // needed: `cascade` does not exist on this verb and the followUpTo/abort
-      // shapes are the runner's own gates, forwarded blindly either way.
-      const forceRuleError = validateRunField('force', force);
-      if (forceRuleError) {
-        logEvent(req, '/api/proxy/recommend-and-dispatch', 400);
-        return badRequest.json(res, forceRuleError);
-      }
+      const failure = await firstFailure([
+        () => (!issueIdentifier || typeof issueIdentifier !== 'string' ? 'issueIdentifier is required and must be a string' : null),
+        () => (isValidIssueId(issueIdentifier) ? null : 'Invalid identifier format'),
+        () => targetError(target, POLLED_TARGETS),
+        () => (noDescend !== undefined && typeof noDescend !== 'boolean' ? 'noDescend must be a boolean' : null),
+        // Opt-in completion hold (LIN-797): boolean, default false. Threaded through
+        // to the dispatched item and forwarded blindly — the runner owns the behaviour.
+        () => validateRunField('waitForFollowUps', waitForFollowUps),
+        // Push-based inter-session comms (LIN-826): stored + forwarded blindly,
+        // exactly like waitForFollowUps. queueIfBusy is never defaulted here (it is
+        // Harbour-set only on the auto-enqueued wake follow-up); subscription is a
+        // declared enum (LIN-900 §6) that defaults to `terminal-only` when omitted.
+        () => validateRunField('queueIfBusy', queueIfBusy),
+        () => validateRunField('subscription', subscription),
+        () => opaqueFieldError(repo, 'repo', { maxLength: MAX_NAME_LENGTH, reportReceivedLength: true }),
+        // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+        // via the shared helper (length + dangerous-chars). NOT a generation-model
+        // registry check — these are the consumer's execution-model/harness fields.
+        () => opaqueFieldError(model, 'model', { maxLength: MAX_NAME_LENGTH }),
+        () => opaqueFieldError(harness, 'harness', { maxLength: MAX_NAME_LENGTH }),
+        // Effort (LIN-2615): same opaque rule, own inline check since this route
+        // validates model/harness itself rather than through validateDispatchPayload.
+        // An out-of-set level is a console.warn only, never a 400.
+        () => opaqueFieldError(effort, 'effort', { maxLength: MAX_NAME_LENGTH }),
+        () => {
+          if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) console.warn(`Unknown dispatch effort level: ${effort}`);
+          return null;
+        },
+        // Optional verb override (LIN-573). When present, the caller pins the step
+        // and the server still writes the body — "autopilot picks the verb, never
+        // the words." Validate with hasPrompt() (PROMPT_TEMPLATES keys only), NOT
+        // isValidDispatchKind(): the latter admits body-less meta-kinds (defer/
+        // custom/autopilot/periodical) that have no generate() and would dispatch
+        // an empty prompt. The caller never supplies prompt text — only the key.
+        () => (kind !== undefined && (typeof kind !== 'string' || !hasPrompt(kind))
+          ? `kind must be a valid prompt template key: ${Object.keys(PROMPT_TEMPLATES).join(', ')}`
+          : null),
+        // Periodical-template join key (LIN-1825/LIN-2385): registry-membership
+        // check, mirroring POST /api/proxy/dispatch's identical guard above and
+        // routes/dispatch.js's. This is the fused verb every autopilot loop
+        // actually uses to continue a tracked task, so it needs the same
+        // stamping capability POST /dispatch already has (LIN-2385 B1) — without
+        // it, a periodical's Stage-2 batch/lane dispatch has no way to stamp
+        // `periodicalId` on the verb it actually takes.
+        () => periodicalIdError(periodicalId),
+        // Autopilot session reference (LIN-591): the autopilot dispatchId that is
+        // driving this run, stamped onto the spawned worker so the dashboard can
+        // reconstruct the session. This is the verb the autopilot actually drives,
+        // so it is the important one. Optional opaque string (LIN-1118, was
+        // UUID-only); stored + forwarded blindly, no target restriction (sessions
+        // span all targets).
+        () => validateSessionId(sessionId)?.error ?? null,
+        // Follow-up reference (LIN-2869): the fused verb can now express "resume
+        // the prior session" — thread it through under the SAME well-formed-UUID
+        // + cli/web-only rule the main dispatch handlers enforce via
+        // validateDispatchPayload (the server-generated prompt never reaches
+        // validateDispatchPayload, so the rule is mirrored here).
+        () => followUpToError({ followUpTo, target }),
+        // Force flag (LIN-2872): boolean only. On this verb `force: true` is
+        // ALWAYS meaningful — `issueIdentifier` is required above, so the
+        // duplicate guard in `createDispatchItem` always has a key to override
+        // (the operator rescue hatch). No followUpTo/abort combination check is
+        // needed: `cascade` does not exist on this verb and the followUpTo/abort
+        // shapes are the runner's own gates, forwarded blindly either way.
+        () => validateRunField('force', force)
+      ]);
+      if (failure) return reject400(req, res, '/api/proxy/recommend-and-dispatch', failure);
 
       // Resolve the subscription edge once for both dispatch paths below (LIN-900
       // §6): DECLARED on the edge, never reconstructed from `sessionId`. An
@@ -845,11 +853,7 @@ export function createDispatchRoutes({
       // OFF; an explicit appendProxyContext:true opts back in. Fresh dispatches
       // keep the default-ON behaviour (opt out with appendProxyContext:false).
       // The credential half is separate (LIN-1429) — see finalizePrompt below.
-      const isFollowUp = followUpTo !== undefined && followUpTo !== null;
-      const explicitOptOut = appendProxyContext === false;
-      const shouldAppendProxyContext = isFollowUp
-        ? appendProxyContext === true
-        : !explicitOptOut;
+      const { isFollowUp, explicitOptOut, shouldAppendProxyContext } = proxyContextPolicy(followUpTo, appendProxyContext);
 
       // Recommendation preconditions — identical to GET /recommend.
       // LIN-3335 R1: forward the body's kind-only `issueSource` so the referent
@@ -955,12 +959,7 @@ export function createDispatchRoutes({
           // bootstrapToken to carry as a field. Opt out with appendProxyContext:false.
           // Free-tier run gate (LIN-3238): token creator's key decides free tier
           // (overrideIsFreeTier, resolved above from the same key).
-          const runGate = buildRunGate({
-            isFreeTier: overrideIsFreeTier,
-            freeTierStore,
-            accountId: req.proxyCreatedBy,
-            accountStore
-          });
+          const runGate = runGateFor(req, overrideIsFreeTier);
           const item = await createDispatchItem({
             store: dispatchQueueStore,
             urlKey: req.proxyUrlKey,
@@ -1052,6 +1051,11 @@ export function createDispatchRoutes({
               // when caller-supplied; otherwise derived from the issue's LIN-694
               // gate marker (LIN-2575) — see `overridePeriodicalId` above.
               periodicalId: overridePeriodicalId,
+              // Opt-in completion hold (LIN-797): validated above and forwarded blindly
+              // to the runner, as the LLM arm below and POST /dispatch both do. This
+              // arm validated it but never stamped it, so a pinned-verb dispatch with
+              // `waitForFollowUps: true` was queued without the hold (LIN-3592).
+              waitForFollowUps: waitForFollowUps === true,
               // Push-comms: `subscription` is the declared edge (LIN-900 §6),
               // `terminal-only` unless the caller declares `everything`; queueIfBusy
               // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.
@@ -1066,50 +1070,14 @@ export function createDispatchRoutes({
           // engine's verb was demonstrably wrong here (LIN-573). The distinct
           // endpoint tag keeps these auditable in the proxy event log.
           logEvent(req, `/api/proxy/recommend-and-dispatch (override:${kind})`, 201);
-          {
-            // Consumer poll-recency warning (LIN-2885) — see formatDispatchWatch's
-            // comment for why this is the same pure function used everywhere.
-            const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
-            return keepalive.send(201, {
-              success: true,
-              id: item._id,
-              status: 'queued',
-              kind: item.kind,
-              promptName: item.promptName,
-              issueIdentifier: item.issueIdentifier,
-              target: item.target,
-              sessionId: item.sessionId || null,
-              // LIN-2934 (R3): parity with this file's own plain POST /dispatch
-              // 201 above — the kickoff prose names this fused verb the
-              // orchestrator's MAIN path, so it must see "n of N" too, not just
-              // the /dispatch handler.
-              maxTasks: item.maxTasks ?? null,
-              ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
-              dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
-              consumerLastSeenAt: item.consumerLastSeenAt || null,
-              ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
-              // The override pins the named issue with no descent — surface that
-              // explicitly so callers can distinguish it from the LLM-driven path.
-              override: true
-            });
-          }
+          // The override pins the named issue with no descent — surface that
+          // explicitly so callers can distinguish it from the LLM-driven path.
+          return keepalive.send(201, receiptFor(item, { override: true }));
         } catch (err) {
-          // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
-          // see `relayDispatchRefusal`. The verb-override arm is
-          // keepalive-armed too, so every refusal rides `keepalive.send`, as on the
-          // LLM arm below.
-          if (relayDispatchRefusal(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
-          // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
-          if (err && err.proxyAttachFailed) {
-            logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-            return keepaliveError(keepalive, 503, PROXY_ATTACH_FAILED_MESSAGE);
-          }
-          // A declared resume whose grant cannot be re-issued (LIN-3134): relay
-          // the coded refusal ahead of graphqlErrorStatus, which would 500 it.
-          if (isStructuralGrantRefusal(err)) {
-            logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
-            return keepaliveError(keepalive, err.status, err.message, { code: err.code, retryable: false });
-          }
+          // Tagged factory refusals, a missing out-of-band token and an unissuable declared
+          // resume (LIN-3134) all ride `keepalive.send` here, as on the LLM arm below, and
+          // are answered ahead of graphqlErrorStatus, which would 500 a coded refusal.
+          if (relayEnqueueFailure(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
           // LIN-2260: classify an upstream provider-auth failure the same way
           // the read path (and GET /recommend via recommendErrorResponse)
           // already does, instead of collapsing every non-classified throw
@@ -1255,12 +1223,7 @@ export function createDispatchRoutes({
         // to carry as a field. Opt out with appendProxyContext:false.
         // Free-tier run gate (LIN-3238): same token-creator-derived isFreeTier
         // the recommendation credential gate above computed.
-        const runGate = buildRunGate({
-          isFreeTier,
-          freeTierStore,
-          accountId: req.proxyCreatedBy,
-          accountStore
-        });
+        const runGate = runGateFor(req, isFreeTier);
         const item = await createDispatchItem({
           store: dispatchQueueStore,
           urlKey: req.proxyUrlKey,
@@ -1386,48 +1349,17 @@ export function createDispatchRoutes({
         // (LIN-327): they let Autopilot read the descent ("LIN-318 → LIN-297
         // (research) · dispatched") from the structured header, never a prompt body.
         const descent = describeDescent(deferredVia, rec);
-        // Consumer poll-recency warning (LIN-2885) — same pure function as
-        // every other enqueue seam; see formatDispatchWatch's comment above.
-        const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
-        keepalive.send(201, {
-          success: true,
-          id: item._id,
-          status: 'queued',
-          kind: item.kind,
-          promptName: item.promptName,
-          issueIdentifier: item.issueIdentifier,
-          target: item.target,
-          sessionId: item.sessionId || null,
-          // LIN-2934 (R3): parity with this file's own plain POST /dispatch 201
-          // and the override arm just above — the LLM-driven path is the same
-          // fused verb, so it must see "n of N" too.
-          maxTasks: item.maxTasks ?? null,
-          ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
-          dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
-          consumerLastSeenAt: item.consumerLastSeenAt || null,
-          ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
+        keepalive.send(201, receiptFor(item, {
           deferredVia,
           deferTruncated,
           ...(descent ? { descent: `${descent} · dispatched` } : {})
-        });
+        }));
       } catch (err) {
         // Duplicate-dispatch refusal (LIN-1656). Keepalive is ARMED on this arm, so
-        // the refusal must ride `keepalive.send` — if the 25s flush already fired,
-        // the 200 is committed and the real 409 travels as `statusCode` in the body
-        // (same contract as the 503 below). The responder also skips the
-        // `Retry-After` header once headers are sent.
-        if (relayDispatchRefusal(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
-        // Fail closed on a missing out-of-band token (LIN-1175) — see kickoff catch.
-        if (err && err.proxyAttachFailed) {
-          logEvent(req, '/api/proxy/recommend-and-dispatch', 503);
-          return keepaliveError(keepalive, 503, PROXY_ATTACH_FAILED_MESSAGE);
-        }
-        // A declared resume whose grant cannot be re-issued (LIN-3134): relay
-        // the coded refusal on the armed keepalive, same as the 503 above.
-        if (isStructuralGrantRefusal(err)) {
-          logEvent(req, '/api/proxy/recommend-and-dispatch', err.status);
-          return keepaliveError(keepalive, err.status, err.message, { code: err.code, retryable: false });
-        }
+        // every refusal must ride `keepalive.send` — if the 25s flush already fired,
+        // the 200 is committed and the real 409 travels as `statusCode` in the body.
+        // The responder also skips the `Retry-After` header once headers are sent.
+        if (relayEnqueueFailure(err, req, res, '/api/proxy/recommend-and-dispatch', keepalive)) return;
         // LIN-2260: classify an upstream provider-auth failure (retryable
         // 503/LINEAR_AUTH) the same way GET /recommend's recommendErrorResponse
         // already does, instead of collapsing every non-classified throw into
@@ -1448,7 +1380,6 @@ export function createDispatchRoutes({
       jsonError(res, status, 'Failed to dispatch prompt', { detail: graphqlErrorDetail(err, req), ...graphqlErrorExtra(err, status) });
     }
   });
-
   /**
    * GET /api/proxy/dispatch
    * List the workspace's dispatch items across both the live queue (status
@@ -1460,10 +1391,7 @@ export function createDispatchRoutes({
    *   ?limit=N                  cap (default 20, max 100)
    */
   router.get('/api/proxy/dispatch', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    if (!dispatchQueueStore) {
-      logEvent(req, '/api/proxy/dispatch', 503);
-      return jsonError(res, 503, 'Dispatch is not available');
-    }
+    if (storeMissing(req, res, '/api/proxy/dispatch')) return;
 
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100);
 
@@ -1471,8 +1399,7 @@ export function createDispatchRoutes({
     if (req.query.issueIdentifier !== undefined) {
       issueIdentifier = String(req.query.issueIdentifier);
       if (issueIdentifier.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(issueIdentifier)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'Invalid issueIdentifier');
+        return reject400(req, res, '/api/proxy/dispatch', 'Invalid issueIdentifier');
       }
     }
 
@@ -1480,8 +1407,7 @@ export function createDispatchRoutes({
     if (req.query.status !== undefined) {
       statusFilter = String(req.query.status);
       if (statusFilter.length > MAX_NAME_LENGTH || DANGEROUS_CHARS_REGEX.test(statusFilter)) {
-        logEvent(req, '/api/proxy/dispatch', 400);
-        return badRequest.json(res, 'Invalid status');
+        return reject400(req, res, '/api/proxy/dispatch', 'Invalid status');
       }
     }
 
@@ -1525,8 +1451,6 @@ export function createDispatchRoutes({
       // by issueIdentifier — rootItemId already isolates the lineage, and
       // inheriting the issue scope would drop siblings filed under a different
       // issue. `projection: {prompt: 0}` preserved (the H12/503 read-cost guard).
-      const anchorFor = item => item.rootItemId ?? item.feedback?.find(f => f.rootItemId)?.rootItemId ?? item.id;
-
       // LIN-1470 (review F1): only rows that actually RAN join the lineage —
       // i.e. `status === 'taken'`, not merely "not queued". `_archiveItem` is
       // called with exactly three statuses (`taken` dispatch-store.js:678,
@@ -1578,54 +1502,7 @@ export function createDispatchRoutes({
         }
       }
 
-      // LIN-1261 F2: attribute an abort's terminality to the loop it TARGETS at the
-      // proxy read boundary too (same class as the reconstruction path, different
-      // consumer). Simple Dispatcher posts `[aborted]` to the abort row's OWN
-      // feedback, never to the `abortTo` target's — so without this a lister of the
-      // aborted TARGET reads it non-terminal until the 24h stale cutoff. Harvest the
-      // abort rows already in `merged` (no extra store call) and derive each item's
-      // effective feedback through the SAME shared F1 guard the reconstruction path
-      // uses — never overriding a later genuine terminal or rewinding completedAt.
-      // NOTE: an issue-scoped list (`?issueIdentifier=`) excludes abort rows at the
-      // store (they carry `issueIdentifier: null`), so attribution applies to the
-      // unscoped list; the point-read watch + follow-up gate are deliberately not
-      // reached here (they need a store seam that finds an abort by target; deferred).
-      const abortedTargets = harvestAbortedTargets(merged);
-
-      // Resolve each item's effective status once (terminal marker → done/failed/
-      // aborted, else `blocked` when the lineage is parked on a human, else the
-      // STORED status) so filtering and the response agree. LIN-2079: this one
-      // assignment feeds the reported field, the `?status=` FILTER and `total`,
-      // so deriving `blocked` here is a wire-behaviour change by design —
-      // `?status=taken` no longer returns parked rows, `?status=blocked` does.
-      // LIN-1470: the lineage merge runs BEFORE abort attribution — ordering is
-      // load-bearing, since `feedbackWithHarvestedAbort`'s F1 guard only lets an
-      // abort win when it is strictly later than the existing terminal, so it
-      // must see the true lineage terminal (a later child `[done]`), not just
-      // this row's own. `_lineageFeedback` (own + verified siblings) feeds the
-      // reported `feedbackCount`; `_terminalFeedback` is `_lineageFeedback` PLUS
-      // any harvested abort and feeds `status`/`completedAt` — kept separate so
-      // the synthetic abort entry never inflates `feedbackCount`.
-      //
-      // Review F7: `joinsLineage` (WHICH ROWS may join) says nothing about
-      // WHICH FEEDBACK a joined row may inherit — a still-`taken` follow-up
-      // dispatched AFTER its parent already finished was absorbing the
-      // parent's earlier terminal. The invariant is structural, not another
-      // status carve-out: a row is never reported complete before it was
-      // itself dispatched. `mergeLineageFeedback` enforces this directly by
-      // taking `i.dispatchedAt` as `since` — a sibling entry only counts if
-      // its timestamp is at or after this row's own dispatch time.
-      const resolved = merged.map(i => {
-        // Rows that never ran (queued, cancelled, expired) opt out of the
-        // lineage join entirely (see above) — `lineageFeedback` stays this
-        // row's own (empty) feedback, same as pre-LIN-1470.
-        const joinsLineage = i.status === 'taken';
-        const anchor = joinsLineage ? anchorFor(i) : null;
-        const siblingRows = anchor ? (siblingsByAnchor.get(anchor) || []).filter(s => s.id !== i.id) : [];
-        const lineageFeedback = joinsLineage ? mergeLineageFeedback(i.feedback, siblingRows, anchor, i.dispatchedAt) : (i.feedback || []);
-        const terminalFeedback = feedbackWithHarvestedAbort(lineageFeedback, abortedTargets.get(i.id));
-        return { ...i, _lineageFeedback: lineageFeedback, _terminalFeedback: terminalFeedback, status: deriveWireStatus({ feedback: terminalFeedback, bookkeeping: i.bookkeeping }) || i.status };
-      });
+      const resolved = resolveListRows(merged, siblingsByAnchor);
 
       // `status` is derived from feedback (not stored), so it stays a JS filter;
       // `issueIdentifier` is already enforced at the store layer above.
@@ -1718,16 +1595,10 @@ export function createDispatchRoutes({
    * immediate short-poll, byte-for-byte.
    */
   router.get('/api/proxy/dispatch/:id', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    if (!dispatchQueueStore) {
-      logEvent(req, '/api/proxy/dispatch/:id', 503);
-      return jsonError(res, 503, 'Dispatch is not available');
-    }
+    if (storeMissing(req, res, '/api/proxy/dispatch/:id')) return;
 
     const { id } = req.params;
-    if (!id || id.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(id)) {
-      logEvent(req, '/api/proxy/dispatch/:id', 400);
-      return badRequest.json(res, 'Invalid dispatch id');
-    }
+    if (isBadDispatchId(id)) return reject400(req, res, '/api/proxy/dispatch/:id', 'Invalid dispatch id');
 
     // Parse + clamp ?wait. Garbage / non-positive → 0 → unchanged short-poll.
     const waitSeconds = Math.min(
@@ -1831,16 +1702,10 @@ export function createDispatchRoutes({
    * chase followUpTo itself if it ever needs the chain root).
    */
   router.get('/api/proxy/dispatch/:id/prompt', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    if (!dispatchQueueStore) {
-      logEvent(req, '/api/proxy/dispatch/:id/prompt', 503);
-      return jsonError(res, 503, 'Dispatch is not available');
-    }
+    if (storeMissing(req, res, '/api/proxy/dispatch/:id/prompt')) return;
 
     const { id } = req.params;
-    if (!id || id.length > MAX_IDENTIFIER_LENGTH || DANGEROUS_CHARS_REGEX.test(id)) {
-      logEvent(req, '/api/proxy/dispatch/:id/prompt', 400);
-      return badRequest.json(res, 'Invalid dispatch id');
-    }
+    if (isBadDispatchId(id)) return reject400(req, res, '/api/proxy/dispatch/:id/prompt', 'Invalid dispatch id');
 
     try {
       const item = await dispatchQueueStore.getItemStatus(req.proxyUrlKey, id);
@@ -1888,10 +1753,7 @@ export function createDispatchRoutes({
    *     "totals": { "minted": N, "wouldSkip": N, "share": 0.35, "byReason": { ... } } }
    */
   router.get('/api/proxy/wake-shadow', proxyLimiter, authenticateProxyToken, async (req, res) => {
-    if (!dispatchQueueStore) {
-      logEvent(req, '/api/proxy/wake-shadow', 503);
-      return jsonError(res, 503, 'Dispatch is not available');
-    }
+    if (storeMissing(req, res, '/api/proxy/wake-shadow')) return;
 
     const rawDays = Number(req.query.days);
     const days = Number.isFinite(rawDays) ? Math.max(1, Math.min(31, Math.floor(rawDays))) : undefined;
