@@ -4,7 +4,7 @@ Honest guesses, to be scored afterwards. The comparison points are experiment 1'
 
 ## Mechanics
 
-- **The worker sets up the room and launches an Opus sub-agent:** about 75% likely without a hitch. The likeliest snags are finding the sub-agent's transcript file, and the plan stage reshaping the steps.
+- **The worker sets up the room and launches a frontier-tier sub-agent:** about 75% likely without a hitch. The likeliest snags are finding the sub-agent's transcript file, and the plan stage reshaping the steps.
 - **The audit passes with 0 violations:** about 80% likely. The likeliest violation is a shell command that doesn't start by entering the room.
 - **A `DECISION:` is raised at some point:** about 40% likely. The likeliest causes are an "unclear" replay group, such as B's empty-text-node question, or an audit snag.
 - **It merges without John:** about 60% likely, lower than experiment 1 because of the extra judgement calls.

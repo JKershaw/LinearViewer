@@ -81,7 +81,7 @@ All three probe agents independently found the same existing gaps: the gate perm
 
 - 37 minutes from kickoff to merge.
 - 5 worker sessions: plan, implementation, review, close-out, plus the autopilot.
-- Models: plan, implementation and close-out on Sonnet 5.5; review and autopilot on Opus 5.5. Implementation took 10½ minutes.
+- Models: plan, implementation and close-out on the mid tier; review and autopilot on the frontier tier. Implementation took 10½ minutes.
 - One review round, which caught a dropped rationale; close-out restored it.
 - No rulings, no tests added, no follow-up tickets.
 - **It went against one instruction.** The ticket said not to build a comparison harness, but implementation ran a throwaway old-versus-new fuzz (120,000 cases) and committed nothing from it. That is very likely why A is exactly equivalent: the informed arm used the old code as an oracle.

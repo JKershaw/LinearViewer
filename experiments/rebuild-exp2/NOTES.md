@@ -60,7 +60,7 @@ Then: "Let's go with both. And sure, we can fix bugs. Folding into 2b is a good 
 
 ## Confounds to keep in mind
 
-- **Models.** Experiment 1's arm B ran on this session's default sub-agent model, Opus 5.5. 2a asks for an Opus sub-agent. Harbour's stage models vary: in LIN-3556, plan, implementation and close-out ran on Sonnet 5.5, review on Opus 5.5.
+- **Models.** Experiment 1's arm B ran on this session's default sub-agent model, the frontier tier. 2a asks for a frontier-tier sub-agent. Harbour's stage models vary: in LIN-3556, plan, implementation and close-out ran on the mid tier, review on the frontier tier.
 - **One run per arm.** 2a's raw output is effectively a second sample of the clean room, so it gives a first look at run-to-run variance.
 - **The base moved.** `main` now holds arm A's `adf.js`, which is behaviourally identical to the original on all 59,718 replayed calls (`../rebuild-exp1/results.md`). So "today's code" and "the original" agree for replay purposes.
 
@@ -246,7 +246,7 @@ LIN-3561 merged as `bf6f7507` (PR #1893) at 20:46Z, about 40 minutes after kicko
 - **tonly:** a clean room with the tests but no spec.
 - **prompt:** a design-first informed arm. A sub-agent in a scratch copy at `c2bc9a65` could see today's code, its 200 tests and the provider tests. It was told to write `DESIGN.md` first, design as if the current code didn't exist, then write the module, with no comparison harness.
 
-All three rooms audited clean (9–11 calls, 0 violations) and ran on Opus 5.5.
+All three rooms audited clean (9–11 calls, 0 violations) and ran on the frontier tier.
 
 **Results.** The replay and shape columns compare with the original behaviour (`arms/A`), except prompt, which compares with today (`c2bc9a65`). "Real texts" means the private 1,037, counting texts whose display after a Jira round trip (`marked.parse(adfToMarkdown(markdownToAdf(md)))`) differs.
 
@@ -410,3 +410,24 @@ Merged as `350242d5` (PR #1899) at 14:08Z, about 5 h 17 min after kickoff (08:51
 - Done without a ruling ✗ (one).
 
 **Inference:** at about 930 lines over two files, design-first plus replay gave the biggest cut yet, with zero regressions. The cost was wall-clock, not quality. Harbour's own decomposition (harness first, then each file) made it safe but slow, and it exposed a gap in the pipeline: a child worker exiting "blocked" left the parent waiting until the blocker closed.
+
+## 16 Oct ~15:00Z: figures added for the write-up (`docs/papers/harbour/rebuild-ladder.md`)
+
+**From this session's private real-text runs (counts only):**
+- `*` bullets displayed as one literal paragraph by `c2bc9a65`'s codec in 135 of 1,037 texts; LIN-3565's codec lists 127 of them.
+- XS r2's real-text display changes: −837 `<strong>` and −849 `<code>`; `<em>` net +1,610 across 334 texts, mostly the `*italic*` fix, with artefacts.
+
+**Rung 4's source-text tests:** nine distinct test files read `proxy-writes.js` or `proxy-rulings.js` (or every `routes/proxy-*.js`) as text:
+- `trashed-signal`;
+- `proxy-relations-query`;
+- `proxy-endpoint-inventory-witness`;
+- `proxy-di-witness`;
+- `rulings-resolution-contract-drift`;
+- `proxy-rulings-routes` (the LIN-1728 absence scan);
+- `proxy-credential-fingerprint-stamping`;
+- `lin-3136-enqueue-census`;
+- `lin-2533-agent-status-extraction`.
+
+**Fresh-reader checks:** every ticket this session (LIN-3564, 3565, 3566, 3569, 3570, 3573) had one before filing, and each found problems that were applied (LIN-3564's found 10). Real traps included: the attachments "hang" (really a generic 500 under `server.js`); a helper filename (`routes/proxy-*`) that would crash the DI census; module-level dedupe singletons that would corrupt a replay; and quotes stretched past their use.
+
+**Correction to the rung 4 entry:** the writes child's wait (12:08 → 13:28Z) was the rulings child's close-out held on the record-only `lin3575-citation-scope` ruling until John answered. It wasn't the pipeline failing to resume.

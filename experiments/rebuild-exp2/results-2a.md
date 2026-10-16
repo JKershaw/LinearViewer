@@ -4,7 +4,7 @@
 
 **The run:**
 
-- **Clean room:** an Opus sub-agent built the module in a sealed temporary folder, 16:58–17:09Z. The audit found 10 tool calls and 0 violations, and review re-ran the audit independently. The sub-agent added no tests.
+- **Clean room:** a frontier-tier sub-agent built the module in a sealed temporary folder, 16:58–17:09Z. The audit found 10 tool calls and 0 violations, and review re-ran the audit independently. The sub-agent added no tests.
 - **Raw commit:** `3d76597f`, which passes 133/133.
 - **Pipeline after the room:** the implementation stage's replay and classification found one regression and fixed it (`c712b2ea`, 5 tests). Review round 1 found two more, R1 and R2, which were fixed in `d2e0b8ff`. Review round 2 passed.
 - **Merged:** `e7f7bd57` at 17:45Z. About 53 minutes from kickoff to merge.
