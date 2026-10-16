@@ -1,0 +1,394 @@
+{
+  "meta": {
+    "generatedAt": "2026-10-16T07:17:00.246Z",
+    "tool": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs",
+    "node": "v22.22.0",
+    "old": {
+      "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/arm/old.js",
+      "copy": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs",
+      "sha": "3c821cd42036",
+      "lib": "/home/user/LinearViewer/lib",
+      "rewrittenImports": 12
+    },
+    "new": {
+      "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/arm/new.js",
+      "copy": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs",
+      "sha": "88d093c35ac3",
+      "lib": "/home/user/LinearViewer/lib",
+      "rewrittenImports": 12
+    },
+    "modelLib": "/home/user/LinearViewer/lib",
+    "frozenNow": "2026-10-14T12:00:00.000Z",
+    "seed": 1,
+    "n": 3000,
+    "genA": 1800,
+    "genB": 1200,
+    "normalisation": "collapse",
+    "envPinned": {
+      "TZ": "UTC",
+      "NODE_ENV": "production",
+      "cleared": [
+        "GITHUB_*",
+        "JIRA_*",
+        "EMAIL_*",
+        "RESEND_*"
+      ]
+    },
+    "capture": {
+      "pin": "c2bc9a65",
+      "files": [
+        {
+          "file": "tests/unit/roadmap-integration.test.js",
+          "calls": 10,
+          "testsPass": 46,
+          "testsFail": 0,
+          "exit": 0
+        },
+        {
+          "file": "tests/unit/roadmap-model-override.test.js",
+          "calls": 4,
+          "testsPass": 13,
+          "testsFail": 0,
+          "exit": 0
+        },
+        {
+          "file": "tests/unit/page-title-primitive.test.js",
+          "calls": 2,
+          "testsPass": 9,
+          "testsFail": 0,
+          "exit": 0
+        },
+        {
+          "file": "tests/unit/render-team-selector-threading.test.js",
+          "calls": 3,
+          "testsPass": 15,
+          "testsFail": 0,
+          "exit": 0
+        }
+      ]
+    },
+    "importSideEffects": {
+      "old": {},
+      "new": {}
+    },
+    "importSideEffectNotes": [
+      "lib/providers/*/index.js call registerProvider() at import (navbar reads the registry); the copies import the same absolute modules, so both versions share one registry instance unless --old-lib/--new-lib differ.",
+      "lib/sample-data/mock-data.js computes its daysAgo() dates at module evaluation, so it is imported only after the clock is frozen.",
+      "lib/components/page.js / openrouter.js / navbar.js have no timers or sockets at import (probe above); the network tripwire counts any attempt."
+    ],
+    "networkAttemptsTotal": 0,
+    "elapsedMs": 11012
+  },
+  "totals": {
+    "inputs": 3105,
+    "identical": 3105,
+    "identicalBothThrew": 38,
+    "differing": 0,
+    "throwsOld": 38,
+    "throwsNew": 38,
+    "byTier": {
+      "test": {
+        "inputs": 19,
+        "identical": 19,
+        "differing": 0
+      },
+      "mock": {
+        "inputs": 4,
+        "identical": 4,
+        "differing": 0
+      },
+      "edge": {
+        "inputs": 40,
+        "identical": 40,
+        "differing": 0
+      },
+      "target": {
+        "inputs": 42,
+        "identical": 42,
+        "differing": 0
+      },
+      "gen-a": {
+        "inputs": 1800,
+        "identical": 1800,
+        "differing": 0
+      },
+      "gen-b": {
+        "inputs": 1200,
+        "identical": 1200,
+        "differing": 0
+      }
+    }
+  },
+  "groups": [],
+  "coarseGroups": [],
+  "differing": [],
+  "throws": [
+    {
+      "id": "gen-a:612",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:879",
+      "old": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "new": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:335:22)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:499:10)"
+    },
+    {
+      "id": "gen-a:885",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:1039",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:1065",
+      "old": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "new": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:335:22)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:499:10)"
+    },
+    {
+      "id": "gen-a:1401",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:1629",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:1639",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:1706",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-a:1739",
+      "old": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "new": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:335:22)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:499:10)"
+    },
+    {
+      "id": "gen-b:36",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:83",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:183",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:190",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:267",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:372",
+      "old": "TypeError: Cannot read properties of null (reading 'map')",
+      "new": "TypeError: Cannot read properties of null (reading 'map')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:423:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'map') |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:474:24) |     at render (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/replay.mjs:88:13)"
+    },
+    {
+      "id": "gen-b:419",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:453",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:459",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:478",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:515",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:615",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:625",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:653",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:714",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:723",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:785",
+      "old": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "new": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:335:22)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:499:10)"
+    },
+    {
+      "id": "gen-b:792",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:798",
+      "old": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "new": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:335:22)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:499:10)"
+    },
+    {
+      "id": "gen-b:861",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:867",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:879",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:975",
+      "old": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "new": "TypeError: Cannot read properties of null (reading 'dispatch')",
+      "oldStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:335:22)",
+      "newStack": "TypeError: Cannot read properties of null (reading 'dispatch') |     at renderNavBar (file:///home/user/LinearViewer/lib/components/navbar.js:140:46) |     at Module.renderRoadmapPage (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:499:10)"
+    },
+    {
+      "id": "gen-b:977",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:999",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:1055",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:1112",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    },
+    {
+      "id": "gen-b:1192",
+      "old": "TypeError: item.completedAt.split is not a function",
+      "new": "TypeError: item.completedAt.split is not a function",
+      "oldStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/old-3c821cd42036.mjs:89:52) |     at Array.map (<anonymous>)",
+      "newStack": "TypeError: item.completedAt.split is not a function |     at renderShipItem (file:///tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung2/replay/work/copies/new-88d093c35ac3.mjs:232:33) |     at Array.map (<anonymous>)"
+    }
+  ],
+  "coverage": null
+}

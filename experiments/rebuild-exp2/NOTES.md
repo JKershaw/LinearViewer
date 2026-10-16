@@ -278,3 +278,53 @@ Its key move: **the gate runs the round trip and compares**, with the four ruled
 3. **The tests, even at 200, don't describe realistic documents.** Every regression here is on everyday Markdown: headings followed directly by lists, `*`-emphasis, links inside emphasis. A small set of realistic synthetic documents, pinned by display, is the missing contract piece. As John put it this morning, missing behaviour found this way is a test to add, then try again.
 4. **The design-first prompt removed the anchoring,** at least once. Arm A (informed, "rewrite as a whole") kept the old shape. The prompt arm, also informed, designed a different structure and is the smallest and most equivalent result so far. One sample, on the stronger contract, with the old code as a behavioural reference. That's the clean room's simplification without its regression risk, at least this time.
 5. **The original codec's own gaps showed up:** `*`-italics are lost. That's a spring-clean candidate (John: missing behaviour is fine to find this way).
+
+## 16 Oct ~07:00Z: John on strictness
+
+John agreed all four rulings as proposed (LIN-3565 ×2 "drop", LIN-3566 "accept-listed" and "keep-fixes"). Then: "Note for as we go; no need to be so strict on edge cases as we experiment. Bugs should be fixed, but we want it to improve, so there's going to be fuzz. It'll be interesting to see the results once the experiments are in."
+
+**For later tickets:**
+- regressions that lose real utility are fixed;
+- edge-case differences are accepted and listed, not escalated;
+- `DECISION:` only for real losses.
+
+**Also noted (LIN-3565, private real-text check on head `2d11c596`):** 280 of 1,037 texts display differently, all in lists, and the change is net a fix (`*` bullets and bullets nested under bullets now render as lists; 2 texts got worse). Nested lists appear in 174 of 1,037 real texts and neither version supports them. That's a spring-clean candidate.
+
+## 16 Oct ~07:20Z: 2b part 2 (LIN-3565) and rung 2 (LIN-3566) done and scored
+
+**LIN-3565, a clean room on the 200-test contract.** Merged as `74e5e2ca` (PR #1895), about an hour after kickoff. Done after John's ruling ("drop" the whitespace-only fence).
+
+| | code | decisions | worst fn | public cells / groups vs today | real texts displayed differently |
+|---|--:|--:|--:|--:|--:|
+| today (`c2bc9a65`) | 318 | 129 | 12 | — | — |
+| 2b-2 raw | 297 | 132 | 24 | — | — |
+| 2b-2 final | 297 | 134 | 24 (a 21-line `switch`) | 3,265 / 444 | 280 (lists, net fix) |
+| prompt arm (here) | 199 | 90 | 22 | 7 / 4 | 0 |
+
+Against `prediction-2b2.md`:
+- room, audit and merge ✓;
+- raw passes the 200? The pipeline fixed 2 regressions, so it didn't;
+- code lines in range ✓;
+- bracket regression didn't recur ✓;
+- "cleaner on both lines and decisions" ✗: fewer lines, more decision points.
+
+The pipeline's public replay didn't see the real-text list change. The private check did, and it's a net fix (`*` bullets now list).
+
+**LIN-3566, rung 2, the roadmap renderer, design-first informed, through Harbour.** Merged as `65969467` (PR #1896), about 45 minutes after kickoff.
+- **Independent replay** (3,105 + 5,105 inputs, 2 seeds, 100% line coverage of the old renderer): **0 differences**, including identical throws.
+- **Shape:** code 375 → 364, decision points 115 → 88, worst function 34 → 22, longest function 148 → 46 lines, functions 24 → 41.
+- **Against the prediction:**
+  - merged ✓;
+  - 0–6 behaviour changes ✓ (0);
+  - design departs ✓;
+  - no function over 60 lines ✓;
+  - 230–330 code lines ✗ (364; the cut was in structure, not size);
+  - worst function ≤15 ✗ (22);
+  - Done without a ruling ✗ (two rulings, both "record" and quickly answered).
+
+**Inference:**
+- Design-first, informed and through Harbour gave perfect equivalence and much flatter structure on a module with a thin contract. That's the safest result of any arm so far.
+- The clean room's extra simplification doesn't hold up through the pipeline on this evidence. 2b-2 came out at about the same complexity as today. The prompt arm, outside Harbour, was much smaller.
+- On this evidence, the working method for the ladder is: **design-first informed rebuild + an independent replay against the old code, + real-data checks where they exist.**
+
+**Spring-clean gaps (private corpus, counts only):** 483 of 1,037 real texts contain nested lists, and 287 use `*italics*`. Main's codec flattens or loses both on a Jira round trip.
