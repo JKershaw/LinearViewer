@@ -1215,11 +1215,11 @@ describe('LIN-2755: ruling-write cache invalidation (RED until beat 3)', () => {
     });
   }
 
-  test('suggest-dismissal (proxy-rulings.js:298) invalidates the proxy-rulings cache — witness 1+3', async () => {
+  test('suggest-dismissal (proxy-rulings.js propose) invalidates the proxy-rulings cache — witness 1+3', async () => {
     await assertInvalidatesAndBounded(`/api/proxy/rulings/${DECISION_ID}/suggest-dismissal`, { reason: 'the task shipped' });
   });
 
-  test('suggest-answer (proxy-rulings.js:404) invalidates the proxy-rulings cache — witness 1+3', async () => {
+  test('suggest-answer (proxy-rulings.js propose) invalidates the proxy-rulings cache — witness 1+3', async () => {
     await assertInvalidatesAndBounded(`/api/proxy/rulings/${DECISION_ID}/suggest-answer`, { optionId: 'a', reason: 'the task shipped' });
   });
 });

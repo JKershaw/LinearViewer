@@ -28,15 +28,13 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { BASE_DEPS, buildApp, call, makeFakeProvider } from './lib/proxy-fake-deps.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8');
 // LIN-679 Stage 3a / LIN-2536: the GET /relations handler (group D) moved to
 // routes/proxy-reads.js — only the GET test below re-points.
 const readsSource = readFileSync(join(__dirname, '../../routes/proxy-reads.js'), 'utf8');
-// LIN-679 Stage 3b / LIN-2537: the DELETE relations handler (group E) moved to
-// routes/proxy-writes.js — only the DELETE handler test below re-points.
-const writesSource = readFileSync(join(__dirname, '../../routes/proxy-writes.js'), 'utf8');
 const providerSource = readFileSync(join(__dirname, '../../lib/providers/linear/index.js'), 'utf8');
 
 // Pull a named gql`...` template literal out of a source by its const name.
@@ -101,23 +99,48 @@ describe('proxy relationship queries', () => {
     assert.match(q, /\$id:\s*String!/, 'id must be String!');
   });
 
-  test('DELETE relation handler is registered with write scope', () => {
-    // Route exists, keyed on relationId, gated by requireWriteScope, and
-    // validates the relation id as a UUID.
-    assert.match(
-      writesSource,
-      /router\.delete\(\s*'\/api\/proxy\/issues\/:issueId\/relations\/:relationId'[^)]*requireWriteScope/s,
-      'DELETE relations route must exist and require write scope'
-    );
-    const handlerStart = writesSource.indexOf("'/api/proxy/issues/:issueId/relations/:relationId'");
-    const block = writesSource.slice(handlerStart, handlerStart + 1100);
-    assert.match(block, /UUID_REGEX\.test\(relationId\)/, 'must validate relationId as UUID');
-    // Post-LIN-309 the handler calls the provider, capability-gated, instead of
-    // owning the delete mutation.
-    assert.match(block, /provider\.deleteRelation\(/, 'must call provider.deleteRelation');
-    // LIN-583: the gate takes the per-request provider (the workspace the write
-    // will actually hit) as its first arg.
-    assert.match(block, /denyIfUnsupported\(provider, 'deleteRelation'/, 'must capability-gate the write');
+  test('DELETE relation handler is registered with write scope', async () => {
+    // LIN-3573: was a read of routes/proxy-writes.js as text; now driven through
+    // the real composer. Route exists, keyed on relationId, gated by
+    // requireWriteScope, validates the relation id as a UUID, and makes exactly
+    // one capability-gated provider.deleteRelation(token, relationId) call.
+    const RELATION = '22222222-2222-4222-8222-222222222222';
+    const path = (id) => `/api/proxy/issues/LIN-1/relations/${id}`;
+    const world = (overrides = {}) => {
+      const deletes = [];
+      const provider = makeFakeProvider();
+      provider.deleteRelation = async (...args) => { deletes.push(args); return { success: true }; };
+      Object.assign(provider, overrides.provider);
+      const tokenScope = overrides.scope || 'readWrite';
+      const deps = BASE_DEPS();
+      const proxyTokenStore = { ...deps.proxyTokenStore, validateToken: async () => ({ ...(await deps.proxyTokenStore.validateToken()), scope: tokenScope }) };
+      return { app: buildApp({ provider, proxyTokenStore }), deletes };
+    };
+
+    // A valid call: the route exists and makes exactly one provider call, keyed on the relation id.
+    let w = world();
+    let res = await call(w.app, 'delete', path(RELATION));
+    assert.equal(res.status, 200, 'DELETE relations route must exist (not 404)');
+    assert.deepEqual(w.deletes, [['test-token', RELATION]], 'must call provider.deleteRelation(token, relationId) once');
+
+    // Write scope is required: a read-scope token is refused before any provider call.
+    w = world({ scope: 'read' });
+    res = await call(w.app, 'delete', path(RELATION));
+    assert.equal(res.status, 403, 'DELETE relations route must require write scope');
+    assert.deepEqual(w.deletes, []);
+
+    // The relation id must be a UUID.
+    w = world();
+    res = await call(w.app, 'delete', path('not-a-uuid'));
+    assert.equal(res.status, 400, 'must validate relationId as UUID');
+    assert.deepEqual(w.deletes, []);
+
+    // LIN-583: the capability gate asks the per-request provider, and a provider without it is refused.
+    w = world({ provider: { supports: (method) => method !== 'deleteRelation' } });
+    res = await call(w.app, 'delete', path(RELATION));
+    assert.equal(res.status, 422, 'must capability-gate the write');
+    assert.equal(res.body.capability, 'deleteRelation');
+    assert.deepEqual(w.deletes, []);
   });
 
   test('/relations handler returns flat arrays, not the {nodes} shape (LIN-310)', () => {
