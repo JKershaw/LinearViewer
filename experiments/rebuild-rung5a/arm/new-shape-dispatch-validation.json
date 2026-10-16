@@ -1,0 +1,564 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-validation.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 302,
+    "code": 146,
+    "comment": 122,
+    "blank": 34
+  },
+  "bytes": 13909,
+  "functions": {
+    "count": 18,
+    "byKind": {
+      "FunctionDeclaration": 12,
+      "ArrowFunctionExpression": 6
+    },
+    "longestBySpan": {
+      "name": "validateDispatchPayload",
+      "spanLines": 61,
+      "codeLines": 35,
+      "startLine": 218
+    },
+    "longestByCodeLines": {
+      "name": "validateDispatchPayload",
+      "spanLines": 61,
+      "codeLines": 35,
+      "startLine": 218
+    }
+  },
+  "maxNesting": 2,
+  "cyclomatic": {
+    "total": 76,
+    "totalConditionsOnly": 75,
+    "decisionPoints": 57,
+    "decisionPointsByKind": {
+      "defaultValue": 4,
+      "if": 26,
+      "or": 7,
+      "ternary": 7,
+      "and": 11,
+      "forOf": 2
+    },
+    "max": {
+      "name": "validateDispatchPayload",
+      "cyclomatic": 20
+    },
+    "unitsOver10": [
+      "validateDispatchPayload"
+    ]
+  },
+  "regexLiterals": 3,
+  "regexConstructors": 0,
+  "optionalChains": 0,
+  "stringLiterals": 47,
+  "templateLiterals": 9,
+  "imports": 6,
+  "topLevelDeclarations": {
+    "count": 26,
+    "items": [
+      {
+        "name": "MAX_NAME_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 20
+      },
+      {
+        "name": "DANGEROUS_CHARS_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 21
+      },
+      {
+        "name": "MAX_PROMPT_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 25
+      },
+      {
+        "name": "MAX_URL_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 26
+      },
+      {
+        "name": "MAX_IDENTIFIER_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 27
+      },
+      {
+        "name": "UUID_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 28
+      },
+      {
+        "name": "MAX_SESSION_ID_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 34
+      },
+      {
+        "name": "STRICT_CONTROL_CHARS_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 39
+      },
+      {
+        "name": "RESERVED_SESSION_ID",
+        "kind": "const",
+        "exported": false,
+        "line": 46
+      },
+      {
+        "name": "DISPATCH_EFFORT_LEVELS",
+        "kind": "const",
+        "exported": false,
+        "line": 51
+      },
+      {
+        "name": "validateOpaqueDispatchField",
+        "kind": "function",
+        "exported": false,
+        "line": 67
+      },
+      {
+        "name": "validateSessionId",
+        "kind": "function",
+        "exported": false,
+        "line": 100
+      },
+      {
+        "name": "isAbsent",
+        "kind": "const",
+        "exported": false,
+        "line": 117
+      },
+      {
+        "name": "abortFollowUpError",
+        "kind": "function",
+        "exported": false,
+        "line": 120
+      },
+      {
+        "name": "abortToError",
+        "kind": "function",
+        "exported": false,
+        "line": 125
+      },
+      {
+        "name": "cascadeAbortError",
+        "kind": "function",
+        "exported": false,
+        "line": 131
+      },
+      {
+        "name": "dispatchKindError",
+        "kind": "function",
+        "exported": false,
+        "line": 136
+      },
+      {
+        "name": "periodicalIdError",
+        "kind": "function",
+        "exported": false,
+        "line": 142
+      },
+      {
+        "name": "isValidAutopilotVariant",
+        "kind": "function",
+        "exported": false,
+        "line": 148
+      },
+      {
+        "name": "targetError",
+        "kind": "function",
+        "exported": false,
+        "line": 157
+      },
+      {
+        "name": "followUpToError",
+        "kind": "function",
+        "exported": false,
+        "line": 163
+      },
+      {
+        "name": "LENGTH_CAPS",
+        "kind": "const",
+        "exported": false,
+        "line": 176
+      },
+      {
+        "name": "OPAQUE_FIELDS",
+        "kind": "const",
+        "exported": false,
+        "line": 188
+      },
+      {
+        "name": "CONTROL_CHAR_FIELDS",
+        "kind": "const",
+        "exported": false,
+        "line": 190
+      },
+      {
+        "name": "firstFailure",
+        "kind": "function",
+        "exported": false,
+        "line": 192
+      },
+      {
+        "name": "validateDispatchPayload",
+        "kind": "function",
+        "exported": false,
+        "line": 218
+      }
+    ]
+  },
+  "exportedNames": [
+    "validateOpaqueDispatchField",
+    "validateSessionId",
+    "validateDispatchPayload",
+    "abortFollowUpError",
+    "abortToError",
+    "cascadeAbortError",
+    "dispatchKindError",
+    "periodicalIdError",
+    "isValidAutopilotVariant",
+    "targetError",
+    "followUpToError",
+    "MAX_NAME_LENGTH",
+    "MAX_PROMPT_LENGTH",
+    "MAX_URL_LENGTH",
+    "MAX_IDENTIFIER_LENGTH",
+    "MAX_SESSION_ID_LENGTH",
+    "UUID_REGEX",
+    "DANGEROUS_CHARS_REGEX",
+    "STRICT_CONTROL_CHARS_REGEX",
+    "RESERVED_SESSION_ID",
+    "DISPATCH_EFFORT_LEVELS"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 302,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "validateOpaqueDispatchField",
+      "kind": "FunctionDeclaration",
+      "startLine": 67,
+      "endLine": 80,
+      "spanLines": 14,
+      "codeLines": 14,
+      "params": 3,
+      "cyclomatic": 10,
+      "cyclomaticConditionsOnly": 10,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "defaultValue": 3,
+        "if": 4,
+        "or": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "validateSessionId",
+      "kind": "FunctionDeclaration",
+      "startLine": 100,
+      "endLine": 108,
+      "spanLines": 9,
+      "codeLines": 9,
+      "params": 1,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 7,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 5,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isAbsent",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 117,
+      "endLine": 117,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "abortFollowUpError",
+      "kind": "FunctionDeclaration",
+      "startLine": 120,
+      "endLine": 122,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "abortToError",
+      "kind": "FunctionDeclaration",
+      "startLine": 125,
+      "endLine": 128,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "ternary": 2,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "cascadeAbortError",
+      "kind": "FunctionDeclaration",
+      "startLine": 131,
+      "endLine": 133,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "dispatchKindError",
+      "kind": "FunctionDeclaration",
+      "startLine": 136,
+      "endLine": 139,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "periodicalIdError",
+      "kind": "FunctionDeclaration",
+      "startLine": 142,
+      "endLine": 145,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "periodicalIdError/λ@143",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 143,
+      "endLine": 143,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "periodicalIdError"
+    },
+    {
+      "name": "isValidAutopilotVariant",
+      "kind": "FunctionDeclaration",
+      "startLine": 148,
+      "endLine": 150,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "targetError",
+      "kind": "FunctionDeclaration",
+      "startLine": 157,
+      "endLine": 160,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 2,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "followUpToError",
+      "kind": "FunctionDeclaration",
+      "startLine": 163,
+      "endLine": 167,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 2,
+        "ternary": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "firstFailure",
+      "kind": "FunctionDeclaration",
+      "startLine": 192,
+      "endLine": 199,
+      "spanLines": 8,
+      "codeLines": 8,
+      "params": 4,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "forOf": 1,
+        "ternary": 1,
+        "if": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "validateDispatchPayload",
+      "kind": "FunctionDeclaration",
+      "startLine": 218,
+      "endLine": 278,
+      "spanLines": 61,
+      "codeLines": 35,
+      "params": 1,
+      "cyclomatic": 20,
+      "cyclomaticConditionsOnly": 20,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "if": 10,
+        "forOf": 1,
+        "and": 7
+      },
+      "enclosing": null
+    },
+    {
+      "name": "validateDispatchPayload/λ@223",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 223,
+      "endLine": 223,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "validateDispatchPayload"
+    },
+    {
+      "name": "validateDispatchPayload/λ@224",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 224,
+      "endLine": 224,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "validateDispatchPayload"
+    },
+    {
+      "name": "validateDispatchPayload/λ@241",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 241,
+      "endLine": 241,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "validateDispatchPayload"
+    },
+    {
+      "name": "validateDispatchPayload/λ@242",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 242,
+      "endLine": 242,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "validateDispatchPayload"
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}

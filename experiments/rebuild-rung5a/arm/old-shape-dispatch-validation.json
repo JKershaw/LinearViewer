@@ -1,0 +1,443 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/dispatch-validation.orig.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 375,
+    "code": 182,
+    "comment": 164,
+    "blank": 29
+  },
+  "bytes": 18278,
+  "functions": {
+    "count": 12,
+    "byKind": {
+      "FunctionDeclaration": 11,
+      "ArrowFunctionExpression": 1
+    },
+    "longestBySpan": {
+      "name": "validateDispatchPayload",
+      "spanLines": 114,
+      "codeLines": 67,
+      "startLine": 238
+    },
+    "longestByCodeLines": {
+      "name": "validateDispatchPayload",
+      "spanLines": 114,
+      "codeLines": 67,
+      "startLine": 238
+    }
+  },
+  "maxNesting": 1,
+  "cyclomatic": {
+    "total": 90,
+    "totalConditionsOnly": 90,
+    "decisionPoints": 77,
+    "decisionPointsByKind": {
+      "defaultValue": 4,
+      "if": 34,
+      "or": 6,
+      "ternary": 9,
+      "and": 24
+    },
+    "max": {
+      "name": "validateDispatchPayload",
+      "cyclomatic": 42
+    },
+    "unitsOver10": [
+      "validateDispatchPayload"
+    ]
+  },
+  "regexLiterals": 3,
+  "regexConstructors": 0,
+  "optionalChains": 0,
+  "stringLiterals": 41,
+  "templateLiterals": 13,
+  "imports": 6,
+  "topLevelDeclarations": {
+    "count": 21,
+    "items": [
+      {
+        "name": "MAX_NAME_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 20
+      },
+      {
+        "name": "DANGEROUS_CHARS_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 21
+      },
+      {
+        "name": "MAX_PROMPT_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 28
+      },
+      {
+        "name": "MAX_URL_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 29
+      },
+      {
+        "name": "MAX_IDENTIFIER_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 30
+      },
+      {
+        "name": "UUID_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 31
+      },
+      {
+        "name": "MAX_SESSION_ID_LENGTH",
+        "kind": "const",
+        "exported": false,
+        "line": 39
+      },
+      {
+        "name": "STRICT_CONTROL_CHARS_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 45
+      },
+      {
+        "name": "RESERVED_SESSION_ID",
+        "kind": "const",
+        "exported": false,
+        "line": 52
+      },
+      {
+        "name": "DISPATCH_EFFORT_LEVELS",
+        "kind": "const",
+        "exported": false,
+        "line": 58
+      },
+      {
+        "name": "validateOpaqueDispatchField",
+        "kind": "function",
+        "exported": false,
+        "line": 74
+      },
+      {
+        "name": "validateSessionId",
+        "kind": "function",
+        "exported": false,
+        "line": 121
+      },
+      {
+        "name": "abortFollowUpError",
+        "kind": "function",
+        "exported": false,
+        "line": 150
+      },
+      {
+        "name": "abortToError",
+        "kind": "function",
+        "exported": false,
+        "line": 157
+      },
+      {
+        "name": "cascadeAbortError",
+        "kind": "function",
+        "exported": false,
+        "line": 167
+      },
+      {
+        "name": "dispatchKindError",
+        "kind": "function",
+        "exported": false,
+        "line": 172
+      },
+      {
+        "name": "periodicalIdError",
+        "kind": "function",
+        "exported": false,
+        "line": 179
+      },
+      {
+        "name": "isValidAutopilotVariant",
+        "kind": "function",
+        "exported": false,
+        "line": 186
+      },
+      {
+        "name": "targetError",
+        "kind": "function",
+        "exported": false,
+        "line": 195
+      },
+      {
+        "name": "followUpToError",
+        "kind": "function",
+        "exported": false,
+        "line": 202
+      },
+      {
+        "name": "validateDispatchPayload",
+        "kind": "function",
+        "exported": false,
+        "line": 238
+      }
+    ]
+  },
+  "exportedNames": [
+    "validateOpaqueDispatchField",
+    "validateSessionId",
+    "validateDispatchPayload",
+    "abortFollowUpError",
+    "abortToError",
+    "cascadeAbortError",
+    "dispatchKindError",
+    "periodicalIdError",
+    "isValidAutopilotVariant",
+    "targetError",
+    "followUpToError",
+    "MAX_NAME_LENGTH",
+    "MAX_PROMPT_LENGTH",
+    "MAX_URL_LENGTH",
+    "MAX_IDENTIFIER_LENGTH",
+    "MAX_SESSION_ID_LENGTH",
+    "UUID_REGEX",
+    "DANGEROUS_CHARS_REGEX",
+    "STRICT_CONTROL_CHARS_REGEX",
+    "RESERVED_SESSION_ID",
+    "DISPATCH_EFFORT_LEVELS"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 375,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "validateOpaqueDispatchField",
+      "kind": "FunctionDeclaration",
+      "startLine": 74,
+      "endLine": 93,
+      "spanLines": 20,
+      "codeLines": 20,
+      "params": 3,
+      "cyclomatic": 10,
+      "cyclomaticConditionsOnly": 10,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "defaultValue": 3,
+        "if": 4,
+        "or": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "validateSessionId",
+      "kind": "FunctionDeclaration",
+      "startLine": 121,
+      "endLine": 141,
+      "spanLines": 21,
+      "codeLines": 17,
+      "params": 1,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 7,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 5,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "abortFollowUpError",
+      "kind": "FunctionDeclaration",
+      "startLine": 150,
+      "endLine": 154,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "abortToError",
+      "kind": "FunctionDeclaration",
+      "startLine": 157,
+      "endLine": 164,
+      "spanLines": 8,
+      "codeLines": 8,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "ternary": 2,
+        "or": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "cascadeAbortError",
+      "kind": "FunctionDeclaration",
+      "startLine": 167,
+      "endLine": 169,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "dispatchKindError",
+      "kind": "FunctionDeclaration",
+      "startLine": 172,
+      "endLine": 176,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "periodicalIdError",
+      "kind": "FunctionDeclaration",
+      "startLine": 179,
+      "endLine": 183,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "periodicalIdError/λ@180",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 180,
+      "endLine": 180,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "periodicalIdError"
+    },
+    {
+      "name": "isValidAutopilotVariant",
+      "kind": "FunctionDeclaration",
+      "startLine": 186,
+      "endLine": 188,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "targetError",
+      "kind": "FunctionDeclaration",
+      "startLine": 195,
+      "endLine": 199,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 2,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "followUpToError",
+      "kind": "FunctionDeclaration",
+      "startLine": 202,
+      "endLine": 206,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 2,
+        "or": 2,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "validateDispatchPayload",
+      "kind": "FunctionDeclaration",
+      "startLine": 238,
+      "endLine": 351,
+      "spanLines": 114,
+      "codeLines": 67,
+      "params": 1,
+      "cyclomatic": 42,
+      "cyclomaticConditionsOnly": 42,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "if": 22,
+        "and": 17,
+        "or": 1
+      },
+      "enclosing": null
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}

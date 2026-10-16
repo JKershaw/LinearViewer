@@ -1,0 +1,3231 @@
+{
+ "tool": "rung5a dispatch replay",
+ "args": {
+  "old": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main",
+  "new": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3",
+  "n": 3000,
+  "seed": 1,
+  "now": "2026-10-02T12:00:00.000Z",
+  "tiers": [
+   "test",
+   "edge",
+   "gen-v",
+   "gen-vx",
+   "gen-f"
+  ],
+  "only": null
+ },
+ "sides": {
+  "old": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main/dispatch-factory.js",
+     "sha": "a1edc85c8ef2"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  },
+  "new": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-factory.js",
+     "sha": "ff63690ae58d"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-validation.js",
+     "sha": "25058c782b50"
+    }
+   }
+  }
+ },
+ "hermetic": {
+  "env": {
+   "TZ": "UTC",
+   "cleared": [
+    "HARBOUR_*",
+    "GITHUB_*",
+    "DISPATCH_*",
+    "OPENROUTER_*",
+    "FREE_TIER_*"
+   ]
+  },
+  "now": "2026-10-02T12:00:00.000Z",
+  "networkAttempts": 6,
+  "networkSample": [
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   }
+  ]
+ },
+ "importCensus": {
+  "old": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  },
+  "new": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "./prompt-templates.js -> repo",
+    "./workspace-preferences.js -> repo",
+    "./proxy-preamble.js -> repo",
+    "./dispatch-validation.js -> side",
+    "./task-done-cache.js -> repo",
+    "./providers/models.js -> repo",
+    "./consumer-poll-warning.js -> repo",
+    "./file-pointer.js -> repo",
+    "./github-pr-files.js -> repo",
+    "./session-telemetry.js -> repo",
+    "./read-horizon.js -> repo",
+    "./workspace.js -> repo",
+    "./dispatch-targets.js -> repo",
+    "./dispatch-fields.js -> repo",
+    "./prompt-templates.js -> repo",
+    "./periodicals.js -> repo",
+    "./prompts/autopilot-kickoff.js -> repo"
+   ]
+  }
+ },
+ "totals": {
+  "inputs": 14193,
+  "differing": 271,
+  "byTier": {
+   "edge": {
+    "inputs": 339,
+    "differing": 9,
+    "calls": 343
+   },
+   "gen-v": {
+    "inputs": 3000,
+    "differing": 143,
+    "calls": 3000
+   },
+   "gen-vx": {
+    "inputs": 1500,
+    "differing": 0,
+    "calls": 1708
+   },
+   "gen-f": {
+    "inputs": 3000,
+    "differing": 119,
+    "calls": 3233
+   },
+   "test": {
+    "inputs": 6354,
+    "differing": 0,
+    "calls": 6354,
+    "files": 84,
+    "testsOld": 2159,
+    "testsFailingOld": 0
+   }
+  },
+  "elapsedMs": 3442,
+  "exportsDiff": 0,
+  "infoOnly": 0
+ },
+ "exportsDiff": [],
+ "exportsInfo": [],
+ "groups": [
+  {
+   "sig": "validation.validateDispatchPayload payload-reads",
+   "kind": "payload-reads",
+   "count": 118,
+   "byTier": {
+    "edge": 1,
+    "gen-v": 117
+   },
+   "example": {
+    "input": "edge:proxy-reads",
+    "kind": "payload-reads",
+    "sig": "validation.validateDispatchPayload payload-reads",
+    "path": null,
+    "old": "prompt,promptName,issueIdentifier,issueTitle,issueUrl,repo,model,harness,terminal,effort,issueId,followUpTo,target,force,cascade,abort,sessionId,ifParked",
+    "new": "effort,issueId,followUpTo,target,force,cascade,abort,sessionId,ifParked,issueIdentifier,prompt,promptName,issueIdentifier,issueTitle,issueUrl,repo,model,harness,terminal,effort,prompt,promptName,issueTitle,repo",
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "validation",
+       "fn": "validateDispatchPayload",
+       "args": [
+        {
+         "$proxyReads": {
+          "prompt": "p",
+          "model": "m",
+          "unknown": 1
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem deps.calls $deps[]",
+   "kind": "deps.calls",
+   "count": 108,
+   "byTier": {
+    "edge": 6,
+    "gen-f": 102
+   },
+   "example": {
+    "input": "edge:dup-null-date-epoch",
+    "kind": "deps.calls",
+    "sig": "factory.createDispatchItem deps.calls $deps[]",
+    "path": "$deps[1]",
+    "old": "(end)",
+    "new": "store.addItem",
+    "call": 0,
+    "oldDeps": "store.findRecentFreshDispatch",
+    "newDeps": "store.findRecentFreshDispatch, store.addItem",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "findRecentFreshDispatch": {
+             "$fn": {
+              "name": "store.findRecentFreshDispatch",
+              "script": {
+               "k": "res",
+               "v": {
+                "id": "prior-1",
+                "dispatchedAt": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem settle:promise-reject->promise-resolve",
+   "kind": "settle:promise-reject->promise-resolve",
+   "count": 95,
+   "byTier": {
+    "edge": 6,
+    "gen-f": 89
+   },
+   "example": {
+    "input": "edge:dup-null-date-epoch",
+    "kind": "settle:promise-reject->promise-resolve",
+    "sig": "factory.createDispatchItem settle:promise-reject->promise-resolve",
+    "path": null,
+    "old": "promise-reject",
+    "new": "promise-resolve",
+    "call": 0,
+    "oldOutcome": "{\"error\":{\"$\":\"error\",\"ctor\":\"Error\",\"message\":\"A dispatch for this issue and kind was created moments ago\",\"name\":\"Error\",\"props\":{\"duplicateDispatch\":{\"$\":\"obj\",\"o\":{\"code\":\"DUPLICATE_DISPATCH\",\"...",
+    "newOutcome": "{\"type\":\"return\",\"value\":{\"$\":\"obj\",\"o\":{\"_id\":\"item-1\",\"bootstrapToken\":null,\"consumerLastSeenAt\":null,\"effort\":null,\"harness\":\"claude-code\",\"id\":\"item-1\",\"issueIdentifier\":\"LIN-1\",\"kind\":\"impleme...",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "findRecentFreshDispatch": {
+             "$fn": {
+              "name": "store.findRecentFreshDispatch",
+              "script": {
+               "k": "res",
+               "v": {
+                "id": "prior-1",
+                "dispatchedAt": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem returned-identity",
+   "kind": "returned-identity",
+   "count": 92,
+   "byTier": {
+    "edge": 6,
+    "gen-f": 86
+   },
+   "example": {
+    "input": "edge:dup-null-date-epoch",
+    "kind": "returned-identity",
+    "sig": "factory.createDispatchItem returned-identity",
+    "path": null,
+    "new": true,
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "findRecentFreshDispatch": {
+             "$fn": {
+              "name": "store.findRecentFreshDispatch",
+              "script": {
+               "k": "res",
+               "v": {
+                "id": "prior-1",
+                "dispatchedAt": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem env-reads",
+   "kind": "env-reads",
+   "count": 90,
+   "byTier": {
+    "edge": 6,
+    "gen-f": 84
+   },
+   "example": {
+    "input": "edge:dup-null-date-epoch",
+    "kind": "env-reads",
+    "sig": "factory.createDispatchItem env-reads",
+    "path": null,
+    "old": "(none)",
+    "new": "HARBOUR_FILE_POINTER_PILOT",
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "findRecentFreshDispatch": {
+             "$fn": {
+              "name": "store.findRecentFreshDispatch",
+              "script": {
+               "k": "res",
+               "v": {
+                "id": "prior-1",
+                "dispatchedAt": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "validation.validateDispatchPayload error.message $error.message",
+   "kind": "error.message",
+   "count": 27,
+   "byTier": {
+    "edge": 1,
+    "gen-v": 26
+   },
+   "example": {
+    "input": "edge:null-body",
+    "kind": "error.message",
+    "sig": "validation.validateDispatchPayload error.message $error.message",
+    "path": "$error.message",
+    "old": "Cannot destructure property 'prompt' of 'body' as it is null.",
+    "new": "Cannot destructure property 'effort' of 'body' as it is null.",
+    "call": 0,
+    "oldError": "TypeError:Cannot destructure property 'prompt' of 'body' as it is null.",
+    "newError": "TypeError:Cannot destructure property 'effort' of 'body' as it is null.",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "validation",
+       "fn": "validateDispatchPayload",
+       "args": [
+        null
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem error.message $error.name",
+   "kind": "error.message",
+   "count": 19,
+   "byTier": {
+    "edge": 1,
+    "gen-f": 18
+   },
+   "example": {
+    "input": "edge:budget-count-undefined",
+    "kind": "error.message",
+    "sig": "factory.createDispatchItem error.message $error.name",
+    "path": "$error.name",
+    "old": "TypeError",
+    "new": "Error",
+    "call": 0,
+    "oldError": "TypeError:Cannot read properties of undefined (reading 'alreadyCounted')",
+    "newError": "Error:Could not verify the task budget for this run",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "res",
+               "v": {
+                "$u": 1
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "res",
+               "v": {
+                "maxTasks": 2
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1",
+          "sessionId": "run-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem error.message $error.message",
+   "kind": "error.message",
+   "count": 12,
+   "byTier": {
+    "gen-f": 12
+   },
+   "example": {
+    "input": "gen-f:161",
+    "kind": "error.message",
+    "sig": "factory.createDispatchItem error.message $error.message",
+    "path": "$error.message",
+    "old": "A dispatch for this issue and kind was created moments ago",
+    "new": "composedRunMarker must be a string",
+    "call": 0,
+    "oldError": "Error:A dispatch for this issue and kind was created moments ago",
+    "newError": "Error:composedRunMarker must be a string",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme-u161",
+         "prompt": "lone\ud800surrogate",
+         "model": "",
+         "harness": "claude-code",
+         "effort": "low",
+         "composedRunMarker": 5,
+         "getWorkspaceAccessToken": {
+          "$fn": {
+           "name": "getWorkspaceAccessToken",
+           "script": {
+            "k": "res",
+            "v": "tok"
+           }
+          }
+         },
+         "fetchIssueContext": {
+          "$fn": {
+           "name": "fetchIssueContext",
+           "script": {
+            "k": "rej",
+            "e": {
+             "name": "Error",
+             "message": "provider error"
+            }
+           }
+          }
+         },
+         "workspacePreferencesStore": {
+          "$obj": {
+           "name": "workspacePreferencesStore",
+           "props": {
+            "getWorkspacePreferences": {
+             "$fn": {
+              "name": "workspacePreferencesStore.getWorkspacePreferences",
+              "script": {
+               "k": "rej",
+               "e": {
+                "name": "Error",
+                "message": "prefs failed"
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "findRecentFreshDispatch": {
+             "$fn": {
+              "name": "store.findRecentFreshDispatch",
+              "script": {
+               "k": "ret",
+               "v": {
+                "id": "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE",
+                "dispatchedAt": null
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "run-1": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row",
+                  "maxTasks": 4,
+                  "stopAt": "pr"
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "Implement",
+          "issueIdentifier": "#20",
+          "issueId": null,
+          "issueUrl": null,
+          "target": "dash",
+          "repo": null,
+          "force": "true",
+          "abort": false,
+          "cascade": false,
+          "sessionId": "run-1",
+          "queueIfBusy": false,
+          "subscription": "everything",
+          "maxTasks": 3,
+          "stopAt": null
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "marker"
+     }
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem console $console[]",
+   "kind": "console",
+   "count": 3,
+   "byTier": {
+    "gen-f": 3
+   },
+   "example": {
+    "input": "gen-f:59",
+    "kind": "console",
+    "sig": "factory.createDispatchItem console $console[]",
+    "path": "$console[0]",
+    "old": "(none)",
+    "new": "log: [file-pointer] {\"issueIdentifier\":\"LIN-2\",\"c0\":2.5,\"c1\":null,\"arm\":\"control\",\"delivered\":false,\"failOpen\":false,\"reason\":null,\"gapMs\":0}",
+    "call": 0,
+    "inputSpec": "{\"calls\":[{\"mod\":\"factory\",\"fn\":\"createDispatchItem\",\"args\":[{\"urlKey\":\"acme\",\"kind\":\"implementation\",\"prompt\":\"BODY\",\"effort\":\"max\",\"filePointerTimeouts\":{\"count\":5,\"plan\":5,\"step\":60},\"filePointerEnabled\":true,\"readPlanBlock\":{\"$fn\":{\"name\":\"readPlanBlock\",\"script\":{\"k\":\"res\",\"v\":\"## Implementation Plan\\n\"}}},\"filePointerOwners\":[\"acme\"],\"filePointerDoFetch\":{\"$fn\":{\"name\":\"filePointerDoFetch\",\"script\":{\"k\":\"res\",\"v\":{\"$obj\":{\"name\":\"fetchResponse\",\"props\":{\"ok\":false,\"status\":404,\"json\":{\"$fn\":{\"name\":\"fetchResponse.json\",\"script\":{\"k\":\"res\",\"v\":null}}}}}}}}},\"store\":{\"$obj\":{\"name\":\"store\",\"props\":{\"addItem\":{\"$fn\":{\"name\":\"store.addItem\",\"script\":{\"k\":\"echo\"}}},\"findRecentFreshDispatch\":{\"$fn\":{\"name\":\"store.findRecentFreshDispatch\",\"script\":{\"k\":\"res\",\"v\":null}}},\"countDistinctTasksForSession\":{\"$fn\":{\"name\":\"store.countDistinctTasksForSession\",\"script\":{\"k\":\"ret\",\"v\":{\"count\":5,\"alreadyCounted\":false,\"taskDispatches\":1}}}},\"getItemStatus\":{\"$fn\":{\"name\":\"store.getItemStatus\",\"script\":{\"k\":\"byArg\",\"index\":1,\"map\":{\"[object Object]\":{\"k\":\"res\",\"v\":null},\"run-1\":{\"k\":\"res\",\"v\":{\"id\":\"run-row\",\"stopAt\":\"pr\"}}},\"default\":{\"k\":\"res\",\"v\":null}}}},\"countPilotEligible\":{\"$fn\":{\"name\":\"store.countPilotEligible\",\"script\":{\"seq\":[{\"k\":\"res\",\"v\":2.5},{\"k\":\"res\",\"v\":null}],\"then\":{\"k\":\"throw\",\"e\":{\"name\":\"Error\",\"message\":\"count sync\"}}}}},\"listHistory\":{\"$fn\":{\"name\":\"store.listHistory\",\"script\":{\"k\":\"res\",\"v\":{\"items\":[{\"feedback\":[{\"message\":\"[evidence] PR · https://github.com/ot…"
+   }
+  }
+ ],
+ "infoGroups": [],
+ "differingInputs": [
+  "edge:null-body",
+  "edge:proxy-reads",
+  "edge:dup-null-date-epoch",
+  "edge:budget-count-sync-value-typeerror",
+  "edge:budget-count-undefined",
+  "edge:run-read-sync-throw-propagates",
+  "edge:anchor-read-sync-throw",
+  "edge:preset-sync-value-typeerror",
+  "edge:consumer-sync-array-typeerror",
+  "gen-v:61",
+  "gen-v:79",
+  "gen-v:86",
+  "gen-v:110",
+  "gen-v:126",
+  "gen-v:154",
+  "gen-v:165",
+  "gen-v:207",
+  "gen-v:238",
+  "gen-v:282",
+  "gen-v:354",
+  "gen-v:399",
+  "gen-v:433",
+  "gen-v:451",
+  "gen-v:461",
+  "gen-v:469",
+  "gen-v:517",
+  "gen-v:529",
+  "gen-v:535",
+  "gen-v:562",
+  "gen-v:565",
+  "gen-v:570",
+  "gen-v:643",
+  "gen-v:703",
+  "gen-v:714",
+  "gen-v:715",
+  "gen-v:717",
+  "gen-v:773",
+  "gen-v:798",
+  "gen-v:804",
+  "gen-v:857",
+  "gen-v:882",
+  "gen-v:893",
+  "gen-v:912",
+  "gen-v:915",
+  "gen-v:935",
+  "gen-v:940",
+  "gen-v:955",
+  "gen-v:958",
+  "gen-v:966",
+  "gen-v:979",
+  "gen-v:1040",
+  "gen-v:1054",
+  "gen-v:1110",
+  "gen-v:1120",
+  "gen-v:1136",
+  "gen-v:1257",
+  "gen-v:1280",
+  "gen-v:1287",
+  "gen-v:1353",
+  "gen-v:1379",
+  "gen-v:1382",
+  "gen-v:1391",
+  "gen-v:1392",
+  "gen-v:1397",
+  "gen-v:1448",
+  "gen-v:1485",
+  "gen-v:1504",
+  "gen-v:1505",
+  "gen-v:1521",
+  "gen-v:1526",
+  "gen-v:1528",
+  "gen-v:1538",
+  "gen-v:1581",
+  "gen-v:1612",
+  "gen-v:1621",
+  "gen-v:1632",
+  "gen-v:1652",
+  "gen-v:1690",
+  "gen-v:1709",
+  "gen-v:1710",
+  "gen-v:1727",
+  "gen-v:1748",
+  "gen-v:1764",
+  "gen-v:1783",
+  "gen-v:1834",
+  "gen-v:1852",
+  "gen-v:1858",
+  "gen-v:1887",
+  "gen-v:1921",
+  "gen-v:1923",
+  "gen-v:1934",
+  "gen-v:1944",
+  "gen-v:1967",
+  "gen-v:1972",
+  "gen-v:1974",
+  "gen-v:2052",
+  "gen-v:2068",
+  "gen-v:2072",
+  "gen-v:2075",
+  "gen-v:2104",
+  "gen-v:2118",
+  "gen-v:2153",
+  "gen-v:2157",
+  "gen-v:2191",
+  "gen-v:2208",
+  "gen-v:2209",
+  "gen-v:2214",
+  "gen-v:2251",
+  "gen-v:2262",
+  "gen-v:2267",
+  "gen-v:2288",
+  "gen-v:2294",
+  "gen-v:2304",
+  "gen-v:2336",
+  "gen-v:2385",
+  "gen-v:2386",
+  "gen-v:2392",
+  "gen-v:2394",
+  "gen-v:2427",
+  "gen-v:2431",
+  "gen-v:2434",
+  "gen-v:2438",
+  "gen-v:2472",
+  "gen-v:2475",
+  "gen-v:2500",
+  "gen-v:2526",
+  "gen-v:2531",
+  "gen-v:2589",
+  "gen-v:2595",
+  "gen-v:2615",
+  "gen-v:2620",
+  "gen-v:2621",
+  "gen-v:2627",
+  "gen-v:2630",
+  "gen-v:2655",
+  "gen-v:2664",
+  "gen-v:2683",
+  "gen-v:2698",
+  "gen-v:2726",
+  "gen-v:2748",
+  "gen-v:2753",
+  "gen-v:2767",
+  "gen-v:2781",
+  "gen-v:2811",
+  "gen-v:2816",
+  "gen-v:2818",
+  "gen-v:2862",
+  "gen-v:2941",
+  "gen-v:2948",
+  "gen-v:2971",
+  "gen-v:2983",
+  "gen-v:2997",
+  "gen-f:36",
+  "gen-f:45",
+  "gen-f:59",
+  "gen-f:73",
+  "gen-f:103",
+  "gen-f:105",
+  "gen-f:145",
+  "gen-f:161",
+  "gen-f:220",
+  "gen-f:232",
+  "gen-f:233",
+  "gen-f:363",
+  "gen-f:414",
+  "gen-f:422",
+  "gen-f:441",
+  "gen-f:474",
+  "gen-f:501",
+  "gen-f:510",
+  "gen-f:542",
+  "gen-f:563",
+  "gen-f:591",
+  "gen-f:593",
+  "gen-f:595",
+  "gen-f:619",
+  "gen-f:646",
+  "gen-f:711",
+  "gen-f:750",
+  "gen-f:772",
+  "gen-f:797",
+  "gen-f:833",
+  "gen-f:850",
+  "gen-f:875",
+  "gen-f:878",
+  "gen-f:880",
+  "gen-f:896",
+  "gen-f:911",
+  "gen-f:930",
+  "gen-f:960",
+  "gen-f:1048",
+  "gen-f:1063",
+  "gen-f:1086",
+  "gen-f:1092",
+  "gen-f:1096",
+  "gen-f:1098",
+  "gen-f:1108",
+  "gen-f:1120",
+  "gen-f:1144",
+  "gen-f:1173",
+  "gen-f:1258",
+  "gen-f:1305",
+  "gen-f:1337",
+  "gen-f:1376",
+  "gen-f:1470",
+  "gen-f:1499",
+  "gen-f:1536",
+  "gen-f:1580",
+  "gen-f:1581",
+  "gen-f:1601",
+  "gen-f:1624",
+  "gen-f:1639",
+  "gen-f:1686",
+  "gen-f:1715",
+  "gen-f:1725",
+  "gen-f:1728",
+  "gen-f:1838",
+  "gen-f:1846",
+  "gen-f:1853",
+  "gen-f:1880",
+  "gen-f:1896",
+  "gen-f:1985",
+  "gen-f:2066",
+  "gen-f:2073",
+  "gen-f:2091",
+  "gen-f:2103",
+  "gen-f:2104",
+  "gen-f:2107",
+  "gen-f:2113",
+  "gen-f:2115",
+  "gen-f:2168",
+  "gen-f:2169",
+  "gen-f:2209",
+  "gen-f:2228",
+  "gen-f:2248",
+  "gen-f:2254",
+  "gen-f:2257",
+  "gen-f:2259",
+  "gen-f:2272",
+  "gen-f:2318",
+  "gen-f:2335",
+  "gen-f:2416",
+  "gen-f:2446",
+  "gen-f:2470",
+  "gen-f:2477",
+  "gen-f:2481",
+  "gen-f:2498",
+  "gen-f:2499",
+  "gen-f:2503",
+  "gen-f:2521",
+  "gen-f:2534",
+  "gen-f:2538",
+  "gen-f:2545",
+  "gen-f:2621",
+  "gen-f:2667",
+  "gen-f:2687",
+  "gen-f:2689",
+  "gen-f:2774",
+  "gen-f:2788",
+  "gen-f:2809",
+  "gen-f:2822",
+  "gen-f:2826",
+  "gen-f:2829",
+  "gen-f:2836",
+  "gen-f:2863",
+  "gen-f:2872",
+  "gen-f:2915",
+  "gen-f:2930",
+  "gen-f:2933",
+  "gen-f:2975",
+  "gen-f:2991"
+ ],
+ "floor": {
+  "validation.validateDispatchPayload": {
+   "return null": 1506,
+   "throw TypeError: Cannot destructure property 'prompt' of 'body' as it is null.": 27,
+   "return {error}": 1619,
+   "throw TypeError: Cannot convert a Symbol value to a string": 3
+  },
+  "validation.validateOpaqueDispatchField": {
+   "throw TypeError: Cannot read properties of null (reading 'maxLength')": 12,
+   "return {error}": 87,
+   "return null": 192
+  },
+  "validation.validateSessionId": {
+   "return null": 124,
+   "return {error}": 75
+  },
+  "validation.abortToError": {
+   "return null": 22,
+   "return \"abortTo is required and must be a UUID when abort is true\"": 44,
+   "return \"abortTo requires abort to be true\"": 43,
+   "throw TypeError: Cannot destructure property 'isAbort' of 'undefined' as it is undefined.": 7
+  },
+  "validation.abortFollowUpError": {
+   "return \"abort and followUpTo are mutually exclusive\"": 33,
+   "return null": 65,
+   "throw TypeError: Cannot destructure property 'isAbort' of 'undefined' as it is undefined.": 3
+  },
+  "validation.cascadeAbortError": {
+   "return \"cascade requires abort to be true\"": 8,
+   "return null": 80
+  },
+  "validation.dispatchKindError": {
+   "return \"kind must be one of: blocked, bug, plan, look-into, triage,": 17,
+   "return null": 63
+  },
+  "validation.periodicalIdError": {
+   "return \"periodicalId must be one of the known periodical template i": 26,
+   "return null": 65
+  },
+  "validation.targetError": {
+   "return \"target must be one of: cli, web, dash\"": 26,
+   "return null": 40,
+   "throw TypeError: Cannot read properties of undefined (reading 'includes')": 7,
+   "throw TypeError: allowed.join is not a function": 5,
+   "return \"target must be one of: cli, web, dash, local\"": 14,
+   "return \"target must be one of: \"": 6,
+   "return \"target must be one of: x\"": 7
+  },
+  "validation.followUpToError": {
+   "return \"followUpTo is only supported for cli/web targets\"": 3,
+   "return null": 19,
+   "throw TypeError: Cannot destructure property 'followUpTo' of 'undefined' as it is undefined.": 3,
+   "return \"Invalid followUpTo format\"": 58
+  },
+  "factory.isFilePointerPilotEnabled": {
+   "return true": 74,
+   "return false": 113
+  },
+  "factory.createDispatchItem": {
+   "throw Error: createDispatchItem requires a dispatch store with addItem": 31,
+   "throw TypeError: Cannot destructure property 'store' of '(intermediate value)(intermediate value)(intermedi": 7,
+   "throw Error: createDispatchItem requires a urlKey": 63,
+   "throw TypeError: Cannot read properties of null (reading 'followUpTo')": 9,
+   "throw TypeError: Cannot read properties of null (reading 'promptName')": 2,
+   "return {_id,id,prompt,kind,…}": 51,
+   "return {_id,id,promptName,issueIdentifier,…}": 1212,
+   "return {_id,id,promptName,prompt,…}": 6,
+   "throw Error: A dispatch for this issue and kind was created moments ago": 225,
+   "return {_id,id,issueIdentifier,followUpTo,…}": 7,
+   "return {_id,id,issueIdentifier,abort,…}": 2,
+   "throw Error: Daily run limit reached (N of N today). Resets at midnight UTC.": 51,
+   "throw Error: Unable to verify the run limit for this account": 93,
+   "return {_id,id,issueIdentifier,sessionId,…}": 1,
+   "return {_id,id,cascade,prompt,…}": 1,
+   "throw Error: This run's task budget (N) has been reached": 15,
+   "throw Error: Could not verify the task budget for this run": 14,
+   "throw TypeError: store.countDistinctTasksForSession(...).catch is not a function": 16,
+   "throw TypeError: Cannot read properties of undefined (reading 'alreadyCounted')": 7,
+   "throw Error: This task has had N fresh sessions in this run. That looks like a runaway, not a normal fi": 32,
+   "throw Error: status sync": 1,
+   "throw Error: This run stops at its PR — close-out is the person's to send": 61,
+   "return {_id,id,sessionId,prompt,…}": 1,
+   "return {_id,id,sessionId,followUpTo,…}": 1,
+   "return {_id,id,sessionId,stopAt,…}": 2,
+   "throw Error: The anchor issue is terminal — refusing this composed-run dispatch": 260,
+   "throw Error: Could not verify the anchor issue is not terminal — refusing this composed-run dispatch": 95,
+   "throw Error: composedRunMarker must be a string": 36,
+   "throw Error: composedRunMarker exceeds maximum length of N": 15,
+   "throw Error: composedRunMarker contains invalid characters": 19,
+   "return {_id,id,followUpTo,issueId,…}": 4,
+   "return {_id,id,followUpTo,issueIdentifier,…}": 2,
+   "return {_id,id,followUpTo,issueSource,…}": 1,
+   "return {_id,id,followUpTo,sessionGroupId,…}": 2,
+   "return {_id,id,followUpTo,prompt,…}": 2,
+   "throw Error: sync": 1,
+   "throw DataCloneError: function (...args) {\n    const r = pick() || { k: 'ret', v: { $u: N } };\n    ctx.rec.push(": 1,
+   "throw TypeError: Cannot read properties of null (reading 'dispatchDefaults')": 27,
+   "throw Error: prefs down": 1,
+   "throw TypeError: dispatchPresetsStore.get(...).catch is not a function": 4,
+   "return {_id,id,issueIdentifier,prompt,…}": 7,
+   "throw Error: mint": 1,
+   "throw TypeError: dispatchTokenStore.listTokens(...).catch is not a function": 25,
+   "throw TypeError: Cannot add property budgetPosition, object is not extensible": 2,
+   "throw TypeError: Cannot set properties of null (setting 'budgetPosition')": 1,
+   "return null": 39,
+   "throw Error: dup key": 1,
+   "return {issueIdentifier,sessionId,prompt,kind,…}": 1,
+   "return {_id,id,promptName,target,…}": 51,
+   "return {_id,id,issueUrl,dispatchedBy,…}": 5,
+   "return {_id,id,promptName,dispatchedBy,…}": 37,
+   "return {_id,id,promptName,issueUrl,…}": 45,
+   "return {_id,id,promptName,issueId,…}": 153,
+   "return {_id,id,issueIdentifier,issueTitle,…}": 26,
+   "throw Error: mint failed": 49,
+   "return {_id,id,issueIdentifier,issueId,…}": 76,
+   "return {_id,id,issueId,cascade,…}": 1,
+   "return {_id,id,target,followUpTo,…}": 4,
+   "throw Error: prefs failed": 20,
+   "throw Error: run sync": 8,
+   "throw Error: insert failed": 40,
+   "throw Error: anchor sync": 10,
+   "return {_id,id,promptName,issueTitle,…}": 73,
+   "throw Error: This run's task budget (N.N) has been reached": 4,
+   "throw Error: finalize sync throw": 34,
+   "return {_id,id,promptName,followUpTo,…}": 21,
+   "return {_id,id,issueIdentifier,dispatchedBy,…}": 28,
+   "throw TypeError: proxyTokenStore.listTokens(...).catch is not a function": 17,
+   "return {promptName,issueIdentifier,issueUrl,dispatchedBy,…}": 4,
+   "return {_id,id,issueTitle,dispatchedBy,…}": 5,
+   "throw Error: addItem sync throw": 23,
+   "return {_id,id,waitForFollowUps,prompt,…}": 1,
+   "return {_id,id,issueIdentifier,issueUrl,…}": 19,
+   "return {_id,id,issueTitle,target,…}": 5,
+   "return {_id,id,promptName,force,…}": 3,
+   "return {_id,id,issueIdentifier,target,…}": 23,
+   "return {promptName,dispatchedBy,target,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,issueTitle,issueUrl,…}": 2,
+   "return {_id,id,issueId,issueTitle,…}": 8,
+   "return {_id,id,issueId,issueUrl,…}": 7,
+   "throw Error: Daily run limit reached (N of undefined today). Resets at midnight UTC.": 12,
+   "return {issueIdentifier,issueId,followUpTo,force,…}": 1,
+   "return {issueIdentifier,dispatchedBy,followUpTo,force,…}": 1,
+   "return {_id,id,followUpTo,abort,…}": 2,
+   "return {_id,id,promptName,repo,…}": 7,
+   "return {0,1,2,_id,…}": 7,
+   "return {promptName,issueIdentifier,issueTitle,followUpTo,…}": 2,
+   "return {_id,id,issueId,target,…}": 7,
+   "throw TypeError: Cannot read properties of undefined (reading 'taskDispatches')": 12,
+   "throw Error: sync count": 3,
+   "return {0,1,_id,id,…}": 5,
+   "return {issueUrl,target,followUpTo,force,…}": 1,
+   "return {promptName,issueIdentifier,issueId,issueTitle,…}": 5,
+   "return {_id,id,issueTitle,issueUrl,…}": 2,
+   "return {_id,id,followUpTo,cascade,…}": 1,
+   "return {_id,id,followUpTo,force,…}": 2,
+   "return {promptName,issueIdentifier,followUpTo,force,…}": 2,
+   "return {_id,id,dispatchedBy,followUpTo,…}": 1,
+   "return {_id,id,dispatchedBy,target,…}": 4,
+   "return {_id,id,repo,followUpTo,…}": 3,
+   "return {_id,id,issueId,dispatchedBy,…}": 6,
+   "return {_id,id,target,repo,…}": 2,
+   "return {issueIdentifier,issueId,dispatchedBy,target,…}": 1,
+   "return {promptName,issueIdentifier,issueId,issueUrl,…}": 2,
+   "return {promptName,issueId,repo,followUpTo,…}": 2,
+   "return {_id,id,dispatchedBy,repo,…}": 2,
+   "return {promptName,issueIdentifier,issueId,dispatchedBy,…}": 3,
+   "return {issueId,issueTitle,target,followUpTo,…}": 1,
+   "return {promptName,issueId,issueTitle,issueUrl,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,target,abort,…}": 1,
+   "return {promptName,followUpTo,abort,sessionId,…}": 1,
+   "return {issueIdentifier,target,repo,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,target,…}": 1,
+   "return {_id,id,issueUrl,target,…}": 3,
+   "return {_id,id,issueId,force,…}": 1,
+   "return {_id,id,promptName,abort,…}": 1,
+   "return {promptName,issueIdentifier,issueId,target,…}": 2,
+   "return {promptName,target,followUpTo,force,…}": 3,
+   "return {promptName,issueIdentifier,target,followUpTo,…}": 1,
+   "return {issueIdentifier,issueTitle,target,followUpTo,…}": 1,
+   "return {_id,id,issueUrl,followUpTo,…}": 1,
+   "return {_id,id,issueId,followUpTo,…}": 1,
+   "return {_id,id,issueId,repo,…}": 1,
+   "return {promptName,issueUrl,target,followUpTo,…}": 1,
+   "return {_id,id,cascade,queueIfBusy,…}": 1,
+   "return {prompt,kind,model,harness,…}": 1,
+   "return {_id,id,issueTitle,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,repo,…}": 1,
+   "return {promptName,issueIdentifier,repo,abort,…}": 1,
+   "return {_id,id,issueIdentifier,repo,…}": 1,
+   "return {promptName,issueUrl,dispatchedBy,repo,…}": 1
+  },
+  "validation.DANGEROUS_CHARS_REGEX.test": {
+   "return false": 115,
+   "return true": 14
+  },
+  "validation.STRICT_CONTROL_CHARS_REGEX.test": {
+   "return false": 79,
+   "return true": 8
+  },
+  "validation.isValidAutopilotVariant": {
+   "return false": 62,
+   "return true": 25
+  },
+  "validation.UUID_REGEX.test": {
+   "return false": 88,
+   "return true": 8
+  }
+ },
+ "testTier": {
+  "files": 84,
+  "discovery": null,
+  "callsByExport": {
+   "factory.createDispatchItem": 936,
+   "validation.abortFollowUpError": 458,
+   "validation.targetError": 765,
+   "validation.abortToError": 380,
+   "validation.cascadeAbortError": 364,
+   "validation.dispatchKindError": 383,
+   "validation.periodicalIdError": 553,
+   "validation.validateDispatchPayload": 391,
+   "validation.validateOpaqueDispatchField": 1520,
+   "validation.validateSessionId": 280,
+   "validation.followUpToError": 185,
+   "validation.isValidAutopilotVariant": 135,
+   "factory.isFilePointerPilotEnabled": 4
+  },
+  "perFile": [
+   {
+    "file": "tests/unit/chat-tools.test.js",
+    "calls": {
+     "old": 16,
+     "new": 16
+    },
+    "tests": {
+     "old": 213,
+     "oldFailing": 0,
+     "new": 213,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 988,
+     "new": 955
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/close-out-is-the-persons-relay.test.js",
+    "calls": {
+     "old": 51,
+     "new": 51
+    },
+    "tests": {
+     "old": 6,
+     "oldFailing": 0,
+     "new": 6,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 825,
+     "new": 860
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/collective-dispatch-defaults.test.js",
+    "calls": {
+     "old": 4,
+     "new": 4
+    },
+    "tests": {
+     "old": 4,
+     "oldFailing": 0,
+     "new": 4,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 652,
+     "new": 609
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/collective-fanout-characterization.test.js",
+    "calls": {
+     "old": 28,
+     "new": 28
+    },
+    "tests": {
+     "old": 18,
+     "oldFailing": 0,
+     "new": 18,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 687,
+     "new": 652
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/collective-mcp-token.test.js",
+    "calls": {
+     "old": 10,
+     "new": 10
+    },
+    "tests": {
+     "old": 13,
+     "oldFailing": 0,
+     "new": 13,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 711,
+     "new": 617
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-factory-run-gate.test.js",
+    "calls": {
+     "old": 14,
+     "new": 14
+    },
+    "tests": {
+     "old": 16,
+     "oldFailing": 0,
+     "new": 16,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 288,
+     "new": 248
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-factory.test.js",
+    "calls": {
+     "old": 169,
+     "new": 169
+    },
+    "tests": {
+     "old": 179,
+     "oldFailing": 0,
+     "new": 179,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 513,
+     "new": 548
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-payload-validation.test.js",
+    "calls": {
+     "old": 174,
+     "new": 174
+    },
+    "tests": {
+     "old": 90,
+     "oldFailing": 0,
+     "new": 90,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 391,
+     "new": 385
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-queue-limiter-export.test.js",
+    "calls": {
+     "old": 130,
+     "new": 130
+    },
+    "tests": {
+     "old": 5,
+     "oldFailing": 0,
+     "new": 5,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 712,
+     "new": 743
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-defaults.test.js",
+    "calls": {
+     "old": 88,
+     "new": 88
+    },
+    "tests": {
+     "old": 14,
+     "oldFailing": 0,
+     "new": 14,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 579,
+     "new": 601
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-max-tasks.test.js",
+    "calls": {
+     "old": 80,
+     "new": 80
+    },
+    "tests": {
+     "old": 11,
+     "oldFailing": 0,
+     "new": 11,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 558,
+     "new": 596
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-model.test.js",
+    "calls": {
+     "old": 148,
+     "new": 148
+    },
+    "tests": {
+     "old": 23,
+     "oldFailing": 0,
+     "new": 23,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 707,
+     "new": 555
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-periodical-id.test.js",
+    "calls": {
+     "old": 154,
+     "new": 154
+    },
+    "tests": {
+     "old": 25,
+     "oldFailing": 0,
+     "new": 25,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 998,
+     "new": 859
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-preset-crud.test.js",
+    "calls": {
+     "old": 106,
+     "new": 106
+    },
+    "tests": {
+     "old": 42,
+     "oldFailing": 0,
+     "new": 42,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 604,
+     "new": 632
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-presets.test.js",
+    "calls": {
+     "old": 52,
+     "new": 52
+    },
+    "tests": {
+     "old": 8,
+     "oldFailing": 0,
+     "new": 8,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 522,
+     "new": 485
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-proxy-context.test.js",
+    "calls": {
+     "old": 102,
+     "new": 102
+    },
+    "tests": {
+     "old": 16,
+     "oldFailing": 0,
+     "new": 16,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 634,
+     "new": 566
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-stop-at.test.js",
+    "calls": {
+     "old": 68,
+     "new": 68
+    },
+    "tests": {
+     "old": 11,
+     "oldFailing": 0,
+     "new": 11,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 585,
+     "new": 513
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-terminal-anchor-guard.test.js",
+    "calls": {
+     "old": 48,
+     "new": 48
+    },
+    "tests": {
+     "old": 7,
+     "oldFailing": 0,
+     "new": 7,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 565,
+     "new": 509
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-route-variant.test.js",
+    "calls": {
+     "old": 54,
+     "new": 54
+    },
+    "tests": {
+     "old": 8,
+     "oldFailing": 0,
+     "new": 8,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 474,
+     "new": 564
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-store-trim.test.js",
+    "calls": {
+     "old": 4,
+     "new": 4
+    },
+    "tests": {
+     "old": 25,
+     "oldFailing": 0,
+     "new": 25,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 317,
+     "new": 319
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/dispatch-validation.test.js",
+    "calls": {
+     "old": 17,
+     "new": 17
+    },
+    "tests": {
+     "old": 16,
+     "oldFailing": 0,
+     "new": 16,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 224,
+     "new": 245
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/feedback-attachment-roundtrip.test.js",
+    "calls": {
+     "old": 6,
+     "new": 6
+    },
+    "tests": {
+     "old": 4,
+     "oldFailing": 0,
+     "new": 4,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 789,
+     "new": 822
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/feedback-route.test.js",
+    "calls": {
+     "old": 145,
+     "new": 145
+    },
+    "tests": {
+     "old": 57,
+     "oldFailing": 0,
+     "new": 57,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1102,
+     "new": 1237
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/feedback-title.test.js",
+    "calls": {
+     "old": 8,
+     "new": 8
+    },
+    "tests": {
+     "old": 12,
+     "oldFailing": 0,
+     "new": 12,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 837,
+     "new": 804
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/file-pointer-factory.test.js",
+    "calls": {
+     "old": 32,
+     "new": 32
+    },
+    "tests": {
+     "old": 25,
+     "oldFailing": 0,
+     "new": 25,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 434,
+     "new": 439
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/file-pointer-routes.test.js",
+    "calls": {
+     "old": 34,
+     "new": 34
+    },
+    "tests": {
+     "old": 8,
+     "oldFailing": 0,
+     "new": 8,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 847,
+     "new": 978
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/flight-companion-approve-follow-up-route.test.js",
+    "calls": {
+     "old": 35,
+     "new": 35
+    },
+    "tests": {
+     "old": 20,
+     "oldFailing": 0,
+     "new": 20,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 885,
+     "new": 1046
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/flight-companion-turn-route.test.js",
+    "calls": {
+     "old": 1,
+     "new": 1
+    },
+    "tests": {
+     "old": 119,
+     "oldFailing": 0,
+     "new": 119,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 2302,
+     "new": 1816
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2216-transient-vs-terminal-auth.test.js",
+    "calls": {
+     "old": 32,
+     "new": 32
+    },
+    "tests": {
+     "old": 24,
+     "oldFailing": 0,
+     "new": 24,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 964,
+     "new": 796
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2260-recommend-dispatch-auth-classification.test.js",
+    "calls": {
+     "old": 71,
+     "new": 71
+    },
+    "tests": {
+     "old": 11,
+     "oldFailing": 0,
+     "new": 11,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 858,
+     "new": 831
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2353-feedback-triage-provider-ui.test.js",
+    "calls": {
+     "old": 19,
+     "new": 19
+    },
+    "tests": {
+     "old": 7,
+     "oldFailing": 0,
+     "new": 7,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 792,
+     "new": 918
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2353-proxy-provider-ui-threading.test.js",
+    "calls": {
+     "old": 144,
+     "new": 144
+    },
+    "tests": {
+     "old": 15,
+     "oldFailing": 0,
+     "new": 15,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1003,
+     "new": 927
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2354-session-lane-no-provider.test.js",
+    "calls": {
+     "old": 30,
+     "new": 30
+    },
+    "tests": {
+     "old": 11,
+     "oldFailing": 0,
+     "new": 11,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 756,
+     "new": 915
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2363-kickoff-provider-attribution.test.js",
+    "calls": {
+     "old": 49,
+     "new": 49
+    },
+    "tests": {
+     "old": 12,
+     "oldFailing": 0,
+     "new": 12,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 751,
+     "new": 766
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2615-effort-route-coverage.test.js",
+    "calls": {
+     "old": 140,
+     "new": 140
+    },
+    "tests": {
+     "old": 21,
+     "oldFailing": 0,
+     "new": 21,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 950,
+     "new": 1058
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2804-provider-ui-endpoint-hints.test.js",
+    "calls": {
+     "old": 54,
+     "new": 54
+    },
+    "tests": {
+     "old": 9,
+     "oldFailing": 0,
+     "new": 9,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 896,
+     "new": 861
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-2872-recommend-dispatch-force-followup.test.js",
+    "calls": {
+     "old": 150,
+     "new": 150
+    },
+    "tests": {
+     "old": 18,
+     "oldFailing": 0,
+     "new": 18,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 985,
+     "new": 1054
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3059-runner-criterion.test.js",
+    "calls": {
+     "old": 8,
+     "new": 8
+    },
+    "tests": {
+     "old": 3,
+     "oldFailing": 0,
+     "new": 3,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 833,
+     "new": 811
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3130-runner-ownership.test.js",
+    "calls": {
+     "old": 2,
+     "new": 2
+    },
+    "tests": {
+     "old": 21,
+     "oldFailing": 0,
+     "new": 21,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1696,
+     "new": 1789
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3133-enqueue-read-scope-refusal.test.js",
+    "calls": {
+     "old": 26,
+     "new": 26
+    },
+    "tests": {
+     "old": 12,
+     "oldFailing": 0,
+     "new": 12,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 953,
+     "new": 868
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3134-default-path-characterization.test.js",
+    "calls": {
+     "old": 179,
+     "new": 179
+    },
+    "tests": {
+     "old": 64,
+     "oldFailing": 0,
+     "new": 64,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1085,
+     "new": 1033
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3134-factory-grant-declaration.test.js",
+    "calls": {
+     "old": 5,
+     "new": 5
+    },
+    "tests": {
+     "old": 8,
+     "oldFailing": 0,
+     "new": 8,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 246,
+     "new": 236
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3134-followup-sites.test.js",
+    "calls": {
+     "old": 769,
+     "new": 769
+    },
+    "tests": {
+     "old": 126,
+     "oldFailing": 0,
+     "new": 126,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 2307,
+     "new": 2480
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3134-secrecy-sinks.test.js",
+    "calls": {
+     "old": 37,
+     "new": 37
+    },
+    "tests": {
+     "old": 20,
+     "oldFailing": 0,
+     "new": 20,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 986,
+     "new": 906
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3134-wake-declared.test.js",
+    "calls": {
+     "old": 16,
+     "new": 16
+    },
+    "tests": {
+     "old": 36,
+     "oldFailing": 0,
+     "new": 36,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1122,
+     "new": 1211
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3136-dispatch-gate.test.js",
+    "calls": {
+     "old": 67,
+     "new": 67
+    },
+    "tests": {
+     "old": 36,
+     "oldFailing": 0,
+     "new": 36,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1155,
+     "new": 1033
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3136-driver-copy-mint.test.js",
+    "calls": {
+     "old": 17,
+     "new": 17
+    },
+    "tests": {
+     "old": 24,
+     "oldFailing": 0,
+     "new": 24,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1128,
+     "new": 1040
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3136-m1-kickoff-declared.test.js",
+    "calls": {
+     "old": 95,
+     "new": 95
+    },
+    "tests": {
+     "old": 13,
+     "oldFailing": 0,
+     "new": 13,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 922,
+     "new": 954
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3136-m2-session-declared.test.js",
+    "calls": {
+     "old": 124,
+     "new": 124
+    },
+    "tests": {
+     "old": 22,
+     "oldFailing": 0,
+     "new": 22,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 820,
+     "new": 791
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3254-follow-up-dispatch-extraction.test.js",
+    "calls": {
+     "old": 13,
+     "new": 13
+    },
+    "tests": {
+     "old": 21,
+     "oldFailing": 0,
+     "new": 21,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 874,
+     "new": 839
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3254-run-proposals-apply.test.js",
+    "calls": {
+     "old": 6,
+     "new": 6
+    },
+    "tests": {
+     "old": 21,
+     "oldFailing": 0,
+     "new": 21,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 792,
+     "new": 930
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3254-run-scoped-chat.test.js",
+    "calls": {
+     "old": 2,
+     "new": 2
+    },
+    "tests": {
+     "old": 16,
+     "oldFailing": 0,
+     "new": 16,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 855,
+     "new": 889
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3335-one-source-per-kind.test.js",
+    "calls": {
+     "old": 16,
+     "new": 16
+    },
+    "tests": {
+     "old": 14,
+     "oldFailing": 0,
+     "new": 14,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 472,
+     "new": 458
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3335-proxy-source-routing.test.js",
+    "calls": {
+     "old": 33,
+     "new": 33
+    },
+    "tests": {
+     "old": 9,
+     "oldFailing": 0,
+     "new": 9,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 854,
+     "new": 882
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3383-owner-only-entries.test.js",
+    "calls": {
+     "old": 74,
+     "new": 74
+    },
+    "tests": {
+     "old": 18,
+     "oldFailing": 0,
+     "new": 18,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 757,
+     "new": 805
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3438-if-parked-refusal.test.js",
+    "calls": {
+     "old": 26,
+     "new": 26
+    },
+    "tests": {
+     "old": 4,
+     "oldFailing": 0,
+     "new": 4,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 764,
+     "new": 796
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3487-entrance-messages.test.js",
+    "calls": {
+     "old": 101,
+     "new": 101
+    },
+    "tests": {
+     "old": 24,
+     "oldFailing": 0,
+     "new": 24,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 877,
+     "new": 904
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/lin-3491-agent-prompt-mint.test.js",
+    "calls": {
+     "old": 8,
+     "new": 8
+    },
+    "tests": {
+     "old": 16,
+     "oldFailing": 0,
+     "new": 16,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 853,
+     "new": 856
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-ai-availability-gate.test.js",
+    "calls": {
+     "old": 17,
+     "new": 17
+    },
+    "tests": {
+     "old": 19,
+     "oldFailing": 0,
+     "new": 19,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 919,
+     "new": 865
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-autopilot-variant.test.js",
+    "calls": {
+     "old": 275,
+     "new": 275
+    },
+    "tests": {
+     "old": 35,
+     "oldFailing": 0,
+     "new": 35,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1142,
+     "new": 1036
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-bootstrap-owner.test.js",
+    "calls": {
+     "old": 8,
+     "new": 8
+    },
+    "tests": {
+     "old": 5,
+     "oldFailing": 0,
+     "new": 5,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 738,
+     "new": 770
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-bootstrap-token.test.js",
+    "calls": {
+     "old": 77,
+     "new": 77
+    },
+    "tests": {
+     "old": 15,
+     "oldFailing": 0,
+     "new": 15,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 920,
+     "new": 1059
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-defaults.test.js",
+    "calls": {
+     "old": 274,
+     "new": 274
+    },
+    "tests": {
+     "old": 33,
+     "oldFailing": 0,
+     "new": 33,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1150,
+     "new": 1225
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-followup-context.test.js",
+    "calls": {
+     "old": 80,
+     "new": 80
+    },
+    "tests": {
+     "old": 13,
+     "oldFailing": 0,
+     "new": 13,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1025,
+     "new": 955
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-max-tasks.test.js",
+    "calls": {
+     "old": 146,
+     "new": 146
+    },
+    "tests": {
+     "old": 18,
+     "oldFailing": 0,
+     "new": 18,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 913,
+     "new": 1012
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-model.test.js",
+    "calls": {
+     "old": 232,
+     "new": 232
+    },
+    "tests": {
+     "old": 37,
+     "oldFailing": 0,
+     "new": 37,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1071,
+     "new": 1051
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-referent-guard.test.js",
+    "calls": {
+     "old": 94,
+     "new": 94
+    },
+    "tests": {
+     "old": 23,
+     "oldFailing": 0,
+     "new": 23,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 903,
+     "new": 940
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-dispatch-subscribe.test.js",
+    "calls": {
+     "old": 94,
+     "new": 94
+    },
+    "tests": {
+     "old": 11,
+     "oldFailing": 0,
+     "new": 11,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 963,
+     "new": 876
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-endpoint-inventory-witness.test.js",
+    "calls": {
+     "old": 1,
+     "new": 1
+    },
+    "tests": {
+     "old": 84,
+     "oldFailing": 0,
+     "new": 84,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1249,
+     "new": 1158
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-kickoff-goal-length.test.js",
+    "calls": {
+     "old": 51,
+     "new": 51
+    },
+    "tests": {
+     "old": 10,
+     "oldFailing": 0,
+     "new": 10,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 934,
+     "new": 887
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-kickoff-max-tasks.test.js",
+    "calls": {
+     "old": 249,
+     "new": 249
+    },
+    "tests": {
+     "old": 18,
+     "oldFailing": 0,
+     "new": 18,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 984,
+     "new": 917
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-kickoff-presets.test.js",
+    "calls": {
+     "old": 35,
+     "new": 35
+    },
+    "tests": {
+     "old": 5,
+     "oldFailing": 0,
+     "new": 5,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 686,
+     "new": 742
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-openrouter-fallback-note.test.js",
+    "calls": {
+     "old": 8,
+     "new": 8
+    },
+    "tests": {
+     "old": 10,
+     "oldFailing": 0,
+     "new": 10,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 852,
+     "new": 948
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-openrouter-principal-hop.test.js",
+    "calls": {
+     "old": 9,
+     "new": 9
+    },
+    "tests": {
+     "old": 9,
+     "oldFailing": 0,
+     "new": 9,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 926,
+     "new": 844
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-prompt-attachments.test.js",
+    "calls": {
+     "old": 9,
+     "new": 9
+    },
+    "tests": {
+     "old": 3,
+     "oldFailing": 0,
+     "new": 3,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 729,
+     "new": 731
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-recommend-dispatch-max-tasks.test.js",
+    "calls": {
+     "old": 60,
+     "new": 60
+    },
+    "tests": {
+     "old": 4,
+     "oldFailing": 0,
+     "new": 4,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 797,
+     "new": 723
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/proxy-recommend-dispatch-subscribe.test.js",
+    "calls": {
+     "old": 150,
+     "new": 150
+    },
+    "tests": {
+     "old": 18,
+     "oldFailing": 0,
+     "new": 18,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 1032,
+     "new": 855
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/recommend-one-path.test.js",
+    "calls": {
+     "old": 77,
+     "new": 77
+    },
+    "tests": {
+     "old": 30,
+     "oldFailing": 0,
+     "new": 30,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 2905,
+     "new": 2562
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/resolve-routing-from-config.test.js",
+    "calls": {
+     "old": 2,
+     "new": 2
+    },
+    "tests": {
+     "old": 23,
+     "oldFailing": 0,
+     "new": 23,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 336,
+     "new": 252
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/run-limit-gating.test.js",
+    "calls": {
+     "old": 40,
+     "new": 40
+    },
+    "tests": {
+     "old": 15,
+     "oldFailing": 0,
+     "new": 15,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 681,
+     "new": 500
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/session-id-render-seam.test.js",
+    "calls": {
+     "old": 16,
+     "new": 16
+    },
+    "tests": {
+     "old": 3,
+     "oldFailing": 0,
+     "new": 3,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 728,
+     "new": 643
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/stop-at-child-inheritance.test.js",
+    "calls": {
+     "old": 102,
+     "new": 102
+    },
+    "tests": {
+     "old": 11,
+     "oldFailing": 0,
+     "new": 11,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 707,
+     "new": 728
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/task-chat-route.test.js",
+    "calls": {
+     "old": 1,
+     "new": 1
+    },
+    "tests": {
+     "old": 17,
+     "oldFailing": 0,
+     "new": 17,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 510,
+     "new": 478
+    },
+    "diffs": 0,
+    "oldFailures": []
+   },
+   {
+    "file": "tests/unit/task-mode-routes.test.js",
+    "calls": {
+     "old": 156,
+     "new": 156
+    },
+    "tests": {
+     "old": 39,
+     "oldFailing": 0,
+     "new": 39,
+     "newFailing": 0
+    },
+    "exit": {
+     "old": 0,
+     "new": 0
+    },
+    "ms": {
+     "old": 643,
+     "new": 598
+    },
+    "diffs": 0,
+    "oldFailures": []
+   }
+  ]
+ },
+ "coverage": {
+  "old": {
+   "dispatch-factory.js": {
+    "linesTotal": 545,
+    "linesCovered": 545,
+    "pct": 100,
+    "uncoveredLines": [],
+    "blocksHit": 317,
+    "blocksTotal": 319,
+    "unhitBlocks": [
+     {
+      "line": 84,
+      "endLine": 84,
+      "code": "return;"
+     },
+     {
+      "line": 146,
+      "endLine": 146,
+      "code": ": Promise.resolve([])"
+     }
+    ]
+   },
+   "dispatch-validation.js": {
+    "linesTotal": 182,
+    "linesCovered": 182,
+    "pct": 100,
+    "uncoveredLines": [],
+    "blocksHit": 129,
+    "blocksTotal": 129,
+    "unhitBlocks": []
+   }
+  },
+  "new": {
+   "dispatch-factory.js": {
+    "linesTotal": 490,
+    "linesCovered": 490,
+    "pct": 100,
+    "uncoveredLines": [],
+    "blocksHit": 281,
+    "blocksTotal": 282,
+    "unhitBlocks": [
+     {
+      "line": 609,
+      "endLine": 609,
+      "code": ": config"
+     }
+    ]
+   },
+   "dispatch-validation.js": {
+    "linesTotal": 146,
+    "linesCovered": 146,
+    "pct": 100,
+    "uncoveredLines": [],
+    "blocksHit": 105,
+    "blocksTotal": 105,
+    "unhitBlocks": []
+   }
+  }
+ }
+}

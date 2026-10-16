@@ -509,3 +509,32 @@ Four files rebuilt in one PR (#1903, merged as `1f8010a0`): `render.js`, `render
 **Prediction:** most lines hit. One miss: the two worst functions would both drop below 40 (`renderSessionPage` is 42).
 
 **Verdict.** The method held at 2.5× size in one PR, with no visible regression. The flattening is smaller than on the hot-spot rungs, because the cluster's complexity is spread across many page functions rather than one giant. The Home row and page functions and the run page's main function are still the most complex. Most of the wall-clock went to infrastructure, not the method.
+
+## 16 Oct ~22:20Z: rung 5a (LIN-3580, dispatch factory + validation) done and scored
+
+**Run.** First launch ~17:20Z. The worker died in the laptop reboot, and the run was paused at 18:58Z for the two-run cap. It was relaunched at 20:27Z with the efficiency wording and merged as #1904 (`b3bdccaf`); Done at 21:56Z, 90 minutes after the relaunch. Not split.
+
+**Independent replay** (`experiments/rebuild-rung5a/`, 14,193 inputs per seed, 100% line coverage of the old files):
+- 271 / 293 inputs differ. 0 of the 6,354 test-captured calls differ, and none of the 2,159 test outcomes.
+- The old factory was patched with exactly the PR's four fixes; against that, the new factory gives 0 differences on both seeds.
+- **(a) fixes:**
+  1. A store read that throws synchronously, or returns a plain value, is treated like a rejection.
+  2. An `undefined` task count is treated as unreadable: it was a TypeError, and is now 409 `BUDGET_EXHAUSTED` with `count: null`.
+  3. A duplicate with `dispatchedAt: null` is admitted.
+  4. A failed consumer-stamp read stamps `null`, instead of rejecting after the token was minted.
+- **(c) fuzz:** validation's property-read order, only on Proxy or getter bodies, with the same verdict; and a TypeError's wording on a `null` body.
+- **(b): 0.** Refusal codes, status, `retryAfter`, the `addItem` argument, the anchor cache and the token mint all match old-plus-fixes.
+
+**Shape:**
+- code lines 727 → 636 (−12.5%);
+- decision points 285 → 226 (−21%);
+- **`createDispatchItem` 181 → 49**, the codebase's worst function. The next worst are now 21 and 19;
+- validation's worst 42 → 20.
+
+No helper module, and no existing test edited. Every source-text census passes. Ticket references: 39 of 40 kept (LIN-1094 was dropped from a docblock).
+
+**Prediction:** 9 hits. Misses: the worst function under 30 (it's 49), and wall-clock time (4h36m, because of the reboot and the pause).
+
+**Notes:**
+- Fix 4 nulls the whole consumer stamp when one token store fails, so a response can say "never polled" while the other store has tokens. LIN-3581 is filed for the cause.
+- The PR's own count for `createDispatchItem` (about 25) is low against the kit (48, or 29 without parameter defaults).

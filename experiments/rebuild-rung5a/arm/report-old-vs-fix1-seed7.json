@@ -1,0 +1,918 @@
+{
+ "tool": "rung5a dispatch replay",
+ "args": {
+  "old": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main",
+  "new": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix1",
+  "n": 3000,
+  "seed": 7,
+  "now": "2026-10-02T12:00:00.000Z",
+  "tiers": [
+   "edge",
+   "gen-f"
+  ],
+  "only": null
+ },
+ "sides": {
+  "old": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main/dispatch-factory.js",
+     "sha": "a1edc85c8ef2"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  },
+  "new": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix1",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix1/dispatch-factory.js",
+     "sha": "578970c5ecfa"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix1/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  }
+ },
+ "hermetic": {
+  "env": {
+   "TZ": "UTC",
+   "cleared": [
+    "HARBOUR_*",
+    "GITHUB_*",
+    "DISPATCH_*",
+    "OPENROUTER_*",
+    "FREE_TIER_*"
+   ]
+  },
+  "now": "2026-10-02T12:00:00.000Z",
+  "networkAttempts": 6,
+  "networkSample": [
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   }
+  ]
+ },
+ "importCensus": {
+  "old": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  },
+  "new": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  }
+ },
+ "totals": {
+  "inputs": 3339,
+  "differing": 52,
+  "byTier": {
+   "edge": {
+    "inputs": 339,
+    "differing": 4,
+    "calls": 343
+   },
+   "gen-f": {
+    "inputs": 3000,
+    "differing": 48,
+    "calls": 3224
+   }
+  },
+  "elapsedMs": 1901,
+  "exportsDiff": 0,
+  "infoOnly": 0
+ },
+ "exportsDiff": [],
+ "exportsInfo": [],
+ "groups": [
+  {
+   "sig": "factory.createDispatchItem deps.calls $deps[]",
+   "kind": "deps.calls",
+   "count": 44,
+   "byTier": {
+    "edge": 4,
+    "gen-f": 40
+   },
+   "example": {
+    "input": "edge:budget-count-sync-value-typeerror",
+    "kind": "deps.calls",
+    "sig": "factory.createDispatchItem deps.calls $deps[]",
+    "path": "$deps[2]",
+    "old": "(end)",
+    "new": "store.addItem",
+    "call": 0,
+    "oldDeps": "store.getItemStatus, store.countDistinctTasksForSession",
+    "newDeps": "store.getItemStatus, store.countDistinctTasksForSession, store.addItem",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "ret",
+               "v": {
+                "count": 0,
+                "taskDispatches": 0
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "res",
+               "v": {
+                "maxTasks": 2
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1",
+          "sessionId": "run-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem settle:promise-reject->promise-resolve",
+   "kind": "settle:promise-reject->promise-resolve",
+   "count": 37,
+   "byTier": {
+    "edge": 4,
+    "gen-f": 33
+   },
+   "example": {
+    "input": "edge:budget-count-sync-value-typeerror",
+    "kind": "settle:promise-reject->promise-resolve",
+    "sig": "factory.createDispatchItem settle:promise-reject->promise-resolve",
+    "path": null,
+    "old": "promise-reject",
+    "new": "promise-resolve",
+    "call": 0,
+    "oldOutcome": "{\"error\":{\"$\":\"error\",\"ctor\":\"TypeError\",\"message\":\"store.countDistinctTasksForSession(...).catch is not a function\",\"name\":\"TypeError\",\"props\":{}},\"type\":\"throw\"}",
+    "newOutcome": "{\"type\":\"return\",\"value\":{\"$\":\"obj\",\"o\":{\"_id\":\"item-1\",\"bootstrapToken\":null,\"budgetPosition\":{\"$\":\"obj\",\"o\":{\"tasks\":{\"$\":\"obj\",\"o\":{\"count\":1,\"maxTasks\":2}}}},\"consumerLastSeenAt\":null,\"effort\":...",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "ret",
+               "v": {
+                "count": 0,
+                "taskDispatches": 0
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "res",
+               "v": {
+                "maxTasks": 2
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1",
+          "sessionId": "run-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem env-reads",
+   "kind": "env-reads",
+   "count": 37,
+   "byTier": {
+    "edge": 4,
+    "gen-f": 33
+   },
+   "example": {
+    "input": "edge:budget-count-sync-value-typeerror",
+    "kind": "env-reads",
+    "sig": "factory.createDispatchItem env-reads",
+    "path": null,
+    "old": "(none)",
+    "new": "HARBOUR_FILE_POINTER_PILOT",
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "ret",
+               "v": {
+                "count": 0,
+                "taskDispatches": 0
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "res",
+               "v": {
+                "maxTasks": 2
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1",
+          "sessionId": "run-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem returned-identity",
+   "kind": "returned-identity",
+   "count": 37,
+   "byTier": {
+    "edge": 4,
+    "gen-f": 33
+   },
+   "example": {
+    "input": "edge:budget-count-sync-value-typeerror",
+    "kind": "returned-identity",
+    "sig": "factory.createDispatchItem returned-identity",
+    "path": null,
+    "new": true,
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "ret",
+               "v": {
+                "count": 0,
+                "taskDispatches": 0
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "res",
+               "v": {
+                "maxTasks": 2
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1",
+          "sessionId": "run-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem error.message $error.message",
+   "kind": "error.message",
+   "count": 9,
+   "byTier": {
+    "gen-f": 9
+   },
+   "example": {
+    "input": "gen-f:1197",
+    "kind": "error.message",
+    "sig": "factory.createDispatchItem error.message $error.message",
+    "path": "$error.message",
+    "old": "sync count",
+    "new": "Could not verify the task budget for this run",
+    "call": 0,
+    "oldError": "Error:sync count",
+    "newError": "Error:Could not verify the task budget for this run",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme",
+         "terminal": 0,
+         "applyDefaultHarness": true,
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "throw",
+               "e": {
+                "name": "Error",
+                "message": "sync count"
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row",
+                  "maxTasks": 2
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "Implement",
+          "issueIdentifier": "ACME-42",
+          "issueId": "123e4567-e89b-42d3-a456-426614174000",
+          "followUpTo": null,
+          "force": false,
+          "sessionId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+          "periodicalId": null,
+          "stopAt": null,
+          "abort": false
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "budget"
+     }
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem error.message $error.name",
+   "kind": "error.message",
+   "count": 6,
+   "byTier": {
+    "gen-f": 6
+   },
+   "example": {
+    "input": "gen-f:422",
+    "kind": "error.message",
+    "sig": "factory.createDispatchItem error.message $error.name",
+    "path": "$error.name",
+    "old": "TypeError",
+    "new": "Error",
+    "call": 0,
+    "oldError": "TypeError:store.countDistinctTasksForSession(...).catch is not a function",
+    "newError": "Error:This run's task budget (1.5) has been reached",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "model": "gpt-x",
+         "harness": "Claude-Code",
+         "applyDefaultHarness": false,
+         "runGate": {
+          "$fn": {
+           "name": "runGate",
+           "script": {
+            "k": "rej",
+            "e": {
+             "name": "Error",
+             "message": "gate failed"
+            }
+           }
+          }
+         },
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "ret",
+               "v": {
+                "count": 2,
+                "alreadyCounted": {
+                 "$u": 1
+                },
+                "taskDispatches": 29
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "run-1": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row",
+                  "maxTasks": 1.5
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "plan review",
+          "issueIdentifier": "#20",
+          "issueId": "123e4567-e89b-42d3-a456-426614174000",
+          "issueTitle": "Title",
+          "force": false,
+          "abort": false,
+          "cascade": true,
+          "sessionId": "run-1",
+          "stopAt": null,
+          "issueSource": null
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "budget"
+     }
+    }
+   }
+  }
+ ],
+ "infoGroups": [],
+ "differingInputs": [
+  "edge:budget-count-sync-value-typeerror",
+  "edge:run-read-sync-throw-propagates",
+  "edge:anchor-read-sync-throw",
+  "edge:preset-sync-value-typeerror",
+  "gen-f:11",
+  "gen-f:62",
+  "gen-f:151",
+  "gen-f:153",
+  "gen-f:345",
+  "gen-f:422",
+  "gen-f:482",
+  "gen-f:554",
+  "gen-f:555",
+  "gen-f:696",
+  "gen-f:720",
+  "gen-f:917",
+  "gen-f:1150",
+  "gen-f:1182",
+  "gen-f:1197",
+  "gen-f:1397",
+  "gen-f:1489",
+  "gen-f:1574",
+  "gen-f:1664",
+  "gen-f:1759",
+  "gen-f:1792",
+  "gen-f:1829",
+  "gen-f:1908",
+  "gen-f:2008",
+  "gen-f:2034",
+  "gen-f:2085",
+  "gen-f:2123",
+  "gen-f:2154",
+  "gen-f:2193",
+  "gen-f:2218",
+  "gen-f:2221",
+  "gen-f:2225",
+  "gen-f:2292",
+  "gen-f:2471",
+  "gen-f:2472",
+  "gen-f:2479",
+  "gen-f:2513",
+  "gen-f:2669",
+  "gen-f:2752",
+  "gen-f:2762",
+  "gen-f:2776",
+  "gen-f:2783",
+  "gen-f:2804",
+  "gen-f:2892",
+  "gen-f:2896",
+  "gen-f:2916",
+  "gen-f:2932",
+  "gen-f:2956"
+ ],
+ "floor": {
+  "validation.validateDispatchPayload": {
+   "return null": 66,
+   "throw TypeError: Cannot destructure property 'prompt' of 'body' as it is null.": 1,
+   "return {error}": 87,
+   "throw TypeError: Cannot convert a Symbol value to a string": 1
+  },
+  "validation.validateOpaqueDispatchField": {
+   "throw TypeError: Cannot read properties of null (reading 'maxLength')": 1,
+   "return {error}": 5,
+   "return null": 2
+  },
+  "validation.validateSessionId": {
+   "return null": 1
+  },
+  "validation.abortToError": {
+   "return null": 2,
+   "return \"abortTo is required and must be a UUID when abort is true\"": 1,
+   "return \"abortTo requires abort to be true\"": 1,
+   "throw TypeError: Cannot destructure property 'isAbort' of 'undefined' as it is undefined.": 1
+  },
+  "validation.abortFollowUpError": {
+   "return \"abort and followUpTo are mutually exclusive\"": 1,
+   "return null": 1
+  },
+  "validation.cascadeAbortError": {
+   "return \"cascade requires abort to be true\"": 1,
+   "return null": 1
+  },
+  "validation.dispatchKindError": {
+   "return \"kind must be one of: blocked, bug, plan, look-into, triage,": 1,
+   "return null": 1
+  },
+  "validation.periodicalIdError": {
+   "return \"periodicalId must be one of the known periodical template i": 1
+  },
+  "validation.targetError": {
+   "return \"target must be one of: cli, web, dash\"": 1,
+   "return null": 1,
+   "throw TypeError: Cannot read properties of undefined (reading 'includes')": 1
+  },
+  "validation.followUpToError": {
+   "return \"followUpTo is only supported for cli/web targets\"": 1,
+   "return null": 1,
+   "throw TypeError: Cannot destructure property 'followUpTo' of 'undefined' as it is undefined.": 1
+  },
+  "factory.isFilePointerPilotEnabled": {
+   "return true": 3,
+   "return false": 2
+  },
+  "factory.createDispatchItem": {
+   "throw Error: createDispatchItem requires a dispatch store with addItem": 51,
+   "throw TypeError: Cannot destructure property 'store' of '(intermediate value)(intermediate value)(intermedi": 4,
+   "throw Error: createDispatchItem requires a urlKey": 68,
+   "throw TypeError: Cannot read properties of null (reading 'followUpTo')": 6,
+   "throw TypeError: Cannot read properties of null (reading 'promptName')": 5,
+   "return {_id,id,prompt,kind,…}": 58,
+   "return {_id,id,promptName,issueIdentifier,…}": 1217,
+   "return {_id,id,promptName,prompt,…}": 6,
+   "throw Error: A dispatch for this issue and kind was created moments ago": 215,
+   "return {_id,id,issueIdentifier,followUpTo,…}": 11,
+   "return {_id,id,issueIdentifier,abort,…}": 1,
+   "throw Error: Daily run limit reached (N of N today). Resets at midnight UTC.": 38,
+   "throw Error: Unable to verify the run limit for this account": 92,
+   "return {_id,id,issueIdentifier,sessionId,…}": 1,
+   "return {_id,id,cascade,prompt,…}": 1,
+   "throw Error: This run's task budget (N) has been reached": 18,
+   "throw Error: Could not verify the task budget for this run": 14,
+   "throw TypeError: store.countDistinctTasksForSession(...).catch is not a function": 13,
+   "throw TypeError: Cannot read properties of undefined (reading 'alreadyCounted')": 7,
+   "throw Error: This task has had N fresh sessions in this run. That looks like a runaway, not a normal fi": 43,
+   "throw Error: status sync": 1,
+   "throw Error: This run stops at its PR — close-out is the person's to send": 51,
+   "return {_id,id,sessionId,prompt,…}": 1,
+   "return {_id,id,sessionId,followUpTo,…}": 1,
+   "return {_id,id,sessionId,stopAt,…}": 2,
+   "throw Error: The anchor issue is terminal — refusing this composed-run dispatch": 234,
+   "throw Error: Could not verify the anchor issue is not terminal — refusing this composed-run dispatch": 101,
+   "throw Error: composedRunMarker must be a string": 33,
+   "throw Error: composedRunMarker exceeds maximum length of N": 25,
+   "throw Error: composedRunMarker contains invalid characters": 25,
+   "return {_id,id,followUpTo,issueId,…}": 4,
+   "return {_id,id,followUpTo,issueIdentifier,…}": 2,
+   "return {_id,id,followUpTo,issueSource,…}": 1,
+   "return {_id,id,followUpTo,sessionGroupId,…}": 2,
+   "return {_id,id,followUpTo,prompt,…}": 2,
+   "throw Error: sync": 1,
+   "throw DataCloneError: function (...args) {\n    const r = pick() || { k: 'ret', v: { $u: N } };\n    ctx.rec.push(": 3,
+   "throw TypeError: Cannot read properties of null (reading 'dispatchDefaults')": 28,
+   "throw Error: prefs down": 1,
+   "throw TypeError: dispatchPresetsStore.get(...).catch is not a function": 8,
+   "return {_id,id,issueIdentifier,prompt,…}": 7,
+   "throw Error: mint": 1,
+   "throw TypeError: dispatchTokenStore.listTokens(...).catch is not a function": 23,
+   "throw TypeError: Cannot add property budgetPosition, object is not extensible": 1,
+   "throw TypeError: Cannot set properties of null (setting 'budgetPosition')": 1,
+   "return null": 37,
+   "throw Error: dup key": 1,
+   "return {issueIdentifier,sessionId,prompt,kind,…}": 1,
+   "return {_id,id,followUpTo,abort,…}": 1,
+   "return {promptName,issueIdentifier,target,repo,…}": 1,
+   "throw Error: Daily run limit reached (N of undefined today). Resets at midnight UTC.": 19,
+   "throw Error: sync count": 14,
+   "return {_id,id,issueIdentifier,issueTitle,…}": 36,
+   "return {_id,id,promptName,issueTitle,…}": 62,
+   "return {_id,id,promptName,dispatchedBy,…}": 53,
+   "return {issueId,dispatchedBy,repo,followUpTo,…}": 1,
+   "return {_id,id,dispatchedBy,target,…}": 9,
+   "throw Error: addItem sync throw": 24,
+   "throw Error: mint failed": 64,
+   "return {_id,id,promptName,issueId,…}": 159,
+   "return {_id,id,issueIdentifier,issueId,…}": 67,
+   "throw Error: insert failed": 34,
+   "return {_id,id,issueId,issueUrl,…}": 8,
+   "throw Error: prefs failed": 30,
+   "return {_id,id,promptName,target,…}": 34,
+   "return {promptName,issueIdentifier,issueId,issueUrl,…}": 1,
+   "return {_id,id,issueId,dispatchedBy,…}": 4,
+   "return {_id,id,promptName,issueUrl,…}": 35,
+   "return {promptName,dispatchedBy,target,repo,…}": 1,
+   "return {_id,id,issueTitle,repo,…}": 2,
+   "return {_id,id,issueIdentifier,target,…}": 17,
+   "return {promptName,issueIdentifier,issueTitle,repo,…}": 1,
+   "return {_id,id,issueIdentifier,issueUrl,…}": 26,
+   "throw TypeError: Cannot read properties of undefined (reading 'taskDispatches')": 10,
+   "throw Error: finalize sync throw": 26,
+   "return {promptName,issueId,issueTitle,dispatchedBy,…}": 1,
+   "return {_id,id,issueId,issueTitle,…}": 8,
+   "return {_id,id,target,followUpTo,…}": 4,
+   "return {_id,id,promptName,repo,…}": 7,
+   "return {_id,id,issueTitle,dispatchedBy,…}": 9,
+   "return {_id,id,issueIdentifier,dispatchedBy,…}": 19,
+   "return {_id,id,repo,followUpTo,…}": 2,
+   "throw Error: anchor sync": 10,
+   "return {issueIdentifier,issueUrl,dispatchedBy,target,…}": 1,
+   "return {_id,id,issueUrl,dispatchedBy,…}": 1,
+   "return {promptName,issueIdentifier,issueId,repo,…}": 2,
+   "throw Error: This run's task budget (N.N) has been reached": 5,
+   "throw Error: run sync": 5,
+   "return {promptName,issueIdentifier,issueTitle,target,…}": 1,
+   "return {issueUrl,followUpTo,cascade,sessionId,…}": 1,
+   "return {promptName,issueIdentifier,issueTitle,issueUrl,…}": 2,
+   "return {_id,id,issueTitle,target,…}": 4,
+   "return {promptName,issueIdentifier,target,followUpTo,…}": 3,
+   "return {_id,id,issueIdentifier,repo,…}": 3,
+   "return {promptName,issueTitle,target,repo,…}": 1,
+   "return {_id,id,issueId,cascade,…}": 1,
+   "return {_id,id,promptName,followUpTo,…}": 12,
+   "return {_id,id,issueId,target,…}": 4,
+   "return {_id,id,issueUrl,target,…}": 2,
+   "return {issueIdentifier,issueUrl,target,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,followUpTo,force,…}": 2,
+   "return {promptName,issueIdentifier,issueId,issueTitle,…}": 4,
+   "return {_id,id,followUpTo,force,…}": 2,
+   "return {_id,id,issueTitle,issueUrl,…}": 3,
+   "return {_id,id,issueTitle,followUpTo,…}": 2,
+   "return {promptName,issueIdentifier,issueId,dispatchedBy,…}": 1,
+   "return {issueIdentifier,issueId,issueTitle,target,…}": 1,
+   "return {promptName,issueId,target,repo,…}": 1,
+   "return {promptName,issueIdentifier,issueId,target,…}": 1,
+   "throw TypeError: proxyTokenStore.listTokens(...).catch is not a function": 14,
+   "return {0,1,2,_id,…}": 3,
+   "return {promptName,issueTitle,dispatchedBy,repo,…}": 1,
+   "return {issueIdentifier,issueId,issueTitle,issueUrl,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,target,…}": 3,
+   "return {_id,id,issueUrl,followUpTo,…}": 2,
+   "return {promptName,issueIdentifier,issueUrl,dispatchedBy,…}": 1,
+   "return {_id,id,dispatchedBy,repo,…}": 1,
+   "return {0,1,_id,id,…}": 2,
+   "return {_id,id,followUpTo,sessionId,…}": 1,
+   "return {_id,id,issueUrl,repo,…}": 1,
+   "return {promptName,followUpTo,queueIfBusy,sessionGroupId,…}": 1,
+   "return {promptName,issueIdentifier,abort,prompt,…}": 2,
+   "return {issueIdentifier,issueTitle,dispatchedBy,followUpTo,…}": 1,
+   "return {promptName,target,repo,followUpTo,…}": 1,
+   "return {issueIdentifier,issueUrl,dispatchedBy,repo,…}": 1,
+   "return {_id,id,target,repo,…}": 1,
+   "return {_id,id,promptName,force,…}": 1,
+   "return {promptName,issueIdentifier,followUpTo,cascade,…}": 1,
+   "return {_id,id,issueId,followUpTo,…}": 1,
+   "return {promptName,issueTitle,issueUrl,target,…}": 1,
+   "return {promptName,target,followUpTo,force,…}": 1,
+   "return {_id,id,followUpTo,cascade,…}": 1,
+   "return {promptName,issueIdentifier,repo,force,…}": 1,
+   "return {prompt,kind,model,harness,…}": 1,
+   "return {promptName,issueIdentifier,issueUrl,target,…}": 1,
+   "return {issueUrl,force,sessionId,prompt,…}": 1,
+   "return {promptName,repo,followUpTo,force,…}": 1
+  }
+ },
+ "testTier": null,
+ "coverage": null
+}

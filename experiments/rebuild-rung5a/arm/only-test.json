@@ -1,0 +1,257 @@
+{
+ "tool": "rung5a dispatch replay",
+ "args": {
+  "old": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix",
+  "new": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3",
+  "n": 3000,
+  "seed": 1,
+  "now": "2026-10-02T12:00:00.000Z",
+  "tiers": [
+   "edge",
+   "gen-v",
+   "gen-vx",
+   "gen-f"
+  ],
+  "only": "edge:null-body"
+ },
+ "sides": {
+  "old": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix/dispatch-factory.js",
+     "sha": "83560199f32f"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  },
+  "new": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-factory.js",
+     "sha": "ff63690ae58d"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-validation.js",
+     "sha": "25058c782b50"
+    }
+   }
+  }
+ },
+ "hermetic": {
+  "env": {
+   "TZ": "UTC",
+   "cleared": [
+    "HARBOUR_*",
+    "GITHUB_*",
+    "DISPATCH_*",
+    "OPENROUTER_*",
+    "FREE_TIER_*"
+   ]
+  },
+  "now": "2026-10-02T12:00:00.000Z",
+  "networkAttempts": 0,
+  "networkSample": []
+ },
+ "importCensus": {
+  "old": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  },
+  "new": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "./prompt-templates.js -> repo",
+    "./workspace-preferences.js -> repo",
+    "./proxy-preamble.js -> repo",
+    "./dispatch-validation.js -> side",
+    "./task-done-cache.js -> repo",
+    "./providers/models.js -> repo",
+    "./consumer-poll-warning.js -> repo",
+    "./file-pointer.js -> repo",
+    "./github-pr-files.js -> repo",
+    "./session-telemetry.js -> repo",
+    "./read-horizon.js -> repo",
+    "./workspace.js -> repo",
+    "./dispatch-targets.js -> repo",
+    "./dispatch-fields.js -> repo",
+    "./prompt-templates.js -> repo",
+    "./periodicals.js -> repo",
+    "./prompts/autopilot-kickoff.js -> repo"
+   ]
+  }
+ },
+ "totals": {
+  "inputs": 1,
+  "differing": 1,
+  "byTier": {
+   "edge": {
+    "inputs": 1,
+    "differing": 1,
+    "calls": 1
+   }
+  },
+  "elapsedMs": 3,
+  "exportsDiff": 0,
+  "infoOnly": 0
+ },
+ "exportsDiff": [],
+ "exportsInfo": [],
+ "groups": [
+  {
+   "sig": "validation.validateDispatchPayload error.message $error.message",
+   "kind": "error.message",
+   "count": 1,
+   "byTier": {
+    "edge": 1
+   },
+   "example": {
+    "input": "edge:null-body",
+    "kind": "error.message",
+    "sig": "validation.validateDispatchPayload error.message $error.message",
+    "path": "$error.message",
+    "old": "Cannot destructure property 'prompt' of 'body' as it is null.",
+    "new": "Cannot destructure property 'effort' of 'body' as it is null.",
+    "call": 0,
+    "oldError": "TypeError:Cannot destructure property 'prompt' of 'body' as it is null.",
+    "newError": "TypeError:Cannot destructure property 'effort' of 'body' as it is null.",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "validation",
+       "fn": "validateDispatchPayload",
+       "args": [
+        null
+       ]
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "infoGroups": [],
+ "differingInputs": [
+  "edge:null-body"
+ ],
+ "floor": {
+  "validation.validateDispatchPayload": {
+   "throw TypeError: Cannot destructure property 'prompt' of 'body' as it is null.": 1
+  }
+ },
+ "testTier": null,
+ "coverage": null,
+ "onlyDetail": {
+  "input": {
+   "id": "edge:null-body",
+   "tier": "edge",
+   "name": "null-body",
+   "calls": [
+    {
+     "mod": "validation",
+     "fn": "validateDispatchPayload",
+     "args": [
+      null
+     ]
+    }
+   ],
+   "seed": 2830176611
+  },
+  "old": [
+   {
+    "fn": "validation.validateDispatchPayload",
+    "settle": "sync-throw",
+    "outcome": {
+     "type": "throw",
+     "error": {
+      "$": "error",
+      "name": "TypeError",
+      "ctor": "TypeError",
+      "message": "Cannot destructure property 'prompt' of 'body' as it is null.",
+      "props": {},
+      "ko": ""
+     }
+    },
+    "deps": [],
+    "console": [],
+    "envReads": [],
+    "mutation": null,
+    "random": {
+     "mathRandom": 0,
+     "randomUUID": 0,
+     "randomBytes": 0
+    },
+    "leakedTimers": 0,
+    "unhandled": [],
+    "network": []
+   }
+  ],
+  "new": [
+   {
+    "fn": "validation.validateDispatchPayload",
+    "settle": "sync-throw",
+    "outcome": {
+     "type": "throw",
+     "error": {
+      "$": "error",
+      "name": "TypeError",
+      "ctor": "TypeError",
+      "message": "Cannot destructure property 'effort' of 'body' as it is null.",
+      "props": {},
+      "ko": ""
+     }
+    },
+    "deps": [],
+    "console": [],
+    "envReads": [],
+    "mutation": null,
+    "random": {
+     "mathRandom": 0,
+     "randomUUID": 0,
+     "randomBytes": 0
+    },
+    "leakedTimers": 0,
+    "unhandled": [],
+    "network": []
+   }
+  ],
+  "diffs": [
+   {
+    "kind": "error.message",
+    "sig": "validation.validateDispatchPayload error.message $error.message",
+    "path": "$error.message",
+    "old": "Cannot destructure property 'prompt' of 'body' as it is null.",
+    "new": "Cannot destructure property 'effort' of 'body' as it is null.",
+    "call": 0,
+    "oldError": "TypeError:Cannot destructure property 'prompt' of 'body' as it is null.",
+    "newError": "TypeError:Cannot destructure property 'effort' of 'body' as it is null."
+   }
+  ],
+  "info": []
+ }
+}

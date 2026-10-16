@@ -1,0 +1,1016 @@
+{
+ "tool": "rung5a dispatch replay",
+ "args": {
+  "old": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main",
+  "new": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix2",
+  "n": 3000,
+  "seed": 1,
+  "now": "2026-10-02T12:00:00.000Z",
+  "tiers": [
+   "edge",
+   "gen-f"
+  ],
+  "only": null
+ },
+ "sides": {
+  "old": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main/dispatch-factory.js",
+     "sha": "a1edc85c8ef2"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/replay/pinned/origin-main/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  },
+  "new": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix2",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix2/dispatch-factory.js",
+     "sha": "b29c313b6e86"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/fix2/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  }
+ },
+ "hermetic": {
+  "env": {
+   "TZ": "UTC",
+   "cleared": [
+    "HARBOUR_*",
+    "GITHUB_*",
+    "DISPATCH_*",
+    "OPENROUTER_*",
+    "FREE_TIER_*"
+   ]
+  },
+  "now": "2026-10-02T12:00:00.000Z",
+  "networkAttempts": 6,
+  "networkSample": [
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   }
+  ]
+ },
+ "importCensus": {
+  "old": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  },
+  "new": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  }
+ },
+ "totals": {
+  "inputs": 3339,
+  "differing": 19,
+  "byTier": {
+   "edge": {
+    "inputs": 339,
+    "differing": 1,
+    "calls": 343
+   },
+   "gen-f": {
+    "inputs": 3000,
+    "differing": 18,
+    "calls": 3233
+   }
+  },
+  "elapsedMs": 1869,
+  "exportsDiff": 0,
+  "infoOnly": 0
+ },
+ "exportsDiff": [],
+ "exportsInfo": [],
+ "groups": [
+  {
+   "sig": "factory.createDispatchItem deps.calls $deps[]",
+   "kind": "deps.calls",
+   "count": 12,
+   "byTier": {
+    "gen-f": 12
+   },
+   "example": {
+    "input": "gen-f:593",
+    "kind": "deps.calls",
+    "sig": "factory.createDispatchItem deps.calls $deps[]",
+    "path": "$deps[2]",
+    "old": "(end)",
+    "new": "dispatchTokenStore.listTokens, store.addItem",
+    "call": 0,
+    "oldDeps": "store.getItemStatus, store.countDistinctTasksForSession",
+    "newDeps": "store.getItemStatus, store.countDistinctTasksForSession, dispatchTokenStore.listTokens, store.addItem",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme",
+         "kind": "",
+         "prompt": "BODY",
+         "harness": "   ",
+         "terminal": "kitty",
+         "applyDefaultHarness": true,
+         "now": 1790942644897,
+         "dispatchTokenStore": {
+          "$obj": {
+           "name": "dispatchTokenStore",
+           "props": {
+            "listTokens": {
+             "$fn": {
+              "name": "dispatchTokenStore.listTokens",
+              "script": {
+               "k": "res",
+               "v": [
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:33:39.889Z"
+                 }
+                },
+                {
+                 "lastUsedAt": 1790942399995
+                },
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:26:52.800Z"
+                 }
+                }
+               ]
+              }
+             }
+            }
+           }
+          }
+         },
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "res",
+               "v": {
+                "$u": 1
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "[object Object]": {
+                 "k": "rej",
+                 "e": {
+                  "name": "Error",
+                  "message": "anchor read failed"
+                 }
+                },
+                "LIN-1117-autopilot-standalone": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row"
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "autopilot",
+          "issueIdentifier": "日本-1",
+          "issueUrl": "https://linear.app/acme/issue/LIN-1",
+          "target": "cli",
+          "repo": "owner/repo",
+          "followUpTo": {
+           "$u": 1
+          },
+          "force": true,
+          "abort": false,
+          "sessionId": "LIN-1117-autopilot-standalone",
+          "subscription": "everything"
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "budget"
+     }
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem settle:promise-reject->promise-resolve",
+   "kind": "settle:promise-reject->promise-resolve",
+   "count": 11,
+   "byTier": {
+    "gen-f": 11
+   },
+   "example": {
+    "input": "gen-f:593",
+    "kind": "settle:promise-reject->promise-resolve",
+    "sig": "factory.createDispatchItem settle:promise-reject->promise-resolve",
+    "path": null,
+    "old": "promise-reject",
+    "new": "promise-resolve",
+    "call": 0,
+    "oldOutcome": "{\"error\":{\"$\":\"error\",\"ctor\":\"TypeError\",\"message\":\"Cannot read properties of undefined (reading 'taskDispatches')\",\"name\":\"TypeError\",\"props\":{}},\"type\":\"throw\"}",
+    "newOutcome": "{\"type\":\"return\",\"value\":{\"$\":\"obj\",\"o\":{\"_id\":\"item-1\",\"abort\":false,\"bootstrapToken\":null,\"consumerLastSeenAt\":\"2026-10-02T11:59:59.995Z\",\"effort\":null,\"followUpTo\":{\"$\":\"undef\"},\"force\":true,\"ha...",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme",
+         "kind": "",
+         "prompt": "BODY",
+         "harness": "   ",
+         "terminal": "kitty",
+         "applyDefaultHarness": true,
+         "now": 1790942644897,
+         "dispatchTokenStore": {
+          "$obj": {
+           "name": "dispatchTokenStore",
+           "props": {
+            "listTokens": {
+             "$fn": {
+              "name": "dispatchTokenStore.listTokens",
+              "script": {
+               "k": "res",
+               "v": [
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:33:39.889Z"
+                 }
+                },
+                {
+                 "lastUsedAt": 1790942399995
+                },
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:26:52.800Z"
+                 }
+                }
+               ]
+              }
+             }
+            }
+           }
+          }
+         },
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "res",
+               "v": {
+                "$u": 1
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "[object Object]": {
+                 "k": "rej",
+                 "e": {
+                  "name": "Error",
+                  "message": "anchor read failed"
+                 }
+                },
+                "LIN-1117-autopilot-standalone": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row"
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "autopilot",
+          "issueIdentifier": "日本-1",
+          "issueUrl": "https://linear.app/acme/issue/LIN-1",
+          "target": "cli",
+          "repo": "owner/repo",
+          "followUpTo": {
+           "$u": 1
+          },
+          "force": true,
+          "abort": false,
+          "sessionId": "LIN-1117-autopilot-standalone",
+          "subscription": "everything"
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "budget"
+     }
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem returned-identity",
+   "kind": "returned-identity",
+   "count": 11,
+   "byTier": {
+    "gen-f": 11
+   },
+   "example": {
+    "input": "gen-f:593",
+    "kind": "returned-identity",
+    "sig": "factory.createDispatchItem returned-identity",
+    "path": null,
+    "new": true,
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme",
+         "kind": "",
+         "prompt": "BODY",
+         "harness": "   ",
+         "terminal": "kitty",
+         "applyDefaultHarness": true,
+         "now": 1790942644897,
+         "dispatchTokenStore": {
+          "$obj": {
+           "name": "dispatchTokenStore",
+           "props": {
+            "listTokens": {
+             "$fn": {
+              "name": "dispatchTokenStore.listTokens",
+              "script": {
+               "k": "res",
+               "v": [
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:33:39.889Z"
+                 }
+                },
+                {
+                 "lastUsedAt": 1790942399995
+                },
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:26:52.800Z"
+                 }
+                }
+               ]
+              }
+             }
+            }
+           }
+          }
+         },
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "res",
+               "v": {
+                "$u": 1
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "[object Object]": {
+                 "k": "rej",
+                 "e": {
+                  "name": "Error",
+                  "message": "anchor read failed"
+                 }
+                },
+                "LIN-1117-autopilot-standalone": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row"
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "autopilot",
+          "issueIdentifier": "日本-1",
+          "issueUrl": "https://linear.app/acme/issue/LIN-1",
+          "target": "cli",
+          "repo": "owner/repo",
+          "followUpTo": {
+           "$u": 1
+          },
+          "force": true,
+          "abort": false,
+          "sessionId": "LIN-1117-autopilot-standalone",
+          "subscription": "everything"
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "budget"
+     }
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem env-reads",
+   "kind": "env-reads",
+   "count": 10,
+   "byTier": {
+    "gen-f": 10
+   },
+   "example": {
+    "input": "gen-f:593",
+    "kind": "env-reads",
+    "sig": "factory.createDispatchItem env-reads",
+    "path": null,
+    "old": "(none)",
+    "new": "HARBOUR_FILE_POINTER_PILOT",
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "urlKey": "acme",
+         "kind": "",
+         "prompt": "BODY",
+         "harness": "   ",
+         "terminal": "kitty",
+         "applyDefaultHarness": true,
+         "now": 1790942644897,
+         "dispatchTokenStore": {
+          "$obj": {
+           "name": "dispatchTokenStore",
+           "props": {
+            "listTokens": {
+             "$fn": {
+              "name": "dispatchTokenStore.listTokens",
+              "script": {
+               "k": "res",
+               "v": [
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:33:39.889Z"
+                 }
+                },
+                {
+                 "lastUsedAt": 1790942399995
+                },
+                {
+                 "lastUsedAt": {
+                  "$date": "2026-10-02T11:26:52.800Z"
+                 }
+                }
+               ]
+              }
+             }
+            }
+           }
+          }
+         },
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "res",
+               "v": {
+                "$u": 1
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "byArg",
+               "index": 1,
+               "map": {
+                "[object Object]": {
+                 "k": "rej",
+                 "e": {
+                  "name": "Error",
+                  "message": "anchor read failed"
+                 }
+                },
+                "LIN-1117-autopilot-standalone": {
+                 "k": "res",
+                 "v": {
+                  "id": "run-row"
+                 }
+                }
+               },
+               "default": {
+                "k": "res",
+                "v": null
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "fields": {
+          "promptName": "autopilot",
+          "issueIdentifier": "日本-1",
+          "issueUrl": "https://linear.app/acme/issue/LIN-1",
+          "target": "cli",
+          "repo": "owner/repo",
+          "followUpTo": {
+           "$u": 1
+          },
+          "force": true,
+          "abort": false,
+          "sessionId": "LIN-1117-autopilot-standalone",
+          "subscription": "everything"
+         }
+        }
+       ]
+      }
+     ],
+     "env": {},
+     "shared": {},
+     "meta": {
+      "profile": "budget"
+     }
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem error.message $error.name",
+   "kind": "error.message",
+   "count": 7,
+   "byTier": {
+    "edge": 1,
+    "gen-f": 6
+   },
+   "example": {
+    "input": "edge:budget-count-undefined",
+    "kind": "error.message",
+    "sig": "factory.createDispatchItem error.message $error.name",
+    "path": "$error.name",
+    "old": "TypeError",
+    "new": "Error",
+    "call": 0,
+    "oldError": "TypeError:Cannot read properties of undefined (reading 'alreadyCounted')",
+    "newError": "Error:Could not verify the task budget for this run",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "factory",
+       "fn": "createDispatchItem",
+       "args": [
+        {
+         "store": {
+          "$obj": {
+           "name": "store",
+           "props": {
+            "addItem": {
+             "$fn": {
+              "name": "store.addItem",
+              "script": {
+               "k": "echo"
+              }
+             }
+            },
+            "countDistinctTasksForSession": {
+             "$fn": {
+              "name": "store.countDistinctTasksForSession",
+              "script": {
+               "k": "res",
+               "v": {
+                "$u": 1
+               }
+              }
+             }
+            },
+            "getItemStatus": {
+             "$fn": {
+              "name": "store.getItemStatus",
+              "script": {
+               "k": "res",
+               "v": {
+                "maxTasks": 2
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         "urlKey": "acme",
+         "prompt": "BODY",
+         "fields": {
+          "promptName": "implementation",
+          "issueIdentifier": "LIN-1",
+          "sessionId": "run-1"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "factory.createDispatchItem error.message $error.message",
+   "kind": "error.message",
+   "count": 1,
+   "byTier": {
+    "gen-f": 1
+   },
+   "example": {
+    "input": "gen-f:880",
+    "kind": "error.message",
+    "sig": "factory.createDispatchItem error.message $error.message",
+    "path": "$error.message",
+    "old": "Cannot read properties of undefined (reading 'taskDispatches')",
+    "new": "dispatchPresetsStore.get(...).catch is not a function",
+    "call": 0,
+    "oldError": "TypeError:Cannot read properties of undefined (reading 'taskDispatches')",
+    "newError": "TypeError:dispatchPresetsStore.get(...).catch is not a function",
+    "inputSpec": "{\"calls\":[{\"mod\":\"factory\",\"fn\":\"createDispatchItem\",\"args\":[{\"urlKey\":\"acme\",\"kind\":\"wake\",\"prompt\":\"BODY\",\"finalizePrompt\":{\"$fn\":{\"name\":\"finalizePrompt\",\"script\":{\"k\":\"res\",\"v\":{\"prompt\":\"FINAL PROMPT\",\"bootstrapToken\":\"tok-1\"}}}},\"now\":null,\"workspacePreferencesStore\":{\"$obj\":{\"name\":\"workspacePreferencesStore\",\"props\":{\"getWorkspacePreferences\":{\"$fn\":{\"name\":\"workspacePreferencesStore.getWorkspacePreferences\",\"script\":{\"k\":\"res\",\"v\":{\"dispatchDefaults\":{\"harness\":\"opencode\"}}}}}}}},\"dispatchPresetsStore\":{\"$obj\":{\"name\":\"dispatchPresetsStore\",\"props\":{\"get\":{\"$fn\":{\"name\":\"dispatchPresetsStore.get\",\"script\":{\"k\":\"ret\",\"v\":{\"config\":{}}}}}}}},\"presetId\":\"p1\",\"store\":{\"$obj\":{\"name\":\"store\",\"props\":{\"addItem\":{\"$fn\":{\"name\":\"store.addItem\",\"script\":{\"k\":\"echo\"}}},\"countDistinctTasksForSession\":{\"$fn\":{\"name\":\"store.countDistinctTasksForSession\",\"script\":{\"k\":\"res\",\"v\":{\"$u\":1}}}},\"getItemStatus\":{\"$fn\":{\"name\":\"store.getItemStatus\",\"script\":{\"k\":\"byArg\",\"index\":1,\"map\":{\"LIN-1117-autopilot-standalone\":{\"k\":\"res\",\"v\":{\"id\":\"run-row\",\"stopAt\":\"pr\"}}},\"default\":{\"k\":\"res\",\"v\":null}}}}}}},\"fields\":{\"promptName\":\"implementation\",\"issueIdentifier\":\"#20\",\"issueTitle\":null,\"issueUrl\":\"https://linear.app/acme/issue/LIN-1\",\"dispatchedBy\":\"acct-1\",\"target\":\"local\",\"followUpTo\":null,\"force\":false,\"sessionId\":\"LIN-1117-autopilot-standalone\",\"periodicalId\":\"code-quality\",\"waitForFollowUps\":true,\"grantRefusal\":{\"code\":\"injected\"},\"abort\":false}}]}],\"env\":{},\"shared\":{},\"meta\":{\"profile…"
+   }
+  }
+ ],
+ "infoGroups": [],
+ "differingInputs": [
+  "edge:budget-count-undefined",
+  "gen-f:593",
+  "gen-f:619",
+  "gen-f:711",
+  "gen-f:875",
+  "gen-f:880",
+  "gen-f:1120",
+  "gen-f:1144",
+  "gen-f:1258",
+  "gen-f:1305",
+  "gen-f:1880",
+  "gen-f:2113",
+  "gen-f:2168",
+  "gen-f:2446",
+  "gen-f:2503",
+  "gen-f:2621",
+  "gen-f:2788",
+  "gen-f:2915",
+  "gen-f:2991"
+ ],
+ "floor": {
+  "validation.validateDispatchPayload": {
+   "return null": 66,
+   "throw TypeError: Cannot destructure property 'prompt' of 'body' as it is null.": 1,
+   "return {error}": 87,
+   "throw TypeError: Cannot convert a Symbol value to a string": 1
+  },
+  "validation.validateOpaqueDispatchField": {
+   "throw TypeError: Cannot read properties of null (reading 'maxLength')": 1,
+   "return {error}": 5,
+   "return null": 2
+  },
+  "validation.validateSessionId": {
+   "return null": 1
+  },
+  "validation.abortToError": {
+   "return null": 2,
+   "return \"abortTo is required and must be a UUID when abort is true\"": 1,
+   "return \"abortTo requires abort to be true\"": 1,
+   "throw TypeError: Cannot destructure property 'isAbort' of 'undefined' as it is undefined.": 1
+  },
+  "validation.abortFollowUpError": {
+   "return \"abort and followUpTo are mutually exclusive\"": 1,
+   "return null": 1
+  },
+  "validation.cascadeAbortError": {
+   "return \"cascade requires abort to be true\"": 1,
+   "return null": 1
+  },
+  "validation.dispatchKindError": {
+   "return \"kind must be one of: blocked, bug, plan, look-into, triage,": 1,
+   "return null": 1
+  },
+  "validation.periodicalIdError": {
+   "return \"periodicalId must be one of the known periodical template i": 1
+  },
+  "validation.targetError": {
+   "return \"target must be one of: cli, web, dash\"": 1,
+   "return null": 1,
+   "throw TypeError: Cannot read properties of undefined (reading 'includes')": 1
+  },
+  "validation.followUpToError": {
+   "return \"followUpTo is only supported for cli/web targets\"": 1,
+   "return null": 1,
+   "throw TypeError: Cannot destructure property 'followUpTo' of 'undefined' as it is undefined.": 1
+  },
+  "factory.isFilePointerPilotEnabled": {
+   "return true": 3,
+   "return false": 2
+  },
+  "factory.createDispatchItem": {
+   "throw Error: createDispatchItem requires a dispatch store with addItem": 31,
+   "throw TypeError: Cannot destructure property 'store' of '(intermediate value)(intermediate value)(intermedi": 7,
+   "throw Error: createDispatchItem requires a urlKey": 63,
+   "throw TypeError: Cannot read properties of null (reading 'followUpTo')": 9,
+   "throw TypeError: Cannot read properties of null (reading 'promptName')": 2,
+   "return {_id,id,prompt,kind,…}": 51,
+   "return {_id,id,promptName,issueIdentifier,…}": 1212,
+   "return {_id,id,promptName,prompt,…}": 6,
+   "throw Error: A dispatch for this issue and kind was created moments ago": 225,
+   "return {_id,id,issueIdentifier,followUpTo,…}": 7,
+   "return {_id,id,issueIdentifier,abort,…}": 2,
+   "throw Error: Daily run limit reached (N of N today). Resets at midnight UTC.": 51,
+   "throw Error: Unable to verify the run limit for this account": 93,
+   "return {_id,id,issueIdentifier,sessionId,…}": 1,
+   "return {_id,id,cascade,prompt,…}": 1,
+   "throw Error: This run's task budget (N) has been reached": 15,
+   "throw Error: Could not verify the task budget for this run": 14,
+   "throw TypeError: store.countDistinctTasksForSession(...).catch is not a function": 16,
+   "throw TypeError: Cannot read properties of undefined (reading 'alreadyCounted')": 7,
+   "throw Error: This task has had N fresh sessions in this run. That looks like a runaway, not a normal fi": 32,
+   "throw Error: status sync": 1,
+   "throw Error: This run stops at its PR — close-out is the person's to send": 61,
+   "return {_id,id,sessionId,prompt,…}": 1,
+   "return {_id,id,sessionId,followUpTo,…}": 1,
+   "return {_id,id,sessionId,stopAt,…}": 2,
+   "throw Error: The anchor issue is terminal — refusing this composed-run dispatch": 260,
+   "throw Error: Could not verify the anchor issue is not terminal — refusing this composed-run dispatch": 95,
+   "throw Error: composedRunMarker must be a string": 36,
+   "throw Error: composedRunMarker exceeds maximum length of N": 15,
+   "throw Error: composedRunMarker contains invalid characters": 19,
+   "return {_id,id,followUpTo,issueId,…}": 4,
+   "return {_id,id,followUpTo,issueIdentifier,…}": 2,
+   "return {_id,id,followUpTo,issueSource,…}": 1,
+   "return {_id,id,followUpTo,sessionGroupId,…}": 2,
+   "return {_id,id,followUpTo,prompt,…}": 2,
+   "throw Error: sync": 1,
+   "throw DataCloneError: function (...args) {\n    const r = pick() || { k: 'ret', v: { $u: N } };\n    ctx.rec.push(": 1,
+   "throw TypeError: Cannot read properties of null (reading 'dispatchDefaults')": 27,
+   "throw Error: prefs down": 1,
+   "throw TypeError: dispatchPresetsStore.get(...).catch is not a function": 4,
+   "return {_id,id,issueIdentifier,prompt,…}": 7,
+   "throw Error: mint": 1,
+   "throw TypeError: dispatchTokenStore.listTokens(...).catch is not a function": 25,
+   "throw TypeError: Cannot add property budgetPosition, object is not extensible": 2,
+   "throw TypeError: Cannot set properties of null (setting 'budgetPosition')": 1,
+   "return null": 39,
+   "throw Error: dup key": 1,
+   "return {issueIdentifier,sessionId,prompt,kind,…}": 1,
+   "return {_id,id,promptName,target,…}": 51,
+   "return {_id,id,issueUrl,dispatchedBy,…}": 5,
+   "return {_id,id,promptName,dispatchedBy,…}": 37,
+   "return {_id,id,promptName,issueUrl,…}": 45,
+   "return {_id,id,promptName,issueId,…}": 153,
+   "return {_id,id,issueIdentifier,issueTitle,…}": 26,
+   "throw Error: mint failed": 49,
+   "return {_id,id,issueIdentifier,issueId,…}": 76,
+   "return {_id,id,issueId,cascade,…}": 1,
+   "return {_id,id,target,followUpTo,…}": 4,
+   "throw Error: prefs failed": 20,
+   "throw Error: run sync": 8,
+   "throw Error: insert failed": 40,
+   "throw Error: anchor sync": 10,
+   "return {_id,id,promptName,issueTitle,…}": 73,
+   "throw Error: This run's task budget (N.N) has been reached": 4,
+   "throw Error: finalize sync throw": 34,
+   "return {_id,id,promptName,followUpTo,…}": 21,
+   "return {_id,id,issueIdentifier,dispatchedBy,…}": 28,
+   "throw TypeError: proxyTokenStore.listTokens(...).catch is not a function": 17,
+   "return {promptName,issueIdentifier,issueUrl,dispatchedBy,…}": 4,
+   "return {_id,id,issueTitle,dispatchedBy,…}": 5,
+   "throw Error: addItem sync throw": 23,
+   "return {_id,id,waitForFollowUps,prompt,…}": 1,
+   "return {_id,id,issueIdentifier,issueUrl,…}": 19,
+   "return {_id,id,issueTitle,target,…}": 5,
+   "return {_id,id,promptName,force,…}": 3,
+   "return {_id,id,issueIdentifier,target,…}": 23,
+   "return {promptName,dispatchedBy,target,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,issueTitle,issueUrl,…}": 2,
+   "return {_id,id,issueId,issueTitle,…}": 8,
+   "return {_id,id,issueId,issueUrl,…}": 7,
+   "throw Error: Daily run limit reached (N of undefined today). Resets at midnight UTC.": 12,
+   "return {issueIdentifier,issueId,followUpTo,force,…}": 1,
+   "return {issueIdentifier,dispatchedBy,followUpTo,force,…}": 1,
+   "return {_id,id,followUpTo,abort,…}": 2,
+   "return {_id,id,promptName,repo,…}": 7,
+   "return {0,1,2,_id,…}": 7,
+   "return {promptName,issueIdentifier,issueTitle,followUpTo,…}": 2,
+   "return {_id,id,issueId,target,…}": 7,
+   "throw TypeError: Cannot read properties of undefined (reading 'taskDispatches')": 12,
+   "throw Error: sync count": 3,
+   "return {0,1,_id,id,…}": 5,
+   "return {issueUrl,target,followUpTo,force,…}": 1,
+   "return {promptName,issueIdentifier,issueId,issueTitle,…}": 5,
+   "return {_id,id,issueTitle,issueUrl,…}": 2,
+   "return {_id,id,followUpTo,cascade,…}": 1,
+   "return {_id,id,followUpTo,force,…}": 2,
+   "return {promptName,issueIdentifier,followUpTo,force,…}": 2,
+   "return {_id,id,dispatchedBy,followUpTo,…}": 1,
+   "return {_id,id,dispatchedBy,target,…}": 4,
+   "return {_id,id,repo,followUpTo,…}": 3,
+   "return {_id,id,issueId,dispatchedBy,…}": 6,
+   "return {_id,id,target,repo,…}": 2,
+   "return {issueIdentifier,issueId,dispatchedBy,target,…}": 1,
+   "return {promptName,issueIdentifier,issueId,issueUrl,…}": 2,
+   "return {promptName,issueId,repo,followUpTo,…}": 2,
+   "return {_id,id,dispatchedBy,repo,…}": 2,
+   "return {promptName,issueIdentifier,issueId,dispatchedBy,…}": 3,
+   "return {issueId,issueTitle,target,followUpTo,…}": 1,
+   "return {promptName,issueId,issueTitle,issueUrl,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,target,abort,…}": 1,
+   "return {promptName,followUpTo,abort,sessionId,…}": 1,
+   "return {issueIdentifier,target,repo,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,target,…}": 1,
+   "return {_id,id,issueUrl,target,…}": 3,
+   "return {_id,id,issueId,force,…}": 1,
+   "return {_id,id,promptName,abort,…}": 1,
+   "return {promptName,issueIdentifier,issueId,target,…}": 2,
+   "return {promptName,target,followUpTo,force,…}": 3,
+   "return {promptName,issueIdentifier,target,followUpTo,…}": 1,
+   "return {issueIdentifier,issueTitle,target,followUpTo,…}": 1,
+   "return {_id,id,issueUrl,followUpTo,…}": 1,
+   "return {_id,id,issueId,followUpTo,…}": 1,
+   "return {_id,id,issueId,repo,…}": 1,
+   "return {promptName,issueUrl,target,followUpTo,…}": 1,
+   "return {_id,id,cascade,queueIfBusy,…}": 1,
+   "return {prompt,kind,model,harness,…}": 1,
+   "return {_id,id,issueTitle,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,repo,…}": 1,
+   "return {promptName,issueIdentifier,repo,abort,…}": 1,
+   "return {_id,id,issueIdentifier,repo,…}": 1,
+   "return {promptName,issueUrl,dispatchedBy,repo,…}": 1
+  }
+ },
+ "testTier": null,
+ "coverage": null
+}
