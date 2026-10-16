@@ -31,8 +31,13 @@ afterEach(() => {
   setProxyFetchImpl(null);
 });
 
-// Stubs only the relay's egress; the test's own loopback requests reach the real fetch.
-const stubEgress = (fn) => { globalThis.fetch = (url, ...rest) => (String(url).startsWith('http://127.0.0.1') ? realFetch(url, ...rest) : fn(url, ...rest)); };
+// Stubs the relay's egress on both transports (native fetch, and the proxy override
+// that createProxyFetch() prefers when HTTPS_PROXY is set, as in the hermetic:proxy
+// run); the test's own loopback requests reach the real fetch.
+const stubEgress = (fn) => {
+  globalThis.fetch = (url, ...rest) => (String(url).startsWith('http://127.0.0.1') ? realFetch(url, ...rest) : fn(url, ...rest));
+  setProxyFetchImpl(fn);
+};
 
 function relayApp({ provider = {}, resolveWorkspaceAccess } = {}) {
   const events = [];
