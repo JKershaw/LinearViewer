@@ -1,0 +1,14 @@
+{
+  "_comment": "Gate 3 justifications. A block under 5 hits must either be reached more (fix the generator) or appear here with a reason. Matching is by file + start line + snippet prefix against the BASE router text.",
+  "rules": [
+    { "match": "module-body", "reason": "The module body of a router file executes once per copy at import; it is not a handler block." },
+    { "match": "factory", "reason": "createProxyWriteRoutes / createRulingsRoutes run once per mounted app (full + bare deployment per variant), i.e. 2 times by construction; they are factories, not handler blocks." }
+  ],
+  "blocks": [
+    { "file": "writes", "line": 735, "snippetPrefix": "|| {}", "reason": "`req.body || {}` in the attachments handler: express.json and the route's own parser both always leave req.body as an object, so the right-hand side is unreachable through HTTP (the unparsed-body case would need the parser removed from the mount)." },
+    { "file": "rulings", "line": 300, "snippetPrefix": "|| {}", "reason": "`req.body || {}` in suggest-dismissal: unreachable for the same reason (the global express.json always sets req.body)." },
+    { "file": "rulings", "line": 395, "snippetPrefix": "|| {}", "reason": "`req.body || {}` in suggest-answer: unreachable for the same reason." },
+    { "file": "rulings", "line": 302, "snippetPrefix": "{ logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400)", "reason": "The `!decisionId` 400 in suggest-dismissal is dead: :decisionId is a path parameter and Express never matches an empty segment (research comment b0cbaeee section 6)." },
+    { "file": "rulings", "line": 398, "snippetPrefix": "{ logEvent(req, routeLabel, 400)", "reason": "The `!decisionId` 400 in suggest-answer is dead for the same reason." }
+  ]
+}
