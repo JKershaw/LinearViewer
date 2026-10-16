@@ -1,0 +1,2462 @@
+{
+  "meta": {
+    "mutants": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/main/mutants.json",
+    "impl": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/main/adf.js",
+    "implSha256": "96888fbed2909e3dc5b09228903c3d3bceb4097f20a3672c9dea2ca912ece575",
+    "testFiles": [
+      "tests/unit/jira-provider-adf-codec.test.js"
+    ],
+    "corpus": {
+      "tests-adf": {
+        "domain": "adf",
+        "items": 1496,
+        "sha256": "81215c99e50b4a3d4d57764391bfe2acdaab98b8dcb9f1a891df48ebeaff37ba",
+        "private": false
+      },
+      "tests-md": {
+        "domain": "md",
+        "items": 1420,
+        "sha256": "e2ff7ce0a9a7cf3665e1dd80d6be57534229c0af3df860434c0ca85379451e96",
+        "private": false
+      },
+      "gen-adf": {
+        "domain": "adf",
+        "items": 3000,
+        "sha256": "ccca06109dfca0edb4b224735bd22ccfc2697072114c06649ee0f00c5cf8cc94",
+        "private": false
+      },
+      "gen-md": {
+        "domain": "md",
+        "items": 3000,
+        "sha256": "c42275119831e721bbcba22298b47b35f0c4e025d7bf85639b3f73373e726652",
+        "private": false
+      }
+    },
+    "batchTimeouts": 6,
+    "ms": 157808,
+    "node": "v22.22.0"
+  },
+  "totals": {
+    "survivors": 83,
+    "distinguished": 46,
+    "distinguishedByPublicCorpus": 44,
+    "hangOrCrashOnSomeBatch": 2,
+    "distinguishedOnlyByPrivateCorpus": 0,
+    "undistinguished": 37
+  },
+  "survivors": [
+    {
+      "id": "M0005",
+      "owner": "<module:RULE>",
+      "line": 42,
+      "operator": "regex-anchor",
+      "original": "/^\\s*-{3,}\\s*$/",
+      "replacement": "/^\\s*-{3,}\\s*/",
+      "distinguished": true,
+      "publicCells": 211,
+      "publicInputs": 160,
+      "byFn": {
+        "a2m": 113,
+        "rt_adf": 4,
+        "m2a": 46,
+        "rt_md": 46,
+        "gate_m2a": 2
+      },
+      "bySource": {
+        "gen-adf": 117,
+        "gen-md": 94
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#404",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "---␍␍```␍```",
+        "size": 17,
+        "input": "---\r\r```\r```"
+      }
+    },
+    {
+      "id": "M0014",
+      "owner": "<module:DELIMITED_MARKS>",
+      "line": 91,
+      "operator": "string-empty",
+      "original": "'*'",
+      "replacement": "''",
+      "distinguished": true,
+      "publicCells": 819,
+      "publicInputs": 455,
+      "byFn": {
+        "rt_adf": 91,
+        "m2a": 364,
+        "rt_md": 364
+      },
+      "bySource": {
+        "gen-adf": 91,
+        "gen-md": 728
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#1041",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "+␠aua␠***au***",
+        "size": 20,
+        "input": "+ naïve ***café***"
+      }
+    },
+    {
+      "id": "M0019",
+      "owner": "<module:DELIMITED_MARKS>",
+      "line": 93,
+      "operator": "string-empty",
+      "original": "'~'",
+      "replacement": "''",
+      "distinguished": true,
+      "publicCells": 97,
+      "publicInputs": 94,
+      "byFn": {
+        "rt_adf": 91,
+        "m2a": 3,
+        "rt_md": 3
+      },
+      "bySource": {
+        "gen-adf": 91,
+        "gen-md": 6
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#1672",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "~~~a␍␠␠␠␠a␍a␠(a)␠{␍-␠a␠a␍␠␠␠␠a␍~~~␍␍>␠␠~~a~~␠a␠a␠a␠a␠**a␠a_a…",
+        "size": 324,
+        "input": "~~~json\r    indented\rif (x) {\r- not list\r    indented\r~~~\r\r>  ~~CI~~ retry on CI build **retry snake_case_name the**\r> _Fix camelCase_ on on the Fix ok x ok camelCase\r\r> `npm test` 42 on on CI snake_case_name x\r>```\r>code\r>```\r> 日本語\r\r*the TODO: café*the user_id\r=\r\r\r```text\r```\r  y()\r\tTAB\r```\r```"
+      }
+    },
+    {
+      "id": "M0062",
+      "owner": "NODE_RENDERERS.mention",
+      "line": 147,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 270,
+      "publicInputs": 135,
+      "byFn": {
+        "a2m": 135,
+        "rt_adf": 135
+      },
+      "bySource": {
+        "gen-adf": 270
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2007",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph{localId}(mention,text[subsup]:\"a␠\",unsupportedInline(text[null]:\"u␠a␠ua\")))",
+        "size": 300,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "mention"
+                },
+                {
+                  "type": "text",
+                  "text": "alpha ",
+                  "marks": [
+                    {
+                      "type": "subsup",
+                      "attrs": {
+                        "type": "sup"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "unsupportedInline",
+                  "content": [
+                    {
+                      "type": "text",
+                      "text": "👍🏽 NOTE 日本語eps",
+                      "marks": null
+                    }
+                  ]
+                }
+              ],
+              "attrs": {
+                "localId": "88a-845b"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0064",
+      "owner": "NODE_RENDERERS.emoji",
+      "line": 148,
+      "operator": "logical-swap",
+      "original": "||",
+      "replacement": "&&",
+      "distinguished": true,
+      "publicCells": 1304,
+      "publicInputs": 652,
+      "byFn": {
+        "a2m": 652,
+        "rt_adf": 652
+      },
+      "bySource": {
+        "gen-adf": 1304
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2011",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph(emoji{shortName}))",
+        "size": 127,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "emoji",
+                  "attrs": {
+                    "shortName": ":custom_emoji:"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0065",
+      "owner": "NODE_RENDERERS.emoji",
+      "line": 148,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 216,
+      "publicInputs": 108,
+      "byFn": {
+        "a2m": 108,
+        "rt_adf": 108
+      },
+      "bySource": {
+        "gen-adf": 216
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1905",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph(text:\"+␠a\",emoji{},text[backgroundColor+underline]:\"a␠0␠a⏎!\",text[em+code]:\"⍽⏎a\"))",
+        "size": 323,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "+ plus"
+                },
+                {
+                  "type": "emoji",
+                  "attrs": {}
+                },
+                {
+                  "type": "text",
+                  "text": "Delta 42 id\n!",
+                  "marks": [
+                    {
+                      "type": "backgroundColor",
+                      "attrs": {
+                        "color": "red"
+                      }
+                    },
+                    {
+                      "type": "underline"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " \nx",
+                  "marks": [
+                    {
+                      "type": "em"
+                    },
+                    {
+                      "type": "code"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0067",
+      "owner": "NODE_RENDERERS.inlineCard",
+      "line": 149,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 606,
+      "publicInputs": 303,
+      "byFn": {
+        "a2m": 303,
+        "rt_adf": 303
+      },
+      "bySource": {
+        "gen-adf": 606
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1771",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(paragraph(inlineCard{data}))",
+        "size": 144,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "inlineCard",
+                  "attrs": {
+                    "data": {
+                      "@type": "Document",
+                      "name": "Doc"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0069",
+      "owner": "NODE_RENDERERS.blockCard",
+      "line": 150,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0073",
+      "owner": "renderNode",
+      "line": 154,
+      "operator": "return-value",
+      "original": "''",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0074",
+      "owner": "renderNode",
+      "line": 154,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 328,
+      "publicInputs": 164,
+      "byFn": {
+        "a2m": 164,
+        "rt_adf": 164
+      },
+      "bySource": {
+        "gen-adf": 328
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#581",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(#0)",
+        "size": 40,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            0
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0091",
+      "owner": "escapeBlockLeader",
+      "line": 189,
+      "operator": "regex-anchor",
+      "original": "/^(\\d+)\\./",
+      "replacement": "/(\\d+)\\./",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0097",
+      "owner": "renderTextRun",
+      "line": 196,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 448,
+      "publicInputs": 224,
+      "byFn": {
+        "a2m": 224,
+        "rt_adf": 224
+      },
+      "bySource": {
+        "gen-adf": 448
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2581",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(bulletList(string),paragraph{localId}(text[link]))",
+        "size": 219,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "bulletList",
+              "content": "not an array"
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "#anchor"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "attrs": {
+                "localId": "46de-d26e"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0103",
+      "owner": "renderTextRun",
+      "line": 199,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 308,
+      "publicInputs": 154,
+      "byFn": {
+        "a2m": 154,
+        "rt_adf": 154
+      },
+      "bySource": {
+        "gen-adf": 308
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1677",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(multiBodiedExtension(blockquote(paragraph(emoji{},text[link],text:\"**␠0.␠a␠a⏎⏎a0\",text:\"aua␠```a⏎a0␠a␠#######␠a`…\")),paragraph()))",
+        "size": 382,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "multiBodiedExtension",
+              "content": [
+                {
+                  "type": "blockquote",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "emoji",
+                          "attrs": {}
+                        },
+                        {
+                          "type": "text",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {}
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "** 10. ten NOTE\n\nv2"
+                        },
+                        {
+                          "type": "text",
+                          "text": "Deltanaïve ```js\nv2 alpha ####### TODO```js "
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "content": []
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0110",
+      "owner": "headingLevel",
+      "line": 209,
+      "operator": "number-shift",
+      "original": "6",
+      "replacement": "7",
+      "distinguished": true,
+      "publicCells": 78,
+      "publicInputs": 39,
+      "byFn": {
+        "a2m": 39,
+        "rt_adf": 39
+      },
+      "bySource": {
+        "tests-adf": 2,
+        "gen-adf": 76
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1616",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(heading{level=7,localId}(null))",
+        "size": 114,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 7,
+                "localId": "dedc-6156"
+              },
+              "content": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0111",
+      "owner": "headingLevel",
+      "line": 209,
+      "operator": "number-shift",
+      "original": "6",
+      "replacement": "5",
+      "distinguished": true,
+      "publicCells": 778,
+      "publicInputs": 418,
+      "byFn": {
+        "a2m": 360,
+        "rt_adf": 360,
+        "rt_md": 58
+      },
+      "bySource": {
+        "tests-adf": 2,
+        "tests-md": 1,
+        "gen-adf": 718,
+        "gen-md": 57
+      },
+      "smallestPublicExample": {
+        "id": "tests-md#78",
+        "fn": "rt_md",
+        "cls": "different",
+        "signature": "######␠a␠a",
+        "size": 17,
+        "input": "###### Too deep"
+      }
+    },
+    {
+      "id": "M0113",
+      "owner": "headingLevel",
+      "line": 209,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": true,
+      "publicCells": 24,
+      "publicInputs": 12,
+      "byFn": {
+        "a2m": 12,
+        "rt_adf": 12
+      },
+      "bySource": {
+        "gen-adf": 24
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#531",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(bulletList(listItem(paragraph(text[strong]:\"a␠u␠ua␠u\")),listItem{localId}(paragraph(text[unknownMark]:\"**␠u␠<a>a</a>␠0\")),listItem(paragraph(text[subsup]:\"a␠a\",text:null,text[textColor]:\"<a>a</a>␠}\")),listItem(paragraph{localId}(text:\"a␠a␠a␠a\"),paragraph{localId}(text:\"u(␠ua␠a\",text[link]:\"u\")),listItem{localId}(paragraph(text:\"\\\\␠a␠+␠a␠a\"),paragraph{localId}())),paragraph[alignment](),paragraph{localId}(text:\"0.␠a\",emoji{shortName,text},mention,hardBreak,text[link]:\"0.␠a␠␠a\"),heading{level=-1}(text[strike]:\"a␠***\",date{timestamp}),paragraph(date{timestamp},text[null]:\"&a;␠a\",text:\"ua␠&a;\",emoji{shortName}),orderedList{order=1}(listItem(paragraph(inlineCard{url},text[underline],text[border]:\"a\",text:\"0.␠a![a](a.a)\"))))",
+        "size": 2378,
+        "input": "(large; see id)"
+      }
+    },
+    {
+      "id": "M0115",
+      "owner": "headingLevel",
+      "line": 209,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": true,
+      "publicCells": 176,
+      "publicInputs": 88,
+      "byFn": {
+        "a2m": 88,
+        "rt_adf": 88
+      },
+      "bySource": {
+        "gen-adf": 176
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2321",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(heading())",
+        "size": 70,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "heading",
+              "content": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0116",
+      "owner": "headingLevel",
+      "line": 209,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0122",
+      "owner": "codeBody",
+      "line": 223,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 268,
+      "publicInputs": 134,
+      "byFn": {
+        "a2m": 134,
+        "rt_adf": 134
+      },
+      "bySource": {
+        "gen-adf": 268
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2258",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(codeBlock(hardBreak))",
+        "size": 92,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "hardBreak"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0123",
+      "owner": "codeBody",
+      "line": 223,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 250,
+      "publicInputs": 125,
+      "byFn": {
+        "a2m": 125,
+        "rt_adf": 125
+      },
+      "bySource": {
+        "gen-adf": 250
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1781",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"⇥a⏎⇥a\",text:\"⏎a\"),paragraph{localId}())",
+        "size": 217,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "\tindented\n\tindented"
+                },
+                {
+                  "type": "text",
+                  "text": "\nmore"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [],
+              "attrs": {
+                "localId": "836d-1e97"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0125",
+      "owner": "codeBody",
+      "line": 223,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 560,
+      "publicInputs": 280,
+      "byFn": {
+        "a2m": 280,
+        "rt_adf": 280
+      },
+      "bySource": {
+        "tests-adf": 6,
+        "gen-adf": 554
+      },
+      "smallestPublicExample": {
+        "id": "tests-adf#57",
+        "fn": "a2m",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"a⏎\"))",
+        "size": 100,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "a\n"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0169",
+      "owner": "parseBlock",
+      "line": 291,
+      "operator": "index-swap",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0205",
+      "owner": "parseInline",
+      "line": 346,
+      "operator": "string-empty",
+      "original": "'\\\\'",
+      "replacement": "''",
+      "distinguished": true,
+      "publicCells": 616,
+      "publicInputs": 539,
+      "byFn": {
+        "rt_adf": 462,
+        "m2a": 77,
+        "rt_md": 77
+      },
+      "bySource": {
+        "gen-adf": 462,
+        "gen-md": 154
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#129",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": ":+0:␠\\[a\\]␠[a␠a_a_a](a://a.a)␠**0␠a**␠a⏎⏎~~~a⏎␠␠a()⏎~~~",
+        "size": 93,
+        "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+      }
+    },
+    {
+      "id": "M0207",
+      "owner": "parseInline",
+      "line": 346,
+      "operator": "arith",
+      "original": "+",
+      "replacement": "-",
+      "distinguished": true,
+      "publicCells": 597,
+      "publicInputs": 520,
+      "byFn": {
+        "rt_adf": 443,
+        "m2a": 77,
+        "rt_md": 77
+      },
+      "bySource": {
+        "gen-adf": 443,
+        "gen-md": 154
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#129",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": ":+0:␠\\[a\\]␠[a␠a_a_a](a://a.a)␠**0␠a**␠a⏎⏎~~~a⏎␠␠a()⏎~~~",
+        "size": 93,
+        "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+      }
+    },
+    {
+      "id": "M0208",
+      "owner": "parseInline",
+      "line": 346,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": true,
+      "publicCells": 549,
+      "publicInputs": 473,
+      "byFn": {
+        "rt_adf": 397,
+        "m2a": 76,
+        "rt_md": 76
+      },
+      "bySource": {
+        "gen-adf": 397,
+        "gen-md": 152
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#129",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": ":+0:␠\\[a\\]␠[a␠a_a_a](a://a.a)␠**0␠a**␠a⏎⏎~~~a⏎␠␠a()⏎~~~",
+        "size": 93,
+        "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+      }
+    },
+    {
+      "id": "M0209",
+      "owner": "parseInline",
+      "line": 346,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0210",
+      "owner": "parseInline",
+      "line": 346,
+      "operator": "logical-swap",
+      "original": "??",
+      "replacement": "&&",
+      "distinguished": true,
+      "publicCells": 616,
+      "publicInputs": 539,
+      "byFn": {
+        "rt_adf": 462,
+        "m2a": 77,
+        "rt_md": 77
+      },
+      "bySource": {
+        "gen-adf": 462,
+        "gen-md": 154
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#129",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": ":+0:␠\\[a\\]␠[a␠a_a_a](a://a.a)␠**0␠a**␠a⏎⏎~~~a⏎␠␠a()⏎~~~",
+        "size": 93,
+        "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+      }
+    },
+    {
+      "id": "M0211",
+      "owner": "parseInline",
+      "line": 346,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0242",
+      "owner": "constructAt",
+      "line": 378,
+      "operator": "return-value",
+      "original": "null",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0243",
+      "owner": "linkAt",
+      "line": 383,
+      "operator": "arith",
+      "original": "+",
+      "replacement": "-",
+      "distinguished": true,
+      "publicCells": 25,
+      "publicInputs": 16,
+      "byFn": {
+        "rt_adf": 7,
+        "m2a": 9,
+        "rt_md": 9
+      },
+      "bySource": {
+        "gen-adf": 7,
+        "gen-md": 18
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#503",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": ">␠-␠<a://a.a/a>⏎⏎-␠[␠]␠a⏎⏎⏎_␠_⏎a://a.a/(a)␠a_a_a␠a␠][a␠a␠a](…",
+        "size": 298,
+        "input": "> - <https://auto.link/path>\n\n- [ ] task\n\n\n_ _\nhttps://ex.com/(x) snake_case_name Fix ][build camelCase retry](https://example.com)**camelCase**\n`` \\\\ `npm test`\n\n~~v2 when~~ **naïve the**  API snake_case_name café on retry camelCase snake_case_name\n\n> *fails the the* ***42***\n*CI*"
+      }
+    },
+    {
+      "id": "M0245",
+      "owner": "linkAt",
+      "line": 383,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0248",
+      "owner": "linkAt",
+      "line": 384,
+      "operator": "boundary",
+      "original": "<",
+      "replacement": "<=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0249",
+      "owner": "linkAt",
+      "line": 384,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0250",
+      "owner": "linkAt",
+      "line": 384,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0251",
+      "owner": "linkAt",
+      "line": 384,
+      "operator": "logical-swap",
+      "original": "||",
+      "replacement": "&&",
+      "distinguished": true,
+      "publicCells": 1379,
+      "publicInputs": 697,
+      "byFn": {
+        "rt_adf": 23,
+        "m2a": 674,
+        "rt_md": 674,
+        "gate_m2a": 8
+      },
+      "bySource": {
+        "gen-adf": 23,
+        "gen-md": 1356
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#1238",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "[a␠[a]␠a](a://a)",
+        "size": 21,
+        "input": "[a [b] c](http://x)"
+      }
+    },
+    {
+      "id": "M0257",
+      "owner": "linkAt",
+      "line": 384,
+      "operator": "return-value",
+      "original": "null",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0260",
+      "owner": "linkAt",
+      "line": 385,
+      "operator": "number-shift",
+      "original": "2",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0263",
+      "owner": "linkAt",
+      "line": 386,
+      "operator": "boundary",
+      "original": "<",
+      "replacement": "<=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0264",
+      "owner": "linkAt",
+      "line": 386,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0265",
+      "owner": "linkAt",
+      "line": 386,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": true,
+      "failedBatches": [
+        {
+          "batch": 29,
+          "kind": "timeout",
+          "inputs": "2900..2999",
+          "private": false
+        },
+        {
+          "batch": 30,
+          "kind": "timeout",
+          "inputs": "3000..3099",
+          "private": false
+        },
+        {
+          "batch": 31,
+          "kind": "timeout",
+          "inputs": "3100..3199",
+          "private": false
+        }
+      ],
+      "stoppedEarly": true,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0266",
+      "owner": "linkAt",
+      "line": 386,
+      "operator": "return-value",
+      "original": "null",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0276",
+      "owner": "linkAt",
+      "line": 390,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": true,
+      "publicCells": 4153,
+      "publicInputs": 2679,
+      "byFn": {
+        "rt_adf": 1206,
+        "m2a": 1473,
+        "rt_md": 1471,
+        "gate_m2a": 3
+      },
+      "bySource": {
+        "gen-adf": 1206,
+        "gen-md": 2947
+      },
+      "smallestPublicExample": {
+        "id": "gen-md#158",
+        "fn": "m2a",
+        "cls": "different",
+        "signature": "[a␠aua](/a)␠a␠u␠_a_⏎⏎---",
+        "size": 43,
+        "input": "[ok naïve](/rel) build مرحبا _Fix_\n\n---"
+      }
+    },
+    {
+      "id": "M0279",
+      "owner": "findUnescaped",
+      "line": 399,
+      "operator": "boundary",
+      "original": "<",
+      "replacement": "<=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0292",
+      "owner": "findUnescaped",
+      "line": 405,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0293",
+      "owner": "findUnescaped",
+      "line": 405,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0294",
+      "owner": "findUnescaped",
+      "line": 407,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0295",
+      "owner": "findUnescaped",
+      "line": 407,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": true,
+      "failedBatches": [
+        {
+          "batch": 29,
+          "kind": "timeout",
+          "inputs": "2900..2999",
+          "private": false
+        },
+        {
+          "batch": 30,
+          "kind": "timeout",
+          "inputs": "3000..3099",
+          "private": false
+        },
+        {
+          "batch": 31,
+          "kind": "timeout",
+          "inputs": "3100..3199",
+          "private": false
+        }
+      ],
+      "stoppedEarly": true,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0308",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 448,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0311",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 449,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0314",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 450,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": true,
+      "publicCells": 5,
+      "publicInputs": 5,
+      "byFn": {
+        "gate": 5
+      },
+      "bySource": {
+        "gen-adf": 5
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#855",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(paragraph(),orderedList{order=1}(listItem{localId}(paragraph(text:\"a␠u␠a␠␠aua\")),listItem))",
+        "size": 289,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": []
+            },
+            {
+              "type": "orderedList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "id 日本語 alpha  straße"
+                        }
+                      ]
+                    }
+                  ],
+                  "attrs": {
+                    "localId": "fb3-ce92"
+                  }
+                },
+                {
+                  "type": "listItem"
+                }
+              ],
+              "attrs": {
+                "order": 1
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0319",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 451,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": true,
+      "publicCells": 3,
+      "publicInputs": 3,
+      "byFn": {
+        "gate": 3
+      },
+      "bySource": {
+        "gen-adf": 3
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#336",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(blockquote(null))",
+        "size": 75,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "blockquote",
+              "content": null
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0322",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 452,
+      "operator": "string-empty",
+      "original": "'text'",
+      "replacement": "''",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0325",
+      "owner": "<module:WRITER_CHILDREN>",
+      "line": 452,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "2",
+      "distinguished": true,
+      "publicCells": 1,
+      "publicInputs": 1,
+      "byFn": {
+        "gate": 1
+      },
+      "bySource": {
+        "gen-adf": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1781",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"⇥a⏎⇥a\",text:\"⏎a\"),paragraph{localId}())",
+        "size": 217,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "\tindented\n\tindented"
+                },
+                {
+                  "type": "text",
+                  "text": "\nmore"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [],
+              "attrs": {
+                "localId": "836d-1e97"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0330",
+      "owner": "WRITER_ATTRS.level",
+      "line": 467,
+      "operator": "number-shift",
+      "original": "1",
+      "replacement": "0",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0332",
+      "owner": "WRITER_ATTRS.level",
+      "line": 467,
+      "operator": "boundary",
+      "original": "<=",
+      "replacement": "<",
+      "distinguished": true,
+      "publicCells": 55,
+      "publicInputs": 55,
+      "byFn": {
+        "gate_m2a": 45,
+        "gate": 10
+      },
+      "bySource": {
+        "tests-md": 1,
+        "gen-adf": 10,
+        "gen-md": 44
+      },
+      "smallestPublicExample": {
+        "id": "tests-md#78",
+        "fn": "gate_m2a",
+        "cls": "different",
+        "signature": "######␠a␠a",
+        "size": 17,
+        "input": "###### Too deep"
+      }
+    },
+    {
+      "id": "M0334",
+      "owner": "WRITER_ATTRS.level",
+      "line": 467,
+      "operator": "number-shift",
+      "original": "6",
+      "replacement": "5",
+      "distinguished": true,
+      "publicCells": 55,
+      "publicInputs": 55,
+      "byFn": {
+        "gate_m2a": 45,
+        "gate": 10
+      },
+      "bySource": {
+        "tests-md": 1,
+        "gen-adf": 10,
+        "gen-md": 44
+      },
+      "smallestPublicExample": {
+        "id": "tests-md#78",
+        "fn": "gate_m2a",
+        "cls": "different",
+        "signature": "######␠a␠a",
+        "size": 17,
+        "input": "###### Too deep"
+      }
+    },
+    {
+      "id": "M0337",
+      "owner": "WRITER_ATTRS.language",
+      "line": 470,
+      "operator": "logical-swap",
+      "original": "&&",
+      "replacement": "||",
+      "distinguished": true,
+      "publicCells": 4,
+      "publicInputs": 4,
+      "byFn": {
+        "gate": 4
+      },
+      "bySource": {
+        "gen-adf": 4
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1913",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock{language=\"a⏎a\"}(text:\"}\"))",
+        "size": 126,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "language": "x\ny"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0339",
+      "owner": "WRITER_ATTRS.language",
+      "line": 470,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 1,
+      "publicInputs": 1,
+      "byFn": {
+        "gate": 1
+      },
+      "bySource": {
+        "gen-adf": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#489",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock{language=\"\"}(text:\"a␠a␠=␠0;\"))",
+        "size": 133,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "language": ""
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "const x = 1;"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0340",
+      "owner": "WRITER_ATTRS.language",
+      "line": 470,
+      "operator": "logical-swap",
+      "original": "&&",
+      "replacement": "||",
+      "distinguished": true,
+      "publicCells": 4,
+      "publicInputs": 4,
+      "byFn": {
+        "gate": 4
+      },
+      "bySource": {
+        "gen-adf": 4
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1913",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock{language=\"a⏎a\"}(text:\"}\"))",
+        "size": 126,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "language": "x\ny"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0342",
+      "owner": "WRITER_ATTRS.language",
+      "line": 470,
+      "operator": "logical-swap",
+      "original": "&&",
+      "replacement": "||",
+      "distinguished": true,
+      "publicCells": 4,
+      "publicInputs": 4,
+      "byFn": {
+        "gate": 4
+      },
+      "bySource": {
+        "gen-adf": 4
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1913",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock{language=\"a⏎a\"}(text:\"}\"))",
+        "size": 126,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "attrs": {
+                "language": "x\ny"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "}"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0351",
+      "owner": "attrsAreRebuildable",
+      "line": 483,
+      "operator": "string-empty",
+      "original": "'heading'",
+      "replacement": "''",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0354",
+      "owner": "attrsAreRebuildable",
+      "line": 484,
+      "operator": "return-value",
+      "original": "false",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0355",
+      "owner": "attrsAreRebuildable",
+      "line": 484,
+      "operator": "bool-flip",
+      "original": "false",
+      "replacement": "true",
+      "distinguished": true,
+      "publicCells": 3,
+      "publicInputs": 3,
+      "byFn": {
+        "gate": 3
+      },
+      "bySource": {
+        "gen-adf": 3
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1683",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(heading{null}(text:\"0)␠a␠{␠0\",text[null]:\"\"))",
+        "size": 160,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "heading",
+              "attrs": null,
+              "content": [
+                {
+                  "type": "text",
+                  "text": "2) eps { 42"
+                },
+                {
+                  "type": "text",
+                  "text": "",
+                  "marks": [
+                    null
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0360",
+      "owner": "attrsAreRebuildable",
+      "line": 491,
+      "operator": "return-value",
+      "original": "false",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0364",
+      "owner": "attrsAreRebuildable",
+      "line": 492,
+      "operator": "string-empty",
+      "original": "'heading'",
+      "replacement": "''",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0366",
+      "owner": "attrsAreRebuildable",
+      "line": 494,
+      "operator": "boundary",
+      "original": ">",
+      "replacement": ">=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0368",
+      "owner": "attrsAreRebuildable",
+      "line": 494,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0376",
+      "owner": "SHAPE_RULES.heading",
+      "line": 511,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 39,
+      "publicInputs": 39,
+      "byFn": {
+        "gate_m2a": 38,
+        "gate": 1
+      },
+      "bySource": {
+        "tests-md": 3,
+        "gen-adf": 1,
+        "gen-md": 35
+      },
+      "smallestPublicExample": {
+        "id": "tests-md#1392",
+        "fn": "gate_m2a",
+        "cls": "different",
+        "signature": "#␠⏎⏎␠⏎⏎-␠a⏎⏎␠a⏎⏎---⏎⏎>␠a",
+        "size": 54,
+        "input": "# \n\n \n\n- padded\n\n leading\n\n---\n\n> trailing"
+      }
+    },
+    {
+      "id": "M0379",
+      "owner": "SHAPE_RULES.paragraph",
+      "line": 524,
+      "operator": "logical-swap",
+      "original": "||",
+      "replacement": "&&",
+      "distinguished": true,
+      "publicCells": 10,
+      "publicInputs": 10,
+      "byFn": {
+        "gate_m2a": 3,
+        "gate": 7
+      },
+      "bySource": {
+        "tests-md": 3,
+        "gen-adf": 7
+      },
+      "smallestPublicExample": {
+        "id": "tests-md#639",
+        "fn": "gate_m2a",
+        "cls": "different",
+        "signature": ">␠a⏎>␠⏎>␠a",
+        "size": 14,
+        "input": "> a\n> \n> b"
+      }
+    },
+    {
+      "id": "M0388",
+      "owner": "SHAPE_RULES.codeBlock",
+      "line": 546,
+      "operator": "string-fill",
+      "original": "''",
+      "replacement": "'__MUTANT__'",
+      "distinguished": true,
+      "publicCells": 1,
+      "publicInputs": 1,
+      "byFn": {
+        "gate": 1
+      },
+      "bySource": {
+        "gen-adf": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#2258",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(hardBreak))",
+        "size": 92,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "hardBreak"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0390",
+      "owner": "SHAPE_RULES.codeBlock",
+      "line": 547,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": true,
+      "publicCells": 1,
+      "publicInputs": 1,
+      "byFn": {
+        "gate": 1
+      },
+      "bySource": {
+        "gen-adf": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#1391",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(text[strong]:\"a␠a␠=␠0;⏎a:\\a⏎␠␠␠␠a⏎a␠a␠…\"))",
+        "size": 179,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "const x = 1;\nC:\\dir\n    four\nconst x = 1;\nfoo_bar",
+                  "marks": [
+                    {
+                      "type": "strong"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0403",
+      "owner": "SHAPE_RULES.text",
+      "line": 552,
+      "operator": "return-value",
+      "original": "true",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0404",
+      "owner": "SHAPE_RULES.text",
+      "line": 552,
+      "operator": "bool-flip",
+      "original": "true",
+      "replacement": "false",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0427",
+      "owner": "SHAPE_RULES.text",
+      "line": 563,
+      "operator": "string-empty",
+      "original": "'link'",
+      "replacement": "''",
+      "distinguished": true,
+      "publicCells": 5,
+      "publicInputs": 5,
+      "byFn": {
+        "gate": 4,
+        "gate_m2a": 1
+      },
+      "bySource": {
+        "gen-adf": 4,
+        "gen-md": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#932",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"-␠a⏎}\"),heading{level=2}(text[link]:\"\\*\",text:\"-␠a␠a␠a\"))",
+        "size": 293,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "- item\n}"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "\\*",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ex.com/\nnl"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "- not list Delta"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0431",
+      "owner": "SHAPE_RULES.text",
+      "line": 563,
+      "operator": "logical-swap",
+      "original": "||",
+      "replacement": "&&",
+      "distinguished": true,
+      "publicCells": 6,
+      "publicInputs": 6,
+      "byFn": {
+        "gate": 5,
+        "gate_m2a": 1
+      },
+      "bySource": {
+        "gen-adf": 5,
+        "gen-md": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#932",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"-␠a⏎}\"),heading{level=2}(text[link]:\"\\*\",text:\"-␠a␠a␠a\"))",
+        "size": 293,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "- item\n}"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "\\*",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ex.com/\nnl"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "- not list Delta"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0433",
+      "owner": "SHAPE_RULES.text",
+      "line": 563,
+      "operator": "return-value",
+      "original": "true",
+      "replacement": "undefined",
+      "distinguished": true,
+      "publicCells": 5,
+      "publicInputs": 5,
+      "byFn": {
+        "gate": 4,
+        "gate_m2a": 1
+      },
+      "bySource": {
+        "gen-adf": 4,
+        "gen-md": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#932",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"-␠a⏎}\"),heading{level=2}(text[link]:\"\\*\",text:\"-␠a␠a␠a\"))",
+        "size": 293,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "- item\n}"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "\\*",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ex.com/\nnl"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "- not list Delta"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0434",
+      "owner": "SHAPE_RULES.text",
+      "line": 563,
+      "operator": "bool-flip",
+      "original": "true",
+      "replacement": "false",
+      "distinguished": true,
+      "publicCells": 5,
+      "publicInputs": 5,
+      "byFn": {
+        "gate": 4,
+        "gate_m2a": 1
+      },
+      "bySource": {
+        "gen-adf": 4,
+        "gen-md": 1
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#932",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(codeBlock(text:\"-␠a⏎}\"),heading{level=2}(text[link]:\"\\*\",text:\"-␠a␠a␠a\"))",
+        "size": 293,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "- item\n}"
+                }
+              ]
+            },
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "\\*",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://ex.com/\nnl"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "- not list Delta"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0445",
+      "owner": "hasAdjacentUnmarkedRuns",
+      "line": 579,
+      "operator": "boundary",
+      "original": ">",
+      "replacement": ">=",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0446",
+      "owner": "hasAdjacentUnmarkedRuns",
+      "line": 579,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "1",
+      "distinguished": true,
+      "publicCells": 51,
+      "publicInputs": 51,
+      "byFn": {
+        "gate": 51
+      },
+      "bySource": {
+        "gen-adf": 51
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#403",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(paragraph(text:\"](␠u␠](␠u\",text:\"0␠a\"))",
+        "size": 140,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "]( 🚀 ]( 🚀"
+                },
+                {
+                  "type": "text",
+                  "text": "42 bar"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0447",
+      "owner": "hasAdjacentUnmarkedRuns",
+      "line": 579,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0450",
+      "owner": "hasAdjacentUnmarkedRuns",
+      "line": 579,
+      "operator": "arith",
+      "original": "-",
+      "replacement": "+",
+      "distinguished": true,
+      "publicCells": 51,
+      "publicInputs": 51,
+      "byFn": {
+        "gate": 51
+      },
+      "bySource": {
+        "gen-adf": 51
+      },
+      "smallestPublicExample": {
+        "id": "gen-adf#403",
+        "fn": "gate",
+        "cls": "different",
+        "signature": "doc(paragraph(text:\"](␠u␠](␠u\",text:\"0␠a\"))",
+        "size": 140,
+        "input": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "]( 🚀 ]( 🚀"
+                },
+                {
+                  "type": "text",
+                  "text": "42 bar"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "M0464",
+      "owner": "isUnrebuildable",
+      "line": 587,
+      "operator": "number-shift",
+      "original": "0",
+      "replacement": "(-1)",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    },
+    {
+      "id": "M0477",
+      "owner": "isUnrebuildable",
+      "line": 593,
+      "operator": "return-value",
+      "original": "false",
+      "replacement": "undefined",
+      "distinguished": false,
+      "publicCells": 0,
+      "publicInputs": 0,
+      "byFn": {},
+      "bySource": {},
+      "smallestPublicExample": null
+    }
+  ]
+}

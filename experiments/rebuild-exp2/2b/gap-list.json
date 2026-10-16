@@ -1,0 +1,1614 @@
+{
+ "commit": "e7f7bd573a7688707ff50a027934f3461caf25de",
+ "file": "lib/providers/jira/adf.js",
+ "tests": "tests/unit/jira-provider-adf-codec.test.js (all tests at that commit)",
+ "rows": [
+  {
+   "id": "M0005",
+   "function": "<module:RULE>",
+   "line": 42,
+   "column": 14,
+   "operator": "regex-anchor",
+   "original": "/^\\s*-{3,}\\s*$/",
+   "replacement": "/^\\s*-{3,}\\s*/",
+   "lineBefore": "const RULE = /^\\s*-{3,}\\s*$/",
+   "lineAfter": "const RULE = /^\\s*-{3,}\\s*/",
+   "outputsChanged": {
+    "a2m": 113,
+    "rt_adf": 4,
+    "m2a": 46,
+    "rt_md": 46,
+    "gate_m2a": 2
+   },
+   "example": {
+    "corpusId": "gen-md#404",
+    "fn": "m2a",
+    "input": "---\r\r```\r```"
+   },
+   "note": null
+  },
+  {
+   "id": "M0014",
+   "function": "<module:DELIMITED_MARKS>",
+   "line": 91,
+   "column": 20,
+   "operator": "string-empty",
+   "original": "'*'",
+   "replacement": "''",
+   "lineBefore": "  ['strong', '**', '*', INLINE],",
+   "lineAfter": "  ['strong', '**', '', INLINE],",
+   "outputsChanged": {
+    "rt_adf": 91,
+    "m2a": 364,
+    "rt_md": 364
+   },
+   "example": {
+    "corpusId": "gen-md#1041",
+    "fn": "m2a",
+    "input": "+ na\u00efve ***caf\u00e9***"
+   },
+   "note": null
+  },
+  {
+   "id": "M0019",
+   "function": "<module:DELIMITED_MARKS>",
+   "line": 93,
+   "column": 20,
+   "operator": "string-empty",
+   "original": "'~'",
+   "replacement": "''",
+   "lineBefore": "  ['strike', '~~', '~', INLINE],",
+   "lineAfter": "  ['strike', '~~', '', INLINE],",
+   "outputsChanged": {
+    "rt_adf": 91,
+    "m2a": 3,
+    "rt_md": 3
+   },
+   "example": {
+    "corpusId": "gen-md#1672",
+    "fn": "m2a",
+    "input": "~~~json\r    indented\rif (x) {\r- not list\r    indented\r~~~\r\r>  ~~CI~~ retry on CI build **retry snake_case_name the**\r> _Fix camelCase_ on on the Fix ok x ok camelCase\r\r> `npm test` 42 on on CI snake_case_name x\r>```\r>code\r>```\r> \u65e5\u672c\u8a9e\r\r*the TODO: caf\u00e9*the user_id\r=\r\r\r```text\r```\r  y()\r\tTAB\r```\r```"
+   },
+   "note": null
+  },
+  {
+   "id": "M0062",
+   "function": "NODE_RENDERERS.mention",
+   "line": 147,
+   "column": 62,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  mention: node => node.attrs?.text || `@${node.attrs?.id ?? ''}`,",
+   "lineAfter": "  mention: node => node.attrs?.text || `@${node.attrs?.id ?? '__MUTANT__'}`,",
+   "outputsChanged": {
+    "a2m": 135,
+    "rt_adf": 135
+   },
+   "example": {
+    "corpusId": "gen-adf#2007",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "mention"
+        },
+        {
+         "type": "text",
+         "text": "alpha ",
+         "marks": [
+          {
+           "type": "subsup",
+           "attrs": {
+            "type": "sup"
+           }
+          }
+         ]
+        },
+        {
+         "type": "unsupportedInline",
+         "content": [
+          {
+           "type": "text",
+           "text": "\ud83d\udc4d\ud83c\udffd NOTE \u65e5\u672c\u8a9eeps",
+           "marks": null
+          }
+         ]
+        }
+       ],
+       "attrs": {
+        "localId": "88a-845b"
+       }
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0064",
+   "function": "NODE_RENDERERS.emoji",
+   "line": 148,
+   "column": 60,
+   "operator": "logical-swap",
+   "original": "||",
+   "replacement": "&&",
+   "lineBefore": "  emoji: node => node.attrs?.text || node.attrs?.shortName || '',",
+   "lineAfter": "  emoji: node => node.attrs?.text || node.attrs?.shortName && '',",
+   "outputsChanged": {
+    "a2m": 652,
+    "rt_adf": 652
+   },
+   "example": {
+    "corpusId": "gen-adf#2011",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "emoji",
+         "attrs": {
+          "shortName": ":custom_emoji:"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0065",
+   "function": "NODE_RENDERERS.emoji",
+   "line": 148,
+   "column": 63,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  emoji: node => node.attrs?.text || node.attrs?.shortName || '',",
+   "lineAfter": "  emoji: node => node.attrs?.text || node.attrs?.shortName || '__MUTANT__',",
+   "outputsChanged": {
+    "a2m": 108,
+    "rt_adf": 108
+   },
+   "example": {
+    "corpusId": "gen-adf#1905",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "+ plus"
+        },
+        {
+         "type": "emoji",
+         "attrs": {}
+        },
+        {
+         "type": "text",
+         "text": "Delta 42 id\n!",
+         "marks": [
+          {
+           "type": "backgroundColor",
+           "attrs": {
+            "color": "red"
+           }
+          },
+          {
+           "type": "underline"
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": "\u00a0\nx",
+         "marks": [
+          {
+           "type": "em"
+          },
+          {
+           "type": "code"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0067",
+   "function": "NODE_RENDERERS.inlineCard",
+   "line": 149,
+   "column": 42,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  inlineCard: node => node.attrs?.url ?? '',",
+   "lineAfter": "  inlineCard: node => node.attrs?.url ?? '__MUTANT__',",
+   "outputsChanged": {
+    "a2m": 303,
+    "rt_adf": 303
+   },
+   "example": {
+    "corpusId": "gen-adf#1771",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "inlineCard",
+         "attrs": {
+          "data": {
+           "@type": "Document",
+           "name": "Doc"
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0074",
+   "function": "renderNode",
+   "line": 154,
+   "column": 31,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  if (!isObject(node)) return ''",
+   "lineAfter": "  if (!isObject(node)) return '__MUTANT__'",
+   "outputsChanged": {
+    "a2m": 164,
+    "rt_adf": 164
+   },
+   "example": {
+    "corpusId": "gen-adf#581",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      0
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0097",
+   "function": "renderTextRun",
+   "line": 196,
+   "column": 54,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  let markdown = escape(context, String(node.text ?? ''))",
+   "lineAfter": "  let markdown = escape(context, String(node.text ?? '__MUTANT__'))",
+   "outputsChanged": {
+    "a2m": 224,
+    "rt_adf": 224
+   },
+   "example": {
+    "corpusId": "gen-adf#2581",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "bulletList",
+       "content": "not an array"
+      },
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "#anchor"
+           }
+          }
+         ]
+        }
+       ],
+       "attrs": {
+        "localId": "46de-d26e"
+       }
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0103",
+   "function": "renderTextRun",
+   "line": 199,
+   "column": 75,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "      markdown = `[${markdown}](${escape(HREF, String(mark.attrs?.href ?? ''))})`",
+   "lineAfter": "      markdown = `[${markdown}](${escape(HREF, String(mark.attrs?.href ?? '__MUTANT__'))})`",
+   "outputsChanged": {
+    "a2m": 154,
+    "rt_adf": 154
+   },
+   "example": {
+    "corpusId": "gen-adf#1677",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "multiBodiedExtension",
+       "content": [
+        {
+         "type": "blockquote",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "emoji",
+             "attrs": {}
+            },
+            {
+             "type": "text",
+             "marks": [
+              {
+               "type": "link",
+               "attrs": {}
+              }
+             ]
+            },
+            {
+             "type": "text",
+             "text": "** 10. ten NOTE\n\nv2"
+            },
+            {
+             "type": "text",
+             "text": "Deltana\u00efve ```js\nv2 alpha ####### TODO```js "
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "paragraph",
+         "content": []
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0110",
+   "function": "headingLevel",
+   "line": 209,
+   "column": 19,
+   "operator": "number-shift",
+   "original": "6",
+   "replacement": "7",
+   "lineBefore": "  return Math.min(6, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "lineAfter": "  return Math.min(7, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "outputsChanged": {
+    "a2m": 39,
+    "rt_adf": 39
+   },
+   "example": {
+    "corpusId": "gen-adf#1616",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "heading",
+       "attrs": {
+        "level": 7,
+        "localId": "dedc-6156"
+       },
+       "content": null
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0111",
+   "function": "headingLevel",
+   "line": 209,
+   "column": 19,
+   "operator": "number-shift",
+   "original": "6",
+   "replacement": "5",
+   "lineBefore": "  return Math.min(6, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "lineAfter": "  return Math.min(5, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "outputsChanged": {
+    "a2m": 360,
+    "rt_adf": 360,
+    "rt_md": 58
+   },
+   "example": {
+    "corpusId": "tests-md#78",
+    "fn": "rt_md",
+    "input": "###### Too deep"
+   },
+   "note": null
+  },
+  {
+   "id": "M0113",
+   "function": "headingLevel",
+   "line": 209,
+   "column": 31,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "0",
+   "lineBefore": "  return Math.min(6, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "lineAfter": "  return Math.min(6, Math.max(0, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "outputsChanged": {
+    "a2m": 12,
+    "rt_adf": 12
+   },
+   "example": {
+    "corpusId": "gen-adf#531",
+    "fn": "a2m",
+    "input": "(large; see id)"
+   },
+   "note": null
+  },
+  {
+   "id": "M0115",
+   "function": "headingLevel",
+   "line": 209,
+   "column": 75,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "2",
+   "lineBefore": "  return Math.min(6, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 1))",
+   "lineAfter": "  return Math.min(6, Math.max(1, Math.trunc(Number(node.attrs?.level)) || 2))",
+   "outputsChanged": {
+    "a2m": 88,
+    "rt_adf": 88
+   },
+   "example": {
+    "corpusId": "gen-adf#2321",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "heading",
+       "content": []
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0122",
+   "function": "codeBody",
+   "line": 223,
+   "column": 61,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  return contentOf(node).map(child => String(child?.text ?? '')).join('').replace(/\\n+$/, '')",
+   "lineAfter": "  return contentOf(node).map(child => String(child?.text ?? '__MUTANT__')).join('').replace(/\\n+$/, '')",
+   "outputsChanged": {
+    "a2m": 134,
+    "rt_adf": 134
+   },
+   "example": {
+    "corpusId": "gen-adf#2258",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "hardBreak"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0123",
+   "function": "codeBody",
+   "line": 223,
+   "column": 71,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  return contentOf(node).map(child => String(child?.text ?? '')).join('').replace(/\\n+$/, '')",
+   "lineAfter": "  return contentOf(node).map(child => String(child?.text ?? '')).join('__MUTANT__').replace(/\\n+$/, '')",
+   "outputsChanged": {
+    "a2m": 125,
+    "rt_adf": 125
+   },
+   "example": {
+    "corpusId": "gen-adf#1781",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "\tindented\n\tindented"
+        },
+        {
+         "type": "text",
+         "text": "\nmore"
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "content": [],
+       "attrs": {
+        "localId": "836d-1e97"
+       }
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0125",
+   "function": "codeBody",
+   "line": 223,
+   "column": 91,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  return contentOf(node).map(child => String(child?.text ?? '')).join('').replace(/\\n+$/, '')",
+   "lineAfter": "  return contentOf(node).map(child => String(child?.text ?? '')).join('').replace(/\\n+$/, '__MUTANT__')",
+   "outputsChanged": {
+    "a2m": 280,
+    "rt_adf": 280
+   },
+   "example": {
+    "corpusId": "tests-adf#57",
+    "fn": "a2m",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "a\n"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0205",
+   "function": "parseInline",
+   "line": 346,
+   "column": 21,
+   "operator": "string-empty",
+   "original": "'\\\\'",
+   "replacement": "''",
+   "lineBefore": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i + 1] ?? '')) {",
+   "lineAfter": "    if (text[i] === '' && ASCII_PUNCTUATION.test(text[i + 1] ?? '')) {",
+   "outputsChanged": {
+    "rt_adf": 462,
+    "m2a": 77,
+    "rt_md": 77
+   },
+   "example": {
+    "corpusId": "gen-md#129",
+    "fn": "m2a",
+    "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+   },
+   "note": null
+  },
+  {
+   "id": "M0207",
+   "function": "parseInline",
+   "line": 346,
+   "column": 59,
+   "operator": "arith",
+   "original": "+",
+   "replacement": "-",
+   "lineBefore": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i + 1] ?? '')) {",
+   "lineAfter": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i - 1] ?? '')) {",
+   "outputsChanged": {
+    "rt_adf": 443,
+    "m2a": 77,
+    "rt_md": 77
+   },
+   "example": {
+    "corpusId": "gen-md#129",
+    "fn": "m2a",
+    "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+   },
+   "note": null
+  },
+  {
+   "id": "M0208",
+   "function": "parseInline",
+   "line": 346,
+   "column": 61,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "2",
+   "lineBefore": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i + 1] ?? '')) {",
+   "lineAfter": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i + 2] ?? '')) {",
+   "outputsChanged": {
+    "rt_adf": 397,
+    "m2a": 76,
+    "rt_md": 76
+   },
+   "example": {
+    "corpusId": "gen-md#129",
+    "fn": "m2a",
+    "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+   },
+   "note": null
+  },
+  {
+   "id": "M0210",
+   "function": "parseInline",
+   "line": 346,
+   "column": 64,
+   "operator": "logical-swap",
+   "original": "??",
+   "replacement": "&&",
+   "lineBefore": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i + 1] ?? '')) {",
+   "lineAfter": "    if (text[i] === '\\\\' && ASCII_PUNCTUATION.test(text[i + 1] && '')) {",
+   "outputsChanged": {
+    "rt_adf": 462,
+    "m2a": 77,
+    "rt_md": 77
+   },
+   "example": {
+    "corpusId": "gen-md#129",
+    "fn": "m2a",
+    "input": ":+1: \\[x\\] [x snake_case_name](https://example.com) **42 CI** when\n\n~~~bash\n  y()\n~~~"
+   },
+   "note": null
+  },
+  {
+   "id": "M0243",
+   "function": "linkAt",
+   "line": 383,
+   "column": 41,
+   "operator": "arith",
+   "original": "+",
+   "replacement": "-",
+   "lineBefore": "  const textEnd = findUnescaped(text, i + 1, ']')",
+   "lineAfter": "  const textEnd = findUnescaped(text, i - 1, ']')",
+   "outputsChanged": {
+    "rt_adf": 7,
+    "m2a": 9,
+    "rt_md": 9
+   },
+   "example": {
+    "corpusId": "gen-md#503",
+    "fn": "m2a",
+    "input": "> - <https://auto.link/path>\n\n- [ ] task\n\n\n_ _\nhttps://ex.com/(x) snake_case_name Fix ][build camelCase retry](https://example.com)**camelCase**\n`` \\\\ `npm test`\n\n~~v2 when~~ **na\u00efve the**  API snake_case_name caf\u00e9 on retry camelCase snake_case_name\n\n> *fails the the* ***42***\n*CI*"
+   },
+   "note": null
+  },
+  {
+   "id": "M0251",
+   "function": "linkAt",
+   "line": 384,
+   "column": 19,
+   "operator": "logical-swap",
+   "original": "||",
+   "replacement": "&&",
+   "lineBefore": "  if (textEnd < 0 || text[textEnd + 1] !== '(') return null",
+   "lineAfter": "  if (textEnd < 0 && text[textEnd + 1] !== '(') return null",
+   "outputsChanged": {
+    "rt_adf": 23,
+    "m2a": 674,
+    "rt_md": 674,
+    "gate_m2a": 8
+   },
+   "example": {
+    "corpusId": "gen-md#1238",
+    "fn": "m2a",
+    "input": "[a [b] c](http://x)"
+   },
+   "note": null
+  },
+  {
+   "id": "M0265",
+   "function": "linkAt",
+   "line": 386,
+   "column": 17,
+   "operator": "number-shift",
+   "original": "0",
+   "replacement": "(-1)",
+   "lineBefore": "  if (hrefEnd < 0) return null",
+   "lineAfter": "  if (hrefEnd < (-1)) return null",
+   "outputsChanged": {},
+   "example": null,
+   "note": "hangs or crashes on some corpus batch; no single example recorded"
+  },
+  {
+   "id": "M0276",
+   "function": "linkAt",
+   "line": 390,
+   "column": 20,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "2",
+   "lineBefore": "    end: hrefEnd + 1,",
+   "lineAfter": "    end: hrefEnd + 2,",
+   "outputsChanged": {
+    "rt_adf": 1206,
+    "m2a": 1473,
+    "rt_md": 1471,
+    "gate_m2a": 3
+   },
+   "example": {
+    "corpusId": "gen-md#158",
+    "fn": "m2a",
+    "input": "[ok na\u00efve](/rel) build \u0645\u0631\u062d\u0628\u0627 _Fix_\n\n---"
+   },
+   "note": null
+  },
+  {
+   "id": "M0295",
+   "function": "findUnescaped",
+   "line": 407,
+   "column": 11,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "0",
+   "lineBefore": "  return -1",
+   "lineAfter": "  return -0",
+   "outputsChanged": {},
+   "example": null,
+   "note": "hangs or crashes on some corpus batch; no single example recorded"
+  },
+  {
+   "id": "M0314",
+   "function": "<module:WRITER_CHILDREN>",
+   "line": 450,
+   "column": 42,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "0",
+   "lineBefore": "  listItem: { types: ['paragraph'], min: 1, max: 1 },",
+   "lineAfter": "  listItem: { types: ['paragraph'], min: 0, max: 1 },",
+   "outputsChanged": {
+    "gate": 5
+   },
+   "example": {
+    "corpusId": "gen-adf#855",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": []
+      },
+      {
+       "type": "orderedList",
+       "content": [
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "id \u65e5\u672c\u8a9e alpha  stra\u00dfe"
+            }
+           ]
+          }
+         ],
+         "attrs": {
+          "localId": "fb3-ce92"
+         }
+        },
+        {
+         "type": "listItem"
+        }
+       ],
+       "attrs": {
+        "order": 1
+       }
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0319",
+   "function": "<module:WRITER_CHILDREN>",
+   "line": 451,
+   "column": 44,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "0",
+   "lineBefore": "  blockquote: { types: ['paragraph'], min: 1, max: 1 },",
+   "lineAfter": "  blockquote: { types: ['paragraph'], min: 0, max: 1 },",
+   "outputsChanged": {
+    "gate": 3
+   },
+   "example": {
+    "corpusId": "gen-adf#336",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "blockquote",
+       "content": null
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0325",
+   "function": "<module:WRITER_CHILDREN>",
+   "line": 452,
+   "column": 46,
+   "operator": "number-shift",
+   "original": "1",
+   "replacement": "2",
+   "lineBefore": "  codeBlock: { types: ['text'], min: 1, max: 1 },",
+   "lineAfter": "  codeBlock: { types: ['text'], min: 1, max: 2 },",
+   "outputsChanged": {
+    "gate": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#1781",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "\tindented\n\tindented"
+        },
+        {
+         "type": "text",
+         "text": "\nmore"
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "content": [],
+       "attrs": {
+        "localId": "836d-1e97"
+       }
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0332",
+   "function": "WRITER_ATTRS.level",
+   "line": 467,
+   "column": 77,
+   "operator": "boundary",
+   "original": "<=",
+   "replacement": "<",
+   "lineBefore": "  heading: { level: level => Number.isInteger(level) && level >= 1 && level <= 6 },",
+   "lineAfter": "  heading: { level: level => Number.isInteger(level) && level >= 1 && level < 6 },",
+   "outputsChanged": {
+    "gate_m2a": 45,
+    "gate": 10
+   },
+   "example": {
+    "corpusId": "tests-md#78",
+    "fn": "gate_m2a",
+    "input": "###### Too deep"
+   },
+   "note": null
+  },
+  {
+   "id": "M0334",
+   "function": "WRITER_ATTRS.level",
+   "line": 467,
+   "column": 80,
+   "operator": "number-shift",
+   "original": "6",
+   "replacement": "5",
+   "lineBefore": "  heading: { level: level => Number.isInteger(level) && level >= 1 && level <= 6 },",
+   "lineAfter": "  heading: { level: level => Number.isInteger(level) && level >= 1 && level <= 5 },",
+   "outputsChanged": {
+    "gate_m2a": 45,
+    "gate": 10
+   },
+   "example": {
+    "corpusId": "tests-md#78",
+    "fn": "gate_m2a",
+    "input": "###### Too deep"
+   },
+   "note": null
+  },
+  {
+   "id": "M0337",
+   "function": "WRITER_ATTRS.language",
+   "line": 470,
+   "column": 67,
+   "operator": "logical-swap",
+   "original": "&&",
+   "replacement": "||",
+   "lineBefore": "  codeBlock: { language: language => typeof language === 'string' && language !== '' && language === language.trim() && !language.includes('\\n') },",
+   "lineAfter": "  codeBlock: { language: language => typeof language === 'string' || language !== '' && language === language.trim() && !language.includes('\\n') },",
+   "outputsChanged": {
+    "gate": 4
+   },
+   "example": {
+    "corpusId": "gen-adf#1913",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "attrs": {
+        "language": "x\ny"
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "}"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0339",
+   "function": "WRITER_ATTRS.language",
+   "line": 470,
+   "column": 83,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "  codeBlock: { language: language => typeof language === 'string' && language !== '' && language === language.trim() && !language.includes('\\n') },",
+   "lineAfter": "  codeBlock: { language: language => typeof language === 'string' && language !== '__MUTANT__' && language === language.trim() && !language.includes('\\n') },",
+   "outputsChanged": {
+    "gate": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#489",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "attrs": {
+        "language": ""
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "const x = 1;"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0340",
+   "function": "WRITER_ATTRS.language",
+   "line": 470,
+   "column": 86,
+   "operator": "logical-swap",
+   "original": "&&",
+   "replacement": "||",
+   "lineBefore": "  codeBlock: { language: language => typeof language === 'string' && language !== '' && language === language.trim() && !language.includes('\\n') },",
+   "lineAfter": "  codeBlock: { language: language => typeof language === 'string' && language !== '' || language === language.trim() && !language.includes('\\n') },",
+   "outputsChanged": {
+    "gate": 4
+   },
+   "example": {
+    "corpusId": "gen-adf#1913",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "attrs": {
+        "language": "x\ny"
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "}"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0342",
+   "function": "WRITER_ATTRS.language",
+   "line": 470,
+   "column": 118,
+   "operator": "logical-swap",
+   "original": "&&",
+   "replacement": "||",
+   "lineBefore": "  codeBlock: { language: language => typeof language === 'string' && language !== '' && language === language.trim() && !language.includes('\\n') },",
+   "lineAfter": "  codeBlock: { language: language => typeof language === 'string' && language !== '' && language === language.trim() || !language.includes('\\n') },",
+   "outputsChanged": {
+    "gate": 4
+   },
+   "example": {
+    "corpusId": "gen-adf#1913",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "attrs": {
+        "language": "x\ny"
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "}"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0355",
+   "function": "attrsAreRebuildable",
+   "line": 484,
+   "column": 37,
+   "operator": "bool-flip",
+   "original": "false",
+   "replacement": "true",
+   "lineBefore": "  if (!isObject(node.attrs)) return false",
+   "lineAfter": "  if (!isObject(node.attrs)) return true",
+   "outputsChanged": {
+    "gate": 3
+   },
+   "example": {
+    "corpusId": "gen-adf#1683",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "heading",
+       "attrs": null,
+       "content": [
+        {
+         "type": "text",
+         "text": "2) eps { 42"
+        },
+        {
+         "type": "text",
+         "text": "",
+         "marks": [
+          null
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0376",
+   "function": "SHAPE_RULES.heading",
+   "line": 511,
+   "column": 25,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "    return markdown === '' || isPadded(markdown) || BLOCK_SEPARATOR.test(markdown)",
+   "lineAfter": "    return markdown === '__MUTANT__' || isPadded(markdown) || BLOCK_SEPARATOR.test(markdown)",
+   "outputsChanged": {
+    "gate_m2a": 38,
+    "gate": 1
+   },
+   "example": {
+    "corpusId": "tests-md#1392",
+    "fn": "gate_m2a",
+    "input": "# \n\n \n\n- padded\n\n leading\n\n---\n\n> trailing"
+   },
+   "note": null
+  },
+  {
+   "id": "M0379",
+   "function": "SHAPE_RULES.paragraph",
+   "line": 524,
+   "column": 43,
+   "operator": "logical-swap",
+   "original": "||",
+   "replacement": "&&",
+   "lineBefore": "    return BLOCK_SEPARATOR.test(markdown) || markdown.startsWith('\\n') || markdown.endsWith('\\n')",
+   "lineAfter": "    return BLOCK_SEPARATOR.test(markdown) && markdown.startsWith('\\n') || markdown.endsWith('\\n')",
+   "outputsChanged": {
+    "gate_m2a": 3,
+    "gate": 7
+   },
+   "example": {
+    "corpusId": "tests-md#639",
+    "fn": "gate_m2a",
+    "input": "> a\n> \n> b"
+   },
+   "note": null
+  },
+  {
+   "id": "M0388",
+   "function": "SHAPE_RULES.codeBlock",
+   "line": 546,
+   "column": 37,
+   "operator": "string-fill",
+   "original": "''",
+   "replacement": "'__MUTANT__'",
+   "lineBefore": "    const body = String(run.text ?? '')",
+   "lineAfter": "    const body = String(run.text ?? '__MUTANT__')",
+   "outputsChanged": {
+    "gate": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#2258",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "hardBreak"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0390",
+   "function": "SHAPE_RULES.codeBlock",
+   "line": 547,
+   "column": 34,
+   "operator": "number-shift",
+   "original": "0",
+   "replacement": "1",
+   "lineBefore": "    return marksOf(run).length > 0 || body === '' || BLOCK_SEPARATOR.test(body)",
+   "lineAfter": "    return marksOf(run).length > 1 || body === '' || BLOCK_SEPARATOR.test(body)",
+   "outputsChanged": {
+    "gate": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#1391",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "const x = 1;\nC:\\dir\n    four\nconst x = 1;\nfoo_bar",
+         "marks": [
+          {
+           "type": "strong"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0427",
+   "function": "SHAPE_RULES.text",
+   "line": 563,
+   "column": 24,
+   "operator": "string-empty",
+   "original": "'link'",
+   "replacement": "''",
+   "lineBefore": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return true",
+   "lineAfter": "    if (mark?.type === '' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return true",
+   "outputsChanged": {
+    "gate": 4,
+    "gate_m2a": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#932",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "- item\n}"
+        }
+       ]
+      },
+      {
+       "type": "heading",
+       "attrs": {
+        "level": 2
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "\\*",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "https://ex.com/\nnl"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": "- not list Delta"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0431",
+   "function": "SHAPE_RULES.text",
+   "line": 563,
+   "column": 72,
+   "operator": "logical-swap",
+   "original": "||",
+   "replacement": "&&",
+   "lineBefore": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return true",
+   "lineAfter": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' && mark.attrs.href.includes('\\n'))) return true",
+   "outputsChanged": {
+    "gate": 5,
+    "gate_m2a": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#932",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "- item\n}"
+        }
+       ]
+      },
+      {
+       "type": "heading",
+       "attrs": {
+        "level": 2
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "\\*",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "https://ex.com/\nnl"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": "- not list Delta"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0433",
+   "function": "SHAPE_RULES.text",
+   "line": 563,
+   "column": 115,
+   "operator": "return-value",
+   "original": "true",
+   "replacement": "undefined",
+   "lineBefore": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return true",
+   "lineAfter": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return undefined",
+   "outputsChanged": {
+    "gate": 4,
+    "gate_m2a": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#932",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "- item\n}"
+        }
+       ]
+      },
+      {
+       "type": "heading",
+       "attrs": {
+        "level": 2
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "\\*",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "https://ex.com/\nnl"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": "- not list Delta"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0434",
+   "function": "SHAPE_RULES.text",
+   "line": 563,
+   "column": 115,
+   "operator": "bool-flip",
+   "original": "true",
+   "replacement": "false",
+   "lineBefore": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return true",
+   "lineAfter": "    if (mark?.type === 'link' && (typeof mark.attrs?.href !== 'string' || mark.attrs.href.includes('\\n'))) return false",
+   "outputsChanged": {
+    "gate": 4,
+    "gate_m2a": 1
+   },
+   "example": {
+    "corpusId": "gen-adf#932",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "codeBlock",
+       "content": [
+        {
+         "type": "text",
+         "text": "- item\n}"
+        }
+       ]
+      },
+      {
+       "type": "heading",
+       "attrs": {
+        "level": 2
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "\\*",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "https://ex.com/\nnl"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": "- not list Delta"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0446",
+   "function": "hasAdjacentUnmarkedRuns",
+   "line": 579,
+   "column": 49,
+   "operator": "number-shift",
+   "original": "0",
+   "replacement": "1",
+   "lineBefore": "  return children.some((node, index) => index > 0 && isUnmarkedRun(node) && isUnmarkedRun(children[index - 1]))",
+   "lineAfter": "  return children.some((node, index) => index > 1 && isUnmarkedRun(node) && isUnmarkedRun(children[index - 1]))",
+   "outputsChanged": {
+    "gate": 51
+   },
+   "example": {
+    "corpusId": "gen-adf#403",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "]( \ud83d\ude80 ]( \ud83d\ude80"
+        },
+        {
+         "type": "text",
+         "text": "42 bar"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  },
+  {
+   "id": "M0450",
+   "function": "hasAdjacentUnmarkedRuns",
+   "line": 579,
+   "column": 106,
+   "operator": "arith",
+   "original": "-",
+   "replacement": "+",
+   "lineBefore": "  return children.some((node, index) => index > 0 && isUnmarkedRun(node) && isUnmarkedRun(children[index - 1]))",
+   "lineAfter": "  return children.some((node, index) => index > 0 && isUnmarkedRun(node) && isUnmarkedRun(children[index + 1]))",
+   "outputsChanged": {
+    "gate": 51
+   },
+   "example": {
+    "corpusId": "gen-adf#403",
+    "fn": "gate",
+    "input": {
+     "type": "doc",
+     "version": 1,
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "]( \ud83d\ude80 ]( \ud83d\ude80"
+        },
+        {
+         "type": "text",
+         "text": "42 bar"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "note": null
+  }
+ ]
+}

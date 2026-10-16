@@ -1,0 +1,9 @@
+{
+  "name": "adf-rebuild-kit",
+  "private": true,
+  "type": "module",
+  "description": "Measurement kit for the adf.js rebuild experiment: shape facts, mutation sweep, corpus replay diff.",
+  "dependencies": {
+    "acorn": "8.12.1"
+  }
+}

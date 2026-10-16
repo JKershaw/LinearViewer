@@ -1,0 +1,348 @@
+{
+  "meta": {
+    "old": {
+      "path": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/f1/adf.js",
+      "sha256": "690d4758aafa363b33c570f70bb97c1a2b0521316471715976493f6fbf3f7823"
+    },
+    "new": {
+      "path": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/prompt/adf.js",
+      "sha256": "3b55268283cd6b685e7d9a2f72d75bf22d43f9d321005380edf4e90c4324a464"
+    },
+    "node": "v22.22.0",
+    "corpus": {
+      "tests-adf": {
+        "domain": "adf",
+        "items": 1496,
+        "sha256": "81215c99e50b4a3d4d57764391bfe2acdaab98b8dcb9f1a891df48ebeaff37ba",
+        "private": false
+      },
+      "tests-md": {
+        "domain": "md",
+        "items": 1420,
+        "sha256": "e2ff7ce0a9a7cf3665e1dd80d6be57534229c0af3df860434c0ca85379451e96",
+        "private": false
+      },
+      "gen-adf": {
+        "domain": "adf",
+        "items": 3000,
+        "sha256": "ccca06109dfca0edb4b224735bd22ccfc2697072114c06649ee0f00c5cf8cc94",
+        "private": false
+      },
+      "gen-md": {
+        "domain": "md",
+        "items": 3000,
+        "sha256": "c42275119831e721bbcba22298b47b35f0c4e025d7bf85639b3f73373e726652",
+        "private": false
+      }
+    },
+    "functions": {
+      "a2m": "adfToMarkdown(adf)",
+      "gate": "adfHasUnrenderableContent(adf)",
+      "rt_adf": "markdownToAdf(adfToMarkdown(adf))",
+      "m2a": "markdownToAdf(md)",
+      "rt_md": "adfToMarkdown(markdownToAdf(md))",
+      "gate_m2a": "adfHasUnrenderableContent(markdownToAdf(md))"
+    },
+    "comparison": "Markdown/string: ===; ADF: util.isDeepStrictEqual (json-equal = equal only after JSON round-trip); boolean: ===; throw: constructor name + message; timeout: both-timeout counts as identical",
+    "loadErrors": null,
+    "timeouts": 0,
+    "shrink": {
+      "limit": 50000,
+      "budget": 600,
+      "shrunk": 7,
+      "differences": 7
+    },
+    "ms": 5561
+  },
+  "totals": {
+    "a2m": {
+      "inputs": 4496,
+      "identical": 4496,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "gate": {
+      "inputs": 4496,
+      "identical": 4492,
+      "jsonEqual": 0,
+      "different": 4
+    },
+    "rt_adf": {
+      "inputs": 4496,
+      "identical": 4496,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "m2a": {
+      "inputs": 4420,
+      "identical": 4420,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "rt_md": {
+      "inputs": 4420,
+      "identical": 4420,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "gate_m2a": {
+      "inputs": 4420,
+      "identical": 4417,
+      "jsonEqual": 0,
+      "different": 3
+    }
+  },
+  "perSource": {
+    "gen-adf a2m": {
+      "inputs": 3000,
+      "identical": 3000,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "gen-adf gate": {
+      "inputs": 3000,
+      "identical": 2996,
+      "jsonEqual": 0,
+      "different": 4
+    },
+    "gen-adf rt_adf": {
+      "inputs": 3000,
+      "identical": 3000,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "gen-md gate_m2a": {
+      "inputs": 3000,
+      "identical": 3000,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "gen-md m2a": {
+      "inputs": 3000,
+      "identical": 3000,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "gen-md rt_md": {
+      "inputs": 3000,
+      "identical": 3000,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "tests-adf a2m": {
+      "inputs": 1496,
+      "identical": 1496,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "tests-adf gate": {
+      "inputs": 1496,
+      "identical": 1496,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "tests-adf rt_adf": {
+      "inputs": 1496,
+      "identical": 1496,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "tests-md gate_m2a": {
+      "inputs": 1420,
+      "identical": 1417,
+      "jsonEqual": 0,
+      "different": 3
+    },
+    "tests-md m2a": {
+      "inputs": 1420,
+      "identical": 1420,
+      "jsonEqual": 0,
+      "different": 0
+    },
+    "tests-md rt_md": {
+      "inputs": 1420,
+      "identical": 1420,
+      "jsonEqual": 0,
+      "different": 0
+    }
+  },
+  "differences": 7,
+  "privateDifferences": 0,
+  "groups": [
+    {
+      "fn": "gate_m2a",
+      "cls": "different",
+      "signature": "gate_m2a | different | >␠a⏎>␠⏎>␠a",
+      "private": false,
+      "count": 3,
+      "sources": {
+        "tests-md": 3
+      },
+      "ids": [
+        "tests-md#639",
+        "tests-md#42",
+        "tests-md#1395"
+      ],
+      "best": {
+        "id": "tests-md#639",
+        "originalSize": 14,
+        "size": 14,
+        "features": [
+          "quote",
+          "trailing-space"
+        ],
+        "input": "> a\n> \n> b",
+        "old": true,
+        "new": false
+      }
+    },
+    {
+      "fn": "gate",
+      "cls": "different",
+      "signature": "gate | different | doc(paragraph[alignment](text:\"a\"))",
+      "private": false,
+      "count": 2,
+      "sources": {
+        "gen-adf": 2
+      },
+      "ids": [
+        "gen-adf#2487",
+        "gen-adf#994"
+      ],
+      "best": {
+        "id": "gen-adf#2487",
+        "originalSize": 200,
+        "size": 117,
+        "features": [
+          "doc",
+          "mark:alignment",
+          "paragraph",
+          "text"
+        ],
+        "input": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "t"
+                }
+              ],
+              "marks": [
+                {
+                  "type": "alignment"
+                }
+              ]
+            }
+          ]
+        },
+        "old": false,
+        "new": true
+      }
+    },
+    {
+      "fn": "gate",
+      "cls": "different",
+      "signature": "gate | different | doc(codeBlock[breakout](text:\"{\"))",
+      "private": false,
+      "count": 1,
+      "sources": {
+        "gen-adf": 1
+      },
+      "ids": [
+        "gen-adf#1648"
+      ],
+      "best": {
+        "id": "gen-adf#1648",
+        "originalSize": 213,
+        "size": 116,
+        "features": [
+          "codeBlock",
+          "doc",
+          "mark:breakout",
+          "text"
+        ],
+        "input": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "codeBlock",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{"
+                }
+              ],
+              "marks": [
+                {
+                  "type": "breakout"
+                }
+              ]
+            }
+          ]
+        },
+        "old": false,
+        "new": true
+      }
+    },
+    {
+      "fn": "gate",
+      "cls": "different",
+      "signature": "gate | different | doc(heading{level=2}(text[link]:\"\"))",
+      "private": false,
+      "count": 1,
+      "sources": {
+        "gen-adf": 1
+      },
+      "ids": [
+        "gen-adf#932"
+      ],
+      "best": {
+        "id": "gen-adf#932",
+        "originalSize": 293,
+        "size": 151,
+        "features": [
+          "doc",
+          "heading",
+          "mark:link",
+          "text"
+        ],
+        "input": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "\n"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "old": true,
+        "new": false
+      }
+    }
+  ],
+  "coarse": {
+    "gate_m2a | quote,trailing-space": 3,
+    "gate | doc,mark:alignment,paragraph,text": 2,
+    "gate | codeBlock,doc,mark:breakout,text": 1,
+    "gate | doc,heading,mark:link,text": 1
+  }
+}

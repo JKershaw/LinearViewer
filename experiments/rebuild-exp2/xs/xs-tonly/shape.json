@@ -1,0 +1,1108 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rebuild-exp1/arms/xs-tonly/adf.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 355,
+    "code": 209,
+    "comment": 109,
+    "blank": 37
+  },
+  "bytes": 15121,
+  "functions": {
+    "count": 50,
+    "byKind": {
+      "ArrowFunctionExpression": 33,
+      "FunctionDeclaration": 17
+    },
+    "longestBySpan": {
+      "name": "renderNode",
+      "spanLines": 44,
+      "codeLines": 39,
+      "startLine": 50
+    },
+    "longestByCodeLines": {
+      "name": "renderNode",
+      "spanLines": 44,
+      "codeLines": 39,
+      "startLine": 50
+    }
+  },
+  "maxNesting": 3,
+  "cyclomatic": {
+    "total": 139,
+    "totalConditionsOnly": 118,
+    "decisionPoints": 88,
+    "decisionPointsByKind": {
+      "and": 16,
+      "ternary": 10,
+      "if": 28,
+      "case": 20,
+      "nullish": 6,
+      "or": 5,
+      "while": 1,
+      "forOf": 1,
+      "for": 1
+    },
+    "max": {
+      "name": "renderNode",
+      "cyclomatic": 25
+    },
+    "unitsOver10": [
+      "renderNode"
+    ]
+  },
+  "regexLiterals": 13,
+  "regexConstructors": 0,
+  "optionalChains": 8,
+  "stringLiterals": 104,
+  "templateLiterals": 9,
+  "imports": 0,
+  "topLevelDeclarations": {
+    "count": 40,
+    "items": [
+      {
+        "name": "isObject",
+        "kind": "const",
+        "exported": false,
+        "line": 29
+      },
+      {
+        "name": "list",
+        "kind": "const",
+        "exported": false,
+        "line": 30
+      },
+      {
+        "name": "INLINE_TYPES",
+        "kind": "const",
+        "exported": false,
+        "line": 37
+      },
+      {
+        "name": "adfToMarkdown",
+        "kind": "function",
+        "exported": true,
+        "line": 39
+      },
+      {
+        "name": "renderBlocks",
+        "kind": "const",
+        "exported": false,
+        "line": 47
+      },
+      {
+        "name": "renderInline",
+        "kind": "const",
+        "exported": false,
+        "line": 48
+      },
+      {
+        "name": "renderNode",
+        "kind": "function",
+        "exported": false,
+        "line": 50
+      },
+      {
+        "name": "clampLevel",
+        "kind": "const",
+        "exported": false,
+        "line": 95
+      },
+      {
+        "name": "plainText",
+        "kind": "const",
+        "exported": false,
+        "line": 97
+      },
+      {
+        "name": "renderList",
+        "kind": "function",
+        "exported": false,
+        "line": 99
+      },
+      {
+        "name": "renderText",
+        "kind": "function",
+        "exported": false,
+        "line": 108
+      },
+      {
+        "name": "wrapInMark",
+        "kind": "function",
+        "exported": false,
+        "line": 120
+      },
+      {
+        "name": "escapeInline",
+        "kind": "const",
+        "exported": false,
+        "line": 135
+      },
+      {
+        "name": "escapeCode",
+        "kind": "const",
+        "exported": false,
+        "line": 138
+      },
+      {
+        "name": "escapeHref",
+        "kind": "const",
+        "exported": false,
+        "line": 141
+      },
+      {
+        "name": "escapeLineStart",
+        "kind": "const",
+        "exported": false,
+        "line": 149
+      },
+      {
+        "name": "markdownToAdf",
+        "kind": "function",
+        "exported": true,
+        "line": 155
+      },
+      {
+        "name": "FENCE",
+        "kind": "const",
+        "exported": false,
+        "line": 162
+      },
+      {
+        "name": "HEADING",
+        "kind": "const",
+        "exported": false,
+        "line": 163
+      },
+      {
+        "name": "BULLET",
+        "kind": "const",
+        "exported": false,
+        "line": 164
+      },
+      {
+        "name": "ORDINAL",
+        "kind": "const",
+        "exported": false,
+        "line": 165
+      },
+      {
+        "name": "parseBlock",
+        "kind": "function",
+        "exported": false,
+        "line": 172
+      },
+      {
+        "name": "listNode",
+        "kind": "function",
+        "exported": false,
+        "line": 197
+      },
+      {
+        "name": "paragraph",
+        "kind": "function",
+        "exported": false,
+        "line": 202
+      },
+      {
+        "name": "ASCII_PUNCTUATION",
+        "kind": "const",
+        "exported": false,
+        "line": 207
+      },
+      {
+        "name": "isEscapable",
+        "kind": "const",
+        "exported": false,
+        "line": 208
+      },
+      {
+        "name": "unescape",
+        "kind": "const",
+        "exported": false,
+        "line": 209
+      },
+      {
+        "name": "textNode",
+        "kind": "const",
+        "exported": false,
+        "line": 211
+      },
+      {
+        "name": "parseInline",
+        "kind": "function",
+        "exported": false,
+        "line": 214
+      },
+      {
+        "name": "DELIMITED_MARKS",
+        "kind": "const",
+        "exported": false,
+        "line": 237
+      },
+      {
+        "name": "readSpan",
+        "kind": "function",
+        "exported": false,
+        "line": 243
+      },
+      {
+        "name": "findUnescaped",
+        "kind": "function",
+        "exported": false,
+        "line": 269
+      },
+      {
+        "name": "adfHasUnrenderableContent",
+        "kind": "function",
+        "exported": true,
+        "line": 298
+      },
+      {
+        "name": "withoutDroppableDetail",
+        "kind": "function",
+        "exported": false,
+        "line": 306
+      },
+      {
+        "name": "keptAttrs",
+        "kind": "function",
+        "exported": false,
+        "line": 320
+      },
+      {
+        "name": "isEmptyPlainText",
+        "kind": "const",
+        "exported": false,
+        "line": 329
+      },
+      {
+        "name": "isMarkedText",
+        "kind": "const",
+        "exported": false,
+        "line": 330
+      },
+      {
+        "name": "isInvisibleRun",
+        "kind": "function",
+        "exported": false,
+        "line": 336
+      },
+      {
+        "name": "isEmptyParagraph",
+        "kind": "const",
+        "exported": false,
+        "line": 347
+      },
+      {
+        "name": "sameTree",
+        "kind": "function",
+        "exported": false,
+        "line": 350
+      }
+    ]
+  },
+  "exportedNames": [
+    "adfToMarkdown",
+    "markdownToAdf",
+    "adfHasUnrenderableContent"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 355,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "isObject",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 29,
+      "endLine": 29,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "list",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 30,
+      "endLine": 30,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "adfToMarkdown",
+      "kind": "FunctionDeclaration",
+      "startLine": 39,
+      "endLine": 45,
+      "spanLines": 7,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderBlocks",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 47,
+      "endLine": 47,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "renderInline",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 48,
+      "endLine": 48,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "renderNode",
+      "kind": "FunctionDeclaration",
+      "startLine": 50,
+      "endLine": 93,
+      "spanLines": 44,
+      "codeLines": 39,
+      "params": 1,
+      "cyclomatic": 25,
+      "cyclomaticConditionsOnly": 19,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "ternary": 2,
+        "case": 15,
+        "nullish": 5,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderNode/λ@61",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 61,
+      "endLine": 61,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 0,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderNode"
+    },
+    {
+      "name": "renderNode/λ@65",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 65,
+      "endLine": 65,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderNode"
+    },
+    {
+      "name": "renderNode/λ@69",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 69,
+      "endLine": 69,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderNode"
+    },
+    {
+      "name": "renderNode/λ@90",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 90,
+      "endLine": 90,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderNode"
+    },
+    {
+      "name": "clampLevel",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 95,
+      "endLine": 95,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "plainText",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 97,
+      "endLine": 97,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderList",
+      "kind": "FunctionDeclaration",
+      "startLine": 99,
+      "endLine": 106,
+      "spanLines": 8,
+      "codeLines": 6,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "renderList/λ@100",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 100,
+      "endLine": 105,
+      "spanLines": 6,
+      "codeLines": 4,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderList"
+    },
+    {
+      "name": "renderText",
+      "kind": "FunctionDeclaration",
+      "startLine": 108,
+      "endLine": 118,
+      "spanLines": 11,
+      "codeLines": 7,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderText/λ@114",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 114,
+      "endLine": 114,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderText"
+    },
+    {
+      "name": "wrapInMark",
+      "kind": "FunctionDeclaration",
+      "startLine": 120,
+      "endLine": 129,
+      "spanLines": 10,
+      "codeLines": 10,
+      "params": 2,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "case": 5,
+        "nullish": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "escapeInline",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 135,
+      "endLine": 135,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "escapeCode",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 138,
+      "endLine": 138,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "escapeHref",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 141,
+      "endLine": 141,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "escapeLineStart",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 149,
+      "endLine": 149,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "markdownToAdf",
+      "kind": "FunctionDeclaration",
+      "startLine": 155,
+      "endLine": 160,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "markdownToAdf/λ@157",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 157,
+      "endLine": 157,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "markdownToAdf"
+    },
+    {
+      "name": "parseBlock",
+      "kind": "FunctionDeclaration",
+      "startLine": 172,
+      "endLine": 190,
+      "spanLines": 19,
+      "codeLines": 18,
+      "params": 1,
+      "cyclomatic": 9,
+      "cyclomaticConditionsOnly": 8,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 6,
+        "ternary": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "parseBlock/λ@184",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 184,
+      "endLine": 184,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "parseBlock"
+    },
+    {
+      "name": "parseBlock/λ@185",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 185,
+      "endLine": 185,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "parseBlock"
+    },
+    {
+      "name": "parseBlock/λ@186",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 186,
+      "endLine": 186,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "parseBlock"
+    },
+    {
+      "name": "parseBlock/λ@187",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 187,
+      "endLine": 187,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "parseBlock"
+    },
+    {
+      "name": "listNode",
+      "kind": "FunctionDeclaration",
+      "startLine": 197,
+      "endLine": 200,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 3,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "listNode/λ@198",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 198,
+      "endLine": 198,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "listNode"
+    },
+    {
+      "name": "paragraph",
+      "kind": "FunctionDeclaration",
+      "startLine": 202,
+      "endLine": 205,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "paragraph/λ@203",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 203,
+      "endLine": 203,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": "paragraph"
+    },
+    {
+      "name": "isEscapable",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 208,
+      "endLine": 208,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "unescape",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 209,
+      "endLine": 209,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "textNode",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 211,
+      "endLine": 211,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "parseInline",
+      "kind": "FunctionDeclaration",
+      "startLine": 214,
+      "endLine": 235,
+      "spanLines": 22,
+      "codeLines": 22,
+      "params": 1,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 7,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "while": 1,
+        "if": 4,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "readSpan",
+      "kind": "FunctionDeclaration",
+      "startLine": 243,
+      "endLine": 266,
+      "spanLines": 24,
+      "codeLines": 24,
+      "params": 2,
+      "cyclomatic": 8,
+      "cyclomaticConditionsOnly": 8,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "forOf": 1,
+        "if": 5,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "findUnescaped",
+      "kind": "FunctionDeclaration",
+      "startLine": 269,
+      "endLine": 275,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 3,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "for": 1,
+        "if": 2,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "adfHasUnrenderableContent",
+      "kind": "FunctionDeclaration",
+      "startLine": 298,
+      "endLine": 303,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "adfHasUnrenderableContent/λ@300",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 300,
+      "endLine": 300,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "adfHasUnrenderableContent"
+    },
+    {
+      "name": "withoutDroppableDetail",
+      "kind": "FunctionDeclaration",
+      "startLine": 306,
+      "endLine": 317,
+      "spanLines": 12,
+      "codeLines": 12,
+      "params": 1,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 3
+      },
+      "enclosing": null
+    },
+    {
+      "name": "withoutDroppableDetail/λ@314",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 314,
+      "endLine": 314,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "withoutDroppableDetail"
+    },
+    {
+      "name": "keptAttrs",
+      "kind": "FunctionDeclaration",
+      "startLine": 320,
+      "endLine": 327,
+      "spanLines": 8,
+      "codeLines": 7,
+      "params": 1,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 2,
+        "and": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isEmptyPlainText",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 329,
+      "endLine": 329,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isMarkedText",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 330,
+      "endLine": 330,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isInvisibleRun",
+      "kind": "FunctionDeclaration",
+      "startLine": 336,
+      "endLine": 339,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 2,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isInvisibleRun/λ@337",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 337,
+      "endLine": 337,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "isInvisibleRun"
+    },
+    {
+      "name": "isEmptyParagraph",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 347,
+      "endLine": 347,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "sameTree",
+      "kind": "FunctionDeclaration",
+      "startLine": 350,
+      "endLine": 355,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 2,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 2,
+        "or": 2,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "sameTree/λ@354",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 354,
+      "endLine": 354,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "sameTree"
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}
