@@ -447,3 +447,34 @@ So "no breakdown" is a ticket line, not a Harbour change (inference).
 2. The renderer cluster as one no-breakdown rung, about 2,300 lines: the Large test.
 3. The dispatch entrance (`routes/dispatch.js`, `proxy-dispatch.js`, `proxy-kickoff.js`; worst functions 122, 93, 62).
 - Alongside: `lib/pipeline-loops.js` (113, 76).
+
+## 16 Oct ~18:10Z: rung 5d (LIN-3578, `pipeline-loops.js`) done and scored
+
+The round runs at altitude now: sub-agents build the replays, draft the tickets, run the fresh-reader checks and score, and the main session reads ≤15-line summaries. `scratchpad/RUNBOOK.md` and `STATE.md` hold the method and the live state.
+
+**Run.** Kickoff 16:35Z, merged 17:42Z as #1901: 67 minutes, 11 dispatches. One implementation run: the ticket's "This is one PR. Don't split it into child tickets." held. No rulings.
+
+**Replay** (`experiments/rebuild-rung5d/`, 3,795 inputs: 751 captured from tests, 44 targeted, 3,000 generated; 100% line coverage of the old file; seeds 1 and 7):
+- 18 inputs differ per seed, none from the captured tests.
+- **(a) fixes: 17.** A lean abort now reaches a target that has no digest: `terminalStatus` goes `null → 'aborted'`. To confirm it, the fix was applied alone to the old file; the replay then shows only the wording difference.
+- **(b) regressions: 0.**
+- **(c) fuzz: 1.** A TypeError's wording on a direct `_buildLoops` call.
+- **Info only:** about 650 inputs differ in key order inside lean `telemetry`, as the PR lists.
+
+**Shape:**
+- code lines 800 → 634 (−21%);
+- decision points 389 → 301 (−23%);
+- worst function 113 → 29; second worst 76 → 20;
+- functions 50 → 86.
+
+No helper module, and no existing test edited. 4 new pin tests. The redaction census rows are kept.
+
+**Prediction:** 9 of 9 lines hit. The decision-point cut came in near the bottom of the predicted 20–35% range.
+
+**Worth noting:**
+- **The fix reaches further than the PR's table says.** For lean callers, an aborted autopilot run with no digest now closes its session window, so later loops on the same issue form their own sessions (in one example, 1 session became 3). Non-lean already did this, so it's a fix. But sessions already stored keep the old grouping until rebuilt, and `BUILDER_VERSION` wasn't bumped.
+- **Comments were cut hard:** 967 → 409 lines, and 17 of 51 ticket references are gone. All five the ticket named remain.
+
+**Side events in the round:**
+- LIN-3579's first implementation worker reported a `simple-dispatcher` checkout, although nothing carried a repo override. It was aborted and relaunched.
+- A fresh-reader check of LIN-3580 found that local e2e loads `.env`. A read-only research dispatch (opencode with a cheap OpenRouter model, under 1¢) found it safe on the operator's machine (`MONGODB_URI` unset), but unguarded. That became LIN-3583.
