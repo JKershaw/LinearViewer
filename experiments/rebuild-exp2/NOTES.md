@@ -375,3 +375,38 @@ Tables already survive. Jira's format can't make code bold, so "code inside, bol
 John: "Let's pause before Rung 5 as I think we'll have a good amount of information to digest, and write up."
 
 Rung 4 (LIN-3573) finishes, since it's already running. Harbour's plan split it into three children: LIN-3574 (the replay harness, done), LIN-3575 (rulings) and LIN-3576 (writes and PR). Then I score it and write up the series. No new rungs.
+
+## 16 Oct ~14:20Z: rung 4 (LIN-3573, write and rulings routes) done and scored
+
+Merged as `350242d5` (PR #1899) at 14:08Z, about 5 h 17 min after kickoff (08:51Z).
+
+**How Harbour ran it:** the plan split the work into three children: LIN-3574 (build and gate the replay harness), LIN-3575 (rulings) and LIN-3576 (writes and the PR). That took two plan-review rounds and one ruling from John (citation-only edits, allowed). There was also a one-hour wait: LIN-3576's first worker found itself "blocked by LIN-3575" and exited at 12:08Z. The pipeline resumed by itself once LIN-3575 closed at 13:28Z.
+
+**Independent replay** (`rung4/replay`, 2 seeds × 3,000 requests per file, 98–100% line coverage of both versions):
+- **Rulings:** 0 differences on both seeds.
+- **Writes:** about 225 requests per seed differ, all in two behaviour changes. The PR names the same two from its own 20,000-request replay (3 seeds), with warrants:
+  - **a1, a fix:** a credential-resolution rejection on a description edit fell through to the generic "Internal server error", unlogged. It's now mapped and logged, as at the other 10 resolution sites.
+  - **a2, a fix:** a description write the provider reports as not landed (`null` or `{success:false}`) returned **200** to the agent. It now returns 502 "Description was not updated", per `docs/proxy-integration.md` ("never … a 2xx with a falsy success").
+  - An extra undefined argument to `resolveProviderAccess` on issue creation has no effect.
+
+**Shape:**
+- `proxy-writes`: code 693 → **421** (−39%), decisions 210 → 150, worst 39 → 26, longest handler 93 → 40 lines.
+- `proxy-rulings`: 236 → 198, decisions 57 → 46, worst 21 → **12**.
+- Combined: 929 → 619 (−33%).
+
+**Design:** the old writes file restated one skeleton eleven times. The rebuild says each step once: a `SPEC` table of the per-route facts, then `guarded()`, `refuse()`, `guardTarget()`, `editDescription()` and the rest. The one place that didn't follow the skeleton (description edits) is where both bugs lived. No shared helper module was added; the PR found the two files share nothing worth one.
+
+**Source-text pins:** all four convertible assertions were converted, each shown failing with its guard removed. All the non-convertible pins were satisfied as written.
+
+**Against `prediction-writes-rulings.md`:**
+- merged ✓;
+- no agent-visible regression ✓;
+- conversions within the allowed set ✓ (4);
+- decisions down 15–30% ✓;
+- no helper module, as predicted at 60% ✓;
+- combined 760–900 lines ✗ (619; a bigger cut than predicted);
+- worst function ≤25 ✗ (26);
+- 70–150 minutes ✗ (about 5 h 17 min, because of the split, review rounds and the wait);
+- Done without a ruling ✗ (one).
+
+**Inference:** at about 930 lines over two files, design-first plus replay gave the biggest cut yet, with zero regressions. The cost was wall-clock, not quality. Harbour's own decomposition (harness first, then each file) made it safe but slow, and it exposed a gap in the pipeline: a child worker exiting "blocked" left the parent waiting until the blocker closed.
