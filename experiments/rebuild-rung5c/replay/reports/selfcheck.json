@@ -1,0 +1,408 @@
+{
+  "base": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/replay/pinned/origin-main",
+  "lib": "/home/user/LinearViewer",
+  "n": 6000,
+  "mutantN": 3000,
+  "seeds": [
+    1,
+    7
+  ],
+  "checks": [
+    {
+      "id": "identity-seed1",
+      "what": "old vs an independent copy of old",
+      "pass": true,
+      "requests": 10396,
+      "perTier": {
+        "gen": {
+          "requests": 6000,
+          "differing": 0
+        },
+        "edge": {
+          "requests": 3158,
+          "differing": 0
+        },
+        "test": {
+          "requests": 1238,
+          "differing": 0
+        }
+      },
+      "differing": 0,
+      "groups": [],
+      "ms": 59624
+    },
+    {
+      "id": "identity-seed7",
+      "what": "old vs an independent copy of old",
+      "pass": true,
+      "requests": 10396,
+      "perTier": {
+        "gen": {
+          "requests": 6000,
+          "differing": 0
+        },
+        "edge": {
+          "requests": 3158,
+          "differing": 0
+        },
+        "test": {
+          "requests": 1238,
+          "differing": 0
+        }
+      },
+      "differing": 0,
+      "groups": [],
+      "ms": 59115
+    },
+    {
+      "id": "d1-status",
+      "what": "trim 'not-downward' 409 → 422",
+      "pass": true,
+      "differing": 7,
+      "detectedIn": [
+        "status x7"
+      ],
+      "groups": [
+        "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim [status] x7"
+      ],
+      "offTarget": [],
+      "ms": 39179
+    },
+    {
+      "id": "d2-field",
+      "what": "session 201 drops item.consumerLastSeenAt",
+      "pass": true,
+      "differing": 524,
+      "detectedIn": [
+        "body x524"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/dispatch [header-derived:content-length] x524",
+        "POST /workspace/:urlKey/api/dispatch [header-derived:etag] x524",
+        "POST /workspace/:urlKey/api/dispatch [body] x524"
+      ],
+      "offTarget": [],
+      "ms": 38943
+    },
+    {
+      "id": "d3-store-arg",
+      "what": "broker plain mint label 'refire-broker' → 'refire'",
+      "pass": true,
+      "differing": 118,
+      "detectedIn": [
+        "store:proxyTokenStore x118"
+      ],
+      "groups": [
+        "POST /api/dispatch/broker-token [store:proxyTokenStore] x118",
+        "POST /api/dispatch/broker-token [header-derived:content-length] x72",
+        "POST /api/dispatch/broker-token [header-derived:etag] x72",
+        "POST /api/dispatch/broker-token [body] x72"
+      ],
+      "offTarget": [],
+      "ms": 39837
+    },
+    {
+      "id": "d4-gate",
+      "what": "DELETE …/halt loses its owner gate",
+      "pass": true,
+      "differing": 110,
+      "detectedIn": [
+        "depCalls x89",
+        "body x54",
+        "console x54",
+        "status x43",
+        "store:workspaceHaltStore x42"
+      ],
+      "groups": [
+        "DELETE /workspace/:urlKey/api/dispatch/halt [depCalls] x89",
+        "DELETE /workspace/:urlKey/api/dispatch/halt [header-derived:content-length] x54",
+        "DELETE /workspace/:urlKey/api/dispatch/halt [header-derived:etag] x54",
+        "DELETE /workspace/:urlKey/api/dispatch/halt [body] x54",
+        "DELETE /workspace/:urlKey/api/dispatch/halt [console] x54",
+        "DELETE /workspace/:urlKey/api/dispatch/halt [status] x43",
+        "DELETE /workspace/:urlKey/api/dispatch/halt [store:workspaceHaltStore] x42"
+      ],
+      "offTarget": [],
+      "ms": 39733
+    },
+    {
+      "id": "d5-fire-and-forget",
+      "what": "task-mode record drops the caller surface",
+      "pass": true,
+      "differing": 4,
+      "detectedIn": [
+        "store:taskModeStore x4"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/dispatch [store:taskModeStore] x4"
+      ],
+      "offTarget": [],
+      "ms": 39703
+    },
+    {
+      "id": "p1-logEvent",
+      "what": "list route audits 200 as 201",
+      "pass": true,
+      "differing": 115,
+      "detectedIn": [
+        "logEvent x115",
+        "store:proxyEventStore x115"
+      ],
+      "groups": [
+        "GET /api/proxy/dispatch [logEvent] x115",
+        "GET /api/proxy/dispatch [store:proxyEventStore] x115"
+      ],
+      "offTarget": [],
+      "ms": 39715
+    },
+    {
+      "id": "p2-longpoll",
+      "what": "long-poll re-check interval 1500 → 1000 ms",
+      "pass": true,
+      "differing": 51,
+      "detectedIn": [
+        "body x30",
+        "store:dispatchQueueStore x27",
+        "header-derived:content-length x2"
+      ],
+      "groups": [
+        "GET /api/proxy/dispatch/:id [body] x30",
+        "GET /api/proxy/dispatch/:id [store:dispatchQueueStore] x27",
+        "GET /api/proxy/dispatch/:id [header-derived:etag] x23",
+        "GET /api/proxy/dispatch/:id [header-derived:content-length] x2"
+      ],
+      "offTarget": [],
+      "ms": 39375
+    },
+    {
+      "id": "p3-field",
+      "what": "override arm drops `override: true`",
+      "pass": true,
+      "differing": 153,
+      "detectedIn": [
+        "body x153"
+      ],
+      "groups": [
+        "POST /api/proxy/recommend-and-dispatch [body] x153",
+        "POST /api/proxy/recommend-and-dispatch [header-derived:content-length] x147",
+        "POST /api/proxy/recommend-and-dispatch [header-derived:etag] x147"
+      ],
+      "offTarget": [],
+      "ms": 39381
+    },
+    {
+      "id": "p4-keepalive",
+      "what": "defer refusal answers on res, not the armed keepalive",
+      "pass": true,
+      "differing": 8,
+      "detectedIn": [
+        "status x8",
+        "body x8",
+        "serverResponse x8",
+        "console x8",
+        "expressErrorHandler x8"
+      ],
+      "groups": [
+        "POST /api/proxy/recommend-and-dispatch [status] x8",
+        "POST /api/proxy/recommend-and-dispatch [body] x8",
+        "POST /api/proxy/recommend-and-dispatch [serverResponse] x8",
+        "POST /api/proxy/recommend-and-dispatch [depCalls] x8",
+        "POST /api/proxy/recommend-and-dispatch [logEvent] x8",
+        "POST /api/proxy/recommend-and-dispatch [console] x8",
+        "POST /api/proxy/recommend-and-dispatch [expressErrorHandler] x8",
+        "POST /api/proxy/recommend-and-dispatch [store:proxyEventStore] x8"
+      ],
+      "offTarget": [],
+      "ms": 39380
+    },
+    {
+      "id": "k1-store-arg",
+      "what": "kickoff row waitForFollowUps true → false",
+      "pass": true,
+      "differing": 185,
+      "detectedIn": [
+        "store:dispatchQueueStore x185"
+      ],
+      "groups": [
+        "POST /api/proxy/autopilot/kickoff [store:dispatchQueueStore] x185"
+      ],
+      "offTarget": [],
+      "ms": 39734
+    },
+    {
+      "id": "k2-declared-site",
+      "what": "kickoff declaredSite 'M1' → 'M2'",
+      "pass": true,
+      "differing": 176,
+      "detectedIn": [
+        "store:dispatchQueueStore x176"
+      ],
+      "groups": [
+        "POST /api/proxy/autopilot/kickoff [store:dispatchQueueStore] x176"
+      ],
+      "offTarget": [],
+      "ms": 38555
+    },
+    {
+      "id": "k3-bound",
+      "what": "GET kickoff goal cap 1000 → 999",
+      "pass": true,
+      "differing": 8,
+      "detectedIn": [
+        "header-derived:content-length x8",
+        "header-derived:etag x8",
+        "body x8"
+      ],
+      "groups": [
+        "GET /api/proxy/autopilot/kickoff [header-derived:content-length] x8",
+        "GET /api/proxy/autopilot/kickoff [header-derived:etag] x8",
+        "GET /api/proxy/autopilot/kickoff [body] x8"
+      ],
+      "offTarget": [],
+      "ms": 38489
+    }
+  ],
+  "coverage": {
+    "seed1": {
+      "dispatch.js": {
+        "pct": 99.48,
+        "covered": 1144,
+        "executable": 1150,
+        "uncovered": [
+          "181: return unauthorized.json(res, 'Empty token');",
+          "182: }",
+          "222: return unauthorized.json(res, 'Empty token');",
+          "223: }",
+          "1907: return serviceUnavailable.json(res, 'Could not mint a broker bootstrap token');",
+          "1908: }"
+        ]
+      },
+      "proxy-dispatch.js": {
+        "pct": 99.7,
+        "covered": 1002,
+        "executable": 1005,
+        "uncovered": [
+          "931: logEvent(req, '/api/proxy/recommend-and-dispatch', 500);",
+          "932: return keepaliveError(keepalive, 500, 'Failed to generate prompt');",
+          "933: }"
+        ]
+      },
+      "proxy-kickoff.js": {
+        "pct": 100,
+        "covered": 295,
+        "executable": 295,
+        "uncovered": []
+      }
+    },
+    "seed7": {
+      "dispatch.js": {
+        "pct": 99.48,
+        "covered": 1144,
+        "executable": 1150,
+        "uncovered": [
+          "181: return unauthorized.json(res, 'Empty token');",
+          "182: }",
+          "222: return unauthorized.json(res, 'Empty token');",
+          "223: }",
+          "1907: return serviceUnavailable.json(res, 'Could not mint a broker bootstrap token');",
+          "1908: }"
+        ]
+      },
+      "proxy-dispatch.js": {
+        "pct": 99.7,
+        "covered": 1002,
+        "executable": 1005,
+        "uncovered": [
+          "931: logEvent(req, '/api/proxy/recommend-and-dispatch', 500);",
+          "932: return keepaliveError(keepalive, 500, 'Failed to generate prompt');",
+          "933: }"
+        ]
+      },
+      "proxy-kickoff.js": {
+        "pct": 100,
+        "covered": 295,
+        "executable": 295,
+        "uncovered": []
+      }
+    }
+  },
+  "thinStatusLogPairs": [],
+  "perRouteRequests": {
+    "GET /workspace/:urlKey/api/dispatch/presets": 147,
+    "POST /api/proxy/dispatch": 889,
+    "GET /api/proxy/autopilot/kickoff": 150,
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId": 182,
+    "POST /workspace/:urlKey/api/dispatch": 1577,
+    "GET /workspace/:urlKey/api/dispatch/recent-prompts": 143,
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts": 152,
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId": 180,
+    "GET /api/proxy/autopilot/manual": 142,
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId": 156,
+    "GET /api/proxy/dispatch/:id": 364,
+    "GET /workspace/:urlKey/api/dispatch/count": 137,
+    "POST /workspace/:urlKey/api/dispatch/presets": 185,
+    "GET /api/proxy/dispatch/:id/prompt": 173,
+    "POST /workspace/:urlKey/api/dispatch/tokens": 218,
+    "GET /api/proxy/dispatch": 348,
+    "POST /api/dispatch/broker-token": 406,
+    "GET /api/proxy/wake-shadow": 150,
+    "GET /api/dispatch/poll": 186,
+    "POST /api/proxy/recommend-and-dispatch": 1148,
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts": 158,
+    "UNMATCHED": 96,
+    "GET /workspace/:urlKey/api/dispatch/history": 151,
+    "DELETE /workspace/:urlKey/api/dispatch/halt": 186,
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim": 208,
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId": 192,
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts": 158,
+    "POST /api/proxy/autopilot/kickoff": 710,
+    "POST /workspace/:urlKey/api/dispatch/halt": 207,
+    "GET /api/proxy/passage-runner/prompt": 144,
+    "GET /workspace/:urlKey/api/dispatch/favorite-prompts": 143,
+    "GET /workspace/:urlKey/api/dispatch/halt": 149,
+    "GET /workspace/:urlKey/api/dispatch/tokens": 138,
+    "POST /api/dispatch/take/:itemId": 163,
+    "GET /workspace/:urlKey/api/dispatch": 175,
+    "GET /workspace/:urlKey/api/dispatch/quota": 159,
+    "POST /api/dispatch/feedback/:itemId": 226
+  },
+  "minPerRoute": 137,
+  "importSideEffects": {
+    "session": {
+      "console": [],
+      "unhandled": [],
+      "fs": [],
+      "envReads": [
+        "NODE_V8_COVERAGE",
+        "OPENROUTER_API_URL"
+      ],
+      "newGlobals": [],
+      "socketEscapes": [],
+      "modulesFirstLoaded": 173,
+      "sideResolutions": [],
+      "importError": null
+    },
+    "proxyDispatch": {
+      "console": [],
+      "unhandled": [],
+      "fs": [],
+      "envReads": [],
+      "newGlobals": [],
+      "socketEscapes": [],
+      "modulesFirstLoaded": 27,
+      "sideResolutions": [],
+      "importError": null
+    },
+    "kickoff": {
+      "console": [],
+      "unhandled": [],
+      "fs": [],
+      "envReads": [],
+      "newGlobals": [],
+      "socketEscapes": [],
+      "modulesFirstLoaded": 20,
+      "sideResolutions": [],
+      "importError": null
+    }
+  }
+}

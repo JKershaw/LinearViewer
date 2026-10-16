@@ -557,3 +557,23 @@ All 11 ticket references are kept. Golden and link tests pass.
 **Prediction:** 7 hits. Misses: both on size (code grew rather than shrank, and the decision-point cut was smaller than predicted).
 
 **Process finding.** The first build push was the old file edited in place, not a rebuild. Code review caught it, along with a regression in that version. The PR says 232 of 414 non-trivial lines still match the old file. Design-first held only because review enforced it. This is the first rung where the "don't copy" instruction was visibly strained, and the first with the lighter, efficiency-first wording. Both may matter. A "rebuilt, not edited" check (a share of lines unchanged from the base) is worth adding to the ticket's Done-when.
+
+## 16 Oct ~23:59Z: rung 5c (LIN-3592, the dispatch entrance) done and scored
+
+`routes/dispatch.js`, `routes/proxy-dispatch.js` and `routes/proxy-kickoff.js` in one PR: 2,450 code lines, the largest rung. It was designed against the rebuilt factory and merged as #1906 (`d2d7d818`). Launched ~21:58Z, Done 23:42Z: 106 minutes, no split, no ruling, no GitHub reviews.
+
+**Independent replay** (10,396 requests per seed, both sides on `d2d7d818`'s factory):
+- **(a) 1 fix,** about 195 requests: `recommend-and-dispatch` with a `kind` now stamps `waitForFollowUps`.
+- **(b, harmless), about 345 requests:** every non-cascade 201 from `POST /api/proxy/dispatch` has its keys in a new order. Same value, same length. It counts as (b) only because the ticket allows no fuzz on a 2xx body. The PR's own replay missed it.
+- With the fix and the key order both patched into the old copies, there are 0 differences.
+
+**Shape:**
+- worst units 122 → 63, 93 → 52, 62 → 41;
+- code lines −11.9%; decision points −8.3%;
+- functions 83 → 172; one pure helper, `lib/dispatch-entrance.js`.
+
+All 17 pinned tests and the whole-tree scans pass. All 131 ticket references are kept.
+
+**Identical lines: 86.7%** of the new non-trivial lines appear verbatim in the old files; outside the pinned blocks, 82.6%. That makes this a careful refactor, not a rebuild from a design. The ticket said not to copy handlers or blocks.
+
+**Reading, with 6a:** the two rungs that came last, with the most pins (5c) or the lightest wording (6a), drifted from rebuild toward edit. Their worst functions still fell sharply, but code and decision-point cuts were the smallest of the round. Next: measure the identical-line share for every rung so far, to see whether earlier rungs really rebuilt.

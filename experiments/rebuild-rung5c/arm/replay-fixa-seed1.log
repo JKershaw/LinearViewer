@@ -1,0 +1,3 @@
+replay: 10396 requests (seed 1; gen 6000, edge 3158, test 1238) in 49957 ms; differing: 349 in 1 groups
+    349  POST /api/proxy/dispatch  [header-derived:etag]  e.g. gen:77 POST /api/proxy/dispatch
+report: /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/report-fixa-seed1.json

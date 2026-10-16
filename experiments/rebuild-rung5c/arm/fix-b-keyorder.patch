@@ -1,0 +1,27 @@
+--- old-fix-a/proxy-dispatch.js	2026-10-16 23:47:33.418194887 +0000
++++ old-fix-ab/proxy-dispatch.js	2026-10-16 23:47:46.542195667 +0000
+@@ -622,19 +622,19 @@
+         success: true,
+         id: item._id,
+         status: 'queued',
+-        promptName: item.promptName,
+         kind: item.kind,
++        promptName: item.promptName,
+         issueIdentifier: item.issueIdentifier,
+         target: item.target,
+-        abort: item.abort === true,
+-        abortTo: item.abortTo || null,
+-        cascade: item.cascade === true,
+         sessionId: item.sessionId || null,
+         maxTasks: item.maxTasks ?? null,
+         ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {}),
+         dispatchedAt: item.dispatchedAt?.toISOString?.() || item.dispatchedAt,
+         consumerLastSeenAt: item.consumerLastSeenAt || null,
+-        ...(consumerPollWarning ? { warning: consumerPollWarning } : {})
++        ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
++        abort: item.abort === true,
++        abortTo: item.abortTo || null,
++        cascade: item.cascade === true
+       });
+     } catch (err) {
+       // Tagged factory refusals (duplicate, run limit, budget, close-out, runaway) —
