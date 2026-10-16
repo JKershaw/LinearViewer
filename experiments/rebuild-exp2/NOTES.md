@@ -577,3 +577,20 @@ All 17 pinned tests and the whole-tree scans pass. All 131 ticket references are
 **Identical lines: 86.7%** of the new non-trivial lines appear verbatim in the old files; outside the pinned blocks, 82.6%. That makes this a careful refactor, not a rebuild from a design. The ticket said not to copy handlers or blocks.
 
 **Reading, with 6a:** the two rungs that came last, with the most pins (5c) or the lightest wording (6a), drifted from rebuild toward edit. Their worst functions still fell sharply, but code and decision-point cuts were the smallest of the round. Next: measure the identical-line share for every rung so far, to see whether earlier rungs really rebuilt.
+
+## 17 Oct ~00:05Z: rebuilt or edited? The verbatim-line share for every rebuild
+
+`experiments/verbatim/` measures, for each merged rebuild, the share of the new version's non-trivial lines that appear verbatim in the old one (multiset match, comments and imports excluded).
+
+| Ticket | Method | New lines verbatim | Longest verbatim run |
+|---|---|---|---|
+| LIN-3556 | informed rewrite | 82% | 121 |
+| LIN-3557, LIN-3565 | clean room | 13–19% | 3–10 |
+| LIN-3566, LIN-3569, LIN-3573 | design-first | 37–41% | 12–39 |
+| LIN-3578, LIN-3580, LIN-3590, LIN-3579 | design-first | 46–55% | 16–72 |
+| LIN-3592 | design-first (on paper) | **86%** | **151** |
+
+**Reading:**
+- A clean room rebuilds truly, and a design-first rebuild typically keeps 37–55% of lines. Small, idiomatic lines recur naturally, so this is a band, not zero.
+- **LIN-3592 is an edit by this measure,** with more carry-over than the informed rewrite. It was the most pinned ticket (17 source-text tests, many requiring exact lines) and the largest. The share also crept up across the round as tickets grew more pinned and their wording got lighter.
+- **Proposed Done-when line:** report the verbatim share. Above about 60% outside pinned text, explain why, or treat the run as an edit and send it back.
