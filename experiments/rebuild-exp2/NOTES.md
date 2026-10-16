@@ -228,3 +228,11 @@ LIN-3561 merged as `bf6f7507` (PR #1893) at 20:46Z, about 40 minutes after kicko
 - A test review bounded by a computed gap list works well and stays small: 78 lines closed 35 of 46 gaps, with no sprawl.
 - In this method, comments are part of the contract. A wrong comment is a wrong spec.
 - F1 is the realistic display bug left in this module; F2 isn't, on this data.
+
+## 15–16 Oct overnight: the inline-code fix (LIN-3564), then a stall
+
+- **Before part 2:** a fix ticket for F1, so the clean room's spec doesn't call the bug "accepted". The fresh-reader check found 10 issues, all applied, including a padding bug for all-space text, a gate regression for adjacent code runs, and the missing no-closer rule.
+- **LIN-3564** was filed and launched at 21:13Z and merged as `c2bc9a65` (PR #1894) at about 21:25Z. Close-out then blocked on a post-deploy Jira-check ruling, as in LIN-3557.
+- **Private-sample replay here:** inline code showing extra backslashes after a Jira round trip fell from 137 of 1,037 real texts to 8. 0 throws; the codec file passes 200/200. The ruling is pre-filled "accept" for John.
+- **Stall:** the session's worker restarted at about 21:15Z. The LIN-3564 watcher died with it, and my next step waited on a permission prompt until morning. The XS rooms (two repeat clean rooms, and one with tests only) were built in the scratchpad but not run. Nothing else was launched.
+- **Lesson (process):** an overnight run needs a self-check that survives a worker restart, such as a scheduled check-in, not only an in-session background watcher.
