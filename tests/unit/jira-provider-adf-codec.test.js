@@ -994,6 +994,12 @@ describe('markdownToAdf: unclosed fence and indented rule (LIN-3557 review)', ()
     assert.equal(adfHasUnrenderableContent(doc), false)
   })
 
+  test('a closed fence with no body is an empty code block, not a block holding the closing fence', () => {
+    assert.deepEqual(markdownToAdf('```js\n```').content, [
+      { type: 'codeBlock', attrs: { language: 'js' }, content: [] },
+    ])
+  })
+
   test('a lone fence line stays text', () => {
     assert.deepEqual(markdownToAdf('```').content.map(n => n.type), ['paragraph'])
   })
@@ -1118,4 +1124,65 @@ describe('code spans: what a reader sees, and what a typed span stores', () => {
     ['text after an unclosed run still parses', '``a `b`', [adfPara(adfText('``a '), adfText('b', [{ type: 'code' }]))]],
   ]
   for (const [name, md, content] of stored) test(`typed: ${name}`, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
+})
+
+// LIN-3565: pins for what the clean-room rebuild (experiment 2b) changed and
+// its replay showed. Each row is one behaviour change or fixed regression.
+describe('LIN-3565: what the rebuild changed, as users see it', () => {
+  const para = (...runs) => adfDoc(adfPara(...runs))
+  const link = { type: 'link', attrs: { href: 'http://a.b' } }
+
+  // Fix: a code run carrying another mark showed the other mark's syntax as
+  // literal code text, and dropped the link or emphasis.
+  const codeWith = [
+    ['strong', { type: 'strong' }, '**`x`**', '<p><strong><code>x</code></strong></p>\n'],
+    ['em', { type: 'em' }, '_`x`_', '<p><em><code>x</code></em></p>\n'],
+    ['strike', { type: 'strike' }, '~~`x`~~', '<p><del><code>x</code></del></p>\n'],
+    ['a link', link, '[`x`](http://a.b)', '<p><a href="http://a.b"><code>x</code></a></p>\n'],
+  ]
+  for (const [name, mark, md, html] of codeWith) {
+    test(`code with ${name} shows both`, () => {
+      assert.equal(adfToMarkdown(para(adfText('x', [mark, { type: 'code' }]))), md)
+      assert.equal(marked.parse(md), html)
+    })
+  }
+
+  // Fix: text that begins with spaces and a block marker was written bare, so
+  // the dashboard showed a list, quote or numbered list instead of the text.
+  const looksLikeBlock = [
+    ['a numbered list', ' 1. a', '1\\. a', '<p>1. a</p>\n'],
+    ['a bullet', ' - a', '\\- a', '<p>- a</p>\n'],
+    ['a quote', ' > a', '\\> a', '<p>&gt; a</p>\n'],
+  ]
+  for (const [name, text, md, html] of looksLikeBlock) {
+    test(`indented text that looks like ${name} stays text`, () => {
+      assert.equal(adfToMarkdown(para(adfText(text))), md)
+      assert.equal(marked.parse(md), html)
+    })
+  }
+
+  // Fix: block markers the dashboard renders as blocks are stored as blocks.
+  const blocks = [
+    ['a * bullet', '* item', [{ type: 'bulletList', content: [adfItem(adfPara(adfText('item')))] }]],
+    ['an indented numbered item', ' 1. item', [{ type: 'orderedList', content: [adfItem(adfPara(adfText('item')))] }]],
+    ['an indented fence', ' ```\ncode\n```', [{ type: 'codeBlock', content: [adfText('code')] }]],
+  ]
+  for (const [name, md, content] of blocks) test(`typed: ${name} is stored as its block`, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
+
+  // Regression fixed: a line ending counts as a space in a code span, so a
+  // whitespace-only run is not padded (padding made the dashboard show more
+  // whitespace than the run holds).
+  test('code of spaces and a newline is shown as it is', () => {
+    const doc = para(adfText(' \n ', [{ type: 'code' }]))
+    const md = adfToMarkdown(doc)
+    assert.equal(md, '` \n `')
+    assert.equal(marked.parse(md), '<p><code>   </code></p>\n')
+  })
+
+  // Regression fixed: a newline in a code block's language moves the rest of
+  // it into the body on the way back, so the write must be refused.
+  test('a code block language with a newline is refused', () => {
+    const doc = adfDoc({ type: 'codeBlock', attrs: { language: 'x\ny' }, content: [adfText('body')] })
+    assert.equal(adfHasUnrenderableContent(doc), true)
+  })
 })
