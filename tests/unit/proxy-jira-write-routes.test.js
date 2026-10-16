@@ -157,8 +157,8 @@ function seed() {
         },
       },
       {
-        // Same blocker, structural half: nesting the writer cannot rebuild at
-        // any depth (it would re-emit the child as a flat sibling list).
+        // A nested list (LIN-3570): the writer rebuilds it as a nested list, so
+        // a write is permitted and the nesting survives.
         id: '30007', key: 'ENG-16',
         fields: {
           summary: 'Nested bullet list',
@@ -649,11 +649,14 @@ describe('Jira-backed proxy writes — the gate is derived from the WRITER (LIN-
       'and the title write never happened either (N1 ordering holds)');
   });
 
-  test('a nested bulletList description refuses (422) rather than being rewritten as two flat sibling lists', async () => {
-    const before = JSON.stringify((await stored('ENG-16')).fields.description);
+  test('a nested bulletList description is appended to, nesting preserved', async () => {
+    const before = (await stored('ENG-16')).fields.description;
     const { status } = await call(buildApp(), 'POST', '/api/proxy/issues/ENG-16/description/append', { block: 'A new note.' });
-    assert.equal(status, 422);
-    assert.equal(JSON.stringify((await stored('ENG-16')).fields.description), before, 'the nesting survives');
+    assert.equal(status, 200);
+    const { content } = (await stored('ENG-16')).fields.description;
+    assert.deepEqual(content.slice(0, before.content.length), before.content, 'the nested list is stored exactly as it was');
+    assert.equal(content[0].content[0].content[1].type, 'bulletList', 'the child list is still under its parent item');
+    assert.equal(content.length, before.content.length + 1, 'and the note was added');
   });
 
   test('the READ path is untouched — the same refused issue still renders its mention/card/emoji for display', async () => {

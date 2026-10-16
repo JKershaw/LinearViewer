@@ -10,12 +10,12 @@ import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
 import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
 
 describe('periodicals registry', () => {
-  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, Integration & Surface Maturity, and Onboarding & Cold-Start (15 templates)', () => {
-    assert.strictEqual(PERIODICALS.length, 15);
+  test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, Integration & Surface Maturity, and Onboarding & Cold-Start, and Seams & Tangles (16 templates)', () => {
+    assert.strictEqual(PERIODICALS.length, 16);
     assert.strictEqual(getPeriodicals(), PERIODICALS);
   });
 
-  test('contains the 12 corrective reviews plus the advisory Stability Review, Recent Headwinds report, and Integration & Surface Maturity review', () => {
+  test('contains the 13 corrective reviews plus the advisory Stability Review, Recent Headwinds report, and Integration & Surface Maturity review', () => {
     // Assert by id/title/mode rather than position so the registry can grow.
     const byId = Object.fromEntries(PERIODICALS.map(t => [t.id, t]));
 
@@ -49,7 +49,8 @@ describe('periodicals registry', () => {
       'performance-scale': ['Performance / Scale Review', 'corrective', 'repo'],
       'data-fetch-architecture': ['Data & Fetch Architecture', 'corrective', 'repo'],
       'integration-surface-maturity': ['Integration & Surface Maturity', 'advisory', 'repo'],
-      'onboarding-journey': ['Onboarding & Cold-Start Review', 'corrective', 'repo']
+      'onboarding-journey': ['Onboarding & Cold-Start Review', 'corrective', 'repo'],
+      'seams-tangles': ['Seams & Tangles', 'corrective', 'repo']
     };
 
     for (const [id, [title, mode, scope]] of Object.entries(expected)) {
@@ -93,7 +94,7 @@ describe('periodicals registry', () => {
 // `review` forever (LIN-386), so the task now ends itself.
 //
 // One half of the Stage-2 contract — *minting a bounded set of follow-up tasks*
-// — is shared only by the 12 CORRECTIVE reviews, which turn findings into
+// — is shared only by the 13 CORRECTIVE reviews, which turn findings into
 // fix-work. The advisory reviews (Stability, Recent Headwinds, Integration &
 // Surface Maturity) deliberately mint NO follow-ups: each is a governor that
 // hands its read to a human. So the follow-up-creation assertion is scoped to
@@ -165,7 +166,7 @@ describe('shared two-stage contract (all periodicals)', () => {
       });
 
       // LIN-700: the Stage-1 scaffold scopes by discovery, not recall. These
-      // four pins lock the four generic wordings across all 15 builders (the
+      // four pins lock the four generic wordings across all 16 builders (the
       // shared helper/vocab renders each once, so the loop covers every one).
       test('LIN-700: Stage 1 scopes by discovery from three sources, not recall', () => {
         assert.match(prompt, /from what you discover, not from what a review/i);
@@ -193,7 +194,7 @@ describe('shared two-stage contract (all periodicals)', () => {
       });
 
       // LIN-2323: the universal adversarial-second-read directive, appended
-      // once by buildPeriodicalScaffold so all 15 templates carry it — mirrors
+      // once by buildPeriodicalScaffold so all 16 templates carry it — mirrors
       // the LIN-700 gap-audit pins above (one shared bullet, one loop).
       test('LIN-2323: directs a fresh-context, separate-session adversarial second-read, not a self-review', () => {
         assert.match(prompt, /fresh-context adversarial second-read/i);
@@ -1104,6 +1105,32 @@ describe('Onboarding & Cold-Start Review specifics (LIN-1689)', () => {
   test('stays general: no file literals or repo-specific symbols leak in', () => {
     assert.doesNotMatch(prompt, /harbour\.cat|OAuth|linear\.app/i);
     assert.doesNotMatch(prompt, /docs\/north-star/i);
+  });
+});
+
+describe('Seams & Tangles specifics (LIN-3550)', () => {
+  const template = PERIODICALS.find(t => t.id === 'seams-tangles');
+  const prompt = template.generatePrompt();
+
+  test('measures with a committed tool found by search, not re-derived, using one guide for both runs', () => {
+    assert.match(prompt, /do not re-derive the dependency numbers by searching/i);
+    assert.match(prompt, /find both by searching the repo/i);
+    assert.match(prompt, /same area guide for both runs/i);
+    assert.match(prompt, /record the full commit you measured/i);
+    assert.match(prompt, /baseline/i);
+  });
+
+  test('keeps judgement as prose and the guide unenforced', () => {
+    for (const re of [/wrong-way dependencies/i, /hub modules/i, /clear way in/i, /rebuild readiness/i, /no scores and no clustering/i, /guide, not a rule/i]) {
+      assert.match(prompt, re);
+    }
+  });
+
+  test('hands off to sibling reviews and shapes follow-ups as one move', () => {
+    assert.match(prompt, /Drift & Coherence Review/);
+    assert.match(prompt, /Code Quality Review/);
+    assert.match(prompt, /Stability Review/);
+    assert.match(prompt, /one move/i);
   });
 });
 

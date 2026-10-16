@@ -1,16 +1,15 @@
-# Code shape (prototype)
+# Code shape
 
-Prototype instruments from the 12–13 Oct coherence-loop session (LIN-3449), kept here as input for the Seams & Tangles periodical. They are not wired into anything yet.
+Measuring tool behind the Seams & Tangles periodical (LIN-3550).
 
-- `measure.mjs <repoDir> <sha> <lv|sd>`: reads one git snapshot straight from the object store (no checkout) and prints JSON:
-  - function sizes, parsed with acorn; route factories and file wrappers are marked as containers;
-  - copied code: normalised 8-line windows that occur more than once;
-  - per-file lines, giant functions, copied lines and resolved relative imports.
+- `seams.mjs <repoDir> <commit> [areaGuidePath]` reads one git commit straight from the object store (no checkout) and prints JSON, facts only:
+  - **links**: imports from one area to another, counted as distinct importer→imported file pairs;
+  - **knots**: pairs of areas that import each other both ways (with the crossing files), and the groups of areas that form a cycle;
+  - **entry files**: for each area, the files other areas import, and from which areas.
+  - Scope is `server.js`, `lib/`, `routes/` and `public/` (`.js`/`.mjs`, not `.min.js`). `scope` in the output lists parse failures, unresolved relative imports, non-literal dynamic imports and files no area claims, so nothing is dropped silently.
+  - `public/` holds classic scripts with no import statements, so the browser-code area shows no edges: that means "not wired by imports", not "isolated".
+- `areas.json` is the area guide: areas in order, first match wins, each with regex patterns over repo-relative paths. It is a guide, not a rule. The review may propose edits, and nothing enforces it.
 
-  Needs `acorn@8.12.1` and `acorn-walk@8.3.4`, which are not in package.json yet.
-- `areas.py`: sorts production files into areas by path (a guide, not a rule), and aggregates size, giants, copies and imports between areas for each snapshot in `snaps.json`.
-- `build_datasets.py`: builds the JSON datasets behind the "Harbour Code Bubbles" dashboard, including a hand-curated reading of the Drift & Coherence ledger.
+To compare two points in time, run the script at both commits **with the same guide** (pass the guide path as the third argument), so a map edit is not mistaken for code movement.
 
-Checks run when these were written:
-- Function sizes match the Code Quality review (LIN-3543) on the 10 functions compared.
-- The import count (1,478 links) matches the Drift review's Tarjan walk (1,476 links, two commits earlier).
+Readiness, hubs, wrong-way imports and suggested areas are the reviewer's judgement and are not computed here. Function size and copied code (the earlier prototype's other output) and the dashboard datasets stay on the branch `claude/jolly-knuth-dgn3m1`.

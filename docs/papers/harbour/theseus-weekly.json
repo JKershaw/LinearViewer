@@ -1,0 +1,2166 @@
+[
+ {
+  "week": "2026-01-05",
+  "commit": "9497c67d",
+  "files": 7,
+  "crossAreaImports": 5,
+  "tangles": 0,
+  "areas": {
+   "Auth, accounts & workspaces": {
+    "files": 1,
+    "productBytes": 3566
+   },
+   "Front end: browser code": {
+    "files": 1,
+    "productBytes": 22751
+   },
+   "Front end: server-rendered pages": {
+    "files": 3,
+    "productBytes": 20909
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 2937
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 13142
+   }
+  },
+  "productBytes": 63305,
+  "testCodeBytes": 15082
+ },
+ {
+  "week": "2026-01-12",
+  "commit": "aa7cc50e",
+  "files": 17,
+  "crossAreaImports": 18,
+  "tangles": 1,
+  "areas": {
+   "Auth, accounts & workspaces": {
+    "files": 4,
+    "productBytes": 18661
+   },
+   "Front end: browser code": {
+    "files": 2,
+    "productBytes": 63891
+   },
+   "Front end: server-rendered pages": {
+    "files": 4,
+    "productBytes": 45753
+   },
+   "LLM & prompts": {
+    "files": 2,
+    "productBytes": 35166
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 13496
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 8795
+   },
+   "Runs & dispatch": {
+    "files": 1,
+    "productBytes": 5555
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 1,
+    "productBytes": 1451
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 23480
+   }
+  },
+  "productBytes": 216248,
+  "testCodeBytes": 140647
+ },
+ {
+  "week": "2026-01-19",
+  "commit": "38cb88f0",
+  "files": 28,
+  "crossAreaImports": 40,
+  "tangles": 1,
+  "areas": {
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 28959
+   },
+   "Front end: browser code": {
+    "files": 2,
+    "productBytes": 134988
+   },
+   "Front end: server-rendered pages": {
+    "files": 7,
+    "productBytes": 68669
+   },
+   "LLM & prompts": {
+    "files": 4,
+    "productBytes": 91388
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 29695
+   },
+   "Platform & plumbing": {
+    "files": 3,
+    "productBytes": 8265
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 10483
+   },
+   "Runs & dispatch": {
+    "files": 2,
+    "productBytes": 13767
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 1,
+    "productBytes": 1519
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 36520
+   }
+  },
+  "productBytes": 424253,
+  "testCodeBytes": 227559
+ },
+ {
+  "week": "2026-01-26",
+  "commit": "c65508fd",
+  "files": 31,
+  "crossAreaImports": 42,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 1,
+    "productBytes": 6111
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30169
+   },
+   "Front end: browser code": {
+    "files": 2,
+    "productBytes": 185394
+   },
+   "Front end: server-rendered pages": {
+    "files": 7,
+    "productBytes": 84120
+   },
+   "LLM & prompts": {
+    "files": 4,
+    "productBytes": 84373
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 30196
+   },
+   "Platform & plumbing": {
+    "files": 3,
+    "productBytes": 6477
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 10483
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 31785
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 1,
+    "productBytes": 2083
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 43177
+   }
+  },
+  "productBytes": 514368,
+  "testCodeBytes": 241050
+ },
+ {
+  "week": "2026-02-02",
+  "commit": "6c959c2b",
+  "files": 33,
+  "crossAreaImports": 43,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 1,
+    "productBytes": 6111
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30169
+   },
+   "Front end: browser code": {
+    "files": 3,
+    "productBytes": 196564
+   },
+   "Front end: server-rendered pages": {
+    "files": 8,
+    "productBytes": 87854
+   },
+   "LLM & prompts": {
+    "files": 4,
+    "productBytes": 95055
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 35665
+   },
+   "Platform & plumbing": {
+    "files": 3,
+    "productBytes": 6477
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15368
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 36367
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 1,
+    "productBytes": 1429
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 48769
+   }
+  },
+  "productBytes": 559828,
+  "testCodeBytes": 283069
+ },
+ {
+  "week": "2026-02-09",
+  "commit": "fb282e72",
+  "files": 42,
+  "crossAreaImports": 59,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 1,
+    "productBytes": 6111
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30198
+   },
+   "Front end: browser code": {
+    "files": 3,
+    "productBytes": 213978
+   },
+   "Front end: server-rendered pages": {
+    "files": 10,
+    "productBytes": 100207
+   },
+   "LLM & prompts": {
+    "files": 6,
+    "productBytes": 103805
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 35665
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21226
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15383
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 37022
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 32070
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 28998
+   }
+  },
+  "productBytes": 624663,
+  "testCodeBytes": 328903
+ },
+ {
+  "week": "2026-02-16",
+  "commit": "b422c76c",
+  "files": 44,
+  "crossAreaImports": 63,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 1,
+    "productBytes": 6141
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30198
+   },
+   "Front end: browser code": {
+    "files": 4,
+    "productBytes": 234100
+   },
+   "Front end: server-rendered pages": {
+    "files": 11,
+    "productBytes": 105218
+   },
+   "LLM & prompts": {
+    "files": 6,
+    "productBytes": 105023
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 35665
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21226
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15864
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 46438
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 33484
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 30620
+   }
+  },
+  "productBytes": 663977,
+  "testCodeBytes": 373433
+ },
+ {
+  "week": "2026-02-23",
+  "commit": "c35a4721",
+  "files": 44,
+  "crossAreaImports": 63,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 1,
+    "productBytes": 6141
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30198
+   },
+   "Front end: browser code": {
+    "files": 4,
+    "productBytes": 238989
+   },
+   "Front end: server-rendered pages": {
+    "files": 11,
+    "productBytes": 105273
+   },
+   "LLM & prompts": {
+    "files": 6,
+    "productBytes": 113249
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 35665
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21226
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15864
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 46508
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 42270
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 30620
+   }
+  },
+  "productBytes": 686003,
+  "testCodeBytes": 390869
+ },
+ {
+  "week": "2026-03-02",
+  "commit": "2d0cb9f2",
+  "files": 44,
+  "crossAreaImports": 63,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 1,
+    "productBytes": 6141
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30198
+   },
+   "Front end: browser code": {
+    "files": 4,
+    "productBytes": 243672
+   },
+   "Front end: server-rendered pages": {
+    "files": 11,
+    "productBytes": 105800
+   },
+   "LLM & prompts": {
+    "files": 6,
+    "productBytes": 113249
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 35665
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21226
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15856
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 51569
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 42390
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 30620
+   }
+  },
+  "productBytes": 696386,
+  "testCodeBytes": 408762
+ },
+ {
+  "week": "2026-03-09",
+  "commit": "c8f30c92",
+  "files": 51,
+  "crossAreaImports": 71,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 4,
+    "productBytes": 59993
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30204
+   },
+   "Front end: browser code": {
+    "files": 6,
+    "productBytes": 316392
+   },
+   "Front end: server-rendered pages": {
+    "files": 13,
+    "productBytes": 122305
+   },
+   "LLM & prompts": {
+    "files": 6,
+    "productBytes": 112899
+   },
+   "Other features": {
+    "files": 1,
+    "productBytes": 35665
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21397
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15856
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 51564
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 44247
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 36004
+   }
+  },
+  "productBytes": 846526,
+  "testCodeBytes": 442811
+ },
+ {
+  "week": "2026-03-16",
+  "commit": "898a05a9",
+  "files": 61,
+  "crossAreaImports": 86,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 5,
+    "productBytes": 88734
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30204
+   },
+   "Front end: browser code": {
+    "files": 9,
+    "productBytes": 380409
+   },
+   "Front end: server-rendered pages": {
+    "files": 17,
+    "productBytes": 156939
+   },
+   "LLM & prompts": {
+    "files": 7,
+    "productBytes": 119549
+   },
+   "Other features": {
+    "files": 2,
+    "productBytes": 36312
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21397
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15941
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 51564
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 49488
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 41265
+   }
+  },
+  "productBytes": 991802,
+  "testCodeBytes": 543581
+ },
+ {
+  "week": "2026-03-23",
+  "commit": "b2bfaa76",
+  "files": 61,
+  "crossAreaImports": 86,
+  "tangles": 0,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 5,
+    "productBytes": 88734
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30204
+   },
+   "Front end: browser code": {
+    "files": 9,
+    "productBytes": 384350
+   },
+   "Front end: server-rendered pages": {
+    "files": 17,
+    "productBytes": 162537
+   },
+   "LLM & prompts": {
+    "files": 7,
+    "productBytes": 119549
+   },
+   "Other features": {
+    "files": 2,
+    "productBytes": 36312
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21397
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15941
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 51564
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 49488
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 41265
+   }
+  },
+  "productBytes": 1001341,
+  "testCodeBytes": 552585
+ },
+ {
+  "week": "2026-03-30",
+  "commit": "abde98e7",
+  "files": 66,
+  "crossAreaImports": 92,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 5,
+    "productBytes": 93942
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 30204
+   },
+   "Front end: browser code": {
+    "files": 10,
+    "productBytes": 400390
+   },
+   "Front end: server-rendered pages": {
+    "files": 18,
+    "productBytes": 173228
+   },
+   "LLM & prompts": {
+    "files": 10,
+    "productBytes": 168593
+   },
+   "Other features": {
+    "files": 2,
+    "productBytes": 36312
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21567
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15946
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 51564
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 55625
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 45975
+   }
+  },
+  "productBytes": 1093346,
+  "testCodeBytes": 634900
+ },
+ {
+  "week": "2026-04-06",
+  "commit": "ff08e05a",
+  "files": 66,
+  "crossAreaImports": 92,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 5,
+    "productBytes": 93942
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 31258
+   },
+   "Front end: browser code": {
+    "files": 10,
+    "productBytes": 400390
+   },
+   "Front end: server-rendered pages": {
+    "files": 18,
+    "productBytes": 173228
+   },
+   "LLM & prompts": {
+    "files": 10,
+    "productBytes": 171902
+   },
+   "Other features": {
+    "files": 2,
+    "productBytes": 36312
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21567
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15946
+   },
+   "Runs & dispatch": {
+    "files": 4,
+    "productBytes": 51564
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 4,
+    "productBytes": 55625
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 46103
+   }
+  },
+  "productBytes": 1097837,
+  "testCodeBytes": 634900
+ },
+ {
+  "week": "2026-04-13",
+  "commit": "14c1f08f",
+  "files": 73,
+  "crossAreaImports": 102,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 5,
+    "productBytes": 95560
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 31398
+   },
+   "Front end: browser code": {
+    "files": 11,
+    "productBytes": 519360
+   },
+   "Front end: server-rendered pages": {
+    "files": 19,
+    "productBytes": 193542
+   },
+   "LLM & prompts": {
+    "files": 11,
+    "productBytes": 177950
+   },
+   "Other features": {
+    "files": 3,
+    "productBytes": 58505
+   },
+   "Platform & plumbing": {
+    "files": 5,
+    "productBytes": 21761
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15946
+   },
+   "Runs & dispatch": {
+    "files": 6,
+    "productBytes": 71672
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 61264
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 50688
+   }
+  },
+  "productBytes": 1297646,
+  "testCodeBytes": 837071
+ },
+ {
+  "week": "2026-04-20",
+  "commit": "bff9ff34",
+  "files": 79,
+  "crossAreaImports": 110,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 6,
+    "productBytes": 126838
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 31398
+   },
+   "Front end: browser code": {
+    "files": 13,
+    "productBytes": 576307
+   },
+   "Front end: server-rendered pages": {
+    "files": 19,
+    "productBytes": 198218
+   },
+   "LLM & prompts": {
+    "files": 13,
+    "productBytes": 187797
+   },
+   "Other features": {
+    "files": 3,
+    "productBytes": 64472
+   },
+   "Platform & plumbing": {
+    "files": 6,
+    "productBytes": 23378
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15946
+   },
+   "Runs & dispatch": {
+    "files": 6,
+    "productBytes": 83538
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 70420
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 51832
+   }
+  },
+  "productBytes": 1430144,
+  "testCodeBytes": 863784
+ },
+ {
+  "week": "2026-04-27",
+  "commit": "8298af18",
+  "files": 80,
+  "crossAreaImports": 113,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 6,
+    "productBytes": 119497
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 31764
+   },
+   "Front end: browser code": {
+    "files": 13,
+    "productBytes": 580848
+   },
+   "Front end: server-rendered pages": {
+    "files": 19,
+    "productBytes": 201561
+   },
+   "LLM & prompts": {
+    "files": 14,
+    "productBytes": 202098
+   },
+   "Other features": {
+    "files": 3,
+    "productBytes": 64472
+   },
+   "Platform & plumbing": {
+    "files": 6,
+    "productBytes": 23462
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15946
+   },
+   "Runs & dispatch": {
+    "files": 6,
+    "productBytes": 83538
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 73301
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 51832
+   }
+  },
+  "productBytes": 1448319,
+  "testCodeBytes": 878947
+ },
+ {
+  "week": "2026-05-18",
+  "commit": "06cb2072",
+  "files": 83,
+  "crossAreaImports": 115,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 6,
+    "productBytes": 119497
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 31764
+   },
+   "Front end: browser code": {
+    "files": 14,
+    "productBytes": 629769
+   },
+   "Front end: server-rendered pages": {
+    "files": 21,
+    "productBytes": 240610
+   },
+   "LLM & prompts": {
+    "files": 14,
+    "productBytes": 202098
+   },
+   "Other features": {
+    "files": 3,
+    "productBytes": 64472
+   },
+   "Platform & plumbing": {
+    "files": 6,
+    "productBytes": 23462
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15946
+   },
+   "Runs & dispatch": {
+    "files": 6,
+    "productBytes": 83538
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 73554
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 54306
+   }
+  },
+  "productBytes": 1539016,
+  "testCodeBytes": 947495
+ },
+ {
+  "week": "2026-05-25",
+  "commit": "4457af25",
+  "files": 87,
+  "crossAreaImports": 125,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 6,
+    "productBytes": 119484
+   },
+   "Auth, accounts & workspaces": {
+    "files": 6,
+    "productBytes": 31904
+   },
+   "Front end: browser code": {
+    "files": 14,
+    "productBytes": 642738
+   },
+   "Front end: server-rendered pages": {
+    "files": 21,
+    "productBytes": 246867
+   },
+   "LLM & prompts": {
+    "files": 18,
+    "productBytes": 221981
+   },
+   "Other features": {
+    "files": 3,
+    "productBytes": 64530
+   },
+   "Platform & plumbing": {
+    "files": 6,
+    "productBytes": 23464
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 15969
+   },
+   "Runs & dispatch": {
+    "files": 6,
+    "productBytes": 83538
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 82871
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 54307
+   }
+  },
+  "productBytes": 1587653,
+  "testCodeBytes": 989945
+ },
+ {
+  "week": "2026-06-01",
+  "commit": "28ff6a06",
+  "files": 94,
+  "crossAreaImports": 135,
+  "tangles": 1,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 6,
+    "productBytes": 135793
+   },
+   "Auth, accounts & workspaces": {
+    "files": 7,
+    "productBytes": 36773
+   },
+   "Front end: browser code": {
+    "files": 15,
+    "productBytes": 707278
+   },
+   "Front end: server-rendered pages": {
+    "files": 22,
+    "productBytes": 254997
+   },
+   "LLM & prompts": {
+    "files": 21,
+    "productBytes": 260927
+   },
+   "Other features": {
+    "files": 4,
+    "productBytes": 73624
+   },
+   "Platform & plumbing": {
+    "files": 6,
+    "productBytes": 23464
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 1,
+    "productBytes": 18304
+   },
+   "Runs & dispatch": {
+    "files": 6,
+    "productBytes": 83611
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 101937
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 55508
+   }
+  },
+  "productBytes": 1752216,
+  "testCodeBytes": 1094630
+ },
+ {
+  "week": "2026-06-08",
+  "commit": "1e211a15",
+  "files": 106,
+  "crossAreaImports": 161,
+  "tangles": 5,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 6,
+    "productBytes": 176066
+   },
+   "Auth, accounts & workspaces": {
+    "files": 7,
+    "productBytes": 41584
+   },
+   "Front end: browser code": {
+    "files": 16,
+    "productBytes": 766578
+   },
+   "Front end: server-rendered pages": {
+    "files": 22,
+    "productBytes": 276477
+   },
+   "LLM & prompts": {
+    "files": 25,
+    "productBytes": 336674
+   },
+   "Other features": {
+    "files": 5,
+    "productBytes": 101892
+   },
+   "Platform & plumbing": {
+    "files": 6,
+    "productBytes": 25478
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 6,
+    "productBytes": 42404
+   },
+   "Runs & dispatch": {
+    "files": 7,
+    "productBytes": 88588
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 5,
+    "productBytes": 129195
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 60469
+   }
+  },
+  "productBytes": 2045405,
+  "testCodeBytes": 1326333
+ },
+ {
+  "week": "2026-06-15",
+  "commit": "03c7715a",
+  "files": 139,
+  "crossAreaImports": 217,
+  "tangles": 7,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 7,
+    "productBytes": 208276
+   },
+   "Auth, accounts & workspaces": {
+    "files": 7,
+    "productBytes": 46689
+   },
+   "Front end: browser code": {
+    "files": 20,
+    "productBytes": 1079878
+   },
+   "Front end: server-rendered pages": {
+    "files": 34,
+    "productBytes": 356355
+   },
+   "LLM & prompts": {
+    "files": 31,
+    "productBytes": 430607
+   },
+   "Other features": {
+    "files": 5,
+    "productBytes": 133830
+   },
+   "Platform & plumbing": {
+    "files": 7,
+    "productBytes": 46759
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 10,
+    "productBytes": 83172
+   },
+   "Runs & dispatch": {
+    "files": 9,
+    "productBytes": 100180
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 8,
+    "productBytes": 199640
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 67685
+   }
+  },
+  "productBytes": 2753071,
+  "testCodeBytes": 1685408
+ },
+ {
+  "week": "2026-06-22",
+  "commit": "63e825ae",
+  "files": 148,
+  "crossAreaImports": 232,
+  "tangles": 8,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 8,
+    "productBytes": 225601
+   },
+   "Auth, accounts & workspaces": {
+    "files": 7,
+    "productBytes": 48138
+   },
+   "Front end: browser code": {
+    "files": 20,
+    "productBytes": 1085363
+   },
+   "Front end: server-rendered pages": {
+    "files": 33,
+    "productBytes": 356129
+   },
+   "LLM & prompts": {
+    "files": 32,
+    "productBytes": 452093
+   },
+   "Other features": {
+    "files": 4,
+    "productBytes": 142960
+   },
+   "Platform & plumbing": {
+    "files": 7,
+    "productBytes": 49475
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 14,
+    "productBytes": 157917
+   },
+   "Runs & dispatch": {
+    "files": 14,
+    "productBytes": 159022
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 8,
+    "productBytes": 218658
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 69625
+   }
+  },
+  "productBytes": 2964981,
+  "testCodeBytes": 1914054
+ },
+ {
+  "week": "2026-06-29",
+  "commit": "70308736",
+  "files": 170,
+  "crossAreaImports": 275,
+  "tangles": 8,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 291162
+   },
+   "Auth, accounts & workspaces": {
+    "files": 9,
+    "productBytes": 109125
+   },
+   "Front end: browser code": {
+    "files": 22,
+    "productBytes": 1150271
+   },
+   "Front end: server-rendered pages": {
+    "files": 36,
+    "productBytes": 402154
+   },
+   "LLM & prompts": {
+    "files": 34,
+    "productBytes": 523920
+   },
+   "Other features": {
+    "files": 3,
+    "productBytes": 111700
+   },
+   "Platform & plumbing": {
+    "files": 9,
+    "productBytes": 72582
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 19,
+    "productBytes": 256929
+   },
+   "Runs & dispatch": {
+    "files": 18,
+    "productBytes": 224740
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 9,
+    "productBytes": 274287
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 96187
+   }
+  },
+  "productBytes": 3513057,
+  "testCodeBytes": 2556132
+ },
+ {
+  "week": "2026-07-06",
+  "commit": "96c6c629",
+  "files": 194,
+  "crossAreaImports": 308,
+  "tangles": 9,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 323618
+   },
+   "Auth, accounts & workspaces": {
+    "files": 10,
+    "productBytes": 121682
+   },
+   "Front end: browser code": {
+    "files": 23,
+    "productBytes": 1267746
+   },
+   "Front end: server-rendered pages": {
+    "files": 47,
+    "productBytes": 508559
+   },
+   "LLM & prompts": {
+    "files": 41,
+    "productBytes": 693644
+   },
+   "Other features": {
+    "files": 2,
+    "productBytes": 90845
+   },
+   "Platform & plumbing": {
+    "files": 9,
+    "productBytes": 72800
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 20,
+    "productBytes": 272767
+   },
+   "Runs & dispatch": {
+    "files": 22,
+    "productBytes": 292950
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 9,
+    "productBytes": 324250
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 108185
+   }
+  },
+  "productBytes": 4077046,
+  "testCodeBytes": 3173078
+ },
+ {
+  "week": "2026-07-13",
+  "commit": "fee12368",
+  "files": 204,
+  "crossAreaImports": 334,
+  "tangles": 11,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 350682
+   },
+   "Auth, accounts & workspaces": {
+    "files": 10,
+    "productBytes": 124069
+   },
+   "Front end: browser code": {
+    "files": 25,
+    "productBytes": 1355775
+   },
+   "Front end: server-rendered pages": {
+    "files": 48,
+    "productBytes": 538094
+   },
+   "LLM & prompts": {
+    "files": 42,
+    "productBytes": 720199
+   },
+   "Other features": {
+    "files": 4,
+    "productBytes": 128410
+   },
+   "Platform & plumbing": {
+    "files": 9,
+    "productBytes": 77276
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 20,
+    "productBytes": 272767
+   },
+   "Runs & dispatch": {
+    "files": 25,
+    "productBytes": 353224
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 10,
+    "productBytes": 366478
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 113424
+   }
+  },
+  "productBytes": 4400398,
+  "testCodeBytes": 3650363
+ },
+ {
+  "week": "2026-07-20",
+  "commit": "921abf74",
+  "files": 219,
+  "crossAreaImports": 354,
+  "tangles": 11,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 373132
+   },
+   "Auth, accounts & workspaces": {
+    "files": 17,
+    "productBytes": 189358
+   },
+   "Front end: browser code": {
+    "files": 27,
+    "productBytes": 1402910
+   },
+   "Front end: server-rendered pages": {
+    "files": 49,
+    "productBytes": 558819
+   },
+   "LLM & prompts": {
+    "files": 43,
+    "productBytes": 732769
+   },
+   "Other features": {
+    "files": 4,
+    "productBytes": 139299
+   },
+   "Platform & plumbing": {
+    "files": 10,
+    "productBytes": 83224
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 20,
+    "productBytes": 275302
+   },
+   "Runs & dispatch": {
+    "files": 28,
+    "productBytes": 455080
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 10,
+    "productBytes": 376128
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 118165
+   }
+  },
+  "productBytes": 4704186,
+  "testCodeBytes": 4280717
+ },
+ {
+  "week": "2026-07-27",
+  "commit": "b6debf33",
+  "files": 230,
+  "crossAreaImports": 380,
+  "tangles": 13,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 407154
+   },
+   "Auth, accounts & workspaces": {
+    "files": 21,
+    "productBytes": 253236
+   },
+   "Front end: browser code": {
+    "files": 28,
+    "productBytes": 1452375
+   },
+   "Front end: server-rendered pages": {
+    "files": 50,
+    "productBytes": 592632
+   },
+   "LLM & prompts": {
+    "files": 44,
+    "productBytes": 789842
+   },
+   "Other features": {
+    "files": 4,
+    "productBytes": 139299
+   },
+   "Platform & plumbing": {
+    "files": 10,
+    "productBytes": 96422
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 21,
+    "productBytes": 290929
+   },
+   "Runs & dispatch": {
+    "files": 30,
+    "productBytes": 526416
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 11,
+    "productBytes": 404416
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 136513
+   }
+  },
+  "productBytes": 5089234,
+  "testCodeBytes": 5005816
+ },
+ {
+  "week": "2026-08-03",
+  "commit": "a4f9638e",
+  "files": 239,
+  "crossAreaImports": 395,
+  "tangles": 14,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 441312
+   },
+   "Auth, accounts & workspaces": {
+    "files": 21,
+    "productBytes": 253236
+   },
+   "Front end: browser code": {
+    "files": 29,
+    "productBytes": 1498236
+   },
+   "Front end: server-rendered pages": {
+    "files": 52,
+    "productBytes": 609731
+   },
+   "LLM & prompts": {
+    "files": 46,
+    "productBytes": 814704
+   },
+   "Other features": {
+    "files": 5,
+    "productBytes": 159756
+   },
+   "Platform & plumbing": {
+    "files": 10,
+    "productBytes": 101264
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 21,
+    "productBytes": 290929
+   },
+   "Runs & dispatch": {
+    "files": 32,
+    "productBytes": 580638
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 12,
+    "productBytes": 408719
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 144133
+   }
+  },
+  "productBytes": 5302658,
+  "testCodeBytes": 5460345
+ },
+ {
+  "week": "2026-08-10",
+  "commit": "9af9730f",
+  "files": 257,
+  "crossAreaImports": 430,
+  "tangles": 14,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 467497
+   },
+   "Auth, accounts & workspaces": {
+    "files": 25,
+    "productBytes": 353198
+   },
+   "Front end: browser code": {
+    "files": 32,
+    "productBytes": 1528072
+   },
+   "Front end: server-rendered pages": {
+    "files": 55,
+    "productBytes": 655461
+   },
+   "LLM & prompts": {
+    "files": 46,
+    "productBytes": 822858
+   },
+   "Other features": {
+    "files": 5,
+    "productBytes": 160432
+   },
+   "Platform & plumbing": {
+    "files": 11,
+    "productBytes": 113871
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 25,
+    "productBytes": 432643
+   },
+   "Runs & dispatch": {
+    "files": 33,
+    "productBytes": 602537
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 14,
+    "productBytes": 441066
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 173303
+   }
+  },
+  "productBytes": 5750938,
+  "testCodeBytes": 6249191
+ },
+ {
+  "week": "2026-08-17",
+  "commit": "b0a98664",
+  "files": 264,
+  "crossAreaImports": 442,
+  "tangles": 14,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 482031
+   },
+   "Auth, accounts & workspaces": {
+    "files": 25,
+    "productBytes": 361830
+   },
+   "Front end: browser code": {
+    "files": 32,
+    "productBytes": 1552219
+   },
+   "Front end: server-rendered pages": {
+    "files": 55,
+    "productBytes": 661446
+   },
+   "LLM & prompts": {
+    "files": 46,
+    "productBytes": 827055
+   },
+   "Other features": {
+    "files": 5,
+    "productBytes": 165870
+   },
+   "Platform & plumbing": {
+    "files": 13,
+    "productBytes": 125443
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 25,
+    "productBytes": 464697
+   },
+   "Runs & dispatch": {
+    "files": 38,
+    "productBytes": 699151
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 14,
+    "productBytes": 448694
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 181319
+   }
+  },
+  "productBytes": 5969755,
+  "testCodeBytes": 6778459
+ },
+ {
+  "week": "2026-08-24",
+  "commit": "a954dc0c",
+  "files": 284,
+  "crossAreaImports": 477,
+  "tangles": 15,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 10,
+    "productBytes": 535368
+   },
+   "Auth, accounts & workspaces": {
+    "files": 29,
+    "productBytes": 431169
+   },
+   "Front end: browser code": {
+    "files": 33,
+    "productBytes": 1658775
+   },
+   "Front end: server-rendered pages": {
+    "files": 56,
+    "productBytes": 691816
+   },
+   "LLM & prompts": {
+    "files": 49,
+    "productBytes": 862194
+   },
+   "Other features": {
+    "files": 5,
+    "productBytes": 167949
+   },
+   "Platform & plumbing": {
+    "files": 13,
+    "productBytes": 132913
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 26,
+    "productBytes": 498854
+   },
+   "Runs & dispatch": {
+    "files": 46,
+    "productBytes": 844596
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 16,
+    "productBytes": 505721
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 192056
+   }
+  },
+  "productBytes": 6521411,
+  "testCodeBytes": 7792176
+ },
+ {
+  "week": "2026-08-31",
+  "commit": "8b2be424",
+  "files": 291,
+  "crossAreaImports": 509,
+  "tangles": 16,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 11,
+    "productBytes": 559350
+   },
+   "Auth, accounts & workspaces": {
+    "files": 31,
+    "productBytes": 454327
+   },
+   "Front end: browser code": {
+    "files": 33,
+    "productBytes": 1663886
+   },
+   "Front end: server-rendered pages": {
+    "files": 56,
+    "productBytes": 710178
+   },
+   "LLM & prompts": {
+    "files": 50,
+    "productBytes": 891767
+   },
+   "Other features": {
+    "files": 6,
+    "productBytes": 182200
+   },
+   "Platform & plumbing": {
+    "files": 14,
+    "productBytes": 142453
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 26,
+    "productBytes": 503169
+   },
+   "Runs & dispatch": {
+    "files": 47,
+    "productBytes": 898965
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 16,
+    "productBytes": 541427
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 199839
+   }
+  },
+  "productBytes": 6747561,
+  "testCodeBytes": 8463513
+ },
+ {
+  "week": "2026-09-07",
+  "commit": "4f59a79a",
+  "files": 314,
+  "crossAreaImports": 603,
+  "tangles": 17,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 23,
+    "productBytes": 644992
+   },
+   "Auth, accounts & workspaces": {
+    "files": 33,
+    "productBytes": 455587
+   },
+   "Front end: browser code": {
+    "files": 33,
+    "productBytes": 1836710
+   },
+   "Front end: server-rendered pages": {
+    "files": 57,
+    "productBytes": 758634
+   },
+   "LLM & prompts": {
+    "files": 52,
+    "productBytes": 999333
+   },
+   "Other features": {
+    "files": 8,
+    "productBytes": 242752
+   },
+   "Platform & plumbing": {
+    "files": 15,
+    "productBytes": 150527
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 27,
+    "productBytes": 507334
+   },
+   "Runs & dispatch": {
+    "files": 49,
+    "productBytes": 981053
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 16,
+    "productBytes": 592640
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 208425
+   }
+  },
+  "productBytes": 7377987,
+  "testCodeBytes": 10114071
+ },
+ {
+  "week": "2026-09-14",
+  "commit": "a58c9920",
+  "files": 316,
+  "crossAreaImports": 610,
+  "tangles": 17,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 23,
+    "productBytes": 676693
+   },
+   "Auth, accounts & workspaces": {
+    "files": 33,
+    "productBytes": 464620
+   },
+   "Front end: browser code": {
+    "files": 33,
+    "productBytes": 2007439
+   },
+   "Front end: server-rendered pages": {
+    "files": 57,
+    "productBytes": 783551
+   },
+   "LLM & prompts": {
+    "files": 52,
+    "productBytes": 1026773
+   },
+   "Other features": {
+    "files": 8,
+    "productBytes": 245435
+   },
+   "Platform & plumbing": {
+    "files": 17,
+    "productBytes": 170466
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 27,
+    "productBytes": 515944
+   },
+   "Runs & dispatch": {
+    "files": 49,
+    "productBytes": 1043306
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 16,
+    "productBytes": 627030
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 210454
+   }
+  },
+  "productBytes": 7771711,
+  "testCodeBytes": 11078284
+ },
+ {
+  "week": "2026-09-21",
+  "commit": "6c1f8e72",
+  "files": 319,
+  "crossAreaImports": 617,
+  "tangles": 17,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 23,
+    "productBytes": 698239
+   },
+   "Auth, accounts & workspaces": {
+    "files": 33,
+    "productBytes": 464633
+   },
+   "Front end: browser code": {
+    "files": 33,
+    "productBytes": 2044787
+   },
+   "Front end: server-rendered pages": {
+    "files": 57,
+    "productBytes": 783579
+   },
+   "LLM & prompts": {
+    "files": 54,
+    "productBytes": 1081418
+   },
+   "Other features": {
+    "files": 7,
+    "productBytes": 214207
+   },
+   "Platform & plumbing": {
+    "files": 17,
+    "productBytes": 170466
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 27,
+    "productBytes": 516140
+   },
+   "Runs & dispatch": {
+    "files": 51,
+    "productBytes": 1070942
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 16,
+    "productBytes": 628582
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 210668
+   }
+  },
+  "productBytes": 7883661,
+  "testCodeBytes": 11325920
+ },
+ {
+  "week": "2026-09-28",
+  "commit": "b0751689",
+  "files": 332,
+  "crossAreaImports": 641,
+  "tangles": 17,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 26,
+    "productBytes": 745883
+   },
+   "Auth, accounts & workspaces": {
+    "files": 39,
+    "productBytes": 532788
+   },
+   "Front end: browser code": {
+    "files": 33,
+    "productBytes": 2062201
+   },
+   "Front end: server-rendered pages": {
+    "files": 59,
+    "productBytes": 799443
+   },
+   "LLM & prompts": {
+    "files": 54,
+    "productBytes": 1107156
+   },
+   "Other features": {
+    "files": 7,
+    "productBytes": 214531
+   },
+   "Platform & plumbing": {
+    "files": 17,
+    "productBytes": 176232
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 27,
+    "productBytes": 516140
+   },
+   "Runs & dispatch": {
+    "files": 53,
+    "productBytes": 1183899
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 16,
+    "productBytes": 651548
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 214474
+   }
+  },
+  "productBytes": 8204295,
+  "testCodeBytes": 12517192
+ },
+ {
+  "week": "2026-10-05",
+  "commit": "6eaf259c",
+  "files": 400,
+  "crossAreaImports": 781,
+  "tangles": 22,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 30,
+    "productBytes": 848547
+   },
+   "Auth, accounts & workspaces": {
+    "files": 49,
+    "productBytes": 797998
+   },
+   "Front end: browser code": {
+    "files": 34,
+    "productBytes": 2168997
+   },
+   "Front end: server-rendered pages": {
+    "files": 63,
+    "productBytes": 881823
+   },
+   "LLM & prompts": {
+    "files": 60,
+    "productBytes": 1046056
+   },
+   "Other features": {
+    "files": 14,
+    "productBytes": 269250
+   },
+   "Platform & plumbing": {
+    "files": 20,
+    "productBytes": 225020
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 31,
+    "productBytes": 562872
+   },
+   "Runs & dispatch": {
+    "files": 79,
+    "productBytes": 1559314
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 19,
+    "productBytes": 775685
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 244295
+   }
+  },
+  "productBytes": 9379857,
+  "testCodeBytes": 16164011
+ },
+ {
+  "week": "2026-10-12",
+  "commit": "ebf93bd9",
+  "files": 429,
+  "crossAreaImports": 897,
+  "tangles": 19,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 30,
+    "productBytes": 828396
+   },
+   "Auth, accounts & workspaces": {
+    "files": 52,
+    "productBytes": 828353
+   },
+   "Front end: browser code": {
+    "files": 36,
+    "productBytes": 2277623
+   },
+   "Front end: server-rendered pages": {
+    "files": 68,
+    "productBytes": 937178
+   },
+   "LLM & prompts": {
+    "files": 64,
+    "productBytes": 1064629
+   },
+   "Other features": {
+    "files": 9,
+    "productBytes": 223767
+   },
+   "Platform & plumbing": {
+    "files": 24,
+    "productBytes": 219031
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 35,
+    "productBytes": 600458
+   },
+   "Runs & dispatch": {
+    "files": 89,
+    "productBytes": 1669500
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 21,
+    "productBytes": 761508
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 245943
+   }
+  },
+  "productBytes": 9656386,
+  "testCodeBytes": 16865861
+ },
+ {
+  "week": "2026-10-13",
+  "commit": "38fc3b5c",
+  "files": 429,
+  "crossAreaImports": 897,
+  "tangles": 19,
+  "areas": {
+   "Agent API (proxy)": {
+    "files": 30,
+    "productBytes": 828396
+   },
+   "Auth, accounts & workspaces": {
+    "files": 52,
+    "productBytes": 828353
+   },
+   "Front end: browser code": {
+    "files": 36,
+    "productBytes": 2277623
+   },
+   "Front end: server-rendered pages": {
+    "files": 68,
+    "productBytes": 937178
+   },
+   "LLM & prompts": {
+    "files": 64,
+    "productBytes": 1064629
+   },
+   "Other features": {
+    "files": 9,
+    "productBytes": 227236
+   },
+   "Platform & plumbing": {
+    "files": 24,
+    "productBytes": 219031
+   },
+   "Providers (Linear, GitHub, Jira, local)": {
+    "files": 35,
+    "productBytes": 600458
+   },
+   "Runs & dispatch": {
+    "files": 89,
+    "productBytes": 1669500
+   },
+   "Web routes (pages & workspace API)": {
+    "files": 21,
+    "productBytes": 761508
+   },
+   "Wiring (server.js)": {
+    "files": 1,
+    "productBytes": 245943
+   }
+  },
+  "productBytes": 9659855,
+  "testCodeBytes": 16867101
+ }
+]

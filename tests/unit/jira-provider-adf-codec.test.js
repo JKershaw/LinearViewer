@@ -23,6 +23,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { marked } from 'marked'
 import { adfToMarkdown, markdownToAdf, adfHasUnrenderableContent } from '../../lib/providers/jira/adf.js'
 
 describe('LIN-2399 — the codec extraction stays extracted', () => {
@@ -210,6 +211,7 @@ const adfText = (text, marks) => (marks ? { type: 'text', text, marks } : { type
 const adfPara = (...content) => ({ type: 'paragraph', content })
 const adfItem = (...content) => ({ type: 'listItem', content })
 const HARD_BREAK = { type: 'hardBreak' }
+const nestedList = (type, ...heads) => ({ type, content: heads.map(head => adfItem(adfPara(adfText(head)))) })
 
 /** Docs the writer CAN rebuild — the gate must permit these AND they must deep-equal. */
 const WRITER_SAFE_ADF = {
@@ -254,6 +256,60 @@ const WRITER_SAFE_ADF = {
     adfDoc(adfPara(adfText('#'), HARD_BREAK, adfText('1  Scope of works'))),
   'codeBlock whose blank separator line carries a stray space (re-review R3.1)':
     adfDoc({ type: 'codeBlock', attrs: { language: 'python' }, content: [adfText('def a():\n    pass\n \ndef b():\n    pass')] }),
+  'heading at level 6': adfDoc({ type: 'heading', attrs: { level: 6 }, content: [adfText('Six')] }),
+  // LIN-3570: nested lists. An empty nested item that is not first must keep
+  // its trailing space on the way out (`  - `, not `  -`), and outer siblings
+  // follow the ones that end in it.
+  'nested bulletList': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('parent')), nestedList('bulletList', 'child'))],
+  }),
+  'nested list with an outer sibling': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b')), adfItem(adfPara(adfText('c')))],
+  }),
+  'bullets under a numbered item': adfDoc({
+    type: 'orderedList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b', 'c')), adfItem(adfPara(adfText('d')))],
+  }),
+  'an item holding a bulletList then an orderedList': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b'), nestedList('orderedList', 'c'))],
+  }),
+  'three levels': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), {
+      type: 'orderedList',
+      content: [adfItem(adfPara(adfText('b')), nestedList('bulletList', 'c')), adfItem(adfPara(adfText('d')))],
+    })],
+  }),
+  'nested list under the tenth ordered item': adfDoc({
+    type: 'orderedList',
+    content: [...'abcdefghi'].map(c => adfItem(adfPara(adfText(c)))).concat(adfItem(adfPara(adfText('j')), nestedList('bulletList', 'k'))),
+  }),
+  'nested list ending in an empty item, then an outer sibling': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b', '')), adfItem(adfPara(adfText('c')))],
+  }),
+  'nested list with an empty middle item': adfDoc({
+    type: 'orderedList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b', '', 'd')), adfItem(adfPara(adfText('e')))],
+  }),
+  'an empty item holding a nested list, not first': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a'))), adfItem(adfPara(adfText('')), nestedList('bulletList', 'b'))],
+  }),
+  'empty depth-2 item before a depth-1 sibling': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), {
+      type: 'bulletList',
+      content: [adfItem(adfPara(adfText('b')), nestedList('bulletList', 'c', '')), adfItem(adfPara(adfText('d')))],
+    }), adfItem(adfPara(adfText('e')))],
+  }),
+  'em mark in a nested item': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), { type: 'bulletList', content: [adfItem(adfPara(adfText('b', [{ type: 'em' }])))] })],
+  }),
 }
 
 /**
@@ -274,12 +330,24 @@ const WRITER_UNSAFE_ADF = {
     adfText(' '), { type: 'emoji', attrs: { text: '🙂' } },
   )),
   // Structural: shapes markdownToAdf never emits.
-  'nested bulletList': adfDoc({
+  'listItem with a list first': adfDoc({ type: 'bulletList', content: [adfItem({ type: 'bulletList', content: [adfItem(adfPara(adfText('b')))] })] }),
+  'listItem with text after its nested list': adfDoc({
     type: 'bulletList',
-    content: [{
-      type: 'listItem',
-      content: [adfPara(adfText('parent')), { type: 'bulletList', content: [adfItem(adfPara(adfText('child')))] }],
-    }],
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b'), adfPara(adfText('c')))],
+  }),
+  'listItem with two neighbouring lists of one kind': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b'), nestedList('bulletList', 'c'))],
+  }),
+  'listItem holding two paragraphs and a list': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), adfPara(adfText('b')), nestedList('bulletList', 'c'))],
+  }),
+  // `markdownToAdf` trims its source, so a trailing ` -` loses its space and
+  // is no longer a marker; the document-edge rule refuses it.
+  'nested list ending in an empty item at the document end': adfDoc({
+    type: 'bulletList',
+    content: [adfItem(adfPara(adfText('a')), nestedList('bulletList', 'b', ''))],
   }),
   'listItem holding two paragraphs': adfDoc({ type: 'bulletList', content: [adfItem(adfPara(adfText('a')), adfPara(adfText('b')))] }),
   'listItem holding nothing': adfDoc({ type: 'bulletList', content: [{ type: 'listItem', content: [] }] }),
@@ -293,10 +361,29 @@ const WRITER_UNSAFE_ADF = {
   'codeBlock with a leading newline': adfDoc({ type: 'codeBlock', content: [adfText('\na')] }),
   'codeBlock with a trailing newline': adfDoc({ type: 'codeBlock', content: [adfText('a\n')] }),
   'empty codeBlock': adfDoc({ type: 'codeBlock', content: [] }),
+  // Adjacent code runs (LIN-3564): their fences touch, and CommonMark reads
+  // ``a``b`` as ONE span. The same two runs with a different mark between them
+  // are fine.
+  'two adjacent code runs': adfDoc(adfPara(adfText('a', [{ type: 'code' }]), adfText('b', [{ type: 'code' }]))),
+  // A code span cannot be escaped, so one that opens a multi-line paragraph
+  // with a fence would read back as a code block.
+  'a paragraph opening with a fence-length code span, then a line break':
+    adfDoc(adfPara(adfText('``x', [{ type: 'code' }]), { type: 'hardBreak' }, adfText('y'))),
   // Marks: INLINE_PATTERN is a single non-nesting scan, so two marks on one run
   // render as `_**x**_` and re-parse as ONE em run whose text is literally `**x**`.
   'text carrying strong + em': adfDoc(adfPara(adfText('x', [{ type: 'strong' }, { type: 'em' }]))),
   'text carrying link + strong': adfDoc(adfPara(adfText('x', [{ type: 'link', attrs: { href: 'https://e.com' } }, { type: 'strong' }]))),
+  // Shapes that are refused wherever they sit, not only at the document's edge.
+  'empty listItem followed by another item': adfDoc({ type: 'bulletList', content: [{ type: 'listItem', content: [] }, adfItem(adfPara(adfText('b')))] }),
+  'empty blockquote between paragraphs': adfDoc(adfPara(adfText('a')), { type: 'blockquote', content: [] }, adfPara(adfText('b'))),
+  'empty heading between paragraphs': adfDoc(adfPara(adfText('a')), { type: 'heading', attrs: { level: 1 }, content: [] }, adfPara(adfText('b'))),
+  'paragraph with a blank line made of two hardBreaks': adfDoc(adfPara(adfText('a'), HARD_BREAK, HARD_BREAK, adfText('b'))),
+  'paragraph split into two plain text runs': adfDoc(adfPara(adfText('a'), adfText('b'))),
+  'codeBlock split into two text runs': adfDoc({ type: 'codeBlock', content: [adfText('const a = '), adfText('1')] }),
+  'codeBlock with a blank language': adfDoc({ type: 'codeBlock', attrs: { language: '' }, content: [adfText('x')] }),
+  'codeBlock with a space-padded language': adfDoc({ type: 'codeBlock', attrs: { language: ' js' }, content: [adfText('x')] }),
+  'codeBlock whose text carries a mark': adfDoc({ type: 'codeBlock', content: [adfText('x', [{ type: 'strong' }])] }),
+  'link whose href contains a newline': adfDoc(adfPara(adfText('x', [{ type: 'link', attrs: { href: 'https://e.com/a\nb' } }]))),
 }
 
 /**
@@ -476,15 +563,28 @@ describe('LIN-1886 ruling d38d3755 & LIN-2019 — the invariant\'s non-lossy att
 
   // LIN-2019: the attrs relaxation must not paper over an independently
   // unrebuildable SHAPE — structural refusals still win over `localId`.
-  test('a nested bulletList carrying localId on the inner list still refuses', () => {
+  test('a nested bulletList carrying localId on the inner list is permitted (LIN-3570)', () => {
     const doc = adfDoc({
       type: 'bulletList',
-      content: [{
-        type: 'listItem',
-        content: [adfPara(adfText('parent')), { type: 'bulletList', attrs: { localId: 'x' }, content: [adfItem(adfPara(adfText('child')))] }],
-      }],
+      content: [adfItem(adfPara(adfText('parent')), { type: 'bulletList', attrs: { localId: 'x' }, content: [adfItem(adfPara(adfText('child')))] })],
     })
-    assert.equal(adfHasUnrenderableContent(doc), true, 'a nested list is unrebuildable regardless of attrs')
+    assert.equal(adfHasUnrenderableContent(doc), false)
+    assert.deepEqual(markdownToAdf(adfToMarkdown(doc)), adfDoc({
+      type: 'bulletList',
+      content: [adfItem(adfPara(adfText('parent')), nestedList('bulletList', 'child'))],
+    }), 'it rebuilds minus the localId')
+  })
+
+  test('a different structural refusal still wins under a localId on a nested list', () => {
+    const doc = adfDoc({
+      type: 'bulletList',
+      content: [adfItem(adfPara(adfText('parent')), {
+        type: 'bulletList',
+        attrs: { localId: 'x' },
+        content: [adfItem(adfPara(adfText('one')), adfPara(adfText('two')))],
+      })],
+    })
+    assert.equal(adfHasUnrenderableContent(doc), true, 'an inner item holding two paragraphs is still unrebuildable')
   })
 
   test('a multi-paragraph blockquote carrying localId still refuses', () => {
@@ -782,6 +882,9 @@ const ADVERSARIAL_TEXTS = [
   '```js', '```', '~~~',
   '| a | b |', '<html>&amp;', 'emoji 🙂 and — dashes',
   'mixed `code` and _em_ and [l](u) and **b**',
+  // Code-span payloads (LIN-3564): they reach the code-mark slot, where text is
+  // fenced rather than escaped.
+  'dir\\', 'a\\\\b', 'a`b', '`x', 'x`', 'x`  ', 'a`b``', '`', '``', ' a ', ' ', '  ', ' `a` ',
   // Whitespace and newlines: these mostly drive the REFUSAL side of the
   // property (a `.trim()` or a block split destroys them), so they are here to
   // prove the refusals are earned rather than blanket.
@@ -926,5 +1029,594 @@ describe('ADF → markdown → ADF, as a generated property over an adversarial 
         )
       }
     }
+  })
+})
+
+// LIN-3557: the writer must never emit a document its own gate refuses. A rule
+// or a closing fence followed by trailing whitespace or a CR (CRLF text) is
+// still a rule / a fence, not a paragraph the gate then blocks with a 422.
+describe('markdownToAdf: rule and closing fence tolerate trailing whitespace (LIN-3557)', () => {
+  for (const md of ['a\n\n---  ', 'a\n\n---\r', 'x\n\n---\r\n']) {
+    test(`rule with trailing whitespace ${JSON.stringify(md)}`, () => {
+      const doc = markdownToAdf(md)
+      assert.deepEqual(doc.content.map(n => n.type), ['paragraph', 'rule'])
+      assert.equal(adfHasUnrenderableContent(doc), false)
+    })
+  }
+
+  for (const md of ['```\nx\n```\r', '```\nx\n``` ']) {
+    test(`closing fence with trailing whitespace ${JSON.stringify(md)}`, () => {
+      const doc = markdownToAdf(md)
+      assert.deepEqual(doc.content, [{ type: 'codeBlock', content: [{ type: 'text', text: 'x' }] }])
+      assert.equal(adfHasUnrenderableContent(doc), false)
+    })
+  }
+})
+
+// LIN-3557 review R1/R2: block forms the writer must match as loosely as the
+// code it replaced, or the input falls through to a paragraph.
+describe('markdownToAdf: unclosed fence and indented rule (LIN-3557 review)', () => {
+  test('an unclosed fence stays a code block, body verbatim', () => {
+    const md = 'Repro:\n\n```python\nclass A:\n    def __init__(self, *args, **kw):\n        pass\n\nA()\n```'
+    const doc = markdownToAdf(md)
+    assert.equal(doc.content[1].type, 'codeBlock')
+    assert.deepEqual(doc.content[1].content, [
+      { type: 'text', text: 'class A:\n    def __init__(self, *args, **kw):\n        pass' },
+    ])
+  })
+
+  test('an unclosed fence without a language is a code block the gate permits', () => {
+    const doc = markdownToAdf('```js\nconst a = 1')
+    assert.deepEqual(doc.content, [
+      { type: 'codeBlock', attrs: { language: 'js' }, content: [{ type: 'text', text: 'const a = 1' }] },
+    ])
+    assert.equal(adfHasUnrenderableContent(doc), false)
+  })
+
+  test('a closed fence with no body is an empty code block, not a block holding the closing fence', () => {
+    assert.deepEqual(markdownToAdf('```js\n```').content, [
+      { type: 'codeBlock', attrs: { language: 'js' }, content: [] },
+    ])
+  })
+
+  test('a lone fence line stays text', () => {
+    assert.deepEqual(markdownToAdf('```').content.map(n => n.type), ['paragraph'])
+  })
+
+  for (const md of [' ---', '\t---', 'a\n\n ---']) {
+    test(`rule with leading whitespace ${JSON.stringify(md)}`, () => {
+      const doc = markdownToAdf(md)
+      assert.equal(doc.content.at(-1).type, 'rule')
+      assert.equal(adfHasUnrenderableContent(doc), false)
+    })
+  }
+
+  test('a stored paragraph that looks like an indented rule round-trips', () => {
+    // Not first: a leading space at the document's own edge is trimmed (and gated).
+    const para = text => ({ type: 'paragraph', content: [{ type: 'text', text }] })
+    const doc = { type: 'doc', version: 1, content: [para('a'), para(' ---')] }
+    assert.equal(adfToMarkdown(doc), 'a\n\n \\---')
+    assert.deepEqual(markdownToAdf(adfToMarkdown(doc)), doc)
+  })
+})
+
+// =============================================================================
+// What users see and what Jira stores (LIN-3561)
+//
+// Tests of the codec's user-visible outputs only: the Markdown Harbour shows
+// (and what `marked`, the dashboard renderer, makes of it with default
+// options), and the ADF Harbour writes to Jira. The gate's refuse/allow
+// decision is pinned in WRITER_UNSAFE_ADF / WRITER_SAFE_ADF above.
+// =============================================================================
+
+describe('what a reader sees: adfToMarkdown, and what marked renders from it', () => {
+  const link = (text, href) => adfText(text, [{ type: 'link', attrs: { href } }])
+  const cases = [
+    ['a link whose href contains brackets', adfDoc(adfPara(link('wiki', 'https://en.wikipedia.org/wiki/Foo_(bar)'))),
+      '[wiki](https://en.wikipedia.org/wiki/Foo_\\(bar\\))', '<p><a href="https://en.wikipedia.org/wiki/Foo_(bar)">wiki</a></p>\n'],
+    ['a plain link', adfDoc(adfPara(link('docs', 'https://e.com/docs'))), '[docs](https://e.com/docs)', '<p><a href="https://e.com/docs">docs</a></p>\n'],
+    ['a "]" in link text', adfDoc(adfPara(link('a]b', 'http://x'))), '[a\\]b](http://x)', '<p><a href="http://x">a]b</a></p>\n'],
+    ['each mark', adfDoc(adfPara(adfText('b', [{ type: 'strong' }]), adfText(' '), adfText('i', [{ type: 'em' }]), adfText(' '), adfText('c', [{ type: 'code' }]), adfText(' '), adfText('s', [{ type: 'strike' }]))),
+      '**b** _i_ `c` ~~s~~', '<p><strong>b</strong> <em>i</em> <code>c</code> <del>s</del></p>\n'],
+    ['prose with underscores', p('call foo_bar_baz now'), 'call foo\\_bar\\_baz now', '<p>call foo_bar_baz now</p>\n'],
+    ['prose with asterisks', p('a **b** c'), 'a \\*\\*b\\*\\* c', '<p>a **b** c</p>\n'],
+    ['prose that looks like a link', p('see [1](2) below'), 'see \\[1\\](2) below', '<p>see [1](2) below</p>\n'],
+    ['prose that looks like a heading', p('# not a heading'), '\\# not a heading', '<p># not a heading</p>\n'],
+    ['prose that looks like a numbered list', p('1. not a list'), '1\\. not a list', '<p>1. not a list</p>\n'],
+  ]
+  for (const [name, doc, md, html] of cases) {
+    test(name, () => {
+      assert.equal(adfToMarkdown(doc), md)
+      assert.equal(marked.parse(md), html)
+    })
+  }
+})
+
+describe('adfToMarkdown: what a reader sees for each node', () => {
+  const cases = [
+    ['an emoji with only a shortName shows the shortName', adfDoc(adfPara({ type: 'emoji', attrs: { shortName: ':party:' } })), ':party:'],
+    ['a level-6 heading', adfDoc({ type: 'heading', attrs: { level: 6 }, content: [adfText('Six')] }), '###### Six'],
+    ['a heading above level 6 is shown at level 6', adfDoc({ type: 'heading', attrs: { level: 7 }, content: [adfText('Deep')] }), '###### Deep'],
+    ['a negative heading level is shown at level 1', adfDoc({ type: 'heading', attrs: { level: -2 }, content: [adfText('Neg')] }), '# Neg'],
+    ['a heading without a level is shown at level 1', adfDoc({ type: 'heading', content: [adfText('None')] }), '# None'],
+    ['a code block split into runs shows them joined', adfDoc({ type: 'codeBlock', content: [adfText('const a = '), adfText('1')] }), '```\nconst a = 1\n```'],
+    ['a code block drops its trailing newlines', adfDoc({ type: 'codeBlock', content: [adfText('a\n\n')] }), '```\na\n```'],
+  ]
+  for (const [name, doc, md] of cases) test(name, () => assert.equal(adfToMarkdown(doc), md))
+})
+
+describe('markdownToAdf: what a write stores in Jira', () => {
+  const link = (t, href) => adfText(t, [{ type: 'link', attrs: { href } }])
+  const cases = [
+    ['an escaped bracket in an href is stored without the backslash', '[Foo](https://e.com/wiki/Foo_\\(bar\\))', [adfPara(link('Foo', 'https://e.com/wiki/Foo_(bar)'))]],
+    ['a line with dashes and words is a paragraph, not a rule', '--- draft ---', [adfPara(adfText('--- draft ---'))]],
+    ['a backslash keeps link syntax literal', 'see \\[1](2) below', [adfPara(adfText('see [1](2) below'))]],
+    ['a tag in brackets right before a link', '[WIP][Fix the build](https://x)', [adfPara(adfText('[WIP]'), link('Fix the build', 'https://x'))]],
+    ['brackets not followed by ( stay text', 'see [docs] (soon)', [adfPara(adfText('see [docs] (soon)'))]],
+    ['text after a link keeps its first character', '[docs](https://x) and more', [adfPara(link('docs', 'https://x'), adfText(' and more'))]],
+  ]
+  for (const [name, md, content] of cases) test(name, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
+
+  // No `{ timeout }`: node:test cannot interrupt a synchronous loop, so it
+  // would claim a guard it does not provide. A hang here aborts the process,
+  // which fails the file.
+  test('an unclosed link stays text', () => {
+    assert.deepEqual(markdownToAdf('see [draft](https://x'), adfDoc(adfPara(adfText('see [draft](https://x'))))
+  })
+})
+
+// LIN-3564: a code span shows exactly its own text, and a typed one stores its
+// content as CommonMark defines it.
+describe('code spans: what a reader sees, and what a typed span stores', () => {
+  const code = text => adfDoc(adfPara(adfText(text, [{ type: 'code' }])))
+  const escapeHtml = text => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const shown = [
+    ['a backslash', 'C:\\dir', '`C:\\dir`'],
+    ['a trailing backslash', 'dir\\', '`dir\\`'],
+    ['a double backslash', 'a\\\\b', '`a\\\\b`'],
+    ['a backtick inside', 'a`b', '``a`b``'],
+    ['a leading backtick', '`x', '`` `x ``'],
+    ['a trailing backtick then spaces', 'x`  ', '``x`  ``'],
+    ['a backtick and a double backtick', 'a`b``', '``` a`b`` ```'],
+    ['a lone backtick', '`', '`` ` ``'],
+    ['spaces on both edges', ' a ', '`  a  `'],
+    ['one space', ' ', '` `'],
+    ['two spaces', '  ', '`  `'],
+  ]
+  for (const [name, text, md] of shown) {
+    test(`code with ${name}`, () => {
+      assert.equal(adfToMarkdown(code(text)), md)
+      assert.equal(marked.parse(md), `<p><code>${escapeHtml(text)}</code></p>\n`)
+      assert.deepEqual(markdownToAdf(md), code(text))
+      assert.equal(adfHasUnrenderableContent(code(text)), false)
+    })
+  }
+
+  const stored = [
+    ['a double backslash is kept', '`a\\\\b`', [adfPara(adfText('a\\\\b', [{ type: 'code' }]))]],
+    ['a trailing backslash does not escape the fence', '`dir\\`', [adfPara(adfText('dir\\', [{ type: 'code' }]))]],
+    ['a double fence holds a backtick', '`` a`b ``', [adfPara(adfText('a`b', [{ type: 'code' }]))]],
+    ['one padding space is stripped from each side', '` a `', [adfPara(adfText('a', [{ type: 'code' }]))]],
+    ['a longer run inside does not close the span', '`a``b`', [adfPara(adfText('a``b', [{ type: 'code' }]))]],
+    ['no run of the same length is left: plain text','``a`', [adfPara(adfText('``a`'))]],
+    ['the opening run is the whole run, not its tail', '```a`b`', [adfPara(adfText('```a'), adfText('b', [{ type: 'code' }]))]],
+    ['text after an unclosed run still parses', '``a `b`', [adfPara(adfText('``a '), adfText('b', [{ type: 'code' }]))]],
+  ]
+  for (const [name, md, content] of stored) test(`typed: ${name}`, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
+})
+
+// LIN-3565: pins for what the clean-room rebuild (experiment 2b) changed and
+// its replay showed. Each row is one behaviour change or fixed regression.
+describe('LIN-3565: what the rebuild changed, as users see it', () => {
+  const para = (...runs) => adfDoc(adfPara(...runs))
+  const link = { type: 'link', attrs: { href: 'http://a.b' } }
+
+  // Fix: a code run carrying another mark showed the other mark's syntax as
+  // literal code text, and dropped the link or emphasis.
+  const codeWith = [
+    ['strong', { type: 'strong' }, '**`x`**', '<p><strong><code>x</code></strong></p>\n'],
+    ['em', { type: 'em' }, '_`x`_', '<p><em><code>x</code></em></p>\n'],
+    ['strike', { type: 'strike' }, '~~`x`~~', '<p><del><code>x</code></del></p>\n'],
+    ['a link', link, '[`x`](http://a.b)', '<p><a href="http://a.b"><code>x</code></a></p>\n'],
+  ]
+  for (const [name, mark, md, html] of codeWith) {
+    test(`code with ${name} shows both`, () => {
+      assert.equal(adfToMarkdown(para(adfText('x', [mark, { type: 'code' }]))), md)
+      assert.equal(marked.parse(md), html)
+    })
+  }
+
+  // Fix: text that begins with spaces and a block marker was written bare, so
+  // the dashboard showed a list, quote or numbered list instead of the text.
+  const looksLikeBlock = [
+    ['a numbered list', ' 1. a', '1\\. a', '<p>1. a</p>\n'],
+    ['a bullet', ' - a', '\\- a', '<p>- a</p>\n'],
+    ['a quote', ' > a', '\\> a', '<p>&gt; a</p>\n'],
+  ]
+  for (const [name, text, md, html] of looksLikeBlock) {
+    test(`indented text that looks like ${name} stays text`, () => {
+      assert.equal(adfToMarkdown(para(adfText(text))), md)
+      assert.equal(marked.parse(md), html)
+    })
+  }
+
+  // Fix: block markers the dashboard renders as blocks are stored as blocks.
+  const blocks = [
+    ['a * bullet', '* item', [{ type: 'bulletList', content: [adfItem(adfPara(adfText('item')))] }]],
+    ['an indented numbered item', ' 1. item', [{ type: 'orderedList', content: [adfItem(adfPara(adfText('item')))] }]],
+    ['an indented fence', ' ```\ncode\n```', [{ type: 'codeBlock', content: [adfText('code')] }]],
+  ]
+  for (const [name, md, content] of blocks) test(`typed: ${name} is stored as its block`, () => assert.deepEqual(markdownToAdf(md), adfDoc(...content)))
+
+  // Regression fixed: a line ending counts as a space in a code span, so a
+  // whitespace-only run is not padded (padding made the dashboard show more
+  // whitespace than the run holds).
+  test('code of spaces and a newline is shown as it is', () => {
+    const doc = para(adfText(' \n ', [{ type: 'code' }]))
+    const md = adfToMarkdown(doc)
+    assert.equal(md, '` \n `')
+    assert.equal(marked.parse(md), '<p><code>   </code></p>\n')
+  })
+
+  // Regression fixed: a newline in a code block's language moves the rest of
+  // it into the body on the way back, so the write must be refused.
+  test('a code block language with a newline is refused', () => {
+    const doc = adfDoc({ type: 'codeBlock', attrs: { language: 'x\ny' }, content: [adfText('body')] })
+    assert.equal(adfHasUnrenderableContent(doc), true)
+  })
+})
+
+// =============================================================================
+// LIN-3570: nested lists and *single-asterisk* italics
+// =============================================================================
+
+describe('LIN-3570: nested lists and *italics*, as users see them', () => {
+  const asBullets = (...heads) => nestedList('bulletList', ...heads)
+  const item = (head, ...lists) => adfItem(adfPara(adfText(head)), ...lists)
+  const list = (type, ...items) => ({ type, content: items })
+  const bullets = (...items) => list('bulletList', ...items)
+  const numbered = (...items) => list('orderedList', ...items)
+  const em = text => adfText(text, [{ type: 'em' }])
+  const strong = text => adfText(text, [{ type: 'strong' }])
+  const tenItems = [...'abcdefghi'].map(c => item(c))
+  const tenth = `${[...'abcdefghi'].map((c, i) => `${i + 1}. ${c}`).join('\n')}\n10. j\n    - k`
+
+  // [name, typed Markdown, stored content, markdown after reading it back]
+  const rows = [
+    ['a two-level bullet list', '- a\n  - b\n- c', [bullets(item('a', asBullets('b')), item('c'))], '- a\n  - b\n- c'],
+    ['a three-level mixed list', '- a\n  1. b\n     - c\n  2. d\n- e',
+      [bullets(item('a', numbered(item('b', asBullets('c')), item('d'))), item('e'))], '- a\n  1. b\n     - c\n  2. d\n- e'],
+    ['bullets under a numbered item', '1. a\n   - sub\n2. b', [numbered(item('a', asBullets('sub')), item('b'))], '1. a\n   - sub\n2. b'],
+    ['* bullets nested', '* a\n  * b', [bullets(item('a', asBullets('b')))], '- a\n  - b'],
+    ['a nested list under the tenth ordered item', tenth, [numbered(...tenItems, item('j', asBullets('k')))], tenth],
+    ['a bullet list then a numbered one in one item', '- a\n  - b\n  1. c', [bullets(item('a', asBullets('b'), nestedList('orderedList', 'c')))], '- a\n  - b\n  1. c'],
+    ['*italic* in prose', 'text with *star* em', [adfPara(adfText('text with '), em('star'), adfText(' em'))], 'text with _star_ em'],
+    ['*italic* inside a list item', '- an *it* item', [bullets(adfItem(adfPara(adfText('an '), em('it'), adfText(' item'))))], '- an _it_ item'],
+    ['*italic* next to **bold**', '*it* and **bold**', [adfPara(em('it'), adfText(' and '), strong('bold'))], '_it_ and **bold**'],
+    ['punctuation is a word boundary', '(*x*) "*y*" see *z*.', [adfPara(adfText('('), em('x'), adfText(') "'), em('y'), adfText('" see '), em('z'), adfText('.'))], '(_x_) "_y_" see _z_.'],
+    ['a literal 2 * 3 * 4 stays text', '2 * 3 * 4', [adfPara(adfText('2 * 3 * 4'))], '2 \\* 3 \\* 4'],
+    ['*"quoted"* inside a word stays text', 'a*"b"*c', [adfPara(adfText('a*"b"*c'))], 'a\\*"b"\\*c'],
+  ]
+  for (const [name, typed, content, readBack] of rows) {
+    test(name, () => {
+      const stored = markdownToAdf(typed)
+      assert.deepEqual(stored, adfDoc(...content), 'what is stored')
+      assert.equal(adfHasUnrenderableContent(stored), false, 'the writer never emits what its gate refuses')
+      assert.equal(adfToMarkdown(stored), readBack, 'what a reader is given')
+      const shown = marked.parse(adfToMarkdown(stored))
+      assert.equal(shown, marked.parse(typed), 'what is displayed equals marked of what was typed')
+      assert.deepEqual(markdownToAdf(adfToMarkdown(stored)), stored, 'and a second save changes nothing')
+      assert.equal(marked.parse(adfToMarkdown(markdownToAdf(readBack))), shown)
+    })
+  }
+
+  test('nesting is displayed as nesting', () => {
+    const html = marked.parse(adfToMarkdown(markdownToAdf('- a\n  - b\n- c')))
+    assert.equal(html.replace(/\s+/g, ''), '<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>')
+  })
+
+  // Accepted differences: stored and displayed as asserted; the display is NOT
+  // compared with marked, and each row says why.
+  const accepted = [
+    ['**bold *it* x**: strong runs do not nest, and an inner * voids them', '**bold *it* x**',
+      [adfPara(adfText('**bold '), em('it'), adfText(' x**'))], '<p>**bold <em>it</em> x**</p>\n'],
+    ['2*3*4 stays text: the reader writes _…_, which marked never shows inside a word', '2*3*4', [adfPara(adfText('2*3*4'))], '<p>2*3*4</p>\n'],
+    ['a*b*c stays text', 'a*b*c', [adfPara(adfText('a*b*c'))], '<p>a*b*c</p>\n'],
+    ['foo*bar* baz stays text', 'foo*bar* baz', [adfPara(adfText('foo*bar* baz'))], '<p>foo*bar* baz</p>\n'],
+    ['an inner link keeps its link', '*see [docs](http://u)*',
+      [adfPara(adfText('*see '), adfText('docs', [{ type: 'link', attrs: { href: 'http://u' } }]), adfText('*'))],
+      '<p>*see <a href="http://u">docs</a>*</p>\n'],
+    ['an inner code span keeps its code', '*run `npm test` now*',
+      [adfPara(adfText('*run '), adfText('npm test', [{ type: 'code' }]), adfText(' now*'))], '<p>*run <code>npm test</code> now*</p>\n'],
+    ['an inner strike keeps its strike', '*a ~~b~~ c*',
+      [adfPara(adfText('*a '), adfText('b', [{ type: 'strike' }]), adfText(' c*'))], '<p>*a <del>b</del> c*</p>\n'],
+    ['an inner _em_ keeps its em', '*a _b_ c*', [adfPara(adfText('*a '), em('b'), adfText(' c*'))], '<p>*a <em>b</em> c*</p>\n'],
+    ['*use snake_case here* stays text (marked shows em)', '*use snake_case here*', [adfPara(adfText('*use snake_case here*'))], '<p>*use snake_case here*</p>\n'],
+    ['*a [b c* stays text (marked shows em)', '*a [b c*', [adfPara(adfText('*a [b c*'))], '<p>*a [b c*</p>\n'],
+    ['*a**b* is two runs; the reader joins them as _a__b_', '*a**b*', [adfPara(em('a'), em('b'))], '<p><em>a__b</em></p>\n'],
+    ['an emoji beside the run is half a surrogate pair: stays text', '😀*x*', [adfPara(adfText('😀*x*'))], '<p>😀*x*</p>\n'],
+    ['a combining mark after the run: stays text', '*x*́ z', [adfPara(adfText('*x*́ z'))], '<p>*x*́ z</p>\n'],
+    ['a format character before the run: stays text', 'a‍*"x"* y', [adfPara(adfText('a‍*"x"* y'))], '<p>a‍*&quot;x&quot;* y</p>\n'],
+    ['***x*** is today\'s result', '***x***', [adfPara(adfText('*'), strong('x'), adfText('*'))], '<p>*<strong>x</strong>*</p>\n'],
+    ['a * list that is not flanked', '* *', [bullets(adfItem(adfPara(adfText('*'))))], null],
+  ]
+  for (const [name, typed, content, html] of accepted) {
+    test(`accepted difference: ${name}`, () => {
+      const stored = markdownToAdf(typed)
+      assert.deepEqual(stored, adfDoc(...content))
+      assert.equal(adfHasUnrenderableContent(stored), false)
+      assert.deepEqual(markdownToAdf(adfToMarkdown(stored)), stored)
+      if (html !== null) assert.equal(marked.parse(adfToMarkdown(stored)), html)
+    })
+  }
+
+  // Unusual indentation is not chased. Stored and gate-clean is the claim.
+  const indentation = [
+    ['text continuing an item keeps today\'s paragraph', '- a\n  continued', 'paragraph'],
+    ['a bullet then a numbered line keeps today\'s paragraph', '- a\n1. b', 'paragraph'],
+    ['a marker indented less than a wide parent is a sibling, so two lists: a paragraph', '10. a\n  - b', 'paragraph'],
+    ['mixed - and * markers form one list (marked splits them)', '- a\n* b', 'bulletList'],
+    ['a one-space indent is a sibling (flat)', '- a\n - b', 'bulletList'],
+  ]
+  for (const [name, typed, type] of indentation) {
+    test(`unusual indentation: ${name}`, () => {
+      const stored = markdownToAdf(typed)
+      assert.equal(stored.content.length, 1)
+      assert.equal(stored.content[0].type, type)
+      assert.equal(adfHasUnrenderableContent(stored), false)
+      assert.deepEqual(markdownToAdf(adfToMarkdown(stored)), stored)
+    })
+  }
+
+  test('extra spaces after a marker move the content column, up to four', () => {
+    const wide = markdownToAdf('-   a\n    - b')
+    assert.deepEqual(wide, adfDoc(bullets(item('a', asBullets('b')))))
+    // Six spaces after the marker: the cap puts the content column at 6, so a
+    // child indented 6 nests. Without the cap the column would be 7 and the
+    // child would be a sibling item.
+    const tooWide = markdownToAdf('-      a\n      - b')
+    assert.equal(tooWide.content[0].content.length, 1, 'one top-level item, not two siblings')
+    assert.equal(tooWide.content[0].content[0].content.length, 2, 'the item holds its paragraph and the nested list')
+  })
+
+  test('a 100-level staircase neither throws nor changes on a round trip', () => {
+    const typed = Array.from({ length: 100 }, (_, depth) => `${'  '.repeat(depth)}- level ${depth}`).join('\n')
+    const stored = markdownToAdf(typed)
+    assert.equal(adfHasUnrenderableContent(stored), false)
+    assert.deepEqual(markdownToAdf(adfToMarkdown(stored)), stored)
+    assert.equal(adfToMarkdown(stored), typed)
+  })
+})
+
+describe('LIN-3570: the reader shows a nested list indented, and everything in an item', () => {
+  const item = (...children) => adfItem(...children)
+  const para = text => adfPara(adfText(text))
+  const cases = [
+    ['a nested list is indented by the marker width',
+      adfDoc({ type: 'bulletList', content: [item(para('a'), nestedList('bulletList', 'b'))] }), '- a\n  - b'],
+    ['a list under a numbered item is indented by three',
+      adfDoc({ type: 'orderedList', content: [item(para('a'), nestedList('bulletList', 'b'))] }), '1. a\n   - b'],
+    ['an empty nested item keeps its trailing space',
+      adfDoc({ type: 'bulletList', content: [item(para('a'), nestedList('bulletList', 'b', '')), item(para('c'))] }), '- a\n  - b\n  - \n- c'],
+    ['an empty head keeps its trailing space',
+      adfDoc({ type: 'bulletList', content: [item(para('a')), item(para(''), nestedList('bulletList', 'b'))] }), '- a\n- \n  - b'],
+    ['text and code after a list still show, inside the item',
+      adfDoc({ type: 'bulletList', content: [item(para('a'), nestedList('bulletList', 'b'), para('c'), { type: 'codeBlock', content: [adfText('code')] })] }),
+      '- a\n  - b\n\n  c\n\n  ```\n  code\n  ```'],
+    ['a list as the first child of an item',
+      adfDoc({ type: 'bulletList', content: [item(nestedList('bulletList', 'b'))] }), '- \n  - b'],
+    ['several non-list children before the list',
+      adfDoc({ type: 'bulletList', content: [item(para('a'), para('b'), nestedList('bulletList', 'c'))] }), '- a\n\nb\n  - c'],
+    ['an item with no list is as it always was',
+      adfDoc({ type: 'bulletList', content: [item(para('a'), para('b'))] }), '- a\n\nb'],
+  ]
+  for (const [name, doc, md] of cases) test(name, () => assert.equal(adfToMarkdown(doc), md))
+
+  test('everything an item holds after a list is displayed', () => {
+    const doc = adfDoc({ type: 'bulletList', content: [item(para('a'), nestedList('bulletList', 'b'), para('cc'), { type: 'codeBlock', content: [adfText('dd')] })] })
+    const html = marked.parse(adfToMarkdown(doc))
+    for (const text of ['a', 'b', 'cc', 'dd']) assert.match(html, new RegExp(`>${text}<|${text}`), text)
+    assert.match(html, /<li>[\s\S]*cc[\s\S]*<\/li>/, 'the paragraph is inside the item')
+  })
+
+  test('no blank line is emitted inside an item holding only a paragraph and lists', () => {
+    const doc = adfDoc({ type: 'bulletList', content: [item(para('a'), nestedList('bulletList', 'b'), nestedList('orderedList', 'c'))] })
+    assert.doesNotMatch(adfToMarkdown(doc), /\n\n/)
+  })
+
+  test('a nested list whose first item is empty is refused, though the writer rebuilds it', () => {
+    const doc = adfDoc({ type: 'bulletList', content: [item(para('a'), nestedList('bulletList', '', 'b'))] })
+    assert.equal(marked.parse(adfToMarkdown(doc)).includes('<h2>'), true, 'marked shows a heading')
+    assert.deepEqual(markdownToAdf(adfToMarkdown(doc)), doc, 'so the round trip itself would hold')
+    assert.equal(adfHasUnrenderableContent(doc), true)
+  })
+
+  test('typed text with an empty first sub-item is stored, then refused on the next edit: an accepted lockout (rare draft input; the alternative stores a description that shows a stray heading)', () => {
+    for (const typed of ['- a\n  - \n  - b', '1. a\n   - \n2. b']) {
+      const stored = markdownToAdf(typed)
+      assert.equal(adfHasUnrenderableContent(stored), true, JSON.stringify(typed))
+    }
+  })
+
+  test('an empty head over a nested list is permitted when the item is not first', () => {
+    const doc = adfDoc({ type: 'bulletList', content: [item(para('a')), item(para(''), nestedList('bulletList', 'b'))] })
+    assert.equal(adfHasUnrenderableContent(doc), false)
+    assert.match(marked.parse(adfToMarkdown(doc)).replace(/\s+/g, ''), /<ul><li>a<\/li><li><ul><li>b<\/li><\/ul><\/li><\/ul>/)
+  })
+
+  test('an empty first item over a nested list is the existing "- " quirk: stored, not compared with marked', () => {
+    const typed = '- \n  - b'
+    const stored = markdownToAdf(typed)
+    assert.deepEqual(stored, adfDoc({ type: 'bulletList', content: [item(para(''), nestedList('bulletList', 'b'))] }))
+    assert.equal(adfHasUnrenderableContent(stored), false)
+    assert.equal(adfToMarkdown(stored), '- \n  - b')
+  })
+})
+
+// A nested list's shape, in the exhaustive and seeded enumerations below.
+// tree = { type, items: [{ head: 'x' | '', lists: [tree] }] }
+const leaf = (type, ...heads) => ({ type, items: heads.map(head => ({ head, lists: [] })) })
+const treeToAdf = tree => ({
+  type: tree.type,
+  content: tree.items.map(({ head, lists }) => adfItem(adfPara(adfText(head)), ...lists.map(treeToAdf))),
+})
+const treeSignature = tree => `<${tree.type === 'bulletList' ? 'ul' : 'ol'}>${tree.items
+  .map(({ head, lists }) => `<li>${head}${lists.map(treeSignature).join('')}</li>`).join('')}</${tree.type === 'bulletList' ? 'ul' : 'ol'}>`
+const htmlSignature = html => html.replace(/<\/?p>|\s+/g, '')
+const KINDS = ['bulletList', 'orderedList']
+const listsOf = (itemsFor, maxItems) => KINDS.flatMap(type => {
+  const choices = itemsFor()
+  const out = []
+  for (const first of choices) {
+    out.push({ type, items: [first] })
+    if (maxItems > 1) for (const second of choices) out.push({ type, items: [first, second] })
+  }
+  return out
+})
+const itemsWith = (heads, listChoices) => () => heads.flatMap(head => listChoices.map(lists => ({ head, lists })))
+const pairsOf = choices => [[]].concat(choices.map(c => [c]), choices.flatMap(a => choices.map(b => [a, b])))
+const tailPara = adfPara(adfText('tail'))
+
+/** "any nested list whose first item has an empty head" (the gate's display rule) */
+const hasEmptyFirstNestedItem = (tree, nested = false) => (nested && tree.items[0].head === '')
+  || tree.items.some(({ lists }) => lists.some(child => hasEmptyFirstNestedItem(child, true)))
+
+function checkTree(tree, withTail, tally) {
+  if (tree.items[0].head === '') { tally.skipped += 1; return }
+  const doc = adfDoc(treeToAdf(tree), ...(withTail ? [tailPara] : []))
+  const md = adfToMarkdown(doc)
+  const rebuilt = markdownToAdf(md)
+  const roundTrips = JSON.stringify(rebuilt) === JSON.stringify(doc)
+  const shownRight = htmlSignature(marked.parse(md)) === treeSignature(tree) + (withTail ? 'tail' : '')
+  if (!adfHasUnrenderableContent(doc)) {
+    tally.permitted += 1
+    if (!roundTrips) assert.fail(`permitted but does not round-trip: ${JSON.stringify(md)}`)
+    if (adfHasUnrenderableContent(rebuilt)) assert.fail(`the writer emitted what its gate refuses: ${JSON.stringify(md)}`)
+    if (!shownRight) assert.fail(`permitted but displayed wrong: ${JSON.stringify(md)}`)
+  } else {
+    tally.refused += 1
+    if (roundTrips && shownRight) {
+      // Over-refusal: only the display rule may do it, and the count is pinned.
+      assert.ok(hasEmptyFirstNestedItem(tree), `refused but round-trips and displays right: ${JSON.stringify(md)}`)
+      tally.residue += 1
+    }
+  }
+}
+
+describe('LIN-3570: nested shapes, permitted ⇒ round-trips and displays nested; refused ⇒ earns it', () => {
+  test('every tree to depth 2 (two items per list, items hold 0-2 child lists)', () => {
+    const leaves = listsOf(itemsWith(['x', ''], [[]]), 2)
+    const itemChoices = itemsWith(['x', ''], pairsOf(leaves))()
+    const tally = { permitted: 0, refused: 0, residue: 0, trees: 0, skipped: 0 }
+    for (const type of KINDS) {
+      const trees = [...itemChoices.map(first => [first]), ...itemChoices.flatMap(first => itemChoices.map(second => [first, second]))]
+      for (const items of trees) {
+        tally.trees += 1
+        checkTree({ type, items }, false, tally)
+        checkTree({ type, items }, true, tally)
+      }
+    }
+    assert.equal(tally.trees, 197820, 'the enumeration did not silently shrink')
+    assert.equal(tally.permitted + tally.refused + tally.skipped, 2 * tally.trees, 'every tree was checked')
+    // The pins come from the first run: a tree skipped because the document
+    // starts with an empty item (the existing `- \n- x` quirk), the rest
+    // permitted or refused, and the refused ones that still round-trip and
+    // display right (the display rule's deliberate residue).
+    assert.deepEqual(tally, { permitted: 4234, refused: 193586, residue: 764, trees: 197820, skipped: 197820 })
+  })
+})
+
+describe('LIN-3570: deeper nested shapes (restricted depth 3, a seeded sample to depth 4)', () => {
+  test('depth 3, restricted: lists of at most two items, one child list each, a one-item innermost list', () => {
+    const innermost = KINDS.flatMap(type => ['x', ''].map(head => leaf(type, head)))
+    const middle = KINDS.flatMap(type => {
+      const items = ['x', ''].flatMap(head => [[], ...innermost.map(inner => [inner])].map(lists => ({ head, lists })))
+      return [...items.map(first => ({ type, items: [first] })), ...items.flatMap(first => items.map(second => ({ type, items: [first, second] })))]
+    })
+    const tops = KINDS.flatMap(type => {
+      const items = ['x', ''].flatMap(head => [[], ...middle.map(child => [child])].map(lists => ({ head, lists })))
+      const leaves = ['x', ''].map(head => ({ head, lists: [] }))
+      return [...items.map(first => ({ type, items: [first] })), ...items.flatMap(first => leaves.map(second => ({ type, items: [first, second] })))]
+    })
+    const tally = { permitted: 0, refused: 0, residue: 0, skipped: 0 }
+    for (const tree of tops) {
+      checkTree(tree, false, tally)
+      checkTree(tree, true, tally)
+    }
+    assert.equal(tops.length, 2652, 'the enumeration did not silently shrink')
+    assert.ok(tally.permitted > 0 && tally.refused > 0)
+  })
+
+  test('2,000 seeded trees to depth 4, any shape', () => {
+    let seed = 3570
+    const random = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n }
+    const make = depth => ({
+      type: KINDS[random(2)],
+      items: Array.from({ length: 1 + random(3) }, () => ({
+        head: random(5) === 0 ? '' : 'x',
+        lists: depth < 4 ? Array.from({ length: random(3) === 0 ? 1 + random(2) : 0 }, () => make(depth + 1)) : [],
+      })),
+    })
+    const tally = { permitted: 0, refused: 0, residue: 0, skipped: 0 }
+    for (let i = 0; i < 2000; i += 1) checkTree(make(1), i % 2 === 0, tally)
+    assert.ok(tally.permitted > 100, `a sample that permits nothing proves nothing: ${JSON.stringify(tally)}`)
+  })
+
+  // Each adversarial payload at the review's six positions, one at a time.
+  test('adversarial payloads hold the invariant at six nested positions', () => {
+    const item = (t, ...lists) => adfItem(adfPara(adfText(t)), ...lists)
+    const positions = {
+      'head of an item with a child': t => adfDoc({ type: 'bulletList', content: [item(t, nestedList('bulletList', 'b'))] }),
+      'first of a nested list': t => adfDoc({ type: 'bulletList', content: [item('a', nestedList('bulletList', t, 'b', 'c'))] }),
+      'middle of a nested list': t => adfDoc({ type: 'bulletList', content: [item('a', nestedList('bulletList', 'b', t, 'c'))] }),
+      'last of a nested list': t => adfDoc({ type: 'bulletList', content: [item('a', nestedList('bulletList', 'b', 'c', t))] }),
+      'last nested item before an outer sibling': t => adfDoc({ type: 'bulletList', content: [item('a', nestedList('bulletList', 'b', t)), item('z')] }),
+      'depth-2 item before a depth-1 sibling': t => adfDoc({
+        type: 'orderedList',
+        content: [item('a', { type: 'bulletList', content: [item('b', nestedList('bulletList', 'q', t)), item('c')] }), item('z')],
+      }),
+    }
+    for (const [name, build] of Object.entries(positions)) {
+      for (const text of ADVERSARIAL_TEXTS) {
+        // An empty first nested item is refused for how `marked` shows it, though
+        // the writer rebuilds it (see the display-rule test above).
+        if (text === '' && name === 'first of a nested list') continue
+        const doc = build(text)
+        const rebuilt = markdownToAdf(adfToMarkdown(doc))
+        if (adfHasUnrenderableContent(doc)) assert.notDeepEqual(rebuilt, doc, `over-refusal: ${name} / ${JSON.stringify(text)}`)
+        else assert.deepEqual(rebuilt, doc, `INVARIANT BROKEN: ${name} / ${JSON.stringify(text)}\n${JSON.stringify(adfToMarkdown(doc))}`)
+      }
+    }
+  })
+})
+
+// The `*` property (plan-review `38766a08`): whatever a typed `*` run stores,
+// the gate permits it, it survives the reader's `_…_`, and `marked` shows the
+// em runs that were stored. The alphabet carries each character class of
+// `marked`'s word-boundary rule: a combining mark, a format character, a
+// control character, a private-use one, an astral emoji, and a backslash.
+describe('LIN-3570: a typed *run* is only stored as emphasis when it can be shown', () => {
+  const ALPHABET = ['*', '*', 'a', 'b', '1', 'é', '😀', ' ', ' ', '"', '(', ')', '[', ']', '.', '~', '$', '-', '`',
+    '́', '‍', '️', '­', '\u0007', '', '\\']
+  const countEm = nodes => nodes.filter(node => node.marks?.some(mark => mark.type === 'em')).length
+  const adjacentEm = nodes => nodes.some((node, i) => i > 0 && [node, nodes[i - 1]].every(n => n.marks?.some(mark => mark.type === 'em')))
+
+  test('300,000 seeded strings: every stored em is permitted, survives the round trip, and is shown', () => {
+    let seed = 20261016
+    const random = n => { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n }
+    let withEm = 0
+    for (let i = 0; i < 300000; i += 1) {
+      const typed = Array.from({ length: 1 + random(12) }, () => ALPHABET[random(ALPHABET.length)]).join('')
+      const stored = markdownToAdf(typed)
+      const runs = stored.content[0]?.content ?? []
+      if (stored.content.length !== 1 || stored.content[0].type !== 'paragraph' || !countEm(runs) || adjacentEm(runs)) continue
+      withEm += 1
+      assert.equal(adfHasUnrenderableContent(stored), false, `gate refused ${JSON.stringify(typed)}`)
+      const md = adfToMarkdown(stored)
+      assert.deepEqual(markdownToAdf(md), stored, `round trip changed ${JSON.stringify(typed)}`)
+      const shown = (marked.parse(md).match(/<em>/g) ?? []).length
+      assert.equal(shown, countEm(runs), `${JSON.stringify(typed)} stores ${countEm(runs)} em, shows ${shown}: ${JSON.stringify(md)}`)
+    }
+    assert.ok(withEm > 5000, `the property needs em runs to check: ${withEm}`)
   })
 })

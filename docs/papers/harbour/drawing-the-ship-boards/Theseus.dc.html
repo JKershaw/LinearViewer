@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Theseus</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#efe9db}
+a{color:#305f7a;text-underline-offset:2px}a:hover{color:#1e2a33}
+</style>
+</helmet>
+<div style="width:100%;max-width:1440px;margin:0 auto;box-sizing:border-box;padding:22px 28px 30px;background:#efe9db;color:#1e2a33;font-family:'EB Garamond',Georgia,'Times New Roman',serif;">
+
+  <header style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 28px;padding-bottom:12px;margin-bottom:16px;border-bottom:1px solid #cfc5ad;">
+    <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;">
+      <span style="font-size:13px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;">Harbour</span>
+      <h1 style="margin:0;font-size:30px;line-height:1.05;font-weight:500;font-style:italic;">Theseus</h1>
+      <span style="font-size:17px;font-style:italic;color:#4c5a63;">the ship rebuilt plank by plank, while she sails</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 20px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">
+      <span>scripts/code-shape/seams.mjs · 40 weekly soundings · 5 Jan → 13 Oct 2026</span>
+      <a href="#flight-companion" style="font-family:'EB Garamond',Georgia,serif;font-size:15px;">Flight Companion →</a>
+    </div>
+  </header>
+
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:24px;">
+
+    <section aria-label="The code as a ship, over time" style="flex:3 1 700px;min-width:0;max-width:980px;">
+
+      <div style="overflow-x:auto;border:1px solid #1e2a33;background:#f1ebdd;">
+        <div style="position:relative;min-width:860px;height:640px;overflow:hidden;perspective:2600px;perspective-origin:50% 18%;">
+
+          <div role="group" aria-label="{{stageAria}}" style="position:absolute;left:50%;top:54%;width:0;height:0;transform-style:preserve-3d;">
+            <div style="{{floorStyle}}">
+
+              <svg width="1120" height="400" viewBox="0 0 1120 400" aria-hidden="true" style="position:absolute;left:0;top:0;overflow:visible;">
+                <defs>
+                  <pattern id="th-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40,0 L0,0 L0,40" fill="none" stroke="#d8cfb8" stroke-width="0.8"></path></pattern>
+                  <clipPath id="th-hull"><path d="M14,34 L600,34 C700,36 772,112 802,200 C772,288 700,364 600,366 L14,366 Z"></path></clipPath>
+                </defs>
+                <rect x="-40" y="-40" width="1200" height="480" fill="url(#th-grid)"></rect>
+                <path d="M14,34 L600,34 C700,36 772,112 802,200 C772,288 700,364 600,366 L14,366 Z" fill="#ece4cf" stroke="#1e2a33" stroke-width="1.3"></path>
+                <g clip-path="url(#th-hull)" stroke="#d6caab" stroke-width="0.8">
+                  <line x1="14" y1="54" x2="810" y2="54"></line><line x1="14" y1="74" x2="810" y2="74"></line><line x1="14" y1="94" x2="810" y2="94"></line>
+                  <line x1="14" y1="114" x2="810" y2="114"></line><line x1="14" y1="134" x2="810" y2="134"></line><line x1="14" y1="154" x2="810" y2="154"></line>
+                  <line x1="14" y1="174" x2="810" y2="174"></line><line x1="14" y1="226" x2="810" y2="226"></line><line x1="14" y1="246" x2="810" y2="246"></line>
+                  <line x1="14" y1="266" x2="810" y2="266"></line><line x1="14" y1="286" x2="810" y2="286"></line><line x1="14" y1="306" x2="810" y2="306"></line>
+                  <line x1="14" y1="326" x2="810" y2="326"></line><line x1="14" y1="346" x2="810" y2="346"></line>
+                </g>
+                <path d="M14,200 L802,200" stroke="#b3a688" stroke-width="1" stroke-dasharray="7 5"></path>
+                <text x="0" y="0" transform="translate(34 200) rotate(-90)" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="15" letter-spacing="7" fill="#4c5a63">THESEUS</text>
+                <g stroke="#a24c14" stroke-width="1.2" fill="none" stroke-dasharray="4 3">
+                  <path d="M812,112 L860,112"></path><path d="M812,288 L860,288"></path>
+                </g>
+                <path d="M853,108 L860,112 L853,116 M853,284 L860,288 L853,292" stroke="#a24c14" stroke-width="1.2" fill="none"></path>
+                <text x="0" y="0" transform="translate(838 200) rotate(90)" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="15" font-style="italic" fill="#a24c14">the work remaining</text>
+                <path d="M870,100 L1030,100 C1075,105 1100,160 1108,200 C1100,240 1075,295 1030,300 L870,300 Z" fill="none" stroke="#4c5a63" stroke-width="0.9" stroke-dasharray="3 3"></path>
+                <text x="985" y="324" text-anchor="middle" font-family="'EB Garamond',Georgia,serif" font-size="15" font-style="italic" fill="#4c5a63">[ideal — unmeasured]</text>
+                <text x="985" y="342" text-anchor="middle" font-family="'JetBrains Mono',monospace" font-size="10" fill="#4c5a63">one-shot ship · same 11 capabilities · drawn to no scale</text>
+              </svg>
+
+              <sc-for list="{{ghosts}}" as="g" hint-placeholder-count="11">
+                <div style="{{g.wrap}}">
+                  <div style="{{g.fN}}"></div>
+                  <div style="{{g.fW}}"></div>
+                  <div style="{{g.fE}}"></div>
+                  <div style="{{g.fS}}"></div>
+                  <div style="{{g.fT}}"></div>
+                </div>
+              </sc-for>
+              <sc-for list="{{ghostPieces}}" as="q" hint-placeholder-count="5">
+                <span style="{{q.st}}"></span>
+              </sc-for>
+
+              <sc-for list="{{cables}}" as="k" hint-placeholder-count="19">
+                <div style="{{k.st}}"></div>
+              </sc-for>
+
+              <sc-for list="{{blocks}}" as="b" hint-placeholder-count="11">
+                <div style="{{b.wrap}}">
+                  <div style="{{b.cut}}"></div>
+                  <div style="{{b.fN}}"></div>
+                  <div style="{{b.fW}}"></div>
+                  <div style="{{b.fE}}"></div>
+                  <div style="{{b.fS}}"></div>
+                  <div style="{{b.fT}}"></div>
+                  <button type="button" onClick="{{b.pick}}" aria-pressed="{{b.pressed}}" aria-label="{{b.aria}}" style="{{b.lbl}}">
+                    <span style="{{b.lblName}}">{{b.short}}</span>
+                    <span style="{{b.lblMeta}}">{{b.meta}}</span>
+                  </button>
+                  <span aria-hidden="true" style="{{b.dStyle}}">{{b.dText}}</span>
+                </div>
+              </sc-for>
+
+              <sc-for list="{{specks}}" as="p" hint-placeholder-count="40">
+                <span style="{{p.st}}"></span>
+              </sc-for>
+              <sc-for list="{{clusters}}" as="c" hint-placeholder-count="5">
+                <span style="{{c.ingot}}"></span>
+                <span style="{{c.lbl}}">{{c.text}}</span>
+              </sc-for>
+
+            </div>
+          </div>
+
+          <div style="position:absolute;left:18px;top:16px;display:flex;flex-direction:column;gap:3px;pointer-events:none;">
+            <span style="font-size:34px;line-height:1;font-weight:500;">{{r.dateLong}}</span>
+            <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">{{r.sub}}</span>
+            <span style="{{r.modeStyle}}">{{r.mode}}</span>
+          </div>
+
+          <div aria-hidden="true" style="position:absolute;left:16px;bottom:14px;display:grid;grid-template-columns:auto auto;gap:5px 18px;padding:9px 12px;background:rgba(251,248,240,0.92);border:1px solid #cfc5ad;font-size:13px;line-height:1.2;color:#1e2a33;">
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:11px;box-sizing:border-box;background:#d3c6a3;border:1px solid #3d4a52;"></span>weathered plank: code as it is</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:11px;box-sizing:border-box;border:1.5px dashed #a24c14;"></span>seam cut: ready to rebuild</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:11px;box-sizing:border-box;background:#f7ecd2;border:1px dashed #1e2a33;"></span>fresh plank: rebuilt (projected)</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:11px;box-sizing:border-box;border:1px dashed #6b7780;"></span>wireframe: the one-shot ideal</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:0;border-top:1.6px solid #8e2a5c;"></span>cable: a two-way tangle</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:0;border-top:1.4px dashed #305f7a;"></span>untied this week</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="display:inline-flex;gap:2px;"><span style="width:5px;height:5px;border-radius:50%;background:#8e2a5c;"></span><span style="width:5px;height:5px;border-radius:50%;background:#8e2a5c;"></span><span style="width:5px;height:5px;border-radius:50%;background:#8e2a5c;"></span></span>specks: one decision, many sites</span>
+            <span style="display:flex;align-items:center;gap:7px;"><span style="width:16px;height:8px;border-radius:2px;box-sizing:border-box;background:#8e2a5c;border:1px solid #1e2a33;"></span>ingot: brought to one place</span>
+          </div>
+
+          <div style="position:absolute;right:14px;bottom:14px;display:flex;align-items:center;gap:8px;padding:7px 10px;background:rgba(251,248,240,0.92);border:1px solid #cfc5ad;">
+            <button type="button" onClick="{{turnLeft}}" aria-label="Turn the view 10 degrees left" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;width:28px;height:26px;padding:0;background:transparent;color:#1e2a33;border:1px solid #8a8170;border-radius:2px;cursor:pointer;">⟲</button>
+            <label for="th-bearing" style="font-size:13.5px;">View bearing</label>
+            <input id="th-bearing" type="range" min="-60" max="0" step="2" value="{{rz}}" onInput="{{bear}}" onChange="{{bear}}" style="width:110px;accent-color:#1e2a33;">
+            <button type="button" onClick="{{turnRight}}" aria-label="Turn the view 10 degrees right" style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;width:28px;height:26px;padding:0;background:transparent;color:#1e2a33;border:1px solid #8a8170;border-radius:2px;cursor:pointer;">⟳</button>
+            <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#4c5a63;min-width:34px;">{{rzLabel}}</span>
+          </div>
+
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px;">
+          <h2 style="margin:0;font-size:22px;line-height:1.15;font-weight:500;">The voyage <span style="font-style:italic;font-weight:400;color:#4c5a63;">— forty weekly soundings, then projection</span></h2>
+          <span style="font-size:14px;font-style:italic;color:#4c5a63;">above the waterline, code; below it, the keel of tangles</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:128px minmax(0,1fr);column-gap:12px;margin-top:8px;">
+
+          <div style="position:relative;height:150px;font-size:13px;line-height:1.25;color:#4c5a63;text-align:right;">
+            <div style="position:absolute;right:0;top:30px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+              <span style="display:flex;align-items:center;gap:6px;">product KB <span style="width:9px;height:12px;background:#3d4a52;"></span></span>
+              <span style="display:flex;align-items:center;gap:6px;">test KB <span style="width:9px;height:12px;box-sizing:border-box;border:1px solid #6f6757;"></span></span>
+            </div>
+            <div style="position:absolute;right:0;top:96px;display:flex;align-items:center;gap:6px;">two-way tangles <span style="width:9px;height:12px;background:#8e2a5c;"></span></div>
+          </div>
+
+          <div aria-hidden="true" style="position:relative;height:150px;">
+            <div style="position:absolute;left:93.02%;right:0;top:0;bottom:0;border:1px dashed #a24c14;box-sizing:border-box;"></div>
+            <span style="position:absolute;right:4px;top:4px;font-size:12px;font-style:italic;color:#a24c14;">projection</span>
+            <sc-for list="{{tl}}" as="c" hint-placeholder-count="43">
+              <div style="{{c.col}}">
+                <div style="{{c.test}}"></div>
+                <div style="{{c.prod}}"></div>
+                <div style="{{c.tang}}"></div>
+                <span style="{{c.plabel}}">{{c.ptext}}</span>
+              </div>
+            </sc-for>
+            <div style="position:absolute;left:0;right:0;top:86px;border-top:1px solid #1e2a33;"></div>
+            <span style="position:absolute;left:66.28%;top:4px;transform:translateX(-50%);font-size:12px;font-style:italic;color:#1e2a33;white-space:nowrap;">tests outweigh code · 3 Aug</span>
+            <span style="position:absolute;left:87.21%;top:142px;transform:translateX(-100%);padding-right:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;color:#8e2a5c;white-space:nowrap;">peak 22 · 5 Oct</span>
+            <div style="{{cursorStyle}}"></div>
+          </div>
+
+          <div style="padding-top:6px;text-align:right;"><label for="th-range" style="font-size:14.5px;">Sounding</label></div>
+          <div>
+            <input id="th-range" type="range" min="0" max="42" step="1" value="{{idx}}" onInput="{{scrub}}" onChange="{{scrub}}" aria-valuetext="{{r.valuetext}}" style="display:block;width:100%;margin:6px 0 0;accent-color:#a24c14;">
+          </div>
+
+          <div></div>
+          <div aria-hidden="true" style="position:relative;height:20px;">
+            <sc-for list="{{months}}" as="m" hint-placeholder-count="11">
+              <span style="{{m.st}}">{{m.t}}</span>
+            </sc-for>
+          </div>
+
+          <div style="padding-top:7px;text-align:right;font-size:14px;line-height:1.15;">
+            <span style="color:#305f7a;font-weight:600;">Harbour’s fleet</span><br>
+            <span style="font-size:12.5px;color:#4c5a63;">loops · cleanups · rebuilds</span>
+          </div>
+          <div style="position:relative;height:42px;border-top:1px dotted #b9ae95;">
+            <sc-for list="{{laneFleet}}" as="e" hint-placeholder-count="4">
+              <button type="button" onClick="{{e.go}}" aria-pressed="{{e.pressed}}" aria-label="{{e.aria}}" title="{{e.title}}" style="{{e.st}}">{{e.glyph}}</button>
+            </sc-for>
+          </div>
+
+          <div style="padding-top:7px;text-align:right;font-size:14px;line-height:1.15;">
+            <span style="color:#a24c14;font-weight:600;">John</span><br>
+            <span style="font-size:12.5px;color:#4c5a63;">+ product · − quality</span>
+          </div>
+          <div style="position:relative;height:42px;border-top:1px dotted #b9ae95;border-bottom:1px dotted #b9ae95;">
+            <sc-for list="{{laneJohn}}" as="e" hint-placeholder-count="8">
+              <button type="button" onClick="{{e.go}}" aria-pressed="{{e.pressed}}" aria-label="{{e.aria}}" title="{{e.title}}" style="{{e.st}}">{{e.glyph}}</button>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:12px;">
+          <button type="button" onClick="{{prev}}" aria-label="Previous sounding" style="font-family:inherit;font-size:15px;padding:5px 12px;background:transparent;color:#1e2a33;border:1px solid #8a8170;border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            <svg aria-hidden="true" width="10" height="12" viewBox="0 0 10 12"><path d="M8,1 L2,6 L8,11" fill="none" stroke="currentColor" stroke-width="1.6"></path></svg>Week
+          </button>
+          <button type="button" onClick="{{play}}" aria-pressed="{{playPressed}}" style="font-family:inherit;font-size:15px;padding:5px 14px;background:#1e2a33;color:#f6f1e5;border:1px solid #1e2a33;border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;">
+            <svg aria-hidden="true" width="11" height="12" viewBox="0 0 11 12"><path d="{{playIcon}}" fill="currentColor"></path></svg>{{playLabel}}
+          </button>
+          <button type="button" onClick="{{next}}" aria-label="Next sounding" style="font-family:inherit;font-size:15px;padding:5px 12px;background:transparent;color:#1e2a33;border:1px solid #8a8170;border-radius:2px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+            Week<svg aria-hidden="true" width="10" height="12" viewBox="0 0 10 12"><path d="M2,1 L8,6 L2,11" fill="none" stroke="currentColor" stroke-width="1.6"></path></svg>
+          </button>
+          <button type="button" onClick="{{today}}" style="font-family:inherit;font-size:15px;padding:5px 12px;background:transparent;color:#1e2a33;border:1px solid #8a8170;border-radius:2px;cursor:pointer;">Today · 13 Oct</button>
+          <button type="button" onClick="{{toProjection}}" style="font-family:inherit;font-size:15px;padding:5px 12px;background:transparent;color:#a24c14;border:1px dashed #a24c14;border-radius:2px;cursor:pointer;">Projection →</button>
+          <span style="margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">{{r.stepNote}}</span>
+        </div>
+      </div>
+    </section>
+    <aside aria-label="Log, readings and block history" style="flex:1 1 330px;min-width:0;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;">
+
+      <section aria-labelledby="log-title" aria-live="polite" style="background:#fbf8f0;border:1px solid #cfc5ad;padding:16px 18px 18px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#4c5a63;">Ship’s log</div>
+        <h2 id="log-title" style="margin:4px 0 10px;font-size:25px;line-height:1.1;font-weight:500;">{{r.logTitle}}</h2>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;">
+          <sc-for list="{{r.events}}" as="e" hint-placeholder-count="1">
+            <li style="display:flex;gap:11px;align-items:flex-start;">
+              <span aria-hidden="true" style="{{e.badge}}">{{e.glyph}}</span>
+              <div style="min-width:0;">
+                <div style="{{e.handStyle}}">{{e.hand}}</div>
+                <p style="margin:3px 0 0;font-size:15.5px;line-height:1.42;">{{e.text}}</p>
+              </div>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+
+      <section aria-labelledby="read-title" style="background:#fbf8f0;border:1px solid #cfc5ad;padding:14px 18px 16px;">
+        <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 10px;">
+          <h2 id="read-title" style="margin:0;font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#4c5a63;">Readings</h2>
+          <span style="{{r.readNoteStyle}}">{{r.readNote}}</span>
+        </div>
+        <dl style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:7px 14px;margin:10px 0 0;">
+          <sc-for list="{{r.rows}}" as="w" hint-placeholder-count="5">
+            <dt style="font-size:15px;">{{w.label}}</dt>
+            <dd style="margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;font-weight:600;text-align:right;">{{w.value}}</dd>
+            <dd style="{{w.dStyle}}">{{w.delta}}</dd>
+          </sc-for>
+        </dl>
+      </section>
+
+      <section aria-labelledby="dec-title" style="background:#fbf8f0;border:1px solid #cfc5ad;padding:14px 18px 16px;">
+        <h2 id="dec-title" style="margin:0;font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#4c5a63;">Scattered decisions</h2>
+        <p style="margin:4px 0 10px;font-size:14px;line-height:1.35;font-style:italic;color:#4c5a63;">Four tracked week by week, plus the provider spec. 23 decisions are still scattered in all (13 Oct survey).</p>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;">
+          <sc-for list="{{r.dec}}" as="d" hint-placeholder-count="5">
+            <li style="display:grid;grid-template-columns:12px minmax(0,1fr) auto;column-gap:9px;align-items:baseline;">
+              <span aria-hidden="true" style="{{d.sw}}"></span>
+              <span style="font-size:15px;line-height:1.25;">{{d.name}}<br><span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;color:#4c5a63;">{{d.note}}</span></span>
+              <span style="{{d.vStyle}}">{{d.value}}</span>
+            </li>
+          </sc-for>
+        </ul>
+      </section>
+
+      <section aria-labelledby="blk-title" style="background:#fbf8f0;border:1px solid #cfc5ad;padding:14px 18px 16px;">
+        <div style="font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#4c5a63;">Block history</div>
+        <h2 id="blk-title" style="margin:4px 0 2px;font-size:21px;line-height:1.15;font-weight:500;">{{blk.name}}</h2>
+        <div style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#4c5a63;">{{blk.meta}}</div>
+        <div aria-hidden="true" style="display:flex;align-items:flex-end;gap:1px;height:62px;margin:12px 0 4px;border-bottom:1px solid #1e2a33;">
+          <sc-for list="{{blk.bars}}" as="v" hint-placeholder-count="40">
+            <span style="{{v.st}}"></span>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:#4c5a63;"><span>5 Jan</span><span>product KB by week</span><span>13 Oct</span></div>
+        <dl style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;margin:12px 0 0;font-size:14.5px;line-height:1.35;">
+          <dt style="color:#4c5a63;">Readiness</dt><dd style="margin:0;">{{blk.ready}}</dd>
+          <dt style="color:#4c5a63;">Tangled with</dt><dd style="margin:0;">{{blk.tangles}}</dd>
+        </dl>
+        <div style="margin-top:12px;font-size:12.5px;color:#4c5a63;">Choose a block</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;">
+          <sc-for list="{{chips}}" as="h" hint-placeholder-count="11">
+            <button type="button" onClick="{{h.pick}}" aria-pressed="{{h.pressed}}" style="{{h.st}}">{{h.t}}</button>
+          </sc-for>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <footer style="display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:20px;padding-top:12px;border-top:1px solid #cfc5ad;font-size:14px;line-height:1.45;color:#4c5a63;">
+    <p style="margin:0;flex:2 1 460px;">How it is drawn: each area is a block. <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;">footprint ∝ √files · height ∝ product KB</span>. Cables are two-way area pairs, and specks are the sites of one decision; for D4, one speck stands for 10 sites. No soundings were taken on 4 or 11 May. Each step is one commit, named in the log.</p>
+    <p style="margin:0;flex:1 1 300px;">Projection steps carry no numbers: they show what the fleet would do next, never data. Hands are assigned by kind of change; per-commit authorship is <span style="font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;">[not yet measured]</span>.</p>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+  renderVals() {
+    // ---- measured history (scripts/code-shape/seams.mjs, 40 weekly soundings) ----
+    const AREAS = [
+      { k: 'BR', name: 'Front end: browser code', short: 'Browser code', x: 90, y: 110, ready: 'Low / unmeasurable' },
+      { k: 'PG', name: 'Front end: server-rendered pages', short: 'Pages', x: 230, y: 110, ready: 'Medium' },
+      { k: 'WR', name: 'Web routes (pages & workspace API)', short: 'Web routes', x: 360, y: 110, ready: 'Medium' },
+      { k: 'AU', name: 'Auth, accounts & workspaces', short: 'Auth', x: 480, y: 110, ready: 'Medium' },
+      { k: 'PR', name: 'Providers (Linear, GitHub, Jira, local)', short: 'Providers', x: 640, y: 110, ready: 'Highest: a clear front door (registry · models · index), only 3 upward edges. Needs one conformance suite first; its spec is written 5 times.' },
+      { k: 'WI', name: 'Wiring (server.js)', short: 'Wiring', x: 60, y: 285, ready: 'n/a (one file)' },
+      { k: 'PL', name: 'Platform & plumbing', short: 'Platform', x: 160, y: 285, ready: 'High' },
+      { k: 'RU', name: 'Runs & dispatch', short: 'Runs', x: 300, y: 285, ready: 'Low–medium' },
+      { k: 'LL', name: 'LLM & prompts', short: 'LLM & prompts', x: 450, y: 285, ready: 'Medium' },
+      { k: 'AG', name: 'Agent API (proxy)', short: 'Agent API', x: 580, y: 285, ready: 'Medium' },
+      { k: 'OT', name: 'Other features', short: 'Other', x: 690, y: 285, ready: 'High (small)' }
+    ];
+    const ORDER = ['BR', 'PG', 'AG', 'RU', 'LL', 'AU', 'PR', 'PL', 'WR', 'OT', 'WI'];
+    const pA = 'LL-RU';
+    const pB = 'PG-LL';
+    const p20 = 'AU-PR PG-LL PG-PR LL-PR LL-RU';
+    const p21 = p20 + ' AG-LL PG-PL';
+    const p22 = p21 + ' AG-PR';
+    const p24 = p22 + ' AU-LL';
+    const p25 = p24 + ' AG-RU AU-PG';
+    const p27 = p25 + ' PG-RU PL-RU';
+    const p28 = p27 + ' LL-OT';
+    const p31 = p28 + ' OT-RU';
+    const p32 = p31 + ' LL-PL';
+    const p33 = p32 + ' AG-WR';
+    const p37 = p33 + ' AG-PG PG-OT PG-WR OT-PL PR-RU';
+    const p38 = p33.replace(' PG-PL', '') + ' AG-PG OT-PL PR-RU';
+    // [date, commit, files, productKB, testKB, crossLinks, files by ORDER, KB by ORDER, two-way pairs]
+    const W = [
+      ['2026-01-05', '9497c67d', 7, 61, 15, 5, '1 3 0 0 0 1 1 0 0 0 1', '22 20 0 0 0 3 3 0 0 0 13', ''],
+      ['2026-01-12', 'aa7cc50e', 17, 210, 137, 18, '2 4 0 1 2 4 1 0 1 1 1', '62 45 0 5 34 18 9 0 1 13 23', pA],
+      ['2026-01-19', '38cb88f0', 28, 413, 222, 40, '2 7 0 2 4 6 1 3 1 1 1', '132 67 0 13 89 28 10 8 1 29 36', pA],
+      ['2026-01-26', 'c65508fd', 31, 500, 235, 42, '2 7 1 4 4 6 1 3 1 1 1', '181 82 6 31 82 29 10 6 2 29 42', ''],
+      ['2026-02-02', '6c959c2b', 33, 547, 276, 43, '3 8 1 4 4 6 1 3 1 1 1', '192 86 6 36 93 29 15 6 1 35 48', ''],
+      ['2026-02-09', 'fb282e72', 42, 609, 321, 59, '3 10 1 4 6 6 1 5 4 1 1', '209 98 6 36 101 29 15 21 31 35 28', ''],
+      ['2026-02-16', 'b422c76c', 44, 649, 365, 63, '4 11 1 4 6 6 1 5 4 1 1', '229 103 6 45 103 29 15 21 33 35 30', ''],
+      ['2026-02-23', 'c35a4721', 44, 669, 382, 63, '4 11 1 4 6 6 1 5 4 1 1', '233 103 6 45 111 29 15 21 41 35 30', ''],
+      ['2026-03-02', '2d0cb9f2', 44, 679, 399, 63, '4 11 1 4 6 6 1 5 4 1 1', '238 103 6 50 111 29 15 21 41 35 30', ''],
+      ['2026-03-09', 'c8f30c92', 51, 825, 432, 71, '6 13 4 4 6 6 1 5 4 1 1', '309 119 59 50 110 29 15 21 43 35 35', ''],
+      ['2026-03-16', '898a05a9', 61, 967, 531, 86, '9 17 5 4 7 6 1 5 4 2 1', '371 153 87 50 117 29 16 21 48 35 40', ''],
+      ['2026-03-23', 'b2bfaa76', 61, 977, 540, 86, '9 17 5 4 7 6 1 5 4 2 1', '375 159 87 50 117 29 16 21 48 35 40', ''],
+      ['2026-03-30', 'abde98e7', 66, 1067, 620, 92, '10 18 5 4 10 6 1 5 4 2 1', '391 169 92 50 165 29 16 21 54 35 45', pB],
+      ['2026-04-06', 'ff08e05a', 66, 1072, 620, 92, '10 18 5 4 10 6 1 5 4 2 1', '391 169 92 50 168 31 16 21 54 35 45', pB],
+      ['2026-04-13', '14c1f08f', 73, 1268, 817, 102, '11 19 5 6 11 6 1 5 5 3 1', '507 189 93 70 174 31 16 21 60 57 50', pB],
+      ['2026-04-20', 'bff9ff34', 79, 1399, 844, 110, '13 19 6 6 13 6 1 6 5 3 1', '563 194 124 82 183 31 16 23 69 63 51', pB],
+      ['2026-04-27', '8298af18', 80, 1416, 858, 113, '13 19 6 6 14 6 1 6 5 3 1', '567 197 117 82 197 31 16 23 72 63 51', pB],
+      ['2026-05-18', '06cb2072', 83, 1504, 925, 115, '14 21 6 6 14 6 1 6 5 3 1', '615 235 117 82 197 31 16 23 72 63 53', pB],
+      ['2026-05-25', '4457af25', 87, 1552, 967, 125, '14 21 6 6 18 6 1 6 5 3 1', '628 241 117 82 217 31 16 23 81 63 53', pB],
+      ['2026-06-01', '28ff6a06', 94, 1713, 1069, 135, '15 22 6 6 21 7 1 6 5 4 1', '691 249 133 82 255 36 18 23 100 72 54', pB],
+      ['2026-06-08', '1e211a15', 106, 1999, 1295, 161, '16 22 6 7 25 7 6 6 5 5 1', '749 270 172 87 329 41 41 25 126 100 59', p20],
+      ['2026-06-15', '03c7715a', 139, 2690, 1646, 217, '20 34 7 9 31 7 10 7 8 5 1', '1055 348 203 98 421 46 81 46 195 131 66', p21],
+      ['2026-06-22', '63e825ae', 148, 2895, 1869, 232, '20 33 8 14 32 7 14 7 8 4 1', '1060 348 220 155 441 47 154 48 214 140 68', p22],
+      ['2026-06-29', '70308736', 170, 3431, 2496, 275, '22 36 10 18 34 9 19 9 9 3 1', '1123 393 284 219 512 107 251 71 268 109 94', p22],
+      ['2026-07-06', '96c6c629', 194, 3982, 3099, 308, '23 47 10 22 41 10 20 9 9 2 1', '1238 497 316 286 677 119 266 71 317 89 106', p24],
+      ['2026-07-13', 'fee12368', 204, 4295, 3565, 334, '25 48 10 25 42 10 20 9 10 4 1', '1324 525 342 345 703 121 266 75 358 125 111', p25],
+      ['2026-07-20', '921abf74', 219, 4593, 4180, 354, '27 49 10 28 43 17 20 10 10 4 1', '1370 546 364 444 716 185 269 81 367 136 115', p25],
+      ['2026-07-27', 'b6debf33', 230, 4969, 4888, 380, '28 50 10 30 44 21 21 10 11 4 1', '1418 579 398 514 771 247 284 94 395 136 133', p27],
+      ['2026-08-03', 'a4f9638e', 239, 5178, 5332, 395, '29 52 10 32 46 21 21 10 12 5 1', '1463 595 431 567 796 247 284 99 399 156 141', p28],
+      ['2026-08-10', '9af9730f', 257, 5617, 6103, 430, '32 55 10 33 46 25 25 11 14 5 1', '1492 640 457 588 804 345 423 111 431 157 169', p28],
+      ['2026-08-17', 'b0a98664', 264, 5831, 6620, 442, '32 55 10 38 46 25 25 13 14 5 1', '1516 646 471 683 808 353 454 123 438 162 177', p28],
+      ['2026-08-24', 'a954dc0c', 284, 6370, 7610, 477, '33 56 10 46 49 29 26 13 16 5 1', '1620 676 523 825 842 421 487 130 494 164 188', p31],
+      ['2026-08-31', '8b2be424', 291, 6590, 8265, 509, '33 56 11 47 50 31 26 14 16 6 1', '1625 694 546 878 871 444 491 139 529 178 195', p32],
+      ['2026-09-07', '4f59a79a', 314, 7206, 9877, 603, '33 57 23 49 52 33 27 15 16 8 1', '1794 741 630 958 976 445 495 147 579 237 204', p33],
+      ['2026-09-14', 'a58c9920', 316, 7590, 10819, 610, '33 57 23 49 52 33 27 17 16 8 1', '1960 765 661 1019 1003 454 504 166 612 240 206', p33],
+      ['2026-09-21', '6c1f8e72', 319, 7699, 11060, 617, '33 57 23 51 54 33 27 17 16 7 1', '1997 765 682 1046 1056 454 504 166 614 209 206', p33],
+      ['2026-09-28', 'b0751689', 332, 8011, 12224, 641, '33 59 26 53 54 39 27 17 16 7 1', '2014 781 728 1156 1081 520 504 172 636 210 209', p33],
+      ['2026-10-05', '6eaf259c', 400, 9162, 15785, 781, '34 63 30 79 60 49 31 20 19 14 1', '2118 861 829 1523 1022 779 550 220 758 263 239', p37],
+      ['2026-10-12', 'ebf93bd9', 429, 9430, 16471, 897, '36 68 30 89 64 52 35 24 21 9 1', '2224 915 809 1630 1040 809 586 214 744 219 240', p38],
+      ['2026-10-13', '38fc3b5c', 429, 9433, 16472, 897, '36 68 30 89 64 52 35 24 21 9 1', '2224 915 809 1630 1040 809 586 214 744 222 240', p38]
+    ];
+    // decision sites as of each sounding (last event on or before that date)
+    const D1 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,4,6,7,8,9,9,9,13,13,13,13,13,13,20,18,18];
+    const D2 = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,4,6,7,8,9,10,12,12,12,12,12,12,12,12,13,14,14];
+    const D3 = [0,0,0,3,3,3,3,3,3,4,4,4,5,5,5,5,5,5,6,6,6,10,9,9,10,10,13,15,15,15,15,16,17,17,17,17,17,19,0,0];
+    const D4 = [0,11,20,56,71,72,82,87,98,175,190,190,207,207,216,237,243,243,261,306,331,367,67,59,70,76,75,75,75,75,76,76,82,86,87,87,87,93,0,0];
+    const DEC = [
+      { k: 'D1', name: 'Tolerant timestamp parse', hx: 180, hy: 205, hz: 120, unit: 1, max: 20, col: '#a24c14', s: D1, note: 'born 29 May · peak 20 on 5 Oct' },
+      { k: 'D2', name: 'Page-shell option bag', hx: 575, hy: 205, hz: 150, unit: 1, max: 14, col: '#305f7a', s: D2, note: 'born 13 Jun · still growing' },
+      { k: 'D3', name: 'Hand-rolled workspace lookup', hx: 470, hy: 378, hz: 46, unit: 1, max: 19, col: '#1e2a33', s: D3, loopAt: 38, note: 'peak 19 · loop 11 Oct → 0 (5 remain by shape)' },
+      { k: 'D4', name: 'Inline error envelope', hx: 380, hy: 192, hz: 215, unit: 10, max: 38, col: '#8e2a5c', s: D4, loopAt: 38, note: 'peak 372 · swept 18 Jun · loop 11 Oct → 0' },
+      { k: 'SP', name: 'Provider spec, written 5 times', hx: 716, hy: 186, hz: 95, unit: 1, max: 5, col: '#5a6e2c', s: null, note: 'one test file per provider · no shared suite' }
+    ];
+    const HAND = {
+      product: { label: 'John · product', glyph: '+', col: '#a24c14' },
+      quality: { label: 'John · quality engineering', glyph: '−', col: '#a24c14' },
+      fleet: { label: 'Harbour’s fleet', glyph: '↻', col: '#305f7a' },
+      today: { label: 'Survey · 13 Oct', glyph: '◦', col: '#1e2a33' },
+      auto: { label: 'Sounding', glyph: '·', col: '#4c5a63' }
+    };
+    const EV = [
+      { i: 0, lane: 'john', hand: 'product', short: 'Keel laid', text: 'Keel laid: 7 files and 61 KB of product code across five areas.' },
+      { i: 1, lane: 'john', hand: 'product', short: 'First tangle', text: 'The first two-way tangle: LLM & prompts ↔ Runs & dispatch. It is untied two weeks later.' },
+      { i: 9, lane: 'john', hand: 'product', short: 'Agent API lands', text: '6 Mar · LIN-193: the Agent API (proxy) lands (6 → 59 KB), and the inline error envelope jumps from 98 sites to 175.' },
+      { i: 12, lane: 'john', hand: 'product', short: 'Pages ↔ LLM', text: 'Server-rendered pages ↔ LLM & prompts: the oldest tangle still standing today.' },
+      { i: 20, lane: 'john', hand: 'product', short: 'Tangles arrive', text: 'Tangles arrive: 1 → 5 in a week, as Providers grows from 1 file to 6.' },
+      { i: 21, lane: 'john', hand: 'product', short: 'Biggest week', text: 'The biggest week: +33 files, product 1,999 → 2,690 KB. The inline error envelope peaks at 372 sites on 16 Jun.' },
+      { i: 22, lane: 'john', hand: 'quality', short: 'One sweep', text: '18 Jun · LIN-420: one quality sweep takes the inline error envelope from 372 sites to 53.' },
+      { i: 28, lane: 'john', hand: 'quality', short: 'Tests outweigh code', text: 'Tests outweigh product code for the first time: 5,332 KB of tests against 5,178 KB of product.' },
+      { i: 37, lane: 'john', hand: 'product', short: 'Peak knot', text: 'Peak knot: 22 two-way tangles, the most ever, in a week of +68 files.', off: -14 },
+      { i: 37, lane: 'john', hand: 'quality', short: 'Meta-prompt deleted', text: '4 Oct · the 106 KB meta-prompt is deleted: prompt 104.5 → 9.5 KB. LLM & prompts shrinks 1,081 → 1,022 KB while the rest grows.', off: 14 },
+      { i: 38, lane: 'fleet', hand: 'fleet', short: 'Coherence loop', text: '11–12 Oct · coherence loop (LIN-3449), 3 batches: 26 decisions brought to one place, product −363 lines. D3 19 → 0 (5 remain by shape), D4 93 → 0. The knot loosens 22 → 19, the first time ever.' },
+      { i: 39, lane: 'none', hand: 'today', short: 'Today', text: 'Today: 429 files, 19 tangles, 23 decisions still scattered. Providers is ready behind its front door (registry · models · index; only 3 upward edges) once its spec, written 5 times, becomes one conformance suite.' },
+      { i: 40, lane: 'fleet', hand: 'fleet', proj: true, short: 'Conformance suite', text: 'The fleet extracts one provider conformance suite. The spec written 5 times becomes one: five specks, one ingot.' },
+      { i: 41, lane: 'fleet', hand: 'fleet', proj: true, short: 'Providers rebuilt', text: 'Providers is rebuilt behind its front door: the first fresh plank, with the same capabilities. Its cables are re-tied through the front door; their number is not projected.' },
+      { i: 42, lane: 'fleet', hand: 'fleet', proj: true, short: 'Next ready block', text: 'The fleet works the next block’s seams. Candidate: Platform & plumbing, readiness High in the 13 Oct survey [unconfirmed].', off: -14 },
+      { i: 42, lane: 'john', hand: 'product', proj: true, short: 'Product continues', text: 'John keeps adding product. New planks join the mass, and the ship keeps sailing while she is rebuilt.' }
+    ];
+    // ---- state ----
+    const self = this;
+    const st0 = this.state || {};
+    const N = 43;
+    const LAST = 39;
+    const idx = typeof st0.idx === 'number' ? st0.idx : LAST;
+    const rz = typeof st0.rz === 'number' ? st0.rz : -32;
+    const sel = st0.sel || 'PR';
+    const playing = !!this._timer;
+    const proj = idx > LAST;
+    const pStep = proj ? idx - LAST : 0;
+    const di = Math.min(idx, LAST);
+    const stopTimer = () => { if (self._timer) { clearInterval(self._timer); self._timer = null; } };
+    const put = (patch) => { const cur0 = self.state || {}; self.setState(Object.assign({ idx: idx, rz: rz, sel: sel }, cur0, patch)); };
+
+    // ---- helpers ----
+    const MONO = "font-family:'JetBrains Mono',ui-monospace,monospace;";
+    const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fmt = (v) => Math.round(v).toLocaleString('en-GB');
+    const longDate = (d) => { const p = d.split('-'); return parseInt(p[2], 10) + ' ' + MON[parseInt(p[1], 10) - 1] + ' ' + p[0]; };
+    const shortDate = (d) => { const p = d.split('-'); return parseInt(p[2], 10) + ' ' + MON[parseInt(p[1], 10) - 1]; };
+    const oi = (k) => ORDER.indexOf(k);
+    const AK = {};
+    AREAS.forEach((a) => { AK[a.k] = a; });
+    const WK = W.map((w) => ({ d: w[0], c: w[1], f: w[2], p: w[3], t: w[4], x: w[5], F: w[6].split(' ').map(Number), K: w[7].split(' ').map(Number), P: w[8] ? w[8].split(' ') : [] }));
+    const cur = WK[di];
+    const prevW = (!proj && di > 0) ? WK[di - 1] : null;
+
+    const TILT = 58;
+    const KBH = 0.105;
+    const FS = 12;
+    const bb = 'rotateZ(' + (-rz) + 'deg) rotateX(' + (-TILT) + 'deg)';
+
+    const geo = {};
+    AREAS.forEach((a) => {
+      const f = cur.F[oi(a.k)];
+      const kb = cur.K[oi(a.k)];
+      geo[a.k] = { f: f, kb: kb, ex: f > 0, s: f > 0 ? Math.max(10, Math.round(FS * Math.sqrt(f))) : 18, h: f > 0 ? Math.max(3, Math.round(kb * KBH)) : 0 };
+    });
+
+    const faces = (s, h, m) => {
+      const T = 'transition:transform .6s ease,width .6s ease,height .6s ease,left .6s ease,top .6s ease;';
+      const base = 'position:absolute;box-sizing:border-box;' + T + (m.hide ? 'display:none;' : '');
+      const bd = 'border:1px ' + (m.dash ? 'dashed ' : 'solid ') + m.edge + ';';
+      const gNS = m.grain ? 'background-image:repeating-linear-gradient(180deg,' + m.grain + ' 0 1px,transparent 1px 10px);' : '';
+      const gEW = m.grain ? 'background-image:repeating-linear-gradient(90deg,' + m.grain + ' 0 1px,transparent 1px 10px);' : '';
+      return {
+        fT: base + 'left:0;top:0;width:' + s + 'px;height:' + s + 'px;transform:translateZ(' + h + 'px);background-color:' + m.top + ';' + bd + (m.topExtra || ''),
+        fN: base + 'left:0;top:0;width:' + s + 'px;height:' + h + 'px;transform-origin:0 0;transform:rotateX(90deg);background-color:' + m.ns + ';' + bd + gNS,
+        fS: base + 'left:0;top:' + s + 'px;width:' + s + 'px;height:' + h + 'px;transform-origin:0 0;transform:rotateX(90deg);background-color:' + m.ns + ';' + bd + gNS,
+        fW: base + 'left:0;top:0;width:' + h + 'px;height:' + s + 'px;transform-origin:0 0;transform:rotateY(-90deg);background-color:' + m.ew + ';' + bd + gEW,
+        fE: base + 'left:' + s + 'px;top:0;width:' + h + 'px;height:' + s + 'px;transform-origin:0 0;transform:rotateY(-90deg);background-color:' + m.ew + ';' + bd + gEW
+      };
+    };
+    const WEATHER = { top: '#e6dcc2', ns: '#d3c6a3', ew: '#c2b38d', edge: '#3d4a52', grain: 'rgba(30,42,51,0.16)' };
+    const FRESH = { top: '#fbf4e2', ns: '#f4e8cb', ew: '#ead9b0', edge: '#1e2a33', grain: 'rgba(162,76,20,0.32)', dash: true };
+    const GHOST = { top: 'transparent', ns: 'transparent', ew: 'transparent', edge: '#6b7780', grain: '', dash: true };
+
+    // ---- blocks ----
+    const blocks = AREAS.map((a) => {
+      const g = geo[a.k];
+      const on = a.k === sel;
+      const rebuilt = a.k === 'PR' && pStep >= 2;
+      const ready = (a.k === 'PR' && idx >= LAST && !rebuilt) || (a.k === 'PL' && pStep >= 3);
+      const mat = Object.assign({}, rebuilt ? FRESH : WEATHER);
+      mat.hide = !g.ex;
+      mat.topExtra = (ready ? 'outline:1.5px dashed #a24c14;outline-offset:-6px;' : '') + (on ? 'box-shadow:inset 0 0 0 2px #a24c14;' : '');
+      const fc = faces(g.s, g.h, mat);
+      const pkb = prevW ? prevW.K[oi(a.k)] : null;
+      const dkb = pkb === null ? 0 : g.kb - pkb;
+      const showD = pkb !== null && g.ex && Math.abs(dkb) >= 30;
+      const z = g.h + 10;
+      let meta = fmt(g.kb) + ' KB · ' + g.f + (g.f === 1 ? ' file' : ' files');
+      if (rebuilt) meta = 'rebuilt · projected';
+      else if (ready && a.k === 'PR') meta = 'ready · ' + fmt(g.kb) + ' KB';
+      else if (ready) meta = 'next ready? · ' + fmt(g.kb) + ' KB';
+      let cut = 'display:none;';
+      if (ready) cut = 'position:absolute;left:-9px;top:-9px;width:' + (g.s + 18) + 'px;height:' + (g.s + 18) + 'px;box-sizing:border-box;border:1.5px dashed #a24c14;transform:translateZ(1px);';
+      else if (!g.ex) cut = 'position:absolute;left:0;top:0;width:18px;height:18px;box-sizing:border-box;border:1px dotted #6f6757;transform:translateZ(1px);';
+      return Object.assign({
+        wrap: 'position:absolute;left:' + (a.x - g.s / 2) + 'px;top:' + (a.y - g.s / 2) + 'px;width:' + g.s + 'px;height:' + g.s + 'px;transform-style:preserve-3d;transition:left .6s ease,top .6s ease,width .6s ease,height .6s ease;',
+        cut: cut,
+        short: a.short,
+        meta: meta,
+        pressed: on ? 'true' : 'false',
+        aria: a.name + ': ' + (g.ex ? g.f + ' files, ' + fmt(g.kb) + ' KB' : 'not yet built') + (rebuilt ? ', rebuilt (projection)' : '') + (ready ? ', seams cut, ready to rebuild' : '') + '. Show its history.',
+        lbl: 'position:absolute;left:50%;top:50%;transform-origin:0 0;transform:translateZ(' + z + 'px) ' + bb + ' translate(-50%,-100%);display:' + (g.ex ? 'flex' : 'none') + ';flex-direction:column;align-items:center;padding:2px 7px 3px;white-space:nowrap;cursor:pointer;font-family:inherit;line-height:1.12;border-radius:2px;transition:transform .6s ease;' +
+          (on ? 'background:#1e2a33;color:#f6f1e5;border:1px solid #1e2a33;' : 'background:rgba(251,248,240,0.94);color:#1e2a33;border:1px ' + (rebuilt ? 'dashed #a24c14;' : 'solid #b9ae95;')),
+        lblName: 'font-size:13.5px;font-weight:600;letter-spacing:.03em;',
+        lblMeta: MONO + 'font-size:10.5px;color:' + (on ? '#e6dfcc' : '#4c5a63') + ';',
+        dStyle: 'position:absolute;left:50%;top:50%;transform-origin:0 0;transform:translateZ(' + z + 'px) ' + bb + ' translate(-50%,-100%) translateY(-38px);' + MONO + 'font-size:11px;padding:1px 5px;white-space:nowrap;border-radius:2px;background:#fbf8f0;border:1px solid ' + (dkb < 0 ? '#305f7a' : '#8a8170') + ';color:' + (dkb < 0 ? '#305f7a' : '#4c5a63') + ';display:' + (showD ? 'block' : 'none') + ';',
+        dText: (dkb > 0 ? '+' : '−') + fmt(Math.abs(dkb)) + ' KB',
+        pick: () => put({ sel: a.k })
+      }, fc);
+    });
+
+    // ---- cables: two-way tangles ----
+    const cables = [];
+    const mk = (pair, kind) => {
+      const ks = pair.split('-');
+      const A1 = AK[ks[0]];
+      const B1 = AK[ks[1]];
+      if (!A1 || !B1) return;
+      const dx = B1.x - A1.x;
+      const dy = B1.y - A1.y;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+      const z = Math.round(Math.min(geo[ks[0]].h, geo[ks[1]].h) * 0.7 + 6);
+      const line = kind === 'untied' ? 'border-top:1.4px dashed #305f7a;' : (kind === 'retied' ? 'border-top:1.4px dashed #4c5a63;' : 'border-top:1.6px solid #8e2a5c;');
+      cables.push({ st: 'position:absolute;left:' + A1.x + 'px;top:' + A1.y + 'px;width:' + Math.round(len) + 'px;height:0;' + line + 'transform-origin:0 0;transform:translateZ(' + z + 'px) rotateZ(' + ang.toFixed(1) + 'deg);' });
+    };
+    cur.P.forEach((p) => mk(p, (pStep >= 2 && p.indexOf('PR') >= 0) ? 'retied' : 'tied'));
+    if (prevW) prevW.P.forEach((p) => { if (cur.P.indexOf(p) < 0) mk(p, 'untied'); });
+
+    // ---- scattered decisions: fixed speck slots per decision, so dropped sites draw into the centre ----
+    const specks = [];
+    const clusters = [];
+    const decState = DEC.map((d) => {
+      let c;
+      let consolidated = false;
+      if (d.k === 'SP') {
+        if (idx < LAST) c = null;
+        else if (pStep >= 1) { c = 0; consolidated = true; }
+        else c = 5;
+      } else {
+        c = d.s[di];
+        consolidated = d.loopAt !== undefined && di >= d.loopAt && c === 0;
+      }
+      return { d: d, c: c, consolidated: consolidated };
+    });
+    decState.forEach((ds) => {
+      const d = ds.d;
+      const c = ds.c;
+      const n = c ? Math.ceil(c / d.unit) : 0;
+      const R = 10 + 7 * Math.sqrt(Math.max(n, 1));
+      const size = d.unit > 1 ? 8 : 6;
+      for (let j = 0; j < d.max; j++) {
+        const live = j < n;
+        const a = j * 2.39996;
+        const rr = live ? R * Math.sqrt((j + 0.5) / n) : 0;
+        const x = d.hx + rr * Math.cos(a);
+        const y = d.hy + rr * Math.sin(a) * 0.9;
+        const z = d.hz + (live ? ((j * 7) % 9 - 4) * 4 : 0);
+        specks.push({ st: 'position:absolute;left:' + x.toFixed(1) + 'px;top:' + y.toFixed(1) + 'px;width:' + size + 'px;height:' + size + 'px;margin:' + (-size / 2) + 'px 0 0 ' + (-size / 2) + 'px;border-radius:50%;background:' + d.col + ';opacity:' + (live ? 1 : 0) + ';transform:translateZ(' + z + 'px) ' + bb + ' scale(' + (live ? 1 : 0.3) + ');transition:left .8s ease,top .8s ease,transform .8s ease,opacity .8s ease;' });
+      }
+      const shown = c !== null && (c > 0 || ds.consolidated);
+      const projected = d.k === 'SP' && pStep >= 1;
+      const zl = ds.consolidated ? d.hz + 14 : Math.round(d.hz + R * 0.45 + 18);
+      let text = d.k + ' · ' + c + (d.unit > 1 ? ' sites' : '');
+      if (d.k === 'SP') text = ds.consolidated ? 'one suite (projected)' : 'spec × 5';
+      else if (ds.consolidated) text = d.k + ' · one place';
+      clusters.push({
+        ingot: 'position:absolute;left:' + d.hx + 'px;top:' + d.hy + 'px;width:34px;height:13px;margin:-6.5px 0 0 -17px;box-sizing:border-box;border-radius:3px;background:' + d.col + ';border:1px ' + (projected ? 'dashed' : 'solid') + ' #1e2a33;opacity:' + (ds.consolidated ? 1 : 0) + ';transform:translateZ(' + d.hz + 'px) ' + bb + ';transition:opacity .8s ease .3s;',
+        lbl: 'position:absolute;left:' + d.hx + 'px;top:' + d.hy + 'px;transform-origin:0 0;transform:translateZ(' + zl + 'px) ' + bb + ' translate(-50%,-100%);' + MONO + 'font-size:11px;white-space:nowrap;padding:1px 5px;border-radius:2px;background:rgba(251,248,240,0.92);color:' + d.col + ';border:1px ' + (projected ? 'dashed ' : 'solid ') + d.col + ';display:' + (shown ? 'block' : 'none') + ';transition:transform .8s ease;',
+        text: text
+      });
+    });
+
+    // ---- the one-shot ideal: wireframe, unmeasured ----
+    const ghosts = AREAS.map((a) => {
+      const gx = 880 + a.x * 0.26;
+      const gy = a.y < 200 ? 152 : 248;
+      return Object.assign({ wrap: 'position:absolute;left:' + (gx - 10) + 'px;top:' + (gy - 10) + 'px;width:20px;height:20px;transform-style:preserve-3d;' }, faces(20, 22, GHOST));
+    });
+    const ghostPieces = DEC.map((d, j) => ({ st: 'position:absolute;left:' + (905 + j * 35) + 'px;top:200px;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;box-sizing:border-box;background:' + d.col + ';border:1px solid #1e2a33;transform:translateZ(10px) ' + bb + ';' }));
+
+    // ---- timeline ----
+    const w = 100 / N;
+    const tl = [];
+    for (let i = 0; i < N; i++) {
+      const col = 'position:absolute;top:0;bottom:0;left:' + (i * w).toFixed(3) + '%;width:' + w.toFixed(3) + '%;';
+      if (i <= LAST) {
+        const wk = WK[i];
+        tl.push({
+          col: col,
+          test: 'position:absolute;left:14%;width:72%;bottom:64px;height:' + (wk.t / 16472 * 80).toFixed(1) + 'px;box-sizing:border-box;border:1px solid #6f6757;border-bottom:none;',
+          prod: 'position:absolute;left:30%;width:40%;bottom:64px;height:' + (wk.p / 16472 * 80).toFixed(1) + 'px;background:' + (i === idx ? '#a24c14' : '#3d4a52') + ';',
+          tang: 'position:absolute;left:30%;width:40%;top:87px;height:' + (wk.P.length * 2.4).toFixed(1) + 'px;background:' + (i === idx ? '#a24c14' : '#8e2a5c') + ';',
+          plabel: 'display:none;',
+          ptext: ''
+        });
+      } else {
+        tl.push({
+          col: col,
+          test: 'display:none;',
+          prod: 'position:absolute;left:14%;width:72%;bottom:64px;height:40px;box-sizing:border-box;border:1px dashed #a24c14;' + (i === idx ? 'background:rgba(162,76,20,0.14);' : ''),
+          tang: 'display:none;',
+          plabel: 'position:absolute;left:50%;top:94px;transform:translateX(-50%);' + MONO + 'font-size:10px;color:#a24c14;',
+          ptext: 'P' + (i - LAST)
+        });
+      }
+    }
+    const months = [['Jan', 0], ['Feb', 4], ['Mar', 8], ['Apr', 13], ['May', 17], ['Jun', 19], ['Jul', 24], ['Aug', 28], ['Sep', 33], ['Oct', 37]].map((m) => ({
+      t: m[0],
+      st: 'position:absolute;top:2px;left:' + (m[1] * w).toFixed(3) + '%;padding-left:2px;border-left:1px solid #b9ae95;' + MONO + 'font-size:10.5px;line-height:14px;color:#4c5a63;'
+    }));
+
+    const laneOf = (lane) => EV.filter((e) => e.lane === lane).map((e) => {
+      const hd = HAND[e.hand];
+      const on = e.i === idx;
+      const when = e.i > LAST ? 'Projection ' + (e.i - LAST) : shortDate(WK[e.i].d);
+      return {
+        glyph: hd.glyph,
+        title: e.short,
+        pressed: on ? 'true' : 'false',
+        aria: when + ': ' + e.short + ' (' + hd.label + (e.proj ? ', projection' : '') + ')',
+        st: 'position:absolute;top:8px;left:' + ((e.i + 0.5) * w).toFixed(3) + '%;transform:translateX(calc(-50% + ' + (e.off || 0) + 'px));width:25px;height:25px;padding:0;border-radius:50%;box-sizing:border-box;cursor:pointer;' + MONO + 'font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;' +
+          (on ? 'background:' + hd.col + ';color:#fbf8f0;' : 'background:#fbf8f0;color:' + hd.col + ';') + 'border:1.5px ' + (e.proj ? 'dashed ' : 'solid ') + hd.col + ';',
+        go: () => { stopTimer(); put({ idx: e.i }); }
+      };
+    });
+
+    // ---- log, readings, decisions ----
+    const here = EV.filter((e) => e.i === idx);
+    let events;
+    if (here.length) {
+      events = here.map((e) => {
+        const hd = HAND[e.hand];
+        return {
+          glyph: hd.glyph,
+          hand: hd.label + (e.proj ? ' · projection' : ''),
+          text: e.text,
+          badge: 'flex:none;width:28px;height:28px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;' + MONO + 'font-size:15px;background:#fbf8f0;color:' + hd.col + ';border:1.5px ' + (e.proj ? 'dashed ' : 'solid ') + hd.col + ';',
+          handStyle: 'font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:' + hd.col + ';'
+        };
+      });
+    } else {
+      const sgn = (v, unit) => (v > 0 ? '+' : (v < 0 ? '−' : '±')) + fmt(Math.abs(v)) + (unit || '');
+      const txt = prevW
+        ? 'Week to ' + shortDate(cur.d) + ': ' + sgn(cur.f - prevW.f) + ' files, product ' + sgn(cur.p - prevW.p, ' KB') + ', tests ' + sgn(cur.t - prevW.t, ' KB') + ', ' + cur.P.length + (cur.P.length === 1 ? ' tangle.' : ' tangles.')
+        : 'First sounding.';
+      events = [{
+        glyph: HAND.auto.glyph,
+        hand: HAND.auto.label + ' · ' + cur.c,
+        text: txt,
+        badge: 'flex:none;width:28px;height:28px;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;' + MONO + 'font-size:15px;background:#fbf8f0;color:#4c5a63;border:1px solid #b9ae95;',
+        handStyle: 'font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#4c5a63;'
+      }];
+    }
+
+    const dl = (a, b) => (b === null ? '—' : (a - b > 0 ? '+' + fmt(a - b) : (a - b < 0 ? '−' + fmt(b - a) : '±0')));
+    const rowDef = [
+      { label: 'Files', v: cur.f, pv: prevW ? prevW.f : null, unit: '', good: false },
+      { label: 'Product code', v: cur.p, pv: prevW ? prevW.p : null, unit: ' KB', good: true },
+      { label: 'Test code', v: cur.t, pv: prevW ? prevW.t : null, unit: ' KB', good: false },
+      { label: 'Two-way tangles', v: cur.P.length, pv: prevW ? prevW.P.length : null, unit: '', good: true },
+      { label: 'Cross-area imports', v: cur.x, pv: prevW ? prevW.x : null, unit: '', good: true }
+    ];
+    const rows = rowDef.map((rd) => {
+      const shrank = rd.pv !== null && rd.v < rd.pv;
+      return {
+        label: rd.label,
+        value: proj ? '—' : fmt(rd.v) + rd.unit,
+        delta: proj ? 'not measured' : dl(rd.v, rd.pv),
+        dStyle: 'margin:0;' + MONO + 'font-size:11.5px;text-align:right;white-space:nowrap;color:' + (proj ? '#a24c14' : (shrank && rd.good ? '#305f7a' : '#4c5a63')) + ';'
+      };
+    });
+
+    const dec = decState.map((ds) => {
+      const d = ds.d;
+      let value;
+      if (d.k === 'SP') value = ds.c === null ? 'not surveyed' : (ds.consolidated ? 'one suite (proj.)' : '5 copies');
+      else value = ds.c === 0 ? (ds.consolidated ? 'one place ✓' : 'not yet') : ds.c + ' sites';
+      return {
+        name: d.k + ' · ' + d.name,
+        note: d.note,
+        value: value,
+        sw: 'display:inline-block;width:10px;height:10px;border-radius:50%;background:' + d.col + ';',
+        vStyle: MONO + 'font-size:12.5px;font-weight:600;white-space:nowrap;color:' + (ds.consolidated ? '#305f7a' : '#1e2a33') + ';'
+      };
+    });
+
+    // ---- block history ----
+    const sa = AK[sel] || AK.PR;
+    const sg = geo[sa.k];
+    const sIdx = oi(sa.k);
+    const maxK = Math.max.apply(null, WK.map((x) => x.K[sIdx])) || 1;
+    const bars = WK.map((x, j) => {
+      const v = x.K[sIdx];
+      const h = v > 0 ? Math.max(1, v / maxK * 58) : 0;
+      return { st: 'flex:1 1 0;min-width:0;height:' + h.toFixed(1) + 'px;background:' + (j === di ? '#a24c14' : (j > di ? '#d6ccb4' : '#3d4a52')) + ';' };
+    });
+    const partners = cur.P.filter((p) => p.split('-').indexOf(sa.k) >= 0).map((p) => { const ks = p.split('-'); return AK[ks[0] === sa.k ? ks[1] : ks[0]].short; });
+    const rebuiltSel = sa.k === 'PR' && pStep >= 2;
+    const blk = {
+      name: sa.name,
+      meta: rebuiltSel ? 'rebuilt behind its front door · projection'
+        : (proj ? 'as of 13 Oct · ' : shortDate(cur.d) + ' · ') + (sg.ex ? sg.f + (sg.f === 1 ? ' file · ' : ' files · ') + fmt(sg.kb) + ' KB' : 'not yet built'),
+      bars: bars,
+      ready: sa.ready + ' (13 Oct survey)',
+      tangles: rebuiltSel ? 'Re-tied through the front door (projection; not measured).' : (partners.length ? partners.length + ': ' + partners.join(', ') : 'none')
+    };
+    const chips = AREAS.map((a) => {
+      const on = a.k === sa.k;
+      return {
+        t: a.short,
+        pressed: on ? 'true' : 'false',
+        st: 'font-family:inherit;font-size:13.5px;padding:2px 8px;border-radius:2px;cursor:pointer;' + (on ? 'background:#1e2a33;color:#f6f1e5;border:1px solid #1e2a33;' : 'background:transparent;color:#1e2a33;border:1px solid #b9ae95;'),
+        pick: () => put({ sel: a.k })
+      };
+    });
+
+    const readingTitle = here.length ? here.map((e) => e.short).join(' · ') : 'Week of ' + shortDate(cur.d);
+    const r = {
+      dateLong: proj ? 'Projection ' + pStep : longDate(cur.d),
+      sub: proj ? 'beyond 13 Oct 2026 · step ' + pStep + ' of 3 · not data' : 'commit ' + cur.c + ' · sounding ' + (idx + 1) + ' of 40',
+      mode: proj ? 'PROJECTION · drawn, not measured' : 'MEASURED',
+      modeStyle: 'align-self:flex-start;margin-top:5px;' + MONO + 'font-size:11px;letter-spacing:.08em;padding:2px 7px;border-radius:2px;background:rgba(251,248,240,0.92);' + (proj ? 'color:#a24c14;border:1px dashed #a24c14;' : 'color:#305f7a;border:1px solid #305f7a;'),
+      valuetext: proj ? 'Projection step ' + pStep + ' of 3' : longDate(cur.d),
+      stepNote: proj ? 'projection ' + pStep + ' / 3' : 'sounding ' + (idx + 1) + ' / 40 · ' + cur.c,
+      logTitle: (proj ? 'Projection · ' : '') + readingTitle,
+      events: events,
+      rows: rows,
+      readNote: proj ? 'projection · no numbers' : 'at ' + cur.c,
+      readNoteStyle: MONO + 'font-size:11px;color:' + (proj ? '#a24c14' : '#4c5a63') + ';',
+      dec: dec
+    };
+
+    // ---- controls ----
+    const play = () => {
+      if (self._timer) { stopTimer(); put({}); return; }
+      const start = idx >= LAST ? 0 : idx;
+      self._timer = setInterval(() => {
+        const s2 = self.state || {};
+        const ci = typeof s2.idx === 'number' ? s2.idx : start;
+        const nx = Math.min(N - 1, ci + 1);
+        if (nx >= N - 1) stopTimer();
+        self.setState(Object.assign({ rz: rz, sel: sel }, s2, { idx: nx }));
+      }, 700);
+      put({ idx: start });
+    };
+    const readVal = (e) => (e && e.target ? parseInt(e.target.value, 10) : NaN);
+
+    return {
+      idx: idx,
+      rz: rz,
+      rzLabel: rz + '°',
+      floorStyle: 'position:absolute;left:-560px;top:-200px;width:1120px;height:400px;transform-style:preserve-3d;transform:scale3d(0.76,0.76,0.76) rotateX(' + TILT + 'deg) rotateZ(' + rz + 'deg);transition:transform .5s ease;',
+      stageAria: (proj ? 'Projection step ' + pStep + ' of 3, beyond 13 Oct 2026. ' : 'The code on ' + longDate(cur.d) + ': ' + cur.f + ' files. ') +
+        'Eleven areas stand as blocks on a ship’s deck; footprint follows files and height follows product KB. ' + cur.P.length + ' two-way tangles run between them as cables. Scattered decisions float as specks and become one ingot when consolidated. Alongside sits a wireframe of the one-shot ideal, unmeasured.',
+      ghosts: ghosts,
+      ghostPieces: ghostPieces,
+      cables: cables,
+      blocks: blocks,
+      specks: specks,
+      clusters: clusters,
+      tl: tl,
+      cursorStyle: 'position:absolute;top:-4px;bottom:-4px;left:' + ((idx + 0.5) * w).toFixed(3) + '%;border-left:1.5px solid #a24c14;transition:left .3s ease;',
+      months: months,
+      laneFleet: laneOf('fleet'),
+      laneJohn: laneOf('john'),
+      r: r,
+      blk: blk,
+      chips: chips,
+      playLabel: playing ? 'Pause' : 'Play the voyage',
+      playIcon: playing ? 'M1,1 L4,1 L4,11 L1,11 Z M7,1 L10,1 L10,11 L7,11 Z' : 'M1,0 L11,6 L1,12 Z',
+      playPressed: playing ? 'true' : 'false',
+      play: play,
+      prev: () => { stopTimer(); put({ idx: Math.max(0, idx - 1) }); },
+      next: () => { stopTimer(); put({ idx: Math.min(N - 1, idx + 1) }); },
+      today: () => { stopTimer(); put({ idx: LAST }); },
+      toProjection: () => { stopTimer(); put({ idx: LAST + 1 }); },
+      scrub: (e) => { const v = readVal(e); if (!isNaN(v)) { stopTimer(); put({ idx: Math.max(0, Math.min(N - 1, v)) }); } },
+      bear: (e) => { const v = readVal(e); if (!isNaN(v)) put({ rz: Math.max(-60, Math.min(0, v)) }); },
+      turnLeft: () => put({ rz: Math.max(-60, rz - 10) }),
+      turnRight: () => put({ rz: Math.min(0, rz + 10) })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -51,6 +51,34 @@ import { enrichLoop, isTerminalLoop } from './dashboard.js';
 const MAX_REASON_LENGTH = 500;
 
 /**
+ * The two propose routes differ only in these facts; everything else (the
+ * validation order, the 503, the target lookup, the write, the cache clear, the
+ * 201 envelope) is one flow, `propose` below. `routeLabel` is the endpoint
+ * string handed to `logEvent` and `name` is the console-log label, each exactly
+ * what the route has always used.
+ *
+ * `outcomeFields` is spread into the store call between `decisionLoopId` and
+ * `reason`: a dismissal writes NO `proposedOutcome`/`optionId` keys (the store
+ * reads their absence as "dismiss"), so a stray `optionId` in a dismissal body
+ * must never reach it.
+ */
+const DISMISSAL = {
+  name: 'suggest-dismissal',
+  routeLabel: '/api/proxy/rulings/suggest-dismissal',
+  needsOption: false,
+  reasonRequired: 'A reason is required — a dismissal nobody justified is one the operator cannot agree to',
+  outcomeFields: () => ({})
+};
+
+const ANSWER = {
+  name: 'suggest-answer',
+  routeLabel: '/api/proxy/rulings/suggest-answer',
+  needsOption: true,
+  reasonRequired: 'A reason is required — an answer proposal nobody justified is one the operator cannot agree to',
+  outcomeFields: (optionId) => ({ proposedOutcome: 'answered', optionId })
+};
+
+/**
  * Attribution comes from the TOKEN, never from the request body — a caller
  * must not be able to propose in someone else's name. A token is minted by a
  * signed-in human, so `createdBy` is a real identity; the label is the
@@ -58,6 +86,64 @@ const MAX_REASON_LENGTH = 500;
  */
 function attributionFromToken(req) {
   return req.proxyCreatedBy || req.proxyTokenLabel || 'proxy token';
+}
+
+/**
+ * The first reason a propose body is refused with 400, or `null`. Checked in
+ * this order, and all before the store check and any read, so a malformed body
+ * is a 400 even where the store is absent.
+ *
+ * `decisionId` comes from the path: Express never matches an empty segment, so
+ * the first check is unreachable today; it is kept as the route's own guard.
+ *
+ * LIN-2756: `decisionLoopId` is OPTIONAL, unlike routes/dashboard.js's dismiss
+ * route (which requires it) — the ticket's back-compat clause is specifically
+ * "keep a decisionId-only write working as applies to every loop carrying that
+ * id", and this route is where that write actually happens (an agent proposing
+ * via the proxy API). Type-checked exactly like dashboard.js's dismiss
+ * validation when PRESENT; its ABSENCE is the documented wide/legacy shape.
+ *
+ * A `reason` is mandatory. That is not ceremony: the operator's whole
+ * interaction with a proposal is a one-click Agree, so one with no stated
+ * reason turns that click into a rubber stamp. It is the same rule shelving
+ * already enforces — silent muting is forbidden
+ * (docs/escalation-philosophy.md §6) — applied to the same class of act.
+ */
+function proposalProblem(spec, { decisionId, decisionLoopId, optionId, reason }) {
+  if (!decisionId || typeof decisionId !== 'string') return 'decisionId is required';
+  if (decisionLoopId !== undefined && (typeof decisionLoopId !== 'string' || !decisionLoopId)) {
+    return 'decisionLoopId, when given, must be a non-empty string';
+  }
+  if (spec.needsOption && (typeof optionId !== 'string' || !optionId.trim())) return 'optionId is required';
+  if (typeof reason !== 'string' || !reason.trim()) return spec.reasonRequired;
+  if (reason.trim().length > MAX_REASON_LENGTH) return `reason must be ${MAX_REASON_LENGTH} characters or fewer`;
+  return null;
+}
+
+/**
+ * LIN-2790: an answer proposal must name one of the decision's own
+ * `options[].id`. The predicate mirrors `recommended`'s validation
+ * (lib/session-telemetry.js), but this route REFUSES an invalid/absent option
+ * instead of dropping the field, since silently accepting it would record an
+ * answer proposal to nothing. A free-text decision with no `options[]` at all
+ * is refused the same way. Returns the 422 to send, or `null` when the option
+ * is valid.
+ */
+function optionRefusal(row, optionId) {
+  const options = row.decision?.options;
+  if (!Array.isArray(options) || options.length === 0) {
+    return {
+      message: 'This decision has no options — it cannot be proposed as answered by option id',
+      code: 'NO_OPTIONS_AVAILABLE'
+    };
+  }
+  if (!options.some(o => o.id === optionId)) {
+    return {
+      message: `optionId "${optionId}" is not one of this decision's options`,
+      code: 'OPTION_NOT_FOUND'
+    };
+  }
+  return null;
 }
 
 /**
@@ -86,6 +172,7 @@ export function createRulingsRoutes({
   sessionsFeedCache = null
 }) {
   const router = Router();
+
 
   /**
    * The workspace's unanswered decisions, through the SAME short-TTL SWR cache
@@ -215,6 +302,76 @@ export function createRulingsRoutes({
   }
 
   /**
+   * Propose that a ruling be dismissed, or answered with a given option. This
+   * does NOT dismiss or answer it.
+   *
+   * Order is the contract: validate the body (400) → store present (503) →
+   * the target ruling exists (404) → for an answer, the option is valid (422)
+   * → write → clear the loop-read cache → 201. This route stays
+   * disposition-agnostic at propose time — see the module docstring.
+   *
+   * LIN-2755: the cache clear is uniform invalidation on every ruling write.
+   * `dismissalSuggestionsStore` is read live (not cached), so it is
+   * defensive rather than fixing an observable staleness bug. Guarded like the
+   * GET read: a null `sessionsFeedCache` means this deployment runs uncached,
+   * so there is nothing to invalidate.
+   */
+  function propose(spec) {
+    const { routeLabel } = spec;
+    return async (req, res) => {
+      const { decisionId } = req.params;
+      const { optionId, reason, decisionLoopId } = req.body || {};
+
+      const problem = proposalProblem(spec, { decisionId, decisionLoopId, optionId, reason });
+      if (problem) {
+        logEvent(req, routeLabel, 400);
+        return badRequest.json(res, problem);
+      }
+      if (!dismissalSuggestionsStore) {
+        logEvent(req, routeLabel, 503);
+        return jsonError(res, 503, 'Dismissal-suggestions store not configured');
+      }
+
+      try {
+        const row = await resolveTargetRuling(req, res, { decisionId, decisionLoopId, routeLabel });
+        if (!row) return; // resolveTargetRuling already sent the 404
+
+        const refusal = spec.needsOption ? optionRefusal(row, optionId) : null;
+        if (refusal) {
+          logEvent(req, routeLabel, 422);
+          return jsonError(res, 422, refusal.message, { code: refusal.code });
+        }
+
+        const record = await dismissalSuggestionsStore.suggest({
+          urlKey: req.proxyUrlKey,
+          decisionId,
+          decisionLoopId: decisionLoopId || undefined,
+          ...spec.outcomeFields(optionId),
+          reason,
+          suggestedBy: attributionFromToken(req)
+        });
+        if (!record) {
+          logEvent(req, routeLabel, 500);
+          return jsonError(res, 500, 'Failed to record the suggestion');
+        }
+        if (sessionsFeedCache) sessionsFeedCache.clear(req.proxyUrlKey);
+        logEvent(req, routeLabel, 201);
+        res.status(201).json({
+          success: true,
+          suggestion: record,
+          // Said plainly on the wire, because the whole risk of this endpoint
+          // is a caller believing it discharged the ruling.
+          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it.'
+        });
+      } catch (error) {
+        console.error(`Proxy ruling ${spec.name} error:`, error);
+        logEvent(req, routeLabel, 500);
+        jsonError(res, 500, 'Failed to record the suggestion');
+      }
+    };
+  }
+
+  /**
    * Every unanswered decision for the TOKEN's workspace.
    *
    * Deliberately single-workspace, unlike the session-authed
@@ -279,203 +436,18 @@ export function createRulingsRoutes({
     }
   });
 
-  /**
-   * Propose that a ruling be dismissed. This does NOT dismiss it.
-   *
-   * A `reason` is mandatory. That is not ceremony: the operator's whole
-   * interaction with this is a one-click Agree, so a proposal with no stated
-   * reason turns that click into a rubber stamp. It is the same rule shelving
-   * already enforces — silent muting is forbidden
-   * (docs/escalation-philosophy.md §6) — applied to the same class of act.
-   *
-   * @route POST /api/proxy/rulings/:decisionId/suggest-dismissal
-   */
+  /** @route POST /api/proxy/rulings/:decisionId/suggest-dismissal */
   router.post(
     '/api/proxy/rulings/:decisionId/suggest-dismissal',
-    proxyLimiter,
-    authenticateProxyToken,
-    requireWriteScope,
-    async (req, res) => {
-      const { decisionId } = req.params;
-      const { reason, decisionLoopId } = req.body || {};
-
-      if (!decisionId || typeof decisionId !== 'string') {
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
-        return badRequest.json(res, 'decisionId is required');
-      }
-      // LIN-2756: OPTIONAL, unlike routes/dashboard.js's dismiss route
-      // (which requires it) — the ticket's back-compat clause is specifically
-      // "keep a decisionId-only write working as applies to every loop
-      // carrying that id", and this route is where that write actually
-      // happens (an agent proposing via the proxy API). Type-checked exactly
-      // like dashboard.js's dismiss validation when PRESENT; its ABSENCE is
-      // the documented wide/legacy shape, not an error.
-      if (decisionLoopId !== undefined && (typeof decisionLoopId !== 'string' || !decisionLoopId)) {
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
-        return badRequest.json(res, 'decisionLoopId, when given, must be a non-empty string');
-      }
-      if (typeof reason !== 'string' || !reason.trim()) {
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
-        return badRequest.json(res, 'A reason is required — a dismissal nobody justified is one the operator cannot agree to');
-      }
-      if (reason.trim().length > MAX_REASON_LENGTH) {
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 400);
-        return badRequest.json(res, `reason must be ${MAX_REASON_LENGTH} characters or fewer`);
-      }
-      if (!dismissalSuggestionsStore) {
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 503);
-        return jsonError(res, 503, 'Dismissal-suggestions store not configured');
-      }
-
-      try {
-        const row = await resolveTargetRuling(req, res, {
-          decisionId, decisionLoopId, routeLabel: '/api/proxy/rulings/suggest-dismissal'
-        });
-        if (!row) return; // resolveTargetRuling already sent the 404
-
-        const suggestedBy = attributionFromToken(req);
-        const record = await dismissalSuggestionsStore.suggest({
-          urlKey: req.proxyUrlKey,
-          decisionId,
-          decisionLoopId: decisionLoopId || undefined,
-          reason,
-          suggestedBy
-        });
-        if (!record) {
-          logEvent(req, '/api/proxy/rulings/suggest-dismissal', 500);
-          return jsonError(res, 500, 'Failed to record the suggestion');
-        }
-        // LIN-2755: uniform invalidation on every ruling write — suggest-
-        // dismissal only ever writes to dismissalSuggestionsStore, which is
-        // read live (not cached), so this is defensive/uniform rather than
-        // fixing an observable staleness bug. Guarded like the GET read
-        // above: a null sessionsFeedCache means this deployment runs
-        // uncached, so there is nothing to invalidate.
-        if (sessionsFeedCache) sessionsFeedCache.clear(req.proxyUrlKey);
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 201);
-        res.status(201).json({
-          success: true,
-          suggestion: record,
-          // Said plainly on the wire, because the whole risk of this endpoint
-          // is a caller believing it discharged the ruling.
-          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it.'
-        });
-      } catch (error) {
-        console.error('Proxy ruling suggest-dismissal error:', error);
-        logEvent(req, '/api/proxy/rulings/suggest-dismissal', 500);
-        jsonError(res, 500, 'Failed to record the suggestion');
-      }
-    }
+    proxyLimiter, authenticateProxyToken, requireWriteScope,
+    propose(DISMISSAL)
   );
 
-  /**
-   * Propose that a ruling be ANSWERED with a given option. This does NOT
-   * answer it — exactly as `suggest-dismissal` does not dismiss. LIN-2790.
-   *
-   * A `reason` is mandatory for the same reason `suggest-dismissal` requires
-   * one: the operator's whole interaction with this is a one-click Agree, so
-   * an unjustified proposal turns that click into a rubber stamp.
-   *
-   * `optionId` must name one of the decision's own `options[].id` — an
-   * unknown option, or a free-text decision with no `options[]` at all, is
-   * refused with 422 rather than silently accepted as an answer to nothing.
-   *
-   * This route stays disposition-agnostic at propose time — see the module
-   * docstring. It never gates on the row's current disposition/canReply/effect.
-   *
-   * @route POST /api/proxy/rulings/:decisionId/suggest-answer
-   */
+  /** @route POST /api/proxy/rulings/:decisionId/suggest-answer */
   router.post(
     '/api/proxy/rulings/:decisionId/suggest-answer',
-    proxyLimiter,
-    authenticateProxyToken,
-    requireWriteScope,
-    async (req, res) => {
-      const { decisionId } = req.params;
-      const { optionId, reason, decisionLoopId } = req.body || {};
-      const routeLabel = '/api/proxy/rulings/suggest-answer';
-
-      if (!decisionId || typeof decisionId !== 'string') {
-        logEvent(req, routeLabel, 400);
-        return badRequest.json(res, 'decisionId is required');
-      }
-      // LIN-2756: OPTIONAL, same convention as suggest-dismissal — see that
-      // route's own comment for why decisionLoopId's absence is a documented
-      // wide/legacy shape, not an error.
-      if (decisionLoopId !== undefined && (typeof decisionLoopId !== 'string' || !decisionLoopId)) {
-        logEvent(req, routeLabel, 400);
-        return badRequest.json(res, 'decisionLoopId, when given, must be a non-empty string');
-      }
-      if (typeof optionId !== 'string' || !optionId.trim()) {
-        logEvent(req, routeLabel, 400);
-        return badRequest.json(res, 'optionId is required');
-      }
-      if (typeof reason !== 'string' || !reason.trim()) {
-        logEvent(req, routeLabel, 400);
-        return badRequest.json(res, 'A reason is required — an answer proposal nobody justified is one the operator cannot agree to');
-      }
-      if (reason.trim().length > MAX_REASON_LENGTH) {
-        logEvent(req, routeLabel, 400);
-        return badRequest.json(res, `reason must be ${MAX_REASON_LENGTH} characters or fewer`);
-      }
-      if (!dismissalSuggestionsStore) {
-        logEvent(req, routeLabel, 503);
-        return jsonError(res, 503, 'Dismissal-suggestions store not configured');
-      }
-
-      try {
-        const row = await resolveTargetRuling(req, res, { decisionId, decisionLoopId, routeLabel });
-        if (!row) return; // resolveTargetRuling already sent the 404
-
-        // LIN-2790: refuse rather than silently drop — the predicate mirrors
-        // `recommended`'s validation (lib/session-telemetry.js), but this
-        // route REFUSES an invalid/absent option instead of dropping the
-        // field, since silently accepting it would record an answer proposal
-        // to nothing.
-        const options = row.decision?.options;
-        if (!Array.isArray(options) || options.length === 0) {
-          logEvent(req, routeLabel, 422);
-          return jsonError(res, 422, 'This decision has no options — it cannot be proposed as answered by option id', {
-            code: 'NO_OPTIONS_AVAILABLE'
-          });
-        }
-        if (!options.some(o => o.id === optionId)) {
-          logEvent(req, routeLabel, 422);
-          return jsonError(res, 422, `optionId "${optionId}" is not one of this decision's options`, {
-            code: 'OPTION_NOT_FOUND'
-          });
-        }
-
-        const suggestedBy = attributionFromToken(req);
-        const record = await dismissalSuggestionsStore.suggest({
-          urlKey: req.proxyUrlKey,
-          decisionId,
-          decisionLoopId: decisionLoopId || undefined,
-          proposedOutcome: 'answered',
-          optionId,
-          reason,
-          suggestedBy
-        });
-        if (!record) {
-          logEvent(req, routeLabel, 500);
-          return jsonError(res, 500, 'Failed to record the suggestion');
-        }
-        // LIN-2755: uniform invalidation, same reasoning as suggest-dismissal above.
-        if (sessionsFeedCache) sessionsFeedCache.clear(req.proxyUrlKey);
-        logEvent(req, routeLabel, 201);
-        res.status(201).json({
-          success: true,
-          suggestion: record,
-          // Said plainly on the wire, because the whole risk of this endpoint
-          // is a caller believing it discharged the ruling.
-          note: 'Recorded as a SUGGESTION only. The ruling is still unanswered until a human dismisses or answers it.'
-        });
-      } catch (error) {
-        console.error('Proxy ruling suggest-answer error:', error);
-        logEvent(req, routeLabel, 500);
-        jsonError(res, 500, 'Failed to record the suggestion');
-      }
-    }
+    proxyLimiter, authenticateProxyToken, requireWriteScope,
+    propose(ANSWER)
   );
 
   return router;

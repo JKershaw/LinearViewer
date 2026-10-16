@@ -1,0 +1,555 @@
+[
+ {
+  "kind": "born",
+  "pair": "LLM & prompts|Runs & dispatch",
+  "date": "2026-01-12",
+  "sha": "ade043e3",
+  "lin": [],
+  "pr": null,
+  "subject": "Merge pull request #17 from JKershaw/claude/review-tags-handling-6Pydq",
+  "thinEdges": [
+   "lib/audit.js>lib/queue-config.js"
+  ],
+  "ticket": null,
+  "title": null,
+  "code": "feature",
+  "note": "Review-tag handling (PR #17), before the tracker was in use; audit imports queue config."
+ },
+ {
+  "kind": "dissolved",
+  "pair": "LLM & prompts|Runs & dispatch",
+  "date": "2026-01-20",
+  "sha": "856d4ad6",
+  "lin": [],
+  "pr": null,
+  "subject": "Merge pull request #99 from JKershaw/claude/summarize-lin-100-dEfw7",
+  "lastEdges": [
+   "lib/audit.js>lib/completion-signals.js",
+   "lib/audit.js>lib/queue-config.js",
+   "lib/openrouter.js>lib/completion-signals.js",
+   "lib/prompt-templates.js>lib/completion-signals.js",
+   "lib/queue-config.js>lib/prompt-templates.js"
+  ],
+  "ticket": "LIN-100",
+  "title": "Remove labels",
+  "code": "removal",
+  "note": "Removing labels deleted the audit\u2019s imports of the run config."
+ },
+ {
+  "kind": "born",
+  "pair": "Front end: server-rendered pages|LLM & prompts",
+  "date": "2026-03-24",
+  "sha": "8d7dbf9f",
+  "lin": [],
+  "pr": null,
+  "subject": "Merge pull request #208 from JKershaw/claude/swim-lane-task-ordering-t3YMm",
+  "thinEdges": [
+   "lib/roadmap.js>lib/render-swipe.js"
+  ],
+  "ticket": null,
+  "title": null,
+  "code": "feature",
+  "note": "Swim-lane task ordering (PR #208); the roadmap reached into the swipe renderer."
+ },
+ {
+  "kind": "born",
+  "pair": "LLM & prompts|Runs & dispatch",
+  "date": "2026-06-06",
+  "sha": "f5354783",
+  "lin": [
+   "LIN-319"
+  ],
+  "pr": "327",
+  "subject": "LIN-319: Add structured `kind` field to dispatch (#327)",
+  "thinEdges": [
+   "routes/dispatch.js>lib/prompt-templates.js"
+  ],
+  "ticket": "LIN-319",
+  "title": "Dispatch verbs carry no structured `kind` field",
+  "code": "feature",
+  "note": "Dispatch verbs gained a structured kind; the dispatch route imports the prompt templates."
+ },
+ {
+  "kind": "born",
+  "pair": "Front end: server-rendered pages|Providers (Linear, GitHub, Jira, local)",
+  "date": "2026-06-07",
+  "sha": "5c6c2201",
+  "lin": [
+   "LIN-174",
+   "LIN-175",
+   "LIN-178",
+   "LIN-276"
+  ],
+  "pr": "346",
+  "subject": "LIN-175: extract canonical state model + state-map (Phase 1 of LIN-174) (#346)",
+  "thinEdges": [
+   "lib/linear.js>lib/tree.js"
+  ],
+  "ticket": "LIN-175",
+  "title": "Phase 1: Canonical Models & State Mapping",
+  "code": "consolidation",
+  "note": "Canonical models and state mapping: one place for issue shape, placed where the tree renderer and Linear reader meet."
+ },
+ {
+  "kind": "born",
+  "pair": "LLM & prompts|Providers (Linear, GitHub, Jira, local)",
+  "date": "2026-06-07",
+  "sha": "5c6c2201",
+  "lin": [
+   "LIN-174",
+   "LIN-175",
+   "LIN-178",
+   "LIN-276"
+  ],
+  "pr": "346",
+  "subject": "LIN-175: extract canonical state model + state-map (Phase 1 of LIN-174) (#346)",
+  "thinEdges": [
+   "lib/prompt-formatters.js>lib/providers/models.js"
+  ],
+  "ticket": "LIN-175",
+  "title": "Phase 1: Canonical Models & State Mapping",
+  "code": "consolidation",
+  "note": "Same commit: prompt formatters import the new canonical models."
+ },
+ {
+  "kind": "born",
+  "pair": "Auth, accounts & workspaces|Providers (Linear, GitHub, Jira, local)",
+  "date": "2026-06-07",
+  "sha": "45bf490a",
+  "lin": [
+   "LIN-306",
+   "LIN-331"
+  ],
+  "pr": "352",
+  "subject": "LIN-331: migrate dashboard consumers onto provider registry + getAuthRouter (#352)",
+  "thinEdges": [
+   "routes/auth.js>lib/providers/registry.js"
+  ],
+  "ticket": "LIN-331",
+  "title": "Consumers: migrate dashboard call sites + getAuthRouter",
+  "code": "consolidation",
+  "note": "Call sites migrated to the provider registry; the auth route imports it."
+ },
+ {
+  "kind": "born",
+  "pair": "Agent API (proxy)|LLM & prompts",
+  "date": "2026-06-13",
+  "sha": "8d48dfe5",
+  "lin": [
+   "LIN-450"
+  ],
+  "pr": "456",
+  "subject": "LIN-450: Collective polish \u2014 default Yap, proxy-aware fetch, prompt preview (#456)",
+  "thinEdges": [
+   "lib/yap-client.js>lib/proxy-fetch.js"
+  ],
+  "ticket": "LIN-450",
+  "title": "Collective yap experiment",
+  "code": "feature",
+  "note": "Collective experiment; its client reuses the proxy fetch."
+ },
+ {
+  "kind": "born",
+  "pair": "Front end: server-rendered pages|Platform & plumbing",
+  "date": "2026-06-14",
+  "sha": "e3f942b7",
+  "lin": [
+   "LIN-481"
+  ],
+  "pr": "468",
+  "subject": "LIN-481: Migrate errors.js htmlError() onto renderPage() (#468)",
+  "thinEdges": [
+   "lib/errors.js>lib/components/page.js"
+  ],
+  "ticket": "LIN-481",
+  "title": "Migrate errors.js htmlError() onto renderPage() \u2014 the residual hand-rolled document",
+  "code": "consolidation",
+  "note": "htmlError moved onto the shared page shell, so plumbing imports a page component."
+ },
+ {
+  "kind": "born",
+  "pair": "Agent API (proxy)|Providers (Linear, GitHub, Jira, local)",
+  "date": "2026-06-18",
+  "sha": "d5d4d565",
+  "lin": [
+   "LIN-399"
+  ],
+  "pr": "510",
+  "subject": "Retry + timeout on the direct Linear read path (LINEAR_UNREACHABLE) (#510)",
+  "thinEdges": [
+   "lib/linear-fetch.js>lib/proxy-fetch.js"
+  ],
+  "ticket": null,
+  "title": null,
+  "code": "fix",
+  "note": "Retry and timeout on the Linear read path, by reusing the proxy fetch\u2019s classifier."
+ },
+ {
+  "kind": "born",
+  "pair": "Auth, accounts & workspaces|LLM & prompts",
+  "date": "2026-07-04",
+  "sha": "50f9df31",
+  "lin": [
+   "LIN-489",
+   "LIN-988",
+   "LIN-989",
+   "LIN-990"
+  ],
+  "pr": "782",
+  "subject": "LIN-989: read-only, workspace-scoped tool catalog (lib/chat-tools.js) (#782)",
+  "thinEdges": [
+   "lib/workspace-preferences.js>lib/openrouter.js"
+  ],
+  "ticket": "LIN-989",
+  "title": "[catalog] Read-only, workspace-scoped tool catalog (lib/chat-tools.js)",
+  "code": "feature",
+  "note": "Read-only tool catalog; workspace preferences import the model client."
+ },
+ {
+  "kind": "born",
+  "pair": "Auth, accounts & workspaces|Front end: server-rendered pages",
+  "date": "2026-07-08",
+  "sha": "acb6361f",
+  "lin": [
+   "LIN-1145"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #849 from JKershaw/lin-1145-per-operation-ai-model-overrides",
+  "thinEdges": [
+   "lib/render-settings.js>lib/workspace-preferences.js"
+  ],
+  "ticket": "LIN-1145",
+  "title": "Allow per-task model selection in workspace AI settings",
+  "code": "feature",
+  "note": "Per-task model selection in workspace settings."
+ },
+ {
+  "kind": "born",
+  "pair": "Agent API (proxy)|Runs & dispatch",
+  "date": "2026-07-09",
+  "sha": "8a4a2cfd",
+  "lin": [
+   "LIN-1139"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #861 from JKershaw/lin-1139-dispatch-factory",
+  "thinEdges": [
+   "lib/dispatch-factory.js>lib/proxy-preamble.js"
+  ],
+  "ticket": "LIN-1139",
+  "title": "Extract createDispatchItem factory (server DRY)",
+  "code": "consolidation",
+  "note": "Dispatch item factory extracted (DRY); it imports the proxy preamble."
+ },
+ {
+  "kind": "born",
+  "pair": "Front end: server-rendered pages|Runs & dispatch",
+  "date": "2026-07-24",
+  "sha": "32eb225e",
+  "lin": [
+   "LIN-1478"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #977 from JKershaw/lin-1478-s2b-lineage-continuous-rendering",
+  "thinEdges": [
+   "lib/render-session.js>lib/loop-supersede.js"
+  ],
+  "ticket": "LIN-1478",
+  "title": "S2b: Lineage-continuous rendering (one continuous loop)",
+  "code": "feature",
+  "note": "Lineage-continuous rendering of a run."
+ },
+ {
+  "kind": "born",
+  "pair": "Platform & plumbing|Runs & dispatch",
+  "date": "2026-07-26",
+  "sha": "8963dd02",
+  "lin": [
+   "LIN-1257",
+   "LIN-1596"
+  ],
+  "pr": "1018",
+  "subject": "LIN-1596: headline the dispatch outcome rate on /kpis (#1018)",
+  "thinEdges": [
+   "lib/kpi-stats.js>lib/dispatch-terminal.js"
+  ],
+  "ticket": "LIN-1596",
+  "title": "Feedback: On the KPIs page: The gap I notice: this page counts activit",
+  "code": "feature",
+  "note": "KPI page change from feedback; KPI stats import dispatch terminal state."
+ },
+ {
+  "kind": "born",
+  "pair": "LLM & prompts|Other features",
+  "date": "2026-08-01",
+  "sha": "9ad101e1",
+  "lin": [
+   "LIN-1675",
+   "LIN-1684",
+   "LIN-1685"
+  ],
+  "pr": "1032",
+  "subject": "LIN-1684: implement ship-journey derivation library (P2 of LIN-1675) (#1032)",
+  "thinEdges": [
+   "lib/prompts/ship-biscuit-editor.js>lib/ship-biscuit.js"
+  ],
+  "ticket": "LIN-1684",
+  "title": "LIN-1675 P2: waypoint-derivation library (lib/ship-journey.js)",
+  "code": "feature",
+  "note": "Waypoint-derivation library for the ship view."
+ },
+ {
+  "kind": "born",
+  "pair": "Other features|Runs & dispatch",
+  "date": "2026-08-23",
+  "sha": "18843e64",
+  "lin": [
+   "LIN-1967",
+   "LIN-694"
+  ],
+  "pr": "1227",
+  "subject": "LIN-694: block a periodical review task's Done transition on unverified report persistence (#1227)",
+  "thinEdges": [
+   "lib/periodicals.js>lib/periodical-report-gate.js"
+  ],
+  "ticket": "LIN-694",
+  "title": "Periodical self-conclusion: block Done until the report PR is persisted (4/11 reports in t",
+  "code": "feature",
+  "note": "Periodical self-conclusion gate."
+ },
+ {
+  "kind": "born",
+  "pair": "LLM & prompts|Platform & plumbing",
+  "date": "2026-08-30",
+  "sha": "40428b26",
+  "lin": [
+   "LIN-1763",
+   "LIN-2384"
+  ],
+  "pr": "1296",
+  "subject": "LIN-2384: fix stale gpt-5.6-sol pricing, add live-catalog conformance sweep (#1296)",
+  "thinEdges": [
+   "lib/audit.js>lib/workflow-config.js",
+   "lib/prompt-formatters.js>lib/workflow-config.js"
+  ],
+  "ticket": "LIN-2384",
+  "title": "Sonnet-5 pricing expires 2026-08-31: update lib/model-pricing.js from live catalog + add a",
+  "code": "upkeep",
+  "note": "Model pricing update; audit and prompt formatters import workflow config."
+ },
+ {
+  "kind": "born",
+  "pair": "Agent API (proxy)|Web routes (pages & workspace API)",
+  "date": "2026-09-05",
+  "sha": "ad97bcf7",
+  "lin": [
+   "LIN-1727",
+   "LIN-1728",
+   "LIN-1938",
+   "LIN-2444"
+  ],
+  "pr": "1387",
+  "subject": "LIN-2444: proxy read of unanswered rulings + propose-a-dismissal (never dismiss) (#1387)",
+  "thinEdges": [
+   "routes/proxy-rulings.js>routes/dashboard.js"
+  ],
+  "ticket": "LIN-2444",
+  "title": "Rulings feed: operator/agent may PROPOSE a dismissal (one-click Agree in the UI, bulk-agre",
+  "code": "feature",
+  "note": "Rulings feed lets an agent propose a dismissal; a proxy route imports a dashboard route."
+ },
+ {
+  "kind": "born",
+  "pair": "Agent API (proxy)|Front end: server-rendered pages",
+  "date": "2026-10-01",
+  "sha": "26014544",
+  "lin": [
+   "LIN-3098"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1623 from JKershaw/lin-3098-s4-setup",
+  "thinEdges": [
+   "lib/render-runner-setup.js>lib/proxy-scopes.js"
+  ],
+  "ticket": "LIN-3098",
+  "title": "The runner prompt: Harbour serves the prompt that turns a person's Claude Code session int",
+  "code": "feature",
+  "note": "The runner prompt page imports the proxy scope list."
+ },
+ {
+  "kind": "born",
+  "pair": "Providers (Linear, GitHub, Jira, local)|Runs & dispatch",
+  "date": "2026-10-05",
+  "sha": "cd25bce5",
+  "lin": [
+   "LIN-2950",
+   "LIN-3311"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1753 from JKershaw/feat/lin-3311-pr-state-store-loader-split",
+  "thinEdges": [
+   "lib/pr-state-store.js>lib/run-evidence.js"
+  ],
+  "ticket": "LIN-3311",
+  "title": "LIN-2950 P1: PR-state store lift, run loader split + settle predicate, owner golden pin",
+  "code": "feature",
+  "note": "PR-state store lifted out of a route as part of a feature phase; borderline consolidation."
+ },
+ {
+  "kind": "born",
+  "pair": "Front end: server-rendered pages|Other features",
+  "date": "2026-10-05",
+  "sha": "e655e73e",
+  "lin": [
+   "LIN-3312"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1754 from JKershaw/feat/lin-3312-guest-run-projection",
+  "thinEdges": [
+   "lib/render-session.js>lib/guest-run.js"
+  ],
+  "ticket": "LIN-3312",
+  "title": "LIN-2950 P2: guest run projection, guest render mode on the run page, scan guard (library ",
+  "code": "feature",
+  "note": "Guest run projection for share links."
+ },
+ {
+  "kind": "born",
+  "pair": "Other features|Platform & plumbing",
+  "date": "2026-10-05",
+  "sha": "e655e73e",
+  "lin": [
+   "LIN-3312"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1754 from JKershaw/feat/lin-3312-guest-run-projection",
+  "thinEdges": [
+   "lib/share-run-scan.js>lib/secret-scan.js"
+  ],
+  "ticket": "LIN-3312",
+  "title": "LIN-2950 P2: guest run projection, guest render mode on the run page, scan guard (library ",
+  "code": "feature",
+  "note": "Share-link secret scan reuses the platform secret scanner."
+ },
+ {
+  "kind": "born",
+  "pair": "Front end: server-rendered pages|Web routes (pages & workspace API)",
+  "date": "2026-10-05",
+  "sha": "c517b442",
+  "lin": [
+   "LIN-2944"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1736 from JKershaw/feat/lin-2944-p3-proxy-default-seed-demotion",
+  "thinEdges": [
+   "lib/render-swipe.js>routes/workspace.js"
+  ],
+  "ticket": "LIN-2944",
+  "title": "The first screen: your backlog, the top task, Go, and the prompt underneath",
+  "code": "feature",
+  "note": "The first screen: the swipe renderer imports a workspace route."
+ },
+ {
+  "kind": "dissolved",
+  "pair": "Front end: server-rendered pages|Other features",
+  "date": "2026-10-06",
+  "sha": "dcfbf7fa",
+  "lin": [
+   "LIN-3325"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1759 from JKershaw/feat/lin-3325-remove-share-links",
+  "lastEdges": [
+   "lib/render-session.js>lib/guest-run.js",
+   "lib/ship-journey.js>lib/ship-layout.js"
+  ],
+  "ticket": "LIN-3325",
+  "title": "Remove share links",
+  "code": "removal",
+  "note": "Share links removed; their guest-run edge went with them."
+ },
+ {
+  "kind": "dissolved",
+  "pair": "Other features|Platform & plumbing",
+  "date": "2026-10-06",
+  "sha": "dcfbf7fa",
+  "lin": [
+   "LIN-3325"
+  ],
+  "pr": null,
+  "subject": "Merge pull request #1759 from JKershaw/feat/lin-3325-remove-share-links",
+  "lastEdges": [
+   "lib/kpi-stats.js>lib/report-history-store.js",
+   "lib/share-run-scan.js>lib/secret-scan.js"
+  ],
+  "ticket": "LIN-3325",
+  "title": "Remove share links",
+  "code": "removal",
+  "note": "Share links removed; the share scan\u2019s edge went with them."
+ },
+ {
+  "kind": "born",
+  "pair": "Other features|Platform & plumbing",
+  "date": "2026-10-11",
+  "sha": "566b89be",
+  "lin": [
+   "LIN-3453",
+   "LIN-3455"
+  ],
+  "pr": "1827",
+  "subject": "LIN-3455: B-scope timestamp helpers -> shared toEpochMs (11 files) (#1827)",
+  "thinEdges": [
+   "lib/kpi-stats.js>lib/report-history-store.js"
+  ],
+  "ticket": "LIN-3455",
+  "title": "LIN-3453 B: stores and rankers that returned 0 or raw NaN (11 files)",
+  "code": "consolidation",
+  "note": "Coherence loop batch: stores that returned NaN; KPI stats import the report history store."
+ },
+ {
+  "kind": "dissolved",
+  "pair": "Front end: server-rendered pages|Web routes (pages & workspace API)",
+  "date": "2026-10-11",
+  "sha": "39ca28a6",
+  "lin": [
+   "LIN-675"
+  ],
+  "pr": "1831",
+  "subject": "LIN-675: invert provider auth wiring; remove all lib/ -> routes/ imports (#1831)",
+  "lastEdges": [
+   "lib/render-swipe.js>routes/workspace.js",
+   "routes/collective.js>lib/render-collective.js",
+   "routes/collective.js>lib/render.js",
+   "routes/dashboard.js>lib/render-effort-readout.js",
+   "routes/dashboard.js>lib/render-escalation-kpis.js",
+   "routes/dashboard.js>lib/render-observation.js"
+  ],
+  "ticket": "LIN-675",
+  "title": "Hoist provider auth-router factories under lib/ (remove both lib/ \u2192 routes/ edges)",
+  "code": "inversion",
+  "note": "Provider auth wiring inverted (providers drop getAuthRouter; server.js mounts routes/provider-auth-routers.js) and the starter seed moved from routes/workspace.js to lib/starter-seed.js, removing every lib/ \u2192 routes/ import, including the swipe renderer\u2019s."
+ },
+ {
+  "kind": "dissolved",
+  "pair": "Front end: server-rendered pages|Platform & plumbing",
+  "date": "2026-10-11",
+  "sha": "ab227381",
+  "lin": [
+   "LIN-3466"
+  ],
+  "pr": "1841",
+  "subject": "LIN-3466: one HTML error page \u2014 retire htmlError for renderErrorPage (#1841)",
+  "lastEdges": [
+   "lib/components/accent-bar.js>lib/utils/html.js",
+   "lib/components/button.js>lib/utils/html.js",
+   "lib/components/empty-state.js>lib/utils/html.js",
+   "lib/components/field.js>lib/utils/html.js",
+   "lib/components/footer.js>lib/utils/html.js",
+   "lib/components/icon-button.js>lib/utils/html.js"
+  ],
+  "ticket": "LIN-3466",
+  "title": "One HTML error page: retire htmlError in favour of renderErrorPage",
+  "code": "removal",
+  "note": "htmlError retired in favour of one error page."
+ }
+]
