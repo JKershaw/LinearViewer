@@ -994,6 +994,12 @@ describe('markdownToAdf: unclosed fence and indented rule (LIN-3557 review)', ()
     assert.equal(adfHasUnrenderableContent(doc), false)
   })
 
+  test('a closed fence with no body is an empty code block, not a block holding the closing fence', () => {
+    assert.deepEqual(markdownToAdf('```js\n```').content, [
+      { type: 'codeBlock', attrs: { language: 'js' }, content: [] },
+    ])
+  })
+
   test('a lone fence line stays text', () => {
     assert.deepEqual(markdownToAdf('```').content.map(n => n.type), ['paragraph'])
   })
