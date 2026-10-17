@@ -147,4 +147,3 @@ describe('LIN-3611 A3 — the addItem argument per lane', () => {
   });
 });
 
-console.log(JSON.stringify(0));
