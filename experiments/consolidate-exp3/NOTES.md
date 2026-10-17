@@ -166,3 +166,16 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Environment note: the runner's checkout lacked `acorn` in `node_modules`, so `scripts/code-shape/seams.test.mjs` failed identically on main; CI runs `npm ci` and is the real check. A small runner fix, not this ticket's.
 
 **Inference.** Freeing a seam was the most expensive step of the round in agent time and the only one that needed John, and it still cost him one press. The output is more than permission to move code: the sweeps check the security properties by behaviour across every route, which the location pins never did.
+
+## 17 Oct: #4a scored (`../consolidate-4-entrance/arm-4a/score.md`)
+
+**Facts.**
+- `routes/` and `lib/` byte-identical before and after; only `tests/` and one doc line changed.
+- Independent text probe: old fails 37 tests in 11 files (same file:line set as before launch), new fails 0.
+- **A real move:** recommend-and-dispatch's 617-line handler moved into `lib/dispatch-entrance.js`. On the new tree the full suite stays green; on the old tree the same move fails 10 tests in 4 files. One C pin (`lin-3136-dispatch-gate.test.js:168`) needs the registration to keep a block-bodied `async (req, res) => { … }` forwarder.
+- Security spot-checks: six properties plus no-token and three planted routes, 13 runs, all fail with the guard removed and pass restored. One weakness: the proxy-grant sweep's "reaches no sink" checks pass vacuously for recommend-and-dispatch and kickoff (fixtures stop at a 404 issue lookup); the explicit 403 checks still catch a dropped gate.
+- Commit order: 4 test-adding commits first, then 14 loosening ones (the worker's evidence table records 67 mutation runs).
+- Suite on new: 17,420 of 17,426 pass; the 6 failures need a git checkout and fail identically on old. `seams.test.mjs` passes with `acorn` present.
+- Prediction misses: 139 tests (predicted 30–70), 7 new files (1–3), faster (2 h 34 min vs 3–5.5 h), a ruling on an unpredicted topic (the plan-review loop bound). Cost to the unit suite: about 13 s.
+
+**Inference.** The seam is genuinely free: a real move now passes. Both constraints (the forwarder form; the vacuous sink checks) go into #4b's ticket.
