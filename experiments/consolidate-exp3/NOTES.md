@@ -291,3 +291,13 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 
 **Inference.** Three lanes leave headroom: load well under the CPU count and no swap. The 16 Oct freeze came from concurrent full suites, which the cap now halves. Two leftovers to raise with John: Spotlight still indexes the workspaces, and old finished sessions still hold `claude` processes.
 - ~14:35Z: LIN-3610 (K3) merged (#1916, `ab85eb9e`). Scoring K1 and K3 together.
+
+## 17 Oct: K1 and K3 scored (`../consolidate-lanes/arm-knots/score.md`)
+
+**Facts.**
+- K1 (#1915): knots 18 → 17; Agent API ↔ pages gone; Agent API ↔ Providers 17/6 → 19/6 exactly as listed; `isBlocked` byte-identical; replay 0 differences on 70,272 inputs; re-exports are the same function.
+- K3 (#1916): knots 17 → 16; Other ↔ Runs gone; no other pair changed; moved code byte-identical; replay 0 differences on 62,321 cases.
+- **Knots on main now: 16** (20 at the start of the day: LIN-3600 −2, K1 −1, K3 −1). Census unchanged (309 / 1,021), as for #3: knots and copies are different measures.
+- K1's first commit added tests that pin *where* the code lives; review replaced them before merge. K3 repointed an importer the ticket missed and left one stale test comment.
+
+**Inference.** Workers create new location pins by default when asked to prove a move: the natural witness for "this moved" is "it's in the new file". A ticket asking for an untie should say the witness is behaviour (and the seams output), not location — or the next move pays for this one's pins. Another tests-as-seam data point.
