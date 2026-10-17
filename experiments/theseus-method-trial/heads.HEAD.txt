@@ -1,0 +1,34 @@
+commit 0d54b97458fdbd697f151a7c7d8f0c37848e280f
+terminal-head writer sites: 44 in 8 files (+1 reader regex in feedback.js)
+by head: {"[failed]":32,"[aborted]":2,"[blocked]":2,"[pending]":2,"[done]":6}
+by file: {"abort.js":2,"admission.js":4,"dispatcher.js":7,"executors.js":1,"followup.js":2,"hook.js":6,"opencode-runner.js":10,"reapers.js":12}
+
+bracket heads the reader does NOT treat as terminal (file:line):
+  [opencode-runner]                  24  opencode-runner.js
+  [stall-failsafe]                   13  reapers.js
+  [working]                          12  dispatcher.js, executors.js, heartbeat.js, hook.js, opencode-runner.js, reapers.js
+  [working · verifying]              8  heartbeat.js, hook.js
+  [opencode]                         8  reapers.js
+  [stalled?]                         6  heartbeat.js, opencode-runner.js, reapers.js
+  [evidence]                         4  hook.js, links.js, opencode-runner.js
+  [started]                          3  dispatcher.js
+  [onboarding]                       3  hook.js
+  [follow-up]                        2  dispatcher.js
+  [duplicate-launch]                 2  dispatcher.js
+  [harbour-broker]                   2  harbour-token-mcp-server.js
+  [usage]                            2  hook.js, opencode-runner.js
+  [hook]                             2  hook.js
+  [window-close]                     2  reapers.js
+  [skipped]                          1  dispatcher.js
+  [ -f package-lock.json ]           1  executors.js
+  [executors]                        1  executors.js
+  [working · running]                1  heartbeat.js
+  [recap unavailable]                1  hook.js
+  [decision]                         1  hook.js
+  [links]                            1  links.js
+  [resources]                        1  reapers.js
+  [fast-fail-watchdog]               1  reapers.js
+  [handle-recovery]                  1  reapers.js
+  [workspace-prep-warn]              1  reapers.js
+  [close-on-done]                    1  reapers.js
+  [dispatcher]                       1  shutdown.js

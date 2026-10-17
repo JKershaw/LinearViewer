@@ -1,0 +1,24 @@
+{
+  "_comment": "Area map for simple-dispatcher, written once by hand on 2026-10-17 at commit 0d54b97 BEFORE any import map was run, from docs/module-map.md and each module's header comment. First match wins. Frozen for this trial: no label may be changed to move a measure. 'other' is the catch-all and owns nothing.",
+  "areas": [
+    { "name": "loop",        "why": "the poll loop and processPolledItem router (claim -> assess -> route -> execute)", "patterns": ["dispatcher.js"] },
+    { "name": "intake",      "why": "what to take and whether to admit it: queue transport, pre-flight verdicts, follow-up/abort/duplicate resolution, halt policy, subscription vocabulary", "patterns": ["queue.js", "admission.js", "followup.js", "abort.js", "duplicate-launch.js", "halt.js", "subscription.js"] },
+    { "name": "pacing",      "why": "when a launch may begin: cold-start pacing and the launch circuit breaker", "patterns": ["pacing.js", "launch-breaker.js"] },
+    { "name": "launch",      "why": "how a session is started: executor registry, harness (engine) registry, terminal drivers", "patterns": ["executors.js", "harnesses.js", "terminal-driver.js"] },
+    { "name": "opencode",    "why": "the opencode harness's own per-session runner and its liveness reader", "patterns": ["opencode-runner.js", "opencode-liveness.js"] },
+    { "name": "hook",        "why": "the Stop hook: protocol decision, sentinels, refusal classification", "patterns": ["hook.js", "refusal.js"] },
+    { "name": "transcript",  "why": "reading what an agent did: transcript reader, heartbeat KPIs, evidence links", "patterns": ["transcript.js", "heartbeat.js", "links.js"] },
+    { "name": "reapers",     "why": "during-work and after-work sweeps: watchdogs, stall failsafe, cleanup, clone inspector", "patterns": ["reapers.js", "clones.js"] },
+    { "name": "feedback",    "why": "talking back to Harbour: feedback POSTs, chunking, the bounded fetch, the credential broker", "patterns": ["feedback.js", "chunk.js", "http.js", "harbour-token-mcp-server.js"] },
+    { "name": "state",       "why": "the IPC bus and its vocabulary: sessions.json store, phases, targets", "patterns": ["state-store.js", "phases.js", "targets.js"] },
+    { "name": "process",     "why": "signals SD sends and receives: signal guard, shutdown handler", "patterns": ["signal-guard.js", "shutdown.js"] },
+    { "name": "telemetry",   "why": "durable local logs and resource sampling", "patterns": ["oplog.js", "resources.js", "resource-metrics.js"] },
+    { "name": "config",      "why": "env-derived configuration", "patterns": ["config.js", "load-env.js"] },
+    { "name": "other",       "why": "catch-all; owns nothing", "patterns": ["format.js", "net-util.js"] },
+    { "name": "e2e",         "why": "manual end-to-end smoke tooling at the repo root (not production)", "patterns": ["e2e-*.js"] },
+    { "name": "test",        "why": "unit and system tests", "patterns": ["test/**"] },
+    { "name": "experiments", "why": "one-off witnesses and prototypes", "patterns": ["experiments/**", "scratchpad/**"] },
+    { "name": "ops",         "why": "host scripts", "patterns": ["scripts/**", "deploy/**", "watch-restart.sh"] }
+  ],
+  "production": ["loop", "intake", "pacing", "launch", "opencode", "hook", "transcript", "reapers", "feedback", "state", "process", "telemetry", "config", "other"]
+}

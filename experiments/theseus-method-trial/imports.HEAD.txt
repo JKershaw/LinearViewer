@@ -1,0 +1,25 @@
+commit 0d54b97458fdbd697f151a7c7d8f0c37848e280f
+js files 246, local import sites 668 (lazy: 200), area pairs with edges 76
+unmapped: none; dynamic requires: none; parse errors: 0
+
+Production area matrix (row imports column; count of import sites):
+from\to       loop intake pacing launch openco   hook transc reaper feedba  state proces teleme config  other
+loop             .      7      2      3             1             1      1      3      2      3      1      2
+intake                  .             2                                  1      3                    2       
+pacing                         .                                                2                    1       
+launch                         1      .                                                1             3       
+opencode                              1      .      1      2             1      3             1      2      2
+hook                                                .      3             1      2             1      2      1
+transcript                                                 .                    1                           1
+reapers                 1      2      3      1      1      2      .      1      4      1      3      2      2
+feedback                                                                 .                                   
+state                                                                           .             1              
+process                                                                  1      2      .      2              
+telemetry                                                                                     .              
+config                                                                                               .       
+other                                                                                                       .
+
+KNOTS (two-way area pairs), all areas: 0; production only: 0
+
+Tangled groups (SCCs of the area graph): none
+File-level cycles: none
