@@ -203,3 +203,16 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 
 **Inference.** "Freed" has degrees: #4a freed the seam for moving code between files, but not for rewriting a line's text. Where a test pins text inside the unit, the consolidation can still be held to the old shape.
 - Filed LIN-3604 (#4b); autopilot kicked off 11:42Z.
+
+## 17 Oct: tests are part of the seam (for later discussion)
+
+John asked why #4b's ticket preferred keeping the three tests that require one exact two-line passage, indentation included. My answer: it isn't better. The preference came from keeping test edits minimal so a green suite is clean evidence of no behaviour change; but the mint sweep already covers the property, the pin holds the authority to the old shape (the 5c failure), and #4a proved the conversion method. The distinction that matters: a behaviour test stays unchanged through a consolidation; a text pin is converted when it constrains the design.
+
+John: "So, if we consider tests part of the "seam", then it makes sense they are tidied up to be corrected as part of this process? One for the notes and later discussion. I think currently the assumption is the tests are all correct (and necessary), which isn't really true."
+
+**For the discussion (inference).** The method so far treats the suite as the fixed oracle: rebuild and consolidation tickets say "keep tests green, change them only with a reason". This round shows the suite is itself diffuse in the same way the code is:
+- #4a: 63 location pins in 35 files guarded properties that 4 behaviour sweeps now guard across every route.
+- #4a's sweeps had a vacuous case (two routes' "reaches no sink" checks stopped at a 404), and a test still says "9 sites" while checking 7.
+- #4b: a text pin survived inside the freed unit.
+- #2: an import-allowlist pin had to grow by one line to let a module reach its authority.
+A seam therefore has a code side and a test side. Freeing it means correcting the tests that guard *where* or *how* instead of *what*, and finding ones that are vacuous, stale or redundant. The safeguard is the one #4a used: a replacement lands and is shown catching the removed guard before the old test goes. The independent replay is what lets tests change at all, because it judges behaviour without trusting the suite.
