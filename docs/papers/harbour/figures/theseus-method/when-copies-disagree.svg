@@ -57,7 +57,7 @@
 <g font-size="10.5" fill="#111827">
 <text x="544" y="68">Name it and list it. Inside a consolidation only comments are fixed;</text>
 <text x="544" y="82">a wrong behaviour becomes (d), so the replay stays at zero.</text>
-<text x="544" y="148">One authority, one visible knob per variation (a lane, a mode);</text>
+<text x="544" y="148">One authority, one visible knob per variation, such as a mode;</text>
 <text x="544" y="162">never a silent branch keyed on who is calling.</text>
 <text x="544" y="228">Listed, with the reason. Never a success reply, a write and its</text>
 <text x="544" y="242">arguments, stored data, check order or security: those go to (d).</text>

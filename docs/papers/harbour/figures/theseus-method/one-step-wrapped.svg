@@ -12,14 +12,11 @@
 <!-- panel 1 -->
 <rect x="20" y="44" width="300" height="180" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
 <text x="34" y="66" font-size="13" font-weight="600" fill="#111827">Before launch</text>
-<g font-size="11" fill="#111827">
-<text x="34" y="92"><tspan font-weight="600">1 Ticket</tspan>: target, owner, counting rule,</text>
-<text x="48" y="107">what the plan must contain</text>
-<text x="34" y="129"><tspan font-weight="600">2 Prediction</tspan>, committed: what moves,</text>
-<text x="48" y="144">and by how much</text>
-<text x="34" y="166"><tspan font-weight="600">3 Fresh reader</tspan>: every claim true, the repo</text>
-<text x="48" y="181">named, no words put in anyone's mouth</text>
-<text x="34" y="203"><tspan font-weight="600">4 Replay</tspan> built and self-checked</text>
+<g font-size="11.5" fill="#111827">
+<text x="34" y="96"><tspan font-weight="600">1</tspan>  The ticket</text>
+<text x="34" y="126"><tspan font-weight="600">2</tspan>  A prediction, committed</text>
+<text x="34" y="156"><tspan font-weight="600">3</tspan>  A fresh reader checks it</text>
+<text x="34" y="186"><tspan font-weight="600">4</tspan>  The replay, built and self-checked</text>
 </g>
 <line x1="320" y1="134" x2="346" y2="134" stroke="#6b7280" stroke-width="1.2" marker-end="url(#ah)"/>
 
@@ -42,12 +39,10 @@
 <!-- panel 3 -->
 <rect x="640" y="44" width="300" height="180" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
 <text x="654" y="66" font-size="13" font-weight="600" fill="#111827">After merge</text>
-<g font-size="11" fill="#111827">
-<text x="654" y="92"><tspan font-weight="600">5 Replay</tspan> old against new, two seeds</text>
-<text x="654" y="114"><tspan font-weight="600">6 Score</tspan> against the prediction,</text>
-<text x="668" y="129">and file the differences it found</text>
-<text x="654" y="151"><tspan font-weight="600">7 Re-measure</tspan> with the standing</text>
-<text x="668" y="166">measures; pick the next target</text>
+<g font-size="11.5" fill="#111827">
+<text x="654" y="96"><tspan font-weight="600">5</tspan>  The replay, on two seeds</text>
+<text x="654" y="126"><tspan font-weight="600">6</tspan>  A score against the prediction</text>
+<text x="654" y="156"><tspan font-weight="600">7</tspan>  The measures again; next target</text>
 </g>
 
 <!-- people lane -->
@@ -56,11 +51,11 @@
 <text x="34" y="302" font-size="10.5" fill="#6b7280">touched at two points</text>
 <path d="M420 224 V258" fill="none" stroke="#eb6834" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ao)"/>
 <text x="428" y="246" font-size="10.5" fill="#6b7280">a review loop runs out</text>
-<text x="350" y="290" font-size="11" fill="#111827"><tspan font-weight="600">A ruling</tspan>: the card comes</text>
-<text x="350" y="306" font-size="11" fill="#111827">pre-filled; a person presses</text>
+<text x="350" y="292" font-size="11.5" fill="#111827"><tspan font-weight="600">A ruling</tspan>, pre-filled:</text>
+<text x="350" y="309" font-size="11.5" fill="#111827">a person reads and presses</text>
 <path d="M720 224 V258" fill="none" stroke="#eb6834" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#ao)"/>
 <text x="728" y="246" font-size="10.5" fill="#6b7280">unclear differences, written up</text>
-<text x="654" y="290" font-size="11" fill="#111827"><tspan font-weight="600">Open questions</tspan>: answered</text>
-<text x="654" y="306" font-size="11" fill="#111827">later, never blocking a run</text>
-<text x="34" y="326" font-size="10.5" fill="#6b7280">One round: eight merges, two presses.</text>
+<text x="654" y="292" font-size="11.5" fill="#111827"><tspan font-weight="600">Open questions</tspan>, answered</text>
+<text x="654" y="309" font-size="11.5" fill="#111827">later, never blocking a run</text>
+
 </svg>

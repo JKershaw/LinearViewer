@@ -44,10 +44,10 @@ async function get(path) {
 }
 
 describe('library catalog', () => {
-  test('every papers file on disk and the 14 listed docs is catalogued and served', () => {
+  test('every papers file on disk and the 15 listed docs is catalogued and served', () => {
     assert.equal(catalog.docs.length, papersOnDisk.length + LISTED_DOCS.length,
       'one catalog entry per .md file plus the listed docs');
-    assert.equal(catalog.listed.length, LISTED_DOCS.length, 'all 14 listed docs resolve');
+    assert.equal(catalog.listed.length, LISTED_DOCS.length, 'all 15 listed docs resolve');
   });
 
   test('shelf membership comes from the document front matter kind (allow-list)', () => {
@@ -106,12 +106,12 @@ describe('library catalog', () => {
     assert.match(catalog.docForSlug('doc/charter').summary, /^Status: DRAFT/);
   });
 
-  test('the 15 front-matter-less documents all get date and author from the tables', () => {
+  test('the 16 front-matter-less documents all get date and author from the tables', () => {
     const overrides = [
       'fleet-complexity-read',
       ...LISTED_DOCS.map(d => `doc/${d.path.replace(/\.md$/, '').split('/').pop()}`),
     ];
-    assert.equal(overrides.length, 15);
+    assert.equal(overrides.length, 16);
     for (const slug of overrides) {
       const doc = catalog.docForSlug(slug);
       assert.ok(doc, `${slug} resolves`);

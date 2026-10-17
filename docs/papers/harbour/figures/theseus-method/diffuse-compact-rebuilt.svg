@@ -50,7 +50,33 @@
 <text x="14" y="276" font-size="10.5" fill="#6b7280">jobs · owner</text>
 <text x="139" y="276" font-size="10.5" fill="#6b7280">core</text>
 <rect x="22" y="196" width="88" height="60" rx="6" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.5"/>
-<path d="M30 246 C 47 202, 62 254, 72 210 S 104 246, 96 204 S 40 220, 58 250 S 106 234, 90 214 S 36 204, 46 232" fill="none" stroke="#2a78d6" stroke-width="1.3"/>
+<g stroke="#2a78d6" stroke-width="1" stroke-opacity="0.8">
+<line x1="34" y1="208" x2="58" y2="248"/>
+<line x1="34" y1="208" x2="90" y2="242"/>
+<line x1="34" y1="208" x2="102" y2="226"/>
+<line x1="58" y1="248" x2="100" y2="206"/>
+<line x1="58" y1="248" x2="72" y2="214"/>
+<line x1="100" y1="206" x2="44" y2="232"/>
+<line x1="100" y1="206" x2="30" y2="248"/>
+<line x1="44" y1="232" x2="90" y2="242"/>
+<line x1="44" y1="232" x2="102" y2="226"/>
+<line x1="90" y1="242" x2="72" y2="214"/>
+<line x1="72" y1="214" x2="30" y2="248"/>
+<line x1="102" y1="226" x2="30" y2="248"/>
+<line x1="80" y1="230" x2="34" y2="208"/>
+<line x1="80" y1="230" x2="100" y2="206"/>
+<line x1="80" y1="230" x2="30" y2="248"/>
+<line x1="58" y1="248" x2="102" y2="226"/>
+</g>
+<circle cx="34" cy="208" r="2.8" fill="#2a78d6"/>
+<circle cx="58" cy="248" r="2.8" fill="#2a78d6"/>
+<circle cx="100" cy="206" r="2.8" fill="#2a78d6"/>
+<circle cx="44" cy="232" r="2.8" fill="#2a78d6"/>
+<circle cx="90" cy="242" r="2.8" fill="#2a78d6"/>
+<circle cx="72" cy="214" r="2.8" fill="#2a78d6"/>
+<circle cx="102" cy="226" r="2.8" fill="#2a78d6"/>
+<circle cx="30" cy="248" r="2.8" fill="#2a78d6"/>
+<circle cx="80" cy="230" r="2.8" fill="#2a78d6"/>
 <g stroke="#6b7280" stroke-width="1.2" fill="none">
 <path d="M35 116 L44 192" marker-end="url(#ah)"/><path d="M92 148 L86 192" marker-end="url(#ah)"/>
 <path d="M165 110 L114 202" marker-end="url(#ah)"/><path d="M216 152 L114 224" marker-end="url(#ah)"/>
@@ -84,10 +110,11 @@
 <text x="14" y="276" font-size="10.5" fill="#6b7280">jobs · owner</text>
 <text x="139" y="276" font-size="10.5" fill="#6b7280">core</text>
 <rect x="22" y="196" width="88" height="60" rx="6" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.5"/>
-<rect x="30" y="204" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
-<rect x="70" y="204" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
-<rect x="30" y="230" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
-<rect x="70" y="230" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<g stroke="#2a78d6" stroke-width="1.1"><line x1="66" y1="217" x2="40" y2="234"/><line x1="66" y1="217" x2="66" y2="234"/><line x1="66" y1="217" x2="92" y2="234"/></g>
+<rect x="50" y="203" width="32" height="14" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<rect x="29" y="234" width="22" height="14" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<rect x="55" y="234" width="22" height="14" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<rect x="81" y="234" width="22" height="14" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
 <g stroke="#6b7280" stroke-width="1.2" fill="none">
 <path d="M35 116 L44 192" marker-end="url(#ah)"/><path d="M92 148 L86 192" marker-end="url(#ah)"/>
 <path d="M165 110 L114 202" marker-end="url(#ah)"/><path d="M216 152 L114 224" marker-end="url(#ah)"/>
@@ -100,6 +127,6 @@
 <text x="5" y="310" font-size="11" fill="#6b7280">lives in</text>
 <text x="62" y="310" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">1 place</text>
 <text x="5" y="330" font-size="11" fill="#6b7280">inside</text>
-<text x="62" y="330" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">small parts</text>
+<text x="62" y="330" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">small parts, clear calls</text>
 </g>
 </svg>

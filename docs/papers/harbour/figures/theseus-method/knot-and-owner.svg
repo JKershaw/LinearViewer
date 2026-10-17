@@ -6,8 +6,8 @@
 <rect x="0" y="0" width="960" height="320" fill="#fff"/>
 
 <!-- ===== left: the knot ===== -->
-<text x="20" y="30" font-size="15" font-weight="600" fill="#111827">A knot</text>
-<text x="20" y="49" font-size="11.5" fill="#6b7280">two areas that import each other</text>
+<text x="20" y="30" font-size="13" font-weight="600" fill="#111827">A knot</text>
+<text x="20" y="48" font-size="11.5" fill="#6b7280">two areas that import each other</text>
 <rect x="20" y="68" width="138" height="164" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
 <rect x="222" y="68" width="138" height="96" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
 <rect x="222" y="184" width="138" height="48" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
@@ -24,9 +24,8 @@
 <text x="168" y="214" font-size="10.5" fill="#6b7280">2 rules</text>
 <line x1="291" y1="164" x2="291" y2="182" stroke="#6b7280" stroke-width="1.2" marker-end="url(#ah)"/>
 <text x="300" y="177" font-size="10" fill="#6b7280">already used</text>
-<text x="20" y="258" font-size="11.5" fill="#111827">Which edge is wrong? Not "the thinner one".</text>
-<text x="20" y="275" font-size="11.5" fill="#111827">Ask of each: which area would have to</text>
-<text x="20" y="292" font-size="11.5" fill="#111827">change if this rule changed?</text>
+<text x="20" y="262" font-size="11.5" fill="#6b7280">For each edge: which area would have to</text>
+<text x="20" y="278" font-size="11.5" fill="#6b7280">change if this rule changed?</text>
 
 <line x1="374" y1="150" x2="398" y2="150" stroke="#6b7280" stroke-width="1.2" marker-end="url(#ah)"/>
 
@@ -43,12 +42,10 @@
 <line x1="198" y1="82" x2="198" y2="90" stroke="#6b7280" stroke-width="1.2" marker-end="url(#ah)"/>
 <rect x="156" y="113" width="84" height="19" rx="4" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.3"/>
 <text x="198" y="126" font-size="10" fill="#111827" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">isBlocked()</text>
-<text x="272" y="40" font-size="13" font-weight="600" fill="#111827">✓ Cut by ownership (what was done)</text>
-<text x="272" y="62" font-size="11" fill="#111827">The lifetimes are the API's rule, so the page</text>
-<text x="272" y="77" font-size="11" fill="#111827">reading them is right: that edge stays.</text>
-<text x="272" y="92" font-size="11" fill="#111827">isBlocked is an issue-state rule, so it moves</text>
-<text x="272" y="107" font-size="11" fill="#111827">to providers. No edge added; the knot is gone.</text>
-<text x="272" y="136" font-size="10.5" fill="#6b7280">moved code byte-identical; behaviour replayed</text>
+<text x="272" y="48" font-size="13" font-weight="600" fill="#111827">✓ Cut by ownership</text>
+<text x="272" y="74" font-size="11.5" fill="#111827">The issue-state rule moves to its owner.</text>
+<text x="272" y="92" font-size="11.5" fill="#111827">The page keeps reading the API's lifetimes.</text>
+<text x="272" y="128" font-size="10.5" fill="#6b7280">what was done: one function moved, byte-identical</text>
 </g>
 
 <!-- ===== option 2: by thinness ===== -->
@@ -66,11 +63,9 @@
 <text x="57" y="271" font-size="9.5" fill="#111827" text-anchor="middle" font-family="JetBrains Mono, ui-monospace, monospace">isBlocked()</text>
 <path d="M146 222 C 124 228, 116 258, 96 264" fill="none" stroke="#eb6834" stroke-width="1.5" marker-end="url(#ao)"/>
 <line x1="198" y1="232" x2="198" y2="240" stroke="#6b7280" stroke-width="1.2" marker-end="url(#ah)"/>
-<text x="272" y="190" font-size="13" font-weight="600" fill="#111827">✗ Cut the thin edge</text>
-<text x="272" y="212" font-size="11" fill="#111827">Copy the lifetimes into the page. The pair is</text>
-<text x="272" y="227" font-size="11" fill="#111827">untied by making a second copy of the API's</text>
-<text x="272" y="242" font-size="11" fill="#111827">rule, and the API still reaches into a page</text>
-<text x="272" y="257" font-size="11" fill="#111827">for an issue rule it doesn't own either.</text>
-<text x="272" y="286" font-size="10.5" fill="#6b7280">a knot traded for a scattered decision</text>
+<text x="272" y="198" font-size="13" font-weight="600" fill="#111827">✗ Cut the thin edge</text>
+<text x="272" y="224" font-size="11.5" fill="#111827">The lifetimes are copied into the page.</text>
+<text x="272" y="242" font-size="11.5" fill="#111827">The rule still sits with neither owner.</text>
+<text x="272" y="278" font-size="10.5" fill="#6b7280">a knot traded for a scattered decision</text>
 </g>
 </svg>
