@@ -261,3 +261,11 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 
 **Inference.** The ownership rule held, but applying it needs every throw and catch site, not just the import that ties the knot. The fresh-reader step overturned a pre-launch ownership call before it cost a run.
 - 14:02Z: light lane 2: LIN-3606 (K1) filed and kicked off. K3 queued for the next free light lane.
+
+## 17 Oct, 14:06Z: LIN-3605 (concurrency cap) merged (#1914); K3 filed as LIN-3610
+
+**Facts.**
+- LIN-3605: kicked off ~13:35Z, merged 14:05:58Z; 4 files, +170/−4; no rulings. `scripts/run-unit-tests.mjs` caps local `node --test` at half the CPUs (override `UNIT_TEST_CONCURRENCY`; any non-empty `CI` = no flag). CLAUDE.md lines 22–23 edited in place (110 lines, 10,720 bytes). Local full suite: 17,446 tests, 0 fail, 57.8 s wall at concurrency 5 of 10 CPUs; hermetic PASS. CI workflow untouched.
+- **The first implementation landed in the wrong repo:** the worker built it as simple-dispatcher#272; review caught it and the design was ported into LinearViewer. The PR says simple-dispatcher#272 should be closed unmerged. (Inference: the two-repo default workspace makes "which repo" a real step for a worker; a ticket naming its repo in the title helps but did not prevent it. Left for John.)
+- LIN-3606 (K1) PR #1915 opened 14:06Z.
+- K3 filed as LIN-3610 and kicked off 14:08Z in light lane 1.
