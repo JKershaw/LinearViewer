@@ -191,3 +191,14 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Census: 12 groups touch the entrance files, but of the 24 shared decisions it sees one (the 201 receipt).
 
 **Inference.** The census is nearly blind here: the entrance copies are procedures (read, gate, build, mint, enqueue, reply), not data or small helpers. Sites-per-decision by hand (the decision map) is the measure for this kind of consolidation.
+
+## 17 Oct: #4b fresh-reader check
+
+**Facts.** 5 must-fix, 5 should-fix, 10 minor; code claims held at `15191460`.
+- The ticket contradicted itself on the #4a sweeps (unmodified vs strengthen the fixture). Fixed: additions only, in their own commit first, green on unchanged code, with dropped-grant mutants shown failing.
+- A source-text anchor survived #4a: three mint-census tests need one exact two-line text in the entrance, indentation included, and the gate check recognises only a bare `isFollowUp`/`followUpTo`. #4a had classified this pin as B (loosened to the entrance as one unit), so a text constraint survived *inside* the unit. The prediction's "0 test edits" was revised before launch.
+- Gate placement in the authority was ambiguous for the session owner gate; now fail-closed wording.
+- No statement of what the plan must contain (the plan review needs something to converge on, after #4a's loop-bound ruling); six required items added.
+- Per-decision site counts weren't checkable (one decision read as 5 sites in the ticket and 14 in the map); a count column and counting rule added.
+
+**Inference.** "Freed" has degrees: #4a freed the seam for moving code between files, but not for rewriting a line's text. Where a test pins text inside the unit, the consolidation can still be held to the old shape.
