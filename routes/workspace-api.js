@@ -296,10 +296,10 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
   return res.json(json);
 }
 
-// LIN-836: surface the stepper variant in the UI. The mode / variant validate against
-// the shared lists (unknown/absent → the default), and ONLY the stepper branch changes
-// label/promptName/downloadName — the standard strings stay byte-identical to preserve
-// the LIN-791 additive invariant.
+// LIN-836: surface the stepper variant in the UI. Validate against the shared
+// list (unknown/absent → standard), thread it into the kickoff body, and let
+// ONLY the stepper branch change label/promptName/downloadName — the standard
+// strings stay byte-identical to preserve the LIN-791 additive invariant.
 function autopilotParams(req) {
   const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
   const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
@@ -982,8 +982,9 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         variant,
         stopAt,
         standalone: true,
-        // LIN-2804: the capability summary of the actually resolved (possibly
-        // cross-source) provider for this issue, same as the generatePrompt pattern.
+        // LIN-2804: mirrors the identical generatePrompt pattern already at
+        // lines 948/1299/1388 in this file — issueProvider is the actually
+        // resolved (possibly cross-source) provider for this issue.
         providerUi: issueProvider.ui || null
       });
       sendAutopilotPrompt(req, res, { stepper, identifier: issue.identifier, prompt, promptName: `${autopilotTitle(stepper)} — ${issue.identifier}` });
@@ -1007,7 +1008,8 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       return jsonError(res, 403, 'Proxy feature is not enabled');
     }
 
-    // LIN-836: same variant wiring as the issue-scoped twin above.
+    // LIN-836: same variant wiring as the issue-scoped twin above (stepper only
+    // changes the response strings; standard stays byte-identical).
     const { mode, variant, stepper, baseUrl } = autopilotParams(req);
     // LIN-2818: stays at 1000 on purpose. This general/stack-walk goal arrives in
     // the URL query string (the dispatch page's goal textarea round-trips it via
@@ -1034,7 +1036,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
 
     try {
-      // LIN-2804: the capability summary, same source as the issue-scoped twin.
+      // LIN-2804: mirrors the identical generatePrompt pattern at lines 439/3415.
       const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, providerUi: getProviderForWorkspace(req.workspace)?.ui || null });
       sendAutopilotPrompt(req, res, {
         stepper,
