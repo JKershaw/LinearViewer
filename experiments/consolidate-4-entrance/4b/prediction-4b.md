@@ -1,6 +1,6 @@
 # Experiment 4b prediction: one authority per dispatch-entrance decision
 
-Grounded at LinearViewer origin/main `15191460` (LIN-3601, #1912). Written before launch. The decision map with file:line is `decisions.md`; the ticket is `ticket-4b.md`; the replay is `replay/`.
+Grounded at LinearViewer origin/main `15191460` (LIN-3601, #1912). Written before launch. **Revised before launch** after the fresh-reader check (`fresh-reader.md`: 20 findings, all applied): §4 tests (1 required sweep addition, plus 0–1 conversion of the `POST_DISPATCH_GATE` text pin) and §5 (V25 added, plan stopping rule). The decision map with file:line is `decisions.md`; the ticket is `ticket-4b.md`; the replay is `replay/`.
 
 ## 1. Sites per decision, before → after (by hand)
 
@@ -93,17 +93,21 @@ Predicted:
 * **Route files:** −1,600 to −1,950.
 * **`lib/dispatch-entrance.js`:** +1,250 to +1,650 (45 lines today). Reason comments move with their code. #2 showed gathering comments beside one authority can add lines.
 * **Production net:** −150 to −450, central −300.
-* **Tests:** 0 required edits. The B censuses are written to pass if the shape rules in `ticket-4b.md` are kept. +0 to +200 lines if the worker adds unit tests for the authority's check groups.
-* **The #4a sweeps:** 0 lines changed.
+* **Tests (revised before launch, after the fresh-reader check):**
+  * **1 required addition.** The proxy-grant sweep fixture gets a valid issue and positive controls for R and K. It lands in its own commit first, green on unchanged code, with dropped-grant scratch runs shown failing.
+  * **0–1 conversion.** `POST_DISPATCH_GATE` (`lin-3134-declared-mint-census.test.js:638`) becomes a behaviour check only if the authority cannot keep its exact 10/12-space text. Likelihood about 40%.
+  * The earlier figure, "0 required edits", missed both.
+  * The source-text censuses are otherwise written to pass if the shape rules in `ticket-4b.md` are kept. +0 to +200 lines if the worker adds unit tests for the authority's check groups.
+* **The LIN-3601 sweeps:** additions only, in `dispatch-entrance-proxy-grant-sweep.test.js`; every other sweep file 0 lines changed.
 
 ## 5. Fixes, rulings, divergences
 
 * **Fixes expected: 7, all comments** (A1–A7 in `decisions.md` §2). **0 behaviour fixes.**
 * **Divergences.**
-  * (b): about 20, kept as named parameters.
+  * (b): about 21, kept as named parameters (V25, structural-refusal text by resume against launch, added after the fresh-reader check).
   * (c): 9 (V1, V16, V19, V24, V29, V30, V33, V40, plus the S-only refusal tags on the proxy lanes).
   * (d): 7, kept and written up under Open questions (V4/V37, V5, V10, V12, V18, V23, V26).
-* **Rulings expected: 0.** The ticket routes every (d) to the PR body, never to DECISION/BLOCKED. Residual risk is about 25%: #4a's 63-pin plan hit the plan-review loop bound. #4b has a similar security weight and a larger code move, so one plan-loop press is the likeliest cost to John.
+* **Rulings expected: 0.** The ticket routes every (d) to the PR body, never to DECISION/BLOCKED. It also routes new behaviour bugs to (d), and lists the six items a complete plan holds, so the plan reviewer has a stopping rule. Residual risk is about 25%: #4a's 63-pin plan hit the plan-review loop bound. #4b has a similar security weight and a larger code move, so one plan-loop press is the likeliest cost to John.
 * **Replay on the merge** (`replay/`, two seeds, about 21,000 requests each):
   * 0 differences;
   * entrance-unit coverage on the new side ≥95%;

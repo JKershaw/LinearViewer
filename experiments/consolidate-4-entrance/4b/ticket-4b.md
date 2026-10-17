@@ -11,7 +11,7 @@ PARENT: LIN-3549 · PROJECT: Quality, Periodicals & Measurement · PRIORITY: Hig
   * "A new helper counts as consolidation only when callers stop making the old decision" (`:208-209`).
 * **LIN-3601 (#1912) freed the seam.**
   * The location pins became behaviour sweeps (`tests/unit/dispatch-entrance-session-owner-sweep.test.js`, `-proxy-grant-sweep`, `-redaction-canary-sweep`, `-mint-sweep`, `-mint-limiter-order`, `-no-token`, `-proxy-key-sets`).
-  * The B censuses now judge `routes/dispatch.js`, `routes/proxy-dispatch.js`, `routes/proxy-kickoff.js` and `lib/dispatch-entrance.js` as one unit, E (for example `tests/unit/lin-3383-runner-enqueue-census.test.js:148`, `tests/unit/lin-3134-declared-mint-census.test.js:95`).
+  * The source-text censuses now judge `routes/dispatch.js`, `routes/proxy-dispatch.js`, `routes/proxy-kickoff.js` and `lib/dispatch-entrance.js` as one unit, E (for example `tests/unit/lin-3383-runner-enqueue-census.test.js:148`, `tests/unit/lin-3134-declared-mint-census.test.js:95`).
   * What still pins location (the C pins): the registrations with their middleware chains, including `requireGrant('dispatch')`; the factory signatures; and the module-scope `rateLimit` declarations. All of these stay in the three route files.
 
 **Decision.**
@@ -26,48 +26,56 @@ The entrances:
 
 The 24 decisions made by two or more entrances, with their sites (96 in all):
 
-| # | Decision | Sites |
-|---|---|---|
-| D1 | store missing → 503 | `proxy-dispatch.js:352-357` (P `:412`, R `:767`); K `proxy-kickoff.js:207-210` |
-| D2 | `req.body \|\| {}` | S `dispatch.js:487`; P `:415`; R `:770`; K `:213` |
-| D3 | verb shape, prompt required, target | S `dispatch.js:493,498-502`; P `proxy-dispatch.js:420,423-426` |
-| D4 | abort/cascade/kind/periodical/run-field list | S `dispatch.js:552-582,599`; P `proxy-dispatch.js:431-466` |
-| D5 | presetId shape + lookup | S `dispatch.js:587-592`; K `proxy-kickoff.js:161-166` |
-| D6 | model/harness/effort + unknown-effort warning | `lib/dispatch-validation.js:228-237` (S, P); R `proxy-dispatch.js:792-801`; K `proxy-kickoff.js:142-156` |
-| D7 | issueIdentifier and sessionId rules | `lib/dispatch-validation.js:179,277` (S, P); R `:775-776,825`; K `:128,137` |
-| D8 | audited 400 | `proxy-dispatch.js:360-363`; `proxy-kickoff.js:76-79`; S `dispatch.js:503,619` (no audit) |
-| D10 | `subscription ?? DEFAULT_SUBSCRIPTION` | S `dispatch.js:879`; P `:491`; R `:848`; K `:227` |
-| D11 | cascade expansion | S `dispatch.js:627-633`; P `proxy-dispatch.js:500-507` |
-| D12 | persisted `issueSource` | S `dispatch.js:639-641`; P `:537-539`; R `:877-879`; K `:238,266` |
-| D13 | resolve the issue's credential | R `proxy-dispatch.js:862-873`; K `proxy-kickoff.js:242-250`; P `proxy-dispatch.js:524-531` |
-| D14 | issue context or 404 | Ro `proxy-dispatch.js:902-915`; K `proxy-kickoff.js:251-264` |
-| D15 | dangling-referent 422 | S `dispatch.js:654-662`; P `proxy-dispatch.js:541-550` |
-| D16 | `repo \|\| null` | S `dispatch.js:869`; P `:556`; Ro `:944`; Rl `:1204`; K `:234` |
-| D17 | proxy-context append policy | `proxy-dispatch.js:141-148` (P `:561`, R `:856`); K `proxy-kickoff.js:359`; S `dispatch.js:537` (opt-in) |
-| D18 | free-tier key + run gate | S `dispatch.js:689-695`; P `proxy-dispatch.js:572-574`; Ro `:895-896,962`; Rl `:1096-1100,1226`; K `proxy-kickoff.js:335-344`; `runGateFor` `proxy-dispatch.js:395-400` |
-| D19 | plan block | S `dispatch.js:717-733`; P `proxy-dispatch.js:592-599`; Ro `:976`; Rl `:1245-1250` |
-| D20 | base URL | S `dispatch.js:684`; P `proxy-dispatch.js:601`; Ro `:987,1005`; Rl `:1261,1279`; K `proxy-kickoff.js:229` |
-| D21 | the `createDispatchItem` call | S `dispatch.js:696`; P `proxy-dispatch.js:575`; Ro `:963`; Rl `:1227`; K `proxy-kickoff.js:345` |
-| D22 | credential mint (follow-up gate, launch attach, plain return) | S `dispatch.js:767-860`; P `proxy-dispatch.js:600-681`; Ro `:977-1029`; Rl `:1251-1303`; K `proxy-kickoff.js:358-398` |
-| D23 | row fields | S `dispatch.js:861-893`; P `proxy-dispatch.js:682-710`; Ro `:1030-1066`; Rl `:1304-1344`; K `proxy-kickoff.js:399-434` |
-| D25 | the 201 | S `dispatch.js:930-945`; `receiptFor` `proxy-dispatch.js:161-179` (P `:714`, Ro `:1075`, Rl `:1352`); K `proxy-kickoff.js:440-459` |
-| D26 | map an enqueue failure | S `dispatch.js:946-998`; `relayEnqueueFailure` `proxy-dispatch.js:374-390` (P `:719-726`, Ro `:1076-1093`, Rl `:1357-1372`, R outer `:1373-1381`); K `proxy-kickoff.js:460-543` |
+| # | Decision | Sites | Count |
+|---|---|---|---|
+| D1 | store missing → 503 | `proxy-dispatch.js:352-357` (P `:412`, R `:767`); K `proxy-kickoff.js:207-210` | 2 |
+| D2 | `req.body \|\| {}` | S `dispatch.js:487`; P `:415`; R `:770`; K `:213` | 4 |
+| D3 | verb shape, prompt required, target | S `dispatch.js:493,498-502`; P `proxy-dispatch.js:420,423-426` | 2 |
+| D4 | abort/cascade/kind/periodical/run-field list | S `dispatch.js:552-582,599`; P `proxy-dispatch.js:431-466` | 2 |
+| D5 | presetId shape + lookup | S `dispatch.js:587-592`; K `proxy-kickoff.js:161-166` | 2 |
+| D6 | model/harness/effort + unknown-effort warning | `lib/dispatch-validation.js:228-237` (S, P); R `proxy-dispatch.js:792-801`; K `proxy-kickoff.js:142-156` | 3 |
+| D7 | issueIdentifier and sessionId rules | `lib/dispatch-validation.js:179,277` (S, P); R `:775-776,825`; K `:128,137` | 4 |
+| D8 | audited 400 | `proxy-dispatch.js:360-363`; `proxy-kickoff.js:76-79`; S `dispatch.js:503,619` (no audit) | 3 |
+| D10 | `subscription ?? DEFAULT_SUBSCRIPTION` | S `dispatch.js:879`; P `:491`; R `:848`; K `:227` | 4 |
+| D11 | cascade expansion | S `dispatch.js:627-633`; P `proxy-dispatch.js:500-507` | 2 |
+| D12 | persisted `issueSource` | S `dispatch.js:639-641`; P `:537-539`; R `:877-879`; K `:238,266` | 4 |
+| D13 | resolve the issue's credential | R `proxy-dispatch.js:862-873`; K `proxy-kickoff.js:242-250`; P `proxy-dispatch.js:524-531` | 3 |
+| D14 | issue context or 404 | Ro `proxy-dispatch.js:902-915`; K `proxy-kickoff.js:251-264` | 2 |
+| D15 | dangling-referent 422 | S `dispatch.js:654-662`; P `proxy-dispatch.js:541-550` | 2 |
+| D16 | `repo \|\| null` | S `dispatch.js:869`; P `:556`; Ro `:944`; Rl `:1204`; K `:234` | 5 |
+| D17 | proxy-context append policy | `proxy-dispatch.js:141-148` (P `:561`, R `:856`); K `proxy-kickoff.js:359`; S `dispatch.js:537` (opt-in) | 3 |
+| D18 | free-tier key + run gate | S `dispatch.js:689-695`; P `proxy-dispatch.js:572-574`; Ro `:895-896,962`; Rl `:1096-1100,1226`; K `proxy-kickoff.js:335-344`; `runGateFor` `proxy-dispatch.js:395-400` | 5 |
+| D19 | plan block | S `dispatch.js:717-733`; P `proxy-dispatch.js:592-599`; Ro `:976`; Rl `:1245-1250` | 4 |
+| D20 | base URL | S `dispatch.js:684`; P `proxy-dispatch.js:601`; Ro `:987,1005`; Rl `:1261,1279`; K `proxy-kickoff.js:229` | 7 |
+| D21 | the `createDispatchItem` call | S `dispatch.js:696`; P `proxy-dispatch.js:575`; Ro `:963`; Rl `:1227`; K `proxy-kickoff.js:345` | 5 |
+| D22 | credential mint (follow-up gate, launch attach, plain return) | S `dispatch.js:767-860`; P `proxy-dispatch.js:600-681`; Ro `:977-1029`; Rl `:1251-1303`; K `proxy-kickoff.js:358-398` | 14 (4 + 5 + 5) |
+| D23 | row fields | S `dispatch.js:861-893`; P `proxy-dispatch.js:682-710`; Ro `:1030-1066`; Rl `:1304-1344`; K `proxy-kickoff.js:399-434` | 5 |
+| D25 | the 201 | S `dispatch.js:930-945`; `receiptFor` `proxy-dispatch.js:161-179` (P `:714`, Ro `:1075`, Rl `:1352`); K `proxy-kickoff.js:440-459` | 3 |
+| D26 | map an enqueue failure | S `dispatch.js:946-998`; `relayEnqueueFailure` `proxy-dispatch.js:374-390` (P `:719-726`, Ro `:1076-1093`, Rl `:1357-1372`, R outer `:1373-1381`); K `proxy-kickoff.js:460-543` | 6 |
 
-Four decisions belong to one lane and stay where they are:
-* D9, who may enqueue: S's owner gate at `dispatch.js:510-516`, and `requireGrant('dispatch')` in the P/R/K registrations;
-* D24, S's task-mode record and Harbour OS spawn (`dispatch.js:900-923`);
-* D27, the proxy lane's `logEvent` on every exit;
-* D28, R's keepalive and client-gone handling.
+**How to count.** A site is one place that writes the decision's rule itself. A call to a shared helper is not a site; the helper is. D22 counts gate, attach and plain return separately (4 + 5 + 5). D18 counts the five places that build the run gate (S, P, Ro, Rl, K): `runGateFor` is P/Ro/Rl's helper, so those three count once each. D26 counts 6: S's catch chain, P's catch with `relayEnqueueFailure`, the Ro and Rl catch tails, R's outer catch, and K's catch chain.
+
+After the PR, count the same way. Each decision should be 1 site in `lib/dispatch-entrance.js`, plus 0 in the route files. Report before and after per row, and the total: 96 → your number.
+
+Four decisions belong to one lane. They are not consolidated, and each keeps its place in its lane's order:
+* **D9, S: who may enqueue.**
+  * The owner gate (`dispatch.js:505-516`) runs after the D3 shape checks (`:498-503`). It runs before every other check and before any store read (the preset lookup included), provider call, run gate, mint, cascade expansion or write, as today.
+  * If S's checks run inside the authority, pass the gate in as S's lane step at that point.
+  * The authority must fail closed. If a session-lane call arrives without the gate, it throws; it never skips the gate.
+* **D9, P/R/K.** `requireGrant('dispatch')` stays on the registration line (a C pin). The authority's enqueue must be reachable only from the four POST handlers.
+* **D24.** S's task-mode record and Harbour OS spawn (`dispatch.js:900-923`) stay in the S route.
+* **D27, the proxy lane's `logEvent` on every exit,** and **D28, R's keepalive and client-gone handling.** Both stay Agent API closures, injected. Their calls may move into the authority, and every status, note and keepalive frame stays the same.
 
 *One authority per decision, reached by every entrance.*
 * **Home: `lib/dispatch-entrance.js`** (area "Runs & dispatch").
   * It owns the dispatch contract, beside `lib/dispatch-factory.js`, `lib/dispatch-validation.js`, `lib/dispatch-fields.js` and `lib/dispatch-refusal.js`.
-  * Every census already counts it as part of E. A second authority file would have to be added to the E set in 8 test files, so use one module.
+  * Every census already counts it as part of E. A second authority file would have to be added to the E set in 9 test files, so use one module.
   * The proxy-lane closures (`logEvent`, `relayDispatchRefusal`, `resolveProviderAccess`, `workspaceUnavailable`, `denyIfUnsupported`, `graphqlErrorStatus`, the keepalive) stay owned by the Agent API. Pass them in as the factories receive them today.
+  * `lib/dispatch-entrance.js` imports nothing from `routes/`. No `lib/` file does today, and `routes/proxy.js` imports the factories that will import the authority. Route values such as `PROXY_ATTACH_FAILED_MESSAGE` are passed in.
   * If you find a better home by the rule "code belongs to the area that would have to change if its rule changed", say why in the PR.
 * **What the route files keep:**
   * the registration lines and middleware chains, unchanged;
-  * on each of the three proxy POSTs, a **block-bodied** `async (req, res) => {` forwarder on the registration line. `tests/unit/lin-3136-dispatch-gate.test.js:164-172` (a C pin) requires the text after the path to be exactly `proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) =>`, optionally followed by ` {`. An expression-bodied `async (req, res) => handler(req, res)` or a bare handler reference fails it. The independent score of #4a moved recommend-and-dispatch's handler into `lib/dispatch-entrance.js`: the full suite stayed green only with this form;
+  * on each of the three proxy POSTs, a **block-bodied** `async (req, res) => {` forwarder on the registration line. `tests/unit/lin-3136-dispatch-gate.test.js:165-178` (a C pin; EXPECTED at `:166`, the comparison at `:173`) requires the text after the path to be exactly `proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'), async (req, res) =>`, optionally followed by ` {`. An expression-bodied `async (req, res) => handler(req, res)` or a bare handler reference fails it. A trial move of recommend-and-dispatch's handler into `lib/dispatch-entrance.js` kept the full suite green only in this form;
   * the factory signatures (`proxy-di-witness`);
   * the module-scope `= rateLimit(` declarations (`dispatch.js:87,102,113`);
   * the GET/DELETE/PATCH routes;
@@ -78,11 +86,23 @@ Four decisions belong to one lane and stay where they are:
   * Every `createDispatchItem({` call in E:
     * has `proxyTokenStore` as a direct key (`lin-3130-create-dispatch-item-proxy-token-store-pin.test.js`);
     * has an inline, spread-free `fields` object;
-    * if it carries `followUpTo`, puts its first `provisionResumeCredential(` under `if (isFollowUp) {` or `...(followUpTo ? {`, passes `attach:`, and has no direct `attachProxyContext(` before the gate's end.
+    * if it carries `followUpTo`, puts its first `provisionResumeCredential(` under `if (isFollowUp) {` or `...(followUpTo ? {`, passes `attach:`, and has no direct `attachProxyContext(` before the gate's end;
+    * if it carries `followUpTo`, has no `declaredGrants` or `grantOwnerAccountId` in the call text before the follow-up gate's closing brace (`lin-3134-declared-mint-census.test.js:458`, rule (iii d)). Keep the M1/M2 literals in the launch arm after the gate, or outside the call;
+    * has no `provisionBootstrapToken(` (rule (iii b)).
+  * The follow-up gate predicate is a bare identifier, `isFollowUp` or `followUpTo`, never `spec.isFollowUp`. `findGate` (`lin-3134-declared-mint-census.test.js:417-438`) matches only `if (isFollowUp) {` or `(followUpTo ? {`.
+  * **A remaining source-text pin.** E must still contain this exact two-line text, indentation included: 10 spaces, `if (isFollowUp) {`, a newline, then 12 spaces, `return provisionResumeCredential({`. It is `POST_DISPATCH_GATE` at `lin-3134-declared-mint-census.test.js:638`, and three mutation tests anchor on it through `plantInE` (`:701`, `:723`, `:783`). Today only P's copy matches.
+    * Prefer an authority that keeps that exact text.
+    * If you can't, you may convert that one check to a behaviour check: the mint sweep (`dispatch-entrance-mint-sweep.test.js`) already covers the property. Show it failing before and passing after, and give the reason in the PR.
+  * Each `declaredGrants: ['dispatch'],` is alone on its line. The census compares the trimmed line exactly (`:141`).
   * A mint helper call in E that sits in no `createDispatchItem({…})` call is keyed `E | - | <fn>`. Only the broker's `provisionResumeCredential` may be (`lin-3134-declared-mint-census.test.js:573-577`). So the follow-up gate and the launch attach live inside the one call, not in a separate helper.
   * At least one statement `const { token: accessToken, reason, provider } = await resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req, { … });` in E. Every `resolveProviderAccess(` in E passes `req` third (`proxy-credential-fingerprint-stamping.test.js:108-168`).
-  * No `.addItem(` or `mintGrantBootstrap(` in E, and no `grantDeclaration` or `grantRefusal` mention.
-  * A `router.` mention in a comment in `routes/proxy-*.js` changes `proxy-endpoint-inventory-witness`'s count.
+  * Some scans count comments as well as code:
+    * no `.addItem(` in E;
+    * don't write the word `mintGrantBootstrap` anywhere in `routes/` or `lib/`, comments included (`proxy-tokens-private-mint-source-pin.test.js:90`);
+    * no `grantDeclaration` or `grantRefusal`;
+    * comments in E must not contain `rateLimit(`: `lin-2534-tokens-admin-extraction.test.js:131-133` counts every occurrence;
+    * comments in `routes/proxy-*.js` must not contain `router.get(`, `router.post(` and the like. They are counted by `proxy-endpoint-inventory-witness` and by the proxy-grant sweep's `derivedUrlForms`.
+  * `lin-3384-redaction-census` keys a store read in a route file by its registration or its named construct; for example K's `parentRun` (`:132`). A read that stays in a route file under a new name is an unlisted site. Move it with its handler into `lib/dispatch-entrance.js`, or keep its name.
   * Each endpoint tag literal stays in its own route file.
 * **Keep each entrance's observable order:**
   * the first-failure order of its checks (each verb keeps its own ordered list, built from shared check groups);
@@ -91,9 +111,9 @@ Four decisions belong to one lane and stay where they are:
   * the 201's bytes, key order included (5c's replay caught a key-order change, `experiments/rebuild-rung5c/arm/score.md` §1);
   * the key set of each `addItem` argument (unit tests `deepEqual` it).
 * **Classify each divergence:**
-  * (a) one copy is a bug: fix it, with a test. Fix only a bug that involves no product choice.
+  * (a) one copy is a bug. The known (a) items are the comment corrections below; make them, and they need no test. If you find a behaviour bug, don't fix it in this PR: treat it as (d) and write it up under Open questions.
   * (b) deliberate variation: keep it as a named parameter of the authority, with its reason beside it.
-  * (c) bounded fuzz: unreachable or harmless; say why.
+  * (c) bounded fuzz: unreachable or harmless; say why. You may unify a (c) to one form; the replay must still show 0 differences.
   * (d) unclear: keep today's behaviour and write it up in the PR body under **Open questions**: the question, the options and your recommendation. Never end the run BLOCKED and never emit a `DECISION:` line for one.
 
   The starting classes, to verify:
@@ -120,7 +140,8 @@ Four decisions belong to one lane and stay where they are:
     * the 201 layouts;
     * R's keepalive;
     * P's permissive credential path (LIN-1948, `proxy-dispatch.js:517-523`);
-    * each entrance's read order.
+    * each entrance's read order;
+    * structural-refusal text. A follow-up resume answers the raw `err.message`: P/R at `proxy-dispatch.js:386`, S at `dispatch.js:977`. A declared launch answers the shared human text: K at `proxy-kickoff.js:481-483`, S at `dispatch.js:968-969`.
   * **(c):**
     * `req.body \|\| {}`;
     * P's `!!prompt` in its follow-up mint (`:621`);
@@ -129,9 +150,9 @@ Four decisions belong to one lane and stay where they are:
     * K's raw `maxTasks` (`:455`);
     * K's guard on `getWorkspaceOpenRouterKey` (`:335-337`; `routes/proxy.js:1576` always passes it);
     * K's missing plan block (the pilot is implementation-only, `lib/dispatch-factory.js:687`);
-    * K's hard-coded `retryable: false` on structural refusals (`:483`).
+    * K's and `relayEnqueueFailure`'s hard-coded `retryable: false` (`proxy-kickoff.js:483`, `proxy-dispatch.js:386`). Every structural code is `retryable: false` in `lib/owner-mint-refusals.js:35-57`.
   * **(d), keep and write up:**
-    * Field acceptance per verb. P ignores `presetId`, `stopAt`, `variant`, `attachProxy`, `entryRung`, `surface` and `composedRunMarker`; R and K take no `terminal`; nothing type-checks `appendProxyContext`.
+    * Field acceptance per verb. P ignores `presetId`, `stopAt`, `variant`, `attachProxy`, `entryRung`, `surface` and `composedRunMarker`; R and K take no `terminal`; no proxy verb type-checks `appendProxyContext`.
     * S and P only length-cap `issueIdentifier` (`lib/dispatch-validation.js:179`), where R and K require `isValidIssueId`.
     * S stamps `issueSource` on an issue-naming abort (`dispatch.js:639`) and P does not (`proxy-dispatch.js:537`).
     * P resolves a provider for a repo-only dispatch (`proxy-dispatch.js:525`, a LIN-2886 leftover).
@@ -140,25 +161,44 @@ Four decisions belong to one lane and stay where they are:
     * R and K return different upstream-auth envelopes (`proxy-dispatch.js:1087-1090` against `proxy-kickoff.js:500-539`).
 * **Out of scope here:** the store's run-field normalisers (`lib/dispatch-fields.js:48-170`) duplicate several D23 normalisers. Write each normaliser once in the authority's `fields` and leave the store alone.
 * No edits to `scripts/code-shape/areas.json`.
-* **Comments.** Keep every ticket reference and reason comment beside the code it governs, and move it with that code. Correct the (a) comments rather than copying them.
+* **Comments.** Keep every ticket reference and reason comment beside the code it governs, and move it with that code. Correct the (a) comments rather than copying them. A reference that only describes removed code may go; the corrected comment names LIN-3333.
 * **Security.** Never weaken a security guard.
-  * The #4a sweeps must stay green and unmodified: `tests/unit/dispatch-entrance-*.test.js` and `tests/unit/lib/entrance-route-sweep.js`.
+  * The LIN-3601 sweeps stay green and unmodified, except as below. They are `tests/unit/dispatch-entrance-*.test.js` (the seven named under Why, plus LIN-3592's `dispatch-entrance-pins.test.js`) and `tests/unit/lib/entrance-route-sweep.js`.
+  * **Risk: a known gap in the sweeps.** For recommend-and-dispatch and kickoff, the proxy-grant sweep's "reaches no sink" checks pass vacuously. Their fixture body `{ issueIdentifier: 'LIN-1' }` (`dispatch-entrance-proxy-grant-sweep.test.js:48-49`) is unknown to the test-mode mock, so the request 404s first. Only the explicit 403 `DISPATCH_GRANT_REQUIRED` checks would catch a dropped grant on those two routes.
+  * **One change is allowed, and it comes first**, in `tests/unit/dispatch-entrance-proxy-grant-sweep.test.js` only.
+    * Give recommend-and-dispatch and kickoff a body that reaches the enqueue point: an issue the test-mode mock knows, as `dispatch-entrance-pins.test.js:83` uses `TEST-1`.
+    * Add a positive control for each: with `dispatch`, the request reaches `addItem`.
+    * Add only. Don't remove or relax any assertion, token case, path, body or `SINKS` entry.
+    * Land it in its own commit before any production change, green on the unchanged code.
+    * In the PR, show it failing on a scratch copy with `requireGrant('dispatch')` dropped from the R registration, and again from the K registration.
+    * Then do the consolidation.
+  * In your replay, include requests with a valid issue and a token lacking `dispatch`, and show they reach no enqueue on R and K.
   * Any other test change needs its reason in the PR.
-  * **Risk: a known gap in the sweeps.** For recommend-and-dispatch and kickoff, the proxy-grant sweep's "reaches no sink" checks pass vacuously: their fixtures stop at a 404 issue lookup. Only the explicit 403 `DISPATCH_GRANT_REQUIRED` checks would catch a dropped grant on those two routes. The gate stays on the registration line, which helps, but check it anyway.
-    * In your replay, include requests with a valid issue and a token lacking `dispatch`, and show they reach no enqueue on R and K.
-    * You may strengthen that sweep's fixture so a valid issue reaches the enqueue point. Give the reason in the PR, and loosen nothing.
 * **Your own replay.**
-  * Drive the four entrances over HTTP, old against new, on about 1,000 seeded inputs with one seed. Cover every body field, auth state, grant, target, cascade/followUpTo/abort shape and error path.
+  * Drive the four entrances over HTTP, old against new, on about 1,000 seeded inputs with one seed. Load the old code from a `git archive` of your merge-base into a temp directory. Cover every body field, auth state, grant, target, cascade/followUpTo/abort shape and error path.
   * Freeze the clock and set TZ=UTC.
   * Compare: status; body bytes, key order included; the headers that matter (`Retry-After`, `RateLimit-*`, content-type); store writes; token-store calls and their arguments; provider calls; `logEvent`; console.
   * Expect 0 differences. Explain any you see by its divergence class.
   * Keep the replay out of `tests/unit` and out of the PR, or put it under `experiments/`. Paste its output in the PR.
-* **Seams.** After committing, run `node scripts/code-shape/seams.mjs . origin/main` (the origin/main you branched from) and `node scripts/code-shape/seams.mjs . HEAD`, and paste the knot count for each.
-  * At `15191460` there are 18 pairs and one group of 9.
-  * A new pair, or a larger group, is not acceptable.
-* **Report** the sites per decision before and after (the table above, re-counted on your branch).
+* **Seams.** After committing, run `node scripts/code-shape/seams.mjs . $(git merge-base HEAD origin/main)` and `node scripts/code-shape/seams.mjs . HEAD`, and paste the pairs and the largest group for each.
+  * At `15191460` there are 18 pairs and one group of 9. If your merge-base differs, compare with it, not with these numbers.
+  * A new pair, or a larger group, is not acceptable. If one appears, find the import that causes it, move that code back where it was, and list it under Open questions.
+* **Report** the sites per decision before and after: the table above, re-counted on your branch by the counting rule.
 * No live checks; no paid model calls.
 * Don't start parallel forks or background sub-agents; do the parts one at a time. While iterating, run the unit tests for the files you change; run the full unit suite once before opening the PR. Leave e2e to CI; run it locally only to reproduce a CI failure.
+
+**The plan.** Before writing code, post a plan that contains these six items, and needs nothing more:
+1. The authority's exports, one line each, with the D-numbers each one owns.
+2. For each entrance (S, P, Ro, Rl, K):
+   * its ordered check list, by check-group name;
+   * its dependency-read order;
+   * where each gate runs ("before X").
+3. For each census constraint above, the export or line that satisfies it.
+4. The test files you expect to change, with the reason for each. Expected: the proxy-grant sweep addition, plus the `POST_DISPATCH_GATE` conversion only if the authority can't keep that text.
+5. The replay: its input classes and the channels it compares.
+6. The divergence table, starting from the one in this ticket, with any class you would change.
+
+The plan reviewer approves a plan that covers 1–6 and breaks no constraint in this ticket. Helper names, parameter shapes and line-level design are for PR review, not plan review.
 
 **This is one PR. Don't split it into child tickets.**
 
@@ -166,7 +206,7 @@ Four decisions belong to one lane and stay where they are:
 * the sites per decision before and after;
 * each divergence with its class, and the (d) items under Open questions;
 * seams before and after, with no new knot;
-* the #4a sweeps untouched and green;
+* the LIN-3601 sweeps green, and unchanged apart from the allowed proxy-grant-sweep addition (its own commit, with the dropped-grant scratch runs shown failing);
 * the replay output.
 
 **Out of scope.**
