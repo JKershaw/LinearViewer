@@ -20,9 +20,12 @@ For comparison, rung 4 converted 4 assertions, each shown failing with its guard
 * 5–8 new behaviour groups, matching N1–N7 in some packaging; 30–70 new test cases in total.
 * 1–3 new test files; 12–16 existing test files edited.
 * At least one route sweep enumerates `router.stack`: 75%.
+* All sweeps descend into nested routers and assert their enumerated counts (26/6/4, plus the composer's): 55%.
 * All three sweeps (redaction canary, proxy grant, session owner) are present: 50%. The session-owner sweep is the likeliest to be dropped or narrowed to a hand-written list, because driving 26 session routes past validation is the most fixture work.
 
 **Production lines changed:** 0, at 95%. Any non-zero diff is a test-only export or a comment, never logic.
+
+The only non-test edit is `docs/architecture/dispatch-and-proxy.md:30-31`, which the ticket allows. The worker updates it: 70%. A diff touching any other non-test file: 5%.
 
 **Mutation evidence**
 * A failing-then-passing record exists for every A conversion: 60%.
@@ -31,10 +34,13 @@ For comparison, rung 4 converted 4 assertions, each shown failing with its guard
 
 **Security guards**
 * No security guard ends weaker by its own witnesses: 85%.
+* The PR's commit order shows every replacement landing, and being shown failing, before its old pin is loosened: 55%. The likeliest slip is one squashed commit that does both.
+* The mixed pins (fingerprint :117/:214, lin-3130 :145, run-limit-gating :234) keep their non-E assertions byte for byte: 80%.
+* The canary sweep passes `npm run secret-scan` on the first try: 70%. Hand-written token-shaped literals are the trap.
 * At least one security pin stays B because behaviour can't express it: 90%. `proxy-scopes`' `READ_WRITE` constant versus literal is the near-certain one.
-* At least one count inside E is kept rather than loosened to ≥1, "to be safe": 65%. Each one kept partly re-pins the structure 4b has to change.
+* At least one count inside E, beyond the declared-writer allow-list, is kept rather than loosened to ≥1, "to be safe": 40%. The ticket now names the allow-list as the only exception. Each one kept partly re-pins the structure 4b has to change.
 
-**Probe re-run.** The PR shows a move probe after the change, with zero A/B pins failing: 40%. The ticket asks for it, but the probe has to be rebuilt from the description.
+**Probe re-run.** The PR shows a move probe after the change, with zero A/B pins failing: 45%. The ticket describes the text-only preload probe in words and attaches nothing, so the worker has to rebuild it.
 
 ## Run
 
@@ -43,13 +49,14 @@ For comparison, rung 4 converted 4 assertions, each shown failing with its guard
 | One PR, not split | 80% |
 | Merged | 75% |
 | Done without a `DECISION:` | 60% |
-| Wall time | 2.5–5 h (median 3.5 h) |
+| Wall time | 3–5.5 h (median 4 h). The ordering rule and the extra sweep plants add mutation runs (about 55). |
 
 A ruling is most likely asked for on one of these:
-* replacing an assertion in `lin-3134-default-path-characterization.test.js`, whose header (:1-34) promises it stays unedited;
+* the ordering rule colliding with a census that can't be left green while a sweep is added beside it;
+* replacing an assertion in `lin-3134-default-path-characterization.test.js`, whose header (:1-33) promises it stays unedited;
 * loosening counts in a security census.
 
-Wall time: rung 5c took 106 min for a rebuild with no conversions. Here the cost is fixtures and mutation runs (about 45), not design.
+Wall time: rung 5c took 106 min for a rebuild with no conversions. Here the cost is fixtures and mutation runs, not design.
 
 Unit-suite time rises by under 5 s; the sweeps are in-process HTTP against fakes.
 
