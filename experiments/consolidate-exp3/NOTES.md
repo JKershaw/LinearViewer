@@ -236,3 +236,21 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - The worker's replay: 0 differences on 2,455 requests (every single fault, every ordered pair of check steps, triples; 574 multi-fault pairs, 0 vacuous on the old tree). Seams 18 → 18; counts inside pairs moved with the code.
 - 8 open questions in the PR, all kept. One needs a human: the proxy and recommend launch arms stay undeclared (M3), and the ticket the docs cite for M3 (LIN-3099) is unrelated, so nothing tracks it. The PR also flags LIN-3603 (Backlog) as a likely duplicate of LIN-3604.
 - 13:33Z: light lane 1: LIN-3605 (node --test concurrency cap) filed and kicked off after the fresh-reader check (3 medium, 6 low, applied).
+
+## 17 Oct: #4b scored (`../consolidate-4-entrance/arm-4b/score.md`)
+
+**Facts.**
+- Independent replay old `15191460` vs new `47d87055`: 0 differences on two seeds (21,077 requests each). Twins 0. 15 of 15 mutants planted on the new tree caught on exactly their entrances, including a dropped `requireGrant('dispatch')` on recommend-and-dispatch (35 requests) and kickoff (29). Coverage 99.47%.
+- `addItem` argument key order changed on two lanes (the replay sorts keys, so it didn't see it; an order-aware copy did); key set, values and persisted row bytes identical.
+- The factory change: 0 differences in persisted row, returned item or errors over 374 captured + 5,000 generated inputs.
+- Sites per decision 95 → 26, verified by hand; 0 entrance sites in the route files.
+- Seams 18 → 18; Agent API → Runs & dispatch imports 46 → 34.
+- Census 309 / 1,022 → 309 / 1,021: the 201-receipt group dissolved; one new group (a field list repeating part of `OPAQUE_FIELDS`).
+- Shape: worst function 63 (the session handler) → 29 (`enterRecommendDispatch`). Production −317 lines, −92 code lines. `lib/dispatch-entrance.js` is now the most complex of the four files (268 decision points) — expected, since it holds all of them.
+- Suite 17,436 / 17,436 from a git checkout. The hermetic check in this container is red at both commits from the same 3 `openrouter.ai` sockets (the known container-proxy effect; CI is the real check).
+- Prediction: 23 hits, 5 misses, 1 partial.
+
+**Inference.**
+- The consolidation alone took the worst function from 63 to 29 — further than 5c's whole rebuild got it (122 → 63). Moving decisions to one place simplified the code before any rebuild.
+- The authority is now the natural rebuild target: one file holding every entrance decision, 268 decision points, no location pins in the way.
+- The replay sorting `addItem` keys is a blind spot worth fixing in the kit (it would miss a key-order change in a stored row built by spread).
