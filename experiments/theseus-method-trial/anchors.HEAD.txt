@@ -1,0 +1,52 @@
+feedback.js:111  /api/dispatch/feedback/${itemId}
+queue.js:127  /api/dispatch/take/${itemId}
+targets.js:17  cli: { substrate: 'hook', remoteControl: false, pollEligible: true }
+dispatcher.js:1345  [started] Running task in ${workspaceKey}
+dispatcher.js:1401   launchFirstMessage = item.prompt;
+dispatcher.js:74   return terminal === 'tmux' ? MAX_DIRECT_LAUNCH_PROMPT_BYTES_TMUX : MAX_DIRECT_L
+dispatcher.js:1332   const directPromptEscapedBytes = Buffer.byteLength(escapeShellSingleQuoted(item
+dispatcher.js:770  if (!claimed) return 'unclaimed';
+reapers.js:968  if (now - last >= thresholdMs) stalled.push(sid);
+HARBOUR  lib/dispatch-wake.js  (up-chain wake self-edges to the child instead of the parent )
+HARBOUR  lib/dispatch-wake.js  (the §5 pending subscription gate is inverted)
+executors.js:728  if (failSession) failSession(sessionId, launch.error || 'unknown error');
+reapers.js:972  if (!session.transcriptPath) continue; // never-started/just-healed → findStuckL
+dispatcher.js:586  const flipToCancelled = wasActive || wasBlocked || wasAwaitingExternal || wasAwa
+dispatcher.js:597  if (flipToCancelled) cancelSessionDep(abortId);
+abort.js:61  if (session.humanContinued && !force) {
+reapers.js:1906  if (session.itemMetadata?.brokerArmed) {
+dispatcher.js:852  if (decision.action === 'signal') {
+dispatcher.js:956  if (forced && session.windowId) closeSessionWindow(closeWindow, session, 'resume
+pacing.js:126  openWindows != null && maxWindows != null && openWindows >= maxWindows
+pacing.js:51  return (now - s.createdAt) < cooldownMs;
+reapers.js:854  if (!session || session.phase !== PHASES.EXECUTING || !session.awaitingVerify) c
+reapers.js:876  if (!session || session.phase !== PHASES.AWAITING_EXTERNAL) continue; if (hasLiv
+reapers.js:951  if (session.awaitingVerify || refireYieldedNothing(session, lastActivityOf)) con
+reapers.js:1006  if (session.awaitingVerify || refireYieldedNothing(session, lastActivityOf)) con
+reapers.js:2075  if (refireYieldedNothing(session, lastActivityOf)) { if (hasLiveSubscribedChild(
+reapers.js:1266  if (!session || !refireYieldedNothing(session, lastActivityOf) || isTerminalPhas
+reapers.js:2285  if (selector !== 'stuck-launch' && hasLiveSubscribedChild(session, state.session
+reapers.js:727  if (!kind) { misses.push({ sid, priorAttempts, settled }); continue; }
+reapers.js:577  if (ageMs < boundMs) return false;
+reapers.js:584  if (!usesTranscriptHook) return false; if (hasTranscriptOnDisk(id, session)) ret
+reapers.js:587  if (watch && watch.nextAttemptAt != null && now < watch.nextAttemptAt) return fa
+reapers.js:568  if (typeof isSettled !== 'function') {
+reapers.js:737  if (!plans.length && !misses.length) return;
+config.js:266   ['FAST_FAIL_CAPTURE_BACKOFF_BASE_MS', baseRaw], ['FAST_FAIL_CAPTURE_BACKOFF_CAP
+hook.js:1527   holdable: false, verifyTask: 'completion unconfirmed',
+dispatcher.js:1653  const halt = data && data.halt;
+dispatcher.js:1690   const haltInputs = { harbourHaltByToken, ...(localHalt ? { local: localHalt } :
+dispatcher.js:1664   const onPollResult = onPollResultDep ? (workspaceKey, rawOutcome, data) => { on
+dispatcher.js:1675   const localHalt = readLocalHaltDep();
+dispatcher.js:502   text = fs.readFileSync(file, 'utf8');
+dispatcher.js:1692   ...(localHalt ? { local: localHalt } : {}), 
+dispatcher.js:1677   if (!HALT_LOCAL_MALFORMED_LOGGED) {
+dispatcher.js:505   return { mode: 'pause', malformed: true, readError: (err && err.message) || Str
+dispatcher.js:1681   } else { HALT_LOCAL_MALFORMED_LOGGED = false; }
+halt.js:183  function autoPauseEngaged() { if (!AUTO_PAUSE_ENABLED) return false; return !!(p
+dispatcher.js:1649   recordPollOutcome(rawOutcome); 
+dispatcher.js:1693   get autoEngaged() { return autoPauseEngaged(); }, 
+halt.js:94  const COUNTING_CLASSES = new Set(['timeout', 'network-error', '5xx', 'malformed-
+halt.js:93  const RESETTING_CLASSES = new Set(['ok-items', 'ok-empty']);
+hook.js:2128  const donePosted = result?.ok === true;
+opencode-runner.js:1571  `[blocked] ${sentinel.detail || 'My part is done; waiting on external action'} (

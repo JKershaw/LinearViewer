@@ -60,7 +60,7 @@
 <text x="544" y="148">One authority, one visible knob per variation (a lane, a mode);</text>
 <text x="544" y="162">never a silent branch keyed on who is calling.</text>
 <text x="544" y="228">Listed, with the reason. Never a success reply, a write and its</text>
-<text x="544" y="242">arguments, stored data, or a security check: those go to (d).</text>
+<text x="544" y="242">arguments, stored data, check order or security: those go to (d).</text>
 <text x="544" y="308">Each caller keeps exactly what it does today. The question goes</text>
 <text x="544" y="322">on a standing ticket for a later ruling; the run never waits on it.</text>
 </g>
@@ -68,7 +68,7 @@
 <text x="930" y="51">7</text><text x="930" y="131">~20</text><text x="930" y="211">9</text><text x="930" y="291">7</text>
 </g>
 <text x="20" y="130" font-size="10.5" fill="#6b7280">Ask in this order.</text>
-<text x="20" y="146" font-size="10.5" fill="#6b7280">Numbers at right: the 43</text>
+<text x="20" y="146" font-size="10.5" fill="#6b7280">Numbers at right: about 43</text>
 <text x="20" y="160" font-size="10.5" fill="#6b7280">differences found when</text>
 <text x="20" y="174" font-size="10.5" fill="#6b7280">one entrance's copies</text>
 <text x="20" y="188" font-size="10.5" fill="#6b7280">were gathered.</text>

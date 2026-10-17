@@ -1,0 +1,12 @@
+commit 0d54b97458fdbd697f151a7c7d8f0c37848e280f: session-record fields touched in >= 3 areas: 11 (of 82 fields seen)
+   2508  phase                      files 11 areas 8  written in: dispatcher.js, opencode-runner.js, reapers.js
+   2250  itemMetadata               files 10 areas 7  written in: dispatcher.js
+    696  resumedAt                  files 4 areas 4  written in: dispatcher.js, reapers.js
+    688  transcriptPath             files 4 areas 4  written in: hook.js, reapers.js
+    519  deferredAt                 files 3 areas 3  written in: dispatcher.js, opencode-runner.js, reapers.js
+    519  noProgressAbortedAt        files 3 areas 3  written in: dispatcher.js, opencode-runner.js, reapers.js
+    519  updatedAt                  files 3 areas 3  written in: dispatcher.js, opencode-runner.js, reapers.js
+    519  pendingFollowUp            files 3 areas 3  written in: dispatcher.js, opencode-runner.js, reapers.js
+    507  dispatchedPrompt           files 3 areas 3  written in: dispatcher.js, reapers.js
+    411  awaitingVerify             files 3 areas 3  written in: dispatcher.js, reapers.js
+    411  verifyTask                 files 3 areas 3  written in: dispatcher.js, reapers.js

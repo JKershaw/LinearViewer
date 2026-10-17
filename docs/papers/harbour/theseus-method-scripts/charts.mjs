@@ -1,4 +1,4 @@
-// Generates the two data figures for docs/papers/harbour/theseus-method.md (Figures 6 and 7).
+// Generates the two data figures for docs/papers/harbour/theseus-method.md (Figures 2 and 7).
 //   node docs/papers/harbour/theseus-method-scripts/charts.mjs docs/papers/harbour/figures/theseus-method && npm run figures:theme
 // Values, all at 509ed3fc: verbatim shares from experiments/verbatim/verbatim.md:7-17, rebuild-rung6b/arm/score.md:70,
 // rebuild-rung7/arm/score.md:77-89 and consolidate-4-entrance/arm-4c/score.md:75-77; the entrance trajectory from
@@ -74,9 +74,9 @@ const f1 = n => n.toFixed(1);
     { label: 'authority rebuilt', sub: 'design-first, 45.7% verbatim', worst: 13, dp: 555, fill: '#2a78d6' },
   ];
   const o = [];
-  o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="The dispatch entrance's most complex function, in decision points. Before: 122. Rebuilt alone: 63. After freeing the seam and consolidating: 29. After rebuilding the consolidated authority: 13. Decision points across the four files: 708, 649, 585, 555.">`);
+  o.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="The dispatch entrance's most complex function, by cyclomatic complexity. Before: 122. Rebuilt alone: 63. After freeing the seam and consolidating: 29. After rebuilding the consolidated authority: 13. Decision points across the four files: 708, 649, 585, 555.">`);
   o.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="#fff"/>`);
-  o.push(`<text x="20" y="28" font-size="15" font-weight="600" fill="#111827">One target, step by step: the entrance's most complex function, in decision points</text>`);
+  o.push(`<text x="20" y="28" font-size="15" font-weight="600" fill="#111827">One target, step by step: the entrance's most complex function, by cyclomatic complexity</text>`);
   o.push(`<text x="${X1 + 40}" y="46" font-size="10.5" fill="#6b7280" text-anchor="middle">decision points,</text>`);
   o.push(`<text x="${X1 + 40}" y="60" font-size="10.5" fill="#6b7280" text-anchor="middle">whole entrance</text>`);
   rows.forEach((r, i) => {

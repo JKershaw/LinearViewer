@@ -1,0 +1,127 @@
+commit 0d54b97458fdbd697f151a7c7d8f0c37848e280f  churn window since 2026-07-14T09:10:40.000Z  production files 38
+
+== cmp: 24 groups spanning >= 2 files; top 14 by places x change
+  score  294  places 3 sites  13  churn-sum 98 union 84   harness == 'opencode'
+        executors.js, opencode-liveness.js, reapers.js
+  score  262  places 2 sites   7  churn-sum 131 union 106   livenessSignal == 'transcript-hook'
+        dispatcher.js, reapers.js
+  score  216  places 2 sites   2  churn-sum 108 union 103   action == 'abort'
+        dispatcher.js, opencode-runner.js
+  score  160  places 2 sites   3  churn-sum 80 union 75   kind == 'pending-external'
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   3  churn-sum 80 union 75   kind == 'blocked'
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   2  churn-sum 80 union 75   kind == 'failed'
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   2  churn-sum 80 union 75   kind == 'pending-internal'
+        hook.js, opencode-runner.js
+  score  156  places 3 sites   7  churn-sum 52 union 50   type == 'text'
+        links.js, opencode-runner.js, transcript.js
+  score  148  places 2 sites   3  churn-sum 74 union 71   type == 'user'
+        reapers.js, transcript.js
+  score  140  places 2 sites   6  churn-sum 70 union 68   mode == 'stop'
+        dispatcher.js, halt.js
+  score  140  places 2 sites   3  churn-sum 70 union 67   runner == 'STALLED'
+        opencode-liveness.js, reapers.js
+  score  140  places 2 sites   3  churn-sum 70 union 67   holdKind == 'opencode'
+        opencode-liveness.js, reapers.js
+  score  140  places 2 sites   2  churn-sum 70 union 68   mode == 'pause'
+        dispatcher.js, halt.js
+  score  140  places 2 sites   2  churn-sum 70 union 67   runner == 'ALIVE'
+        opencode-liveness.js, reapers.js
+
+== set: 3 groups spanning >= 2 files; top 14 by places x change
+  score  392  places 4 sites   8  churn-sum 98 union 92   {ignore, pipe}
+        hook.js, opencode-runner.js, signal-guard.js, terminal-driver.js
+  score  140  places 2 sites   2  churn-sum 70 union 68   {pause, stop}
+        dispatcher.js, halt.js
+  score  140  places 2 sites   2  churn-sum 70 union 67   {ALIVE, STALLED}
+        opencode-liveness.js, reapers.js
+
+== const: 12 groups spanning >= 2 files; top 14 by places x change
+  score  485  places 5 sites   7  churn-sum 97 union 80   2000
+        chunk.js, config.js, feedback.js, opencode-runner.js, terminal-driver.js
+  score  160  places 2 sites   3  churn-sum 80 union 75   3000
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   2  churn-sum 80 union 71   /^\d+$/
+        reapers.js, terminal-driver.js
+  score   88  places 2 sites   2  churn-sum 44 union 42   8000
+        config.js, transcript.js
+  score   82  places 2 sites   4  churn-sum 41 union 38   30000
+        config.js, heartbeat.js
+  score   82  places 2 sites   3  churn-sum 41 union 38   600000
+        config.js, heartbeat.js
+  score   82  places 2 sites   3  churn-sum 41 union 38   300000
+        config.js, heartbeat.js
+  score   80  places 2 sites   4  churn-sum 40 union 38   15000
+        config.js, feedback.js
+  score   76  places 2 sites   4  churn-sum 38 union 38   5000
+        config.js, state-store.js
+  score   76  places 2 sites   3  churn-sum 38 union 38   10000
+        config.js, state-store.js
+  score   70  places 2 sites   6  churn-sum 35 union 35   /^(0|false|no|off)$/i
+        config.js, oplog.js
+  score    8  places 2 sites   2  churn-sum 4 union 4   /\s+/
+        resources.js, signal-guard.js
+
+== record: 4 groups spanning >= 2 files; top 14 by places x change
+  score  844  places 4 sites   4  churn-sum 211 union 159   {attempt, cause, error, item, status, url}
+        dispatcher.js, hook.js, opencode-runner.js, reapers.js
+  score  519  places 3 sites   3  churn-sum 173 union 140   {backoffBaseMs, backoffCapMs, budget, maxAttempts, onAttemptFailed}
+        dispatcher.js, opencode-runner.js, reapers.js
+  score  262  places 2 sites   3  churn-sum 131 union 106   {bootstrapToken, reservePort, sessionId, usesMcp}
+        dispatcher.js, reapers.js
+  score   78  places 2 sites   2  churn-sum 39 union 32   {cloneDir, resume, sessionId, templateDir}
+        executors.js, harnesses.js
+
+== clone: 0 groups spanning >= 2 files; top 14 by places x change
+
+== marker: 9 groups spanning >= 2 files; top 14 by places x change
+  score 1968  places 8 sites  34  churn-sum 246 union 171   [failed]
+        abort.js, admission.js, dispatcher.js, executors.js, followup.js, hook.js, opencode-runner.js, reapers.js
+  score  920  places 5 sites   6  churn-sum 184 union 135   FAILED
+        config.js, hook.js, opencode-runner.js, phases.js, reapers.js
+  score  596  places 4 sites   6  churn-sum 149 union 125   BLOCKED
+        hook.js, opencode-runner.js, phases.js, reapers.js
+  score  435  places 3 sites   6  churn-sum 145 union 125   [done]
+        hook.js, opencode-runner.js, reapers.js
+  score  206  places 2 sites   8  churn-sum 103 union 92   DONE
+        hook.js, reapers.js
+  score  160  places 2 sites   2  churn-sum 80 union 75   [usage]
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   2  churn-sum 80 union 75   [blocked]
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   2  churn-sum 80 union 75   [pending]
+        hook.js, opencode-runner.js
+  score  138  places 2 sites   2  churn-sum 69 union 67   AWAITING_EXTERNAL
+        phases.js, reapers.js
+
+== lit: 21 groups spanning >= 2 files; top 14 by places x change
+  score  476  places 7 sites  10  churn-sum 68 union 58   ''
+        executors.js, halt.js, harbour-token-mcp-server.js, opencode-liveness.js, signal-guard.js, terminal-driver.js, transcript.js
+  score  435  places 3 sites   5  churn-sum 145 union 125   'blocked'
+        hook.js, opencode-runner.js, reapers.js
+  score  336  places 3 sites   8  churn-sum 112 union 105   'stop'
+        dispatcher.js, halt.js, opencode-runner.js
+  score  294  places 3 sites  16  churn-sum 98 union 84   'opencode'
+        executors.js, opencode-liveness.js, reapers.js
+  score  262  places 2 sites   7  churn-sum 131 union 106   'transcript-hook'
+        dispatcher.js, reapers.js
+  score  232  places 4 sites   9  churn-sum 58 union 56   'assistant'
+        heartbeat.js, links.js, opencode-runner.js, transcript.js
+  score  216  places 2 sites   2  churn-sum 108 union 103   'abort'
+        dispatcher.js, opencode-runner.js
+  score  160  places 2 sites   3  churn-sum 80 union 75   'pending-external'
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   3  churn-sum 80 union 75   'failed'
+        hook.js, opencode-runner.js
+  score  160  places 2 sites   2  churn-sum 80 union 75   'pending-internal'
+        hook.js, opencode-runner.js
+  score  156  places 3 sites   7  churn-sum 52 union 50   'text'
+        links.js, opencode-runner.js, transcript.js
+  score  148  places 2 sites   3  churn-sum 74 union 71   'user'
+        reapers.js, transcript.js
+  score  140  places 2 sites   3  churn-sum 70 union 68   'pause'
+        dispatcher.js, halt.js
+  score  140  places 2 sites   3  churn-sum 70 union 67   'STALLED'
+        opencode-liveness.js, reapers.js

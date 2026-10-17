@@ -70,13 +70,13 @@
 
 <!-- behaviour band -->
 <rect x="218" y="236" width="704" height="46" rx="6" fill="#f9fafb" stroke="#6b7280" stroke-dasharray="4 3"/>
-<text x="570" y="256" font-size="11.5" fill="#111827" text-anchor="middle">unchanged across every move: an independent replay finds 0 differences,</text>
-<text x="570" y="272" font-size="11.5" fill="#111827" text-anchor="middle">except fixes the change names and lists</text>
+<text x="570" y="256" font-size="11.5" fill="#111827" text-anchor="middle">unchanged across every move: an independent replay finds 0 differences, except named fixes;</text>
+<text x="570" y="272" font-size="11.5" fill="#111827" text-anchor="middle">the tests-only move, which changes no production code, is checked by probes and mutation runs</text>
 
 <!-- done-when row -->
 <g font-size="10.5" fill="#111827" text-anchor="middle">
-<text x="282" y="312">targets ranked by</text><text x="282" y="327">sites × churn</text>
-<text x="426" y="312">owner checked against</text><text x="426" y="327">every use and throw</text>
+<text x="282" y="312">targets ranked by</text><text x="282" y="327">places × change</text>
+<text x="426" y="312">owner checked at every</text><text x="426" y="327">use, throw and catch</text>
 <text x="570" y="312">moving the code fails</text><text x="570" y="327">no test; prod unchanged</text>
 <text x="714" y="312">one site per decision,</text><text x="714" y="327">copies deleted</text>
 <text x="858" y="312">worst function down;</text><text x="858" y="327">under ~60% verbatim</text>

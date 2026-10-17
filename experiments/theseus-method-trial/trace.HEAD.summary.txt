@@ -1,0 +1,6 @@
+escapes: 0
+reader sites: 4  reader files: 4  production files read: 43
+  test/process-item.test.js:750                        dispatcher.js
+  test/feedback.test.js:616                            8 files (whole-tree)
+  test/claude-md-anchor-resolver.test.js:95            43 files (whole-tree)
+  test/links.test.js:374                               43 files (whole-tree)
