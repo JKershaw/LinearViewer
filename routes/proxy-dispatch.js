@@ -334,15 +334,15 @@ export function createDispatchRoutes({
    *
    * `periodicalId` (LIN-1825/LIN-2385): optional periodical-template join key,
    * registry-validated exactly like `POST /api/proxy/dispatch`'s field of the
-   * same name. Stamped onto BOTH `createDispatchItem` fields blocks below —
-   * the verb-override branch AND the recommendation-derived one — because
+   * same name. Stamped onto the row of BOTH arms — the verb-override branch
+   * AND the recommendation-derived one — because
    * this fused verb, not `POST /dispatch`, is what every autopilot loop
    * actually calls to continue a tracked task (see `lib/prompts/
    * autopilot-kickoff.js`'s "Trigger the next step"), and the normal trigger
    * carries no `kind`, landing on the recommendation-derived branch.
    *
    * `followUpTo` (LIN-2869): optional well-formed UUID, cli/web targets only,
-   * threaded onto whichever `createDispatchItem` call this route resolves to —
+   * threaded onto whichever arm's row this route resolves to —
    * the recommendation still runs and the generated body becomes a follow-up
    * instruction resuming the prior session. A fused follow-up is exempt from
    * the duplicate guard by the factory's own gate, and suppresses the
