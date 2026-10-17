@@ -216,3 +216,4 @@ John: "So, if we consider tests part of the "seam", then it makes sense they are
 - #4b: a text pin survived inside the freed unit.
 - #2: an import-allowlist pin had to grow by one line to let a module reach its authority.
 A seam therefore has a code side and a test side. Freeing it means correcting the tests that guard *where* or *how* instead of *what*, and finding ones that are vacuous, stale or redundant. The safeguard is the one #4a used: a replacement lands and is shown catching the removed guard before the old test goes. The independent replay is what lets tests change at all, because it judges behaviour without trusting the suite.
+- John: "Don't update the work in progress. We can always redo this part with an improved process." LIN-3604 runs on its ticket as filed; how it handles the text pin is part of what it shows.
