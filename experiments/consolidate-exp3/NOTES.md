@@ -151,3 +151,4 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 **Inference.**
 - A consolidation can add lines. The reasons that were scattered beside each copy were gathered beside the one authority: line count is the wrong measure for it; sites per decision and the census are right.
 - The census sees this consolidation (one group gone); the knots don't (the decision moved within its area). The two instruments are complementary: #3 moved knots and not the census, #2 the reverse.
+- 09:45Z: John pressed the LIN-3601 ruling ("Ruling applied"): one more plan review of revision 4.
