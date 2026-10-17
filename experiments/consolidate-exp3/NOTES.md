@@ -282,3 +282,11 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 **Inference.** The perturbation probe is a good generic way to find a seam's test side: rewrite the code in behaviour-preserving ways and see which tests fail. Every failure is a test guarding *how* the code is written. It found the tests-as-seam items mechanically.
 - #4c fresh-reader: 4 high, 6 medium, 12 low. High: the ticket never named its repository (right after a worker built in the wrong repo); a conversion (A4, "at least one writer line") was weaker than the security pin it replaced, and two A-class loosenings would have left three planted-mutation tests failing with no permission to change them; the open-questions list was paraphrased and dropped details; no stale-base check. All sent back for fixing; A4 replaced by a count equal to the declared sites.
 - 14:25Z: heavy lane: LIN-3611 (#4c, design-first rebuild of the authority) filed and kicked off after the fresh-reader fixes (prediction revised before launch). Three lanes now in use: LIN-3611 heavy, LIN-3606 and LIN-3610 light.
+
+## 17 Oct, ~14:30Z: LIN-3606 (K1) merged (#1915); laptop load with three lanes
+
+**Facts.**
+- K1 merged as `6ae4c0e4`: `isBlocked` moved to `lib/providers/state-map.js`, `tree.js` keeps a re-export, the two proxy routes import from the owner; a new test fails on main and passes after. Kickoff ~14:00Z, merged ~14:25Z. Scoring after K3.
+- Load check (read-only opencode research dispatch `4c149c1b`, cheap model) with LIN-3611 (heavy), LIN-3610 and LIN-3606's close-out running: 10 CPUs, 32 GB. Load averages 3.73 / 5.53 / 6.52 falling to 3.47 / 4.84 / 6.03 over two minutes; swap 0; about 12 GB reclaimable memory. Node CPU over 120 s: about 8 s for the research tool's own server, 4.3 s for the dispatcher, about 0.5 s per hook process. Spotlight (`mds_stores`) at 42% CPU, the biggest single consumer. 0 `node --test` processes at that moment. 11 `claude` processes, including sessions for tickets that finished in round 2 (LIN-3592, LIN-3579) and one that looks stuck.
+
+**Inference.** Three lanes leave headroom: load well under the CPU count and no swap. The 16 Oct freeze came from concurrent full suites, which the cap now halves. Two leftovers to raise with John: Spotlight still indexes the workspaces, and old finished sessions still hold `claude` processes.
