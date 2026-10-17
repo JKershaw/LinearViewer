@@ -25,6 +25,13 @@
  * classify the one ordinary-turn execute caller as propose-only.
  *
  * Mutation witnesses run the same scanners over planted copies of the tree.
+ *
+ * LIN-3601: the four dispatch-entrance files (routes/dispatch.js,
+ * routes/proxy-dispatch.js, routes/proxy-kickoff.js, lib/dispatch-entrance.js) are
+ * judged as ONE unit (E_MEMBERS): each sink kind must occur in E at least once and
+ * an unlisted kind fails. Which route reaches a sink, and behind which gate, is
+ * carried by the route sweeps (dispatch-entrance-session-owner-sweep and
+ * dispatch-entrance-proxy-grant-sweep), which call the routes over HTTP.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -85,12 +92,6 @@ function findSinks(tree) {
  * must each be preceded, inside that text, by GATE (or the row's own `gate`).
  */
 const MEMBERS = [
-  { id: 1, file: 'routes/dispatch.js', sink: 'createDispatchItem', count: 1, verdict: 'gated',
-    reason: "POST /api/dispatch: every browser launcher (Dispatch page, ladder, Home, swipe, kickoff prompts, reply box, close-out press) lands here",
-    handler: "router.post('/workspace/:urlKey/api/dispatch'", before: ['createDispatchItem('] },
-  { id: 2, file: 'routes/dispatch.js', sink: 'expandCascadeAborts', count: 1, verdict: 'gated',
-    reason: 'cascade abort expansion writes runner-consumed abort rows without the factory; same handler, gate runs first',
-    handler: "router.post('/workspace/:urlKey/api/dispatch'", before: ['expandCascadeAborts('] },
   { id: '3-4', file: 'routes/workspace-api.js', sink: 'createDispatchItem', count: 2, verdict: 'gated',
     reason: 'feedback triage + autopilot lanes; the two helper callers below are the only entry and sit in the feedback handler',
     handler: "router.post('/workspace/:urlKey/api/feedback'", before: ['enqueueFeedbackTriage(', 'enqueueFeedbackAutopilot('],
@@ -112,32 +113,9 @@ const MEMBERS = [
   { id: 7, file: 'routes/collective.js', sink: 'createDispatchItem', count: 1, verdict: 'gated',
     reason: 'Collective start: per participant workspace, a seat the session does not own is ok:false',
     handler: "router.post('/workspace/:urlKey/collective/start'", before: ['createDispatchItem('] },
-  { id: 8, file: 'routes/proxy-dispatch.js', sink: 'createDispatchItem', count: 3, verdict: 'token-scoped',
-    reason: "proxy token routes behind requireGrant('dispatch') (LIN-3136); pinned by lin-3136-enqueue-census C1; the grant is minted owner-checked only" },
-  { id: 8, file: 'routes/proxy-dispatch.js', sink: 'expandCascadeAborts', count: 1, verdict: 'token-scoped',
-    reason: "proxy abort/cascade, same requireGrant('dispatch') POST" },
-  { id: 8, file: 'routes/proxy-kickoff.js', sink: 'createDispatchItem', count: 1, verdict: 'token-scoped',
-    reason: "proxy kickoff behind requireGrant('dispatch') (LIN-3136 C1)" },
-  { id: 9, file: 'routes/dispatch.js', sink: 'addFeedback', count: 1, verdict: 'token-scoped',
-    reason: 'runner/feedback-token write; comes from the runner itself, not a session' },
   { id: 9, file: 'routes/proxy-runner.js', sink: 'addFeedback', count: 1, verdict: 'token-scoped',
     reason: 'runner token write; comes from the runner itself, not a session' },
   // LIN-3398 / LIN-3409: runner-state mutations other than enqueue.
-  { id: 10, file: 'routes/dispatch.js', sink: 'setWorkspaceHalt', count: 1, verdict: 'gated',
-    reason: 'session halt POST: owner-only (LIN-3408), gate after mode validation and before the write',
-    handler: "router.post('/workspace/:urlKey/api/dispatch/halt'", before: ['setWorkspaceHalt('], gateToken: 'refuseNonOwner(' },
-  { id: 10, file: 'routes/dispatch.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'gated',
-    reason: 'session halt DELETE (resume): owner-only (LIN-3408)',
-    handler: "router.delete('/workspace/:urlKey/api/dispatch/halt'", before: ['clearWorkspaceHalt('], gateToken: 'refuseNonOwner(' },
-  { id: 11, file: 'routes/dispatch.js', sink: 'removeItem', count: 1, verdict: 'gated',
-    reason: 'session queue-item delete: owner-only for runner targets (LIN-3408); the gate reads the row for its target first, which writes nothing',
-    handler: "router.delete('/workspace/:urlKey/api/dispatch/:itemId'", before: ['removeItem('], gateToken: 'refuseNonOwner(' },
-  { id: 12, file: 'routes/dispatch.js', sink: 'trimSessionBudget', count: 1, verdict: 'gated',
-    reason: 'session trim: owner-only for runner targets (LIN-3408)',
-    handler: "router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim'", before: ['trimSessionBudget('], gateToken: 'refuseNonOwner(' },
-  { id: 13, file: 'routes/dispatch.js', sink: 'revokeToken', count: 1, verdict: 'gated',
-    reason: 'dispatch-token revoke (the dispatch-token store has no owner seam and one branch, so it is gated at its route; LIN-3408)',
-    handler: "router.delete('/workspace/:urlKey/api/dispatch/tokens/:tokenId'", before: ['revokeToken('], gateToken: 'refuseNonOwner(' },
   { id: 14, file: 'routes/proxy-halt.js', sink: 'setWorkspaceHalt', count: 1, verdict: 'gated',
     reason: 'proxy halt POST: owner-only on the token\'s own workspace id and creator, 409 for an unbound token (LIN-3409)',
     handler: 'router.post(HALT_ROUTE', before: ['setWorkspaceHalt('], gateToken: 'refuseUnlessOwner(',
@@ -150,6 +128,33 @@ const MEMBERS = [
     handler: "router.delete('/workspace/:urlKey/api/proxy/tokens/:tokenId'", passes: ['workspaceId:', 'accountId:'] },
   { id: 16, file: 'routes/test.js', sink: 'clearWorkspaceHalt', count: 1, verdict: 'test-only',
     reason: '/test cleanup route, mounted only under the test harness; no session, no member identity' }
+];
+
+/**
+ * LIN-3601: the dispatch entrances (E) are ONE unit. routes/dispatch.js,
+ * routes/proxy-dispatch.js, routes/proxy-kickoff.js and lib/dispatch-entrance.js
+ * used to be rows of MEMBERS, each keyed to a file, a registration and an exact
+ * sink count, which is what stopped the three entrances sharing one authority
+ * (LIN-3592, lib/dispatch-entrance.js:10-12). They are now judged as a unit:
+ * each sink KIND in the table must still occur at least once somewhere in E, and
+ * a sink kind that is not in the table fails the census. Which route may reach a
+ * sink, and behind which gate, is no longer a statement about source position:
+ *   - the session routes (gated verdicts): dispatch-entrance-session-owner-sweep.test.js
+ *     calls every route of routes/dispatch.js as a non-owner on a runner target;
+ *   - the proxy routes (token-scoped verdicts): dispatch-entrance-proxy-grant-sweep.test.js
+ *     calls every write route of the composer with a token lacking `dispatch`.
+ * Non-E rows keep their exact counts and positional gates (MEMBERS above).
+ */
+const E_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js', 'lib/dispatch-entrance.js']);
+const E_MEMBERS = [
+  { sink: 'createDispatchItem', verdict: 'gated', reason: 'session POST /api/dispatch (LIN-3383 owner gate: every browser launcher lands here) and the three proxy POSTs behind requireGrant(\'dispatch\') (LIN-3136; the grant is minted owner-checked only)' },
+  { sink: 'expandCascadeAborts', verdict: 'gated', reason: 'cascade abort expansion writes runner-consumed abort rows without the factory: the session POST behind the owner gate, the proxy POST behind the dispatch grant' },
+  { sink: 'addFeedback', verdict: 'token-scoped', reason: 'runner/feedback-token write; comes from the runner itself, not a session' },
+  { sink: 'setWorkspaceHalt', verdict: 'gated', reason: 'session halt POST: owner-only (LIN-3408), gate after mode validation and before the write' },
+  { sink: 'clearWorkspaceHalt', verdict: 'gated', reason: 'session halt DELETE (resume): owner-only (LIN-3408)' },
+  { sink: 'removeItem', verdict: 'gated', reason: 'session queue-item delete: owner-only for runner targets (LIN-3408); the gate reads the row for its target first, which writes nothing' },
+  { sink: 'trimSessionBudget', verdict: 'gated', reason: 'session trim: owner-only for runner targets (LIN-3408)' },
+  { sink: 'revokeToken', verdict: 'gated', reason: 'dispatch-token revoke (the dispatch-token store has no owner seam and one branch, so it is gated at its route; LIN-3408)' }
 ];
 
 /** Execute-mode caller table. `mode` is authoritative (see header). */
@@ -220,7 +225,23 @@ function gatedBefore(text, tokens, gate) {
 
 function scanSinks(tree) {
   const v = [];
-  const hits = findSinks(tree);
+  const allHits = findSinks(tree);
+  // LIN-3601: E is one unit. A sink kind must still occur somewhere in E, and an
+  // unlisted kind fails; position and count inside E are the sweeps' concern.
+  const hits = allHits.filter(h => !E_FILES.has(h.file));
+  const eHits = allHits.filter(h => E_FILES.has(h.file));
+  const eKinds = new Set(E_MEMBERS.map(m => m.sink));
+  for (const m of E_MEMBERS) {
+    if (!m.reason) v.push(`E|${m.sink}: a row needs a recorded reason`);
+    if (!VERDICTS.includes(m.verdict)) v.push(`E|${m.sink}: verdict must be one of ${VERDICTS.join(' | ')}`);
+    if (!eHits.some(h => h.sink === m.sink)) v.push(`E|${m.sink}: no call left in the four entrance files — stale row, or the sink moved out of E`);
+  }
+  for (const sink of new Set(eHits.map(h => h.sink))) {
+    if (!eKinds.has(sink)) {
+      const where = eHits.filter(h => h.sink === sink).map(h => `${h.file}:${h.line}`).join(',');
+      v.push(`E|${sink}: an unlisted sink kind in the entrances (${where}) — give it a gated | token-scoped verdict and a sweep`);
+    }
+  }
   const counts = {};
   for (const h of hits) { const k = `${h.file}|${h.sink}`; counts[k] = (counts[k] || 0) + 1; }
   const listed = new Set();
@@ -352,15 +373,12 @@ describe('LIN-3383 census — every session-reachable runner enqueue sink is gat
 const mutate = (file, fn) => TREE.map(t => (t.file === file ? { ...t, src: fn(t.src) } : t));
 
 describe('LIN-3383 census — mutation witnesses', () => {
-  test('removing the Dispatch route gate fails the census', () => {
-    const v = scanSinks(mutate('routes/dispatch.js', s => s.replace('const enqueueRefusal = await resolveRunnerOwnerRefusal(', 'const enqueueRefusal = await (async () => null)(')));
-    assert.ok(v.some(m => m.startsWith('routes/dispatch.js (router.post') && m.includes('is reached before')), v.join('\n'));
-  });
-
-  test('moving the cascade expansion above the gate fails the census', () => {
-    const v = scanSinks(mutate('routes/dispatch.js', s => s.replace("      // LIN-3383 owner-only runner enqueue.", "      await dispatchQueueStore.expandCascadeAborts(workspace.urlKey, abortTo, {});\n      // LIN-3383 owner-only runner enqueue.")));
-    assert.ok(v.length > 0);
-  });
+  // LIN-3601: 'removing the Dispatch route gate' and 'moving the cascade expansion
+  // above the gate' (formerly here) planted into routes/dispatch.js text. The
+  // property is now carried by dispatch-entrance-session-owner-sweep.test.js,
+  // 'POST /workspace/:urlKey/api/dispatch — owner-gated' (non-owner on cli, web and
+  // absent targets, plus the abort, cascade and followUpTo bodies). Both old
+  // mutations were shown failing that test in a scratch copy (PR evidence).
 
   test('removing the feedback lane gate fails the census', () => {
     const v = scanSinks(mutate('routes/workspace-api.js', s => s.replaceAll('resolveRunnerOwnerRefusal(', 'noGate(')));
@@ -433,29 +451,49 @@ describe('LIN-3383 census — mutation witnesses', () => {
   });
 });
 
-describe('LIN-3409 census — mutation witnesses for the runner-state sinks', () => {
-  test('removing a session-route gate fails the census (halt POST/DELETE, delete, trim, dispatch-token revoke)', () => {
-    const cases = [
-      ["router.post('/workspace/:urlKey/api/dispatch/halt'", 'setWorkspaceHalt('],
-      ["router.delete('/workspace/:urlKey/api/dispatch/halt'", 'clearWorkspaceHalt('],
-      ["router.delete('/workspace/:urlKey/api/dispatch/:itemId'", 'removeItem('],
-      ["router.patch('/workspace/:urlKey/api/dispatch/:sessionId/trim'", 'trimSessionBudget('],
-      ["router.delete('/workspace/:urlKey/api/dispatch/tokens/:tokenId'", 'revokeToken(']
-    ];
-    for (const [handler, sink] of cases) {
-      const v = scanSinks(mutate('routes/dispatch.js', s => {
-        const at = s.indexOf(handler);
-        const end = at + (handlerText(s, handler) || '').length;
-        return s.slice(0, at) + s.slice(at, end).replace(/await refuseNonOwner\(/g, 'await (async () => false)(') + s.slice(end);
-      }));
-      assert.ok(v.some(m => m.startsWith('routes/dispatch.js') && m.includes(sink) && m.includes('is reached before')), `${sink}: ${v.join('\n')}`);
-    }
+describe('LIN-3601 census — the entrances are one unit', () => {
+  const E_FILE_LIST = [...E_FILES];
+
+  test('every E file is part of the scanned tree (lib/dispatch-entrance.js included)', () => {
+    for (const file of E_FILE_LIST) assert.ok(TREE.some(t => t.file === file), file);
   });
 
-  test('moving a session store write above its gate fails the census', () => {
-    const v = scanSinks(mutate('routes/dispatch.js', s => s.replace('      if (await refuseNonOwner(req, res, row?.target)) return;\n', '      await dispatchQueueStore.removeItem(workspace.urlKey, itemId);\n      if (await refuseNonOwner(req, res, row?.target)) return;\n')));
-    assert.ok(v.length > 0, 'a second removeItem( above the gate must not pass');
+  test('moving a sink call between the entrance files does not change the verdict (the point of the ticket)', () => {
+    // routes/dispatch.js's `.removeItem(` call, relocated into lib/dispatch-entrance.js:
+    const moved = TREE.map(t => {
+      if (t.file === 'routes/dispatch.js') return { ...t, src: t.src.replace('await dispatchQueueStore.removeItem(workspace.urlKey, itemId);', 'void 0;') };
+      if (t.file === 'lib/dispatch-entrance.js') return { ...t, src: `${t.src}\nexport const moved = (store, k, id) => store.removeItem(k, id);\n` };
+      return t;
+    });
+    assert.notDeepEqual(moved, TREE);
+    assert.deepEqual(scanSinks(moved), []);
   });
+
+  test('a sink KIND missing from the unit fails (stale row)', () => {
+    const gone = TREE.map(t => (E_FILES.has(t.file) ? { ...t, src: t.src.replaceAll('.trimSessionBudget(', '.noLongerTrims(') } : t));
+    assert.ok(scanSinks(gone).some(m => m.startsWith('E|trimSessionBudget') && m.includes('no call left')), scanSinks(gone).join('\n'));
+  });
+
+  // Re-targeted count-drift witness (LIN-3601): a new sink KIND in any one of the
+  // four entrance files, lib/dispatch-entrance.js included, fails the census. A
+  // new ROUTE in E is the session-owner / proxy-grant sweeps' to fail (their
+  // enumerated-route count and missing-row checks).
+  for (const file of E_FILE_LIST) {
+    test(`a new sink kind planted in ${file} fails the census`, () => {
+      const planted = mutate(file, s => `${s}\nexport const planted = (store) => store._mintWake(1);\n`);
+      assert.ok(scanSinks(planted).some(m => m.startsWith('E|_mintWake') && m.includes('unlisted sink kind')), scanSinks(planted).join('\n'));
+    });
+  }
+});
+
+describe('LIN-3409 census — mutation witnesses for the runner-state sinks', () => {
+  // LIN-3601: 'removing a session-route gate fails the census (halt POST/DELETE,
+  // delete, trim, dispatch-token revoke)' and 'moving a session store write above
+  // its gate' (formerly here) planted into routes/dispatch.js text. Covered by
+  // dispatch-entrance-session-owner-sweep.test.js, one test per route
+  // (POST/DELETE .../halt, DELETE .../:itemId, PATCH .../:sessionId/trim, DELETE
+  // .../tokens/:tokenId — each 'owner-gated'). Each old mutation was shown failing
+  // that test in a scratch copy (PR evidence).
 
   test('removing the proxy-halt gate call fails the census (POST and DELETE)', () => {
     for (const [handler, sink] of [['router.post(HALT_ROUTE', 'setWorkspaceHalt('], ['router.delete(HALT_ROUTE', 'clearWorkspaceHalt(']]) {

@@ -39,6 +39,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DUPLICATE_DISPATCH_CODE } from '../../lib/dispatch-factory.js';
+import { createProxyRoutes } from '../../routes/proxy.js';
+import { BASE_DEPS } from './lib/proxy-fake-deps.js';
+import { appAround, request, SAMPLE_UUID } from './lib/entrance-route-sweep.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -50,7 +53,8 @@ const proxySource = readFileSync(join(__dirname, '../../routes/proxy.js'), 'utf8
 const proxyComputeSource = readFileSync(join(__dirname, '../../routes/proxy-compute.js'), 'utf8');
 // LIN-679 Stage 6 (LIN-2540): group I, including the shared
 // `formatDispatchWatch`/`sessionId` band, moved to its own sub-router.
-const proxyDispatchSource = readFileSync(join(__dirname, '../../routes/proxy-dispatch.js'), 'utf8');
+// LIN-3601: assertions 1 and 2 below no longer read routes/proxy-dispatch.js as text;
+// they call the real routes (see their comments), so the entrance can move.
 const factorySource = readFileSync(join(__dirname, '../../lib/dispatch-factory.js'), 'utf8');
 const integrationSource = readFileSync(join(__dirname, '../../docs/proxy-integration.md'), 'utf8');
 // LIN-2245: the /api/proxy/instructions catalog (the source of all 3
@@ -92,13 +96,25 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   // whole-file token search can't pass by finding sessionId elsewhere on
   // the route (it appears byte-identical in formatDispatchWatch too — see
   // assertion 2 below).
-  test('/dispatch list item is an exact field set that includes sessionId and maxTasks', () => {
-    const itemsLiteral = sliceBetween(
-      proxyDispatchSource,
-      'const items = filtered.slice(0, limit).map(i => ({',
-      '}));'
-    );
-    const keys = literalKeys(itemsLiteral);
+  // LIN-3601: this test sliced the `const items = ...map(i => ({` literal out of
+  // routes/proxy-dispatch.js and compared its `key:` names. It now calls
+  // GET /api/proxy/dispatch over HTTP with a stored row that ALSO carries
+  // bootstrapToken, prompt, grantDeclaration, grantRefusal and an unknown key, and
+  // compares the keys of the reply. The set below is the old one plus `closedAt` and
+  // `closedReason` (LIN-3364): they come from `...closedProjection(i.bookkeeping)`, a
+  // spread the text scan could not see, so the old set never listed them. The exact
+  // set of the watch read is pinned in dispatch-entrance-proxy-key-sets.test.js.
+  test('/dispatch list item is an exact field set that includes sessionId and maxTasks', async () => {
+    const row = {
+      id: SAMPLE_UUID, status: 'queued', promptName: 'Prompt', kind: 'custom', issueIdentifier: 'LIN-1', issueUrl: 'https://example.test/LIN-1',
+      target: 'cli', sessionId: 'sess-1', maxTasks: 3, dispatchedAt: '2026-10-17T00:00:00.000Z', feedback: [],
+      bootstrapToken: 'fixture-bootstrap-token', prompt: 'fixture prompt', grantDeclaration: { grants: ['dispatch'] }, grantRefusal: { code: 'X' }, unknownKey: 'u'
+    };
+    const deps = BASE_DEPS();
+    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, listItems: async () => [{ ...row }], listHistory: async () => ({ items: [], total: 0 }) };
+    const res = await request(appAround(createProxyRoutes(deps)), 'GET', '/api/proxy/dispatch', { headers: { Authorization: 'Bearer anything' } });
+    assert.equal(res.status, 200, res.text);
+    const keys = Object.keys(res.body.items[0]);
     assert.deepStrictEqual(
       new Set(keys),
       // LIN-2885: consumerLastSeenAt/consumerPollWarning added deliberately
@@ -107,7 +123,7 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
       // artifact that misled a passage runner into reporting budget
       // stamping as absent when it was only unread.
       new Set(['id', 'status', 'promptName', 'kind', 'issueIdentifier', 'issueUrl', 'target',
-        'sessionId', 'maxTasks', 'dispatchedAt', 'resolvedAt', 'completedAt',
+        'sessionId', 'maxTasks', 'dispatchedAt', 'resolvedAt', 'completedAt', 'closedAt', 'closedReason',
         'feedbackCount', 'consumerLastSeenAt', 'consumerPollWarning']),
       'list item field set drifted — check whether sessionId/maxTasks was silently dropped, or a bootstrapToken-shaped leak was added'
     );
@@ -115,18 +131,21 @@ describe('assertion 1+2 (LIN-1870-F4): the sessionId asymmetry, both sides pinne
   });
 
   // The other side of the asymmetry: formatDispatchWatch (the watch/detail
-  // read) DOES carry sessionId, deliberately. `sessionId: item.sessionId ||
-  // null,` appears 5x byte-identical in routes/proxy.js, so a file-level
-  // match would stay green after deleting it from just this one formatter
-  // (plan-review note 2). Scoped to the function body via anchor text so it
-  // can only see this one copy.
-  test('formatDispatchWatch includes sessionId, scoped to its own function body', () => {
-    const fnBody = sliceBetween(
-      proxyDispatchSource,
-      'function formatDispatchWatch(item, meta = null, wakeShadow = null, liveConsumerLastSeenAt = null) {',
-      'function dispatchWatchChanged(baseline, item) {'
-    );
-    assert.match(fnBody, /\bsessionId:\s*item\.sessionId \|\| null\b/);
+  // read) DOES carry sessionId, deliberately. LIN-3601: this test sliced
+  // formatDispatchWatch's body out of routes/proxy-dispatch.js and matched
+  // `sessionId: item.sessionId || null`; it now reads GET /api/proxy/dispatch/:id
+  // and requires the stored sessionId in the reply, which fails whichever file the
+  // formatter sits in the moment it stops carrying it.
+  test('formatDispatchWatch includes sessionId, scoped to its own function body', async () => {
+    const row = { id: SAMPLE_UUID, status: 'queued', promptName: 'Prompt', kind: 'custom', target: 'cli', sessionId: 'sess-watch', dispatchedAt: '2026-10-17T00:00:00.000Z', feedback: [] };
+    const deps = BASE_DEPS();
+    deps.dispatchQueueStore = { ...deps.dispatchQueueStore, getItemStatus: async () => ({ ...row }) };
+    const res = await request(appAround(createProxyRoutes(deps)), 'GET', `/api/proxy/dispatch/${SAMPLE_UUID}`, { headers: { Authorization: 'Bearer anything' } });
+    assert.equal(res.status, 200, res.text);
+    assert.equal(res.body.sessionId, 'sess-watch');
+    const noSession = await request(appAround(createProxyRoutes({ ...deps, dispatchQueueStore: { ...deps.dispatchQueueStore, getItemStatus: async () => ({ ...row, sessionId: undefined }) } })),
+      'GET', `/api/proxy/dispatch/${SAMPLE_UUID}`, { headers: { Authorization: 'Bearer anything' } });
+    assert.ok('sessionId' in noSession.body && noSession.body.sessionId === null, 'the key is present even with no session (null)');
   });
 });
 

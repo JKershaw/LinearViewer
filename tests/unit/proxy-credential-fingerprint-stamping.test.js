@@ -55,6 +55,11 @@ const PROXY_KICKOFF_SRC = readFileSync(join(__dirname, '../../routes/proxy-kicko
 // moved to its own sub-router — three-way split, part 3 of 3, closing. The
 // partition is now true: F=7 + H=1 + I=1 = 9, and routes/proxy.js has 0.
 const PROXY_DISPATCH_SRC = readFileSync(join(__dirname, '../../routes/proxy-dispatch.js'), 'utf8');
+// LIN-3601: the proxy entrances (routes/proxy-kickoff.js + routes/proxy-dispatch.js)
+// are judged together with lib/dispatch-entrance.js as one unit, so the two E call
+// sites may sit in any of the three files. The 7 sites in routes/proxy-compute.js and
+// the 0 in routes/proxy.js are not E and stay exact.
+const ENTRANCE_LIB_SRC = readFileSync(join(__dirname, '../../lib/dispatch-entrance.js'), 'utf8');
 
 // The 7 direct call sites that moved to routes/proxy-compute.js, named by
 // the endpoint tag their own workspaceUnavailable(...) call passes — a
@@ -109,6 +114,9 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       const filtered = callSites.filter(c => !c.startsWith('resolveProviderAccess(urlKey'));
       invocations.push(...filtered.map(call => ({ file, call })));
     }
+    // LIN-3601: lib/dispatch-entrance.js is part of the entrance unit, so a call that
+    // moves there is still checked for the `req` argument.
+    invocations.push(...((ENTRANCE_LIB_SRC.match(/resolveProviderAccess\([^)]*\)/g) || []).map(call => ({ file: 'lib/dispatch-entrance.js', call }))));
     assert.ok(invocations.length >= 10, `expected at least 10 resolveProviderAccess call sites across ${proxyRouteFiles.join(', ')}, found ${invocations.length}`);
     const missingReq = invocations.filter(({ call }) => !/,\s*req[,)]/.test(call));
     assert.deepEqual(missingReq, [], `every resolveProviderAccess(...) call must pass \`req\` as the third argument so the chokepoint can stamp — offenders: ${JSON.stringify(missingReq)}`);
@@ -137,21 +145,23 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     const computeMatches = PROXY_COMPUTE_SRC.match(pattern) || [];
     const kickoffMatches = PROXY_KICKOFF_SRC.match(pattern) || [];
     const dispatchMatches = PROXY_DISPATCH_SRC.match(pattern) || [];
+    const entranceLibMatches = ENTRANCE_LIB_SRC.match(pattern) || [];
     const proxyMatches = PROXY_SRC.match(pattern) || [];
     assert.equal(
       computeMatches.length,
       7,
       `expected 7 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites in routes/proxy-compute.js, found ${computeMatches.length}.`
     );
-    assert.equal(
-      kickoffMatches.length,
-      1,
-      `expected 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site in routes/proxy-kickoff.js, found ${kickoffMatches.length}.`
-    );
-    assert.equal(
-      dispatchMatches.length,
-      1,
-      `expected 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site in routes/proxy-dispatch.js, found ${dispatchMatches.length}.`
+    // LIN-3601: was `kickoffMatches.length === 1`, `dispatchMatches.length === 1` and
+    // the F=7 + H=1 + I=1 = 9 partition. The two entrance sites (autopilot/kickoff,
+    // recommend-and-dispatch) are one unit with lib/dispatch-entrance.js: at least one
+    // direct site must remain in it, each with the destructure shape above. Which of
+    // the three files holds it is not pinned. That the !accessToken guard still
+    // answers 503 and calls nothing further is dispatch-entrance-no-token.test.js's.
+    const entranceMatches = kickoffMatches.length + dispatchMatches.length + entranceLibMatches.length;
+    assert.ok(
+      entranceMatches >= 1,
+      `expected at least 1 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call site in the dispatch entrances (routes/proxy-kickoff.js, routes/proxy-dispatch.js, lib/dispatch-entrance.js), found ${entranceMatches}.`
     );
     assert.equal(
       proxyMatches.length,
@@ -159,11 +169,6 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
       `expected 0 direct resolveProviderAccess(req.proxyUrlKey, req.proxyCreatedBy, req) call sites remaining in routes/proxy.js, found ${proxyMatches.length}. ` +
       'A count above 0 means a site did not move with group I, or a NEW direct site was added — update this pin\'s expected counts only after also ' +
       'updating the "expected exactly 1" resolveWorkspaceAccess( count pinned in workspace-accesstoken-linear-egress-census.test.js.'
-    );
-    assert.equal(
-      computeMatches.length + kickoffMatches.length + dispatchMatches.length,
-      9,
-      'F=7 + H=1 + I=1 = 9 — the resolveProviderAccess direct-site count must now be expressible as a partition across exactly 3 modules, not a moving target'
     );
   });
 
@@ -211,10 +216,16 @@ describe('LIN-1980 — req.resolvedCredentialFingerprint stamping coverage', () 
     }
   }
 
+  // LIN-3601: this test also ran assertOrderingGuard over routes/proxy-kickoff.js (1 site)
+  // and routes/proxy-dispatch.js (1 site) by source position. Those two are the
+  // dispatch entrances; the property (nothing acts on a request whose provider
+  // resolution failed) is now carried by dispatch-entrance-no-token.test.js, which
+  // calls kickoff and both recommend-and-dispatch arms with no token and requires 503
+  // with the credential resolution as the only call made. The guards negated in a
+  // scratch copy fail it (PR evidence). The 7 sites in routes/proxy-compute.js and the
+  // 0 in routes/proxy.js are not E and stay exactly as they were.
   test('each of the 9 direct sites checks !accessToken immediately after the resolveProviderAccess(...) call, with nothing but the LIN-1980 comment between them — no logic can act on a request whose provider resolution failed before the guard has a chance to reject it', () => {
     assertOrderingGuard(PROXY_COMPUTE_SRC, 7, 'routes/proxy-compute.js');
-    assertOrderingGuard(PROXY_KICKOFF_SRC, 1, 'routes/proxy-kickoff.js');
-    assertOrderingGuard(PROXY_DISPATCH_SRC, 1, 'routes/proxy-dispatch.js');
     assertOrderingGuard(PROXY_SRC, 0, 'routes/proxy.js');
   });
 
