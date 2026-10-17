@@ -714,7 +714,7 @@ async function resolveFeedbackTeamId(provider, token, bodyTeamId) {
 // any other error, so the caller keeps its existing logging path. The ticket is
 // already filed — this only says why no run started.
 function runLimitRefusal(err) {
-  const limit = err?.runLimit;
+  const limit = err ? err.runLimit : null;
   if (!limit) return null;
   return {
     launched: false,
@@ -751,23 +751,18 @@ function feedbackCaptureBlock({ url, userAgent }) {
 
 // The PR head the reader saw, or null.
 function statusHeadSha(status) {
-  if (!status || status.readable !== true) return null;
-  return (status.head && status.head.sha) || status.ref || null;
+  return status?.readable === true ? (status.head?.sha || status.ref || null) : null;
 }
 
 // The open-ledger-item counts at merge: review-ledger items not yet
 // discharged, by scope. Content-free — counts only (the audit trail says what
 // "Done" meant).
 function countOpenLedgerItems(review) {
-  const items = (review && review.ledger && review.ledger.items) || [];
-  const counts = { inside: 0, outside: 0, unknown: 0, total: 0 };
-  for (const item of items) {
-    if (!item || item.discharged) continue;
-    const scope = item.scope === 'inside' ? 'inside' : item.scope === 'outside' ? 'outside' : 'unknown';
-    counts[scope] += 1;
-    counts.total += 1;
-  }
-  return counts;
+  const open = (review?.ledger?.items || []).filter((item) => item && !item.discharged);
+  const inScope = (scope) => open.filter((item) => item.scope === scope).length;
+  const inside = inScope('inside');
+  const outside = inScope('outside');
+  return { inside, outside, unknown: open.length - inside - outside, total: open.length };
 }
 
 // A usable close-out/run-evidence identifier: present and at most 100 chars.
@@ -786,17 +781,18 @@ function isPersonSession(req) {
 // record the error and retry on the next check.
 async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
   const { issue } = await provider.fetchIssueContext(callScope, issueIdentifier);
-  const issueRef = (issue && issue.id) || issueIdentifier;
-  let teamId = (issue && issue.team && issue.team.id) || null;
+  const issueRef = issue?.id || issueIdentifier;
+  const teamOf = (record) => record?.team?.id || null;
+
+  let teamId = teamOf(issue);
   if (!teamId && typeof provider.issueWriteGuard === 'function') {
-    const guard = await provider.issueWriteGuard(callScope, issueRef);
-    teamId = (guard && guard.team && guard.team.id) || null;
+    teamId = teamOf(await provider.issueWriteGuard(callScope, issueRef));
   }
   if (!teamId) throw new Error('could not resolve the issue team for Done');
+
   const states = await provider.states(callScope, teamId);
-  const completed = (states || []).find(s => s && s.type === 'completed');
-  const stateId = (completed && completed.id) || resolveStateRef(states, 'Done');
-  return provider.updateIssue(callScope, issueRef, { stateId });
+  const completedId = (states || []).find((state) => state?.type === 'completed')?.id;
+  return provider.updateIssue(callScope, issueRef, { stateId: completedId || resolveStateRef(states, 'Done') });
 }
 
 /**
