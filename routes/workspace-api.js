@@ -187,6 +187,13 @@ function failureOf(error, fallbackMessage, { notFound: hasNotFoundArm = true, op
   return [500, fallbackMessage, { message: error.message }];
 }
 
+/** The catch tail of the keepalive routes: stop the keepalive, log, and reply through it with the ladder's answer. */
+function keepaliveFailure(keepalive, label, error, fallbackMessage, arms) {
+  keepalive.stop();
+  console.error(label, error);
+  keepaliveError(keepalive, ...failureOf(error, fallbackMessage, arms));
+}
+
 /**
  * The preamble every issue-addressed route opens with: resolve the issue's own binding
  * (LIN-1904: per the `source` provenance stamp, not always the workspace's active
@@ -235,6 +242,20 @@ async function loadContext(workspace, issueId, { provider, callScope }) {
     return { context, missing: !context };
   }
   return { context: await provider.fetchRecommendationContext(callScope, issueId), missing: false };
+}
+
+/**
+ * The scan routes' common first steps: the task's context and the canonical id a durable
+ * scan record is keyed under (LIN-2197 Phase 2 close-out ledger item 3: never a
+ * non-canonical fallback). A refusal comes back as `[status, message, extra]` for the
+ * route to reply with, plain or through its keepalive.
+ */
+async function loadScanSubject(workspace, issueId, binding) {
+  const { context, missing } = await loadContext(workspace, issueId, binding);
+  if (missing) return { refusal: [404, 'Issue not found'] };
+  const canonicalId = context.issue?.id || issueId;
+  if (!UUID_REGEX.test(canonicalId)) return { refusal: CANONICAL_ID_REFUSAL };
+  return { context, canonicalId };
 }
 
 /** The non-null slice of a scan row the scan routes return; `raw` keeps absent fields absent (retire, unretire). */
@@ -1624,6 +1645,60 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       });
     };
 
+    // The recovery sequence once a replacement credential exists: mirror it onto the
+    // workspace, save the session, re-resolve the binding and retry the guard and the
+    // write. Resolves true once the request is answered, false when there was nothing
+    // newer to adopt. This is the ONLY path that mutates or saves the session (it is
+    // reached from the catch below, never in test mode, never for a `?source` binding).
+    const retryWithAdoptedCredential = async () => {
+      const adopted = await adoptReplacementCredential();
+      if (!adopted) return false;
+
+      applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt);
+      await saveSession(req.session);
+      // LIN-3186: same observability shape as the headless lane's
+      // [credential-adopted] line — this lane's write-back is the request's
+      // own session row via applyAccessTokenToWorkspace. Digests only,
+      // never token bytes.
+      console.log('[credential-adopted]', JSON.stringify({
+        source: 'session-comment-recovery',
+        urlKey: workspace.urlKey,
+        provider: provider.name,
+        fromFingerprint: fingerprintCredential(token),
+        toFingerprint: fingerprintCredential(adopted.token),
+        writeBack: { rows: 1, ok: true },
+      }));
+
+      // Re-resolve the binding to pick up the freshly-mirrored token.
+      // `requestedSource` is null here (the eligibility check in the catch),
+      // so this re-read is guaranteed to land on the same active
+      // binding `applyAccessTokenToWorkspace` just mirrored into.
+      const retried = resolveIssueBinding(workspace, requestedSource);
+
+      if (!isTestMode) {
+        const retryGuard = await retried.provider.issueWriteGuard(retried.callScope, issueId);
+        if (isTrashed(retryGuard)) {
+          // Same terminal outcome the main path gives a trashed issue —
+          // plan-review implementation note 4.
+          refuseTrashed();
+          return true;
+        }
+      }
+
+      const retryCommentCreate = await writeComment(retried);
+
+      if (!retryCommentCreate.success || !retryCommentCreate.comment) {
+        // Unlike the main path's direct 502, a non-success shape here is
+        // treated as a thrown synthetic error so there is exactly one
+        // exit from this catch block downstream of it: the classified
+        // 500 below.
+        throw new Error('Comment was not created on retry');
+      }
+
+      await finishCommentSuccess(retryCommentCreate);
+      return true;
+    };
+
     try {
       if (!isTestMode) {
         // Two-step trashed guard (LIN-1559): the capability check above cannot
@@ -1720,51 +1795,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         // authorisation reads are unguarded), and the one exit from this catch
         // is the classified 500 below.
         try {
-          const adopted = await adoptReplacementCredential();
-
-          if (adopted) {
-            applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt);
-            await saveSession(req.session);
-            // LIN-3186: same observability shape as the headless lane's
-            // [credential-adopted] line — this lane's write-back is the request's
-            // own session row via applyAccessTokenToWorkspace. Digests only,
-            // never token bytes.
-            console.log('[credential-adopted]', JSON.stringify({
-              source: 'session-comment-recovery',
-              urlKey: workspace.urlKey,
-              provider: provider.name,
-              fromFingerprint: fingerprintCredential(token),
-              toFingerprint: fingerprintCredential(adopted.token),
-              writeBack: { rows: 1, ok: true },
-            }));
-
-            // Re-resolve the binding to pick up the freshly-mirrored token.
-            // `requestedSource` is null here (the eligibility check above),
-            // so this re-read is guaranteed to land on the same active
-            // binding `applyAccessTokenToWorkspace` just mirrored into.
-            const retried = resolveIssueBinding(workspace, requestedSource);
-
-            if (!isTestMode) {
-              const retryGuard = await retried.provider.issueWriteGuard(retried.callScope, issueId);
-              if (isTrashed(retryGuard)) {
-                // Same terminal outcome the main path gives a trashed issue —
-                // plan-review implementation note 4.
-                return refuseTrashed();
-              }
-            }
-
-            const retryCommentCreate = await writeComment(retried);
-
-            if (!retryCommentCreate.success || !retryCommentCreate.comment) {
-              // Unlike the main path's direct 502, a non-success shape here is
-              // treated as a thrown synthetic error so there is exactly one
-              // exit from this catch block downstream of it: the classified
-              // 500 below.
-              throw new Error('Comment was not created on retry');
-            }
-
-            return await finishCommentSuccess(retryCommentCreate);
-          }
+          if (await retryWithAdoptedCredential()) return;
         } catch (recoveryErr) {
           errorToClassify = recoveryErr;
         }
@@ -1954,18 +1985,49 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
   };
 
-  // The POST tail of both: persist the generated body under the issue's content hash,
-  // read the stored row back for its timestamp, and reply fresh.
-  const storeGenerated = async (kind, store, { workspace, canonicalId, inputHash, body, model, keepalive }) => {
-    await store.put(workspace.urlKey, canonicalId, { inputHash, [kind]: body, model });
-    const stored = await store.get(workspace.urlKey, canonicalId);
+  // The POST half of both, after each route's own AI pre-flight: read the context, generate
+  // the body (the deterministic mock under `mockAi`, the model otherwise), persist it under
+  // the issue's content hash, read the stored row back for its timestamp, and reply fresh.
+  // Force-regenerate always calls OpenRouter; the keepalive is a Heroku H12 guard.
+  //   @param {'recap'|'brief'} kind
+  //   @param {Object} ai - the route's resolved credential: `{ mockAi, apiKey, isFreeTier }`
+  const generateCachedDocument = async (kind, store, res, issue, ai, { generate, buildMock }) => {
+    const { workspace, issueId } = issue;
+    const { isFreeTier } = ai;
+    const keepalive = armKeepalive(res);
+    try {
+      const { context, missing } = await loadContext(workspace, issueId, issue);
+      if (missing) {
+        return keepaliveError(keepalive, 404, 'Issue not found');
+      }
 
-    keepalive.send(200, {
-      status: 'fresh',
-      [kind]: stored?.[kind] ?? body,
-      generatedAt: stored?.generatedAt ?? new Date(),
-      model
-    });
+      const canonicalId = context.issue?.id || issueId;
+      const inputHash = hashContext(context);
+      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: kind, forceDefault: isFreeTier });
+
+      let body;
+      let modelUsed;
+      if (ai.mockAi) {
+        body = buildMock(context);
+        modelUsed = model;
+      } else {
+        const result = await generate(context.issue, context, { apiKey: ai.apiKey, model, callMeta: { urlKey: workspace?.urlKey } });
+        body = result[kind];
+        modelUsed = result.model;
+      }
+
+      await store.put(workspace.urlKey, canonicalId, { inputHash, [kind]: body, model: modelUsed });
+      const stored = await store.get(workspace.urlKey, canonicalId);
+
+      keepalive.send(200, {
+        status: 'fresh',
+        [kind]: stored?.[kind] ?? body,
+        generatedAt: stored?.generatedAt ?? new Date(),
+        model: modelUsed
+      });
+    } catch (error) {
+      keepaliveFailure(keepalive, `${kind === 'recap' ? 'Recap' : 'Brief'} POST error:`, error, `Failed to generate ${kind}`, { openRouter: true });
+    }
   };
 
   /**
@@ -2007,39 +2069,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
     }
 
-    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
-    const keepalive = armKeepalive(res);
-    try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) {
-        return keepaliveError(keepalive, 404, 'Issue not found');
-      }
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
-
-      let recap;
-      let modelUsed;
-      if (mockAi) {
-        recap = buildMockRecap(context);
-        modelUsed = selectedModel;
-      } else {
-        const result = await generateRecap(
-          context.issue,
-          context,
-          { apiKey: apiKeyToUse, model: selectedModel, callMeta: { urlKey: workspace?.urlKey } }
-        );
-        recap = result.recap;
-        modelUsed = result.model;
-      }
-
-      await storeGenerated('recap', recapCacheStore, { workspace, canonicalId, inputHash, body: recap, model: modelUsed, keepalive });
-    } catch (error) {
-      keepalive.stop();
-      console.error('Recap POST error:', error);
-      keepaliveError(keepalive, ...failureOf(error, 'Failed to generate recap', { openRouter: true }));
-    }
+    return generateCachedDocument('recap', recapCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateRecap, buildMock: buildMockRecap });
   });
 
   // ===========================================================================
@@ -2130,39 +2160,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       }
     }
 
-    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
-    const keepalive = armKeepalive(res);
-    try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) {
-        return keepaliveError(keepalive, 404, 'Issue not found');
-      }
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
-
-      let brief;
-      let modelUsed;
-      if (mockAi) {
-        brief = buildMockBrief(context);
-        modelUsed = selectedModel;
-      } else {
-        const result = await generateBrief(
-          context.issue,
-          context,
-          { apiKey: apiKeyToUse, model: selectedModel, callMeta: { urlKey: workspace?.urlKey } }
-        );
-        brief = result.brief;
-        modelUsed = result.model;
-      }
-
-      await storeGenerated('brief', briefCacheStore, { workspace, canonicalId, inputHash, body: brief, model: modelUsed, keepalive });
-    } catch (error) {
-      keepalive.stop();
-      console.error('Brief POST error:', error);
-      keepaliveError(keepalive, ...failureOf(error, 'Failed to generate brief', { openRouter: true }));
-    }
+    return generateCachedDocument('brief', briefCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateBrief, buildMock: buildMockBrief });
   });
 
   // ===========================================================================
@@ -2195,18 +2193,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       return null;
     }
 
-    const { context, missing } = await loadContext(workspace, issueId, binding);
-    if (missing) {
-      notFound.json(res, 'Issue not found');
+    const subject = await loadScanSubject(workspace, issueId, binding);
+    if (subject.refusal) {
+      jsonError(res, ...subject.refusal);
       return null;
     }
-
-    const canonicalId = context.issue?.id || issueId;
-    if (!UUID_REGEX.test(canonicalId)) {
-      jsonError(res, ...CANONICAL_ID_REFUSAL);
-      return null;
-    }
-    return canonicalId;
+    return subject.canonicalId;
   };
 
   /**
@@ -2232,16 +2224,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const { workspace, issueId } = issue;
 
     try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) return notFound.json(res, 'Issue not found');
+      const subject = await loadScanSubject(workspace, issueId, issue);
+      if (subject.refusal) return jsonError(res, ...subject.refusal);
+      const { context, canonicalId } = subject;
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        // Never let a durable scan record be keyed under a non-canonical
-        // fallback (LIN-2197 Phase 2 close-out ledger item 3) — this task's
-        // canonical id could not be resolved from the fetched context.
-        return jsonError(res, ...CANONICAL_ID_REFUSAL);
-      }
       const inputHash = hashContext(context);
       const cached = await taskDecisionsStore.getStatus(workspace.urlKey, canonicalId, inputHash);
 
@@ -2332,15 +2318,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
     const keepalive = armKeepalive(res);
     try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) {
-        return keepaliveError(keepalive, 404, 'Issue not found');
-      }
+      const subject = await loadScanSubject(workspace, issueId, issue);
+      if (subject.refusal) return keepaliveError(keepalive, ...subject.refusal);
+      const { context, canonicalId } = subject;
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        return keepaliveError(keepalive, ...CANONICAL_ID_REFUSAL);
-      }
       const inputHash = hashContext(context);
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
 
@@ -2421,9 +2402,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
       keepalive.send(200, { status: 'fresh', ...scanRow(record), model: modelUsed });
     } catch (error) {
-      keepalive.stop();
-      console.error('Scan POST error:', error);
-      keepaliveError(keepalive, ...failureOf(error, 'Failed to run scan', { openRouter: true }));
+      keepaliveFailure(keepalive, 'Scan POST error:', error, 'Failed to run scan', { openRouter: true });
     }
   });
 
@@ -2532,15 +2511,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // always needs fresh content, never just the stored row.
     const keepalive = armKeepalive(res);
     try {
-      const { context, missing } = await loadContext(workspace, issueId, issue);
-      if (missing) {
-        return keepaliveError(keepalive, 404, 'Issue not found');
-      }
+      const subject = await loadScanSubject(workspace, issueId, issue);
+      if (subject.refusal) return keepaliveError(keepalive, ...subject.refusal);
+      const { context, canonicalId } = subject;
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        return keepaliveError(keepalive, ...CANONICAL_ID_REFUSAL);
-      }
       const inputHash = hashContext(context);
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
 
@@ -2613,9 +2587,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
       return keepalive.send(200, { retired: true, ...scanRow(record, { raw: true }) });
     } catch (error) {
-      keepalive.stop();
-      console.error('Scan retire error:', error);
-      keepaliveError(keepalive, ...failureOf(error, 'Failed to retire scan result', { openRouter: true }));
+      keepaliveFailure(keepalive, 'Scan retire error:', error, 'Failed to retire scan result', { openRouter: true });
     }
   });
 
