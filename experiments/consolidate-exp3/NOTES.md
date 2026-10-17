@@ -121,3 +121,9 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 
 **Inference.** Two lessons for the method. A ticket that waits on the base moving needs its baseline taken from the branch point, not from the drafting commit. And "raise a DECISION" in a ticket costs John attention; where the safe default (keep today's behaviour) exists, the ticket should say so and send the question to the standing ticket instead.
 - Filed LIN-3602, autopilot kicked off 08:21Z. Both Harbour slots are now in use (LIN-3601 since 08:09Z: plan done 08:10Z, plan review running at 08:13Z).
+
+## 17 Oct, 08:50Z: LIN-3601 (4a) blocked on the plan-review loop bound
+
+**Facts.** Plan 08:10Z, then three plan-review rounds requested changes (08:27, 08:37, and one more), each narrower than the last; the loop hit its bound and raised ruling `lin3601-plan-loop-bound` (options: one more review of revision 4; build on it unreviewed; re-scope). Pre-filled "one more review" for John to press. LIN-3602 (#2) meanwhile went plan → plan review → implementation (08:29Z) → review (08:41Z) → close-out (08:49Z), with close-out asking for an upper-case `[BLOCKED]` test.
+
+**Inference.** The first ruling of the round came from the largest, most security-weighted ticket: a 63-pin plan takes more review rounds than the loop allows. That is a cost of freeing the seam in John's currency (one press), not agent hours.
