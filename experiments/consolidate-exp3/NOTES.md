@@ -224,3 +224,14 @@ A seam therefore has a code side and a test side. Freeing it means correcting th
 John, on the fresh-reader and replay catching workers' slips: "I'm not sure that's even a caveat; we have multiple steps specifically to catch these things." Then: "I wonder, can we open up additional lanes (being mindful not to overload the dashboard - fine for most sessions which aren't running heavy node scripts)." On the proposal (one heavy lane for rebuilds and consolidations, two light lanes for bounded tickets, the `node --test` concurrency cap first, then three single-import knots with ownership calls already made): "Feels like a good idea to me."
 
 Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state checks from `tree.js` → `providers/state-map.js`); knot Auth ↔ Providers (`TokenRefreshError` → `providers/interface.js`); knot Other ↔ Runs (periodical marker → `periodicals.js`). Held: the "is this issue closed" sets (needs a ruling on `duplicate`), the map-error knot (Other ↔ Platform), the medium-risk LLM ↔ Providers knot. Census-only small consolidations (free-tier refusal body ×13, loopback-host rule ×7) are candidates after these.
+
+## 17 Oct, 13:17Z: LIN-3604 (#4b) merged (#1913)
+
+**Facts (from the PR; independent scoring running).**
+- Kickoff 11:42Z; three plan-review rounds, approved on the third; implementation from 12:14Z; PR 13:02Z; merged 13:17:38Z. 1 h 36 min; no rulings; nothing asked of John.
+- 16 files, +2,965/−2,113. Route files 1,963 → 1,436, 1,773 → 750, 569 → 149 lines; `lib/dispatch-entrance.js` 45 → 1,677 (about half moved ticket/reason comments). Exports `enterSessionDispatch`, `enterProxyDispatch`, `enterRecommendDispatch`, `enterKickoff`; each lane lists its check steps in its own order as data.
+- **Sites per decision 95 → 26** by the ticket's counting rule (route files 0); the worker corrected one "before" count (96 → 95).
+- Sweep additions first, in their own commit, green on unchanged code and shown failing with the grant dropped from R and K. One new test: the owner gate fails closed when called directly. No other test changed; `POST_DISPATCH_GATE` kept as is (no census converted).
+- A small factory change (`createDispatchItem` drops caller fields left `undefined`) reaches five out-of-scope callers; the PR reasons each saved row is unchanged.
+- The worker's replay: 0 differences on 2,455 requests (every single fault, every ordered pair of check steps, triples; 574 multi-fault pairs, 0 vacuous on the old tree). Seams 18 → 18; counts inside pairs moved with the code.
+- 8 open questions in the PR, all kept. One needs a human: the proxy and recommend launch arms stay undeclared (M3), and the ticket the docs cite for M3 (LIN-3099) is unrelated, so nothing tracks it. The PR also flags LIN-3603 (Backlog) as a likely duplicate of LIN-3604.
