@@ -635,8 +635,6 @@ const replaceOnce = (needle, replacement) => (src) => {
   return src.slice(0, i) + replacement + src.slice(i + needle.length);
 };
 
-const POST_DISPATCH_GATE = "          if (isFollowUp) {\n            return provisionResumeCredential({";
-
 /**
  * LIN-3611 (A1): plant by POSITION, not by text. The follow-up gate of the first
  * entrance call that carries followUpTo is found with the file's own scanner
@@ -727,11 +725,6 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
   // catch is this scanner: an entrance call that carries followUpTo and whose first
   // helper is under neither gate form fails, here and in the C2 (v) classification
   // below (the helper becomes `E | launch | provisionResumeCredential`).
-  test('mutation 1 (re-pointed): the helper moved out from under the gate predicate fails the no-gate rule (iii c)', () => {
-    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
-    assert.ok(censusC2(mutated).some(m => m.includes('under no follow-up gate')), censusC2(mutated).join('\n'));
-  });
-
   test('mutation 1 (position-planted, LIN-3611 A1): the gate rewritten to `if (prompt) {` fails (iii c), also after the authority is re-indented', () => {
     for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
       const mutated = gateReplaced(files);
@@ -755,11 +748,6 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
   //     which reports it as an `unlisted writer` — the F3 test with the planted literal.)
   // mutation 5 below (a direct provisionBootstrapToken( in lib/chat-tools.js) plants
   // outside E and stays exactly as it was.
-
-  test('mutation 4 (iii d half, re-pointed): a declaredGrants literal planted in an entrance is caught by F3 as an unlisted writer', () => {
-    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, " const launchGrant = { declaredGrants: ['dispatch'] };\n" + POST_DISPATCH_GATE);
-    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer:')), checkF3(mutated).join('\n'));
-  });
 
   test('mutation 4 (position-planted, LIN-3611 A1): a declaredGrants literal before the gate is caught by F3 as an unlisted writer, also after re-indenting', () => {
     for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
@@ -821,11 +809,6 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
     }
     // ...and every entrance follow-up call passes attach:, so its row carries both modes.
     assert.deepEqual(E_MINT_ROWS.find(e => e.cls === 'followup-helper').modes, ['attach', 'pbt']);
-  });
-
-  test('mutation 1 (v): with the gate predicate gone, the helper becomes an unlisted launch-arm mint (location-free)', () => {
-    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
-    assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('E | launch | provisionResumeCredential')), censusClassification(mutated).join('\n'));
   });
 
   test('mutation 1 (v, position-planted, LIN-3611 A1): with the gate predicate gone the helper is an unlisted launch-arm mint, also after re-indenting', () => {
