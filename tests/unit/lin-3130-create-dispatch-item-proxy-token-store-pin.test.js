@@ -19,7 +19,15 @@
  *   (c) extracts the argument object's DEPTH-1 keys (string- and nesting-aware,
  *       so a nested `{ proxyTokenStore }` never satisfies it) and asserts
  *       `proxyTokenStore` is one of them;
- *   (d) counts every call site so the `=== 10` check covers the whole surface.
+ *   (d) counts every call site so the count check covers the whole surface.
+ *
+ * LIN-3601: the dispatch entrances (routes/dispatch.js, routes/proxy-dispatch.js,
+ * routes/proxy-kickoff.js, lib/dispatch-entrance.js) are one unit. The shape check
+ * (a)-(c) still runs on EVERY call, entrance or not, wherever it sits. The count
+ * (d) was `=== 10`: it is now exactly 5 call sites outside the entrances
+ * (routes/collective.js, routes/workspace-api.js x2, lib/follow-up-dispatch.js,
+ * lib/chat-tools.js) and at least 1 inside them, so the entrances can move calls
+ * between their files.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const ENTRANCE_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js', 'lib/dispatch-entrance.js']);
 
 function walk(dir) {
   const out = [];
@@ -174,6 +183,9 @@ describe('LIN-3130 L2 — every createDispatchItem call threads proxyTokenStore 
 
     const missing = calls.filter((c) => !c.hasProxyTokenStore).map((c) => c.file);
     assert.deepEqual(missing, [], `createDispatchItem call sites missing a depth-1 proxyTokenStore key: ${missing.join(', ')}`);
-    assert.equal(calls.length, 10, `expected 10 createDispatchItem call sites (definition excluded), found ${calls.length}`);
+    const outside = calls.filter((c) => !ENTRANCE_FILES.has(c.file));
+    const inside = calls.filter((c) => ENTRANCE_FILES.has(c.file));
+    assert.equal(outside.length, 5, `expected 5 createDispatchItem call sites outside the dispatch entrances (definition excluded), found ${outside.length}: ${outside.map((c) => c.file).join(', ')}`);
+    assert.ok(inside.length >= 1, `expected at least 1 createDispatchItem call site in the dispatch entrances, found ${inside.length}`);
   });
 });
