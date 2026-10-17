@@ -4,6 +4,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { unitTestConcurrency, nodeTestArgs } from '../../scripts/run-unit-tests.mjs';
 
@@ -67,5 +70,28 @@ describe('wrapper spawned (dry run)', () => {
   });
   test('invalid override exits non-zero', () => {
     assert.notEqual(run({ UNIT_TEST_CONCURRENCY: 'abc' }).status, 0);
+  });
+});
+
+describe('wrapper spawned (exit code pass-through)', () => {
+  const runFile = (body) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rut-'));
+    try {
+      const file = path.join(dir, 'probe.test.mjs');
+      fs.writeFileSync(file, `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('x', () => { ${body} });\n`);
+      const env = { ...process.env, CI: 'true' };
+      delete env.UNIT_TEST_CONCURRENCY;
+      delete env.UNIT_TEST_DRY_RUN;
+      delete env.NODE_TEST_CONTEXT; // set when this file runs under node --test; the nested run must be a top-level one
+      return spawnSync(process.execPath, [script, file], { env, encoding: 'utf8' });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+  test('a failing test file makes the wrapper exit 1', () => {
+    assert.equal(runFile('assert.fail()').status, 1);
+  });
+  test('a passing test file makes the wrapper exit 0', () => {
+    assert.equal(runFile('assert.ok(true)').status, 0);
   });
 });
