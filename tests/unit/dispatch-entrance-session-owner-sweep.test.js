@@ -154,7 +154,7 @@ describe('LIN-3601 session-owner sweep — routes/dispatch.js', () => {
   const keyOf = (r) => `${r.method} ${r.path}`;
 
   test(`enumerates exactly ${ROUTE_COUNT} routes and the table has one row for each`, () => {
-    assert.equal(routes.length, ROUTE_COUNT, 'enumerating fewer routes than the router registers fails the sweep');
+    assert.equal(routes.length, ROUTE_COUNT, `the router registers ${routes.length} routes, the sweep was written for ${ROUTE_COUNT}: a planted or dropped route fails here, and needs a table row below`);
     const keys = routes.map(keyOf);
     assert.deepEqual(keys.filter(k => !TABLE[k]), [], 'an enumerated route without a row');
     assert.deepEqual(Object.keys(TABLE).filter(k => !keys.includes(k)), [], 'a row for a route that is not enumerated');
