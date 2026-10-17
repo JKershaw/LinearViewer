@@ -18,7 +18,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { WAITING_WAKE_MARKERS } from '../../lib/digest-feedback.js';
+import { WAITING_WAKE_MARKERS } from '../../lib/dispatch-terminal.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { LivenessAlarmStore } from '../../lib/liveness-alarm-store.js';
 import { sweepOneWorkspace } from '../../lib/liveness-alarm-sweep.js';

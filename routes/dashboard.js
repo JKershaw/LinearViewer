@@ -59,7 +59,7 @@ import { prReadToken } from '../lib/github-pr-status.js';
 import { prStateCopy } from '../lib/pr-state-copy.js';
 import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
 import { buildSessionContextGraph } from '../lib/context-graph.js';
-import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed } from '../lib/dispatch-terminal.js';
+import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
 import { toEpochMs } from '../lib/utils/time.js';
 import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
@@ -298,7 +298,7 @@ export function isStandaloneSession(session) {
  * Six values: `stale`, `in-progress`, `waiting`, `error`, `done`, and
  * `done-with-warning`. `waiting` (LIN-1005) is the session-level "this session
  * needs you" rollup — a non-terminal session paused on a human (an agent-status
- * `blocked` run and/or a latest `[blocked]`/`[pending]` feedback marker). It is
+ * `blocked` run and/or a latest `[blocked]` feedback marker). It is
  * deliberately NON-terminal: `[blocked]` stays a pause/wait signal, never a
  * terminal state, so a genuinely finished session is never shown as waiting.
  * `done-with-warning` (LIN-749) is the done/error split's 5th outcome: a terminal
@@ -329,21 +329,14 @@ export function deriveSessionStatus({ terminal, stale, hasError, waiting = false
   return 'in-progress';
 }
 
-// The wake markers that roll up to a session-level "waiting on user" state
-// (LIN-1005). Mirrors WAITING_WAKE_MARKERS in pipeline-loops.js — a run whose
-// pre-derived `wakeMarker` is one of these is paused on a human, not finished.
-// ONLY `[blocked]` qualifies; `[pending]` is excluded (LIN-1025) because it is an
-// agent-to-agent orchestrator handoff (LIN-843), not a request for user input —
-// keep this in parity with the pipeline-loops.js definition.
-const WAITING_WAKE_MARKERS = new Set(['blocked']);
-
 /**
  * Is a single ENRICHED loop (effectiveAgentState applied) waiting on a human?
  *
  * Two independent runner channels, unioned (LIN-1005 — neither subsumes the
  * other): (a) an agent-status `blocked` entry surfaces as `agentState==='waiting'`
- * (lib/pipeline-loops.js `_deriveAgentState`), and (b) a `[blocked]`/`[pending]`
- * *feedback* marker, pre-derived at build time as `wakeMarker` so this read is
+ * (lib/pipeline-loops.js `_deriveAgentState`), and (b) a `[blocked]`
+ * *feedback* marker (`WAITING_WAKE_MARKERS`, lib/dispatch-terminal.js; `[pending]`
+ * is not a wait, LIN-1025), pre-derived at build time as `wakeMarker` so this read is
  * lean-safe (never touches raw `feedback[]`, which the feed drops). Terminal wins:
  * a run that actually finished (a terminal feedback marker folded in by
  * `effectiveAgentState`, or a native complete/error) is never waiting.
@@ -359,13 +352,13 @@ function loopIsWaiting(loop) {
   const marker = loop.wakeMarker !== undefined
     ? loop.wakeMarker
     : (findWakeEvent(loop.feedback)?.marker || null);
-  return marker != null && WAITING_WAKE_MARKERS.has(marker);
+  return isWaitingWakeMarker(marker);
 }
 
 /**
  * Roll a session's ENRICHED loops up to a session-level waiting signal (LIN-1005):
  * `{ waiting, message }`. `waiting` is true when a chain TAIL loop is waiting on a
- * human; `message` is the first available blocked/pending text (falling back to
+ * human; `message` is the first available waiting (`[blocked]`) text (falling back to
  * the waiting run's agent summary) so the UI can show the actual message rather
  * than a manufactured taxonomy. Pure; the single truth shared by the feed payload
  * and the session-page banner so they can never disagree.
@@ -817,7 +810,7 @@ export function createDashboardRoutes({
     const stale = !terminal && lastActivityMs > 0 && (Date.now() - lastActivityMs) > STALE_AFTER_MS;
 
     // Session-level "waiting on user" rollup (LIN-1005): unions any agent-status
-    // `blocked` run and any latest `[blocked]`/`[pending]` feedback marker across
+    // `blocked` run and any latest `[blocked]` feedback marker across
     // the session's loops, from the lean-safe pre-derived per-loop facts. Terminal
     // precedence is gated HERE on the emitted flag (not only in `deriveSessionStatus`):
     // the session anchor can post `[done]` while a worker loop lingers `[blocked]`, so
