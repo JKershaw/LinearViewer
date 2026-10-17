@@ -1,0 +1,449 @@
+{
+ "commit": "603853c5",
+ "files": 396,
+ "parseFailures": [],
+ "codeLines": 73425,
+ "functions": 6474,
+ "cyclomaticTotal": 27944,
+ "fnSpanGE50": 463,
+ "fnSpanGE100": 183,
+ "fnSpanGE200": 60,
+ "fnSpanGE500": 19,
+ "topLevelSpanGE100": 132,
+ "topLevelSpanGE200": 47,
+ "cycOver10": 572,
+ "cycGE50": 10,
+ "cycGE100": 1,
+ "nestGE5": 21,
+ "nestGE7": 2,
+ "longest15": [
+  "routes/workspace-api.js:createWorkspaceApiRoutes span 2952 cyc 11 nest 0",
+  "routes/dashboard.js:createDashboardRoutes span 2539 cyc 28 nest 0",
+  "routes/test.js:createTestRoutes span 1853 cyc 6 nest 0",
+  "routes/dispatch.js:createDispatchRoutes span 1653 cyc 11 nest 0",
+  "routes/proxy-compute.js:createComputeRoutes span 1531 cyc 1 nest 0",
+  "routes/proxy-dispatch.js:createDispatchRoutes span 1456 cyc 4 nest 0",
+  "lib/proxy-instructions.js:buildInstructions span 1128 cyc 16 nest 0",
+  "routes/proxy.js:createProxyRoutes span 1126 cyc 18 nest 0",
+  "lib/github-install-flow.js:createGitHubInstallFlowRoutes span 876 cyc 2 nest 0",
+  "routes/jira-auth.js:createJiraAuthRoutes span 875 cyc 2 nest 0",
+  "routes/workspace-api-roadmap.js:createRoadmapRoutes span 809 cyc 1 nest 0",
+  "lib/chat-tools.js:createChatToolCatalog span 715 cyc 33 nest 1",
+  "routes/proxy-writes.js:createProxyWriteRoutes span 619 cyc 3 nest 0",
+  "routes/collective.js:createCollectiveRoutes span 560 cyc 2 nest 0",
+  "routes/proxy-reads.js:createReadRoutes span 526 cyc 1 nest 0"
+ ],
+ "mostComplex10": [
+  "lib/runner-kit/runner.mjs:runCommand cyc 114 span 262",
+  "lib/unanswered-decisions.js:collectUnansweredDecisions cyc 63 span 269",
+  "routes/dispatch.js:createDispatchRoutes/λ@483 cyc 63 span 517",
+  "lib/agent-turn.js:runAgentTurn cyc 60 span 401",
+  "lib/dispatch-store.js:addFeedback cyc 60 span 399",
+  "lib/next-run.js:formatNextRunContext cyc 57 span 124",
+  "lib/terminal-marked-task-cost.js:computeTerminalMarkedTaskCost cyc 57 span 471",
+  "lib/ship-biscuit.js:buildEditionModel cyc 52 span 117",
+  "routes/proxy-dispatch.js:createDispatchRoutes/λ@766 cyc 52 span 617",
+  "routes/task-chat.js:createTaskChatRoutes/λ@387 cyc 50 span 318"
+ ],
+ "focus": {
+  "lib/providers/jira/adf.js": {
+   "code": 345,
+   "fns": 80,
+   "longestSpan": {
+    "name": "parseInline",
+    "spanLines": 28,
+    "codeLines": 28,
+    "startLine": 461
+   },
+   "maxCyc": {
+    "name": "renderNode",
+    "cyclomatic": 24
+   },
+   "maxNest": 3,
+   "cycTotal": 244,
+   "over10": 4,
+   "top": 56,
+   "topOver100": 0
+  },
+  "lib/render-roadmap.js": {
+   "code": 364,
+   "fns": 40,
+   "longestSpan": {
+    "name": "renderRoadmapPage",
+    "spanLines": 57,
+    "codeLines": 46,
+    "startLine": 455
+   },
+   "maxCyc": {
+    "name": "renderRoadmapPage",
+    "cyclomatic": 22
+   },
+   "maxNest": 3,
+   "cycTotal": 129,
+   "over10": 2,
+   "top": 22,
+   "topOver100": 0
+  },
+  "routes/proxy-reads.js": {
+   "code": 378,
+   "fns": 32,
+   "longestSpan": {
+    "name": "createReadRoutes",
+    "spanLines": 526,
+    "codeLines": 357,
+    "startLine": 72
+   },
+   "maxCyc": {
+    "name": "createReadRoutes/λ@524",
+    "cyclomatic": 22
+   },
+   "maxNest": 3,
+   "cycTotal": 105,
+   "over10": 2,
+   "top": 3,
+   "topOver100": 1
+  },
+  "routes/proxy-writes.js": {
+   "code": 421,
+   "fns": 50,
+   "longestSpan": {
+    "name": "createProxyWriteRoutes",
+    "spanLines": 619,
+    "codeLines": 382,
+    "startLine": 128
+   },
+   "maxCyc": {
+    "name": "createProxyWriteRoutes/λ@382",
+    "cyclomatic": 26
+   },
+   "maxNest": 2,
+   "cycTotal": 201,
+   "over10": 3,
+   "top": 1,
+   "topOver100": 1
+  },
+  "routes/proxy-rulings.js": {
+   "code": 198,
+   "fns": 19,
+   "longestSpan": {
+    "name": "createRulingsRoutes",
+    "spanLines": 293,
+    "codeLines": 148,
+    "startLine": 162
+   },
+   "maxCyc": {
+    "name": "proposalProblem",
+    "cyclomatic": 12
+   },
+   "maxNest": 2,
+   "cycTotal": 66,
+   "over10": 2,
+   "top": 6,
+   "topOver100": 1
+  },
+  "lib/pipeline-loops.js": {
+   "code": 634,
+   "fns": 86,
+   "longestSpan": {
+    "name": "_buildLoops",
+    "spanLines": 53,
+    "codeLines": 41,
+    "startLine": 471
+   },
+   "maxCyc": {
+    "name": "_loopRecord",
+    "cyclomatic": 29
+   },
+   "maxNest": 4,
+   "cycTotal": 387,
+   "over10": 10,
+   "top": 39,
+   "topOver100": 0
+  },
+  "lib/render.js": {
+   "code": 465,
+   "fns": 42,
+   "longestSpan": {
+    "name": "renderDetailsContent",
+    "spanLines": 101,
+    "codeLines": 67,
+    "startLine": 678
+   },
+   "maxCyc": {
+    "name": "renderPage",
+    "cyclomatic": 45
+   },
+   "maxNest": 3,
+   "cycTotal": 252,
+   "over10": 6,
+   "top": 23,
+   "topOver100": 1
+  },
+  "lib/render-session.js": {
+   "code": 423,
+   "fns": 41,
+   "longestSpan": {
+    "name": "renderHeaderBody",
+    "spanLines": 73,
+    "codeLines": 56,
+    "startLine": 462
+   },
+   "maxCyc": {
+    "name": "renderSessionPage",
+    "cyclomatic": 42
+   },
+   "maxNest": 2,
+   "cycTotal": 244,
+   "over10": 6,
+   "top": 25,
+   "topOver100": 0
+  },
+  "lib/render-settings.js": {
+   "code": 786,
+   "fns": 74,
+   "longestSpan": {
+    "name": "renderSettingsPage",
+    "spanLines": 83,
+    "codeLines": 66,
+    "startLine": 1150
+   },
+   "maxCyc": {
+    "name": "renderSettingsPage",
+    "cyclomatic": 28
+   },
+   "maxNest": 1,
+   "cycTotal": 220,
+   "over10": 2,
+   "top": 38,
+   "topOver100": 0
+  },
+  "lib/render-swipe.js": {
+   "code": 335,
+   "fns": 60,
+   "longestSpan": {
+    "name": "renderSwipePage",
+    "spanLines": 92,
+    "codeLines": 71,
+    "startLine": 535
+   },
+   "maxCyc": {
+    "name": "renderSwipePage",
+    "cyclomatic": 29
+   },
+   "maxNest": 3,
+   "cycTotal": 189,
+   "over10": 4,
+   "top": 20,
+   "topOver100": 0
+  },
+  "lib/home-swipe-prompt-opts.js": {
+   "code": 24,
+   "fns": 3,
+   "longestSpan": {
+    "name": "buildPromptOpts",
+    "spanLines": 25,
+    "codeLines": 22,
+    "startLine": 28
+   },
+   "maxCyc": {
+    "name": "buildPromptOpts",
+    "cyclomatic": 10
+   },
+   "maxNest": 1,
+   "cycTotal": 13,
+   "over10": 0,
+   "top": 1,
+   "topOver100": 0
+  },
+  "lib/dispatch-factory.js": {
+   "code": 490,
+   "fns": 41,
+   "longestSpan": {
+    "name": "createDispatchItem",
+    "spanLines": 193,
+    "codeLines": 132,
+    "startLine": 855
+   },
+   "maxCyc": {
+    "name": "createDispatchItem",
+    "cyclomatic": 49
+   },
+   "maxNest": 5,
+   "cycTotal": 211,
+   "over10": 5,
+   "top": 20,
+   "topOver100": 1
+  },
+  "lib/dispatch-validation.js": {
+   "code": 146,
+   "fns": 18,
+   "longestSpan": {
+    "name": "validateDispatchPayload",
+    "spanLines": 61,
+    "codeLines": 35,
+    "startLine": 218
+   },
+   "maxCyc": {
+    "name": "validateDispatchPayload",
+    "cyclomatic": 20
+   },
+   "maxNest": 2,
+   "cycTotal": 76,
+   "over10": 1,
+   "top": 13,
+   "topOver100": 0
+  },
+  "lib/task-page-loader.js": {
+   "code": 488,
+   "fns": 85,
+   "longestSpan": {
+    "name": "createTaskPageLoader",
+    "spanLines": 204,
+    "codeLines": 134,
+    "startLine": 720
+   },
+   "maxCyc": {
+    "name": "buildTaskPageModel",
+    "cyclomatic": 13
+   },
+   "maxNest": 3,
+   "cycTotal": 343,
+   "over10": 4,
+   "top": 43,
+   "topOver100": 1
+  },
+  "lib/dispatch-entrance.js": {
+   "code": 11,
+   "fns": 2,
+   "longestSpan": {
+    "name": "firstFailure",
+    "spanLines": 7,
+    "codeLines": 7,
+    "startLine": 25
+   },
+   "maxCyc": {
+    "name": "firstFailure",
+    "cyclomatic": 3
+   },
+   "maxNest": 2,
+   "cycTotal": 6,
+   "over10": 0,
+   "top": 2,
+   "topOver100": 0
+  },
+  "routes/dispatch.js": {
+   "code": 1051,
+   "fns": 77,
+   "longestSpan": {
+    "name": "createDispatchRoutes",
+    "spanLines": 1653,
+    "codeLines": 889,
+    "startLine": 311
+   },
+   "maxCyc": {
+    "name": "createDispatchRoutes/λ@483",
+    "cyclomatic": 63
+   },
+   "maxNest": 4,
+   "cycTotal": 409,
+   "over10": 6,
+   "top": 16,
+   "topOver100": 1
+  },
+  "routes/proxy-dispatch.js": {
+   "code": 846,
+   "fns": 69,
+   "longestSpan": {
+    "name": "createDispatchRoutes",
+    "spanLines": 1456,
+    "codeLines": 722,
+    "startLine": 318
+   },
+   "maxCyc": {
+    "name": "createDispatchRoutes/λ@766",
+    "cyclomatic": 52
+   },
+   "maxNest": 5,
+   "cycTotal": 320,
+   "over10": 7,
+   "top": 9,
+   "topOver100": 1
+  },
+  "routes/proxy-kickoff.js": {
+   "code": 250,
+   "fns": 24,
+   "longestSpan": {
+    "name": "createKickoffRoutes",
+    "spanLines": 521,
+    "codeLines": 233,
+    "startLine": 49
+   },
+   "maxCyc": {
+    "name": "createKickoffRoutes/λ@206",
+    "cyclomatic": 41
+   },
+   "maxNest": 4,
+   "cycTotal": 90,
+   "over10": 1,
+   "top": 1,
+   "topOver100": 1
+  },
+  "lib/kpi-stats.js": {
+   "code": 463,
+   "fns": 78,
+   "longestSpan": {
+    "name": "collectKpiStats",
+    "spanLines": 119,
+    "codeLines": 70,
+    "startLine": 839
+   },
+   "maxCyc": {
+    "name": "categorizeProxyEvent",
+    "cyclomatic": 9
+   },
+   "maxNest": 3,
+   "cycTotal": 178,
+   "over10": 0,
+   "top": 40,
+   "topOver100": 1
+  },
+  "routes/workspace-api.js": {
+   "code": 1997,
+   "fns": 153,
+   "longestSpan": {
+    "name": "createWorkspaceApiRoutes",
+    "spanLines": 2952,
+    "codeLines": 1541,
+    "startLine": 813
+   },
+   "maxCyc": {
+    "name": "createWorkspaceApiRoutes/λ@3151",
+    "cyclomatic": 31
+   },
+   "maxNest": 4,
+   "cycTotal": 692,
+   "over10": 19,
+   "top": 46,
+   "topOver100": 1
+  },
+  "lib/workspace-api-mocks.js": {
+   "code": 226,
+   "fns": 36,
+   "longestSpan": {
+    "name": "generateMockRecommendation",
+    "spanLines": 33,
+    "codeLines": 28,
+    "startLine": 53
+   },
+   "maxCyc": {
+    "name": "generateMockRecommendation",
+    "cyclomatic": 9
+   },
+   "maxNest": 1,
+   "cycTotal": 88,
+   "over10": 0,
+   "top": 11,
+   "topOver100": 0
+  }
+ }
+}

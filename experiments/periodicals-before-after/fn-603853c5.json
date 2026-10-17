@@ -1,0 +1,88 @@
+{
+ "commit": "603853c5",
+ "files": 396,
+ "parseFailures": [],
+ "codeLines": 73425,
+ "functions": 6474,
+ "cyclomaticTotal": 27944,
+ "fnSpanGE50": 463,
+ "fnSpanGE100": 183,
+ "fnSpanGE200": 60,
+ "fnSpanGE500": 19,
+ "topLevelSpanGE100": 132,
+ "topLevelSpanGE200": 47,
+ "cycOver10": 572,
+ "cycGE50": 10,
+ "cycGE100": 1,
+ "nestGE5": 21,
+ "nestGE7": 2,
+ "longest15": [
+  "routes/workspace-api.js:createWorkspaceApiRoutes span 2952 cyc 11 nest 0",
+  "routes/dashboard.js:createDashboardRoutes span 2539 cyc 28 nest 0",
+  "routes/test.js:createTestRoutes span 1853 cyc 6 nest 0",
+  "routes/dispatch.js:createDispatchRoutes span 1653 cyc 11 nest 0",
+  "routes/proxy-compute.js:createComputeRoutes span 1531 cyc 1 nest 0",
+  "routes/proxy-dispatch.js:createDispatchRoutes span 1456 cyc 4 nest 0",
+  "lib/proxy-instructions.js:buildInstructions span 1128 cyc 16 nest 0",
+  "routes/proxy.js:createProxyRoutes span 1126 cyc 18 nest 0",
+  "lib/github-install-flow.js:createGitHubInstallFlowRoutes span 876 cyc 2 nest 0",
+  "routes/jira-auth.js:createJiraAuthRoutes span 875 cyc 2 nest 0",
+  "routes/workspace-api-roadmap.js:createRoadmapRoutes span 809 cyc 1 nest 0",
+  "lib/chat-tools.js:createChatToolCatalog span 715 cyc 33 nest 1",
+  "routes/proxy-writes.js:createProxyWriteRoutes span 619 cyc 3 nest 0",
+  "routes/collective.js:createCollectiveRoutes span 560 cyc 2 nest 0",
+  "routes/proxy-reads.js:createReadRoutes span 526 cyc 1 nest 0"
+ ],
+ "mostComplex10": [
+  "lib/runner-kit/runner.mjs:runCommand cyc 114 span 262",
+  "lib/unanswered-decisions.js:collectUnansweredDecisions cyc 63 span 269",
+  "routes/dispatch.js:createDispatchRoutes/λ@483 cyc 63 span 517",
+  "lib/agent-turn.js:runAgentTurn cyc 60 span 401",
+  "lib/dispatch-store.js:addFeedback cyc 60 span 399",
+  "lib/next-run.js:formatNextRunContext cyc 57 span 124",
+  "lib/terminal-marked-task-cost.js:computeTerminalMarkedTaskCost cyc 57 span 471",
+  "lib/ship-biscuit.js:buildEditionModel cyc 52 span 117",
+  "routes/proxy-dispatch.js:createDispatchRoutes/λ@766 cyc 52 span 617",
+  "routes/task-chat.js:createTaskChatRoutes/λ@387 cyc 50 span 318"
+ ],
+ "focus": {
+  "routes/workspace-api.js": {
+   "code": 1997,
+   "fns": 153,
+   "longestSpan": {
+    "name": "createWorkspaceApiRoutes",
+    "spanLines": 2952,
+    "codeLines": 1541,
+    "startLine": 813
+   },
+   "maxCyc": {
+    "name": "createWorkspaceApiRoutes/λ@3151",
+    "cyclomatic": 31
+   },
+   "maxNest": 4,
+   "cycTotal": 692,
+   "over10": 19,
+   "top": 46,
+   "topOver100": 1
+  },
+  "lib/workspace-api-mocks.js": {
+   "code": 226,
+   "fns": 36,
+   "longestSpan": {
+    "name": "generateMockRecommendation",
+    "spanLines": 33,
+    "codeLines": 28,
+    "startLine": 53
+   },
+   "maxCyc": {
+    "name": "generateMockRecommendation",
+    "cyclomatic": 9
+   },
+   "maxNest": 1,
+   "cycTotal": 88,
+   "over10": 0,
+   "top": 11,
+   "topOver100": 0
+  }
+ }
+}

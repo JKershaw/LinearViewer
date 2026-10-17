@@ -95,5 +95,6 @@
   "writing-length": "Yes, by about 1.6×. Over three months the length of Harbour's reviews roughly tripled while the count of distinct things they say roughly doubled. The gap between those two numbers is the part of the writing with no idea behind it.",
   "test-surplus": "Partly, but not the way the 90% guess supposes. Harbour's unit suite is not a thick blanket in which most tests repeat each other. It is a thin, wide net. Most of the faults it catches are caught by one test file only, usually the file…",
   "theseus": "Yes for one block, the read and write half of Providers, once its spec is written down. That takes a schema, a Linear fake and one conformance suite, none of which changes behaviour, plus one internal change that makes write results agree.…",
-  "rebuild-ladder": "Yes, up to the size tried so far: about 930 lines over two files. The method that worked is design-first: the agent sees today's code, writes the requirements and a fresh design before any code, then builds. An independent replay against…"
+  "rebuild-ladder": "Yes, up to the size tried so far: about 930 lines over two files. The method that worked is design-first: the agent sees today's code, writes the requirements and a fresh design before any code, then builds. An independent replay against…",
+  "rebuild-round": "Yes, viable and fairly cheap, and what it improves is the inside of the files it touches. Seven more design-first rebuilds ran through ordinary Harbour tickets on 16–17 October, from 441 to 2,816 code lines, the largest three times the…"
 }

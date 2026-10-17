@@ -643,3 +643,20 @@ One helper module was added. All 8 source-text pins pass. Ticket references 106 
 **Prediction:** 10 of 11 hits. Miss: the cut beat the 6–18% range.
 
 **Measure note:** the verbatim share moves about 6 points on semicolons alone. From now on, normalise trailing `;`.
+
+## 16 Oct, the laptop load and the dispatcher's cost (recorded 17 Oct for the paper)
+
+On 16 October, with three runs at once, the operator's laptop hit 100% CPU and froze (a reboot at about 18:25Z). A snapshot before the reboot showed a `node` process with about 80 CPU-hours and Spotlight (`mds_stores`) with about 45.
+
+**Measurements.** Read-only research dispatches (opencode with a cheap OpenRouter model, reporting sizes and counts only):
+- `4125e5a1`, 18:32Z, four minutes after the reboot, idle: `node dispatcher.js` gained about 15 CPU-seconds per 120 s, about 12.5% of a core. Spotlight was indexing the dispatcher's workspaces.
+- `49a03018`, 20:32Z, after LIN-3585 deployed, with three sessions running: 10.3 CPU-seconds per 300 s, about 3.4% of a core. `state/sessions.json` was 0.99 MB with 92 records.
+
+**Cause and fix (LIN-3585, simple-dispatcher#271).** A code reading plus a benchmark found three things:
+- `sessions.json` was parsed about 11 times per cycle;
+- BLOCKED records were never reaped;
+- finished parents' transcripts were re-read every cycle.
+
+The fix takes one snapshot per cycle, reaps BLOCKED records after an age limit, and runs the cheap check before the transcript read.
+
+**Spotlight.** The operator is adding the dispatcher folders to Spotlight Privacy.
