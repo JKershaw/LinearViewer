@@ -269,3 +269,14 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - **The first implementation landed in the wrong repo:** the worker built it as simple-dispatcher#272; review caught it and the design was ported into LinearViewer. The PR says simple-dispatcher#272 should be closed unmerged. (Inference: the two-repo default workspace makes "which repo" a real step for a worker; a ticket naming its repo in the title helps but did not prevent it. Left for John.)
 - LIN-3606 (K1) PR #1915 opened 14:06Z.
 - K3 filed as LIN-3610 and kicked off 14:08Z in light lane 1.
+
+## 17 Oct: #4c drafted
+
+**Facts.**
+- Shape now: `lib/dispatch-entrance.js` 878 code lines, 268 decision points, worst function 29 (`enterRecommendDispatch`), then 28 (`failure`). Four entrance files: 2,056 / 585 / 29 (at `15191460`: 2,158 / 649 / 63).
+- Verbatim: #4b's authority was 42.0% verbatim against the files it replaced (5c reproduced at 86.1% with the same rule).
+- Constraints found by **nine behaviour-preserving rewrites of the authority, each run against the full suite**: no behaviour test failed in any; blanking every comment broke nothing. What did fail: 7 class-A text or location pins (the `POST_DISPATCH_GATE` text with indentation; `if (isFollowUp)` spelling; an inline `fields` literal; exactly two `declaredGrants` lines; one exact `resolveProviderAccess` line; the entrance file lists, so a helper module fails 21 tests in 7 files; an object-literal call naming `proxyTokenStore`, recommended kept) and 10 class-C vocabulary and sink rules. Also 4 stale test entries (one row is never checked) and one test claim that no longer holds (a rewrite it says is behaviour-invisible is now caught by the mint sweep and the replay).
+- Replay re-checked on the new base: old vs old 0 on two seeds; 20 of 20 planted changes caught; a new direct-call class for the owner gate (600 cases per seed, 4 of 4 mutants caught).
+- Prediction: code lines 720–830, decision points 200–245, worst 12–20; about 4 test conversions; verbatim about 50% (42–60%), since 315 of 733 counted lines are fixed messages and key lines a faithful rewrite reproduces.
+
+**Inference.** The perturbation probe is a good generic way to find a seam's test side: rewrite the code in behaviour-preserving ways and see which tests fail. Every failure is a test guarding *how* the code is written. It found the tests-as-seam items mechanically.
