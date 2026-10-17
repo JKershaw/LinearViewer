@@ -10,7 +10,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { extractPrUrls, summarizeChecks, buildRunEvidence } from '../../lib/run-evidence.js';
+import { extractPrUrls, buildRunEvidence } from '../../lib/run-evidence.js';
+import { summarizeChecks } from '../../lib/github-pr-status.js';
 
 const REPLY = '## Review\n\n### What CI Did Not Prove\n- one claim\n\n**Verdict: Approve — conditional on close-out discharging the ledger.**';
 
