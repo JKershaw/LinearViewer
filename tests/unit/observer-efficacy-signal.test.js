@@ -190,6 +190,34 @@ describe('observer-efficacy-signal: computeIncumbentSignal (LIN-2133)', () => {
     assert.strictEqual(row.resolved, true, 'the loop is now [done] — no longer blocked');
   });
 
+  // LIN-3602: the marker test is WAKE_FEEDBACK_REGEX + the exact-match
+  // isWaitingWakeMarker, so findFirstBlockedMarker must lower-case the captured
+  // marker itself. The old /^\s*\[blocked\]/i accepted any case.
+  for (const marker of ['[BLOCKED]', '[Blocked]']) {
+    test(`a leading ${marker} marker is measured exactly like a lower-case [blocked] one`, () => {
+      const measure = (wakeMessage) => {
+        const loops = _buildLoops({
+          historyItems: [historyItem({
+            feedback: [
+              { message: `  ${wakeMessage} need a decision`, timestamp: '2026-04-11T11:10:00.000Z' },
+              { kind: 'decision-answer', message: 'a human replied', timestamp: '2026-04-11T11:12:30.000Z' },
+              { message: '[done] shipped', timestamp: '2026-04-11T11:15:00.000Z' }
+            ]
+          })],
+          now: NOW, lean: false
+        });
+        return computeIncumbentSignal(loops);
+      };
+      const lower = measure('[blocked]');
+      const mixed = measure(marker);
+      assert.strictEqual(mixed.count, 1, `${marker} is a wake marker`);
+      assert.strictEqual(mixed.perLoop[0].timeToRespondMs, 150_000);
+      const { loopId: _a, ...lowerRow } = lower.perLoop[0];
+      const { loopId: _b, ...mixedRow } = mixed.perLoop[0];
+      assert.deepStrictEqual(mixedRow, lowerRow);
+    });
+  }
+
   test('a loop whose [blocked] marker is the LAST feedback entry: no response yet, still blocked', () => {
     const loops = _buildLoops({
       historyItems: [historyItem({
