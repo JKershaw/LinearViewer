@@ -202,3 +202,4 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Per-decision site counts weren't checkable (one decision read as 5 sites in the ticket and 14 in the map); a count column and counting rule added.
 
 **Inference.** "Freed" has degrees: #4a freed the seam for moving code between files, but not for rewriting a line's text. Where a test pins text inside the unit, the consolidation can still be held to the old shape.
+- Filed LIN-3604 (#4b); autopilot kicked off 11:42Z.
