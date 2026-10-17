@@ -113,8 +113,14 @@ describe('LIN-2534: limiter declaration and lifetime — source-text half', () =
     // Replaces the pinned scoped total (5): derive both sides from source and
     // require every occurrence to be a `= rateLimit(` declaration, so a new
     // bare call cannot slip in behind a matching number.
+    // LIN-3601: the dispatch entrances are one unit, so a `rateLimit(` that moves
+    // out of routes/dispatch.js into another entrance file (or lib/dispatch-entrance.js)
+    // is still scanned. Module-scope limiter declarations stay in the route files.
     const files = [
       'routes/dispatch.js',
+      'routes/proxy-dispatch.js',
+      'routes/proxy-kickoff.js',
+      'lib/dispatch-entrance.js',
       'routes/proxy.js',
       'routes/proxy-tokens-admin.js',
       'routes/proxy-agent-status.js',

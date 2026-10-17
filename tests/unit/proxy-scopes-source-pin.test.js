@@ -41,8 +41,19 @@ const SITES = [
     usage: 'SCOPES.includes(scope)',
   },
   {
+    // LIN-3601: the refire broker's inline mint (`scope: READ_WRITE`) sits in the
+    // dispatch entrances, which are one unit: routes/dispatch.js today, but it may move
+    // to any of these. `'readWrite'` and READ_WRITE are the same value, so no
+    // behaviour test can tell the constant from a literal; this stays a source pin,
+    // now over the unit (at least one entrance file must import the module and use the
+    // constant), not over one file.
     path: 'routes/dispatch.js',
-    specifier: '../lib/proxy-scopes.js',
+    unit: [
+      { path: 'routes/dispatch.js', specifier: '../lib/proxy-scopes.js' },
+      { path: 'routes/proxy-dispatch.js', specifier: '../lib/proxy-scopes.js' },
+      { path: 'routes/proxy-kickoff.js', specifier: '../lib/proxy-scopes.js' },
+      { path: 'lib/dispatch-entrance.js', specifier: './proxy-scopes.js' },
+    ],
     imports: ['READ_WRITE'],
     usage: 'scope: READ_WRITE',
   },
@@ -56,6 +67,21 @@ const SITES = [
 
 describe('LIN-3129 — the five A2 sites import the shared scope/grant vocabulary', () => {
   for (const site of SITES) {
+    if (site.unit) {
+      test(`the dispatch entrances import the shared scope module and use the constant (${site.usage})`, () => {
+        const holders = site.unit.filter((member) => {
+          const src = source(member.path);
+          return src.includes(`from '${member.specifier}'`)
+            && site.imports.every((name) => new RegExp(`\\b${name}\\b`).test(src))
+            && src.includes(site.usage);
+        });
+        assert.ok(
+          holders.length >= 1,
+          `at least one of ${site.unit.map((m) => m.path).join(', ')} must import the shared module and use "${site.usage}"`
+        );
+      });
+      continue;
+    }
     test(`${site.path} imports from ${site.specifier} and uses the constant`, () => {
       const src = source(site.path);
       assert.ok(
