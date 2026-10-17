@@ -89,3 +89,15 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 **Facts.**
 - LIN-3600: kickoff 07:50:53Z, PR #1910 opened 07:53:50Z, merged 08:06:50Z as `f885f44c`. 16 minutes kickoff to merge; no rulings; nothing asked of John. Scoring is running.
 - LIN-3601 (4a) filed after the fresh-reader fixes (ticket, inventory and prediction committed before launch); autopilot kicked off 08:09Z. One stray line was removed from the draft before filing (an operating rule of mine about dispatch, meaningless to the worker).
+
+## 17 Oct: #2 drafted (`../consolidate-2-waiting/`)
+
+**Facts.**
+- Decision: which wake marker means "waiting on a person". Source: LIN-3339 (one job, many paths), whose 12 Oct re-check (Drift & Coherence, LIN-3516) found it holding and growing (LIN-3504 added an inline copy in `task-page-loader.js`).
+- Sites at `d349e78c`: the authority `WAITING_WAKE_MARKERS` (`lib/digest-feedback.js:56`), 2 set copies, 7 inline checks. Two inline checks were missing from the review and the census list (`observer-efficacy-signal.js:110`, a private `[blocked]` regex; `dispatch-wake.js:343`). Two listed sites are a different vocabulary (agent-status words) and one already reaches the decision. The census's group id was wrong in my brief (G0040, not G0038).
+- **Every copy holds the same set, `{'blocked'}`.** The copies differ in what surrounds it: which channel counts, what ends a wait, and when a question goes stale. Classified: (a) stale "keep in parity" comments; (b) deliberate wire-only resume rule (LIN-2123/LIN-2268) and the census lane's "answered out of band" rule; (c) a run-view clock edge that can't arise in production; (d) the channel, the console vocabulary, `[pending]` in the transcript highlight, closed-row ordering.
+- Home: `lib/dispatch-terminal.js` (Runs & dispatch), which owns the wake-marker regex and `findWakeEvent`. Shape: the set plus an exact-match predicate.
+- On a hand-made consolidated copy: knots 20 → 20, nothing new; census 310 / 1,026 → 309 / 1,022; 2,619 relevant tests pass.
+- Per-caller replay: 16 callers, 3,046 captured + 3,000 generated inputs each, two seeds. Old vs old 0; 14 of 14 per-site mutants caught on exactly the expected callers; coverage of touched functions 100%; old vs the consolidated copy 0 differences over 51,046 inputs.
+
+**Inference.** The decision the Periodical named is really several. The membership is already unanimous; what has drifted is the composition around it, and that is invisible to a text census. A membership-only consolidation is safe and cheap but moves little (4 sites). The composition questions are the real consolidation and need rulings first, which is why this ticket leaves them out. This may be the general shape: scattered *data* consolidates mechanically; scattered *rules* need a decision first.
