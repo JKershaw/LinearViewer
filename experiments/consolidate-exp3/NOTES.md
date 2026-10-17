@@ -101,3 +101,16 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Per-caller replay: 16 callers, 3,046 captured + 3,000 generated inputs each, two seeds. Old vs old 0; 14 of 14 per-site mutants caught on exactly the expected callers; coverage of touched functions 100%; old vs the consolidated copy 0 differences over 51,046 inputs.
 
 **Inference.** The decision the Periodical named is really several. The membership is already unanimous; what has drifted is the composition around it, and that is invisible to a text census. A membership-only consolidation is safe and cheap but moves little (4 sites). The composition questions are the real consolidation and need rulings first, which is why this ticket leaves them out. This may be the general shape: scattered *data* consolidates mechanically; scattered *rules* need a decision first.
+
+## 17 Oct: #3 scored (`../consolidate-3-untie/arm/score.md`)
+
+**Facts.**
+- Knots 20 → 18, both targets gone, no new knot, one knot group of the same 9 areas. `scripts/code-shape/` untouched. Links 64 → 62, cross-area imports 902 → 899. The after-JSON matches the pre-launch copy run field for field.
+- 7 files, +24/−24; the 16 moved lines byte-identical; no re-export (the test repointed); no shim; no leftover copy; no ticket reference or comment dropped.
+- Independent replay: 0 differences on 10,864 `summarizeChecks` inputs (two seeds plus every value and ordered pair) and on 3,086 `buildPromptOpts` inputs; old vs old 0; 3 of 3 mutants caught.
+- Census unchanged (310 / 1,026): the moved sets were never in a group. A knot can untie without the census moving.
+- Prediction: 36 of 43 lines hit; the misses were line counts off by one or two.
+- PR #1910 pasted the seams before/after and its replay as asked, and reports the full unit suite 17,268/17,268. The scorer had inferred from the timeline that the full suite couldn't have run before the PR opened; the PR body says it ran (probably during review). Recorded as resolved.
+- Cost to John: nothing. 16 minutes wall clock, one run slot.
+
+**Inference.** Untying a single-import knot by moving code to its owner is close to free when the ownership call is clear, and the Periodical moves exactly as predicted. The hard part was the judgement (which side owns the decision), done before launch; `knots.md` has that call for all seven single-import knots, so five more are ready to ticket.
