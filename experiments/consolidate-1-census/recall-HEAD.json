@@ -1,0 +1,256 @@
+{
+ "commit": "d349e78cbe18ccca2141354922dea8e0b4f6ff2f",
+ "recall": "9/9",
+ "decisions": {
+  "terminalStates": {
+   "signatureFiles": 5,
+   "rediscovered": true,
+   "coveredFiles": 5,
+   "best": [
+    {
+     "id": "G0023",
+     "detector": "set",
+     "overlap": 5,
+     "groupFiles": 6,
+     "decision": "string set {'canceled', 'completed', 'duplicate'} as Set/array [TERMINAL_STATES, TERMINAL_TYPES, RECORD_TARGET_TERMINAL_"
+    },
+    {
+     "id": "G0055",
+     "detector": "set",
+     "overlap": 3,
+     "groupFiles": 7,
+     "decision": "string set {'0', '1', '2', '3', '4'} as table-keys [PRIORITY_LABELS, PRIORITY_RING, PRIORITY_WORDS]"
+    },
+    {
+     "id": "G0271",
+     "detector": "discrim",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "string set {'backlog', 'started'} as switch"
+    }
+   ]
+  },
+  "fenceParse": {
+   "signatureFiles": 0,
+   "rediscovered": false,
+   "coveredFiles": 0,
+   "best": []
+  },
+  "tsParse": {
+   "signatureFiles": 0,
+   "rediscovered": false,
+   "coveredFiles": 0,
+   "best": []
+  },
+  "fmtDuration": {
+   "signatureFiles": 5,
+   "rediscovered": true,
+   "coveredFiles": 4,
+   "best": [
+    {
+     "id": "G0142",
+     "detector": "clone",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "near-duplicate function formatElapsed(), ~12 statements, structurally identical"
+    },
+    {
+     "id": "G0262",
+     "detector": "clone",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "near-duplicate function formatDuration(), ~9 statements, structurally identical"
+    },
+    {
+     "id": "G0263",
+     "detector": "set",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "string set {'/common-actions.css', '/effort-readout.css', '/escalation-kpis.css', '/style.css'} as array [stylesheets]"
+    }
+   ]
+  },
+  "stampClassifier": {
+   "signatureFiles": 8,
+   "rediscovered": true,
+   "coveredFiles": 6,
+   "best": [
+    {
+     "id": "G0021",
+     "detector": "set+discrim",
+     "overlap": 6,
+     "groupFiles": 6,
+     "decision": "string set {'decision-answer', 'decision-withdrawal-reversed', 'decision-withdrawn'} as or-chain/Set [ID.kind, DECISION_"
+    },
+    {
+     "id": "G0181",
+     "detector": "const",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "named constant DECISION_LIFECYCLE_STAMP_KINDS=Set[decision-answer,decision-withdrawal-reversed,decision-withdrawn]"
+    }
+   ]
+  },
+  "sessionClass": {
+   "signatureFiles": 6,
+   "rediscovered": true,
+   "coveredFiles": 3,
+   "best": [
+    {
+     "id": "G0024",
+     "detector": "set+discrim",
+     "overlap": 2,
+     "groupFiles": 3,
+     "decision": "string set {'complete', 'error'} as Set/or-chain [LOOP_TERMINAL_AGENT_STATES, ID.agentState, TERMINAL_AGENT_STATES]"
+    },
+    {
+     "id": "G0041",
+     "detector": "clone",
+     "overlap": 2,
+     "groupFiles": 3,
+     "decision": "tiny rule copied as a helper (anonymous)() (also: loadLoops), 3 copies of 1-4 statements"
+    },
+    {
+     "id": "G0009",
+     "detector": "set+discrim",
+     "overlap": 2,
+     "groupFiles": 5,
+     "decision": "string set {'aborted', 'done', 'failed', 'skipped'} as Set/or-chain/table-keys [LOOP_TERMINAL_MARKERS, MARKER_TO_AGENT_S"
+    }
+   ]
+  },
+  "shipLayout": {
+   "signatureFiles": 4,
+   "rediscovered": true,
+   "coveredFiles": 4,
+   "best": [
+    {
+     "id": "G0242",
+     "detector": "clone",
+     "overlap": 4,
+     "groupFiles": 4,
+     "decision": "near-duplicate function orderByDependency(), ~59 statements, same vocabulary (dialect copy or close variant)"
+    },
+    {
+     "id": "G0243",
+     "detector": "clone",
+     "overlap": 4,
+     "groupFiles": 4,
+     "decision": "tiny rule copied as a helper union(), 4 copies of 1-4 statements"
+    },
+    {
+     "id": "G0253",
+     "detector": "clone",
+     "overlap": 3,
+     "groupFiles": 3,
+     "decision": "near-duplicate function clusterSiblingsInLane() (also: computeShipReachableIds, pullItemAndDescendants, promoteDependenc"
+    }
+   ]
+  },
+  "segmentRank": {
+   "signatureFiles": 2,
+   "rediscovered": true,
+   "coveredFiles": 2,
+   "best": [
+    {
+     "id": "G0295",
+     "detector": "clone",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "near-duplicate function assignLanes(), ~32 statements, same vocabulary (dialect copy or close variant)"
+    },
+    {
+     "id": "G0296",
+     "detector": "clone",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "near-duplicate function assignSegments(), ~21 statements, same vocabulary (dialect copy or close variant)"
+    },
+    {
+     "id": "G0297",
+     "detector": "clone",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "near-duplicate function buildChainLabel(), ~10 statements, same vocabulary (dialect copy or close variant)"
+    }
+   ]
+  },
+  "ledgerHeading": {
+   "signatureFiles": 6,
+   "rediscovered": true,
+   "coveredFiles": 6,
+   "best": [
+    {
+     "id": "G0015",
+     "detector": "contract",
+     "overlap": 6,
+     "groupFiles": 6,
+     "decision": "text contract heading: what ci did not prove"
+    },
+    {
+     "id": "G0115",
+     "detector": "contract",
+     "overlap": 2,
+     "groupFiles": 2,
+     "decision": "text contract heading: plan review verdict"
+    }
+   ]
+  },
+  "pageShell": {
+   "signatureFiles": 15,
+   "rediscovered": true,
+   "coveredFiles": 14,
+   "best": [
+    {
+     "id": "G0003",
+     "detector": "record",
+     "overlap": 13,
+     "groupFiles": 13,
+     "decision": "record assembled from the same sources {deployInfo=getDeployInfo(), urlKey=ID.urlKey, openRouterSource=getOpenRouterSour"
+    },
+    {
+     "id": "G0001",
+     "detector": "record",
+     "overlap": 5,
+     "groupFiles": 10,
+     "decision": "record assembled from the same sources {remaining=ID.remaining, limit=ID.limit, resetsAt=ID.resetsAt}"
+    },
+    {
+     "id": "G0196",
+     "detector": "clone",
+     "overlap": 3,
+     "groupFiles": 3,
+     "decision": "near-duplicate function (anonymous)(), ~12 statements, fuzzy"
+    }
+   ]
+  },
+  "storeClear": {
+   "signatureFiles": 19,
+   "rediscovered": true,
+   "coveredFiles": 18,
+   "best": [
+    {
+     "id": "G0043",
+     "detector": "clone",
+     "overlap": 8,
+     "groupFiles": 8,
+     "decision": "near-duplicate function clear(), ~7 statements, structurally identical"
+    },
+    {
+     "id": "G0018",
+     "detector": "clone",
+     "overlap": 5,
+     "groupFiles": 5,
+     "decision": "tiny rule copied as a helper clear(), 5 copies of 1-4 statements"
+    },
+    {
+     "id": "G0029",
+     "detector": "clone",
+     "overlap": 4,
+     "groupFiles": 4,
+     "decision": "near-duplicate function clear() (also: clearHistory), ~7 statements, fuzzy"
+    }
+   ]
+  }
+ }
+}

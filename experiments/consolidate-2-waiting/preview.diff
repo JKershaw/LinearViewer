@@ -1,0 +1,306 @@
+diff --git a/lib/digest-feedback.js b/lib/digest-feedback.js
+index 24a2cac..fbd5b5e 100644
+--- a/lib/digest-feedback.js
++++ b/lib/digest-feedback.js
+@@ -36,7 +36,7 @@
+  * ticket for the full reasoning).
+  */
+ import { formatFeedbackEntries } from './dispatch-feedback-format.js';
+-import { findTerminalFeedback, findWakeEvent } from './dispatch-terminal.js';
++import { findTerminalFeedback, findWakeEvent, isWaitingWakeMarker } from './dispatch-terminal.js';
+ import {
+   buildRunTelemetry, deriveRuntime, parseDecision, __internal as SESSION_TELEMETRY_INTERNAL,
+ } from './session-telemetry.js';
+@@ -45,15 +45,6 @@ import { PULSE_MAX_WINDOW_MS } from './live-console.js';
+ 
+ const { TICKET_PREFIX } = SESSION_TELEMETRY_INTERNAL;
+ 
+-// The wake markers that mean a run is *paused waiting on a human*, as opposed
+-// to the terminal wake markers (done/complete/failed/aborted). Moved here
+-// from `lib/pipeline-loops.js` (LIN-3008) — the single definition this
+-// module's `deriveLoopFacingFacts` and `_buildLoops` both need; that file
+-// imports it back rather than keeping its own copy. See the original
+-// docstring (pipeline-loops.js git history, LIN-1005/LIN-1025) for why only
+-// `[blocked]` belongs here and `[pending]` is deliberately excluded. Mirror
+-// any change here in routes/dashboard.js (loopIsWaiting).
+-export const WAITING_WAKE_MARKERS = new Set(['blocked']);
+ 
+ // ─── Decision derivation (LIN-2182 / H3) — moved from pipeline-loops.js ──────
+ 
+@@ -343,7 +334,7 @@ export function deriveLoopFacingFacts(feedback, isoDispatchedAt) {
+   const wake = wakeEvent
+     ? {
+       marker: wakeEvent.marker,
+-      waitingMessage: WAITING_WAKE_MARKERS.has(wakeEvent.marker) ? (wakeEvent.entry?.message || null) : null,
++      waitingMessage: isWaitingWakeMarker(wakeEvent.marker) ? (wakeEvent.entry?.message || null) : null,
+     }
+     : null;
+ 
+diff --git a/lib/dispatch-terminal.js b/lib/dispatch-terminal.js
+index f67689b..ecee1e4 100644
+--- a/lib/dispatch-terminal.js
++++ b/lib/dispatch-terminal.js
+@@ -109,6 +109,16 @@ export const WAKE_FEEDBACK_REGEX = /^\s*\[(done|complete|failed|aborted|blocked|
+  */
+ const RESUME_MARKER_REGEX = /^\s*\[working\]\s*Session resumed\./i;
+ 
++// The wake markers that mean a run is paused waiting on a person (LIN-1005).
++// ONLY `[blocked]`: `[pending]` is an agent-to-agent orchestrator handoff
++// (LIN-843), not a request for user input (LIN-1025). Contract-pinned (LIN-3258).
++export const WAITING_WAKE_MARKERS = new Set(['blocked']);
++
++/** Is this (lower-cased) wake marker one that means waiting on a person? */
++export function isWaitingWakeMarker(marker) {
++  return marker != null && WAITING_WAKE_MARKERS.has(marker);
++}
++
+ /**
+  * Scan feedback entries for a terminal marker and return the LAST one found
+  * (the runner posts the terminal event last) as {entry, status}, or null.
+@@ -222,7 +232,7 @@ export function deriveBlockedStatus(feedback) {
+     const message = feedback[i]?.message || '';
+     if (RESUME_MARKER_REGEX.test(message)) return null;
+     const match = WAKE_FEEDBACK_REGEX.exec(message);
+-    if (match) return match[1].toLowerCase() === 'blocked' ? 'blocked' : null;
++    if (match) return isWaitingWakeMarker(match[1].toLowerCase()) ? 'blocked' : null;
+   }
+   return null;
+ }
+diff --git a/lib/dispatch-wake.js b/lib/dispatch-wake.js
+index 09f137c..7177af9 100644
+--- a/lib/dispatch-wake.js
++++ b/lib/dispatch-wake.js
+@@ -38,7 +38,7 @@
+  * every boundary. It is NOT read here — this function stays pure; the store
+  * applies it at the addFeedback seam.
+  */
+-import { findWakeEvent } from './dispatch-terminal.js';
++import { findWakeEvent, isWaitingWakeMarker } from './dispatch-terminal.js';
+ 
+ /**
+  * Subscription levels (LIN-900 §6). The edge's declared `subscription` enum is the
+@@ -340,7 +340,7 @@ function sameRefSet(a, b) {
+ export function classifyWake({ marker, personOriginated = false, message = '', prior = null } = {}) {
+   if (!marker) return { wouldSkip: false, reason: 'unknown' };
+   if (marker !== 'pending') {
+-    return { wouldSkip: false, reason: marker === 'blocked' ? 'blocked' : 'terminal' };
++    return { wouldSkip: false, reason: isWaitingWakeMarker(marker) ? 'blocked' : 'terminal' };
+   }
+   if (personOriginated) return { wouldSkip: false, reason: 'person' };
+ 
+diff --git a/lib/observer-efficacy-signal.js b/lib/observer-efficacy-signal.js
+index 5921b03..d03f60a 100644
+--- a/lib/observer-efficacy-signal.js
++++ b/lib/observer-efficacy-signal.js
+@@ -98,16 +98,9 @@
+  */
+ 
+ import { getLoopsForWorkspace } from './pipeline-loops.js';
+-import { deriveLifecycleStatus } from './dispatch-terminal.js';
++import { deriveLifecycleStatus, WAKE_FEEDBACK_REGEX, isWaitingWakeMarker } from './dispatch-terminal.js';
+ import { toEpochMs } from './utils/time.js';
+ 
+-// Matches WAKE_FEEDBACK_REGEX's `blocked` alternative (lib/dispatch-terminal.js)
+-// but scoped to just that one marker — this module only ever needs to find
+-// the FIRST `[blocked]` entry in a loop's feedback, which `dispatch-terminal.js`
+-// has no exported "first" scan for (only "last", via findWakeEvent/
+-// findTerminalFeedback). Not a new marker: the same leading-prefix contract,
+-// applied to the one marker this module's scope actually needs.
+-const BLOCKED_MARKER_RE = /^\s*\[blocked\]/i;
+ 
+ /**
+  * Scan forward from `fromIndex` (exclusive) for the first entry stamped
+@@ -292,7 +285,8 @@ export function computeNewHarnessSignal(shadowLogEntries, { capacity } = {}) {
+ function findFirstBlockedMarker(feedback) {
+   if (!Array.isArray(feedback)) return null;
+   for (let i = 0; i < feedback.length; i++) {
+-    if (BLOCKED_MARKER_RE.test(feedback[i]?.message || '')) return { index: i, entry: feedback[i] };
++    const match = WAKE_FEEDBACK_REGEX.exec(feedback[i]?.message || '');
++    if (match && isWaitingWakeMarker(match[1].toLowerCase())) return { index: i, entry: feedback[i] };
+   }
+   return null;
+ }
+diff --git a/lib/observer-sweep.js b/lib/observer-sweep.js
+index 93d8a3a..a74b90f 100644
+--- a/lib/observer-sweep.js
++++ b/lib/observer-sweep.js
+@@ -17,6 +17,7 @@
+ 
+ import { getLoopsForWorkspace } from './pipeline-loops.js';
+ import { computeSupersededLoopIds } from './loop-supersede.js';
++import { isWaitingWakeMarker } from './dispatch-terminal.js';
+ import { isLoopActive, isFreshlyActive, loopLastActivityMs, DEFAULT_LANE_STALE_MS } from './live-console.js';
+ import { computeWouldBeActions } from './observer-shadow-log.js';
+ import { isDecisionAnsweredInLineage, answeredDecisionIdsByLineage, isDecisionWithdrawn } from './unanswered-decisions.js';
+@@ -94,7 +95,7 @@ export function classifyLoop(loop, { superseded, now, staleMs, answeredByLineage
+   const supersededIds = superseded || new Set();
+   const { loopId, terminalStatus, wakeMarker, agentState, historyStatus, source, bookkeeping } = loop;
+ 
+-  const lifecycle = terminalStatus ?? ((wakeMarker === 'blocked' || agentState === 'waiting') ? 'blocked' : null);
++  const lifecycle = terminalStatus ?? ((isWaitingWakeMarker(wakeMarker) || agentState === 'waiting') ? 'blocked' : null);
+ 
+   if (lifecycle === 'done' || lifecycle === 'failed' || lifecycle === 'aborted' || lifecycle === 'skipped') {
+     return 'terminal';
+diff --git a/lib/render-run-steps.js b/lib/render-run-steps.js
+index d7283ec..fbc9a97 100644
+--- a/lib/render-run-steps.js
++++ b/lib/render-run-steps.js
+@@ -18,7 +18,7 @@
+ 
+ import { escapeHtml } from './utils/html.js';
+ import { resolveCredentialState } from './credential-state.js';
+-import { findWakeEvent, isRowClosed } from './dispatch-terminal.js';
++import { findWakeEvent, isRowClosed, isWaitingWakeMarker } from './dispatch-terminal.js';
+ import { tierOf } from './run-view.js';
+ 
+ /** Short, safe machine-fact rendering of a timestamp (mono face upstream). */
+@@ -151,12 +151,6 @@ function renderRunChips(telemetry, credential = null) {
+ 
+ const EMPTY_SET = new Set();
+ 
+-// The wake markers that count as "waiting on a human" (LIN-1005/LIN-1025).
+-// Mirrors `WAITING_WAKE_MARKERS` in `routes/dashboard.js` and
+-// `lib/pipeline-loops.js` — keep in parity. ONLY `[blocked]` qualifies:
+-// `[pending]` is an agent-to-agent orchestrator handoff (LIN-843), not a
+-// request for user input.
+-const WAITING_WAKE_MARKERS = new Set(['blocked']);
+ 
+ /**
+  * A per-run "waiting for input" signal (LIN-1163, item 5), derived read-only
+@@ -195,7 +189,7 @@ function runIsWaiting(loop, supersededLoopIds = EMPTY_SET) {
+   const marker = loop.wakeMarker !== undefined
+     ? loop.wakeMarker
+     : (findWakeEvent(loop.feedback)?.marker || null);
+-  return marker != null && WAITING_WAKE_MARKERS.has(marker);
++  return isWaitingWakeMarker(marker);
+ }
+ 
+ /**
+diff --git a/lib/run-view.js b/lib/run-view.js
+index 8dee460..ee4fe3e 100644
+--- a/lib/run-view.js
++++ b/lib/run-view.js
+@@ -24,7 +24,7 @@
+  */
+ 
+ import { computeSupersededLoopIds } from './loop-supersede.js';
+-import { isRowClosed, WAKE_FEEDBACK_REGEX } from './dispatch-terminal.js';
++import { isRowClosed, WAKE_FEEDBACK_REGEX, isWaitingWakeMarker } from './dispatch-terminal.js';
+ import { toEpochMs } from './utils/time.js';
+ 
+ /** The fixed pipeline spine. Real `PROMPT_TEMPLATES` keys; order is the contract. */
+@@ -229,7 +229,7 @@ function waitingClock(loops, supersededLoopIds, nowMs) {
+     if (isRowClosed(loop)) continue; // LIN-3364
+     if (supersededLoopIds.has(loop.loopId)) continue;
+     const wake = lastWakeEntry(loop.feedback);
+-    if (!wake || wake.marker !== 'blocked') continue;
++    if (!wake || !isWaitingWakeMarker(wake.marker)) continue;
+     const since = wake.entry.timestamp || null;
+     const sinceMs = toEpochMs(since);
+     return {
+diff --git a/lib/task-page-loader.js b/lib/task-page-loader.js
+index a1516b2..da638b8 100644
+--- a/lib/task-page-loader.js
++++ b/lib/task-page-loader.js
+@@ -42,7 +42,7 @@
+ 
+ import { getLoopsForIssue as realGetLoopsForIssue } from './pipeline-loops.js';
+ import { computeSupersededLoopIds } from './loop-supersede.js';
+-import { findWakeEvent, isRowClosed, WAKE_FEEDBACK_REGEX } from './dispatch-terminal.js';
++import { findWakeEvent, isRowClosed, WAKE_FEEDBACK_REGEX, isWaitingWakeMarker } from './dispatch-terminal.js';
+ import { USUAL_STAGES, STAGE_LABELS } from './run-view.js';
+ import { stepKindWord } from './render-run-steps.js';
+ import { readTaskRunFacts as realReadTaskRunFacts } from './task-run-facts.js';
+@@ -172,7 +172,7 @@ export function briefCurrentSection(body) {
+  */
+ export function sessionMessage(loop, state) {
+   const wake = findWakeEvent(loop.feedback);
+-  const stale = wake && wake.marker === 'blocked' && state !== 'waiting';
++  const stale = wake && isWaitingWakeMarker(wake.marker) && state !== 'waiting';
+   const wakeText = !stale && wake && wake.entry && wake.entry.message;
+   const raw = wakeText || loop.agentSummary || '';
+   const text = String(raw).replace(WAKE_FEEDBACK_REGEX, '').trim();
+diff --git a/lib/unanswered-decisions.js b/lib/unanswered-decisions.js
+index 6606c3e..abe66f4 100644
+--- a/lib/unanswered-decisions.js
++++ b/lib/unanswered-decisions.js
+@@ -16,7 +16,7 @@
+  */
+ 
+ import { computeSupersededLoopIds } from './loop-supersede.js';
+-import { isRowClosed } from './dispatch-terminal.js';
++import { isRowClosed, isWaitingWakeMarker } from './dispatch-terminal.js';
+ import { toEpochMs } from './utils/time.js';
+ 
+ // LIN-3021: the canonical scoped ruling-ref key, extracted verbatim from the
+@@ -68,7 +68,7 @@ const REAP_INACTIVITY_MS = 21600000; // 6h
+  * @returns {'resumable'|'gone'|'mid-turn'|'indeterminate'}
+  */
+ export function resolveDisposition(loop, { now }) {
+-  if (!loop.terminalStatus && loop.wakeMarker === 'blocked') return 'resumable';
++  if (!loop.terminalStatus && isWaitingWakeMarker(loop.wakeMarker)) return 'resumable';
+   // A stamped (closed) row has no live writer, whatever its agentState says (LIN-3364):
+   // it ages from the stamp like a terminal one.
+   if (loop.terminalStatus || isRowClosed(loop)) {
+diff --git a/routes/dashboard.js b/routes/dashboard.js
+index d35342b..4ad6c73 100644
+--- a/routes/dashboard.js
++++ b/routes/dashboard.js
+@@ -59,7 +59,7 @@ import { prReadToken } from '../lib/github-pr-status.js';
+ import { prStateCopy } from '../lib/pr-state-copy.js';
+ import { resolveRunVariant, listRows } from '../lib/run-closeout-state.js';
+ import { buildSessionContextGraph } from '../lib/context-graph.js';
+-import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed } from '../lib/dispatch-terminal.js';
++import { deriveTerminalStatus, deriveCompletedAt, findWakeEvent, isRowClosed, isWaitingWakeMarker } from '../lib/dispatch-terminal.js';
+ import { armKeepalive } from '../lib/http-keepalive.js';
+ import { toEpochMs } from '../lib/utils/time.js';
+ import { createSessionsFeedCache } from '../lib/sessions-feed-cache.js';
+@@ -329,13 +329,6 @@ export function deriveSessionStatus({ terminal, stale, hasError, waiting = false
+   return 'in-progress';
+ }
+ 
+-// The wake markers that roll up to a session-level "waiting on user" state
+-// (LIN-1005). Mirrors WAITING_WAKE_MARKERS in pipeline-loops.js — a run whose
+-// pre-derived `wakeMarker` is one of these is paused on a human, not finished.
+-// ONLY `[blocked]` qualifies; `[pending]` is excluded (LIN-1025) because it is an
+-// agent-to-agent orchestrator handoff (LIN-843), not a request for user input —
+-// keep this in parity with the pipeline-loops.js definition.
+-const WAITING_WAKE_MARKERS = new Set(['blocked']);
+ 
+ /**
+  * Is a single ENRICHED loop (effectiveAgentState applied) waiting on a human?
+@@ -359,7 +352,7 @@ function loopIsWaiting(loop) {
+   const marker = loop.wakeMarker !== undefined
+     ? loop.wakeMarker
+     : (findWakeEvent(loop.feedback)?.marker || null);
+-  return marker != null && WAITING_WAKE_MARKERS.has(marker);
++  return isWaitingWakeMarker(marker);
+ }
+ 
+ /**
+diff --git a/tests/unit/liveness-contract-and-capability.test.js b/tests/unit/liveness-contract-and-capability.test.js
+index 70c09f1..5e33d8e 100644
+--- a/tests/unit/liveness-contract-and-capability.test.js
++++ b/tests/unit/liveness-contract-and-capability.test.js
+@@ -18,7 +18,7 @@ import { test, describe, before, after } from 'node:test';
+ import assert from 'node:assert/strict';
+ import { readFileSync } from 'node:fs';
+ import { fileURLToPath } from 'node:url';
+-import { WAITING_WAKE_MARKERS } from '../../lib/digest-feedback.js';
++import { WAITING_WAKE_MARKERS } from '../../lib/dispatch-terminal.js';
+ import { DispatchQueueStore } from '../../lib/dispatch-store.js';
+ import { LivenessAlarmStore } from '../../lib/liveness-alarm-store.js';
+ import { sweepOneWorkspace } from '../../lib/liveness-alarm-sweep.js';
+diff --git a/tests/unit/observer-sweep.test.js b/tests/unit/observer-sweep.test.js
+index c9bf962..1b724d9 100644
+--- a/tests/unit/observer-sweep.test.js
++++ b/tests/unit/observer-sweep.test.js
+@@ -1731,7 +1731,7 @@ describe('observer-sweep: negative capability — no automated-intervention path
+     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
+     assert.deepStrictEqual(
+       specifiers.sort(),
+-      ['./live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js'].sort(),
++      ['./dispatch-terminal.js', './live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js'].sort(),
+       'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion. ' +
+       './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance. ' +
+       './unanswered-decisions.js (LIN-2671) is itself pure (imports only ./loop-supersede.js; see unanswered-decisions.js) and exports the ONE answered-decision predicate classifyLoop must reuse rather than fork'

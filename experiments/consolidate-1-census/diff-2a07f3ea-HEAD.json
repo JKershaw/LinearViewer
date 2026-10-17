@@ -1,0 +1,42 @@
+{
+ "from": "2a07f3ea",
+ "to": "d349e78c",
+ "totals": {
+  "from": {
+   "groups": 318,
+   "sites": 1069
+  },
+  "to": {
+   "groups": 310,
+   "sites": 1026
+  }
+ },
+ "gone": [
+  "clone 2f near-duplicate function resolveIssueStateRef() (also: resolveStateInput), ~7 statements, structurally identica | routes/proxy.js routes/workspace-api.js",
+  "clone 3f near-duplicate function buildMockRecapContext() (also: buildMockRecapContextFromFixtures, buildMockTaskContext | routes/proxy-compute.js routes/task-chat.js routes/workspace-api.js",
+  "set 3f string set {'inside', 'outside', 'total', 'unknown'} as array/table-keys [[...].every, counts, SCOPE_MARK] | lib/close-out-events-store.js lib/render-run-evidence.js routes/workspace-api.js",
+  "clone 2f near-duplicate function buildMockBrief() (also: buildMockBriefFromContext), ~20 statements, structurally ident | routes/proxy-compute.js routes/workspace-api.js",
+  "clone 2f near-duplicate function buildMockRecap() (also: buildMockRecapFromContext), ~14 statements, structurally ident | routes/proxy-compute.js routes/workspace-api.js",
+  "record 2f record assembled from the same sources {brief=ID.brief, generatedAt=ID.generatedAt, model=ID.model} | routes/proxy-compute.js routes/workspace-api.js",
+  "record 2f record assembled from the same sources {recap=ID.recap, generatedAt=ID.generatedAt, model=ID.model} | routes/proxy-compute.js routes/workspace-api.js",
+  "discrim 4f string set {'merged', 'partial'} as or-chain [ID.closeOut.status, ID.status] | lib/render-run-evidence.js lib/task-page-loader.js public/close-out.js public/session.js",
+  "clone 2f near-duplicate function (anonymous)(), ~18 statements, same vocabulary (dialect copy or close variant) | routes/dispatch.js routes/proxy-halt.js",
+  "const 2f named constant DEFAULT_PROMPT_KEYS=[implementation,look-into,plan,research] | lib/render-swipe.js lib/render.js",
+  "set 2f string set {'implementation', 'look-into', 'plan', 'research'} as array [DEFAULT_PROMPT_KEYS] | lib/render-swipe.js lib/render.js",
+  "discrim 2f string set {'env', 'free', 'oauth'} as if-chain | lib/components/footer.js lib/render-settings.js",
+  "discrim 2f string set {'queued', 'running', 'waiting'} as or-chain [ID.state] | lib/render-task-page.js lib/task-page-loader.js",
+  "discrim 2f string set {'queued', 'running'} as or-chain [ID.outcome, ID.state] | lib/recent-runs.js lib/task-page-loader.js"
+ ],
+ "born": [
+  "clone 3f tiny rule copied as a helper (anonymous)() (also: brief), 3 copies of 1-4 statements | lib/chat-tools.js lib/workspace-api-mocks.js routes/proxy.js",
+  "set+discrim 4f string set {'merged', 'partial'} as or-chain/Set [ID.closeOut.status, MERGED_STATUSES, ID.status] | lib/render-run-evidence.js lib/task-page-loader.js public/close-out.js public/session.js",
+  "clone 3f near-duplicate function buildMockRecapContext() (also: buildMockRecapContextFromFixtures, buildMockTaskContext | lib/workspace-api-mocks.js routes/proxy-compute.js routes/task-chat.js",
+  "const 2f named constant MONTHS=[Apr,Aug,Dec,Feb,Jan,Jul,Jun,Mar,May,Nov,Oct,Sep] | lib/render.js lib/task-page-loader.js",
+  "record 2f record assembled from the same sources {promptMeta=ID.promptMeta, defaultPromptKeys=ID.defaultPromptKeys, more | lib/render-swipe.js public/app.js",
+  "record 2f record assembled from the same sources {prompt=ID.prompt, model=ID.model, harness=ID.harness} | lib/dispatch-factory.js public/next-run.js",
+  "set+discrim 2f string set {'queued', 'running', 'waiting'} as or-chain/Set [ID.state, UNENDED_STATES] | lib/render-task-page.js lib/task-page-loader.js",
+  "set+discrim 2f string set {'queued', 'running'} as or-chain/Set [ID.outcome, LIVE_STATES] | lib/recent-runs.js lib/task-page-loader.js",
+  "set 2f string set {'inside', 'outside', 'total', 'unknown'} as array/table-keys [[...].every, SCOPE_MARK] | lib/close-out-events-store.js lib/render-run-evidence.js",
+  "clone 3f tiny rule copied as a helper (anonymous)() (also: isActive), 3 copies of 1-4 statements | lib/prompts/roadmap-digest-template.js lib/prompts/roadmap-narrative-template.js lib/render-roadmap.js"
+ ]
+}
