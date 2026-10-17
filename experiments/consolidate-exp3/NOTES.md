@@ -152,3 +152,17 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - A consolidation can add lines. The reasons that were scattered beside each copy were gathered beside the one authority: line count is the wrong measure for it; sites per decision and the census are right.
 - The census sees this consolidation (one group gone); the knots don't (the decision moved within its area). The two instruments are complementary: #3 moved knots and not the census, #2 the reverse.
 - 09:45Z: John pressed the LIN-3601 ruling ("Ruling applied"): one more plan review of revision 4.
+
+## 17 Oct, 10:43Z: LIN-3601 (#4a) merged (#1912)
+
+**Facts (from the PR; independent scoring running).**
+- Kickoff 08:09Z; three plan-review rounds hit the loop bound (08:50Z ruling); John pressed "one more review" at about 09:44Z; PR opened 10:26Z, merged 10:43:32Z. About 2 h 34 min, of which about 54 min waited on the ruling. One press from John.
+- 22 files, +2,267/−339, 18 commits; tests only plus `docs/architecture/dispatch-and-proxy.md` line 31.
+- The worker's move probe: on main 37 tests in 11 files fail (the ticket's figure reproduced); on the branch 0.
+- 139 new tests in 7 files: a session-owner sweep (26 routes over HTTP), a proxy-grant sweep (nested routers descended, route count asserted), a redaction canary sweep (runtime-built canary, no token literal), a mint sweep (real token store spied), plus the two coverage gaps the inventory found (mint-chain order with a real limiter; the no-token 503).
+- Order of work followed: replacements first, 67 failing-then-passing mutation runs recorded, then each old pin removed or loosened commit by commit.
+- Pins: A 25 handled plus 1 corrected; B 20 judged with the entrance as one unit; C 17 untouched. One reclassification (lin-3134 :586, which plants outside the entrance).
+- The PR states its residual risk (what the sweeps' fixtures can't reach).
+- Environment note: the runner's checkout lacked `acorn` in `node_modules`, so `scripts/code-shape/seams.test.mjs` failed identically on main; CI runs `npm ci` and is the real check. A small runner fix, not this ticket's.
+
+**Inference.** Freeing a seam was the most expensive step of the round in agent time and the only one that needed John, and it still cost him one press. The output is more than permission to move code: the sweeps check the security properties by behaviour across every route, which the location pins never did.
