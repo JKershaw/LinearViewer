@@ -4,6 +4,8 @@ Scope: the Dispatch API and the proxy consumer integration. Moved verbatim from 
 
 The Dispatch feature allows users to queue prompts for external consumers (AI agents, automation tools).
 
+The four enqueue handlers (`POST /workspace/:urlKey/api/dispatch`, `POST /api/proxy/dispatch`, `POST /api/proxy/recommend-and-dispatch`, `POST /api/proxy/autopilot/kickoff`) are thin forwarders: the decisions they share (body checks and their order, the issue credential, the proxy-context policy, the free-tier run gate, the one `createDispatchItem` call, the 201, the failure mapping) are made once in `lib/dispatch-entrance.js` (LIN-3604). The route files keep the registrations and middleware chains, including `requireGrant('dispatch')`, and the session route passes its owner gate in.
+
 **User-facing endpoints** (session auth, workspace-prefixed):
 - `POST /workspace/:urlKey/api/dispatch` - Queue a prompt
 - `GET /workspace/:urlKey/api/dispatch` - List queued items
@@ -28,7 +30,7 @@ The Dispatch feature allows users to queue prompts for external consumers (AI ag
   because the client reads a `403` there as flag-off) and reply, Task Chat's execute-mode
   `send_follow_up`, and Collective (per participant workspace: an unowned seat is `ok:false`). The
   proxy routes stay `requireGrant('dispatch')`-scoped. `tests/unit/lin-3383-runner-enqueue-census.test.js`
-  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink. Residual: an invitee
+  re-scans `routes/`, `lib/` and `server.js` and fails on any unlisted sink kind, and `tests/unit/dispatch-entrance-session-owner-sweep.test.js` calls every session route as a non-owner and fails on an unlisted route. Residual: an invitee
   who owns a workspace with their own runner can still start a no-`stopAt` run that merges without
   the press (stated in the close-out box line and `docs/v1.md` step 7). The proxy-side halt and runner-credential
   revoke are not yet covered (LIN-3409).

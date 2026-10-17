@@ -289,11 +289,10 @@ const K = await loadVocabulary();
 async function loadVocabulary() {
   const pt = await import(libUrl('lib/prompt-templates.js', 'gen'));
   const per = await import(libUrl('lib/periodicals.js', 'gen'));
-  const gate = await import(libUrl('lib/periodical-report-gate.js', 'gen'));
   const ds = await import(libUrl('lib/dispatch-store.js', 'gen'));
   return {
     TEMPLATE_KEYS: Object.keys(pt.PROMPT_TEMPLATES), DDK: pt.DISPATCH_DEFAULT_KINDS, PERIODICAL_AUTOPILOT_TAIL: per.PERIODICAL_AUTOPILOT_TAIL,
-    gateMarker: gate.buildPeriodicalGateMarker(per.getPeriodicals().find(p => p.id === 'security-review')?.title || 'Security Review'),
+    gateMarker: per.buildPeriodicalGateMarker(per.getPeriodicals().find(p => p.id === 'security-review')?.title || 'Security Review'),
     FEEDBACK_ENTRY_KINDS: ds.FEEDBACK_ENTRY_KINDS,
   };
 }

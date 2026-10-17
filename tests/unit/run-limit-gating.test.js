@@ -232,27 +232,34 @@ describe('LIN-3238 — relay coverage (static guard)', () => {
   const files = readdirSync(routesDir).filter(f => f.endsWith('.js'));
 
   test('every gated lane file passes runGate to createDispatchItem AND relays err.runLimit', () => {
-    const gated = files.filter(f => {
-      const src = readFileSync(`${routesDir}/${f}`, 'utf8');
-      return /createDispatchItem\s*\(/.test(src) && /runGate/.test(src);
-    }).sort();
+    // LIN-3601: the dispatch entrances (routes/dispatch.js, routes/proxy-dispatch.js,
+    // routes/proxy-kickoff.js and lib/dispatch-entrance.js) are one unit. This used to
+    // require exactly the four files dispatch.js, proxy-dispatch.js, proxy-kickoff.js
+    // and workspace-api.js, each with its own relay. Now: outside the entrances the
+    // gated files are exactly workspace-api.js (the two feedback lanes) and it relays;
+    // inside them at least one file passes runGate to createDispatchItem and the unit
+    // holds a relay. Which of the four holds either is not pinned.
+    const entranceFiles = new Set(['dispatch.js', 'proxy-dispatch.js', 'proxy-kickoff.js']);
+    const entranceLib = { name: 'lib/dispatch-entrance.js', src: readFileSync(fileURLToPath(new URL('../../lib/dispatch-entrance.js', import.meta.url)), 'utf8') };
+    const read = (f) => readFileSync(`${routesDir}/${f}`, 'utf8');
+    const isGated = (src) => /createDispatchItem\s*\(/.test(src) && /runGate/.test(src);
+    const hasRelayIn = (src) => /err\.runLimit/.test(src) || /mapDispatchRefusal\s*\(/.test(src) || /relayDispatchRefusal\s*\(/.test(src);
 
-    // The seven gated lanes live in four files: dispatch (1), proxy-dispatch
-    // (3), proxy-kickoff (1), workspace-api (2, the two feedback lanes).
-    assert.deepEqual(
-      gated,
-      ['dispatch.js', 'proxy-dispatch.js', 'proxy-kickoff.js', 'workspace-api.js'],
-      `unexpected gated-lane file set: ${gated.join(', ')}`
-    );
+    const gatedOutside = files.filter(f => !entranceFiles.has(f) && isGated(read(f))).sort();
+    // The two feedback lanes (workspace-api) are the only gated lanes outside the entrances.
+    assert.deepEqual(gatedOutside, ['workspace-api.js'], `unexpected gated-lane file set outside the entrances: ${gatedOutside.join(', ')}`);
 
-    for (const f of gated) {
-      const src = readFileSync(`${routesDir}/${f}`, 'utf8');
-      // The feedback lanes relay inline (`err.runLimit`); the session `/dispatch` lane
-      // calls `mapDispatchRefusal`; proxy lanes relay through the
-      // shared `relayDispatchRefusal` helper defined in routes/proxy.js.
-      const hasRelay = /err\.runLimit/.test(src) || /mapDispatchRefusal\s*\(/.test(src) || /relayDispatchRefusal\s*\(/.test(src);
-      assert.ok(hasRelay, `${f} passes runGate but has no err.runLimit relay`);
+    const entranceSources = [...[...entranceFiles].map(f => ({ name: f, src: read(f) })), entranceLib];
+    const gatedInside = entranceSources.filter(e => isGated(e.src));
+    assert.ok(gatedInside.length >= 1, 'no dispatch entrance file passes runGate to createDispatchItem any more');
+
+    // The feedback lanes relay inline (`err.runLimit`); the session `/dispatch` lane
+    // calls `mapDispatchRefusal`; proxy lanes relay through the
+    // shared `relayDispatchRefusal` helper defined in routes/proxy.js.
+    for (const f of gatedOutside) {
+      assert.ok(hasRelayIn(read(f)), `${f} passes runGate but has no err.runLimit relay`);
     }
+    assert.ok(entranceSources.some(e => hasRelayIn(e.src)), 'the dispatch entrances pass runGate but nothing in them relays err.runLimit');
   });
 
   test('routes/proxy.js defines the shared relayDispatchRefusal, which maps via lib/dispatch-refusal.js', () => {

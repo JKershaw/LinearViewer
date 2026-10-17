@@ -11,6 +11,11 @@
  *
  * Pure scanners over `{file, src}`; the mutation witnesses plant a change in a
  * synthetic copy and assert the scan fails.
+ *
+ * LIN-3601: inside the proxy entrances (routes/proxy-dispatch.js, routes/proxy-kickoff.js,
+ * lib/dispatch-entrance.js, treated as one unit) C1 asks only that a sink exists;
+ * the gate in front of it is dispatch-entrance-proxy-grant-sweep.test.js's. Every
+ * other proxy route file stays exact.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,11 +29,21 @@ const REPO = join(__dirname, '../..');
 const PROXY_ROUTE_FILES = readdirSync(join(REPO, 'routes'))
   .filter(name => /^proxy-.*\.js$/.test(name))
   .map(name => ({ file: `routes/${name}`, src: readFileSync(join(REPO, 'routes', name), 'utf8') }));
+// LIN-3601: the proxy entrances are judged with lib/dispatch-entrance.js as one unit.
+const ENTRANCE_LIB = { file: 'lib/dispatch-entrance.js', src: readFileSync(join(REPO, 'lib/dispatch-entrance.js'), 'utf8') };
+const SCANNED_FILES = [...PROXY_ROUTE_FILES, ENTRANCE_LIB];
 
 const GATED = "proxyLimiter, authenticateProxyToken, requireWriteScope, requireGrant('dispatch'),";
-const EXPECTED_SINKS = { 'routes/proxy-dispatch.js': 3, 'routes/proxy-kickoff.js': 1 };
+// LIN-3601: was { 'routes/proxy-dispatch.js': 3, 'routes/proxy-kickoff.js': 1 }, an exact count per
+// file, each sink tied to the registration above it. Those two files and
+// lib/dispatch-entrance.js are the proxy entrances (E); inside E a sink may sit in
+// any of them, and the gate in front of each is carried by
+// dispatch-entrance-proxy-grant-sweep.test.js (every write route of the composer is
+// called with a readWrite token lacking `dispatch` and a read token; neither reaches
+// addItem or expandCascadeAborts). Every OTHER proxy route file stays exact below.
+const E_PROXY_FILES = new Set(['routes/proxy-dispatch.js', 'routes/proxy-kickoff.js', 'lib/dispatch-entrance.js']);
 
-/** Each enqueue sink with the route registration it sits under. */
+/** Each enqueue sink; outside E, with the route registration it sits under. */
 function scanC1(files) {
   const v = [];
   const counts = {};
@@ -37,6 +52,7 @@ function scanC1(files) {
     lines.forEach((line, i) => {
       if (!/\bcreateDispatchItem\(/.test(line) || /^\s*(\/\/|\*)/.test(line) || /^import\b/.test(line)) return;
       counts[file] = (counts[file] || 0) + 1;
+      if (E_PROXY_FILES.has(file)) return;
       let reg = null;
       for (let j = i; j >= 0; j--) {
         if (/^\s{2}router\.(get|post|put|patch|delete|use)\(/.test(lines[j])) { reg = lines[j]; break; }
@@ -46,28 +62,40 @@ function scanC1(files) {
       }
     });
   }
-  for (const [file, n] of Object.entries(EXPECTED_SINKS)) {
-    if ((counts[file] || 0) !== n) v.push(`${file}: expected ${n} enqueue sinks, found ${counts[file] || 0}`);
-  }
+  const inE = [...E_PROXY_FILES].reduce((n, f) => n + (counts[f] || 0), 0);
+  if (inE < 1) v.push('the proxy entrances hold no enqueue sink at all: expected at least one in routes/proxy-dispatch.js, routes/proxy-kickoff.js or lib/dispatch-entrance.js');
   for (const file of Object.keys(counts)) {
-    if (!(file in EXPECTED_SINKS)) v.push(`${file}: an unlisted proxy enqueue sink`);
+    if (!E_PROXY_FILES.has(file)) v.push(`${file}: an unlisted proxy enqueue sink`);
   }
   return v;
 }
 
 describe('LIN-3136 C1 — every proxy-token enqueue sink is behind the dispatch gate', () => {
-  test('the live tree: 4 sinks, all under the three gated POST handlers', () => {
-    assert.deepEqual(scanC1(PROXY_ROUTE_FILES), []);
+  test('the live tree: the entrances hold an enqueue sink; no other proxy file holds one, and any outside E sits under a gated POST', () => {
+    assert.deepEqual(scanC1(SCANNED_FILES), []);
   });
 
-  test('mutation: the gate removed from a mount fails C1', () => {
-    const mutated = PROXY_ROUTE_FILES.map(f => (f.file === 'routes/proxy-kickoff.js'
-      ? { ...f, src: f.src.replace("requireWriteScope, requireGrant('dispatch'), async", 'requireWriteScope, async') } : f));
-    assert.ok(scanC1(mutated).some(m => m.startsWith('routes/proxy-kickoff.js:') && m.includes('not under a dispatch-gated POST')));
+  // LIN-3601: 'mutation: the gate removed from a mount fails C1' (formerly here)
+  // dropped `requireGrant('dispatch')` from a registration in routes/proxy-kickoff.js
+  // and expected the positional scan to fail. The entrances' gating is now carried by
+  // dispatch-entrance-proxy-grant-sweep.test.js: the same mutation, applied to
+  // routes/proxy-kickoff.js, to routes/proxy-dispatch.js POST /dispatch, and a
+  // planted ungated POST that calls createDispatchItem, each fail it in a scratch copy.
+
+  test('LIN-3601: moving a sink between the entrance files keeps C1 clean; removing every sink from E fails it', () => {
+    const moved = SCANNED_FILES.map(f => {
+      if (f.file === 'routes/proxy-kickoff.js') return { ...f, src: f.src.replace('const item = await createDispatchItem({', 'const item = await moved({') };
+      if (f.file === 'lib/dispatch-entrance.js') return { ...f, src: `${f.src}\nexport const moved2 = (store) => createDispatchItem({ store });\n` };
+      return f;
+    });
+    assert.notDeepEqual(moved, SCANNED_FILES);
+    assert.deepEqual(scanC1(moved), []);
+    const none = SCANNED_FILES.map(f => (E_PROXY_FILES.has(f.file) ? { ...f, src: f.src.replaceAll('createDispatchItem(', 'somethingElse(') } : f));
+    assert.ok(scanC1(none).some(m => m.startsWith('the proxy entrances hold no enqueue sink')));
   });
 
   test('mutation: a sink in a new ungated proxy route fails C1', () => {
-    const planted = [...PROXY_ROUTE_FILES, {
+    const planted = [...SCANNED_FILES, {
       file: 'routes/proxy-new.js',
       src: "export function x() {\n  router.post('/api/proxy/new', proxyLimiter, authenticateProxyToken, requireWriteScope, async (req, res) => {\n      const item = await createDispatchItem({});\n  });\n}\n"
     }];

@@ -52,8 +52,7 @@ import {
   DEFAULT_HORIZON_MS
 } from '../../lib/periodical-runs.js';
 import { PERIODICAL_PROJECTION, PERIODICAL_HISTORY_PROJECTION, DispatchQueueStore } from '../../lib/dispatch-store.js';
-import { PERIODICALS, resolvePeriodicalIdFromGateMarker } from '../../lib/periodicals.js';
-import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
+import { PERIODICALS, resolvePeriodicalIdFromGateMarker, buildPeriodicalGateMarker } from '../../lib/periodicals.js';
 
 const WEEK_MS = CADENCE_MS.weekly;
 const DAY_MS = 24 * 60 * 60 * 1000;

@@ -5,9 +5,8 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL, resolvePeriodicalIdFromGateMarker } from '../../lib/periodicals.js';
+import { PERIODICALS, getPeriodicals, buildPeriodicalNodes, withAutopilotTail, PERIODICAL_AUTOPILOT_TAIL, resolvePeriodicalIdFromGateMarker, buildPeriodicalGateMarker } from '../../lib/periodicals.js';
 import { PERIODICALS_PROJECT_ID } from '../../lib/tree.js';
-import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
 
 describe('periodicals registry', () => {
   test('seeds the LIN-354 review set plus Drift & Coherence, Comprehension-Debt, Stability, Dependency & Supply-Chain, Recent Headwinds, Design & Interface, Performance / Scale, Data & Fetch Architecture, Integration & Surface Maturity, and Onboarding & Cold-Start, and Seams & Tangles (16 templates)', () => {

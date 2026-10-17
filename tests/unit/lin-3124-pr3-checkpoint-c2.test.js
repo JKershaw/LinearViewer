@@ -12,10 +12,11 @@ import { dirname, join } from 'node:path';
 import { createConnectionAccess } from '../../lib/connection-credential.js';
 import { createWorkspaceTitleResolver } from '../../lib/workspace-title-resolver.js';
 import { fingerprintCredential } from '../../lib/credential-diagnostics.js';
+import { createDispatchRoutes } from '../../routes/dispatch.js';
+import { appAround, request } from './lib/entrance-route-sweep.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SERVER_SRC = readFileSync(join(__dirname, '../../server.js'), 'utf8');
-const DISPATCH_SRC = readFileSync(join(__dirname, '../../routes/dispatch.js'), 'utf8');
 const DASHBOARD_SRC = readFileSync(join(__dirname, '../../routes/dashboard.js'), 'utf8');
 
 const BUFFER = 5 * 60 * 1000;
@@ -97,8 +98,37 @@ describe('LIN-3124 PR3 checkpoint C2 — D16 owner-blind threading (source-text 
     assert.match(body, /return \(await resolveWorkspaceAccess\(urlKey\)\)\.token/);
   });
 
-  test('routes/dispatch.js threads the session into the done-guard', () => {
-    assert.match(DISPATCH_SRC, /getWorkspaceAccessToken: \(k\) => getWorkspaceAccessToken\(k, req\.session\)/);
+  // LIN-3601: this test matched the text `getWorkspaceAccessToken: (k) =>
+  // getWorkspaceAccessToken(k, req.session)` in routes/dispatch.js. It now posts a
+  // composed-run dispatch (the only path that runs the done-guard) with an injected
+  // getWorkspaceAccessToken and requires every call to arrive carrying the SESSION that
+  // made the request, so a connection-backed workspace reads the session's own
+  // hydrated credential (D16).
+  test('routes/dispatch.js threads the session into the done-guard', async () => {
+    const session = { accountId: 'acct-owner' };
+    const seen = [];
+    const router = createDispatchRoutes({
+      dispatchQueueStore: { addItem: async (_urlKey, fields) => ({ _id: 'item-1', ...fields }) },
+      dispatchTokenStore: {},
+      workspaceOwnerCheck: async () => ({ status: 'owner' }),
+      userPreferencesStore: {},
+      getWorkspaceAccessToken: async (urlKey, sess) => { seen.push([urlKey, sess]); return 'workspace-token'; },
+      fetchIssueContext: async () => ({ issue: { state: { type: 'started' } } }),
+      workspaceFromUrl: (req, _res, next) => {
+        req.workspace = { urlKey: 'acme', id: 'ws-acme', provider: 'linear' };
+        req.session = session;
+        next();
+      }
+    });
+    const res = await request(appAround(router), 'POST', '/workspace/acme/api/dispatch', {
+      body: { prompt: 'p', target: 'cli', issueIdentifier: 'LIN-1', composedRunMarker: 'ruling-composed-run' }
+    });
+    assert.equal(res.status, 201, res.text);
+    assert.ok(seen.length >= 1, 'the done-guard asked for the workspace access token');
+    for (const [urlKey, sess] of seen) {
+      assert.equal(urlKey, 'acme');
+      assert.strictEqual(sess, session, 'the token lookup receives the requesting session');
+    }
   });
 
   test('routes/dashboard.js threads the session through mergeSessions and the hydrate route', () => {

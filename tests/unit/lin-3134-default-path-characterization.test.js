@@ -29,12 +29,13 @@
  * below.
  *
  * Additive only: no existing assertion is touched.
+ * LIN-3601: only the `:556` source assertion (route projection bodies) was replaced, by a
+ * behaviour test of the same name; every golden literal here is unchanged.
  */
 process.env.NODE_ENV = 'test';
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -553,23 +554,55 @@ describe('S0 — buildWakeCredentialProvisioner output per branch', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('S0 — projection source bodies are spread-free and token-free', () => {
-  test('formatDispatchWatch and the list map contain no declared field or row spread', () => {
-    const src = readFileSync(join(ROOT, 'routes', 'proxy-dispatch.js'), 'utf8');
-
-    const watchStart = src.indexOf('function formatDispatchWatch(');
-    assert.ok(watchStart > -1, 'formatDispatchWatch found');
-    const watchEnd = src.indexOf('\n}\n', watchStart);
-    const watchBody = src.slice(watchStart, watchEnd);
-
-    const listMapStart = src.indexOf('const items = filtered.slice(0, limit).map(');
-    assert.ok(listMapStart > -1, 'list map found');
-    const listMapEnd = src.indexOf('}));', listMapStart);
-    const listMapBody = src.slice(listMapStart, listMapEnd);
-
-    for (const body of [watchBody, listMapBody]) {
-      assert.ok(!body.includes('grantDeclaration'), 'no grantDeclaration in projection');
-      assert.ok(!body.includes('grantRefusal'), 'no grantRefusal in projection');
-      assert.ok(!/\.\.\.\s*(item|i)\b/.test(body), 'no row spread in projection');
+  // LIN-3601: this test sliced `formatDispatchWatch` and the list map out of
+  // routes/proxy-dispatch.js and asserted the text held no `grantDeclaration`,
+  // `grantRefusal` or row spread. It now reads both routes over HTTP from a stored row
+  // that carries both declared fields and an unknown key, so a spread of the row (the
+  // only way a field this test cannot name could leave) shows up in the reply.
+  test('formatDispatchWatch and the list map contain no declared field or row spread', async () => {
+    const ID = '11111111-2222-4333-8444-555555555555';
+    const row = {
+      id: ID, status: 'queued', promptName: 'Prompt', kind: 'custom', issueIdentifier: 'TEST-1', target: 'cli',
+      dispatchedAt: '2026-10-17T00:00:00.000Z', feedback: [],
+      grantDeclaration: { grants: ['dispatch'], ownerAccountId: 'acct-A', workspaceId: 'ws-A', site: 'M1' },
+      grantRefusal: { code: 'GRANT_REFUSED' }, bootstrapToken: 'fixture-token', prompt: 'fixture prompt', unknownRowField: 'u'
+    };
+    const deps = {
+      proxyTokenStore: { validateToken: async () => ({ tokenId: 't1', urlKey: 'acme', label: 'test', scope: 'readWrite', createdBy: 'u1' }), listTokens: async () => [], describeRejectionCause: async () => null },
+      proxyEventStore: { recordEvent: async () => {} },
+      resolveWorkspaceAccess: async () => ({ token: 'test-token', reason: 'ok' }),
+      getWorkspaceAccessToken: async () => 'test-token',
+      getWorkspaceOpenRouterKey: async () => null,
+      agentStatusStore: {},
+      recapCacheStore: { get: async () => null, set: async () => {} },
+      briefCacheStore: { get: async () => null, set: async () => {} },
+      workspaceFromUrl: (req, res, next) => next(),
+      workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
+      freeTierStore: { tryUse: async () => ({ allowed: true }) },
+      dispatchTokenStore: { listTokens: async () => [] },
+      dispatchQueueStore: {
+        listItems: async () => [{ ...row }],
+        listHistory: async () => ({ items: [], total: 0 }),
+        getItemStatus: async () => ({ ...row })
+      }
+    };
+    const app = express();
+    app.use(express.json());
+    app.use(createProxyRoutes(deps));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    try {
+      const { port } = server.address();
+      for (const path of ['/api/proxy/dispatch', `/api/proxy/dispatch/${ID}`]) {
+        const res = await fetch(`http://127.0.0.1:${port}${path}`, { headers: { Authorization: 'Bearer anything' } });
+        const text = await res.text();
+        assert.equal(res.status, 200, `${path}: ${text}`);
+        for (const withheld of ['grantDeclaration', 'grantRefusal', 'bootstrapToken', 'fixture-token', 'fixture prompt', 'unknownRowField', 'ownerAccountId']) {
+          assert.ok(!text.includes(withheld), `${path} leaked ${withheld}: ${text}`);
+        }
+      }
+    } finally {
+      await new Promise(resolve => server.close(resolve));
     }
   });
 });
