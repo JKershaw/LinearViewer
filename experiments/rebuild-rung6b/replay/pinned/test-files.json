@@ -1,0 +1,16 @@
+{
+ "note": "Unit-test files that call a target export (discovered with the pinned old side). Regenerate with --rediscover-tests.",
+ "candidates": 3,
+ "withCalls": 3,
+ "calls": {
+  "tests/unit/digest-feedback.test.js": 3,
+  "tests/unit/kpi-stats.test.js": 97,
+  "tests/unit/lin3014-capture-kpis.test.js": 2
+ },
+ "failingOnOld": [],
+ "files": [
+  "tests/unit/digest-feedback.test.js",
+  "tests/unit/kpi-stats.test.js",
+  "tests/unit/lin3014-capture-kpis.test.js"
+ ]
+}

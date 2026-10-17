@@ -153,8 +153,14 @@ export function buildError(e, libs) {
   }
 }
 
+let stateGetter = null;
+/** Install the per-request state reader `{__fromState: key}` resolves against. */
+export function setStateGetter(fn) { stateGetter = fn; }
+
 export function materialize(v, libs) {
   if (v === null || typeof v !== 'object') return v;
+  if (v.__fromState !== undefined) return stateGetter?.()?.[v.__fromState];
+  if (v.__setOf) return new Set(materialize(v.__setOf, libs));
   if (Array.isArray(v)) return v.map(x => materialize(x, libs));
   if (v.__arrayWithProps) {
     const arr = v.items.map(x => materialize(x, libs));

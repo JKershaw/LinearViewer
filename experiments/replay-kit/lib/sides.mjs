@@ -122,7 +122,7 @@ export function pinCopy({ sha, relPath, outDir, snapshotDir }) {
 }
 
 /** Snapshot `sha` (lib routes tests public server.js package.json content scripts) once. */
-export function ensureSnapshot({ sha, dir, paths = ['lib', 'routes', 'tests', 'public', 'server.js', 'package.json', 'content', 'scripts'] }) {
+export function ensureSnapshot({ sha, dir, paths = ['lib', 'routes', 'tests', 'public', 'server.js', 'package.json', 'content', 'scripts', 'docs'] }) {
   if (fs.existsSync(path.join(dir, 'SHA')) && fs.readFileSync(path.join(dir, 'SHA'), 'utf8').trim() === sha) return dir;
   fs.mkdirSync(dir, { recursive: true });
   const tar = execFileSync('git', ['-C', REPO, 'archive', sha, ...paths], { maxBuffer: 512 << 20 });

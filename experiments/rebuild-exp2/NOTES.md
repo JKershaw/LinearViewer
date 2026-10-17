@@ -594,3 +594,25 @@ All 17 pinned tests and the whole-tree scans pass. All 131 ticket references are
 - A clean room rebuilds truly, and a design-first rebuild typically keeps 37–55% of lines. Small, idiomatic lines recur naturally, so this is a band, not zero.
 - **LIN-3592 is an edit by this measure,** with more carry-over than the informed rewrite. It was the most pinned ticket (17 source-text tests, many requiring exact lines) and the largest. The share also crept up across the round as tickets grew more pinned and their wording got lighter.
 - **Proposed Done-when line:** report the verbatim share. Above about 60% outside pinned text, explain why, or treat the run as an edit and send it back.
+
+## 17 Oct ~00:20Z: rung 6b (LIN-3591, `kpi-stats.js`, the `/kpis` privacy boundary) done and scored
+
+Launched 23:14Z, merged as #1907 (`91fca7dd`), Done ~00:03Z: about 50 minutes, no split, no ruling.
+
+**The fix: "the free-tier count leak".**
+- The old code summed `doc.count || 0`, so a non-numeric stored count was glued, as text, into the public `freeTier.counts`. It was a counting bug and a privacy leak at once. Real data can't trigger it, because the store only ever uses `$inc`.
+- The new code counts only finite numbers.
+- The worker's own replay found it (85 findings). **Mine missed it:** my generator only ever made numeric counts, so its privacy scan reported "old side clean". A separate canary probe on that field: old leaks on 52 of 196 inputs, new on 0, old-plus-fix on 0. The lesson for the kit: put canaries into numeric fields too.
+
+**Independent replay** (3,193 inputs per seed): all differences are the one fix. With it patched into the old copy, 0 differences. No (b), no (c). Store calls match exactly.
+
+**Shape:**
+- code lines 598 → 463 (−22.6%);
+- worst function 77 → 9; no unit over 10;
+- functions 47 → 78.
+
+**Verbatim share: 38.9%** (longest run 9). All 25 ticket references are kept.
+
+**Prediction:** 8 hits. Miss: code shrank further than predicted (463 against 480–580), because the five derived fields came from one shared builder.
+
+The cleanest rung so far: a genuine rebuild, a large cut, and a real fix.
