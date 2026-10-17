@@ -69,15 +69,24 @@ describe('LIN-3129 — the five A2 sites import the shared scope/grant vocabular
   for (const site of SITES) {
     if (site.unit) {
       test(`the dispatch entrances import the shared scope module and use the constant (${site.usage})`, () => {
-        const holders = site.unit.filter((member) => {
-          const src = source(member.path);
-          return src.includes(`from '${member.specifier}'`)
-            && site.imports.every((name) => new RegExp(`\\b${name}\\b`).test(src))
-            && src.includes(site.usage);
-        });
+        // Judged as a unit: some entrance file imports the shared module and references
+        // each name, and some entrance file uses the constant. The import and the use
+        // need not sit in the same file as they do today, so a move of the broker's
+        // inline mint into another entrance file (with its import) is not a failure.
+        const sources = site.unit.map((member) => ({ ...member, src: source(member.path) }));
         assert.ok(
-          holders.length >= 1,
-          `at least one of ${site.unit.map((m) => m.path).join(', ')} must import the shared module and use "${site.usage}"`
+          sources.some((m) => m.src.includes(`from '${m.specifier}'`)),
+          `at least one of ${site.unit.map((m) => m.path).join(', ')} must import the shared module`
+        );
+        for (const name of site.imports) {
+          assert.ok(
+            sources.some((m) => m.src.includes(`from '${m.specifier}'`) && new RegExp(`\\b${name}\\b`).test(m.src)),
+            `an entrance file must import and reference ${name}`
+          );
+        }
+        assert.ok(
+          sources.some((m) => m.src.includes(site.usage)),
+          `at least one of ${site.unit.map((m) => m.path).join(', ')} must use the shared constant: expected "${site.usage}"`
         );
       });
       continue;
