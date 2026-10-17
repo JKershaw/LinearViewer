@@ -1,0 +1,1531 @@
+{
+  "tool": "pipeline-loops behavioural replay (rung5d)",
+  "old": {
+    "spec": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5d/replay/pinned/origin-main",
+    "files": [
+      {
+        "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5d/replay/pinned/origin-main/pipeline-loops.js",
+        "sha": "d4fd19b0dd4a"
+      }
+    ]
+  },
+  "new": {
+    "spec": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5d/arm/new",
+    "files": [
+      {
+        "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5d/arm/new/pipeline-loops.js",
+        "sha": "161de9402e04"
+      }
+    ],
+    "rewrites": []
+  },
+  "options": {
+    "n": 3000,
+    "seed": 1,
+    "now": "2026-10-01T12:00:00.000Z",
+    "tiers": [
+      "test",
+      "edge",
+      "gen"
+    ],
+    "only": null
+  },
+  "totals": {
+    "inputs": 3795,
+    "differing": 18,
+    "withInfoOnly": 649,
+    "byTier": {
+      "test": {
+        "inputs": 751,
+        "differing": 0,
+        "steps": 751
+      },
+      "edge": {
+        "inputs": 44,
+        "differing": 2,
+        "steps": 106
+      },
+      "gen": {
+        "inputs": 3000,
+        "differing": 16,
+        "steps": 3704
+      }
+    },
+    "kinds": {
+      "error": 1,
+      "return": 20
+    },
+    "seconds": 46.5
+  },
+  "byFamily": {
+    "test": {
+      "inputs": 751,
+      "differing": 0
+    },
+    "cutoff exactly 30d kept, 30d+1ms dropped": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "horizon all keeps 90d-old rows": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "horizon all + epoch-0 dispatchedAt (falsy item.dispatchedAt kept)": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "horizon all + lean + digest + epoch-0 dispatchedAt": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "now as string throws": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "now as number throws": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "no args / null arg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "items as non-arrays": {
+      "inputs": 1,
+      "differing": 1
+    },
+    "malformed rows warn once per cause per instance": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "window bounds inclusive (lower == dispatchedAt, upper == next dispatch)": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "exact dispatchId beats window; ties keep the first; null timestamps": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "resolvedAt before dispatchedAt: empty window": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "same-ms dispatches tie-break on String(loopId).localeCompare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "issueIdentifier that looks like an anchor bucket key": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "general autopilot anchors: own bucket, dispatchId-only status, empty-string identifier": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "agentState truth table via rows": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "lean: digest missing decisionCase / answeredDecisions / withdrawalReversed keys": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "lean vs non-lean: same rows both ways": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "abort harvest: later abort wins, earlier abort loses to [done], [skipped] ignored, lean and non-lean": {
+      "inputs": 1,
+      "differing": 1
+    },
+    "decisions: answered, withdrawn, reversed, assistant-text case": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "LIN-1393 straddle: root unclaimed session-target": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "LIN-1393 straddle: root owned by an autopilot session": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "LIN-1393 straddle: root is a dash row (cannot anchor)": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "LIN-1393 straddle: chain root aged out (resolve null)": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "group id is an autopilot session key": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "group root aged out: followers coalesce anchorless": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "group root present but incompatible (autopilot / dash / claimed)": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "legacy chain: root dash, root autopilot, cycle, self-loop, missing root": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "duplicate loopIds across live and history": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "inference: seed/descendant/ancestor in window, stamped elsewhere never stolen, other orchestrator never absorbed": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "taskPosition: maxTasks variants and seam scoping": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "_assembleSession: completedAt only when all terminal; empty loops": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "_buildSessions: defaults": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "_hierarchyHelpers: cycles, missing graph": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "deriveIssueGraph: parent outside set, identifier missing, duplicate ids": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "guards: missing urlKey/issue/stores": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "lean self-heal: stale rows re-read, written back, vanished row served stale": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "lean self-heal: updateOne rejects with a non-Error / empty message": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "OBSERVATION_FEED_TIMING=1 lean prints one timing line": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "stores returning sync values / garbage shapes": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "stores throwing synchronously": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "updateOne rejects with an empty Error": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "find rejects: self-heal fails the whole fill": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "internal export constants": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "buildLoops": {
+      "inputs": 886,
+      "differing": 8
+    },
+    "getLoopsForWorkspace": {
+      "inputs": 279,
+      "differing": 1
+    },
+    "getSessionsForIssues": {
+      "inputs": 244,
+      "differing": 1
+    },
+    "sessionsChain": {
+      "inputs": 460,
+      "differing": 4
+    },
+    "redigest": {
+      "inputs": 107,
+      "differing": 0
+    },
+    "sequence": {
+      "inputs": 72,
+      "differing": 1
+    },
+    "getSessionsForWorkspace": {
+      "inputs": 212,
+      "differing": 1
+    },
+    "getLoopsForIssue": {
+      "inputs": 210,
+      "differing": 0
+    },
+    "small": {
+      "inputs": 238,
+      "differing": 0
+    },
+    "fetchWorkspaceData": {
+      "inputs": 115,
+      "differing": 0
+    },
+    "sessionsHandBuilt": {
+      "inputs": 177,
+      "differing": 0
+    }
+  },
+  "capture": {
+    "now": "2026-10-01T12:00:00.000Z",
+    "files": [
+      {
+        "file": "tests/unit/chat-tools.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 1,
+        "pass": 185,
+        "fail": 0,
+        "calls": 217
+      },
+      {
+        "file": "tests/unit/closed-row-readers.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 12,
+        "fail": 0,
+        "calls": 1
+      },
+      {
+        "file": "tests/unit/dashboard-routes.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 1,
+        "pass": 240,
+        "fail": 0,
+        "calls": 166
+      },
+      {
+        "file": "tests/unit/digest-feedback-buildloops-characterization.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.2,
+        "pass": 2,
+        "fail": 0,
+        "calls": 2
+      },
+      {
+        "file": "tests/unit/digest-feedback.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.4,
+        "pass": 68,
+        "fail": 0,
+        "calls": 10
+      },
+      {
+        "file": "tests/unit/dispatch-skipped-marker.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 7,
+        "fail": 0,
+        "calls": 1
+      },
+      {
+        "file": "tests/unit/dispatch-store-decision-withdrawal.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 16,
+        "fail": 0,
+        "calls": 5
+      },
+      {
+        "file": "tests/unit/escalation-kpis.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 23,
+        "fail": 0,
+        "calls": 4
+      },
+      {
+        "file": "tests/unit/false-live-rows.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.8,
+        "pass": 24,
+        "fail": 0,
+        "calls": 27
+      },
+      {
+        "file": "tests/unit/fossil-pass-selection.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.4,
+        "pass": 31,
+        "fail": 0,
+        "calls": 31
+      },
+      {
+        "file": "tests/unit/lin-3013-swipe-lean-read-wiring.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.2,
+        "pass": 3,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/lin-3254-run-proposals-apply.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.8,
+        "pass": 17,
+        "fail": 0,
+        "calls": 20
+      },
+      {
+        "file": "tests/unit/lin-3433-paired-measure.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.6,
+        "pass": 16,
+        "fail": 0,
+        "calls": 3
+      },
+      {
+        "file": "tests/unit/live-console-events-route.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.6,
+        "pass": 11,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/liveness-real-lean-sweep.test.js",
+        "exit": 1,
+        "signal": null,
+        "seconds": 0.6,
+        "pass": 3,
+        "fail": 1,
+        "calls": 6
+      },
+      {
+        "file": "tests/unit/mongo-smoke.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.8,
+        "pass": 0,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/observation-ruling-delivery.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.6,
+        "pass": 158,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/observation-sessions-materializer.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 31,
+        "fail": 0,
+        "calls": 40
+      },
+      {
+        "file": "tests/unit/observation-sessions-store.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 21,
+        "fail": 0,
+        "calls": 4
+      },
+      {
+        "file": "tests/unit/observer-efficacy-signal.test.js",
+        "exit": 1,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 30,
+        "fail": 1,
+        "calls": 16
+      },
+      {
+        "file": "tests/unit/observer-sweep.test.js",
+        "exit": 1,
+        "signal": null,
+        "seconds": 0.7,
+        "pass": 63,
+        "fail": 2,
+        "calls": 51
+      },
+      {
+        "file": "tests/unit/pipeline-abort-session-terminal.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.8,
+        "pass": 7,
+        "fail": 0,
+        "calls": 10
+      },
+      {
+        "file": "tests/unit/pipeline-loops-horizon.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.2,
+        "pass": 4,
+        "fail": 0,
+        "calls": 6
+      },
+      {
+        "file": "tests/unit/pipeline-loops.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 176,
+        "fail": 0,
+        "calls": 228
+      },
+      {
+        "file": "tests/unit/pipeline-sessions.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.5,
+        "pass": 47,
+        "fail": 0,
+        "calls": 78
+      },
+      {
+        "file": "tests/unit/proxy-rulings-routes.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.9,
+        "pass": 56,
+        "fail": 0,
+        "calls": 40
+      },
+      {
+        "file": "tests/unit/render-session.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.6,
+        "pass": 125,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/run-summary.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 15,
+        "fail": 0,
+        "calls": 31
+      },
+      {
+        "file": "tests/unit/session-context-graph.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 15,
+        "fail": 0,
+        "calls": 4
+      },
+      {
+        "file": "tests/unit/session-summary.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 11,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/sessions-feed-cache.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 19,
+        "fail": 0,
+        "calls": 0
+      },
+      {
+        "file": "tests/unit/task-page-loader.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.7,
+        "pass": 69,
+        "fail": 0,
+        "calls": 1
+      },
+      {
+        "file": "tests/unit/ticket-close-closer.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.9,
+        "pass": 49,
+        "fail": 0,
+        "calls": 66
+      },
+      {
+        "file": "tests/unit/ticket-closed-clear.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.6,
+        "pass": 7,
+        "fail": 0,
+        "calls": 15
+      },
+      {
+        "file": "tests/unit/unanswered-decisions.test.js",
+        "exit": 0,
+        "signal": null,
+        "seconds": 0.3,
+        "pass": 106,
+        "fail": 0,
+        "calls": 0
+      }
+    ],
+    "rawCalls": 1083,
+    "unique": 751,
+    "duplicatesDropped": 332,
+    "unserializable": 0,
+    "byFn": {
+      "getSessionsForIssues": 36,
+      "getSessionsForWorkspace": 116,
+      "isDecisionLifecycleStampEntry": 46,
+      "getLoopsForWorkspace": 180,
+      "resolvedDecisionEvents": 21,
+      "firstRaisedAt": 10,
+      "deriveIssueGraph": 5,
+      "getLoopsForIssue": 9,
+      "__internal._buildLoops": 230,
+      "redigestHistoryRows": 15,
+      "__internal._assembleSession": 1,
+      "__internal._buildSessions": 32,
+      "__internal._deriveAgentState": 13,
+      "__internal._deriveStage": 4,
+      "__internal._matchAgentStatusToLoop": 11,
+      "__internal.correlateDecisionCase": 8,
+      "__internal._findLastDecision": 4,
+      "isDecisionAnswerEntry": 5,
+      "__internal._findDecisionAnswer": 5
+    },
+    "repoUnchanged": true,
+    "fidelity": {
+      "same": 751
+    },
+    "fidelityExamples": []
+  },
+  "groups": [
+    {
+      "signature": "return __internal._buildLoops $[].telemetry.runtime.completedAt",
+      "kind": "return",
+      "inputs": 12,
+      "byTier": {
+        "edge": 1,
+        "gen": 11
+      },
+      "example": {
+        "input": "edge:18",
+        "site": "abort harvest: later abort wins, earlier abort loses to [done], [skipped] ignored, lean and non-lean",
+        "kind": "return",
+        "step": 1,
+        "fn": "__internal._buildLoops",
+        "sig": "return __internal._buildLoops $[].telemetry.runtime.completedAt",
+        "paths": [
+          {
+            "path": "$[0].telemetry.runtime.completedAt",
+            "old": "null",
+            "new": "\"2026-10-01T09:09:00.000Z\""
+          },
+          {
+            "path": "$[0].telemetry.runtime.ms",
+            "old": "null",
+            "new": "540000"
+          },
+          {
+            "path": "$[0].terminalCompletedAt",
+            "old": "null",
+            "new": "\"2026-10-01T09:09:00.000Z\""
+          },
+          {
+            "path": "$[0].terminalStatus",
+            "old": "null",
+            "new": "\"aborted\""
+          },
+          {
+            "path": "$[0].wakeMarker",
+            "old": "null",
+            "new": "\"aborted\""
+          }
+        ]
+      }
+    },
+    {
+      "signature": "return __internal._buildSessions $[].completedAt",
+      "kind": "return",
+      "inputs": 2,
+      "byTier": {
+        "gen": 2
+      },
+      "example": {
+        "input": "gen:27",
+        "site": null,
+        "kind": "return",
+        "step": 1,
+        "fn": "__internal._buildSessions",
+        "sig": "return __internal._buildSessions $[].completedAt",
+        "paths": [
+          {
+            "path": "$[5].completedAt",
+            "old": "null",
+            "new": "\"2026-09-14T09:34:25.066Z\""
+          },
+          {
+            "path": "$[5].loops[0].telemetry.runtime.completedAt",
+            "old": "null",
+            "new": "\"2026-09-14T08:52:49.536Z\""
+          },
+          {
+            "path": "$[5].loops[0].telemetry.runtime.ms",
+            "old": "null",
+            "new": "2700000"
+          },
+          {
+            "path": "$[5].loops[0].terminalCompletedAt",
+            "old": "null",
+            "new": "\"2026-09-14T08:52:49.536Z\""
+          },
+          {
+            "path": "$[5].loops[0].terminalStatus",
+            "old": "null",
+            "new": "\"aborted\""
+          },
+          {
+            "path": "$[5].loops[0].wakeMarker",
+            "old": "null",
+            "new": "\"aborted\""
+          }
+        ]
+      }
+    },
+    {
+      "signature": "return getLoopsForWorkspace $[].telemetry.runtime.completedAt",
+      "kind": "return",
+      "inputs": 2,
+      "byTier": {
+        "gen": 2
+      },
+      "example": {
+        "input": "gen:132",
+        "site": null,
+        "kind": "return",
+        "step": 0,
+        "fn": "getLoopsForWorkspace",
+        "sig": "return getLoopsForWorkspace $[].telemetry.runtime.completedAt",
+        "paths": [
+          {
+            "path": "$[0].telemetry.runtime.completedAt",
+            "old": "null",
+            "new": "\"2026-09-13T10:37:11.421Z\""
+          },
+          {
+            "path": "$[0].telemetry.runtime.ms",
+            "old": "null",
+            "new": "1860000"
+          },
+          {
+            "path": "$[0].terminalCompletedAt",
+            "old": "null",
+            "new": "\"2026-09-13T10:37:11.421Z\""
+          },
+          {
+            "path": "$[0].terminalStatus",
+            "old": "null",
+            "new": "\"aborted\""
+          },
+          {
+            "path": "$[0].wakeMarker",
+            "old": "null",
+            "new": "\"aborted\""
+          }
+        ]
+      }
+    },
+    {
+      "signature": "error __internal._buildLoops TypeError→TypeError",
+      "kind": "error",
+      "inputs": 1,
+      "byTier": {
+        "edge": 1
+      },
+      "example": {
+        "input": "edge:7",
+        "site": "items as non-arrays",
+        "kind": "error",
+        "step": 2,
+        "fn": "__internal._buildLoops",
+        "sig": "error __internal._buildLoops TypeError→TypeError",
+        "old": "{\"name\":\"TypeError\",\"ctor\":\"TypeError\",\"message\":\"agentStatusEntries is not iterable\"}",
+        "new": "{\"name\":\"TypeError\",\"ctor\":\"TypeError\",\"message\":\"entries is not iterable\"}"
+      }
+    },
+    {
+      "signature": "return getSessionsForIssues $.length",
+      "kind": "return",
+      "inputs": 1,
+      "byTier": {
+        "gen": 1
+      },
+      "example": {
+        "input": "gen:280",
+        "site": null,
+        "kind": "return",
+        "step": 0,
+        "fn": "getSessionsForIssues",
+        "sig": "return getSessionsForIssues $.length",
+        "paths": [
+          {
+            "path": "$.length",
+            "old": 1,
+            "new": 3
+          },
+          {
+            "path": "$[0].dispatchedAt",
+            "old": "\"2026-09-19T20:23:58.893Z\"",
+            "new": "\"2026-09-27T06:32:18.057Z\""
+          },
+          {
+            "path": "$[0].loops.length",
+            "old": 5,
+            "new": 2
+          },
+          {
+            "path": "$[0].loops[0].agentState",
+            "old": "\"queued\"",
+            "new": "\"running\""
+          },
+          {
+            "path": "$[0].loops[0].dispatchedAt",
+            "old": "\"2026-09-19T20:23:58.893Z\"",
+            "new": "\"2026-09-27T06:32:18.057Z\""
+          },
+          {
+            "path": "$[0].loops[0].dispatchedBy",
+            "old": "null",
+            "new": "\"acct-3\""
+          }
+        ]
+      }
+    },
+    {
+      "signature": "return getSessionsForWorkspace $[].completedAt",
+      "kind": "return",
+      "inputs": 1,
+      "byTier": {
+        "gen": 1
+      },
+      "example": {
+        "input": "gen:1007",
+        "site": null,
+        "kind": "return",
+        "step": 0,
+        "fn": "getSessionsForWorkspace",
+        "sig": "return getSessionsForWorkspace $[].completedAt",
+        "paths": [
+          {
+            "path": "$[1].completedAt",
+            "old": "null",
+            "new": "\"2026-09-02T10:58:13.377Z\""
+          },
+          {
+            "path": "$[1].loops[0].telemetry.runtime.completedAt",
+            "old": "null",
+            "new": "\"2026-09-02T10:58:13.377Z\""
+          },
+          {
+            "path": "$[1].loops[0].telemetry.runtime.ms",
+            "old": "null",
+            "new": "2940000"
+          },
+          {
+            "path": "$[1].loops[0].terminalCompletedAt",
+            "old": "null",
+            "new": "\"2026-09-02T10:58:13.377Z\""
+          },
+          {
+            "path": "$[1].loops[0].terminalStatus",
+            "old": "null",
+            "new": "\"aborted\""
+          },
+          {
+            "path": "$[1].loops[0].wakeMarker",
+            "old": "null",
+            "new": "\"aborted\""
+          }
+        ]
+      }
+    },
+    {
+      "signature": "return __internal._buildLoops $[].terminalStatus",
+      "kind": "return",
+      "inputs": 1,
+      "byTier": {
+        "gen": 1
+      },
+      "example": {
+        "input": "gen:1699",
+        "site": null,
+        "kind": "return",
+        "step": 0,
+        "fn": "__internal._buildLoops",
+        "sig": "return __internal._buildLoops $[].terminalStatus",
+        "paths": [
+          {
+            "path": "$[1].terminalStatus",
+            "old": "null",
+            "new": "\"aborted\""
+          },
+          {
+            "path": "$[1].wakeMarker",
+            "old": "null",
+            "new": "\"aborted\""
+          }
+        ]
+      }
+    },
+    {
+      "signature": "return __internal._buildSessions $.length",
+      "kind": "return",
+      "inputs": 1,
+      "byTier": {
+        "gen": 1
+      },
+      "example": {
+        "input": "gen:2475",
+        "site": null,
+        "kind": "return",
+        "step": 1,
+        "fn": "__internal._buildSessions",
+        "sig": "return __internal._buildSessions $.length",
+        "paths": [
+          {
+            "path": "$.length",
+            "old": 6,
+            "new": 13
+          },
+          {
+            "path": "$[0].dispatchedAt",
+            "old": "\"2026-09-11T19:53:47.589Z\"",
+            "new": "\"2026-09-28T19:08:10.744Z\""
+          },
+          {
+            "path": "$[0].loops.length",
+            "old": 15,
+            "new": 1
+          },
+          {
+            "path": "$[0].loops[0].agentState",
+            "old": "\"queued\"",
+            "new": "\"error\""
+          },
+          {
+            "path": "$[0].loops[0].decision",
+            "old": "null",
+            "new": "{\"decision_id\":\"d-1\",\"free_text\":false,\"options\":[{\"cost\":4,\"id\":\"a\",\"label\":\"Option A\"},{\"id\":\"b\",\"label\":\"Option B\"}],\"question\":\"Split the PR?\",\"recommended\":\"b\"}"
+          },
+          {
+            "path": "$[0].loops[0].decisionCase.length",
+            "old": 0,
+            "new": 1
+          }
+        ]
+      }
+    }
+  ],
+  "infoGroups": [
+    {
+      "signature": "key-order __internal._buildLoops $[].telemetry",
+      "kind": "key-order",
+      "inputs": 464,
+      "example": {
+        "input": "test:346",
+        "kind": "key-order",
+        "step": 0,
+        "fn": "__internal._buildLoops",
+        "sig": "key-order __internal._buildLoops $[].telemetry",
+        "old": "$[0].telemetry: metrics,producedArtifacts,runtime",
+        "new": "$[0].telemetry: runtime,metrics,producedArtifacts"
+      }
+    },
+    {
+      "signature": "key-order __internal._buildSessions $[].loops[].telemetry",
+      "kind": "key-order",
+      "inputs": 138,
+      "example": {
+        "input": "gen:5",
+        "kind": "key-order",
+        "step": 1,
+        "fn": "__internal._buildSessions",
+        "sig": "key-order __internal._buildSessions $[].loops[].telemetry",
+        "old": "$[2].loops[0].telemetry: metrics,producedArtifacts,runtime",
+        "new": "$[2].loops[0].telemetry: runtime,metrics,producedArtifacts"
+      }
+    },
+    {
+      "signature": "key-order getLoopsForWorkspace $[].telemetry",
+      "kind": "key-order",
+      "inputs": 99,
+      "example": {
+        "input": "test:382",
+        "kind": "key-order",
+        "step": 0,
+        "fn": "getLoopsForWorkspace",
+        "sig": "key-order getLoopsForWorkspace $[].telemetry",
+        "old": "$[0].telemetry: metrics,producedArtifacts,runtime",
+        "new": "$[0].telemetry: runtime,metrics,producedArtifacts"
+      }
+    },
+    {
+      "signature": "key-order getSessionsForWorkspace $[].loops[].telemetry",
+      "kind": "key-order",
+      "inputs": 54,
+      "example": {
+        "input": "edge:38",
+        "kind": "key-order",
+        "step": 0,
+        "fn": "getSessionsForWorkspace",
+        "sig": "key-order getSessionsForWorkspace $[].loops[].telemetry",
+        "old": "$[0].loops[0].telemetry: metrics,producedArtifacts,runtime",
+        "new": "$[0].loops[0].telemetry: runtime,metrics,producedArtifacts"
+      }
+    },
+    {
+      "signature": "key-order getSessionsForIssues $[].loops[].telemetry",
+      "kind": "key-order",
+      "inputs": 35,
+      "example": {
+        "input": "test:307",
+        "kind": "key-order",
+        "step": 0,
+        "fn": "getSessionsForIssues",
+        "sig": "key-order getSessionsForIssues $[].loops[].telemetry",
+        "old": "$[0].loops[0].telemetry: metrics,producedArtifacts,runtime",
+        "new": "$[0].loops[0].telemetry: runtime,metrics,producedArtifacts"
+      }
+    }
+  ],
+  "exportsDiff": {
+    "old": {
+      "__internal": "object",
+      "__internal.LOOKBACK_MS": "number:2592000000",
+      "__internal._assembleSession": "function/3",
+      "__internal._buildLoops": "function/0",
+      "__internal._buildSessions": "function/0",
+      "__internal._deriveAgentState": "function/3",
+      "__internal._deriveStage": "function/2",
+      "__internal._fetchWorkspaceData": "function/2 async",
+      "__internal._findDecisionAnswer": "function/1",
+      "__internal._findLastDecision": "function/1",
+      "__internal._hierarchyHelpers": "function/1",
+      "__internal._loopCompletedAt": "function/1",
+      "__internal._matchAgentStatusToLoop": "function/3",
+      "__internal._sessionWindow": "function/2",
+      "__internal.correlateDecisionCase": "function/2",
+      "deriveIssueGraph": "function/1",
+      "firstRaisedAt": "function/2",
+      "getLoopsForIssue": "function/2 async",
+      "getLoopsForWorkspace": "function/1 async",
+      "getSessionsForIssues": "function/1 async",
+      "getSessionsForWorkspace": "function/1 async",
+      "isDecisionAnswerEntry": "function/1",
+      "isDecisionLifecycleStampEntry": "function/1",
+      "redigestHistoryRows": "function/2 async",
+      "resolvedDecisionEvents": "function/1",
+      "identity:isDecisionAnswerEntry": "=== digest-feedback.isDecisionAnswerEntry",
+      "identity:isDecisionLifecycleStampEntry": "=== digest-feedback.isDecisionLifecycleStampEntry",
+      "identity:resolvedDecisionEvents": "=== digest-feedback.resolvedDecisionEvents",
+      "identity:__internal._findLastDecision": "=== digest-feedback._findLastDecision",
+      "identity:__internal._findDecisionAnswer": "=== digest-feedback._findDecisionAnswer",
+      "identity:__internal.correlateDecisionCase": "=== digest-feedback.correlateDecisionCase"
+    },
+    "differences": []
+  },
+  "fnCensus": {
+    "getSessionsForIssues": {
+      "calls": 288,
+      "modes": {
+        "resolve": 274,
+        "reject": 14
+      },
+      "nonEmptyArrays": 229,
+      "warnings": 85
+    },
+    "getSessionsForWorkspace": {
+      "calls": 332,
+      "modes": {
+        "resolve": 321,
+        "reject": 11
+      },
+      "nonEmptyArrays": 292,
+      "warnings": 125
+    },
+    "isDecisionLifecycleStampEntry": {
+      "calls": 68,
+      "modes": {
+        "return": 68
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "getLoopsForWorkspace": {
+      "calls": 525,
+      "modes": {
+        "resolve": 495,
+        "reject": 30
+      },
+      "nonEmptyArrays": 472,
+      "warnings": 283
+    },
+    "resolvedDecisionEvents": {
+      "calls": 43,
+      "modes": {
+        "return": 43
+      },
+      "nonEmptyArrays": 15,
+      "warnings": 0
+    },
+    "firstRaisedAt": {
+      "calls": 43,
+      "modes": {
+        "return": 43
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "deriveIssueGraph": {
+      "calls": 26,
+      "modes": {
+        "return": 26
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "getLoopsForIssue": {
+      "calls": 223,
+      "modes": {
+        "resolve": 205,
+        "reject": 18
+      },
+      "nonEmptyArrays": 158,
+      "warnings": 88
+    },
+    "__internal._buildLoops": {
+      "calls": 1732,
+      "modes": {
+        "return": 1727,
+        "throw": 5
+      },
+      "nonEmptyArrays": 1686,
+      "warnings": 2238
+    },
+    "redigestHistoryRows": {
+      "calls": 126,
+      "modes": {
+        "resolve": 122,
+        "reject": 4
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._assembleSession": {
+      "calls": 32,
+      "modes": {
+        "return": 32
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._buildSessions": {
+      "calls": 683,
+      "modes": {
+        "return": 683
+      },
+      "nonEmptyArrays": 679,
+      "warnings": 0
+    },
+    "__internal._deriveAgentState": {
+      "calls": 66,
+      "modes": {
+        "return": 66
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._deriveStage": {
+      "calls": 24,
+      "modes": {
+        "return": 24
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._matchAgentStatusToLoop": {
+      "calls": 37,
+      "modes": {
+        "return": 37
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal.correlateDecisionCase": {
+      "calls": 37,
+      "modes": {
+        "return": 37
+      },
+      "nonEmptyArrays": 8,
+      "warnings": 0
+    },
+    "__internal._findLastDecision": {
+      "calls": 33,
+      "modes": {
+        "return": 33
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "isDecisionAnswerEntry": {
+      "calls": 27,
+      "modes": {
+        "return": 27
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._findDecisionAnswer": {
+      "calls": 33,
+      "modes": {
+        "return": 33
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._hierarchyHelpers": {
+      "calls": 15,
+      "modes": {
+        "return": 15
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._fetchWorkspaceData": {
+      "calls": 116,
+      "modes": {
+        "resolve": 112,
+        "reject": 4
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._loopCompletedAt": {
+      "calls": 19,
+      "modes": {
+        "return": 19
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    },
+    "__internal._sessionWindow": {
+      "calls": 33,
+      "modes": {
+        "return": 33
+      },
+      "nonEmptyArrays": 0,
+      "warnings": 0
+    }
+  },
+  "networkAttempts": [],
+  "differing": [
+    {
+      "id": "edge:7",
+      "family": "items as non-arrays",
+      "site": "items as non-arrays",
+      "kinds": [
+        "error"
+      ]
+    },
+    {
+      "id": "edge:18",
+      "family": "abort harvest: later abort wins, earlier abort loses to [done], [skipped] ignored, lean and non-lean",
+      "site": "abort harvest: later abort wins, earlier abort loses to [done], [skipped] ignored, lean and non-lean",
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:27",
+      "family": "sessionsChain",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:132",
+      "family": "getLoopsForWorkspace",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:280",
+      "family": "getSessionsForIssues",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:515",
+      "family": "sessionsChain",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:745",
+      "family": "sessionsChain",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1007",
+      "family": "getSessionsForWorkspace",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1281",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1623",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1699",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1842",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1918",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:1929",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:2475",
+      "family": "sessionsChain",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:2627",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:2714",
+      "family": "buildLoops",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    },
+    {
+      "id": "gen:2737",
+      "family": "sequence",
+      "site": null,
+      "kinds": [
+        "return"
+      ]
+    }
+  ],
+  "coverage": {
+    "old:pipeline-loops.js": {
+      "all": {
+        "linesTotal": 800,
+        "linesCovered": 800,
+        "pct": 100,
+        "uncoveredLines": [],
+        "blocksHit": 749,
+        "blocksTotal": 759,
+        "unhitBlocks": [
+          {
+            "line": 713,
+            "endLine": 713,
+            "code": "|| []"
+          },
+          {
+            "line": 720,
+            "endLine": 720,
+            "code": "|| []"
+          },
+          {
+            "line": 1245,
+            "endLine": 1245,
+            "code": "continue;"
+          },
+          {
+            "line": 1246,
+            "endLine": 1246,
+            "code": "continue;"
+          },
+          {
+            "line": 1335,
+            "endLine": 1335,
+            "code": "continue;"
+          },
+          {
+            "line": 1337,
+            "endLine": 1337,
+            "code": "continue;"
+          },
+          {
+            "line": 1338,
+            "endLine": 1338,
+            "code": "continue;"
+          },
+          {
+            "line": 1373,
+            "endLine": 1373,
+            "code": "continue;"
+          },
+          {
+            "line": 1374,
+            "endLine": 1374,
+            "code": "continue;"
+          },
+          {
+            "line": 1729,
+            "endLine": 1729,
+            "code": "|| {}"
+          }
+        ]
+      },
+      "byTier": {
+        "test": {
+          "pct": 97.13,
+          "linesCovered": 777,
+          "linesTotal": 800
+        },
+        "edge": {
+          "pct": 98.63,
+          "linesCovered": 789,
+          "linesTotal": 800
+        },
+        "gen": {
+          "pct": 100,
+          "linesCovered": 800,
+          "linesTotal": 800
+        }
+      }
+    },
+    "new:pipeline-loops.js": {
+      "all": {
+        "linesTotal": 634,
+        "linesCovered": 634,
+        "pct": 100,
+        "uncoveredLines": [],
+        "blocksHit": 571,
+        "blocksTotal": 573,
+        "unhitBlocks": [
+          {
+            "line": 363,
+            "endLine": 363,
+            "code": "|| []"
+          },
+          {
+            "line": 1034,
+            "endLine": 1034,
+            "code": "|| {}"
+          }
+        ]
+      },
+      "byTier": {
+        "test": {
+          "pct": 97.63,
+          "linesCovered": 619,
+          "linesTotal": 634
+        },
+        "edge": {
+          "pct": 99.37,
+          "linesCovered": 630,
+          "linesTotal": 634
+        },
+        "gen": {
+          "pct": 100,
+          "linesCovered": 634,
+          "linesTotal": 634
+        }
+      }
+    }
+  }
+}

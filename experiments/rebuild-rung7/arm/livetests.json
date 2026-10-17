@@ -1,0 +1,53 @@
+{
+  "files": 178,
+  "tests": 5403,
+  "failingOnOld": 13,
+  "failingOnOldList": [
+    "tests/unit/lin-688-undici-not-a-dependency.test.js :: LIN-688: undici is not a declared dependency > the lockfile root package declares no undici dependency",
+    "tests/unit/lin-688-undici-not-a-dependency.test.js :: LIN-688: undici is not a declared dependency",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d) > over a seeded population with the owner index and John present > exits 0 and prints one would-assign line per target plus the summary",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d) > over a seeded population with the owner index and John present > prints a JSON report { gates, targets, undatable, summary }",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d) > over a seeded population with the owner index and John present > G6e the synthetic org-id-shaped workspace id appears only as workspace= or a workspaceId field",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d) > over a seeded population with the owner index and John present",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d) > an empty data dir (no indexes) exits 0 with skipped=owner-index-missing: gate 1 runs before gate 2",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d) > the owner index built and no John identity exits 0 with skipped=identity-no-match, still writing nothing",
+    "tests/unit/owner-backfill-script.test.js :: dry-run-owner-backfill script (LIN-3142 G6d)",
+    "tests/unit/workspace-api-pins.test.js :: comment recovery: a throwing adoptConnectionCredential is classified (LIN-3596) > answers the classified 500, never echoes the throw, and neither mutates nor saves the session",
+    "tests/unit/workspace-api-pins.test.js :: comment recovery: a throwing adoptConnectionCredential is classified (LIN-3596)",
+    "tests/unit/workspace-api-pins.test.js :: image proxy: a repeated ?url= is a 400 (LIN-3596) > answers 400 Invalid image URL format and makes no fetch",
+    "tests/unit/workspace-api-pins.test.js :: image proxy: a repeated ?url= is a 400 (LIN-3596)"
+  ],
+  "differingFiles": 1,
+  "diffs": [
+    {
+      "file": "tests/unit/workspace-api-pins.test.js",
+      "exit": {
+        "old": 1,
+        "new": 0
+      },
+      "tests": [
+        {
+          "test": "comment recovery: a throwing adoptConnectionCredential is classified (LIN-3596) > answers the classified 500, never echoes the throw, and neither mutates nor saves the session",
+          "old": "not ok: |-",
+          "new": "ok"
+        },
+        {
+          "test": "comment recovery: a throwing adoptConnectionCredential is classified (LIN-3596)",
+          "old": "not ok: '1 subtest failed'",
+          "new": "ok"
+        },
+        {
+          "test": "image proxy: a repeated ?url= is a 400 (LIN-3596) > answers 400 Invalid image URL format and makes no fetch",
+          "old": "not ok: |-",
+          "new": "ok"
+        },
+        {
+          "test": "image proxy: a repeated ?url= is a 400 (LIN-3596)",
+          "old": "not ok: '1 subtest failed'",
+          "new": "ok"
+        }
+      ]
+    }
+  ],
+  "elapsedMs": 53352
+}

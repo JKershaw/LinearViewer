@@ -1,0 +1,66 @@
+{
+ "dispatch": {
+  "refsOld": 68,
+  "refsNew": 69,
+  "dropped": [],
+  "added": [
+   "LIN-3592"
+  ],
+  "fewer": [],
+  "commentRefOccurrencesOld": 124,
+  "commentRefOccurrencesNew": 125,
+  "nonTrivialOld": 926,
+  "nonTrivialNew": 864,
+  "identicalNew": 747,
+  "identicalShareOfNew": 0.865,
+  "identicalShareOfOld": 0.807
+ },
+ "proxy-dispatch": {
+  "refsOld": 79,
+  "refsNew": 80,
+  "dropped": [],
+  "added": [
+   "LIN-3592"
+  ],
+  "fewer": [
+   "LIN-2885 6→4",
+   "LIN-805 7→6",
+   "LIN-3134 7→6",
+   "LIN-1175 3→1",
+   "LIN-2934 2→1"
+  ],
+  "commentRefOccurrencesOld": 210,
+  "commentRefOccurrencesNew": 208,
+  "nonTrivialOld": 856,
+  "nonTrivialNew": 735,
+  "identicalNew": 641,
+  "identicalShareOfNew": 0.872,
+  "identicalShareOfOld": 0.749
+ },
+ "proxy-kickoff": {
+  "refsOld": 37,
+  "refsNew": 38,
+  "dropped": [],
+  "added": [
+   "LIN-3592"
+  ],
+  "fewer": [],
+  "commentRefOccurrencesOld": 59,
+  "commentRefOccurrencesNew": 60,
+  "nonTrivialOld": 251,
+  "nonTrivialNew": 220,
+  "identicalNew": 189,
+  "identicalShareOfNew": 0.859,
+  "identicalShareOfOld": 0.753
+ },
+ "total": {
+  "nonTrivialOld": 2033,
+  "nonTrivialNew": 1819,
+  "identicalNew": 1577,
+  "identicalShareOfNew": 0.867,
+  "identicalShareOfOld": 0.776,
+  "uniqueRefsOld": 131,
+  "uniqueRefsNew": 132,
+  "droppedAcrossFiles": []
+ }
+}

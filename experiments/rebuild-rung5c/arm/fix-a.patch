@@ -1,0 +1,10 @@
+--- /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/replay/pinned/origin-main/proxy-dispatch.js	2026-10-16 20:45:29.981953676 +0000
++++ old-fix-a/proxy-dispatch.js	2026-10-16 23:47:33.418194887 +0000
+@@ -1052,6 +1052,7 @@
+               // when caller-supplied; otherwise derived from the issue's LIN-694
+               // gate marker (LIN-2575) — see `overridePeriodicalId` above.
+               periodicalId: overridePeriodicalId,
++              waitForFollowUps: waitForFollowUps === true,
+               // Push-comms: `subscription` is the declared edge (LIN-900 §6),
+               // `terminal-only` unless the caller declares `everything`; queueIfBusy
+               // forwarded blindly. Both stored + forwarded, no Harbour-side semantics.

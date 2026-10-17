@@ -1,0 +1,23 @@
+self-check: 14 replay runs (4 at a time), identity n=6000 (+edge+test) on seeds 1,7, mutants n=3000
+PASS  identity-seed1       old vs an independent copy of old  differing=0
+PASS  identity-seed7       old vs an independent copy of old  differing=0
+PASS  d1-status            trim 'not-downward' 409 → 422  differing=7  detected: status x7
+PASS  d2-field             session 201 drops item.consumerLastSeenAt  differing=524  detected: body x524
+PASS  d3-store-arg         broker plain mint label 'refire-broker' → 'refire'  differing=118  detected: store:proxyTokenStore x118
+PASS  d4-gate              DELETE …/halt loses its owner gate  differing=110  detected: depCalls x89, body x54, console x54, status x43, store:workspaceHaltStore x42
+PASS  d5-fire-and-forget   task-mode record drops the caller surface  differing=4  detected: store:taskModeStore x4
+PASS  p1-logEvent          list route audits 200 as 201  differing=115  detected: logEvent x115, store:proxyEventStore x115
+PASS  p2-longpoll          long-poll re-check interval 1500 → 1000 ms  differing=51  detected: body x30, store:dispatchQueueStore x27, header-derived:content-length x2
+PASS  p3-field             override arm drops `override: true`  differing=153  detected: body x153
+PASS  p4-keepalive         defer refusal answers on res, not the armed keepalive  differing=8  detected: status x8, body x8, serverResponse x8, console x8, expressErrorHandler x8
+PASS  k1-store-arg         kickoff row waitForFollowUps true → false  differing=185  detected: store:dispatchQueueStore x185
+PASS  k2-declared-site     kickoff declaredSite 'M1' → 'M2'  differing=176  detected: store:dispatchQueueStore x176
+PASS  k3-bound             GET kickoff goal cap 1000 → 999  differing=8  detected: header-derived:content-length x8, header-derived:etag x8, body x8
+coverage seed1 dispatch.js: 99.48% (1144/1150); uncovered: 181, 182, 222, 223, 1907, 1908
+coverage seed1 proxy-dispatch.js: 99.7% (1002/1005); uncovered: 931, 932, 933
+coverage seed1 proxy-kickoff.js: 100% (295/295); uncovered: none
+coverage seed7 dispatch.js: 99.48% (1144/1150); uncovered: 181, 182, 222, 223, 1907, 1908
+coverage seed7 proxy-dispatch.js: 99.7% (1002/1005); uncovered: 931, 932, 933
+coverage seed7 proxy-kickoff.js: 100% (295/295); uncovered: none
+min requests per URL form: 137; thin (status, logEvent) pairs: 0
+self-check report: /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/replay/reports/selfcheck.json

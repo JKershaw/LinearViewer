@@ -1,0 +1,8 @@
+replay: 10396 requests (seed 1; gen 6000, edge 3158, test 1238) in 53336 ms; differing: 0 in 0 groups
+  coverage old dispatch.js: 99.48% (1144/1150); uncovered: 181, 182, 222, 223, 1907, 1908
+  coverage old proxy-dispatch.js: 99.7% (1003/1006); uncovered: 931, 932, 933
+  coverage old proxy-kickoff.js: 100% (295/295); uncovered: none
+  coverage new dispatch.js: 99.43% (1045/1051); uncovered: 333, 334, 374, 375, 1831, 1832
+  coverage new proxy-dispatch.js: 99.65% (843/846); uncovered: 935, 936, 937
+  coverage new proxy-kickoff.js: 100% (250/250); uncovered: none
+report: /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/report-cov-seed1.json

@@ -1,0 +1,789 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5b/arm/render-session.f4749b91.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 737,
+    "code": 435,
+    "comment": 260,
+    "blank": 42
+  },
+  "bytes": 42938,
+  "functions": {
+    "count": 34,
+    "byKind": {
+      "FunctionDeclaration": 19,
+      "ArrowFunctionExpression": 15
+    },
+    "longestBySpan": {
+      "name": "renderSessionPage",
+      "spanLines": 199,
+      "codeLines": 154,
+      "startLine": 539
+    },
+    "longestByCodeLines": {
+      "name": "renderSessionPage",
+      "spanLines": 199,
+      "codeLines": 154,
+      "startLine": 539
+    }
+  },
+  "maxNesting": 2,
+  "cyclomatic": {
+    "total": 263,
+    "totalConditionsOnly": 170,
+    "decisionPoints": 228,
+    "decisionPointsByKind": {
+      "forOf": 3,
+      "ternary": 56,
+      "and": 27,
+      "or": 82,
+      "if": 19,
+      "defaultValue": 40,
+      "nullish": 1
+    },
+    "max": {
+      "name": "renderSessionPage",
+      "cyclomatic": 75
+    },
+    "unitsOver10": [
+      "renderInlineReplyBox",
+      "renderRun",
+      "renderLineageGroup",
+      "renderQuestionCard",
+      "renderDecisionCard",
+      "renderBareBlockedCard",
+      "renderSessionPage"
+    ]
+  },
+  "regexLiterals": 1,
+  "regexConstructors": 0,
+  "optionalChains": 0,
+  "stringLiterals": 193,
+  "templateLiterals": 72,
+  "imports": 13,
+  "topLevelDeclarations": {
+    "count": 20,
+    "items": [
+      {
+        "name": "rollupCredential",
+        "kind": "function",
+        "exported": false,
+        "line": 53
+      },
+      {
+        "name": "BLOCKED_MARKER_REGEX",
+        "kind": "const",
+        "exported": false,
+        "line": 70
+      },
+      {
+        "name": "isBlockedEntry",
+        "kind": "function",
+        "exported": false,
+        "line": 73
+      },
+      {
+        "name": "encodeFeedbackJSON",
+        "kind": "function",
+        "exported": false,
+        "line": 84
+      },
+      {
+        "name": "renderTranscriptEntries",
+        "kind": "function",
+        "exported": false,
+        "line": 99
+      },
+      {
+        "name": "renderInlineReplyBox",
+        "kind": "function",
+        "exported": false,
+        "line": 131
+      },
+      {
+        "name": "renderProposalRow",
+        "kind": "function",
+        "exported": false,
+        "line": 173
+      },
+      {
+        "name": "renderProposalBlock",
+        "kind": "function",
+        "exported": false,
+        "line": 200
+      },
+      {
+        "name": "renderRun",
+        "kind": "function",
+        "exported": false,
+        "line": 223
+      },
+      {
+        "name": "renderLineageGroup",
+        "kind": "function",
+        "exported": false,
+        "line": 283
+      },
+      {
+        "name": "ifUnansweredText",
+        "kind": "function",
+        "exported": false,
+        "line": 306
+      },
+      {
+        "name": "renderQuestionCard",
+        "kind": "function",
+        "exported": false,
+        "line": 325
+      },
+      {
+        "name": "renderDecisionCard",
+        "kind": "function",
+        "exported": false,
+        "line": 388
+      },
+      {
+        "name": "renderBareBlockedCard",
+        "kind": "function",
+        "exported": false,
+        "line": 426
+      },
+      {
+        "name": "renderQuestionCards",
+        "kind": "function",
+        "exported": false,
+        "line": 459
+      },
+      {
+        "name": "shortRunId",
+        "kind": "function",
+        "exported": false,
+        "line": 471
+      },
+      {
+        "name": "tierRollup",
+        "kind": "function",
+        "exported": false,
+        "line": 478
+      },
+      {
+        "name": "stepSummary",
+        "kind": "function",
+        "exported": false,
+        "line": 489
+      },
+      {
+        "name": "renderPrLine",
+        "kind": "function",
+        "exported": true,
+        "line": 514
+      },
+      {
+        "name": "renderSessionPage",
+        "kind": "function",
+        "exported": true,
+        "line": 539
+      }
+    ]
+  },
+  "exportedNames": [
+    "renderPrLine",
+    "renderSessionPage"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 737,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "rollupCredential",
+      "kind": "FunctionDeclaration",
+      "startLine": 53,
+      "endLine": 62,
+      "spanLines": 10,
+      "codeLines": 10,
+      "params": 2,
+      "cyclomatic": 10,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "forOf": 1,
+        "ternary": 1,
+        "and": 3,
+        "or": 2,
+        "if": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isBlockedEntry",
+      "kind": "FunctionDeclaration",
+      "startLine": 73,
+      "endLine": 75,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "encodeFeedbackJSON",
+      "kind": "FunctionDeclaration",
+      "startLine": 84,
+      "endLine": 89,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "encodeFeedbackJSON/λ@86",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 86,
+      "endLine": 86,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 5
+      },
+      "enclosing": "encodeFeedbackJSON"
+    },
+    {
+      "name": "renderTranscriptEntries",
+      "kind": "FunctionDeclaration",
+      "startLine": 99,
+      "endLine": 104,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "ternary": 1,
+        "if": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderInlineReplyBox",
+      "kind": "FunctionDeclaration",
+      "startLine": 131,
+      "endLine": 165,
+      "spanLines": 35,
+      "codeLines": 25,
+      "params": 3,
+      "cyclomatic": 11,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "or": 6,
+        "ternary": 3
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderProposalRow",
+      "kind": "FunctionDeclaration",
+      "startLine": 173,
+      "endLine": 193,
+      "spanLines": 21,
+      "codeLines": 21,
+      "params": 1,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 4,
+        "ternary": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderProposalBlock",
+      "kind": "FunctionDeclaration",
+      "startLine": 200,
+      "endLine": 206,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 2,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "or": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderRun",
+      "kind": "FunctionDeclaration",
+      "startLine": 223,
+      "endLine": 259,
+      "spanLines": 37,
+      "codeLines": 23,
+      "params": 2,
+      "cyclomatic": 11,
+      "cyclomaticConditionsOnly": 10,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "defaultValue": 6,
+        "ternary": 1,
+        "and": 2,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderRun/λ@227",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 227,
+      "endLine": 241,
+      "spanLines": 15,
+      "codeLines": 11,
+      "params": 0,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 2,
+        "and": 2,
+        "ternary": 1
+      },
+      "enclosing": "renderRun"
+    },
+    {
+      "name": "renderLineageGroup",
+      "kind": "FunctionDeclaration",
+      "startLine": 283,
+      "endLine": 297,
+      "spanLines": 15,
+      "codeLines": 13,
+      "params": 2,
+      "cyclomatic": 12,
+      "cyclomaticConditionsOnly": 10,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "defaultValue": 4,
+        "ternary": 2,
+        "and": 2,
+        "nullish": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderLineageGroup/λ@287",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 287,
+      "endLine": 287,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderLineageGroup"
+    },
+    {
+      "name": "ifUnansweredText",
+      "kind": "FunctionDeclaration",
+      "startLine": 306,
+      "endLine": 312,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 2,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "and": 3,
+        "if": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderQuestionCard",
+      "kind": "FunctionDeclaration",
+      "startLine": 325,
+      "endLine": 385,
+      "spanLines": 61,
+      "codeLines": 52,
+      "params": 1,
+      "cyclomatic": 19,
+      "cyclomaticConditionsOnly": 9,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "or": 10,
+        "ternary": 7,
+        "if": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderQuestionCard/λ@352",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 352,
+      "endLine": 352,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderQuestionCard"
+    },
+    {
+      "name": "renderQuestionCard/λ@362",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 362,
+      "endLine": 367,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 5
+      },
+      "enclosing": "renderQuestionCard"
+    },
+    {
+      "name": "renderDecisionCard",
+      "kind": "FunctionDeclaration",
+      "startLine": 388,
+      "endLine": 414,
+      "spanLines": 27,
+      "codeLines": 25,
+      "params": 2,
+      "cyclomatic": 23,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 14,
+        "and": 5,
+        "ternary": 3
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderBareBlockedCard",
+      "kind": "FunctionDeclaration",
+      "startLine": 426,
+      "endLine": 449,
+      "spanLines": 24,
+      "codeLines": 24,
+      "params": 1,
+      "cyclomatic": 11,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 7,
+        "ternary": 2,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderQuestionCards",
+      "kind": "FunctionDeclaration",
+      "startLine": 459,
+      "endLine": 466,
+      "spanLines": 8,
+      "codeLines": 8,
+      "params": 1,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 7,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "ternary": 2,
+        "if": 1,
+        "and": 3
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderQuestionCards/λ@461",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 461,
+      "endLine": 461,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderQuestionCards"
+    },
+    {
+      "name": "shortRunId",
+      "kind": "FunctionDeclaration",
+      "startLine": 471,
+      "endLine": 475,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "or": 1,
+        "if": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "tierRollup",
+      "kind": "FunctionDeclaration",
+      "startLine": 478,
+      "endLine": 486,
+      "spanLines": 9,
+      "codeLines": 9,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "forOf": 1,
+        "if": 1,
+        "and": 1,
+        "ternary": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "tierRollup/λ@483",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 483,
+      "endLine": 483,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "tierRollup"
+    },
+    {
+      "name": "stepSummary",
+      "kind": "FunctionDeclaration",
+      "startLine": 489,
+      "endLine": 500,
+      "spanLines": 12,
+      "codeLines": 12,
+      "params": 1,
+      "cyclomatic": 10,
+      "cyclomaticConditionsOnly": 8,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "if": 4,
+        "and": 3,
+        "ternary": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderPrLine",
+      "kind": "FunctionDeclaration",
+      "startLine": 514,
+      "endLine": 516,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "defaultValue": 4,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderSessionPage",
+      "kind": "FunctionDeclaration",
+      "startLine": 539,
+      "endLine": 737,
+      "spanLines": 199,
+      "codeLines": 154,
+      "params": 2,
+      "cyclomatic": 75,
+      "cyclomaticConditionsOnly": 54,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "defaultValue": 25,
+        "or": 21,
+        "if": 3,
+        "and": 1,
+        "ternary": 23,
+        "forOf": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "taskPageHrefFor",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 608,
+      "endLine": 610,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSessionPage"
+    },
+    {
+      "name": "renderSessionPage/λ@612",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 612,
+      "endLine": 617,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": "renderSessionPage"
+    },
+    {
+      "name": "renderSessionPage/λ@684",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 684,
+      "endLine": 684,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSessionPage"
+    },
+    {
+      "name": "renderSessionPage/λ@687",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 687,
+      "endLine": 698,
+      "spanLines": 12,
+      "codeLines": 12,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSessionPage"
+    },
+    {
+      "name": "renderSessionPage/λ@687/λ@688",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 688,
+      "endLine": 688,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSessionPage/λ@687"
+    },
+    {
+      "name": "renderSessionPage/λ@687/λ@689",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 689,
+      "endLine": 689,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSessionPage/λ@687"
+    },
+    {
+      "name": "renderSessionPage/λ@687/λ@690",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 690,
+      "endLine": 692,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1,
+        "and": 1
+      },
+      "enclosing": "renderSessionPage/λ@687"
+    },
+    {
+      "name": "renderSessionPage/λ@703",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 703,
+      "endLine": 706,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSessionPage"
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}

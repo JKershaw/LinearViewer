@@ -447,3 +447,216 @@ So "no breakdown" is a ticket line, not a Harbour change (inference).
 2. The renderer cluster as one no-breakdown rung, about 2,300 lines: the Large test.
 3. The dispatch entrance (`routes/dispatch.js`, `proxy-dispatch.js`, `proxy-kickoff.js`; worst functions 122, 93, 62).
 - Alongside: `lib/pipeline-loops.js` (113, 76).
+
+## 16 Oct ~18:10Z: rung 5d (LIN-3578, `pipeline-loops.js`) done and scored
+
+The round runs at altitude now: sub-agents build the replays, draft the tickets, run the fresh-reader checks and score, and the main session reads ≤15-line summaries. `scratchpad/RUNBOOK.md` and `STATE.md` hold the method and the live state.
+
+**Run.** Kickoff 16:35Z, merged 17:42Z as #1901: 67 minutes, 11 dispatches. One implementation run: the ticket's "This is one PR. Don't split it into child tickets." held. No rulings.
+
+**Replay** (`experiments/rebuild-rung5d/`, 3,795 inputs: 751 captured from tests, 44 targeted, 3,000 generated; 100% line coverage of the old file; seeds 1 and 7):
+- 18 inputs differ per seed, none from the captured tests.
+- **(a) fixes: 17.** A lean abort now reaches a target that has no digest: `terminalStatus` goes `null → 'aborted'`. To confirm it, the fix was applied alone to the old file; the replay then shows only the wording difference.
+- **(b) regressions: 0.**
+- **(c) fuzz: 1.** A TypeError's wording on a direct `_buildLoops` call.
+- **Info only:** about 650 inputs differ in key order inside lean `telemetry`, as the PR lists.
+
+**Shape:**
+- code lines 800 → 634 (−21%);
+- decision points 389 → 301 (−23%);
+- worst function 113 → 29; second worst 76 → 20;
+- functions 50 → 86.
+
+No helper module, and no existing test edited. 4 new pin tests. The redaction census rows are kept.
+
+**Prediction:** 9 of 9 lines hit. The decision-point cut came in near the bottom of the predicted 20–35% range.
+
+**Worth noting:**
+- **The fix reaches further than the PR's table says.** For lean callers, an aborted autopilot run with no digest now closes its session window, so later loops on the same issue form their own sessions (in one example, 1 session became 3). Non-lean already did this, so it's a fix. But sessions already stored keep the old grouping until rebuilt, and `BUILDER_VERSION` wasn't bumped.
+- **Comments were cut hard:** 967 → 409 lines, and 17 of 51 ticket references are gone. All five the ticket named remain.
+
+**Side events in the round:**
+- LIN-3579's first implementation worker reported a `simple-dispatcher` checkout, although nothing carried a repo override. It was aborted and relaunched.
+- A fresh-reader check of LIN-3580 found that local e2e loads `.env`. A read-only research dispatch (opencode with a cheap OpenRouter model, under 1¢) found it safe on the operator's machine (`MONGODB_URI` unset), but unguarded. That became LIN-3583.
+
+## 16 Oct ~21:05Z: rung 5b (LIN-3579, the renderer cluster, the Large test) done and scored
+
+Four files rebuilt in one PR (#1903, merged as `1f8010a0`): `render.js`, `render-session.js`, `render-swipe.js` and `render-settings.js`, 2,313 code lines, about 2.5× rung 4.
+
+**Run.** First launch 17:09Z. Merged 20:26Z, Done 20:56Z after two rulings. Harbour didn't split it. What it ran into:
+- **A wrong checkout:** the first implementation worker reported a `simple-dispatcher` checkout, with no repo override set. It was aborted and relaunched at 17:53Z.
+- **A laptop reboot at ~18:25Z.** The operator's laptop froze under three concurrent runs, Spotlight indexing, and the dispatcher's growing per-cycle cost (fixed in LIN-3585). The stall failsafe resumed the worker, but its three background forks were lost. A forced follow-up at 19:50Z told it to finish one part at a time with a lighter replay.
+- **Two rulings at close-out:** a live Periodicals check (skipped: the ticket rules out live checks) and the worker replay's coverage (about 94% strict block, accepted).
+
+**Independent replay** (`experiments/rebuild-rung5b/`, 19,856 inputs, seeds 1 and 7):
+- **(a) fixes, about 470 per seed:**
+  - the details meta line now escapes identifier, assignee and estimate (an assignee of `<b>` used to become a live element);
+  - Periodicals rows are left out of Home's ordering, which restores the top-task mark.
+- **(c) fuzz:**
+  - the same Periodicals change on Swipe, which no caller produces today (the swipe route never passes `urlKey`);
+  - 3,089 Settings pages gain a space between two block-level closing tags. Nothing renders differently.
+- **(b) regressions: 0. Page-contract changes: 0** (424 tokens checked).
+- The run page is byte-identical (2,913 pages).
+- **Real text:** 0 of 1,037 descriptions render differently.
+
+**Shape:**
+- code lines 2,313 → 2,057 with the new helper (−11%);
+- decision points 917 → 693 (−24%, or −20% without removed default parameters);
+- worst functions: `renderDetailsContent` 75 → 33; `renderSessionPage` 75 → 42; `renderPage` stays at 45; the new `renderNodeHtml` is 45.
+
+**PR facts:** one helper, `lib/home-swipe-prompt-opts.js`. 4 new tests (3 fail on the base). No existing test edited, and `llms.txt` unchanged. Source-text pins and the golden pass (540 tests).
+
+**Prediction:** most lines hit. One miss: the two worst functions would both drop below 40 (`renderSessionPage` is 42).
+
+**Verdict.** The method held at 2.5× size in one PR, with no visible regression. The flattening is smaller than on the hot-spot rungs, because the cluster's complexity is spread across many page functions rather than one giant. The Home row and page functions and the run page's main function are still the most complex. Most of the wall-clock went to infrastructure, not the method.
+
+## 16 Oct ~22:20Z: rung 5a (LIN-3580, dispatch factory + validation) done and scored
+
+**Run.** First launch ~17:20Z. The worker died in the laptop reboot, and the run was paused at 18:58Z for the two-run cap. It was relaunched at 20:27Z with the efficiency wording and merged as #1904 (`b3bdccaf`); Done at 21:56Z, 90 minutes after the relaunch. Not split.
+
+**Independent replay** (`experiments/rebuild-rung5a/`, 14,193 inputs per seed, 100% line coverage of the old files):
+- 271 / 293 inputs differ. 0 of the 6,354 test-captured calls differ, and none of the 2,159 test outcomes.
+- The old factory was patched with exactly the PR's four fixes; against that, the new factory gives 0 differences on both seeds.
+- **(a) fixes:**
+  1. A store read that throws synchronously, or returns a plain value, is treated like a rejection.
+  2. An `undefined` task count is treated as unreadable: it was a TypeError, and is now 409 `BUDGET_EXHAUSTED` with `count: null`.
+  3. A duplicate with `dispatchedAt: null` is admitted.
+  4. A failed consumer-stamp read stamps `null`, instead of rejecting after the token was minted.
+- **(c) fuzz:** validation's property-read order, only on Proxy or getter bodies, with the same verdict; and a TypeError's wording on a `null` body.
+- **(b): 0.** Refusal codes, status, `retryAfter`, the `addItem` argument, the anchor cache and the token mint all match old-plus-fixes.
+
+**Shape:**
+- code lines 727 → 636 (−12.5%);
+- decision points 285 → 226 (−21%);
+- **`createDispatchItem` 181 → 49**, the codebase's worst function. The next worst are now 21 and 19;
+- validation's worst 42 → 20.
+
+No helper module, and no existing test edited. Every source-text census passes. Ticket references: 39 of 40 kept (LIN-1094 was dropped from a docblock).
+
+**Prediction:** 9 hits. Misses: the worst function under 30 (it's 49), and wall-clock time (4h36m, because of the reboot and the pause).
+
+**Notes:**
+- Fix 4 nulls the whole consumer stamp when one token store fails, so a response can say "never polled" while the other store has tokens. LIN-3581 is filed for the cause.
+- The PR's own count for `createDispatchItem` (about 25) is low against the kit (48, or 29 without parameter defaults).
+
+## 16 Oct ~23:30Z: rung 6a (LIN-3590, `task-page-loader.js`) done and scored
+
+The first ticket to carry the efficiency wording from launch (no forks, targeted tests, e2e left to CI, a lighter worker replay) and the comment-retention rule. Launched ~21:35Z, merged as #1905 (`16e7ae77`), Done 23:12Z: 96 minutes, no split, no ruling.
+
+**Independent replay** (built on the new shared kit `experiments/replay-kit/`; 4,496 inputs per seed; seeds 1 and 7):
+- **(a) 1 fix:** a null close-out event made `readMergedBy`, documented "Never throws", reject. The page now loads. With that one-token fix patched into the old copy, there are 0 differences.
+- **(b) 0. (c) 0.**
+
+**Shape:**
+- worst function 77 → 13; functions over 10 decision points 7 → 4;
+- decision points 287 → 257 (−10.5%);
+- code lines 441 → **488 (+11%)**; functions 56 → 85.
+
+All 11 ticket references are kept. Golden and link tests pass.
+
+**Prediction:** 7 hits. Misses: both on size (code grew rather than shrank, and the decision-point cut was smaller than predicted).
+
+**Process finding.** The first build push was the old file edited in place, not a rebuild. Code review caught it, along with a regression in that version. The PR says 232 of 414 non-trivial lines still match the old file. Design-first held only because review enforced it. This is the first rung where the "don't copy" instruction was visibly strained, and the first with the lighter, efficiency-first wording. Both may matter. A "rebuilt, not edited" check (a share of lines unchanged from the base) is worth adding to the ticket's Done-when.
+
+## 16 Oct ~23:59Z: rung 5c (LIN-3592, the dispatch entrance) done and scored
+
+`routes/dispatch.js`, `routes/proxy-dispatch.js` and `routes/proxy-kickoff.js` in one PR: 2,450 code lines, the largest rung. It was designed against the rebuilt factory and merged as #1906 (`d2d7d818`). Launched ~21:58Z, Done 23:42Z: 106 minutes, no split, no ruling, no GitHub reviews.
+
+**Independent replay** (10,396 requests per seed, both sides on `d2d7d818`'s factory):
+- **(a) 1 fix,** about 195 requests: `recommend-and-dispatch` with a `kind` now stamps `waitForFollowUps`.
+- **(b, harmless), about 345 requests:** every non-cascade 201 from `POST /api/proxy/dispatch` has its keys in a new order. Same value, same length. It counts as (b) only because the ticket allows no fuzz on a 2xx body. The PR's own replay missed it.
+- With the fix and the key order both patched into the old copies, there are 0 differences.
+
+**Shape:**
+- worst units 122 → 63, 93 → 52, 62 → 41;
+- code lines −11.9%; decision points −8.3%;
+- functions 83 → 172; one pure helper, `lib/dispatch-entrance.js`.
+
+All 17 pinned tests and the whole-tree scans pass. All 131 ticket references are kept.
+
+**Identical lines: 86.7%** of the new non-trivial lines appear verbatim in the old files; outside the pinned blocks, 82.6%. That makes this a careful refactor, not a rebuild from a design. The ticket said not to copy handlers or blocks.
+
+**Reading, with 6a:** the two rungs that came last, with the most pins (5c) or the lightest wording (6a), drifted from rebuild toward edit. Their worst functions still fell sharply, but code and decision-point cuts were the smallest of the round. Next: measure the identical-line share for every rung so far, to see whether earlier rungs really rebuilt.
+
+## 17 Oct ~00:05Z: rebuilt or edited? The verbatim-line share for every rebuild
+
+`experiments/verbatim/` measures, for each merged rebuild, the share of the new version's non-trivial lines that appear verbatim in the old one (multiset match, comments and imports excluded).
+
+| Ticket | Method | New lines verbatim | Longest verbatim run |
+|---|---|---|---|
+| LIN-3556 | informed rewrite | 82% | 121 |
+| LIN-3557, LIN-3565 | clean room | 13–19% | 3–10 |
+| LIN-3566, LIN-3569, LIN-3573 | design-first | 37–41% | 12–39 |
+| LIN-3578, LIN-3580, LIN-3590, LIN-3579 | design-first | 46–55% | 16–72 |
+| LIN-3592 | design-first (on paper) | **86%** | **151** |
+
+**Reading:**
+- A clean room rebuilds truly, and a design-first rebuild typically keeps 37–55% of lines. Small, idiomatic lines recur naturally, so this is a band, not zero.
+- **LIN-3592 is an edit by this measure,** with more carry-over than the informed rewrite. It was the most pinned ticket (17 source-text tests, many requiring exact lines) and the largest. The share also crept up across the round as tickets grew more pinned and their wording got lighter.
+- **Proposed Done-when line:** report the verbatim share. Above about 60% outside pinned text, explain why, or treat the run as an edit and send it back.
+
+## 17 Oct ~00:20Z: rung 6b (LIN-3591, `kpi-stats.js`, the `/kpis` privacy boundary) done and scored
+
+Launched 23:14Z, merged as #1907 (`91fca7dd`), Done ~00:03Z: about 50 minutes, no split, no ruling.
+
+**The fix: "the free-tier count leak".**
+- The old code summed `doc.count || 0`, so a non-numeric stored count was glued, as text, into the public `freeTier.counts`. It was a counting bug and a privacy leak at once. Real data can't trigger it, because the store only ever uses `$inc`.
+- The new code counts only finite numbers.
+- The worker's own replay found it (85 findings). **Mine missed it:** my generator only ever made numeric counts, so its privacy scan reported "old side clean". A separate canary probe on that field: old leaks on 52 of 196 inputs, new on 0, old-plus-fix on 0. The lesson for the kit: put canaries into numeric fields too.
+
+**Independent replay** (3,193 inputs per seed): all differences are the one fix. With it patched into the old copy, 0 differences. No (b), no (c). Store calls match exactly.
+
+**Shape:**
+- code lines 598 → 463 (−22.6%);
+- worst function 77 → 9; no unit over 10;
+- functions 47 → 78.
+
+**Verbatim share: 38.9%** (longest run 9). All 25 ticket references are kept.
+
+**Prediction:** 8 hits. Miss: code shrank further than predicted (463 against 480–580), because the five derived fields came from one shared builder.
+
+The cleanest rung so far: a genuine rebuild, a large cut, and a real fix.
+
+## 17 Oct ~03:00Z: rung 7 (LIN-3596, `workspace-api.js`, the XL single file) done and scored. All targets merged.
+
+Launched 00:23Z, merged as #1908 (`603853c5`), Done about 02:30Z: about 2h07m, not split, no ruling on the issue.
+
+**Review enforced the rebuild.** The first head was 79.3% verbatim, an edit, and review 1 sent it back citing the ticket's new Done-when line. The redo reached 54.3% by the PR's definition (51.4% by ours; 57.6% if trailing semicolons are ignored, since the new file adds them). The PR admits the design step was still done with the old file open.
+
+**Independent replay** (6,592 requests per seed, plus a live tier of 178 test files per side):
+- **(a) 2 fixes, both listed:**
+  - a throwing `adoptConnectionCredential` on comment POST now gets the classified error instead of a bare 500;
+  - a repeated `?url=` on `/image` is a 400, not a TypeError 500.
+
+  Both are in security areas, and both tighten: nothing is echoed or sent, and the session is untouched.
+- **(b), harmless:** retire, unretire and dismiss 200s put `scannedAt` earlier in the JSON (one shared builder). Same values.
+- With the fixes and the key order patched into the old copy, there are 0 differences on both seeds.
+
+**Shape:**
+- code lines 2,816 → 2,223 (−21%), the largest cut of the round;
+- decision points 769 → 589 (−23%);
+- functions over 10 decision points 29 → 19;
+- worst function 57 → 31.
+
+One helper module was added. All 8 source-text pins pass. Ticket references 106 → 107, but LIN-772/773 was dropped although its code remains.
+
+**Prediction:** 10 of 11 hits. Miss: the cut beat the 6–18% range.
+
+**Measure note:** the verbatim share moves about 6 points on semicolons alone. From now on, normalise trailing `;`.
+
+## 16 Oct, the laptop load and the dispatcher's cost (recorded 17 Oct for the paper)
+
+On 16 October, with three runs at once, the operator's laptop hit 100% CPU and froze (a reboot at about 18:25Z). A snapshot before the reboot showed a `node` process with about 80 CPU-hours and Spotlight (`mds_stores`) with about 45.
+
+**Measurements.** Read-only research dispatches (opencode with a cheap OpenRouter model, reporting sizes and counts only):
+- `4125e5a1`, 18:32Z, four minutes after the reboot, idle: `node dispatcher.js` gained about 15 CPU-seconds per 120 s, about 12.5% of a core. Spotlight was indexing the dispatcher's workspaces.
+- `49a03018`, 20:32Z, after LIN-3585 deployed, with three sessions running: 10.3 CPU-seconds per 300 s, about 3.4% of a core. `state/sessions.json` was 0.99 MB with 92 records.
+
+**Cause and fix (LIN-3585, simple-dispatcher#271).** A code reading plus a benchmark found three things:
+- `sessions.json` was parsed about 11 times per cycle;
+- BLOCKED records were never reaped;
+- finished parents' transcripts were re-read every cycle.
+
+The fix takes one snapshot per cycle, reaps BLOCKED records after an age limit, and runs the cheap check before the transcript read.
+
+**Spotlight.** The operator is adding the dispatcher folders to Spotlight Privacy.

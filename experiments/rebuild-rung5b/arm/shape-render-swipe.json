@@ -1,0 +1,951 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5b/arm/render-swipe.f4749b91.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 721,
+    "code": 420,
+    "comment": 234,
+    "blank": 67
+  },
+  "bytes": 30173,
+  "functions": {
+    "count": 47,
+    "byKind": {
+      "ArrowFunctionExpression": 31,
+      "FunctionDeclaration": 16
+    },
+    "longestBySpan": {
+      "name": "renderSwipePage",
+      "spanLines": 106,
+      "codeLines": 77,
+      "startLine": 616
+    },
+    "longestByCodeLines": {
+      "name": "renderSwipePage",
+      "spanLines": 106,
+      "codeLines": 77,
+      "startLine": 616
+    }
+  },
+  "maxNesting": 5,
+  "cyclomatic": {
+    "total": 232,
+    "totalConditionsOnly": 174,
+    "decisionPoints": 184,
+    "decisionPointsByKind": {
+      "forOf": 28,
+      "or": 56,
+      "if": 37,
+      "and": 13,
+      "nullish": 2,
+      "ternary": 22,
+      "for": 1,
+      "defaultValue": 23,
+      "while": 2
+    },
+    "max": {
+      "name": "renderSwipePage",
+      "cyclomatic": 41
+    },
+    "unitsOver10": [
+      "issueToCard",
+      "flattenTrees",
+      "sortIssuesForSwipe/λ@210",
+      "clusterByParent",
+      "buildFilterGroups",
+      "orderIssuesForSwipe",
+      "renderSwipePage"
+    ]
+  },
+  "regexLiterals": 0,
+  "regexConstructors": 0,
+  "optionalChains": 9,
+  "stringLiterals": 82,
+  "templateLiterals": 9,
+  "imports": 14,
+  "topLevelDeclarations": {
+    "count": 16,
+    "items": [
+      {
+        "name": "DEFAULT_PROMPT_KEYS",
+        "kind": "const",
+        "exported": false,
+        "line": 29
+      },
+      {
+        "name": "MORE_PROMPT_KEYS",
+        "kind": "const",
+        "exported": false,
+        "line": 32
+      },
+      {
+        "name": "buildPromptMeta",
+        "kind": "function",
+        "exported": false,
+        "line": 38
+      },
+      {
+        "name": "issueToCard",
+        "kind": "function",
+        "exported": false,
+        "line": 53
+      },
+      {
+        "name": "flattenTrees",
+        "kind": "function",
+        "exported": true,
+        "line": 84
+      },
+      {
+        "name": "isBoostableBug",
+        "kind": "function",
+        "exported": true,
+        "line": 151
+      },
+      {
+        "name": "UNBLOCK_PROMOTION_THRESHOLD",
+        "kind": "const",
+        "exported": false,
+        "line": 165
+      },
+      {
+        "name": "effectiveStateOrder",
+        "kind": "function",
+        "exported": false,
+        "line": 193
+      },
+      {
+        "name": "sortIssuesForSwipe",
+        "kind": "function",
+        "exported": true,
+        "line": 209
+      },
+      {
+        "name": "computeOffPageBlockers",
+        "kind": "function",
+        "exported": true,
+        "line": 257
+      },
+      {
+        "name": "buildWhy",
+        "kind": "function",
+        "exported": true,
+        "line": 282
+      },
+      {
+        "name": "applyBlockingOrder",
+        "kind": "function",
+        "exported": true,
+        "line": 306
+      },
+      {
+        "name": "clusterByParent",
+        "kind": "function",
+        "exported": true,
+        "line": 365
+      },
+      {
+        "name": "buildFilterGroups",
+        "kind": "function",
+        "exported": true,
+        "line": 434
+      },
+      {
+        "name": "orderIssuesForSwipe",
+        "kind": "function",
+        "exported": true,
+        "line": 505
+      },
+      {
+        "name": "renderSwipePage",
+        "kind": "function",
+        "exported": true,
+        "line": 616
+      }
+    ]
+  },
+  "exportedNames": [
+    "computeGraphFeatures",
+    "flattenTrees",
+    "isBoostableBug",
+    "sortIssuesForSwipe",
+    "computeOffPageBlockers",
+    "buildWhy",
+    "applyBlockingOrder",
+    "clusterByParent",
+    "buildFilterGroups",
+    "orderIssuesForSwipe",
+    "renderSwipePage"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 721,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "<module>/λ@32",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 32,
+      "endLine": 32,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "buildPromptMeta",
+      "kind": "FunctionDeclaration",
+      "startLine": 38,
+      "endLine": 44,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 0,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "forOf": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "issueToCard",
+      "kind": "FunctionDeclaration",
+      "startLine": 53,
+      "endLine": 76,
+      "spanLines": 24,
+      "codeLines": 24,
+      "params": 3,
+      "cyclomatic": 13,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 12
+      },
+      "enclosing": null
+    },
+    {
+      "name": "issueToCard/λ@64",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 64,
+      "endLine": 64,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "issueToCard"
+    },
+    {
+      "name": "issueToCard/λ@71",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 71,
+      "endLine": 71,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "issueToCard"
+    },
+    {
+      "name": "issueToCard/λ@72",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 72,
+      "endLine": 72,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "issueToCard"
+    },
+    {
+      "name": "flattenTrees",
+      "kind": "FunctionDeclaration",
+      "startLine": 84,
+      "endLine": 135,
+      "spanLines": 52,
+      "codeLines": 46,
+      "params": 2,
+      "cyclomatic": 17,
+      "cyclomaticConditionsOnly": 12,
+      "maxNesting": 5,
+      "decisionPoints": {
+        "if": 4,
+        "forOf": 7,
+        "or": 5
+      },
+      "enclosing": null
+    },
+    {
+      "name": "walkAll",
+      "kind": "FunctionDeclaration",
+      "startLine": 87,
+      "endLine": 92,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 2,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "forOf": 1,
+        "or": 1
+      },
+      "enclosing": "flattenTrees"
+    },
+    {
+      "name": "walkInProgress",
+      "kind": "FunctionDeclaration",
+      "startLine": 94,
+      "endLine": 101,
+      "spanLines": 8,
+      "codeLines": 8,
+      "params": 2,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "forOf": 1,
+        "or": 1
+      },
+      "enclosing": "flattenTrees"
+    },
+    {
+      "name": "isBoostableBug",
+      "kind": "FunctionDeclaration",
+      "startLine": 151,
+      "endLine": 155,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 2,
+        "and": 3
+      },
+      "enclosing": null
+    },
+    {
+      "name": "isBoostableBug/λ@152",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 152,
+      "endLine": 152,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "isBoostableBug"
+    },
+    {
+      "name": "effectiveStateOrder",
+      "kind": "FunctionDeclaration",
+      "startLine": 193,
+      "endLine": 197,
+      "spanLines": 5,
+      "codeLines": 5,
+      "params": 1,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1,
+        "or": 1,
+        "nullish": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "sortIssuesForSwipe",
+      "kind": "FunctionDeclaration",
+      "startLine": 209,
+      "endLine": 240,
+      "spanLines": 32,
+      "codeLines": 21,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "sortIssuesForSwipe/λ@210",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 210,
+      "endLine": 238,
+      "spanLines": 29,
+      "codeLines": 18,
+      "params": 2,
+      "cyclomatic": 15,
+      "cyclomaticConditionsOnly": 9,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 5,
+        "ternary": 3,
+        "or": 6
+      },
+      "enclosing": "sortIssuesForSwipe"
+    },
+    {
+      "name": "computeOffPageBlockers",
+      "kind": "FunctionDeclaration",
+      "startLine": 257,
+      "endLine": 272,
+      "spanLines": 16,
+      "codeLines": 16,
+      "params": 2,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "for": 1,
+        "and": 1,
+        "or": 1,
+        "if": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "keyOf",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 259,
+      "endLine": 259,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "computeOffPageBlockers"
+    },
+    {
+      "name": "computeOffPageBlockers/λ@260",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 260,
+      "endLine": 260,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "computeOffPageBlockers"
+    },
+    {
+      "name": "computeOffPageBlockers/λ@261",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 261,
+      "endLine": 261,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "computeOffPageBlockers"
+    },
+    {
+      "name": "computeOffPageBlockers/λ@266",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 266,
+      "endLine": 266,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "nullish": 1
+      },
+      "enclosing": "computeOffPageBlockers"
+    },
+    {
+      "name": "computeOffPageBlockers/λ@267",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 267,
+      "endLine": 267,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "computeOffPageBlockers"
+    },
+    {
+      "name": "buildWhy",
+      "kind": "FunctionDeclaration",
+      "startLine": 282,
+      "endLine": 295,
+      "spanLines": 14,
+      "codeLines": 11,
+      "params": 2,
+      "cyclomatic": 9,
+      "cyclomaticConditionsOnly": 9,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "if": 4,
+        "or": 2,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "applyBlockingOrder",
+      "kind": "FunctionDeclaration",
+      "startLine": 306,
+      "endLine": 354,
+      "spanLines": 49,
+      "codeLines": 35,
+      "params": 1,
+      "cyclomatic": 8,
+      "cyclomaticConditionsOnly": 8,
+      "maxNesting": 4,
+      "decisionPoints": {
+        "while": 1,
+        "forOf": 2,
+        "if": 4
+      },
+      "enclosing": null
+    },
+    {
+      "name": "applyBlockingOrder/λ@309",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 309,
+      "endLine": 309,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "applyBlockingOrder"
+    },
+    {
+      "name": "applyBlockingOrder/λ@310",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 310,
+      "endLine": 310,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "applyBlockingOrder"
+    },
+    {
+      "name": "applyBlockingOrder/λ@318",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 318,
+      "endLine": 318,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "applyBlockingOrder"
+    },
+    {
+      "name": "applyBlockingOrder/λ@319",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 319,
+      "endLine": 319,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "applyBlockingOrder"
+    },
+    {
+      "name": "applyBlockingOrder/λ@333",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 333,
+      "endLine": 333,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "applyBlockingOrder"
+    },
+    {
+      "name": "applyBlockingOrder/λ@345",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 345,
+      "endLine": 345,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "applyBlockingOrder"
+    },
+    {
+      "name": "clusterByParent",
+      "kind": "FunctionDeclaration",
+      "startLine": 365,
+      "endLine": 427,
+      "spanLines": 63,
+      "codeLines": 47,
+      "params": 1,
+      "cyclomatic": 21,
+      "cyclomaticConditionsOnly": 16,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "forOf": 3,
+        "if": 6,
+        "or": 8,
+        "while": 1,
+        "and": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "clusterByParent/λ@382",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 382,
+      "endLine": 382,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "clusterByParent"
+    },
+    {
+      "name": "collectFamily",
+      "kind": "FunctionDeclaration",
+      "startLine": 388,
+      "endLine": 395,
+      "spanLines": 8,
+      "codeLines": 8,
+      "params": 3,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "or": 3,
+        "forOf": 1
+      },
+      "enclosing": "clusterByParent"
+    },
+    {
+      "name": "buildFilterGroups",
+      "kind": "FunctionDeclaration",
+      "startLine": 434,
+      "endLine": 484,
+      "spanLines": 51,
+      "codeLines": 40,
+      "params": 1,
+      "cyclomatic": 12,
+      "cyclomaticConditionsOnly": 10,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "if": 4,
+        "forOf": 4,
+        "or": 3
+      },
+      "enclosing": null
+    },
+    {
+      "name": "buildFilterGroups/λ@442",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 442,
+      "endLine": 442,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "buildFilterGroups/λ@443",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 443,
+      "endLine": 443,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "buildFilterGroups/λ@450",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 450,
+      "endLine": 450,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "buildFilterGroups/λ@451",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 451,
+      "endLine": 451,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "buildFilterGroups/λ@457",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 457,
+      "endLine": 457,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "buildFilterGroups/λ@459",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 459,
+      "endLine": 459,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "buildFilterGroups/λ@475",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 475,
+      "endLine": 478,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1
+      },
+      "enclosing": "buildFilterGroups"
+    },
+    {
+      "name": "orderIssuesForSwipe",
+      "kind": "FunctionDeclaration",
+      "startLine": 505,
+      "endLine": 603,
+      "spanLines": 99,
+      "codeLines": 68,
+      "params": 1,
+      "cyclomatic": 24,
+      "cyclomaticConditionsOnly": 23,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "defaultValue": 5,
+        "forOf": 7,
+        "if": 6,
+        "ternary": 3,
+        "and": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "cardKey",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 514,
+      "endLine": 514,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "orderIssuesForSwipe"
+    },
+    {
+      "name": "orderIssuesForSwipe/λ@544",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 544,
+      "endLine": 544,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "orderIssuesForSwipe"
+    },
+    {
+      "name": "orderIssuesForSwipe/λ@595",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 595,
+      "endLine": 595,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "orderIssuesForSwipe"
+    },
+    {
+      "name": "orderIssuesForSwipe/λ@595",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 595,
+      "endLine": 595,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "orderIssuesForSwipe"
+    },
+    {
+      "name": "renderSwipePage",
+      "kind": "FunctionDeclaration",
+      "startLine": 616,
+      "endLine": 721,
+      "spanLines": 106,
+      "codeLines": 77,
+      "params": 2,
+      "cyclomatic": 41,
+      "cyclomaticConditionsOnly": 33,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "defaultValue": 17,
+        "forOf": 1,
+        "or": 5,
+        "and": 4,
+        "ternary": 13
+      },
+      "enclosing": null
+    },
+    {
+      "name": "renderSwipePage/λ@667",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 667,
+      "endLine": 667,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "renderSwipePage"
+    },
+    {
+      "name": "renderSwipePage/λ@701",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 701,
+      "endLine": 701,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": "renderSwipePage"
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}

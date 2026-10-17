@@ -1,0 +1,4685 @@
+{
+  "tool": "dispatch routers behavioural replay (rung 5c)",
+  "lib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/wt",
+  "libHead": "d2d7d81882bb67e7201988f773db7888fc901cb0",
+  "seed": 7,
+  "n": 6000,
+  "tiers": "gen,edge,test",
+  "fatal": null,
+  "old": {
+    "session": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/old-fix-a/dispatch.js",
+    "proxyDispatch": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/old-fix-a/proxy-dispatch.js",
+    "kickoff": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/old-fix-a/proxy-kickoff.js"
+  },
+  "new": {
+    "session": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/newroutes/dispatch.js",
+    "proxyDispatch": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/newroutes/proxy-dispatch.js",
+    "kickoff": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/newroutes/proxy-kickoff.js"
+  },
+  "importSideEffects": {
+    "old": {
+      "session": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [
+          "NODE_V8_COVERAGE",
+          "OPENROUTER_API_URL"
+        ],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 170,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "proxyDispatch": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 27,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "kickoff": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 20,
+        "sideResolutions": [],
+        "importError": null
+      }
+    },
+    "new": {
+      "session": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [
+          "OPENROUTER_API_URL"
+        ],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 168,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "proxyDispatch": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 28,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "kickoff": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 21,
+        "sideResolutions": [],
+        "importError": null
+      }
+    }
+  },
+  "exportsDiff": {
+    "session": [],
+    "proxyDispatch": [],
+    "kickoff": []
+  },
+  "summary": {
+    "requests": 10396,
+    "differingRequests": 340,
+    "groups": 1,
+    "perTier": {
+      "gen": {
+        "requests": 6000,
+        "differing": 114
+      },
+      "edge": {
+        "requests": 3158,
+        "differing": 79
+      },
+      "test": {
+        "requests": 1238,
+        "differing": 147
+      }
+    },
+    "elapsedMs": 52330,
+    "socketEscapesDuringReplay": 0,
+    "fetchAttempts": null
+  },
+  "perRoute": {
+    "GET /api/proxy/passage-runner/prompt": {
+      "requests": 144,
+      "differing": 0,
+      "byTier": {
+        "gen": 121,
+        "edge": 20,
+        "test": 3
+      },
+      "oldStatus": {
+        "200": 102,
+        "401": 28,
+        "429": 8,
+        "500": 6
+      },
+      "newStatus": {
+        "200": 102,
+        "401": 28,
+        "429": 8,
+        "500": 6
+      },
+      "statusLogPairs": {
+        "200 | logEvent 200": 102,
+        "429 | logEvent -": 8,
+        "401 | logEvent -": 28,
+        "500 | logEvent -": 6
+      },
+      "tags": {
+        "variant:full": 126,
+        "variant:noQueue": 6,
+        "variant:sparse": 12,
+        "code:PROXY_TOKEN_INVALID": 28,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:test:tests/unit/passage-runner-prompt-route.test.js": 2,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1
+      }
+    },
+    "POST /api/dispatch/feedback/:itemId": {
+      "requests": 226,
+      "differing": 0,
+      "byTier": {
+        "gen": 165,
+        "edge": 43,
+        "test": 18
+      },
+      "oldStatus": {
+        "200": 70,
+        "400": 93,
+        "401": 32,
+        "404": 9,
+        "413": 5,
+        "500": 17
+      },
+      "newStatus": {
+        "200": 70,
+        "400": 93,
+        "401": 32,
+        "404": 9,
+        "413": 5,
+        "500": 17
+      },
+      "statusLogPairs": {
+        "400 | logEvent -": 93,
+        "404 | logEvent -": 9,
+        "500 | logEvent -": 17,
+        "200 | logEvent -": 70,
+        "401 | logEvent -": 32,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:noStores": 27,
+        "variant:full": 190,
+        "variant:sparse": 9,
+        "declaredMint": 4,
+        "intent:edge:harbour-token": 6,
+        "intent:edge:withdrawn-clears-cache": 6,
+        "intent:edge:wake-provisioner": 6,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:invalid-token": 5,
+        "intent:edge:gate:token-store-throws": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/dispatch-feedback-kind-sanitize.test.js": 10,
+        "intent:test:tests/unit/dispatch-wake-credential-provisioning.test.js": 3,
+        "intent:test:tests/unit/dispatch-store-decision-answer.test.js": 1,
+        "intent:test:tests/unit/lin-3134-wake-declared.test.js": 2,
+        "intent:test:tests/unit/lin-3130-runner-ownership.test.js": 2
+      }
+    },
+    "POST /api/proxy/dispatch": {
+      "requests": 891,
+      "differing": 340,
+      "byTier": {
+        "gen": 366,
+        "edge": 334,
+        "test": 191
+      },
+      "oldStatus": {
+        "201": 359,
+        "400": 179,
+        "401": 43,
+        "403": 85,
+        "409": 29,
+        "413": 7,
+        "422": 15,
+        "429": 28,
+        "500": 87,
+        "503": 59
+      },
+      "newStatus": {
+        "201": 359,
+        "400": 179,
+        "401": 43,
+        "403": 85,
+        "409": 29,
+        "413": 7,
+        "422": 15,
+        "429": 28,
+        "500": 87,
+        "503": 59
+      },
+      "statusLogPairs": {
+        "201 | logEvent 201": 359,
+        "403 | logEvent -": 79,
+        "500 | logEvent -": 13,
+        "500 | logEvent 500": 74,
+        "400 | logEvent 400": 173,
+        "503 | logEvent 503": 59,
+        "401 | logEvent -": 43,
+        "429 | logEvent 429": 10,
+        "409 | logEvent 409": 29,
+        "422 | logEvent 422": 15,
+        "429 | logEvent -": 18,
+        "413 | logEvent -": 7,
+        "400 | logEvent -": 6,
+        "403 | logEvent 403": 6
+      },
+      "tags": {
+        "variant:full": 831,
+        "intent:fresh:clean": 56,
+        "warning": 86,
+        "enqueued": 357,
+        "variant:sparse": 32,
+        "intent:issue": 45,
+        "intent:abort": 12,
+        "intent:abort:clean": 19,
+        "intent:cascade:clean": 13,
+        "intent:followUp:clean": 37,
+        "intent:issue:clean": 71,
+        "intent:fresh": 39,
+        "code:DISPATCH_GRANT_REQUIRED": 50,
+        "intent:repo:clean": 13,
+        "variant:noQueue": 28,
+        "declaredMint": 18,
+        "intent:free:clean": 8,
+        "code:PROXY_TOKEN_INVALID": 43,
+        "code:RUN_LIMIT_REACHED": 10,
+        "retry-after": 18,
+        "intent:followUp": 15,
+        "code:DUPLICATE_DISPATCH": 8,
+        "intent:repo": 16,
+        "intent:free": 6,
+        "code:ISSUE_NOT_FOUND": 15,
+        "intent:cascade": 10,
+        "code:RUN_LIMIT_UNVERIFIED": 9,
+        "code:TASK_SESSION_RUNAWAY": 8,
+        "code:GRANT_OWNERLESS": 2,
+        "budgetPosition": 7,
+        "code:WORKSPACE_OWNER_UNSET": 1,
+        "intent:edge:no-queue": 6,
+        "intent:edge:grant-absent": 6,
+        "intent:edge:grant-take-only": 6,
+        "intent:edge:read-scope": 6,
+        "intent:edge:limiter": 6,
+        "intent:edge:auth-missing": 6,
+        "intent:edge:auth-rejected-descriptor": 6,
+        "intent:edge:auth-throws": 6,
+        "intent:edge:abort+followUp": 6,
+        "intent:edge:prompt-missing": 6,
+        "intent:edge:target-local": 6,
+        "intent:edge:abortTo-missing": 6,
+        "intent:edge:cascade-nonbool": 6,
+        "intent:edge:cascade-without-abort": 6,
+        "intent:edge:kind-bad": 6,
+        "intent:edge:periodical-bad": 6,
+        "intent:edge:wait-bad": 6,
+        "intent:edge:queueIfBusy-bad": 6,
+        "intent:edge:subscription-bad": 6,
+        "intent:edge:maxTasks-bad": 6,
+        "intent:edge:payload-bad": 6,
+        "intent:edge:cascade-ok": 6,
+        "intent:edge:cascade-throws": 6,
+        "intent:edge:abort-ok": 6,
+        "intent:edge:repo-only": 6,
+        "intent:edge:dangling": 6,
+        "intent:edge:access-null": 6,
+        "intent:edge:access-throws": 6,
+        "intent:edge:append-default-prose": 6,
+        "intent:edge:append-default-mcp": 6,
+        "intent:edge:append-optout": 6,
+        "intent:edge:followUp-default": 6,
+        "intent:edge:followUp-optout": 6,
+        "intent:edge:followUp-attach": 6,
+        "intent:edge:followUp-declared": 6,
+        "intent:edge:followUp-structural": 6,
+        "code:INVALID_GRANTS": 6,
+        "intent:edge:followUp-declared-owner-only": 6,
+        "code:GRANT_OWNER_ONLY": 6,
+        "intent:edge:attach-failed": 6,
+        "intent:edge:dup": 6,
+        "intent:edge:budget": 6,
+        "code:BUDGET_EXHAUSTED": 6,
+        "intent:edge:budget-position": 6,
+        "intent:edge:runaway": 6,
+        "intent:edge:close-out": 6,
+        "code:CLOSE_OUT_IS_THE_PERSONS": 6,
+        "intent:edge:run-limit": 6,
+        "intent:edge:run-limit-unverified": 6,
+        "intent:edge:addItem-throws": 6,
+        "intent:edge:orKey-throws": 6,
+        "intent:edge:force-queue-wait": 6,
+        "intent:edge:pilot": 6,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:read-scope": 5,
+        "intent:edge:gate:no-grant": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/close-out-is-the-persons-relay.test.js": 1,
+        "intent:test:tests/unit/dispatch-route-periodical-id.test.js": 4,
+        "intent:test:tests/unit/file-pointer-routes.test.js": 1,
+        "intent:test:tests/unit/lin-2615-effort-route-coverage.test.js": 3,
+        "intent:test:tests/unit/lin-3059-runner-criterion.test.js": 2,
+        "intent:test:tests/unit/lin-3134-default-path-characterization.test.js": 8,
+        "intent:test:tests/unit/lin-3134-wake-declared.test.js": 2,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 1,
+        "intent:test:tests/unit/lin-3134-followup-sites.test.js": 23,
+        "intent:test:tests/unit/lin-3136-m1-kickoff-declared.test.js": 4,
+        "intent:test:tests/unit/lin-3136-dispatch-gate.test.js": 17,
+        "intent:test:tests/unit/lin-3136-driver-copy-mint.test.js": 1,
+        "intent:test:tests/unit/lin-3438-if-parked-refusal.test.js": 1,
+        "intent:test:tests/unit/lin-3487-entrance-messages.test.js": 10,
+        "intent:test:tests/unit/lin-3491-agent-prompt-mint.test.js": 2,
+        "intent:test:tests/unit/proxy-dispatch-bootstrap-owner.test.js": 1,
+        "intent:test:tests/unit/proxy-dispatch-bootstrap-token.test.js": 4,
+        "intent:test:tests/unit/proxy-dispatch-followup-context.test.js": 10,
+        "intent:test:tests/unit/proxy-dispatch-defaults.test.js": 14,
+        "intent:test:tests/unit/proxy-dispatch-max-tasks.test.js": 20,
+        "intent:test:tests/unit/proxy-dispatch-model.test.js": 20,
+        "intent:test:tests/unit/proxy-dispatch-referent-guard.test.js": 7,
+        "intent:test:tests/unit/proxy-dispatch-subscribe.test.js": 9,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1,
+        "intent:test:tests/unit/proxy-kickoff-max-tasks.test.js": 14,
+        "intent:test:tests/unit/proxy-recommend-dispatch-max-tasks.test.js": 3,
+        "intent:test:tests/unit/session-id-render-seam.test.js": 2,
+        "intent:test:tests/unit/stop-at-child-inheritance.test.js": 6
+      }
+    },
+    "POST /api/dispatch/broker-token": {
+      "requests": 406,
+      "differing": 0,
+      "byTier": {
+        "gen": 186,
+        "edge": 139,
+        "test": 81
+      },
+      "oldStatus": {
+        "201": 142,
+        "400": 22,
+        "401": 43,
+        "403": 59,
+        "413": 5,
+        "500": 11,
+        "503": 124
+      },
+      "newStatus": {
+        "201": 142,
+        "400": 22,
+        "401": 43,
+        "403": 59,
+        "413": 5,
+        "500": 11,
+        "503": 124
+      },
+      "statusLogPairs": {
+        "201 | logEvent -": 142,
+        "503 | logEvent -": 124,
+        "401 | logEvent -": 43,
+        "400 | logEvent -": 22,
+        "403 | logEvent -": 59,
+        "500 | logEvent -": 11,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 359,
+        "declaredMint": 38,
+        "variant:sparse": 16,
+        "code:REFIRE_CALLER_NOT_PERMITTED": 53,
+        "variant:noStores": 31,
+        "code:GRANT_OWNERLESS": 8,
+        "intent:edge:ownerless-strict": 6,
+        "intent:edge:ownerless-compat": 6,
+        "intent:edge:no-proxy-store": 6,
+        "intent:edge:plain-ok": 6,
+        "intent:edge:plain-null": 6,
+        "intent:edge:declared:ok": 6,
+        "intent:edge:declared:owner-mismatch": 6,
+        "intent:edge:declared:ownerless-record": 6,
+        "intent:edge:declared:row-unreadable": 6,
+        "intent:edge:declared:row-terminal": 6,
+        "intent:edge:declared:not-taker": 6,
+        "intent:edge:declared:done-feedback": 6,
+        "intent:edge:declared:mint-unavailable": 6,
+        "intent:edge:declared:mint-structural": 6,
+        "code:GRANT_OWNER_ONLY": 6,
+        "intent:edge:declared:mint-odd-code": 6,
+        "intent:edge:declared:mint-plain-error": 6,
+        "intent:edge:declared:reread-throws": 6,
+        "intent:edge:declared:reread-vanished": 6,
+        "intent:edge:itemId-none-state": 6,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:invalid-token": 5,
+        "intent:edge:gate:token-store-throws": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/dispatch-broker-token.test.js": 18,
+        "intent:test:tests/unit/lin-3135-broker-refire-declared.test.js": 63
+      }
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId": {
+      "requests": 182,
+      "differing": 0,
+      "byTier": {
+        "gen": 134,
+        "edge": 37,
+        "test": 11
+      },
+      "oldStatus": {
+        "200": 30,
+        "400": 75,
+        "401": 13,
+        "404": 28,
+        "413": 5,
+        "500": 8,
+        "503": 23
+      },
+      "newStatus": {
+        "200": 30,
+        "400": 75,
+        "401": 13,
+        "404": 28,
+        "413": 5,
+        "500": 8,
+        "503": 23
+      },
+      "statusLogPairs": {
+        "503 | logEvent -": 23,
+        "400 | logEvent -": 75,
+        "200 | logEvent -": 30,
+        "404 | logEvent -": 28,
+        "401 | logEvent -": 13,
+        "500 | logEvent -": 8,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:noStores": 30,
+        "variant:full": 149,
+        "variant:sparse": 3,
+        "intent:edge:preset-patch-keep-byKind": 6,
+        "intent:edge:preset-patch-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/dispatch-route-preset-crud.test.js": 11
+      }
+    },
+    "POST /api/dispatch/take/:itemId": {
+      "requests": 163,
+      "differing": 0,
+      "byTier": {
+        "gen": 126,
+        "edge": 25,
+        "test": 12
+      },
+      "oldStatus": {
+        "200": 58,
+        "400": 11,
+        "401": 39,
+        "404": 33,
+        "413": 5,
+        "500": 17
+      },
+      "newStatus": {
+        "200": 58,
+        "400": 11,
+        "401": 39,
+        "404": 33,
+        "413": 5,
+        "500": 17
+      },
+      "statusLogPairs": {
+        "401 | logEvent -": 39,
+        "200 | logEvent -": 58,
+        "400 | logEvent -": 11,
+        "404 | logEvent -": 33,
+        "500 | logEvent -": 17,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 139,
+        "variant:noStores": 15,
+        "variant:sparse": 9,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:invalid-token": 5,
+        "intent:edge:gate:token-store-throws": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 1,
+        "intent:test:tests/unit/lin-3130-runner-ownership.test.js": 10,
+        "intent:test:tests/unit/lin-3384-bootstrap-token-redaction.test.js": 1
+      }
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt": {
+      "requests": 186,
+      "differing": 0,
+      "byTier": {
+        "gen": 122,
+        "edge": 56,
+        "test": 8
+      },
+      "oldStatus": {
+        "200": 62,
+        "400": 12,
+        "401": 12,
+        "403": 18,
+        "404": 8,
+        "409": 8,
+        "413": 5,
+        "500": 14,
+        "503": 47
+      },
+      "newStatus": {
+        "200": 62,
+        "400": 12,
+        "401": 12,
+        "403": 18,
+        "404": 8,
+        "409": 8,
+        "413": 5,
+        "500": 14,
+        "503": 47
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 62,
+        "401 | logEvent -": 12,
+        "409 | logEvent -": 8,
+        "403 | logEvent -": 18,
+        "500 | logEvent -": 14,
+        "503 | logEvent -": 47,
+        "404 | logEvent -": 8,
+        "400 | logEvent -": 12,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 159,
+        "code:WORKSPACE_OWNER_UNSET": 8,
+        "code:RUNNER_OWNER_ONLY": 18,
+        "code:GRANT_OWNERLESS": 13,
+        "code:OWNER_CHECK_UNAVAILABLE": 24,
+        "variant:sparse": 13,
+        "variant:noStores": 14,
+        "intent:edge:halt-clear-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:not-owner": 5,
+        "intent:edge:owner:no-owner": 5,
+        "intent:edge:owner:no-account": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:edge:owner:unwired": 5,
+        "intent:test:tests/unit/dispatch-route-halt.test.js": 6,
+        "intent:test:tests/unit/lin-3398-session-runner-gates.test.js": 2
+      }
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId": {
+      "requests": 192,
+      "differing": 0,
+      "byTier": {
+        "gen": 129,
+        "edge": 56,
+        "test": 7
+      },
+      "oldStatus": {
+        "200": 54,
+        "400": 25,
+        "401": 11,
+        "403": 5,
+        "404": 34,
+        "409": 8,
+        "413": 5,
+        "500": 24,
+        "503": 26
+      },
+      "newStatus": {
+        "200": 54,
+        "400": 25,
+        "401": 11,
+        "403": 5,
+        "404": 34,
+        "409": 8,
+        "413": 5,
+        "500": 24,
+        "503": 26
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 54,
+        "500 | logEvent -": 24,
+        "401 | logEvent -": 11,
+        "400 | logEvent -": 25,
+        "404 | logEvent -": 34,
+        "503 | logEvent -": 26,
+        "409 | logEvent -": 8,
+        "413 | logEvent -": 5,
+        "403 | logEvent -": 5
+      },
+      "tags": {
+        "variant:noStores": 13,
+        "variant:sparse": 16,
+        "variant:full": 163,
+        "code:GRANT_OWNERLESS": 11,
+        "code:OWNER_CHECK_UNAVAILABLE": 15,
+        "code:WORKSPACE_OWNER_UNSET": 8,
+        "intent:edge:delete-local-row-member": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:not-owner": 5,
+        "code:RUNNER_OWNER_ONLY": 5,
+        "intent:edge:owner:no-owner": 5,
+        "intent:edge:owner:no-account": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:edge:owner:unwired": 5,
+        "intent:test:tests/unit/dispatch-route-halt.test.js": 1,
+        "intent:test:tests/unit/lin-3398-session-runner-gates.test.js": 6
+      }
+    },
+    "GET /api/proxy/wake-shadow": {
+      "requests": 150,
+      "differing": 0,
+      "byTier": {
+        "gen": 121,
+        "edge": 25,
+        "test": 4
+      },
+      "oldStatus": {
+        "200": 83,
+        "401": 25,
+        "429": 10,
+        "500": 21,
+        "503": 11
+      },
+      "newStatus": {
+        "200": 83,
+        "401": 25,
+        "429": 10,
+        "500": 21,
+        "503": 11
+      },
+      "statusLogPairs": {
+        "200 | logEvent 200": 83,
+        "500 | logEvent 500": 13,
+        "401 | logEvent -": 25,
+        "429 | logEvent -": 10,
+        "500 | logEvent -": 8,
+        "503 | logEvent 503": 11
+      },
+      "tags": {
+        "variant:full": 126,
+        "variant:sparse": 11,
+        "code:PROXY_TOKEN_INVALID": 25,
+        "variant:noQueue": 13,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:no-queue": 5,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1,
+        "intent:test:tests/unit/wake-shadow.test.js": 3
+      }
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId": {
+      "requests": 180,
+      "differing": 0,
+      "byTier": {
+        "gen": 126,
+        "edge": 50,
+        "test": 4
+      },
+      "oldStatus": {
+        "200": 54,
+        "400": 26,
+        "401": 13,
+        "403": 8,
+        "404": 25,
+        "409": 10,
+        "413": 5,
+        "500": 8,
+        "503": 31
+      },
+      "newStatus": {
+        "200": 54,
+        "400": 26,
+        "401": 13,
+        "403": 8,
+        "404": 25,
+        "409": 10,
+        "413": 5,
+        "500": 8,
+        "503": 31
+      },
+      "statusLogPairs": {
+        "401 | logEvent -": 13,
+        "400 | logEvent -": 26,
+        "200 | logEvent -": 54,
+        "503 | logEvent -": 31,
+        "404 | logEvent -": 25,
+        "403 | logEvent -": 8,
+        "500 | logEvent -": 8,
+        "409 | logEvent -": 10,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:noStores": 17,
+        "variant:full": 151,
+        "code:OWNER_CHECK_UNAVAILABLE": 23,
+        "variant:sparse": 12,
+        "code:RUNNER_OWNER_ONLY": 8,
+        "code:WORKSPACE_OWNER_UNSET": 10,
+        "code:GRANT_OWNERLESS": 8,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:not-owner": 5,
+        "intent:edge:owner:no-owner": 5,
+        "intent:edge:owner:no-account": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:edge:owner:unwired": 5,
+        "intent:test:tests/unit/lin-3137-dispatch-token-preservation.test.js": 2,
+        "intent:test:tests/unit/lin-3398-session-runner-gates.test.js": 2
+      }
+    },
+    "POST /workspace/:urlKey/api/dispatch": {
+      "requests": 1577,
+      "differing": 0,
+      "byTier": {
+        "gen": 577,
+        "edge": 725,
+        "test": 275
+      },
+      "oldStatus": {
+        "201": 720,
+        "400": 409,
+        "401": 16,
+        "403": 30,
+        "404": 21,
+        "409": 78,
+        "413": 6,
+        "422": 31,
+        "429": 17,
+        "500": 74,
+        "503": 175
+      },
+      "newStatus": {
+        "201": 720,
+        "400": 409,
+        "401": 16,
+        "403": 30,
+        "404": 21,
+        "409": 78,
+        "413": 6,
+        "422": 31,
+        "429": 17,
+        "500": 74,
+        "503": 175
+      },
+      "statusLogPairs": {
+        "429 | logEvent -": 17,
+        "400 | logEvent -": 409,
+        "422 | logEvent -": 31,
+        "503 | logEvent -": 175,
+        "201 | logEvent -": 720,
+        "500 | logEvent -": 74,
+        "404 | logEvent -": 21,
+        "403 | logEvent -": 30,
+        "409 | logEvent -": 78,
+        "401 | logEvent -": 16,
+        "413 | logEvent -": 6
+      },
+      "tags": {
+        "variant:full": 1440,
+        "intent:issue:clean": 90,
+        "code:RUN_LIMIT_REACHED": 14,
+        "retry-after": 34,
+        "intent:issue": 51,
+        "variant:noStores": 81,
+        "code:ISSUE_NOT_FOUND": 31,
+        "intent:periodical:clean": 21,
+        "code:RUN_LIMIT_UNVERIFIED": 19,
+        "code:INVALID_GRANTS": 18,
+        "intent:autopilot": 31,
+        "intent:abort:clean": 20,
+        "warning": 194,
+        "enqueued": 728,
+        "intent:autopilot:clean": 40,
+        "declaredMint": 79,
+        "intent:followUp:clean": 49,
+        "intent:free:clean": 12,
+        "intent:followUp": 24,
+        "intent:fresh:clean": 75,
+        "intent:abort": 35,
+        "code:GRANT_OWNERLESS": 21,
+        "intent:fresh": 50,
+        "variant:sparse": 56,
+        "intent:cascade:clean": 20,
+        "intent:free": 8,
+        "intent:local:clean": 17,
+        "spawn:false": 38,
+        "intent:local": 9,
+        "code:RUNNER_OWNER_ONLY": 23,
+        "code:OWNER_CHECK_UNAVAILABLE": 78,
+        "code:ANCHOR_TERMINAL": 16,
+        "intent:cascade": 15,
+        "code:DUPLICATE_DISPATCH": 17,
+        "intent:periodical": 10,
+        "code:TASK_SESSION_RUNAWAY": 7,
+        "code:WORKSPACE_OWNER_UNSET": 17,
+        "spawn:true": 33,
+        "ttyWrite": 33,
+        "code:BUDGET_EXHAUSTED": 15,
+        "code:GRANT_OWNER_ONLY": 7,
+        "intent:edge:abort+followUpTo": 6,
+        "intent:edge:prompt-missing": 6,
+        "intent:edge:target-bad": 6,
+        "intent:edge:owner:not-owner": 11,
+        "intent:edge:owner:no-owner": 11,
+        "intent:edge:owner:weird": 6,
+        "intent:edge:owner:throws": 6,
+        "intent:edge:owner:no-account": 11,
+        "intent:edge:owner:unwired": 11,
+        "intent:edge:owner:dash-ungated": 6,
+        "intent:edge:abortTo-missing": 6,
+        "intent:edge:abortTo-without-abort": 6,
+        "intent:edge:abort-local-target": 6,
+        "intent:edge:abort-ok": 6,
+        "intent:edge:cascade-nonbool": 6,
+        "intent:edge:cascade-without-abort": 6,
+        "intent:edge:cascade-ok": 6,
+        "intent:edge:cascade-store-throws": 6,
+        "intent:edge:kind-bad": 6,
+        "intent:edge:periodical-bad": 6,
+        "intent:edge:wait-bad": 6,
+        "intent:edge:queueIfBusy-bad": 6,
+        "intent:edge:subscription-bad": 6,
+        "intent:edge:queueIfBusy+subscription-ok": 6,
+        "intent:edge:presetId-empty": 6,
+        "intent:edge:presetId-miss": 6,
+        "intent:edge:presetId-hit": 6,
+        "intent:edge:presetId-no-store": 6,
+        "intent:edge:maxTasks-bad": 6,
+        "intent:edge:attachProxy-nonbool": 6,
+        "intent:edge:entryRung-bad": 6,
+        "intent:edge:entryRung-abort": 6,
+        "intent:edge:entryRung-no-issue": 6,
+        "intent:edge:entryRung-ok": 6,
+        "intent:edge:entryRung-record-rejects": 6,
+        "intent:edge:entryRung-record-sync-throw": 6,
+        "intent:edge:entryRung-no-account": 6,
+        "intent:edge:stopAt-bad": 6,
+        "intent:edge:stopAt-followUp": 6,
+        "intent:edge:stopAt-not-autopilot": 6,
+        "intent:edge:stopAt-no-issue": 6,
+        "intent:edge:stopAt-ok": 6,
+        "intent:edge:variant-bad": 6,
+        "intent:edge:variant-cascade": 6,
+        "intent:edge:variant-not-autopilot": 6,
+        "intent:edge:surface-bad": 6,
+        "intent:edge:local-remote-host": 6,
+        "intent:edge:payload-model-long": 6,
+        "intent:edge:payload-ifParked": 6,
+        "intent:edge:payload-force-alone": 6,
+        "intent:edge:dangling": 6,
+        "intent:edge:dangling-binding-source": 6,
+        "intent:edge:dangling-ambiguous-skip": 6,
+        "intent:edge:referent-auth-swallowed": 6,
+        "intent:edge:pilot:token": 6,
+        "intent:edge:pilot:fallback-scope": 6,
+        "intent:edge:pilot:token-throws": 6,
+        "intent:edge:pilot:ambiguous": 6,
+        "intent:edge:pilot:ctx-throws": 6,
+        "intent:edge:pilot:ctx-slow": 6,
+        "intent:edge:pilot:control-arm": 6,
+        "intent:edge:followUp-pbt-mint": 6,
+        "intent:edge:followUp-declared": 6,
+        "intent:edge:followUp-declared-invalid": 6,
+        "intent:edge:followUp-decl-lookup-throws": 6,
+        "intent:edge:followUp-attach-ok": 6,
+        "intent:edge:followUp-attach-unchanged": 6,
+        "intent:edge:attach-prose": 6,
+        "intent:edge:attach-mcp": 6,
+        "intent:edge:attach-unchanged": 6,
+        "intent:edge:attach-mcp-mint-fails": 6,
+        "intent:edge:attach-no-store": 6,
+        "intent:edge:M2:ok": 6,
+        "intent:edge:M2:owner-only": 6,
+        "intent:edge:M2:owner-unavailable": 6,
+        "intent:edge:M2:odd-code": 6,
+        "intent:edge:M2:no-workspace-id": 6,
+        "intent:edge:M2:no-token": 6,
+        "intent:edge:M2:periodical-tail": 6,
+        "intent:edge:M2:periodical-no-tail": 6,
+        "intent:edge:dup": 6,
+        "intent:edge:dup-force-bypass": 6,
+        "intent:edge:budget-exhausted": 6,
+        "intent:edge:budget-position": 6,
+        "intent:edge:budget-unverified": 6,
+        "intent:edge:runaway": 6,
+        "intent:edge:close-out-refused": 6,
+        "code:CLOSE_OUT_IS_THE_PERSONS": 6,
+        "intent:edge:run-limit": 6,
+        "intent:edge:run-limit-unverified": 6,
+        "intent:edge:run-gate-no-account": 6,
+        "intent:edge:marker-invalid": 6,
+        "intent:edge:marker-anchor-terminal": 6,
+        "intent:edge:marker-anchor-unverified": 6,
+        "intent:edge:marker-anchor-live": 6,
+        "intent:edge:addItem-throws": 6,
+        "intent:edge:warning-never": 6,
+        "intent:edge:warning-stale": 6,
+        "intent:edge:prefs-defaults": 6,
+        "intent:edge:local:ok": 6,
+        "intent:edge:local:ok-repo": 6,
+        "intent:edge:local:unsafe-repo": 6,
+        "intent:edge:local:take-throws": 6,
+        "intent:edge:local:tty-fails": 6,
+        "intent:edge:local:write-fails": 6,
+        "intent:edge:local:mint-fails": 6,
+        "intent:edge:local:no-feedback-store": 6,
+        "intent:edge:local:amended-item": 6,
+        "intent:edge:limiter-burst": 33,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:test:tests/unit/close-out-is-the-persons-relay.test.js": 2,
+        "intent:test:tests/unit/dispatch-route-defaults.test.js": 11,
+        "intent:test:tests/unit/dispatch-queue-limiter-export.test.js": 66,
+        "intent:test:tests/unit/dispatch-route-max-tasks.test.js": 11,
+        "intent:test:tests/unit/dispatch-route-model.test.js": 20,
+        "intent:test:tests/unit/dispatch-route-terminal-anchor-guard.test.js": 6,
+        "intent:test:tests/unit/dispatch-route-presets.test.js": 7,
+        "intent:test:tests/unit/dispatch-route-periodical-id.test.js": 3,
+        "intent:test:tests/unit/dispatch-route-stop-at.test.js": 10,
+        "intent:test:tests/unit/dispatch-route-proxy-context.test.js": 13,
+        "intent:test:tests/unit/dispatch-route-variant.test.js": 7,
+        "intent:test:tests/unit/file-pointer-routes.test.js": 1,
+        "intent:test:tests/unit/lin-2354-session-lane-no-provider.test.js": 2,
+        "intent:test:tests/unit/lin-2615-effort-route-coverage.test.js": 2,
+        "intent:test:tests/unit/lin-3134-default-path-characterization.test.js": 7,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 1,
+        "intent:test:tests/unit/lin-3134-followup-sites.test.js": 24,
+        "intent:test:tests/unit/lin-3136-m2-session-declared.test.js": 17,
+        "intent:test:tests/unit/lin-3335-one-source-per-kind.test.js": 2,
+        "intent:test:tests/unit/lin-3383-owner-only-entries.test.js": 16,
+        "intent:test:tests/unit/lin-3438-if-parked-refusal.test.js": 1,
+        "intent:test:tests/unit/lin-3487-entrance-messages.test.js": 14,
+        "intent:test:tests/unit/proxy-dispatch-referent-guard.test.js": 5,
+        "intent:test:tests/unit/run-limit-gating.test.js": 5,
+        "intent:test:tests/unit/task-mode-routes.test.js": 22
+      }
+    },
+    "GET /api/proxy/dispatch/:id": {
+      "requests": 364,
+      "differing": 0,
+      "byTier": {
+        "gen": 208,
+        "edge": 97,
+        "test": 59
+      },
+      "oldStatus": {
+        "200": 155,
+        "400": 31,
+        "401": 36,
+        "404": 70,
+        "429": 13,
+        "500": 26,
+        "503": 15,
+        "NO_RESPONSE": 18
+      },
+      "newStatus": {
+        "200": 155,
+        "400": 31,
+        "401": 36,
+        "404": 70,
+        "429": 13,
+        "500": 26,
+        "503": 15,
+        "NO_RESPONSE": 18
+      },
+      "statusLogPairs": {
+        "200 | logEvent 200": 155,
+        "400 | logEvent 400": 31,
+        "401 | logEvent -": 36,
+        "404 | logEvent 404": 70,
+        "500 | logEvent 500": 17,
+        "429 | logEvent -": 13,
+        "503 | logEvent 503": 15,
+        "500 | logEvent -": 9,
+        "NO_RESPONSE(server 200) | logEvent -": 12,
+        "NO_RESPONSE(server 500) | logEvent 500": 6
+      },
+      "tags": {
+        "variant:full": 332,
+        "variant:sparse": 16,
+        "code:PROXY_TOKEN_INVALID": 36,
+        "reason:terminal": 40,
+        "reason:timeout": 30,
+        "variant:noQueue": 16,
+        "reason:change": 14,
+        "intent:edge:wait-change": 6,
+        "intent:edge:wait-feedback": 6,
+        "intent:edge:wait-timeout": 6,
+        "intent:edge:wait-vanish": 6,
+        "intent:edge:wait-terminal-first": 6,
+        "intent:edge:wait-closed-first": 6,
+        "intent:edge:wait-full-keepalive": 6,
+        "intent:edge:wait-client-abort": 6,
+        "clientGone": 18,
+        "intent:edge:wait-client-abort-after-flush": 6,
+        "intent:edge:wait-reread-throws": 6,
+        "intent:edge:wait-abort-then-throw": 6,
+        "intent:edge:no-wait-queued-warning": 6,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:no-queue": 5,
+        "intent:test:tests/unit/dispatch-closed-row-wire.test.js": 5,
+        "intent:test:tests/unit/dispatch-store-attribution.test.js": 2,
+        "intent:test:tests/unit/dispatch-watch-preset-echo.test.js": 5,
+        "intent:test:tests/unit/dispatch-watch-feedback-kind.test.js": 3,
+        "intent:test:tests/unit/dispatch-watch-root-item-id.test.js": 1,
+        "intent:test:tests/unit/dispatch-watch-repo-field.test.js": 2,
+        "intent:test:tests/unit/dispatch-watch-lineage-forward-only.test.js": 12,
+        "intent:test:tests/unit/lin-3130-runner-routes.test.js": 1,
+        "intent:test:tests/unit/lin-3134-default-path-characterization.test.js": 1,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 4,
+        "intent:test:tests/unit/lin-3136-dispatch-gate.test.js": 1,
+        "intent:test:tests/unit/lin-3409-proxy-halt-gate.test.js": 3,
+        "intent:test:tests/unit/proxy-di-witness.test.js": 1,
+        "intent:test:tests/unit/proxy-dispatch-bootstrap-token.test.js": 1,
+        "intent:test:tests/unit/proxy-dispatch-poll-warning-queued-only.test.js": 3,
+        "intent:test:tests/unit/proxy-halt-collision-witness.test.js": 1,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 2,
+        "intent:test:tests/unit/proxy-kickoff-goal-length.test.js": 1,
+        "intent:test:tests/unit/proxy-halt.test.js": 8,
+        "intent:test:tests/unit/wake-shadow.test.js": 2
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/halt": {
+      "requests": 149,
+      "differing": 0,
+      "byTier": {
+        "gen": 122,
+        "edge": 21,
+        "test": 6
+      },
+      "oldStatus": {
+        "200": 82,
+        "400": 9,
+        "401": 11,
+        "404": 7,
+        "500": 16,
+        "503": 24
+      },
+      "newStatus": {
+        "200": 82,
+        "400": 9,
+        "401": 11,
+        "404": 7,
+        "500": 16,
+        "503": 24
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 82,
+        "503 | logEvent -": 24,
+        "500 | logEvent -": 16,
+        "404 | logEvent -": 7,
+        "401 | logEvent -": 11,
+        "400 | logEvent -": 9
+      },
+      "tags": {
+        "variant:full": 121,
+        "halt": 52,
+        "variant:noStores": 21,
+        "variant:sparse": 7,
+        "intent:edge:halt-read-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:test:tests/unit/dispatch-route-halt.test.js": 6
+      }
+    },
+    "POST /api/proxy/recommend-and-dispatch": {
+      "requests": 1148,
+      "differing": 0,
+      "byTier": {
+        "gen": 360,
+        "edge": 598,
+        "test": 190
+      },
+      "oldStatus": {
+        "200": 38,
+        "201": 290,
+        "400": 177,
+        "401": 32,
+        "403": 63,
+        "404": 101,
+        "409": 39,
+        "413": 7,
+        "422": 65,
+        "429": 39,
+        "500": 70,
+        "503": 164,
+        "504": 27,
+        "NO_RESPONSE": 36
+      },
+      "newStatus": {
+        "200": 38,
+        "201": 290,
+        "400": 177,
+        "401": 32,
+        "403": 63,
+        "404": 101,
+        "409": 39,
+        "413": 7,
+        "422": 65,
+        "429": 39,
+        "500": 70,
+        "503": 164,
+        "504": 27,
+        "NO_RESPONSE": 36
+      },
+      "statusLogPairs": {
+        "201 | logEvent 201": 260,
+        "409 | logEvent 409": 27,
+        "403 | logEvent -": 61,
+        "400 | logEvent 400": 170,
+        "503 | logEvent 503": 121,
+        "NO_RESPONSE(server 499) | logEvent 499": 26,
+        "500 | logEvent 500": 38,
+        "404 | logEvent 404": 91,
+        "429 | logEvent 200,200,429": 8,
+        "200 | logEvent 422": 8,
+        "401 | logEvent -": 26,
+        "409 | logEvent 200,409": 6,
+        "413 | logEvent -": 7,
+        "422 | logEvent 422": 54,
+        "503 | logEvent 200,200,503": 22,
+        "201 | logEvent 200,201": 16,
+        "503 | logEvent 200,503": 21,
+        "500 | logEvent 200,200,500": 11,
+        "429 | logEvent -": 13,
+        "403 | logEvent 403": 2,
+        "429 | logEvent 429": 18,
+        "504 | logEvent 504": 16,
+        "500 | logEvent -": 11,
+        "201 | logEvent 200,200,201": 14,
+        "409 | logEvent 200,200,409": 6,
+        "400 | logEvent -": 7,
+        "504 | logEvent 200,504": 6,
+        "422 | logEvent 200,200,422": 6,
+        "401 | logEvent 401": 6,
+        "200 | logEvent 201": 18,
+        "200 | logEvent 409": 6,
+        "200 | logEvent 503": 6,
+        "404 | logEvent 200,200,404": 5,
+        "404 | logEvent 200,404": 5,
+        "504 | logEvent 200,200,504": 5,
+        "500 | logEvent 200,500": 10,
+        "422 | logEvent 200,422": 5,
+        "NO_RESPONSE(server 499) | logEvent 200,200,499": 5,
+        "NO_RESPONSE(server 499) | logEvent 200,499": 5
+      },
+      "tags": {
+        "variant:full": 1098,
+        "intent:llm:clean": 130,
+        "enqueued": 334,
+        "intent:override": 61,
+        "code:DUPLICATE_DISPATCH": 40,
+        "retry-after": 43,
+        "intent:llm": 80,
+        "descent": 16,
+        "intent:override:clean": 89,
+        "warning": 71,
+        "override": 190,
+        "code:DISPATCH_GRANT_REQUIRED": 38,
+        "code:RUN_LIMIT_UNVERIFIED": 5,
+        "clientGone": 36,
+        "reason:no_paid_key_resolved": 8,
+        "keepaliveFlushed:422": 8,
+        "code:WORKSPACE_UNAVAILABLE": 12,
+        "code:INVALID_GRANTS": 14,
+        "variant:noQueue": 21,
+        "code:PROXY_TOKEN_INVALID": 26,
+        "code:TASK_SESSION_RUNAWAY": 4,
+        "variant:sparse": 29,
+        "code:GRANT_OWNER_ONLY": 2,
+        "declaredMint": 6,
+        "code:RUN_LIMIT_REACHED": 9,
+        "code:GRANT_OWNERLESS": 2,
+        "code:BUDGET_EXHAUSTED": 1,
+        "code:LINEAR_AUTH": 50,
+        "intent:edge:no-queue": 6,
+        "intent:edge:grant-absent": 6,
+        "intent:edge:id-missing": 6,
+        "intent:edge:id-bad": 6,
+        "intent:edge:target-local": 6,
+        "intent:edge:noDescend-bad": 6,
+        "intent:edge:wait-bad": 6,
+        "intent:edge:queue-bad": 6,
+        "intent:edge:sub-bad": 6,
+        "intent:edge:repo-bad": 6,
+        "intent:edge:model-bad": 6,
+        "intent:edge:harness-bad": 6,
+        "intent:edge:effort-bad": 6,
+        "intent:edge:effort-unknown-warn": 6,
+        "intent:edge:kind-bad": 6,
+        "intent:edge:periodical-bad": 6,
+        "intent:edge:session-bad": 6,
+        "intent:edge:followUp-bad": 6,
+        "intent:edge:followUp-dash": 6,
+        "intent:edge:force-bad": 6,
+        "intent:edge:access-null": 6,
+        "intent:edge:access-throws": 6,
+        "intent:edge:unsupported-ctx": 6,
+        "code:CAPABILITY_NOT_SUPPORTED": 12,
+        "intent:edge:unsupported-rec": 6,
+        "intent:edge:override:ok": 6,
+        "intent:edge:override:ok-periodical-marker": 6,
+        "intent:edge:override:ok-periodical-caller": 6,
+        "intent:edge:override:ctx-not-found": 6,
+        "intent:edge:override:ctx-null": 6,
+        "intent:edge:override:ctx-gql-401": 6,
+        "intent:edge:override:ctx-gql-401-transient": 6,
+        "intent:edge:override:ctx-timeout": 6,
+        "intent:edge:override:hang-up": 6,
+        "intent:edge:override:slow-keepalive": 6,
+        "keepaliveFlushed:201": 18,
+        "intent:edge:override:slow-keepalive-refusal": 6,
+        "keepaliveFlushed:409": 6,
+        "intent:edge:override:followUp-attach": 6,
+        "intent:edge:override:followUp-pbt": 6,
+        "intent:edge:override:optout": 6,
+        "intent:edge:override:dup": 6,
+        "intent:edge:override:attach-failed": 6,
+        "intent:edge:override:structural": 6,
+        "intent:edge:override:addItem-gql": 6,
+        "intent:edge:override:test-mode": 6,
+        "intent:edge:override:orKey-free": 6,
+        "intent:edge:llm:ok": 6,
+        "intent:edge:llm:ai-unavailable": 6,
+        "intent:edge:llm:ai-unavailable-test-mode": 6,
+        "intent:edge:llm:paid-env-witness": 6,
+        "intent:edge:llm:free-charge-ok": 6,
+        "intent:edge:llm:free-charge-429": 6,
+        "intent:edge:llm:rec-not-found": 6,
+        "intent:edge:llm:rec-openrouter": 6,
+        "intent:edge:llm:rec-gql": 6,
+        "intent:edge:llm:rec-timeout": 6,
+        "intent:edge:llm:hang-up": 6,
+        "intent:edge:llm:hang-up-then-return": 6,
+        "intent:edge:llm:slow-flush": 6,
+        "intent:edge:llm:slow-flush-error": 6,
+        "keepaliveFlushed:503": 6,
+        "intent:edge:llm:defer-stuck": 6,
+        "intent:edge:llm:no-prompt": 6,
+        "intent:edge:llm:descend": 6,
+        "intent:edge:llm:descend-timeout": 6,
+        "intent:edge:llm:cycle": 6,
+        "intent:edge:llm:noDescend": 6,
+        "intent:edge:llm:followUp-attach": 6,
+        "intent:edge:llm:followUp-pbt": 6,
+        "intent:edge:llm:structural": 6,
+        "intent:edge:llm:attach-failed": 6,
+        "intent:edge:llm:dup": 6,
+        "intent:edge:llm:addItem-gql": 6,
+        "intent:edge:llm:orKey-throws-outer": 6,
+        "intent:edge:llm:pilot": 6,
+        "intent:edge:llm:x-request-start": 6,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:read-scope": 5,
+        "intent:edge:gate:no-grant": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:llm-free:ok": 5,
+        "intent:edge:llm-paid-env:ok": 5,
+        "intent:edge:llm-free:not-found": 5,
+        "intent:edge:llm-paid-env:not-found": 5,
+        "intent:edge:llm-free:openrouter": 5,
+        "intent:edge:llm-paid-env:openrouter": 5,
+        "intent:edge:llm-free:gql-401": 5,
+        "intent:edge:llm-paid-env:gql-401": 5,
+        "intent:edge:llm-free:gql-403-transient": 5,
+        "intent:edge:llm-paid-env:gql-403-transient": 5,
+        "intent:edge:llm-free:timeout": 5,
+        "intent:edge:llm-paid-env:timeout": 5,
+        "intent:edge:llm-free:weird": 5,
+        "intent:edge:llm-paid-env:weird": 5,
+        "intent:edge:llm-free:defer": 5,
+        "intent:edge:llm-paid-env:defer": 5,
+        "intent:edge:llm-free:hang-up": 5,
+        "intent:edge:llm-paid-env:hang-up": 5,
+        "intent:edge:llm-free:dup": 5,
+        "intent:edge:llm-paid-env:dup": 5,
+        "intent:edge:llm-free:addItem-500": 5,
+        "intent:edge:llm-paid-env:addItem-500": 5,
+        "intent:edge:llm-free:attach-503": 5,
+        "intent:edge:llm-paid-env:attach-503": 5,
+        "intent:test:tests/unit/close-out-is-the-persons-relay.test.js": 2,
+        "intent:test:tests/unit/dispatch-route-periodical-id.test.js": 12,
+        "intent:test:tests/unit/file-pointer-routes.test.js": 2,
+        "intent:test:tests/unit/lin-2260-recommend-dispatch-auth-classification.test.js": 8,
+        "intent:test:tests/unit/lin-2615-effort-route-coverage.test.js": 4,
+        "intent:test:tests/unit/lin-2353-proxy-provider-ui-threading.test.js": 16,
+        "intent:test:tests/unit/lin-2872-recommend-dispatch-force-followup.test.js": 17,
+        "intent:test:tests/unit/lin-3134-default-path-characterization.test.js": 6,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 2,
+        "intent:test:tests/unit/lin-3134-followup-sites.test.js": 42,
+        "intent:test:tests/unit/lin-3136-dispatch-gate.test.js": 13,
+        "intent:test:tests/unit/lin-3136-driver-copy-mint.test.js": 1,
+        "intent:test:tests/unit/lin-3487-entrance-messages.test.js": 3,
+        "intent:test:tests/unit/proxy-dispatch-bootstrap-token.test.js": 3,
+        "intent:test:tests/unit/proxy-dispatch-defaults.test.js": 15,
+        "intent:test:tests/unit/proxy-dispatch-model.test.js": 11,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1,
+        "intent:test:tests/unit/proxy-prompt-attachments.test.js": 1,
+        "intent:test:tests/unit/proxy-openrouter-fallback-note.test.js": 1,
+        "intent:test:tests/unit/proxy-openrouter-principal-hop.test.js": 1,
+        "intent:test:tests/unit/proxy-recommend-dispatch-max-tasks.test.js": 4,
+        "intent:test:tests/unit/proxy-recommend-dispatch-subscribe.test.js": 21,
+        "intent:test:tests/unit/recommend-one-path.test.js": 4
+      }
+    },
+    "GET /api/proxy/dispatch/:id/prompt": {
+      "requests": 173,
+      "differing": 0,
+      "byTier": {
+        "gen": 132,
+        "edge": 25,
+        "test": 16
+      },
+      "oldStatus": {
+        "200": 54,
+        "400": 17,
+        "401": 22,
+        "404": 36,
+        "429": 10,
+        "500": 22,
+        "503": 12
+      },
+      "newStatus": {
+        "200": 54,
+        "400": 17,
+        "401": 22,
+        "404": 36,
+        "429": 10,
+        "500": 22,
+        "503": 12
+      },
+      "statusLogPairs": {
+        "404 | logEvent 404": 36,
+        "200 | logEvent 200": 54,
+        "500 | logEvent -": 7,
+        "400 | logEvent 400": 17,
+        "500 | logEvent 500": 15,
+        "429 | logEvent -": 10,
+        "503 | logEvent 503": 12,
+        "401 | logEvent -": 22
+      },
+      "tags": {
+        "variant:full": 148,
+        "variant:sparse": 11,
+        "variant:noQueue": 14,
+        "code:PROXY_TOKEN_INVALID": 22,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:no-queue": 5,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 4,
+        "intent:test:tests/unit/lin-3384-bootstrap-token-redaction.test.js": 3,
+        "intent:test:tests/unit/proxy-dispatch-prompt.test.js": 4,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1,
+        "intent:test:tests/unit/proxy-kickoff-goal-length.test.js": 4
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota": {
+      "requests": 159,
+      "differing": 0,
+      "byTier": {
+        "gen": 122,
+        "edge": 33,
+        "test": 4
+      },
+      "oldStatus": {
+        "200": 113,
+        "400": 13,
+        "401": 12,
+        "404": 10,
+        "500": 11
+      },
+      "newStatus": {
+        "200": 113,
+        "400": 13,
+        "401": 12,
+        "404": 10,
+        "500": 11
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 113,
+        "401 | logEvent -": 12,
+        "400 | logEvent -": 13,
+        "404 | logEvent -": 10,
+        "500 | logEvent -": 11
+      },
+      "tags": {
+        "variant:full": 126,
+        "variant:sparse": 14,
+        "variant:noStores": 19,
+        "intent:edge:quota-usage-throws": 6,
+        "intent:edge:quota-free-tier": 6,
+        "intent:edge:quota-free-no-account-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:test:tests/unit/run-limit-gating.test.js": 4
+      }
+    },
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts": {
+      "requests": 152,
+      "differing": 0,
+      "byTier": {
+        "gen": 127,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 33,
+        "400": 56,
+        "401": 19,
+        "404": 10,
+        "413": 5,
+        "500": 7,
+        "503": 22
+      },
+      "newStatus": {
+        "200": 33,
+        "400": 56,
+        "401": 19,
+        "404": 10,
+        "413": 5,
+        "500": 7,
+        "503": 22
+      },
+      "statusLogPairs": {
+        "400 | logEvent -": 56,
+        "200 | logEvent -": 33,
+        "404 | logEvent -": 10,
+        "401 | logEvent -": 19,
+        "503 | logEvent -": 22,
+        "500 | logEvent -": 7,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 125,
+        "variant:noStores": 14,
+        "variant:sparse": 13,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/recent-prompts": {
+      "requests": 143,
+      "differing": 0,
+      "byTier": {
+        "gen": 122,
+        "edge": 21
+      },
+      "oldStatus": {
+        "200": 107,
+        "400": 10,
+        "401": 20,
+        "404": 6
+      },
+      "newStatus": {
+        "200": 107,
+        "400": 10,
+        "401": 20,
+        "404": 6
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 107,
+        "400 | logEvent -": 10,
+        "401 | logEvent -": 20,
+        "404 | logEvent -": 6
+      },
+      "tags": {
+        "variant:full": 121,
+        "variant:noStores": 11,
+        "variant:sparse": 11,
+        "intent:edge:recent-get-no-account": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/history": {
+      "requests": 151,
+      "differing": 0,
+      "byTier": {
+        "gen": 133,
+        "edge": 15,
+        "test": 3
+      },
+      "oldStatus": {
+        "200": 91,
+        "400": 13,
+        "401": 12,
+        "404": 11,
+        "500": 24
+      },
+      "newStatus": {
+        "200": 91,
+        "400": 13,
+        "401": 12,
+        "404": 11,
+        "500": 24
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 91,
+        "500 | logEvent -": 24,
+        "400 | logEvent -": 13,
+        "401 | logEvent -": 12,
+        "404 | logEvent -": 11
+      },
+      "tags": {
+        "variant:full": 124,
+        "variant:sparse": 16,
+        "variant:noStores": 11,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 2,
+        "intent:test:tests/unit/lin-3384-bootstrap-token-redaction.test.js": 1
+      }
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts": {
+      "requests": 158,
+      "differing": 0,
+      "byTier": {
+        "gen": 127,
+        "edge": 31
+      },
+      "oldStatus": {
+        "200": 42,
+        "400": 51,
+        "401": 16,
+        "404": 12,
+        "413": 5,
+        "500": 8,
+        "503": 24
+      },
+      "newStatus": {
+        "200": 42,
+        "400": 51,
+        "401": 16,
+        "404": 12,
+        "413": 5,
+        "500": 8,
+        "503": 24
+      },
+      "statusLogPairs": {
+        "400 | logEvent -": 51,
+        "401 | logEvent -": 16,
+        "503 | logEvent -": 24,
+        "200 | logEvent -": 42,
+        "500 | logEvent -": 8,
+        "404 | logEvent -": 12,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 132,
+        "variant:noStores": 12,
+        "variant:sparse": 14,
+        "intent:edge:fav-delete-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5
+      }
+    },
+    "POST /api/proxy/autopilot/kickoff": {
+      "requests": 710,
+      "differing": 0,
+      "byTier": {
+        "gen": 273,
+        "edge": 308,
+        "test": 129
+      },
+      "oldStatus": {
+        "201": 208,
+        "400": 173,
+        "401": 36,
+        "403": 53,
+        "404": 24,
+        "409": 33,
+        "413": 5,
+        "422": 6,
+        "429": 25,
+        "500": 62,
+        "503": 72,
+        "NO_RESPONSE": 13
+      },
+      "newStatus": {
+        "201": 208,
+        "400": 173,
+        "401": 36,
+        "403": 53,
+        "404": 24,
+        "409": 33,
+        "413": 5,
+        "422": 6,
+        "429": 25,
+        "500": 62,
+        "503": 72,
+        "NO_RESPONSE": 13
+      },
+      "statusLogPairs": {
+        "201 | logEvent 201": 208,
+        "403 | logEvent -": 43,
+        "500 | logEvent 500": 55,
+        "503 | logEvent 503": 72,
+        "401 | logEvent -": 30,
+        "500 | logEvent -": 7,
+        "429 | logEvent -": 16,
+        "400 | logEvent 400": 164,
+        "403 | logEvent 403": 10,
+        "400 | logEvent -": 9,
+        "404 | logEvent 404": 24,
+        "409 | logEvent 409": 33,
+        "429 | logEvent 429": 9,
+        "401 | logEvent 401": 6,
+        "NO_RESPONSE(server 201) | logEvent 201": 7,
+        "422 | logEvent 422": 6,
+        "NO_RESPONSE(server 409) | logEvent 409": 6,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 653,
+        "intent:scoped:clean": 89,
+        "warning": 44,
+        "enqueued": 224,
+        "intent:general:clean": 83,
+        "intent:scoped": 54,
+        "code:DISPATCH_GRANT_REQUIRED": 26,
+        "declaredMint": 263,
+        "intent:general": 47,
+        "code:PROXY_TOKEN_INVALID": 30,
+        "code:RUN_LIMIT_UNVERIFIED": 6,
+        "code:GRANT_OWNER_ONLY": 10,
+        "variant:sparse": 41,
+        "budgetPosition": 4,
+        "code:INVALID_GRANTS": 16,
+        "variant:noQueue": 16,
+        "code:DUPLICATE_DISPATCH": 16,
+        "retry-after": 25,
+        "code:WORKSPACE_OWNER_UNSET": 9,
+        "code:RUN_LIMIT_REACHED": 9,
+        "code:WORKSPACE_UNAVAILABLE": 8,
+        "code:BUDGET_EXHAUSTED": 8,
+        "code:GRANT_OWNERLESS": 10,
+        "code:LINEAR_AUTH": 14,
+        "clientGone": 13,
+        "intent:edge:no-queue": 6,
+        "intent:edge:grant-absent": 6,
+        "intent:edge:mode-bad": 6,
+        "intent:edge:variant-bad": 6,
+        "intent:edge:goal-bad": 6,
+        "intent:edge:target-bad": 6,
+        "intent:edge:repo-bad": 6,
+        "intent:edge:issue-bad": 6,
+        "intent:edge:session-bad": 6,
+        "intent:edge:sub-bad": 6,
+        "intent:edge:model-bad": 6,
+        "intent:edge:harness-bad": 6,
+        "intent:edge:effort-bad": 6,
+        "intent:edge:effort-unknown": 6,
+        "intent:edge:preset-empty": 6,
+        "intent:edge:preset-miss": 6,
+        "intent:edge:preset-hit": 6,
+        "intent:edge:preset-no-store": 6,
+        "intent:edge:maxTasks-bad": 6,
+        "intent:edge:general-ok": 6,
+        "intent:edge:general-optout": 6,
+        "intent:edge:scoped-ok": 6,
+        "intent:edge:scoped-access-null": 6,
+        "intent:edge:scoped-unsupported": 6,
+        "code:CAPABILITY_NOT_SUPPORTED": 6,
+        "intent:edge:scoped-not-found": 6,
+        "intent:edge:scoped-null": 6,
+        "intent:edge:scoped-gql-401": 10,
+        "intent:edge:scoped-gql-other": 6,
+        "intent:edge:scoped-hang-up": 6,
+        "intent:edge:scoped-hang-up-dup": 6,
+        "intent:edge:child-inherits-stopAt": 6,
+        "intent:edge:child-parent-throws": 6,
+        "intent:edge:child-no-getItemStatus": 6,
+        "intent:edge:declared-owner-only": 6,
+        "intent:edge:declared-unavailable": 6,
+        "intent:edge:declared-no-workspace": 6,
+        "intent:edge:declared-ownerless": 6,
+        "intent:edge:declared-odd": 6,
+        "intent:edge:dup": 6,
+        "intent:edge:budget-child": 6,
+        "intent:edge:run-limit": 6,
+        "intent:edge:run-limit-no-key-fn": 6,
+        "intent:edge:addItem-throws": 6,
+        "intent:edge:attach-failed-mcp": 6,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:read-scope": 5,
+        "intent:edge:gate:no-grant": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/close-out-is-the-persons-relay.test.js": 1,
+        "intent:test:tests/unit/lin-2216-transient-vs-terminal-auth.test.js": 4,
+        "intent:test:tests/unit/lin-2615-effort-route-coverage.test.js": 8,
+        "intent:test:tests/unit/lin-2363-kickoff-provider-attribution.test.js": 6,
+        "intent:test:tests/unit/lin-2804-provider-ui-endpoint-hints.test.js": 5,
+        "intent:test:tests/unit/lin-3136-m1-kickoff-declared.test.js": 8,
+        "intent:test:tests/unit/lin-3136-dispatch-gate.test.js": 13,
+        "intent:test:tests/unit/lin-3487-entrance-messages.test.js": 1,
+        "intent:test:tests/unit/proxy-autopilot-variant.test.js": 40,
+        "intent:test:tests/unit/proxy-dispatch-bootstrap-token.test.js": 2,
+        "intent:test:tests/unit/proxy-dispatch-defaults.test.js": 3,
+        "intent:test:tests/unit/proxy-dispatch-subscribe.test.js": 4,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1,
+        "intent:test:tests/unit/proxy-kickoff-goal-length.test.js": 7,
+        "intent:test:tests/unit/proxy-kickoff-presets.test.js": 4,
+        "intent:test:tests/unit/proxy-kickoff-max-tasks.test.js": 16,
+        "intent:test:tests/unit/stop-at-child-inheritance.test.js": 6
+      }
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets": {
+      "requests": 185,
+      "differing": 0,
+      "byTier": {
+        "gen": 134,
+        "edge": 31,
+        "test": 20
+      },
+      "oldStatus": {
+        "201": 44,
+        "400": 80,
+        "401": 6,
+        "404": 16,
+        "413": 5,
+        "500": 9,
+        "503": 25
+      },
+      "newStatus": {
+        "201": 44,
+        "400": 80,
+        "401": 6,
+        "404": 16,
+        "413": 5,
+        "500": 9,
+        "503": 25
+      },
+      "statusLogPairs": {
+        "404 | logEvent -": 16,
+        "201 | logEvent -": 44,
+        "400 | logEvent -": 80,
+        "503 | logEvent -": 25,
+        "500 | logEvent -": 9,
+        "401 | logEvent -": 6,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 156,
+        "variant:noStores": 19,
+        "variant:sparse": 10,
+        "intent:edge:preset-create-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/dispatch-route-preset-crud.test.js": 20
+      }
+    },
+    "GET /api/dispatch/poll": {
+      "requests": 186,
+      "differing": 0,
+      "byTier": {
+        "gen": 132,
+        "edge": 33,
+        "test": 21
+      },
+      "oldStatus": {
+        "200": 132,
+        "401": 31,
+        "500": 23
+      },
+      "newStatus": {
+        "200": 132,
+        "401": 31,
+        "500": 23
+      },
+      "statusLogPairs": {
+        "500 | logEvent -": 23,
+        "200 | logEvent -": 132,
+        "401 | logEvent -": 31
+      },
+      "tags": {
+        "variant:full": 155,
+        "halt": 38,
+        "variant:noStores": 24,
+        "variant:sparse": 7,
+        "intent:edge:halt-timeout-cached": 6,
+        "intent:edge:poll-no-halt-store": 6,
+        "intent:edge:poll-items-reject-during-halt": 6,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:invalid-token": 5,
+        "intent:edge:gate:token-store-throws": 5,
+        "intent:test:tests/unit/dispatch-route-poll-halt.test.js": 15,
+        "intent:test:tests/unit/lin-3130-runner-routes.test.js": 2,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 1,
+        "intent:test:tests/unit/lin-3137-dispatch-token-preservation.test.js": 2,
+        "intent:test:tests/unit/lin-3384-bootstrap-token-redaction.test.js": 1
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch": {
+      "requests": 175,
+      "differing": 0,
+      "byTier": {
+        "gen": 150,
+        "edge": 15,
+        "test": 10
+      },
+      "oldStatus": {
+        "200": 128,
+        "400": 9,
+        "401": 10,
+        "404": 7,
+        "500": 21
+      },
+      "newStatus": {
+        "200": 128,
+        "400": 9,
+        "401": 10,
+        "404": 7,
+        "500": 21
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 128,
+        "500 | logEvent -": 21,
+        "404 | logEvent -": 7,
+        "401 | logEvent -": 10,
+        "400 | logEvent -": 9
+      },
+      "tags": {
+        "variant:full": 155,
+        "variant:noStores": 11,
+        "variant:sparse": 9,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 2,
+        "intent:test:tests/unit/lin-3384-bootstrap-token-redaction.test.js": 6,
+        "intent:test:tests/unit/proxy-dispatch-poll-warning-queued-only.test.js": 2
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/tokens": {
+      "requests": 138,
+      "differing": 0,
+      "byTier": {
+        "gen": 121,
+        "edge": 15,
+        "test": 2
+      },
+      "oldStatus": {
+        "200": 89,
+        "400": 9,
+        "401": 9,
+        "404": 12,
+        "500": 19
+      },
+      "newStatus": {
+        "200": 89,
+        "400": 9,
+        "401": 9,
+        "404": 12,
+        "500": 19
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 89,
+        "500 | logEvent -": 19,
+        "404 | logEvent -": 12,
+        "400 | logEvent -": 9,
+        "401 | logEvent -": 9
+      },
+      "tags": {
+        "variant:full": 121,
+        "variant:sparse": 8,
+        "variant:noStores": 9,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:test:tests/unit/lin-3137-dispatch-token-preservation.test.js": 2
+      }
+    },
+    "UNMATCHED": {
+      "requests": 95,
+      "differing": 0,
+      "byTier": {
+        "gen": 95
+      },
+      "oldStatus": {
+        "404": 95
+      },
+      "newStatus": {
+        "404": 95
+      },
+      "statusLogPairs": {
+        "404 | logEvent -": 95
+      },
+      "tags": {
+        "variant:full": 81,
+        "variant:noStores": 6,
+        "variant:noQueue": 2,
+        "variant:sparse": 6
+      }
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts": {
+      "requests": 158,
+      "differing": 0,
+      "byTier": {
+        "gen": 127,
+        "edge": 31
+      },
+      "oldStatus": {
+        "200": 40,
+        "400": 53,
+        "401": 12,
+        "404": 12,
+        "413": 7,
+        "500": 15,
+        "503": 19
+      },
+      "newStatus": {
+        "200": 40,
+        "400": 53,
+        "401": 12,
+        "404": 12,
+        "413": 7,
+        "500": 15,
+        "503": 19
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 40,
+        "401 | logEvent -": 12,
+        "400 | logEvent -": 53,
+        "500 | logEvent -": 15,
+        "503 | logEvent -": 19,
+        "404 | logEvent -": 12,
+        "413 | logEvent -": 7
+      },
+      "tags": {
+        "variant:full": 134,
+        "variant:noStores": 16,
+        "variant:sparse": 8,
+        "intent:edge:recent-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5
+      }
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId": {
+      "requests": 156,
+      "differing": 0,
+      "byTier": {
+        "gen": 121,
+        "edge": 31,
+        "test": 4
+      },
+      "oldStatus": {
+        "200": 52,
+        "400": 14,
+        "401": 6,
+        "404": 43,
+        "413": 5,
+        "500": 8,
+        "503": 28
+      },
+      "newStatus": {
+        "200": 52,
+        "400": 14,
+        "401": 6,
+        "404": 43,
+        "413": 5,
+        "500": 8,
+        "503": 28
+      },
+      "statusLogPairs": {
+        "404 | logEvent -": 43,
+        "400 | logEvent -": 14,
+        "200 | logEvent -": 52,
+        "503 | logEvent -": 28,
+        "500 | logEvent -": 8,
+        "401 | logEvent -": 6,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 125,
+        "variant:noStores": 15,
+        "variant:sparse": 16,
+        "intent:edge:preset-delete-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:test:tests/unit/dispatch-route-preset-crud.test.js": 4
+      }
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim": {
+      "requests": 208,
+      "differing": 0,
+      "byTier": {
+        "gen": 131,
+        "edge": 56,
+        "test": 21
+      },
+      "oldStatus": {
+        "200": 29,
+        "400": 85,
+        "401": 10,
+        "403": 7,
+        "404": 24,
+        "409": 19,
+        "413": 5,
+        "500": 9,
+        "503": 20
+      },
+      "newStatus": {
+        "200": 29,
+        "400": 85,
+        "401": 10,
+        "403": 7,
+        "404": 24,
+        "409": 19,
+        "413": 5,
+        "500": 9,
+        "503": 20
+      },
+      "statusLogPairs": {
+        "404 | logEvent -": 24,
+        "400 | logEvent -": 85,
+        "200 | logEvent -": 29,
+        "409 | logEvent -": 19,
+        "500 | logEvent -": 9,
+        "401 | logEvent -": 10,
+        "503 | logEvent -": 20,
+        "403 | logEvent -": 7,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 170,
+        "variant:noStores": 21,
+        "variant:sparse": 17,
+        "code:OWNER_CHECK_UNAVAILABLE": 12,
+        "code:GRANT_OWNERLESS": 8,
+        "code:RUNNER_OWNER_ONLY": 7,
+        "code:WORKSPACE_OWNER_UNSET": 7,
+        "intent:edge:trim-ok": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:not-owner": 5,
+        "intent:edge:owner:no-owner": 5,
+        "intent:edge:owner:no-account": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:edge:owner:unwired": 5,
+        "intent:test:tests/unit/dispatch-route-trim.test.js": 14,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 1,
+        "intent:test:tests/unit/lin-3384-bootstrap-token-redaction.test.js": 2,
+        "intent:test:tests/unit/lin-3398-session-runner-gates.test.js": 4
+      }
+    },
+    "GET /api/proxy/dispatch": {
+      "requests": 347,
+      "differing": 0,
+      "byTier": {
+        "gen": 222,
+        "edge": 31,
+        "test": 94
+      },
+      "oldStatus": {
+        "200": 142,
+        "400": 44,
+        "401": 36,
+        "429": 14,
+        "500": 100,
+        "503": 11
+      },
+      "newStatus": {
+        "200": 142,
+        "400": 44,
+        "401": 36,
+        "429": 14,
+        "500": 100,
+        "503": 11
+      },
+      "statusLogPairs": {
+        "200 | logEvent 200": 142,
+        "429 | logEvent -": 14,
+        "401 | logEvent -": 36,
+        "503 | logEvent 503": 11,
+        "500 | logEvent 500": 87,
+        "500 | logEvent -": 13,
+        "400 | logEvent 400": 44
+      },
+      "tags": {
+        "variant:full": 309,
+        "variant:sparse": 26,
+        "code:PROXY_TOKEN_INVALID": 36,
+        "variant:noQueue": 12,
+        "intent:edge:lineage-over-cap": 6,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:edge:gate:no-queue": 5,
+        "intent:test:tests/unit/dispatch-closed-row-wire.test.js": 3,
+        "intent:test:tests/unit/dispatch-store-attribution.test.js": 1,
+        "intent:test:tests/unit/dispatch-watch-lineage-forward-only.test.js": 2,
+        "intent:test:tests/unit/lin-3134-default-path-characterization.test.js": 1,
+        "intent:test:tests/unit/lin-3134-secrecy-sinks.test.js": 2,
+        "intent:test:tests/unit/lin-3136-dispatch-gate.test.js": 1,
+        "intent:test:tests/unit/proxy-dispatch-abort-attribution.test.js": 3,
+        "intent:test:tests/unit/proxy-dispatch-bootstrap-token.test.js": 1,
+        "intent:test:tests/unit/proxy-dispatch-list-budget-fields.test.js": 3,
+        "intent:test:tests/unit/proxy-dispatch-poll-warning-queued-only.test.js": 2,
+        "intent:test:tests/unit/proxy-dispatch-lineage-join.test.js": 74,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1
+      }
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt": {
+      "requests": 207,
+      "differing": 0,
+      "byTier": {
+        "gen": 127,
+        "edge": 62,
+        "test": 18
+      },
+      "oldStatus": {
+        "200": 55,
+        "400": 57,
+        "401": 13,
+        "403": 9,
+        "404": 8,
+        "409": 7,
+        "413": 5,
+        "500": 9,
+        "503": 44
+      },
+      "newStatus": {
+        "200": 55,
+        "400": 57,
+        "401": 13,
+        "403": 9,
+        "404": 8,
+        "409": 7,
+        "413": 5,
+        "500": 9,
+        "503": 44
+      },
+      "statusLogPairs": {
+        "400 | logEvent -": 57,
+        "200 | logEvent -": 55,
+        "500 | logEvent -": 9,
+        "403 | logEvent -": 9,
+        "409 | logEvent -": 7,
+        "401 | logEvent -": 13,
+        "503 | logEvent -": 44,
+        "404 | logEvent -": 8,
+        "413 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 171,
+        "halt": 55,
+        "variant:noStores": 25,
+        "code:RUNNER_OWNER_ONLY": 9,
+        "code:WORKSPACE_OWNER_UNSET": 7,
+        "variant:sparse": 11,
+        "code:OWNER_CHECK_UNAVAILABLE": 18,
+        "code:GRANT_OWNERLESS": 12,
+        "intent:edge:halt-no-store": 6,
+        "intent:edge:halt-ok": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:not-owner": 5,
+        "intent:edge:owner:no-owner": 5,
+        "intent:edge:owner:no-account": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:edge:owner:unwired": 5,
+        "intent:test:tests/unit/dispatch-route-halt.test.js": 14,
+        "intent:test:tests/unit/lin-3398-session-runner-gates.test.js": 4
+      }
+    },
+    "GET /api/proxy/autopilot/kickoff": {
+      "requests": 150,
+      "differing": 0,
+      "byTier": {
+        "gen": 126,
+        "edge": 20,
+        "test": 4
+      },
+      "oldStatus": {
+        "200": 108,
+        "401": 28,
+        "429": 5,
+        "500": 9
+      },
+      "newStatus": {
+        "200": 108,
+        "401": 28,
+        "429": 5,
+        "500": 9
+      },
+      "statusLogPairs": {
+        "200 | logEvent 200": 108,
+        "401 | logEvent -": 28,
+        "500 | logEvent -": 9,
+        "429 | logEvent -": 5
+      },
+      "tags": {
+        "variant:full": 130,
+        "variant:noQueue": 9,
+        "code:PROXY_TOKEN_INVALID": 28,
+        "variant:sparse": 11,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:test:tests/unit/proxy-autopilot-variant.test.js": 3,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/count": {
+      "requests": 137,
+      "differing": 0,
+      "byTier": {
+        "gen": 122,
+        "edge": 15
+      },
+      "oldStatus": {
+        "200": 95,
+        "400": 10,
+        "401": 11,
+        "404": 8,
+        "500": 13
+      },
+      "newStatus": {
+        "200": 95,
+        "400": 10,
+        "401": 11,
+        "404": 8,
+        "500": 13
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 95,
+        "404 | logEvent -": 8,
+        "400 | logEvent -": 10,
+        "401 | logEvent -": 11,
+        "500 | logEvent -": 13
+      },
+      "tags": {
+        "variant:full": 124,
+        "variant:sparse": 7,
+        "variant:noStores": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens": {
+      "requests": 218,
+      "differing": 0,
+      "byTier": {
+        "gen": 129,
+        "edge": 72,
+        "test": 17
+      },
+      "oldStatus": {
+        "201": 80,
+        "400": 19,
+        "401": 9,
+        "403": 17,
+        "404": 19,
+        "409": 15,
+        "413": 6,
+        "429": 5,
+        "500": 7,
+        "503": 41
+      },
+      "newStatus": {
+        "201": 80,
+        "400": 19,
+        "401": 9,
+        "403": 17,
+        "404": 19,
+        "409": 15,
+        "413": 6,
+        "429": 5,
+        "500": 7,
+        "503": 41
+      },
+      "statusLogPairs": {
+        "400 | logEvent -": 19,
+        "503 | logEvent -": 41,
+        "500 | logEvent -": 7,
+        "201 | logEvent -": 80,
+        "403 | logEvent -": 17,
+        "401 | logEvent -": 9,
+        "409 | logEvent -": 15,
+        "404 | logEvent -": 19,
+        "429 | logEvent -": 5,
+        "413 | logEvent -": 6
+      },
+      "tags": {
+        "variant:full": 185,
+        "variant:sparse": 18,
+        "code:OWNER_CHECK_UNAVAILABLE": 27,
+        "code:GRANT_OWNERLESS": 14,
+        "code:GRANT_OWNER_ONLY": 17,
+        "code:WORKSPACE_OWNER_UNSET": 15,
+        "variant:noStores": 15,
+        "intent:edge:token-mint-owner": 6,
+        "intent:edge:token-mint-not-owner": 6,
+        "intent:edge:token-limiter-burst": 10,
+        "retry-after": 5,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:edge:gate:body-too-large": 5,
+        "intent:edge:gate:malformed-json": 5,
+        "intent:edge:owner:not-owner": 5,
+        "intent:edge:owner:no-owner": 5,
+        "intent:edge:owner:no-account": 5,
+        "intent:edge:owner:seam-throws": 5,
+        "intent:edge:owner:unwired": 5,
+        "intent:test:tests/unit/lin-3137-dispatch-token-mint-gate.test.js": 8,
+        "intent:test:tests/unit/lin-3137-dispatch-token-preservation.test.js": 2,
+        "intent:test:tests/unit/lin-3137-mint-refusal-parity.test.js": 7
+      }
+    },
+    "GET /api/proxy/autopilot/manual": {
+      "requests": 142,
+      "differing": 0,
+      "byTier": {
+        "gen": 121,
+        "edge": 20,
+        "test": 1
+      },
+      "oldStatus": {
+        "200": 103,
+        "401": 21,
+        "429": 10,
+        "500": 8
+      },
+      "newStatus": {
+        "200": 103,
+        "401": 21,
+        "429": 10,
+        "500": 8
+      },
+      "statusLogPairs": {
+        "200 | logEvent 200": 103,
+        "500 | logEvent -": 8,
+        "401 | logEvent -": 21,
+        "429 | logEvent -": 10
+      },
+      "tags": {
+        "variant:full": 131,
+        "variant:sparse": 7,
+        "variant:noQueue": 4,
+        "code:PROXY_TOKEN_INVALID": 21,
+        "intent:edge:gate:limiter": 5,
+        "intent:edge:gate:no-auth": 5,
+        "intent:edge:gate:rejected": 5,
+        "intent:edge:gate:auth-throws": 5,
+        "intent:test:tests/unit/proxy-endpoint-inventory-witness.test.js": 1
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/presets": {
+      "requests": 147,
+      "differing": 0,
+      "byTier": {
+        "gen": 121,
+        "edge": 21,
+        "test": 5
+      },
+      "oldStatus": {
+        "200": 107,
+        "400": 11,
+        "401": 13,
+        "404": 9,
+        "500": 7
+      },
+      "newStatus": {
+        "200": 107,
+        "400": 11,
+        "401": 13,
+        "404": 9,
+        "500": 7
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 107,
+        "500 | logEvent -": 7,
+        "401 | logEvent -": 13,
+        "400 | logEvent -": 11,
+        "404 | logEvent -": 9
+      },
+      "tags": {
+        "variant:full": 118,
+        "variant:sparse": 9,
+        "variant:noStores": 20,
+        "intent:edge:preset-list-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5,
+        "intent:test:tests/unit/dispatch-route-preset-crud.test.js": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/dispatch/favorite-prompts": {
+      "requests": 143,
+      "differing": 0,
+      "byTier": {
+        "gen": 122,
+        "edge": 21
+      },
+      "oldStatus": {
+        "200": 106,
+        "400": 11,
+        "401": 16,
+        "404": 10
+      },
+      "newStatus": {
+        "200": 106,
+        "400": 11,
+        "401": 16,
+        "404": 10
+      },
+      "statusLogPairs": {
+        "200 | logEvent -": 106,
+        "401 | logEvent -": 16,
+        "400 | logEvent -": 11,
+        "404 | logEvent -": 10
+      },
+      "tags": {
+        "variant:noStores": 24,
+        "variant:full": 108,
+        "variant:sparse": 11,
+        "intent:edge:fav-get-no-store": 6,
+        "intent:edge:gate:bad-urlKey": 5,
+        "intent:edge:gate:no-workspaces": 5,
+        "intent:edge:gate:unknown-workspace": 5
+      }
+    }
+  },
+  "edgeOutcomes": {
+    "POST /workspace/:urlKey/api/dispatch edge:abort+followUpTo": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:prompt-missing": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:target-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:not-owner": {
+      "403 | logEvent -": 11
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:no-owner": {
+      "409 | logEvent -": 11
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:weird": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:throws": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:no-account": {
+      "503 | logEvent -": 11
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:unwired": {
+      "503 | logEvent -": 11
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:dash-ungated": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:abortTo-missing": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:abortTo-without-abort": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:abort-local-target": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:abort-ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:cascade-nonbool": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:cascade-without-abort": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:cascade-ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:cascade-store-throws": {
+      "500 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:kind-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:periodical-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:wait-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:queueIfBusy-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:subscription-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:queueIfBusy+subscription-ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:presetId-empty": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:presetId-miss": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:presetId-hit": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:presetId-no-store": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:maxTasks-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:attachProxy-nonbool": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-abort": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-no-issue": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-ok": {
+      "201 | logEvent -": 5,
+      "422 | logEvent -": 1
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-record-rejects": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-record-sync-throw": {
+      "422 | logEvent -": 1,
+      "201 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:entryRung-no-account": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:stopAt-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:stopAt-followUp": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:stopAt-not-autopilot": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:stopAt-no-issue": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:stopAt-ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:variant-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:variant-cascade": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:variant-not-autopilot": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:surface-bad": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local-remote-host": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:payload-model-long": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:payload-ifParked": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:payload-force-alone": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:dangling": {
+      "422 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:dangling-binding-source": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:dangling-ambiguous-skip": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:referent-auth-swallowed": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:token": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:fallback-scope": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:token-throws": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:ambiguous": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:ctx-throws": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:ctx-slow": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:pilot:control-arm": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:followUp-pbt-mint": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:followUp-declared": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:followUp-declared-invalid": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:followUp-decl-lookup-throws": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:followUp-attach-ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:followUp-attach-unchanged": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:attach-prose": {
+      "422 | logEvent -": 2,
+      "201 | logEvent -": 4
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:attach-mcp": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:attach-unchanged": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:attach-mcp-mint-fails": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:attach-no-store": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:owner-only": {
+      "403 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:owner-unavailable": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:odd-code": {
+      "500 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:no-workspace-id": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:no-token": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:periodical-tail": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:M2:periodical-no-tail": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:dup": {
+      "409 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:dup-force-bypass": {
+      "201 | logEvent -": 5,
+      "422 | logEvent -": 1
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:budget-exhausted": {
+      "409 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:budget-position": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:budget-unverified": {
+      "409 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:runaway": {
+      "409 | logEvent -": 5,
+      "422 | logEvent -": 1
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:close-out-refused": {
+      "409 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:run-limit": {
+      "429 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:run-limit-unverified": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:run-gate-no-account": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:marker-invalid": {
+      "400 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:marker-anchor-terminal": {
+      "409 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:marker-anchor-unverified": {
+      "409 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:marker-anchor-live": {
+      "201 | logEvent -": 5,
+      "409 | logEvent -": 1
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:addItem-throws": {
+      "500 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:warning-never": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:warning-stale": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:prefs-defaults": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:ok-repo": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:unsafe-repo": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:take-throws": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:tty-fails": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:write-fails": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:mint-fails": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:no-feedback-store": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:local:amended-item": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:limiter-burst": {
+      "201 | logEvent -": 30,
+      "429 | logEvent -": 3
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:halt-no-store": {
+      "503 | logEvent -": 6
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:halt-clear-no-store": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:halt-ok": {
+      "200 | logEvent -": 4,
+      "500 | logEvent -": 2
+    },
+    "GET /workspace/:urlKey/api/dispatch/halt edge:halt-read-no-store": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts edge:recent-no-store": {
+      "503 | logEvent -": 6
+    },
+    "GET /workspace/:urlKey/api/dispatch/recent-prompts edge:recent-get-no-account": {
+      "401 | logEvent -": 6
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts edge:fav-delete-no-store": {
+      "503 | logEvent -": 6
+    },
+    "GET /workspace/:urlKey/api/dispatch/favorite-prompts edge:fav-get-no-store": {
+      "200 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:token-mint-owner": {
+      "201 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:token-mint-not-owner": {
+      "403 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:token-limiter-burst": {
+      "201 | logEvent -": 5,
+      "429 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota edge:quota-usage-throws": {
+      "500 | logEvent -": 6
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota edge:quota-free-tier": {
+      "200 | logEvent -": 6
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota edge:quota-free-no-account-store": {
+      "200 | logEvent -": 6
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:preset-patch-keep-byKind": {
+      "200 | logEvent -": 6
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:preset-patch-no-store": {
+      "503 | logEvent -": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets edge:preset-create-no-store": {
+      "503 | logEvent -": 6
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId edge:preset-delete-no-store": {
+      "503 | logEvent -": 6
+    },
+    "GET /workspace/:urlKey/api/dispatch/presets edge:preset-list-no-store": {
+      "200 | logEvent -": 6
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:delete-local-row-member": {
+      "200 | logEvent -": 6
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:trim-ok": {
+      "200 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:ownerless-strict": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:ownerless-compat": {
+      "201 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:no-proxy-store": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:plain-ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:plain-null": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:ok": {
+      "201 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:owner-mismatch": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:ownerless-record": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:row-unreadable": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:row-terminal": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:not-taker": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:done-feedback": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:mint-unavailable": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:mint-structural": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:mint-odd-code": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:mint-plain-error": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:reread-throws": {
+      "503 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:declared:reread-vanished": {
+      "201 | logEvent -": 6
+    },
+    "POST /api/dispatch/broker-token edge:itemId-none-state": {
+      "201 | logEvent -": 6
+    },
+    "POST /api/dispatch/feedback/:itemId edge:harbour-token": {
+      "200 | logEvent -": 6
+    },
+    "POST /api/dispatch/feedback/:itemId edge:withdrawn-clears-cache": {
+      "200 | logEvent -": 6
+    },
+    "POST /api/dispatch/feedback/:itemId edge:wake-provisioner": {
+      "200 | logEvent -": 6
+    },
+    "GET /api/dispatch/poll edge:halt-timeout-cached": {
+      "200 | logEvent -": 6
+    },
+    "GET /api/dispatch/poll edge:poll-no-halt-store": {
+      "200 | logEvent -": 6
+    },
+    "GET /api/dispatch/poll edge:poll-items-reject-during-halt": {
+      "500 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:no-queue": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/dispatch edge:grant-absent": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:grant-take-only": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:read-scope": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:limiter": {
+      "429 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:auth-missing": {
+      "401 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:auth-rejected-descriptor": {
+      "401 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:auth-throws": {
+      "500 | logEvent -": 6
+    },
+    "POST /api/proxy/dispatch edge:abort+followUp": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:prompt-missing": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:target-local": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:abortTo-missing": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:cascade-nonbool": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:cascade-without-abort": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:kind-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:periodical-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:wait-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:queueIfBusy-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:subscription-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:maxTasks-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:payload-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:cascade-ok": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:cascade-throws": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/dispatch edge:abort-ok": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:repo-only": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:dangling": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/dispatch edge:access-null": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:access-throws": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/dispatch edge:append-default-prose": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:append-default-mcp": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:append-optout": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:followUp-default": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:followUp-optout": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:followUp-attach": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:followUp-declared": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:followUp-structural": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/dispatch edge:followUp-declared-owner-only": {
+      "403 | logEvent 403": 6
+    },
+    "POST /api/proxy/dispatch edge:attach-failed": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/dispatch edge:dup": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/dispatch edge:budget": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/dispatch edge:budget-position": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:runaway": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/dispatch edge:close-out": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/dispatch edge:run-limit": {
+      "429 | logEvent 429": 6
+    },
+    "POST /api/proxy/dispatch edge:run-limit-unverified": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/dispatch edge:addItem-throws": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/dispatch edge:orKey-throws": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/dispatch edge:force-queue-wait": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/dispatch edge:pilot": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:no-queue": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:grant-absent": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:id-missing": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:id-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:target-local": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:noDescend-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:wait-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:queue-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:sub-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:repo-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:model-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:harness-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:effort-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:effort-unknown-warn": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:kind-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:periodical-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:session-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:followUp-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:followUp-dash": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:force-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:access-null": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:access-throws": {
+      "401 | logEvent 401": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:unsupported-ctx": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:unsupported-rec": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ok": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ok-periodical-marker": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ok-periodical-caller": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ctx-not-found": {
+      "404 | logEvent 404": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ctx-null": {
+      "404 | logEvent 404": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ctx-gql-401": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ctx-gql-401-transient": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:ctx-timeout": {
+      "504 | logEvent 504": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:hang-up": {
+      "NO_RESPONSE(server 499) | logEvent 499": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:slow-keepalive": {
+      "200 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:slow-keepalive-refusal": {
+      "200 | logEvent 409": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:followUp-attach": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:followUp-pbt": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:optout": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:dup": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:attach-failed": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:structural": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:addItem-gql": {
+      "429 | logEvent 429": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:test-mode": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:override:orKey-free": {
+      "429 | logEvent 429": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:ok": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:ai-unavailable": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:ai-unavailable-test-mode": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:paid-env-witness": {
+      "201 | logEvent 200,201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:free-charge-ok": {
+      "201 | logEvent 200,200,201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:free-charge-429": {
+      "429 | logEvent 200,200,429": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:rec-not-found": {
+      "404 | logEvent 404": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:rec-openrouter": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:rec-gql": {
+      "503 | logEvent 503": 3,
+      "404 | logEvent 404": 1,
+      "429 | logEvent 429": 1,
+      "500 | logEvent 500": 1
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:rec-timeout": {
+      "504 | logEvent 504": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:hang-up": {
+      "NO_RESPONSE(server 499) | logEvent 499": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:hang-up-then-return": {
+      "NO_RESPONSE(server 499) | logEvent 499": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:slow-flush": {
+      "200 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:slow-flush-error": {
+      "200 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:defer-stuck": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:no-prompt": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:descend": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:descend-timeout": {
+      "200 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:cycle": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:noDescend": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:followUp-attach": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:followUp-pbt": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:structural": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:attach-failed": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:dup": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:addItem-gql": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:orKey-throws-outer": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:pilot": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm:x-request-start": {
+      "200 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:no-queue": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:grant-absent": {
+      "403 | logEvent -": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:mode-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:variant-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:goal-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:target-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:repo-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:issue-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:session-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:sub-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:model-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:harness-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:effort-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:effort-unknown": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:preset-empty": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:preset-miss": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:preset-hit": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:preset-no-store": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:maxTasks-bad": {
+      "400 | logEvent 400": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:general-ok": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:general-optout": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-ok": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-access-null": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-unsupported": {
+      "422 | logEvent 422": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-not-found": {
+      "404 | logEvent 404": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-null": {
+      "404 | logEvent 404": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-gql-401": {
+      "503 | logEvent 503": 5,
+      "401 | logEvent 401": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-gql-other": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-hang-up": {
+      "NO_RESPONSE(server 201) | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:scoped-hang-up-dup": {
+      "NO_RESPONSE(server 409) | logEvent 409": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:child-inherits-stopAt": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:child-parent-throws": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:child-no-getItemStatus": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:declared-owner-only": {
+      "403 | logEvent 403": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:declared-unavailable": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:declared-no-workspace": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:declared-ownerless": {
+      "503 | logEvent 503": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:declared-odd": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:dup": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:budget-child": {
+      "409 | logEvent 409": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:run-limit": {
+      "429 | logEvent 429": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:run-limit-no-key-fn": {
+      "201 | logEvent 201": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:addItem-throws": {
+      "500 | logEvent 500": 6
+    },
+    "POST /api/proxy/autopilot/kickoff edge:attach-failed-mcp": {
+      "503 | logEvent 503": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-change": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-feedback": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-timeout": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-vanish": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-terminal-first": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-closed-first": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-full-keepalive": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-client-abort": {
+      "NO_RESPONSE(server 200) | logEvent -": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-client-abort-after-flush": {
+      "NO_RESPONSE(server 200) | logEvent -": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-reread-throws": {
+      "500 | logEvent 500": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:wait-abort-then-throw": {
+      "NO_RESPONSE(server 500) | logEvent 500": 6
+    },
+    "GET /api/proxy/dispatch/:id edge:no-wait-queued-warning": {
+      "200 | logEvent 200": 6
+    },
+    "GET /api/proxy/dispatch edge:lineage-over-cap": {
+      "200 | logEvent 200": 6
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/count edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/count edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/count edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/quota edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/history edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/history edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/history edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:no-workspaces": {
+      "401 | logEvent -": 4,
+      "413 | logEvent -": 1
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/recent-prompts edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/favorite-prompts edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/halt edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/halt edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/halt edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:owner:not-owner": {
+      "403 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:owner:no-owner": {
+      "409 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:owner:no-account": {
+      "503 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/halt edge:owner:unwired": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:owner:not-owner": {
+      "403 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:owner:no-owner": {
+      "409 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:owner:no-account": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/halt edge:owner:unwired": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:owner:not-owner": {
+      "403 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:owner:no-owner": {
+      "409 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:owner:no-account": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/:itemId edge:owner:unwired": {
+      "503 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:owner:not-owner": {
+      "403 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:owner:no-owner": {
+      "409 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:owner:no-account": {
+      "503 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/:sessionId/trim edge:owner:unwired": {
+      "503 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:owner:not-owner": {
+      "403 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:owner:no-owner": {
+      "409 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:owner:no-account": {
+      "503 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/tokens edge:owner:unwired": {
+      "413 | logEvent -": 1,
+      "503 | logEvent -": 4
+    },
+    "GET /workspace/:urlKey/api/dispatch/tokens edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/tokens edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/tokens edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:owner:not-owner": {
+      "403 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:owner:no-owner": {
+      "409 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:owner:no-account": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:owner:seam-throws": {
+      "503 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/tokens/:tokenId edge:owner:unwired": {
+      "503 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/presets edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/presets edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "GET /workspace/:urlKey/api/dispatch/presets edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /workspace/:urlKey/api/dispatch/presets edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "PATCH /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:bad-urlKey": {
+      "400 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:no-workspaces": {
+      "401 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:unknown-workspace": {
+      "404 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "DELETE /workspace/:urlKey/api/dispatch/presets/:presetId edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "GET /api/dispatch/poll edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/dispatch/poll edge:gate:invalid-token": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/dispatch/poll edge:gate:token-store-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/dispatch/broker-token edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/dispatch/broker-token edge:gate:invalid-token": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/dispatch/broker-token edge:gate:token-store-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/dispatch/broker-token edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /api/dispatch/broker-token edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "POST /api/dispatch/take/:itemId edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/dispatch/take/:itemId edge:gate:invalid-token": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/dispatch/take/:itemId edge:gate:token-store-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/dispatch/take/:itemId edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /api/dispatch/take/:itemId edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "POST /api/dispatch/feedback/:itemId edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/dispatch/feedback/:itemId edge:gate:invalid-token": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/dispatch/feedback/:itemId edge:gate:token-store-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/dispatch/feedback/:itemId edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /api/dispatch/feedback/:itemId edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/kickoff edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/kickoff edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/kickoff edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/kickoff edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:read-scope": {
+      "403 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:no-grant": {
+      "403 | logEvent -": 4,
+      "503 | logEvent 503": 1
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /api/proxy/autopilot/kickoff edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/manual edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/manual edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/manual edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/autopilot/manual edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "GET /api/proxy/passage-runner/prompt edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/passage-runner/prompt edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/passage-runner/prompt edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/passage-runner/prompt edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:read-scope": {
+      "403 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:no-grant": {
+      "403 | logEvent -": 4,
+      "201 | logEvent 201": 1
+    },
+    "POST /api/proxy/dispatch edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /api/proxy/dispatch edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:no-auth": {
+      "401 | logEvent -": 4,
+      "400 | logEvent -": 1
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:read-scope": {
+      "403 | logEvent -": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:no-grant": {
+      "403 | logEvent -": 4,
+      "422 | logEvent 422": 1
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:body-too-large": {
+      "413 | logEvent -": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:gate:malformed-json": {
+      "400 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch edge:gate:no-queue": {
+      "503 | logEvent 503": 5
+    },
+    "GET /api/proxy/dispatch/:id edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id edge:gate:no-queue": {
+      "503 | logEvent 503": 5
+    },
+    "GET /api/proxy/dispatch/:id/prompt edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id/prompt edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id/prompt edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id/prompt edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "GET /api/proxy/dispatch/:id/prompt edge:gate:no-queue": {
+      "503 | logEvent 503": 5
+    },
+    "GET /api/proxy/wake-shadow edge:gate:limiter": {
+      "429 | logEvent -": 5
+    },
+    "GET /api/proxy/wake-shadow edge:gate:no-auth": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/wake-shadow edge:gate:rejected": {
+      "401 | logEvent -": 5
+    },
+    "GET /api/proxy/wake-shadow edge:gate:auth-throws": {
+      "500 | logEvent -": 5
+    },
+    "GET /api/proxy/wake-shadow edge:gate:no-queue": {
+      "503 | logEvent 503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:ok": {
+      "201 | logEvent 200,200,201": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:ok": {
+      "201 | logEvent 200,201": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:not-found": {
+      "404 | logEvent 200,200,404": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:not-found": {
+      "404 | logEvent 200,404": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:openrouter": {
+      "503 | logEvent 200,200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:openrouter": {
+      "503 | logEvent 200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:gql-401": {
+      "503 | logEvent 200,200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:gql-401": {
+      "503 | logEvent 200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:gql-403-transient": {
+      "503 | logEvent 200,200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:gql-403-transient": {
+      "503 | logEvent 200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:timeout": {
+      "504 | logEvent 200,200,504": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:timeout": {
+      "504 | logEvent 200,504": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:weird": {
+      "500 | logEvent 200,200,500": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:weird": {
+      "500 | logEvent 200,500": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:defer": {
+      "422 | logEvent 200,200,422": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:defer": {
+      "422 | logEvent 200,422": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:hang-up": {
+      "NO_RESPONSE(server 499) | logEvent 200,200,499": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:hang-up": {
+      "NO_RESPONSE(server 499) | logEvent 200,499": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:dup": {
+      "409 | logEvent 200,200,409": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:dup": {
+      "409 | logEvent 200,409": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:addItem-500": {
+      "500 | logEvent 200,200,500": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:addItem-500": {
+      "500 | logEvent 200,500": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-free:attach-503": {
+      "503 | logEvent 200,200,503": 5
+    },
+    "POST /api/proxy/recommend-and-dispatch edge:llm-paid-env:attach-503": {
+      "503 | logEvent 200,503": 5
+    }
+  },
+  "thinStatusLogPairs": [
+    {
+      "route": "POST /api/proxy/recommend-and-dispatch",
+      "pair": "403 | logEvent 403",
+      "count": 2
+    }
+  ],
+  "differences": [
+    {
+      "endpoint": "POST /api/proxy/dispatch",
+      "kind": "header-derived:etag",
+      "count": 340,
+      "ids": [
+        "gen:2",
+        "gen:66",
+        "gen:117",
+        "gen:174",
+        "gen:264",
+        "gen:273",
+        "gen:311",
+        "gen:389",
+        "gen:390",
+        "gen:394",
+        "gen:414",
+        "gen:773",
+        "gen:805",
+        "gen:949",
+        "gen:960",
+        "gen:1161",
+        "gen:1194",
+        "gen:1307",
+        "gen:1319",
+        "gen:1359",
+        "gen:1406",
+        "gen:1581",
+        "gen:1662",
+        "gen:1700",
+        "gen:1707"
+      ],
+      "bodyPaths": {},
+      "example": {
+        "id": "gen:2",
+        "request": {
+          "method": "POST",
+          "path": "/api/proxy/dispatch",
+          "headers": {
+            "host": "harbour.example",
+            "authorization": "Bearer hb_work_tok"
+          },
+          "body": {
+            "kind": "json",
+            "value": {
+              "prompt": "it's 'quoted' $HOME `x`",
+              "promptName": "Close out",
+              "terminal": "iterm",
+              "repo": "org/repo",
+              "waitForFollowUps": true
+            }
+          }
+        },
+        "difference": {
+          "old": "W/\"1b5-ohDS2HpdfvZya5sX5Uzb/9NAPqI\"",
+          "new": "W/\"1b5-sI6EkIgZkPpbA5ppTTUgU8AR/U0\""
+        },
+        "old": {
+          "status": 201,
+          "headers": {
+            "x-powered-by": "Express",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "437",
+            "etag": "W/\"1b5-ohDS2HpdfvZya5sX5Uzb/9NAPqI\"",
+            "date": "Fri, 16 Oct 2026 23:48:41 GMT",
+            "connection": "close"
+          },
+          "body": {
+            "success": true,
+            "id": "657b2ab4-95bb-4e70-a038-3ef3018361ba",
+            "status": "queued",
+            "promptName": "Close out",
+            "kind": "close-out",
+            "issueIdentifier": null,
+            "target": "cli",
+            "abort": false,
+            "abortTo": null,
+            "cascade": false,
+            "sessionId": null,
+            "maxTasks": null,
+            "dispatchedAt": "2026-10-01T12:03:00.000Z",
+            "consumerLastSeenAt": null,
+            "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts."
+          },
+          "calls": {
+            "store": [
+              {
+                "store": "proxyTokenStore",
+                "op": "validateToken",
+                "args": [
+                  "hb_work_tok"
+                ]
+              },
+              {
+                "store": "workspacePreferencesStore",
+                "op": "getWorkspacePreferences",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "proxyTokenStore",
+                "op": "createToken",
+                "args": [
+                  "acme",
+                  {
+                    "kind": "bootstrap",
+                    "scope": "readWrite",
+                    "label": "dispatch-bootstrap",
+                    "ttl": 172800,
+                    "createdBy": "acct-owner"
+                  }
+                ]
+              },
+              {
+                "store": "dispatchTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "proxyTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "addItem",
+                "args": [
+                  "acme",
+                  {
+                    "promptName": "Close out",
+                    "issueId": null,
+                    "issueIdentifier": null,
+                    "issueTitle": null,
+                    "issueUrl": null,
+                    "dispatchedBy": "acct-owner",
+                    "target": "cli",
+                    "repo": "org/repo",
+                    "followUpTo": null,
+                    "force": false,
+                    "abort": false,
+                    "abortTo": null,
+                    "cascade": false,
+                    "sessionId": null,
+                    "periodicalId": null,
+                    "waitForFollowUps": true,
+                    "queueIfBusy": false,
+                    "subscription": "terminal-only",
+                    "maxTasks": null,
+                    "issueSource": null,
+                    "prompt": "it's 'quoted' $HOME `x`\n\n---\n## Workspace API access (auto-appended)\n\nYou have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: $HARBOUR_LOCAL_BASE/api/proxy\n\nThis workspace's own dispatch API is available locally at the URL in your\nHARBOUR_LOCAL_BASE envi…(+1582)",
+                    "kind": "close-out",
+                    "model": null,
+                    "harness": "claude-code",
+                    "terminal": "iterm",
+                    "effort": null,
+                    "presetConfig": null,
+                    "presetName": null,
+                    "bootstrapToken": "hb_boot_xyz",
+                    "consumerLastSeenAt": null
+                  }
+                ]
+              },
+              {
+                "store": "proxyEventStore",
+                "op": "recordEvent",
+                "args": [
+                  {
+                    "urlKey": "acme",
+                    "tokenId": "ptok-1",
+                    "tokenLabel": "runner-copy",
+                    "method": "POST",
+                    "endpoint": "/api/proxy/dispatch",
+                    "status": 201,
+                    "note": null,
+                    "stage": "provider-lane",
+                    "credentialFingerprint": null,
+                    "credentialSource": "session"
+                  }
+                ]
+              }
+            ],
+            "deps": [
+              {
+                "fn": "proxyLimiter"
+              },
+              {
+                "fn": "authenticateProxyToken"
+              },
+              {
+                "fn": "requireWriteScope",
+                "scope": "readWrite"
+              },
+              {
+                "fn": "resolveProviderAccess",
+                "urlKey": "acme",
+                "ownerAccountId": "acct-owner",
+                "hasReq": true,
+                "opts": {
+                  "source": {
+                    "__undefined": true
+                  }
+                },
+                "argc": 4
+              },
+              {
+                "fn": "getWorkspaceOpenRouterKey",
+                "args": [
+                  "acme",
+                  "acct-owner"
+                ]
+              }
+            ],
+            "log": [
+              {
+                "endpoint": "/api/proxy/dispatch",
+                "status": 201,
+                "note": null,
+                "opts": "<omitted>"
+              }
+            ],
+            "registry": [
+              {
+                "op": "recordCredentialResolution",
+                "urlKey": "acme",
+                "ownerAccountId": "acct-owner",
+                "provider": "linear",
+                "credential": "lin_tok"
+              }
+            ],
+            "fetch": [],
+            "console": [],
+            "unhandled": [],
+            "expressErrors": [],
+            "fs": [],
+            "tty": [],
+            "timers": [],
+            "libConsole": [],
+            "serverResponse": {
+              "statusCode": 201,
+              "ended": true,
+              "headersSent": true,
+              "contentType": "application/json; charset=utf-8",
+              "body": "{\"success\":true,\"id\":\"657b2ab4-95bb-4e70-a038-3ef3018361ba\",\"status\":\"queued\",\"promptName\":\"Close out\",\"kind\":\"close-out\",\"issueIdentifier\":null,\"target\":\"cli\",\"abort\":false,\"abortTo\":null,\"cascade\":false,\"sessionId\":null,\"maxTasks\":null,\"dispatchedAt\":\"2026-10-01T12:03:00.000Z\",\"consumerLastSeenAt\"…(+135)"
+            },
+            "timersPending": []
+          }
+        },
+        "new": {
+          "status": 201,
+          "headers": {
+            "x-powered-by": "Express",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "437",
+            "etag": "W/\"1b5-sI6EkIgZkPpbA5ppTTUgU8AR/U0\"",
+            "date": "Fri, 16 Oct 2026 23:48:41 GMT",
+            "connection": "close"
+          },
+          "body": {
+            "success": true,
+            "id": "657b2ab4-95bb-4e70-a038-3ef3018361ba",
+            "status": "queued",
+            "kind": "close-out",
+            "promptName": "Close out",
+            "issueIdentifier": null,
+            "target": "cli",
+            "sessionId": null,
+            "maxTasks": null,
+            "dispatchedAt": "2026-10-01T12:03:00.000Z",
+            "consumerLastSeenAt": null,
+            "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts.",
+            "abort": false,
+            "abortTo": null,
+            "cascade": false
+          },
+          "calls": {
+            "store": [
+              {
+                "store": "proxyTokenStore",
+                "op": "validateToken",
+                "args": [
+                  "hb_work_tok"
+                ]
+              },
+              {
+                "store": "workspacePreferencesStore",
+                "op": "getWorkspacePreferences",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "proxyTokenStore",
+                "op": "createToken",
+                "args": [
+                  "acme",
+                  {
+                    "kind": "bootstrap",
+                    "scope": "readWrite",
+                    "label": "dispatch-bootstrap",
+                    "ttl": 172800,
+                    "createdBy": "acct-owner"
+                  }
+                ]
+              },
+              {
+                "store": "dispatchTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "proxyTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "addItem",
+                "args": [
+                  "acme",
+                  {
+                    "promptName": "Close out",
+                    "issueId": null,
+                    "issueIdentifier": null,
+                    "issueTitle": null,
+                    "issueUrl": null,
+                    "dispatchedBy": "acct-owner",
+                    "target": "cli",
+                    "repo": "org/repo",
+                    "followUpTo": null,
+                    "force": false,
+                    "abort": false,
+                    "abortTo": null,
+                    "cascade": false,
+                    "sessionId": null,
+                    "periodicalId": null,
+                    "waitForFollowUps": true,
+                    "queueIfBusy": false,
+                    "subscription": "terminal-only",
+                    "maxTasks": null,
+                    "issueSource": null,
+                    "prompt": "it's 'quoted' $HOME `x`\n\n---\n## Workspace API access (auto-appended)\n\nYou have a workspace API proxy for this workspace (source-neutral; currently backed by Linear). Base: $HARBOUR_LOCAL_BASE/api/proxy\n\nThis workspace's own dispatch API is available locally at the URL in your\nHARBOUR_LOCAL_BASE envi…(+1582)",
+                    "kind": "close-out",
+                    "model": null,
+                    "harness": "claude-code",
+                    "terminal": "iterm",
+                    "effort": null,
+                    "presetConfig": null,
+                    "presetName": null,
+                    "bootstrapToken": "hb_boot_xyz",
+                    "consumerLastSeenAt": null
+                  }
+                ]
+              },
+              {
+                "store": "proxyEventStore",
+                "op": "recordEvent",
+                "args": [
+                  {
+                    "urlKey": "acme",
+                    "tokenId": "ptok-1",
+                    "tokenLabel": "runner-copy",
+                    "method": "POST",
+                    "endpoint": "/api/proxy/dispatch",
+                    "status": 201,
+                    "note": null,
+                    "stage": "provider-lane",
+                    "credentialFingerprint": null,
+                    "credentialSource": "session"
+                  }
+                ]
+              }
+            ],
+            "deps": [
+              {
+                "fn": "proxyLimiter"
+              },
+              {
+                "fn": "authenticateProxyToken"
+              },
+              {
+                "fn": "requireWriteScope",
+                "scope": "readWrite"
+              },
+              {
+                "fn": "resolveProviderAccess",
+                "urlKey": "acme",
+                "ownerAccountId": "acct-owner",
+                "hasReq": true,
+                "opts": {
+                  "source": {
+                    "__undefined": true
+                  }
+                },
+                "argc": 4
+              },
+              {
+                "fn": "getWorkspaceOpenRouterKey",
+                "args": [
+                  "acme",
+                  "acct-owner"
+                ]
+              }
+            ],
+            "log": [
+              {
+                "endpoint": "/api/proxy/dispatch",
+                "status": 201,
+                "note": null,
+                "opts": "<omitted>"
+              }
+            ],
+            "registry": [
+              {
+                "op": "recordCredentialResolution",
+                "urlKey": "acme",
+                "ownerAccountId": "acct-owner",
+                "provider": "linear",
+                "credential": "lin_tok"
+              }
+            ],
+            "fetch": [],
+            "console": [],
+            "unhandled": [],
+            "expressErrors": [],
+            "fs": [],
+            "tty": [],
+            "timers": [],
+            "libConsole": [],
+            "serverResponse": {
+              "statusCode": 201,
+              "ended": true,
+              "headersSent": true,
+              "contentType": "application/json; charset=utf-8",
+              "body": "{\"success\":true,\"id\":\"657b2ab4-95bb-4e70-a038-3ef3018361ba\",\"status\":\"queued\",\"kind\":\"close-out\",\"promptName\":\"Close out\",\"issueIdentifier\":null,\"target\":\"cli\",\"sessionId\":null,\"maxTasks\":null,\"dispatchedAt\":\"2026-10-01T12:03:00.000Z\",\"consumerLastSeenAt\":null,\"warning\":\"No consumer has ever polled …(+135)"
+            },
+            "timersPending": []
+          }
+        }
+      }
+    }
+  ]
+}

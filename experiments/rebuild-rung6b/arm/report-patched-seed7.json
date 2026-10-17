@@ -1,0 +1,602 @@
+{
+  "tool": "kpi-stats (rung6b score @91fca7dd) behavioural replay",
+  "snapshot": {
+    "sha": "91fca7dd875bc8842bcbf849ba44ea441bbd6d00",
+    "dir": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/replay-kit/snapshots/91fca7dd"
+  },
+  "old": {
+    "spec": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6b/arm/replay91/pinned/old-patched",
+    "files": [
+      {
+        "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6b/arm/replay91/pinned/old-patched/kpi-stats.js",
+        "sha": "389322545f1a"
+      }
+    ]
+  },
+  "new": {
+    "spec": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6b/arm/replay91/pinned/new-91fca7dd",
+    "files": [
+      {
+        "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6b/arm/replay91/pinned/new-91fca7dd/kpi-stats.js",
+        "sha": "980b9743919d"
+      }
+    ],
+    "rewrites": []
+  },
+  "options": {
+    "n": 3000,
+    "seed": 7,
+    "now": "2026-10-01T12:00:00.000Z",
+    "tiers": [
+      "test",
+      "edge",
+      "gen"
+    ],
+    "only": null
+  },
+  "totals": {
+    "inputs": 3193,
+    "differing": 0,
+    "withInfoOnly": 0,
+    "byTier": {
+      "test": {
+        "inputs": 103,
+        "differing": 0
+      },
+      "edge": {
+        "inputs": 90,
+        "differing": 0
+      },
+      "gen": {
+        "inputs": 3000,
+        "differing": 0
+      }
+    },
+    "kinds": {},
+    "seconds": 28.4
+  },
+  "findings": {
+    "old": {
+      "inputs": 0,
+      "groups": []
+    },
+    "new": {
+      "inputs": 0,
+      "groups": []
+    }
+  },
+  "byFamily": {
+    "test:digest-feedback.test.js": {
+      "inputs": 3,
+      "differing": 0
+    },
+    "test:kpi-stats-pins.test.js": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "test:kpi-stats.test.js": {
+      "inputs": 97,
+      "differing": 0
+    },
+    "test:lin3014-capture-kpis.test.js": {
+      "inputs": 2,
+      "differing": 0
+    },
+    "edge:activity-window-edges:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:activity-window-edges:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:activity-window-edges:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:agent-status-window:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:agent-status-window:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:agent-status-window:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:busiest-median:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:busiest-median:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:busiest-median:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:categorize-noargs": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:categorize-table": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:digest-variants:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:digest-variants:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:digest-variants:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:empty": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:empty-dbBackend": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:empty-default-now": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:agentStatus.toArray:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:agentStatus.toArray:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:agentStatus.toArray:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:dispatchHistory.aggregate:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:dispatchHistory.aggregate:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:dispatchHistory.aggregate:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:dispatchHistory.toArray:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:dispatchHistory.toArray:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:dispatchHistory.toArray:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:proxyEvents.aggregate:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:proxyEvents.aggregate:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:proxyEvents.aggregate:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:proxyEvents.toArray:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:proxyEvents.toArray:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:proxyEvents.toArray:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:sessions.find:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:sessions.find:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:sessions.find:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:userPreferences.countDocuments:reject": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:userPreferences.countDocuments:rejectBare": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:fail:userPreferences.countDocuments:throw": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:free-tier:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:free-tier:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:free-tier:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:funnel-dep-rejects": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:funnel-full": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:funnel-merge-click-rejects": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:funnel-uninstrumented": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-fail:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-fail:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-fail:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-noopts-undefined": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-null": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-since:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-since:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory-since:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:loadHistory:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:missing-collection": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:no-funnel-deps": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:no-options": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:now-boundary:2026-09-30T23:59:59.999Z": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:now-boundary:2026-10-01T00:00:00.000Z": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:null-collection": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:outcome-weeks:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:outcome-weeks:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:outcome-weeks:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:privacy-shapes:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:privacy-shapes:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:privacy-shapes:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:proxy-bins:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:proxy-bins:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:proxy-bins:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:reads-only:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:reads-only:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:reads-only:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:sequence": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:sessions-expiry:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:sessions-expiry:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:sessions-expiry:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:top-endpoints:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:top-endpoints:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:top-endpoints:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:top-kinds:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:top-kinds:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:top-kinds:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:workspace-union:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:workspace-union:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:workspace-union:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:writes-ratio:mango": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:writes-ratio:mango-noagg": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "edge:writes-ratio:mock": {
+      "inputs": 1,
+      "differing": 0
+    },
+    "gen:categorize": {
+      "inputs": 225,
+      "differing": 0
+    },
+    "gen:collect": {
+      "inputs": 2403,
+      "differing": 0
+    },
+    "gen:loadHistory": {
+      "inputs": 217,
+      "differing": 0
+    },
+    "gen:sequence": {
+      "inputs": 155,
+      "differing": 0
+    }
+  },
+  "testTier": {
+    "files": 4,
+    "discovery": null,
+    "callsByExport": {
+      "loadDispatchHistory": 11,
+      "collectKpiStats": 73,
+      "categorizeProxyEvent": 19
+    },
+    "perFile": [
+      {
+        "file": "tests/unit/digest-feedback.test.js",
+        "calls": {
+          "old": 3,
+          "new": 3
+        },
+        "tests": {
+          "old": 83,
+          "oldFailing": 0,
+          "new": 83,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 340,
+          "new": 308
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/kpi-stats-pins.test.js",
+        "calls": {
+          "old": 1,
+          "new": 1
+        },
+        "tests": {
+          "old": 2,
+          "oldFailing": 0,
+          "new": 2,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 233,
+          "new": 226
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/kpi-stats.test.js",
+        "calls": {
+          "old": 97,
+          "new": 97
+        },
+        "tests": {
+          "old": 89,
+          "oldFailing": 0,
+          "new": 89,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 642,
+          "new": 434
+        },
+        "oldFailures": []
+      },
+      {
+        "file": "tests/unit/lin3014-capture-kpis.test.js",
+        "calls": {
+          "old": 2,
+          "new": 2
+        },
+        "tests": {
+          "old": 2,
+          "oldFailing": 0,
+          "new": 2,
+          "newFailing": 0
+        },
+        "exit": {
+          "old": 0,
+          "new": 0
+        },
+        "ms": {
+          "old": 247,
+          "new": 252
+        },
+        "oldFailures": []
+      }
+    ]
+  },
+  "groups": [],
+  "infoGroups": [],
+  "exportsDiff": {
+    "old": {
+      "ACTIVITY_WINDOW_DAYS": "number:30",
+      "FREE_TIER_WINDOW_DAYS": "number:7",
+      "HOURLY_WINDOW_HOURS": "number:24",
+      "OUTCOME_WINDOW_WEEKS": "number:4",
+      "PROXY_PHASES": "object:[\"orienting\",\"deciding\",\"acting\",\"watching\",\"reporting\"]",
+      "__internal": "object",
+      "__internal.FRESH_DIGEST": "object:{\"$and\":[{\"$eq\":[{\"$type\":\"$feedbackDigest\"},\"object\"]},{\"$eq\":[{\"$ifNull\":[\"$feedbackDigest.version\",-1]},{\"$ifNull\":[\"$feedbackVersion\",0]}]}]}",
+      "categorizeProxyEvent": "function/2",
+      "collectKpiStats": "function/1 async",
+      "loadDispatchHistory": "function/1 async"
+    },
+    "differences": []
+  },
+  "fnCensus": {
+    "loadDispatchHistory": {
+      "calls": 239,
+      "modes": {
+        "resolve": 231,
+        "reject": 8
+      }
+    },
+    "collectKpiStats": {
+      "calls": 2864,
+      "modes": {
+        "resolve": 2574,
+        "reject": 290
+      }
+    },
+    "categorizeProxyEvent": {
+      "calls": 597,
+      "modes": {
+        "return": 597
+      }
+    }
+  },
+  "networkAttempts": [],
+  "differing": []
+}

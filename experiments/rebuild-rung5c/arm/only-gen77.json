@@ -1,0 +1,1243 @@
+{
+  "tool": "dispatch routers behavioural replay (rung 5c)",
+  "lib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/wt",
+  "libHead": "d2d7d81882bb67e7201988f773db7888fc901cb0",
+  "seed": 1,
+  "n": 6000,
+  "tiers": "gen,edge,test",
+  "fatal": null,
+  "old": {
+    "session": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/replay/pinned/origin-main/dispatch.js",
+    "proxyDispatch": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/replay/pinned/origin-main/proxy-dispatch.js",
+    "kickoff": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/replay/pinned/origin-main/proxy-kickoff.js"
+  },
+  "new": {
+    "session": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/newroutes/dispatch.js",
+    "proxyDispatch": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/newroutes/proxy-dispatch.js",
+    "kickoff": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/newroutes/proxy-kickoff.js"
+  },
+  "importSideEffects": {
+    "old": {
+      "session": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [
+          "NODE_V8_COVERAGE",
+          "OPENROUTER_API_URL"
+        ],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 170,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "proxyDispatch": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 27,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "kickoff": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 20,
+        "sideResolutions": [],
+        "importError": null
+      }
+    },
+    "new": {
+      "session": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [
+          "OPENROUTER_API_URL"
+        ],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 168,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "proxyDispatch": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 28,
+        "sideResolutions": [],
+        "importError": null
+      },
+      "kickoff": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 21,
+        "sideResolutions": [],
+        "importError": null
+      }
+    }
+  },
+  "exportsDiff": {
+    "session": [],
+    "proxyDispatch": [],
+    "kickoff": []
+  },
+  "summary": {
+    "requests": 1,
+    "differingRequests": 1,
+    "groups": 1,
+    "perTier": {
+      "gen": {
+        "requests": 1,
+        "differing": 1
+      }
+    },
+    "elapsedMs": 381,
+    "socketEscapesDuringReplay": 0,
+    "fetchAttempts": null
+  },
+  "perRoute": {
+    "POST /api/proxy/dispatch": {
+      "requests": 1,
+      "differing": 1,
+      "byTier": {
+        "gen": 1
+      },
+      "oldStatus": {
+        "201": 1
+      },
+      "newStatus": {
+        "201": 1
+      },
+      "statusLogPairs": {
+        "201 | logEvent 201": 1
+      },
+      "tags": {
+        "variant:full": 1,
+        "intent:issue:clean": 1,
+        "warning": 1,
+        "enqueued": 1
+      }
+    }
+  },
+  "edgeOutcomes": {},
+  "thinStatusLogPairs": [
+    {
+      "route": "POST /api/proxy/dispatch",
+      "pair": "201 | logEvent 201",
+      "count": 1
+    }
+  ],
+  "differences": [
+    {
+      "endpoint": "POST /api/proxy/dispatch",
+      "kind": "header-derived:etag",
+      "count": 1,
+      "ids": [
+        "gen:77"
+      ],
+      "bodyPaths": {},
+      "example": {
+        "id": "gen:77",
+        "request": {
+          "method": "POST",
+          "path": "/api/proxy/dispatch",
+          "headers": {
+            "host": "harbour.example",
+            "authorization": "Bearer hb_work_tok"
+          },
+          "body": {
+            "kind": "json",
+            "value": {
+              "prompt": "tab\there\r\nCRLF",
+              "issueIdentifier": "LIN-42",
+              "issueId": "LIN-42",
+              "kind": "implementation",
+              "appendProxyContext": false
+            }
+          }
+        },
+        "difference": {
+          "old": "W/\"1bb-r//Y1yCUlZzbxigsnCDI+W4htIo\"",
+          "new": "W/\"1bb-0QKeW28evZ5ZsHikrolkaOzFQio\""
+        },
+        "old": {
+          "status": 201,
+          "headers": {
+            "x-powered-by": "Express",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "443",
+            "etag": "W/\"1bb-r//Y1yCUlZzbxigsnCDI+W4htIo\"",
+            "date": "Fri, 16 Oct 2026 23:47:11 GMT",
+            "connection": "close"
+          },
+          "body": {
+            "success": true,
+            "id": "245c860b-9135-4fc1-ac20-793e5ca8ee3a",
+            "status": "queued",
+            "promptName": "Prompt",
+            "kind": "implementation",
+            "issueIdentifier": "LIN-42",
+            "target": "cli",
+            "abort": false,
+            "abortTo": null,
+            "cascade": false,
+            "sessionId": null,
+            "maxTasks": null,
+            "dispatchedAt": "2026-10-01T13:55:30.000Z",
+            "consumerLastSeenAt": null,
+            "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts."
+          },
+          "calls": {
+            "store": [
+              {
+                "store": "proxyTokenStore",
+                "op": "validateToken",
+                "args": [
+                  "hb_work_tok"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "findRecentFreshDispatch",
+                "args": [
+                  "acme",
+                  {
+                    "issueIdentifier": "LIN-42",
+                    "kind": "implementation",
+                    "since": {
+                      "__date": "2026-10-01T13:50:30.000Z"
+                    }
+                  }
+                ]
+              },
+              {
+                "store": "workspacePreferencesStore",
+                "op": "getWorkspacePreferences",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "proxyTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "countPilotEligible",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "addItem",
+                "args": [
+                  "acme",
+                  {
+                    "promptName": "Prompt",
+                    "issueId": "LIN-42",
+                    "issueIdentifier": "LIN-42",
+                    "issueTitle": null,
+                    "issueUrl": null,
+                    "dispatchedBy": null,
+                    "target": "cli",
+                    "repo": null,
+                    "followUpTo": null,
+                    "force": false,
+                    "abort": false,
+                    "abortTo": null,
+                    "cascade": false,
+                    "sessionId": null,
+                    "periodicalId": null,
+                    "waitForFollowUps": false,
+                    "queueIfBusy": false,
+                    "subscription": "terminal-only",
+                    "maxTasks": null,
+                    "issueSource": null,
+                    "prompt": "tab\there\r\nCRLF",
+                    "kind": "implementation",
+                    "model": null,
+                    "harness": "claude-code",
+                    "terminal": null,
+                    "effort": null,
+                    "presetConfig": null,
+                    "presetName": null,
+                    "bootstrapToken": null,
+                    "consumerLastSeenAt": null
+                  }
+                ]
+              },
+              {
+                "store": "proxyEventStore",
+                "op": "recordEvent",
+                "args": [
+                  {
+                    "urlKey": "acme",
+                    "tokenId": "ptok-1",
+                    "tokenLabel": "runner-copy",
+                    "method": "POST",
+                    "endpoint": "/api/proxy/dispatch",
+                    "status": 201,
+                    "note": null,
+                    "stage": "provider-lane",
+                    "credentialFingerprint": "fp-1",
+                    "credentialSource": "session"
+                  }
+                ]
+              }
+            ],
+            "deps": [
+              {
+                "fn": "proxyLimiter"
+              },
+              {
+                "fn": "authenticateProxyToken"
+              },
+              {
+                "fn": "requireWriteScope",
+                "scope": "readWrite"
+              },
+              {
+                "fn": "resolveProviderAccess",
+                "urlKey": "acme",
+                "ownerAccountId": null,
+                "hasReq": true,
+                "opts": {
+                  "source": {
+                    "__undefined": true
+                  }
+                },
+                "argc": 4
+              },
+              {
+                "fn": "provider.issueWriteGuard",
+                "args": [
+                  "lin_tok",
+                  "LIN-42"
+                ]
+              },
+              {
+                "fn": "getWorkspaceOpenRouterKey",
+                "args": [
+                  "acme",
+                  null
+                ]
+              }
+            ],
+            "log": [
+              {
+                "endpoint": "/api/proxy/dispatch",
+                "status": 201,
+                "note": null,
+                "opts": "<omitted>"
+              }
+            ],
+            "registry": [
+              {
+                "op": "recordCredentialResolution",
+                "urlKey": "acme",
+                "ownerAccountId": null,
+                "provider": "linear",
+                "credential": "lin_tok"
+              },
+              {
+                "op": "witnessAccepted",
+                "fingerprint": "fp-1"
+              }
+            ],
+            "fetch": [],
+            "console": [
+              {
+                "level": "log",
+                "msg": "[file-pointer] {\"issueIdentifier\":\"LIN-42\",\"c0\":1,\"c1\":null,\"arm\":\"control\",\"delivered\":false,\"failOpen\":false,\"reason\":null,\"gapMs\":0}"
+              }
+            ],
+            "unhandled": [],
+            "expressErrors": [],
+            "fs": [],
+            "tty": [],
+            "timers": [
+              {
+                "op": "setTimeout",
+                "ms": 2000,
+                "at": 1790862930000
+              },
+              {
+                "op": "clear",
+                "at": 1790862930000
+              }
+            ],
+            "libConsole": [],
+            "serverResponse": {
+              "statusCode": 201,
+              "ended": true,
+              "headersSent": true,
+              "contentType": "application/json; charset=utf-8",
+              "body": "{\"success\":true,\"id\":\"245c860b-9135-4fc1-ac20-793e5ca8ee3a\",\"status\":\"queued\",\"promptName\":\"Prompt\",\"kind\":\"implementation\",\"issueIdentifier\":\"LIN-42\",\"target\":\"cli\",\"abort\":false,\"abortTo\":null,\"cascade\":false,\"sessionId\":null,\"maxTasks\":null,\"dispatchedAt\":\"2026-10-01T13:55:30.000Z\",\"consumerLastS…(+141)"
+            },
+            "timersPending": []
+          }
+        },
+        "new": {
+          "status": 201,
+          "headers": {
+            "x-powered-by": "Express",
+            "content-type": "application/json; charset=utf-8",
+            "content-length": "443",
+            "etag": "W/\"1bb-0QKeW28evZ5ZsHikrolkaOzFQio\"",
+            "date": "Fri, 16 Oct 2026 23:47:11 GMT",
+            "connection": "close"
+          },
+          "body": {
+            "success": true,
+            "id": "245c860b-9135-4fc1-ac20-793e5ca8ee3a",
+            "status": "queued",
+            "kind": "implementation",
+            "promptName": "Prompt",
+            "issueIdentifier": "LIN-42",
+            "target": "cli",
+            "sessionId": null,
+            "maxTasks": null,
+            "dispatchedAt": "2026-10-01T13:55:30.000Z",
+            "consumerLastSeenAt": null,
+            "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts.",
+            "abort": false,
+            "abortTo": null,
+            "cascade": false
+          },
+          "calls": {
+            "store": [
+              {
+                "store": "proxyTokenStore",
+                "op": "validateToken",
+                "args": [
+                  "hb_work_tok"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "findRecentFreshDispatch",
+                "args": [
+                  "acme",
+                  {
+                    "issueIdentifier": "LIN-42",
+                    "kind": "implementation",
+                    "since": {
+                      "__date": "2026-10-01T13:50:30.000Z"
+                    }
+                  }
+                ]
+              },
+              {
+                "store": "workspacePreferencesStore",
+                "op": "getWorkspacePreferences",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "proxyTokenStore",
+                "op": "listTokens",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "countPilotEligible",
+                "args": [
+                  "acme"
+                ]
+              },
+              {
+                "store": "dispatchQueueStore",
+                "op": "addItem",
+                "args": [
+                  "acme",
+                  {
+                    "promptName": "Prompt",
+                    "issueId": "LIN-42",
+                    "issueIdentifier": "LIN-42",
+                    "issueTitle": null,
+                    "issueUrl": null,
+                    "dispatchedBy": null,
+                    "target": "cli",
+                    "repo": null,
+                    "followUpTo": null,
+                    "force": false,
+                    "abort": false,
+                    "abortTo": null,
+                    "cascade": false,
+                    "sessionId": null,
+                    "periodicalId": null,
+                    "waitForFollowUps": false,
+                    "queueIfBusy": false,
+                    "subscription": "terminal-only",
+                    "maxTasks": null,
+                    "issueSource": null,
+                    "prompt": "tab\there\r\nCRLF",
+                    "kind": "implementation",
+                    "model": null,
+                    "harness": "claude-code",
+                    "terminal": null,
+                    "effort": null,
+                    "presetConfig": null,
+                    "presetName": null,
+                    "bootstrapToken": null,
+                    "consumerLastSeenAt": null
+                  }
+                ]
+              },
+              {
+                "store": "proxyEventStore",
+                "op": "recordEvent",
+                "args": [
+                  {
+                    "urlKey": "acme",
+                    "tokenId": "ptok-1",
+                    "tokenLabel": "runner-copy",
+                    "method": "POST",
+                    "endpoint": "/api/proxy/dispatch",
+                    "status": 201,
+                    "note": null,
+                    "stage": "provider-lane",
+                    "credentialFingerprint": "fp-1",
+                    "credentialSource": "session"
+                  }
+                ]
+              }
+            ],
+            "deps": [
+              {
+                "fn": "proxyLimiter"
+              },
+              {
+                "fn": "authenticateProxyToken"
+              },
+              {
+                "fn": "requireWriteScope",
+                "scope": "readWrite"
+              },
+              {
+                "fn": "resolveProviderAccess",
+                "urlKey": "acme",
+                "ownerAccountId": null,
+                "hasReq": true,
+                "opts": {
+                  "source": {
+                    "__undefined": true
+                  }
+                },
+                "argc": 4
+              },
+              {
+                "fn": "provider.issueWriteGuard",
+                "args": [
+                  "lin_tok",
+                  "LIN-42"
+                ]
+              },
+              {
+                "fn": "getWorkspaceOpenRouterKey",
+                "args": [
+                  "acme",
+                  null
+                ]
+              }
+            ],
+            "log": [
+              {
+                "endpoint": "/api/proxy/dispatch",
+                "status": 201,
+                "note": null,
+                "opts": "<omitted>"
+              }
+            ],
+            "registry": [
+              {
+                "op": "recordCredentialResolution",
+                "urlKey": "acme",
+                "ownerAccountId": null,
+                "provider": "linear",
+                "credential": "lin_tok"
+              },
+              {
+                "op": "witnessAccepted",
+                "fingerprint": "fp-1"
+              }
+            ],
+            "fetch": [],
+            "console": [
+              {
+                "level": "log",
+                "msg": "[file-pointer] {\"issueIdentifier\":\"LIN-42\",\"c0\":1,\"c1\":null,\"arm\":\"control\",\"delivered\":false,\"failOpen\":false,\"reason\":null,\"gapMs\":0}"
+              }
+            ],
+            "unhandled": [],
+            "expressErrors": [],
+            "fs": [],
+            "tty": [],
+            "timers": [
+              {
+                "op": "setTimeout",
+                "ms": 2000,
+                "at": 1790862930000
+              },
+              {
+                "op": "clear",
+                "at": 1790862930000
+              }
+            ],
+            "libConsole": [],
+            "serverResponse": {
+              "statusCode": 201,
+              "ended": true,
+              "headersSent": true,
+              "contentType": "application/json; charset=utf-8",
+              "body": "{\"success\":true,\"id\":\"245c860b-9135-4fc1-ac20-793e5ca8ee3a\",\"status\":\"queued\",\"kind\":\"implementation\",\"promptName\":\"Prompt\",\"issueIdentifier\":\"LIN-42\",\"target\":\"cli\",\"sessionId\":null,\"maxTasks\":null,\"dispatchedAt\":\"2026-10-01T13:55:30.000Z\",\"consumerLastSeenAt\":null,\"warning\":\"No consumer has ever p…(+141)"
+            },
+            "timersPending": []
+          }
+        }
+      }
+    }
+  ],
+  "onlyDetail": [
+    {
+      "scenario": {
+        "tier": "gen",
+        "index": 77,
+        "id": "gen:77",
+        "routeKey": "POST /api/proxy/dispatch",
+        "lane": "proxy",
+        "variant": "full",
+        "method": "POST",
+        "path": "/api/proxy/dispatch",
+        "headers": {
+          "host": "harbour.example",
+          "authorization": "Bearer hb_work_tok"
+        },
+        "body": {
+          "kind": "json",
+          "value": {
+            "prompt": "tab\there\r\nCRLF",
+            "issueIdentifier": "LIN-42",
+            "issueId": "LIN-42",
+            "kind": "implementation",
+            "appendProxyContext": false
+          }
+        },
+        "clockBase": 1790862930000,
+        "randomSeed": 1022069865,
+        "env": {
+          "NODE_ENV": "test",
+          "HARBOUR_FILE_POINTER_PILOT": "1"
+        },
+        "stores": {
+          "proxyTokenStore": {
+            "validateToken": {
+              "ret": {
+                "tokenId": "ptok-1",
+                "urlKey": "acme",
+                "label": "runner-copy",
+                "scope": "readWrite",
+                "createdBy": null,
+                "grants": [
+                  "dispatch"
+                ]
+              }
+            },
+            "describeRejectionCause": {
+              "ret": {
+                "state": "consumed",
+                "urlKey": "acme"
+              }
+            },
+            "listTokens": {
+              "ret": [
+                {
+                  "lastUsedAt": "2026-10-01T13:54:30.000Z",
+                  "grants": []
+                },
+                {
+                  "lastUsedAt": "2026-10-01T13:54:30.000Z"
+                }
+              ]
+            },
+            "createToken": {
+              "ret": {
+                "token": "hb_boot_xyz",
+                "expiresAt": "2026-10-03T13:55:30.000Z"
+              }
+            },
+            "mintGrantBootstrap": {
+              "ret": {
+                "token": "hb_grant_xyz",
+                "workspaceId": "ws-acme"
+              }
+            }
+          },
+          "dispatchQueueStore": {
+            "countPilotEligible": {
+              "ret": 1
+            }
+          },
+          "workspacePreferencesStore": {
+            "getWorkspacePreferences": {
+              "ret": {}
+            }
+          },
+          "dispatchTokenStore": {
+            "listTokens": {
+              "ret": [
+                {
+                  "lastUsedAt": null
+                }
+              ]
+            }
+          },
+          "freeTierStore": {
+            "checkRun": {
+              "ret": {
+                "allowed": true
+              }
+            }
+          }
+        },
+        "ids": {
+          "item": "245c860b-9135-4fc1-ac20-793e5ca8ee3a"
+        },
+        "intent": "issue:clean",
+        "access": {
+          "token": "lin_tok",
+          "providerName": "linear",
+          "credentialFingerprint": "fp-1",
+          "expiresAt": 1790866530000,
+          "credentialSource": "session"
+        },
+        "provider": {
+          "name": "linear",
+          "unsupported": [],
+          "missing": [],
+          "methods": {
+            "issueWriteGuard": {
+              "ret": {
+                "id": "issue-1"
+              }
+            },
+            "fetchIssueContext": {
+              "ret": {
+                "issue": {
+                  "description": "Plan: do X"
+                }
+              }
+            }
+          }
+        },
+        "registry": {},
+        "orKey": {
+          "ret": "sk-or-creator"
+        }
+      },
+      "old": {
+        "status": 201,
+        "headers": {
+          "x-powered-by": "Express",
+          "content-type": "application/json; charset=utf-8",
+          "content-length": "443",
+          "etag": "W/\"1bb-r//Y1yCUlZzbxigsnCDI+W4htIo\"",
+          "date": "Fri, 16 Oct 2026 23:47:11 GMT",
+          "connection": "close"
+        },
+        "body": {
+          "success": true,
+          "id": "245c860b-9135-4fc1-ac20-793e5ca8ee3a",
+          "status": "queued",
+          "promptName": "Prompt",
+          "kind": "implementation",
+          "issueIdentifier": "LIN-42",
+          "target": "cli",
+          "abort": false,
+          "abortTo": null,
+          "cascade": false,
+          "sessionId": null,
+          "maxTasks": null,
+          "dispatchedAt": "2026-10-01T13:55:30.000Z",
+          "consumerLastSeenAt": null,
+          "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts."
+        },
+        "calls": {
+          "store": [
+            {
+              "store": "proxyTokenStore",
+              "op": "validateToken",
+              "args": [
+                "hb_work_tok"
+              ]
+            },
+            {
+              "store": "dispatchQueueStore",
+              "op": "findRecentFreshDispatch",
+              "args": [
+                "acme",
+                {
+                  "issueIdentifier": "LIN-42",
+                  "kind": "implementation",
+                  "since": {
+                    "__date": "2026-10-01T13:50:30.000Z"
+                  }
+                }
+              ]
+            },
+            {
+              "store": "workspacePreferencesStore",
+              "op": "getWorkspacePreferences",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "dispatchTokenStore",
+              "op": "listTokens",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "proxyTokenStore",
+              "op": "listTokens",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "dispatchQueueStore",
+              "op": "countPilotEligible",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "dispatchQueueStore",
+              "op": "addItem",
+              "args": [
+                "acme",
+                {
+                  "promptName": "Prompt",
+                  "issueId": "LIN-42",
+                  "issueIdentifier": "LIN-42",
+                  "issueTitle": null,
+                  "issueUrl": null,
+                  "dispatchedBy": null,
+                  "target": "cli",
+                  "repo": null,
+                  "followUpTo": null,
+                  "force": false,
+                  "abort": false,
+                  "abortTo": null,
+                  "cascade": false,
+                  "sessionId": null,
+                  "periodicalId": null,
+                  "waitForFollowUps": false,
+                  "queueIfBusy": false,
+                  "subscription": "terminal-only",
+                  "maxTasks": null,
+                  "issueSource": null,
+                  "prompt": "tab\there\r\nCRLF",
+                  "kind": "implementation",
+                  "model": null,
+                  "harness": "claude-code",
+                  "terminal": null,
+                  "effort": null,
+                  "presetConfig": null,
+                  "presetName": null,
+                  "bootstrapToken": null,
+                  "consumerLastSeenAt": null
+                }
+              ]
+            },
+            {
+              "store": "proxyEventStore",
+              "op": "recordEvent",
+              "args": [
+                {
+                  "urlKey": "acme",
+                  "tokenId": "ptok-1",
+                  "tokenLabel": "runner-copy",
+                  "method": "POST",
+                  "endpoint": "/api/proxy/dispatch",
+                  "status": 201,
+                  "note": null,
+                  "stage": "provider-lane",
+                  "credentialFingerprint": "fp-1",
+                  "credentialSource": "session"
+                }
+              ]
+            }
+          ],
+          "deps": [
+            {
+              "fn": "proxyLimiter"
+            },
+            {
+              "fn": "authenticateProxyToken"
+            },
+            {
+              "fn": "requireWriteScope",
+              "scope": "readWrite"
+            },
+            {
+              "fn": "resolveProviderAccess",
+              "urlKey": "acme",
+              "ownerAccountId": null,
+              "hasReq": true,
+              "opts": {
+                "source": {
+                  "__undefined": true
+                }
+              },
+              "argc": 4
+            },
+            {
+              "fn": "provider.issueWriteGuard",
+              "args": [
+                "lin_tok",
+                "LIN-42"
+              ]
+            },
+            {
+              "fn": "getWorkspaceOpenRouterKey",
+              "args": [
+                "acme",
+                null
+              ]
+            }
+          ],
+          "log": [
+            {
+              "endpoint": "/api/proxy/dispatch",
+              "status": 201,
+              "note": null,
+              "opts": "<omitted>"
+            }
+          ],
+          "registry": [
+            {
+              "op": "recordCredentialResolution",
+              "urlKey": "acme",
+              "ownerAccountId": null,
+              "provider": "linear",
+              "credential": "lin_tok"
+            },
+            {
+              "op": "witnessAccepted",
+              "fingerprint": "fp-1"
+            }
+          ],
+          "fetch": [],
+          "console": [
+            {
+              "level": "log",
+              "msg": "[file-pointer] {\"issueIdentifier\":\"LIN-42\",\"c0\":1,\"c1\":null,\"arm\":\"control\",\"delivered\":false,\"failOpen\":false,\"reason\":null,\"gapMs\":0}"
+            }
+          ],
+          "unhandled": [],
+          "expressErrors": [],
+          "fs": [],
+          "tty": [],
+          "timers": [
+            {
+              "op": "setTimeout",
+              "ms": 2000,
+              "at": 1790862930000
+            },
+            {
+              "op": "clear",
+              "at": 1790862930000
+            }
+          ],
+          "libConsole": [],
+          "serverResponse": {
+            "statusCode": 201,
+            "ended": true,
+            "headersSent": true,
+            "contentType": "application/json; charset=utf-8",
+            "body": "{\"success\":true,\"id\":\"245c860b-9135-4fc1-ac20-793e5ca8ee3a\",\"status\":\"queued\",\"promptName\":\"Prompt\",\"kind\":\"implementation\",\"issueIdentifier\":\"LIN-42\",\"target\":\"cli\",\"abort\":false,\"abortTo\":null,\"cascade\":false,\"sessionId\":null,\"maxTasks\":null,\"dispatchedAt\":\"2026-10-01T13:55:30.000Z\",\"consumerLastSeenAt\":null,\"warning\":\"No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts.\"}"
+          },
+          "timersPending": []
+        }
+      },
+      "new": {
+        "status": 201,
+        "headers": {
+          "x-powered-by": "Express",
+          "content-type": "application/json; charset=utf-8",
+          "content-length": "443",
+          "etag": "W/\"1bb-0QKeW28evZ5ZsHikrolkaOzFQio\"",
+          "date": "Fri, 16 Oct 2026 23:47:11 GMT",
+          "connection": "close"
+        },
+        "body": {
+          "success": true,
+          "id": "245c860b-9135-4fc1-ac20-793e5ca8ee3a",
+          "status": "queued",
+          "kind": "implementation",
+          "promptName": "Prompt",
+          "issueIdentifier": "LIN-42",
+          "target": "cli",
+          "sessionId": null,
+          "maxTasks": null,
+          "dispatchedAt": "2026-10-01T13:55:30.000Z",
+          "consumerLastSeenAt": null,
+          "warning": "No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts.",
+          "abort": false,
+          "abortTo": null,
+          "cascade": false
+        },
+        "calls": {
+          "store": [
+            {
+              "store": "proxyTokenStore",
+              "op": "validateToken",
+              "args": [
+                "hb_work_tok"
+              ]
+            },
+            {
+              "store": "dispatchQueueStore",
+              "op": "findRecentFreshDispatch",
+              "args": [
+                "acme",
+                {
+                  "issueIdentifier": "LIN-42",
+                  "kind": "implementation",
+                  "since": {
+                    "__date": "2026-10-01T13:50:30.000Z"
+                  }
+                }
+              ]
+            },
+            {
+              "store": "workspacePreferencesStore",
+              "op": "getWorkspacePreferences",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "dispatchTokenStore",
+              "op": "listTokens",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "proxyTokenStore",
+              "op": "listTokens",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "dispatchQueueStore",
+              "op": "countPilotEligible",
+              "args": [
+                "acme"
+              ]
+            },
+            {
+              "store": "dispatchQueueStore",
+              "op": "addItem",
+              "args": [
+                "acme",
+                {
+                  "promptName": "Prompt",
+                  "issueId": "LIN-42",
+                  "issueIdentifier": "LIN-42",
+                  "issueTitle": null,
+                  "issueUrl": null,
+                  "dispatchedBy": null,
+                  "target": "cli",
+                  "repo": null,
+                  "followUpTo": null,
+                  "force": false,
+                  "abort": false,
+                  "abortTo": null,
+                  "cascade": false,
+                  "sessionId": null,
+                  "periodicalId": null,
+                  "waitForFollowUps": false,
+                  "queueIfBusy": false,
+                  "subscription": "terminal-only",
+                  "maxTasks": null,
+                  "issueSource": null,
+                  "prompt": "tab\there\r\nCRLF",
+                  "kind": "implementation",
+                  "model": null,
+                  "harness": "claude-code",
+                  "terminal": null,
+                  "effort": null,
+                  "presetConfig": null,
+                  "presetName": null,
+                  "bootstrapToken": null,
+                  "consumerLastSeenAt": null
+                }
+              ]
+            },
+            {
+              "store": "proxyEventStore",
+              "op": "recordEvent",
+              "args": [
+                {
+                  "urlKey": "acme",
+                  "tokenId": "ptok-1",
+                  "tokenLabel": "runner-copy",
+                  "method": "POST",
+                  "endpoint": "/api/proxy/dispatch",
+                  "status": 201,
+                  "note": null,
+                  "stage": "provider-lane",
+                  "credentialFingerprint": "fp-1",
+                  "credentialSource": "session"
+                }
+              ]
+            }
+          ],
+          "deps": [
+            {
+              "fn": "proxyLimiter"
+            },
+            {
+              "fn": "authenticateProxyToken"
+            },
+            {
+              "fn": "requireWriteScope",
+              "scope": "readWrite"
+            },
+            {
+              "fn": "resolveProviderAccess",
+              "urlKey": "acme",
+              "ownerAccountId": null,
+              "hasReq": true,
+              "opts": {
+                "source": {
+                  "__undefined": true
+                }
+              },
+              "argc": 4
+            },
+            {
+              "fn": "provider.issueWriteGuard",
+              "args": [
+                "lin_tok",
+                "LIN-42"
+              ]
+            },
+            {
+              "fn": "getWorkspaceOpenRouterKey",
+              "args": [
+                "acme",
+                null
+              ]
+            }
+          ],
+          "log": [
+            {
+              "endpoint": "/api/proxy/dispatch",
+              "status": 201,
+              "note": null,
+              "opts": "<omitted>"
+            }
+          ],
+          "registry": [
+            {
+              "op": "recordCredentialResolution",
+              "urlKey": "acme",
+              "ownerAccountId": null,
+              "provider": "linear",
+              "credential": "lin_tok"
+            },
+            {
+              "op": "witnessAccepted",
+              "fingerprint": "fp-1"
+            }
+          ],
+          "fetch": [],
+          "console": [
+            {
+              "level": "log",
+              "msg": "[file-pointer] {\"issueIdentifier\":\"LIN-42\",\"c0\":1,\"c1\":null,\"arm\":\"control\",\"delivered\":false,\"failOpen\":false,\"reason\":null,\"gapMs\":0}"
+            }
+          ],
+          "unhandled": [],
+          "expressErrors": [],
+          "fs": [],
+          "tty": [],
+          "timers": [
+            {
+              "op": "setTimeout",
+              "ms": 2000,
+              "at": 1790862930000
+            },
+            {
+              "op": "clear",
+              "at": 1790862930000
+            }
+          ],
+          "libConsole": [],
+          "serverResponse": {
+            "statusCode": 201,
+            "ended": true,
+            "headersSent": true,
+            "contentType": "application/json; charset=utf-8",
+            "body": "{\"success\":true,\"id\":\"245c860b-9135-4fc1-ac20-793e5ca8ee3a\",\"status\":\"queued\",\"kind\":\"implementation\",\"promptName\":\"Prompt\",\"issueIdentifier\":\"LIN-42\",\"target\":\"cli\",\"sessionId\":null,\"maxTasks\":null,\"dispatchedAt\":\"2026-10-01T13:55:30.000Z\",\"consumerLastSeenAt\":null,\"warning\":\"No consumer has ever polled this workspace — this dispatch was enqueued but may sit unclaimed until a runner starts.\",\"abort\":false,\"abortTo\":null,\"cascade\":false}"
+          },
+          "timersPending": []
+        }
+      },
+      "diffs": [
+        {
+          "kind": "header-derived:etag",
+          "detail": {
+            "old": "W/\"1bb-r//Y1yCUlZzbxigsnCDI+W4htIo\"",
+            "new": "W/\"1bb-0QKeW28evZ5ZsHikrolkaOzFQio\""
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,455 @@
+{
+  "base": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung7/replay/pinned/origin-main",
+  "lib": "default",
+  "n": 3000,
+  "mutantN": 1500,
+  "seeds": [
+    1,
+    7
+  ],
+  "checks": [
+    {
+      "id": "identity-seed1",
+      "what": "old vs an independent copy of old",
+      "pass": true,
+      "requests": 6592,
+      "perTier": {
+        "gen": {
+          "requests": 3000,
+          "differing": 0
+        },
+        "edge": {
+          "requests": 3241,
+          "differing": 0
+        },
+        "test": {
+          "requests": 351,
+          "differing": 0
+        }
+      },
+      "differing": 0,
+      "groups": [],
+      "ms": 40600
+    },
+    {
+      "id": "identity-seed7",
+      "what": "old vs an independent copy of old",
+      "pass": true,
+      "requests": 6592,
+      "perTier": {
+        "gen": {
+          "requests": 3000,
+          "differing": 0
+        },
+        "edge": {
+          "requests": 3241,
+          "differing": 0
+        },
+        "test": {
+          "requests": 351,
+          "differing": 0
+        }
+      },
+      "differing": 0,
+      "groups": [],
+      "ms": 40349
+    },
+    {
+      "id": "m01-egress",
+      "what": "image proxy sends the workspace credential for every provider (LIN-1899 guard dropped)",
+      "pass": true,
+      "differing": 29,
+      "detectedIn": [
+        "egressFetch x29"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/image [egressFetch] x29"
+      ],
+      "offTarget": [],
+      "ms": 33056
+    },
+    {
+      "id": "m02-attribution",
+      "what": "comment attribution 'via Harbour' → 'by Harbour'",
+      "pass": true,
+      "differing": 179,
+      "detectedIn": [
+        "depCalls x142",
+        "body x104"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/comments/:issueId [depCalls] x142",
+        "POST /workspace/:urlKey/api/comments/:issueId [header-derived:content-length] x104",
+        "POST /workspace/:urlKey/api/comments/:issueId [header-derived:etag] x104",
+        "POST /workspace/:urlKey/api/comments/:issueId [body] x104"
+      ],
+      "offTarget": [],
+      "ms": 32768
+    },
+    {
+      "id": "m03-owner-gate",
+      "what": "feedback triage/autopilot lane loses its owner gate (LIN-3383)",
+      "pass": true,
+      "differing": 94,
+      "detectedIn": [
+        "depCalls x87",
+        "body x15",
+        "store:dispatchQueueStore x9",
+        "store:proxyTokenStore x9",
+        "store:workspacePreferencesStore x9",
+        "console x1"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/feedback [depCalls] x87",
+        "POST /workspace/:urlKey/api/feedback [header-derived:content-length] x15",
+        "POST /workspace/:urlKey/api/feedback [header-derived:etag] x15",
+        "POST /workspace/:urlKey/api/feedback [body] x15",
+        "POST /workspace/:urlKey/api/feedback [store:dispatchQueueStore] x9",
+        "POST /workspace/:urlKey/api/feedback [store:proxyTokenStore] x9",
+        "POST /workspace/:urlKey/api/feedback [store:workspacePreferencesStore] x9",
+        "POST /workspace/:urlKey/api/feedback [console] x1"
+      ],
+      "offTarget": [],
+      "ms": 33078
+    },
+    {
+      "id": "m04-page-size",
+      "what": "scan-due page size 40 → 39",
+      "pass": true,
+      "differing": 67,
+      "detectedIn": [
+        "store:taskDecisionsStore x67"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/scan-due [store:taskDecisionsStore] x67"
+      ],
+      "offTarget": [],
+      "ms": 33009
+    },
+    {
+      "id": "m05-order",
+      "what": "sessions served oldest-first",
+      "pass": true,
+      "differing": 4,
+      "detectedIn": [
+        "body x4"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/sessions/:identifier [header-derived:etag] x4",
+        "GET /workspace/:urlKey/api/sessions/:identifier [body] x4"
+      ],
+      "offTarget": [],
+      "ms": 32879
+    },
+    {
+      "id": "m06-code",
+      "what": "press 409 code renamed",
+      "pass": true,
+      "differing": 12,
+      "detectedIn": [
+        "body x12"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press [header-derived:content-length] x12",
+        "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press [header-derived:etag] x12",
+        "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press [body] x12"
+      ],
+      "offTarget": [],
+      "ms": 32936
+    },
+    {
+      "id": "m07-fire-and-forget",
+      "what": "PATCH fires onTicketWrite on every write, not only state writes",
+      "pass": true,
+      "differing": 27,
+      "detectedIn": [
+        "depCalls x27",
+        "console x1"
+      ],
+      "groups": [
+        "PATCH /workspace/:urlKey/api/issues/:issueId [depCalls] x27",
+        "PATCH /workspace/:urlKey/api/issues/:issueId [console] x1"
+      ],
+      "offTarget": [],
+      "ms": 33251
+    },
+    {
+      "id": "m08-sse",
+      "what": "stream drops its 'fetching_context' phase event",
+      "pass": true,
+      "differing": 123,
+      "detectedIn": [
+        "body x118"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/recommend/:issueId/stream [body] x118",
+        "GET /workspace/:urlKey/api/recommend/:issueId/stream [serverResponse] x14"
+      ],
+      "offTarget": [],
+      "ms": 33264
+    },
+    {
+      "id": "m09-capability",
+      "what": "audit 422 capability 'audit' → 'Audit'",
+      "pass": true,
+      "differing": 24,
+      "detectedIn": [
+        "body x24"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/audit [header-derived:etag] x24",
+        "GET /workspace/:urlKey/api/audit [body] x24"
+      ],
+      "offTarget": [],
+      "ms": 33233
+    },
+    {
+      "id": "m10-free-clamp",
+      "what": "recap POST free tier no longer clamped to the default model (LIN-513)",
+      "pass": true,
+      "differing": 9,
+      "detectedIn": [
+        "store:workspacePreferencesStore x9"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/recap/:issueId [store:workspacePreferencesStore] x9"
+      ],
+      "offTarget": [],
+      "ms": 33257
+    },
+    {
+      "id": "m11-store-arg",
+      "what": "retire stamps outcomeBasisHash null",
+      "pass": true,
+      "differing": 53,
+      "detectedIn": [
+        "store:taskDecisionsStore x53",
+        "body x26"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/scan/:issueId/retire [store:taskDecisionsStore] x53",
+        "POST /workspace/:urlKey/api/scan/:issueId/retire [body] x26",
+        "POST /workspace/:urlKey/api/scan/:issueId/retire [header-derived:content-length] x25",
+        "POST /workspace/:urlKey/api/scan/:issueId/retire [header-derived:etag] x25"
+      ],
+      "offTarget": [],
+      "ms": 33720
+    },
+    {
+      "id": "m12-header",
+      "what": "image Cache-Control 'private' → 'public'",
+      "pass": true,
+      "differing": 36,
+      "detectedIn": [
+        "header:cache-control x36"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/image [header:cache-control] x36"
+      ],
+      "offTarget": [],
+      "ms": 33823
+    },
+    {
+      "id": "m13-whitelist",
+      "what": "detail section whitelist drops 'recent-activity'",
+      "pass": true,
+      "differing": 6,
+      "detectedIn": [
+        "header-derived:content-length x6",
+        "header-derived:etag x6",
+        "body x6"
+      ],
+      "groups": [
+        "GET /workspace/:urlKey/api/detail/:issueId [header-derived:content-length] x6",
+        "GET /workspace/:urlKey/api/detail/:issueId [header-derived:etag] x6",
+        "GET /workspace/:urlKey/api/detail/:issueId [body] x6"
+      ],
+      "offTarget": [],
+      "ms": 34298
+    },
+    {
+      "id": "m14-stamp-arg",
+      "what": "decision stamp drops the optionId argument",
+      "pass": true,
+      "differing": 4,
+      "detectedIn": [
+        "store:dispatchQueueStore x4"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/comments/:issueId [store:dispatchQueueStore] x4"
+      ],
+      "offTarget": [],
+      "ms": 34466
+    },
+    {
+      "id": "m15-session",
+      "what": "LIN-2933 recovery mirrors the adopted token without its expiry (session mutation)",
+      "pass": true,
+      "differing": 7,
+      "detectedIn": [
+        "session x7"
+      ],
+      "groups": [
+        "POST /workspace/:urlKey/api/comments/:issueId [session] x7"
+      ],
+      "offTarget": [],
+      "ms": 34261
+    }
+  ],
+  "coverage": {
+    "seed1": {
+      "workspace-api.js": {
+        "pct": 98.79,
+        "covered": 2782,
+        "executable": 2816,
+        "uncovered": [
+          "468: id: s.id,",
+          "469: identifier: s.url.split('/').pop(),",
+          "470: title: s.title,",
+          "471: state: s.state",
+          "550: return jsonError(res, 500, 'Failed to generate prompt')",
+          "551: }",
+          "763: console.error('Autopilot kickoff error:', error)",
+          "764: jsonError(res, 500, 'Failed to generate autopilot kickoff', { message: error.message })",
+          "765: }",
+          "1725: ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user",
+          "2128: return notFound.json(res, 'Issue not found');",
+          "2129: }",
+          "2361: id: c.id,",
+          "2362: body: c.body,",
+          "2363: createdAt: c.createdAt,",
+          "2364: user: { name: c.user?.name || 'Unknown' }",
+          "2367: id: c.id,",
+          "2368: identifier: c.identifier || c.id,",
+          "2369: title: c.title,",
+          "2370: state: c.state || { type: 'unstarted', name: 'Todo' },",
+          "2371: labels: (c.labels?.nodes || []).map(l => l.name)",
+          "2673: return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {",
+          "2674: code: 'PRINCIPLE_ZERO_UNAVAILABLE'",
+          "2675: });",
+          "2676: }",
+          "2975: return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {",
+          "2976: code: 'PRINCIPLE_ZERO_UNAVAILABLE'",
+          "2977: });",
+          "2978: }",
+          "3874: return jsonError(res, 413, 'image too large');",
+          "3875: }",
+          "4324: console.error('OpenRouter model catalog endpoint error:', error);",
+          "4325: res.json({ models: [] });",
+          "4326: }"
+        ]
+      }
+    },
+    "seed7": {
+      "workspace-api.js": {
+        "pct": 98.79,
+        "covered": 2782,
+        "executable": 2816,
+        "uncovered": [
+          "468: id: s.id,",
+          "469: identifier: s.url.split('/').pop(),",
+          "470: title: s.title,",
+          "471: state: s.state",
+          "550: return jsonError(res, 500, 'Failed to generate prompt')",
+          "551: }",
+          "763: console.error('Autopilot kickoff error:', error)",
+          "764: jsonError(res, 500, 'Failed to generate autopilot kickoff', { message: error.message })",
+          "765: }",
+          "1725: ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user",
+          "2128: return notFound.json(res, 'Issue not found');",
+          "2129: }",
+          "2361: id: c.id,",
+          "2362: body: c.body,",
+          "2363: createdAt: c.createdAt,",
+          "2364: user: { name: c.user?.name || 'Unknown' }",
+          "2367: id: c.id,",
+          "2368: identifier: c.identifier || c.id,",
+          "2369: title: c.title,",
+          "2370: state: c.state || { type: 'unstarted', name: 'Todo' },",
+          "2371: labels: (c.labels?.nodes || []).map(l => l.name)",
+          "2673: return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {",
+          "2674: code: 'PRINCIPLE_ZERO_UNAVAILABLE'",
+          "2675: });",
+          "2676: }",
+          "2975: return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {",
+          "2976: code: 'PRINCIPLE_ZERO_UNAVAILABLE'",
+          "2977: });",
+          "2978: }",
+          "3874: return jsonError(res, 413, 'image too large');",
+          "3875: }",
+          "4324: console.error('OpenRouter model catalog endpoint error:', error);",
+          "4325: res.json({ models: [] });",
+          "4326: }"
+        ]
+      }
+    }
+  },
+  "thinStatusPairs": [
+    {
+      "route": "PATCH /workspace/:urlKey/api/issues/:issueId",
+      "pair": "NO_RESPONSE(server 404)",
+      "count": 1
+    }
+  ],
+  "perRouteRequests": {
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire": 169,
+    "POST /workspace/:urlKey/api/brief/:issueId": 219,
+    "GET /workspace/:urlKey/api/recap/:issueId": 156,
+    "POST /workspace/:urlKey/api/comments/:issueId": 311,
+    "GET /workspace/:urlKey/api/recommend/:issueId": 255,
+    "GET /workspace/:urlKey/api/roadmap/north-star": 89,
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss": 181,
+    "POST /workspace/:urlKey/api/issues": 183,
+    "GET /workspace/:urlKey/api/autopilot-prompt": 134,
+    "GET /workspace/:urlKey/api/image": 211,
+    "GET /workspace/:urlKey/api/recommend/status": 102,
+    "POST /workspace/:urlKey/api/roadmap/reports": 83,
+    "GET /workspace/:urlKey/api/scan/:issueId": 170,
+    "POST /workspace/:urlKey/api/roadmap/chat": 87,
+    "GET /workspace/:urlKey/api/comments/:issueId": 115,
+    "GET /workspace/:urlKey/api/roadmap/reports/:id": 87,
+    "PUT /workspace/:urlKey/api/roadmap/north-star": 90,
+    "GET /workspace/:urlKey/api/detail/:issueId": 136,
+    "CALL generateMockRecommendation": 69,
+    "POST /workspace/:urlKey/api/scan/:issueId/retire": 260,
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream": 251,
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check": 175,
+    "POST /workspace/:urlKey/api/scan/:issueId": 235,
+    "PATCH /workspace/:urlKey/api/issues/:issueId": 219,
+    "GET /workspace/:urlKey/api/roadmap/reports": 87,
+    "GET /workspace/:urlKey/api/prompts/custom": 83,
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id": 85,
+    "GET /workspace/:urlKey/api/sessions/:identifier": 114,
+    "PUT /workspace/:urlKey/api/prompts/custom/:id": 84,
+    "GET /workspace/:urlKey/api/scan-due": 146,
+    "POST /workspace/:urlKey/api/feedback": 353,
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press": 148,
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier": 119,
+    "CALL buildMockRecommendationHop": 55,
+    "GET /workspace/:urlKey/api/openrouter/models": 102,
+    "UNMATCHED": 45,
+    "GET /workspace/:urlKey/api/context/:issueId": 141,
+    "POST /workspace/:urlKey/api/prompts/custom": 82,
+    "GET /workspace/:urlKey/api/audit": 155,
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName": 188,
+    "POST /workspace/:urlKey/api/recap/:issueId": 208,
+    "GET /workspace/:urlKey/api/brief/:issueId": 151,
+    "GET /workspace/:urlKey/api/prompt-traces": 87,
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId": 172
+  },
+  "minPerRoute": 55,
+  "importSideEffects": {
+    "main": {
+      "console": [],
+      "unhandled": [],
+      "fs": [],
+      "fetch": [],
+      "envReads": [],
+      "newGlobals": [],
+      "socketEscapes": [],
+      "modulesFirstLoaded": 747,
+      "sideResolutions": [],
+      "importError": null
+    }
+  }
+}

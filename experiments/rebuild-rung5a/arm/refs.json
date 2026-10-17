@@ -1,0 +1,13 @@
+{
+ "oldUnique": 40,
+ "newUnique": 40,
+ "kept": 39,
+ "dropped": [
+  "LIN-1094"
+ ],
+ "added": [
+  "LIN-3581"
+ ],
+ "oldAnywhere": 40,
+ "newAnywhere": 40
+}

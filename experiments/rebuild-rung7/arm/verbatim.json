@@ -1,0 +1,246 @@
+{
+  "canonical (imports stripped, as S/verbatim)": {
+    "routerPlusHelper": {
+      "total": 1760,
+      "oldTotal": 2209,
+      "multiset": 905,
+      "multisetPct": "51.4%",
+      "membership": 937,
+      "membershipPct": "53.2%",
+      "longestMultisetRun": 31,
+      "longestAt": "routes/workspace-api.js nt-line 231",
+      "linesInRuns10": 281,
+      "runs10": 19,
+      "top5Runs": [
+        [
+          "routes/workspace-api.js",
+          231,
+          31
+        ],
+        [
+          "lib/workspace-api-mocks.js",
+          40,
+          24
+        ],
+        [
+          "routes/workspace-api.js",
+          961,
+          20
+        ],
+        [
+          "routes/workspace-api.js",
+          1224,
+          19
+        ],
+        [
+          "routes/workspace-api.js",
+          785,
+          16
+        ]
+      ]
+    },
+    "routerAlone": {
+      "total": 1574,
+      "oldTotal": 2209,
+      "multiset": 832,
+      "multisetPct": "52.9%",
+      "membership": 858,
+      "membershipPct": "54.5%",
+      "longestMultisetRun": 31,
+      "longestAt": "routes/workspace-api.js nt-line 231",
+      "linesInRuns10": 231,
+      "runs10": 16,
+      "top5Runs": [
+        [
+          "routes/workspace-api.js",
+          231,
+          31
+        ],
+        [
+          "routes/workspace-api.js",
+          961,
+          20
+        ],
+        [
+          "routes/workspace-api.js",
+          1224,
+          19
+        ],
+        [
+          "routes/workspace-api.js",
+          785,
+          16
+        ],
+        [
+          "routes/workspace-api.js",
+          1245,
+          15
+        ]
+      ]
+    }
+  },
+  "imports kept": {
+    "routerPlusHelper": {
+      "total": 1834,
+      "oldTotal": 2271,
+      "multiset": 962,
+      "multisetPct": "52.5%",
+      "membership": 995,
+      "membershipPct": "54.3%",
+      "longestMultisetRun": 48,
+      "longestAt": "routes/workspace-api.js nt-line 9",
+      "linesInRuns10": 329,
+      "runs10": 20,
+      "top5Runs": [
+        [
+          "routes/workspace-api.js",
+          9,
+          48
+        ],
+        [
+          "routes/workspace-api.js",
+          302,
+          31
+        ],
+        [
+          "lib/workspace-api-mocks.js",
+          43,
+          24
+        ],
+        [
+          "routes/workspace-api.js",
+          1032,
+          20
+        ],
+        [
+          "routes/workspace-api.js",
+          1295,
+          19
+        ]
+      ]
+    },
+    "routerAlone": {
+      "total": 1645,
+      "oldTotal": 2271,
+      "multiset": 889,
+      "multisetPct": "54.0%",
+      "membership": 916,
+      "membershipPct": "55.7%",
+      "longestMultisetRun": 48,
+      "longestAt": "routes/workspace-api.js nt-line 9",
+      "linesInRuns10": 279,
+      "runs10": 17,
+      "top5Runs": [
+        [
+          "routes/workspace-api.js",
+          9,
+          48
+        ],
+        [
+          "routes/workspace-api.js",
+          302,
+          31
+        ],
+        [
+          "routes/workspace-api.js",
+          1032,
+          20
+        ],
+        [
+          "routes/workspace-api.js",
+          1295,
+          19
+        ],
+        [
+          "routes/workspace-api.js",
+          856,
+          16
+        ]
+      ]
+    }
+  },
+  "imports stripped, trailing ; ignored": {
+    "routerPlusHelper": {
+      "total": 1760,
+      "oldTotal": 2209,
+      "multiset": 1013,
+      "multisetPct": "57.6%",
+      "membership": 1033,
+      "membershipPct": "58.7%",
+      "longestMultisetRun": 31,
+      "longestAt": "routes/workspace-api.js nt-line 231",
+      "linesInRuns10": 413,
+      "runs10": 27,
+      "top5Runs": [
+        [
+          "routes/workspace-api.js",
+          1137,
+          35
+        ],
+        [
+          "routes/workspace-api.js",
+          231,
+          31
+        ],
+        [
+          "lib/workspace-api-mocks.js",
+          40,
+          24
+        ],
+        [
+          "routes/workspace-api.js",
+          761,
+          23
+        ],
+        [
+          "routes/workspace-api.js",
+          961,
+          20
+        ]
+      ]
+    },
+    "routerAlone": {
+      "total": 1574,
+      "oldTotal": 2209,
+      "multiset": 938,
+      "multisetPct": "59.6%",
+      "membership": 953,
+      "membershipPct": "60.5%",
+      "longestMultisetRun": 31,
+      "longestAt": "routes/workspace-api.js nt-line 231",
+      "linesInRuns10": 363,
+      "runs10": 24,
+      "top5Runs": [
+        [
+          "routes/workspace-api.js",
+          1137,
+          35
+        ],
+        [
+          "routes/workspace-api.js",
+          231,
+          31
+        ],
+        [
+          "routes/workspace-api.js",
+          761,
+          23
+        ],
+        [
+          "routes/workspace-api.js",
+          961,
+          20
+        ],
+        [
+          "routes/workspace-api.js",
+          1224,
+          19
+        ]
+      ]
+    }
+  },
+  "semicolonCensus": {
+    "oldLinesEndingSemicolon": 941,
+    "oldNonCommentLines": 2812
+  }
+}

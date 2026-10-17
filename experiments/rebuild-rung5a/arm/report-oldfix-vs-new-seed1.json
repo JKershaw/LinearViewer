@@ -1,0 +1,581 @@
+{
+ "tool": "rung5a dispatch replay",
+ "args": {
+  "old": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix",
+  "new": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3",
+  "n": 3000,
+  "seed": 1,
+  "now": "2026-10-02T12:00:00.000Z",
+  "tiers": [
+   "edge",
+   "gen-v",
+   "gen-vx",
+   "gen-f"
+  ],
+  "only": null
+ },
+ "sides": {
+  "old": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix/dispatch-factory.js",
+     "sha": "83560199f32f"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/oldfix/dispatch-validation.js",
+     "sha": "838c5c1e2e2b"
+    }
+   }
+  },
+  "new": {
+   "srcLib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib",
+   "files": {
+    "dispatch-factory.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-factory.js",
+     "sha": "ff63690ae58d"
+    },
+    "dispatch-validation.js": {
+     "src": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5a/arm/new-b3/lib/dispatch-validation.js",
+     "sha": "25058c782b50"
+    }
+   }
+  }
+ },
+ "hermetic": {
+  "env": {
+   "TZ": "UTC",
+   "cleared": [
+    "HARBOUR_*",
+    "GITHUB_*",
+    "DISPATCH_*",
+    "OPENROUTER_*",
+    "FREE_TIER_*"
+   ]
+  },
+  "now": "2026-10-02T12:00:00.000Z",
+  "networkAttempts": 6,
+  "networkSample": [
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   },
+   {
+    "what": "fetch",
+    "target": "api.github.com"
+   }
+  ]
+ },
+ "importCensus": {
+  "old": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace-preferences.js -> absolute",
+    "file:///home/user/LinearViewer/lib/proxy-preamble.js -> absolute",
+    "./dispatch-validation.js -> side",
+    "file:///home/user/LinearViewer/lib/task-done-cache.js -> absolute",
+    "file:///home/user/LinearViewer/lib/providers/models.js -> absolute",
+    "file:///home/user/LinearViewer/lib/consumer-poll-warning.js -> absolute",
+    "file:///home/user/LinearViewer/lib/file-pointer.js -> absolute",
+    "file:///home/user/LinearViewer/lib/github-pr-files.js -> absolute",
+    "file:///home/user/LinearViewer/lib/session-telemetry.js -> absolute",
+    "file:///home/user/LinearViewer/lib/read-horizon.js -> absolute",
+    "file:///home/user/LinearViewer/lib/workspace.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-targets.js -> absolute",
+    "file:///home/user/LinearViewer/lib/dispatch-fields.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompt-templates.js -> absolute",
+    "file:///home/user/LinearViewer/lib/periodicals.js -> absolute",
+    "file:///home/user/LinearViewer/lib/prompts/autopilot-kickoff.js -> absolute"
+   ]
+  },
+  "new": {
+   "newGlobals": [],
+   "envChanged": [],
+   "listenersChanged": false,
+   "resolutions": [
+    "./prompt-templates.js -> repo",
+    "./workspace-preferences.js -> repo",
+    "./proxy-preamble.js -> repo",
+    "./dispatch-validation.js -> side",
+    "./task-done-cache.js -> repo",
+    "./providers/models.js -> repo",
+    "./consumer-poll-warning.js -> repo",
+    "./file-pointer.js -> repo",
+    "./github-pr-files.js -> repo",
+    "./session-telemetry.js -> repo",
+    "./read-horizon.js -> repo",
+    "./workspace.js -> repo",
+    "./dispatch-targets.js -> repo",
+    "./dispatch-fields.js -> repo",
+    "./prompt-templates.js -> repo",
+    "./periodicals.js -> repo",
+    "./prompts/autopilot-kickoff.js -> repo"
+   ]
+  }
+ },
+ "totals": {
+  "inputs": 7839,
+  "differing": 145,
+  "byTier": {
+   "edge": {
+    "inputs": 339,
+    "differing": 2,
+    "calls": 343
+   },
+   "gen-v": {
+    "inputs": 3000,
+    "differing": 143,
+    "calls": 3000
+   },
+   "gen-vx": {
+    "inputs": 1500,
+    "differing": 0,
+    "calls": 1708
+   },
+   "gen-f": {
+    "inputs": 3000,
+    "differing": 0,
+    "calls": 3233
+   }
+  },
+  "elapsedMs": 3057,
+  "exportsDiff": 0,
+  "infoOnly": 0
+ },
+ "exportsDiff": [],
+ "exportsInfo": [],
+ "groups": [
+  {
+   "sig": "validation.validateDispatchPayload payload-reads",
+   "kind": "payload-reads",
+   "count": 118,
+   "byTier": {
+    "edge": 1,
+    "gen-v": 117
+   },
+   "example": {
+    "input": "edge:proxy-reads",
+    "kind": "payload-reads",
+    "sig": "validation.validateDispatchPayload payload-reads",
+    "path": null,
+    "old": "prompt,promptName,issueIdentifier,issueTitle,issueUrl,repo,model,harness,terminal,effort,issueId,followUpTo,target,force,cascade,abort,sessionId,ifParked",
+    "new": "effort,issueId,followUpTo,target,force,cascade,abort,sessionId,ifParked,issueIdentifier,prompt,promptName,issueIdentifier,issueTitle,issueUrl,repo,model,harness,terminal,effort,prompt,promptName,issueTitle,repo",
+    "call": 0,
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "validation",
+       "fn": "validateDispatchPayload",
+       "args": [
+        {
+         "$proxyReads": {
+          "prompt": "p",
+          "model": "m",
+          "unknown": 1
+         }
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "sig": "validation.validateDispatchPayload error.message $error.message",
+   "kind": "error.message",
+   "count": 27,
+   "byTier": {
+    "edge": 1,
+    "gen-v": 26
+   },
+   "example": {
+    "input": "edge:null-body",
+    "kind": "error.message",
+    "sig": "validation.validateDispatchPayload error.message $error.message",
+    "path": "$error.message",
+    "old": "Cannot destructure property 'prompt' of 'body' as it is null.",
+    "new": "Cannot destructure property 'effort' of 'body' as it is null.",
+    "call": 0,
+    "oldError": "TypeError:Cannot destructure property 'prompt' of 'body' as it is null.",
+    "newError": "TypeError:Cannot destructure property 'effort' of 'body' as it is null.",
+    "inputSpec": {
+     "calls": [
+      {
+       "mod": "validation",
+       "fn": "validateDispatchPayload",
+       "args": [
+        null
+       ]
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "infoGroups": [],
+ "differingInputs": [
+  "edge:null-body",
+  "edge:proxy-reads",
+  "gen-v:61",
+  "gen-v:79",
+  "gen-v:86",
+  "gen-v:110",
+  "gen-v:126",
+  "gen-v:154",
+  "gen-v:165",
+  "gen-v:207",
+  "gen-v:238",
+  "gen-v:282",
+  "gen-v:354",
+  "gen-v:399",
+  "gen-v:433",
+  "gen-v:451",
+  "gen-v:461",
+  "gen-v:469",
+  "gen-v:517",
+  "gen-v:529",
+  "gen-v:535",
+  "gen-v:562",
+  "gen-v:565",
+  "gen-v:570",
+  "gen-v:643",
+  "gen-v:703",
+  "gen-v:714",
+  "gen-v:715",
+  "gen-v:717",
+  "gen-v:773",
+  "gen-v:798",
+  "gen-v:804",
+  "gen-v:857",
+  "gen-v:882",
+  "gen-v:893",
+  "gen-v:912",
+  "gen-v:915",
+  "gen-v:935",
+  "gen-v:940",
+  "gen-v:955",
+  "gen-v:958",
+  "gen-v:966",
+  "gen-v:979",
+  "gen-v:1040",
+  "gen-v:1054",
+  "gen-v:1110",
+  "gen-v:1120",
+  "gen-v:1136",
+  "gen-v:1257",
+  "gen-v:1280",
+  "gen-v:1287",
+  "gen-v:1353",
+  "gen-v:1379",
+  "gen-v:1382",
+  "gen-v:1391",
+  "gen-v:1392",
+  "gen-v:1397",
+  "gen-v:1448",
+  "gen-v:1485",
+  "gen-v:1504",
+  "gen-v:1505",
+  "gen-v:1521",
+  "gen-v:1526",
+  "gen-v:1528",
+  "gen-v:1538",
+  "gen-v:1581",
+  "gen-v:1612",
+  "gen-v:1621",
+  "gen-v:1632",
+  "gen-v:1652",
+  "gen-v:1690",
+  "gen-v:1709",
+  "gen-v:1710",
+  "gen-v:1727",
+  "gen-v:1748",
+  "gen-v:1764",
+  "gen-v:1783",
+  "gen-v:1834",
+  "gen-v:1852",
+  "gen-v:1858",
+  "gen-v:1887",
+  "gen-v:1921",
+  "gen-v:1923",
+  "gen-v:1934",
+  "gen-v:1944",
+  "gen-v:1967",
+  "gen-v:1972",
+  "gen-v:1974",
+  "gen-v:2052",
+  "gen-v:2068",
+  "gen-v:2072",
+  "gen-v:2075",
+  "gen-v:2104",
+  "gen-v:2118",
+  "gen-v:2153",
+  "gen-v:2157",
+  "gen-v:2191",
+  "gen-v:2208",
+  "gen-v:2209",
+  "gen-v:2214",
+  "gen-v:2251",
+  "gen-v:2262",
+  "gen-v:2267",
+  "gen-v:2288",
+  "gen-v:2294",
+  "gen-v:2304",
+  "gen-v:2336",
+  "gen-v:2385",
+  "gen-v:2386",
+  "gen-v:2392",
+  "gen-v:2394",
+  "gen-v:2427",
+  "gen-v:2431",
+  "gen-v:2434",
+  "gen-v:2438",
+  "gen-v:2472",
+  "gen-v:2475",
+  "gen-v:2500",
+  "gen-v:2526",
+  "gen-v:2531",
+  "gen-v:2589",
+  "gen-v:2595",
+  "gen-v:2615",
+  "gen-v:2620",
+  "gen-v:2621",
+  "gen-v:2627",
+  "gen-v:2630",
+  "gen-v:2655",
+  "gen-v:2664",
+  "gen-v:2683",
+  "gen-v:2698",
+  "gen-v:2726",
+  "gen-v:2748",
+  "gen-v:2753",
+  "gen-v:2767",
+  "gen-v:2781",
+  "gen-v:2811",
+  "gen-v:2816",
+  "gen-v:2818",
+  "gen-v:2862",
+  "gen-v:2941",
+  "gen-v:2948",
+  "gen-v:2971",
+  "gen-v:2983",
+  "gen-v:2997"
+ ],
+ "floor": {
+  "validation.validateDispatchPayload": {
+   "return null": 1506,
+   "throw TypeError: Cannot destructure property 'prompt' of 'body' as it is null.": 27,
+   "return {error}": 1619,
+   "throw TypeError: Cannot convert a Symbol value to a string": 3
+  },
+  "validation.validateOpaqueDispatchField": {
+   "throw TypeError: Cannot read properties of null (reading 'maxLength')": 12,
+   "return {error}": 87,
+   "return null": 192
+  },
+  "validation.validateSessionId": {
+   "return null": 124,
+   "return {error}": 75
+  },
+  "validation.abortToError": {
+   "return null": 22,
+   "return \"abortTo is required and must be a UUID when abort is true\"": 44,
+   "return \"abortTo requires abort to be true\"": 43,
+   "throw TypeError: Cannot destructure property 'isAbort' of 'undefined' as it is undefined.": 7
+  },
+  "validation.abortFollowUpError": {
+   "return \"abort and followUpTo are mutually exclusive\"": 33,
+   "return null": 65,
+   "throw TypeError: Cannot destructure property 'isAbort' of 'undefined' as it is undefined.": 3
+  },
+  "validation.cascadeAbortError": {
+   "return \"cascade requires abort to be true\"": 8,
+   "return null": 80
+  },
+  "validation.dispatchKindError": {
+   "return \"kind must be one of: blocked, bug, plan, look-into, triage,": 17,
+   "return null": 63
+  },
+  "validation.periodicalIdError": {
+   "return \"periodicalId must be one of the known periodical template i": 26,
+   "return null": 65
+  },
+  "validation.targetError": {
+   "return \"target must be one of: cli, web, dash\"": 26,
+   "return null": 40,
+   "throw TypeError: Cannot read properties of undefined (reading 'includes')": 7,
+   "throw TypeError: allowed.join is not a function": 5,
+   "return \"target must be one of: cli, web, dash, local\"": 14,
+   "return \"target must be one of: \"": 6,
+   "return \"target must be one of: x\"": 7
+  },
+  "validation.followUpToError": {
+   "return \"followUpTo is only supported for cli/web targets\"": 3,
+   "return null": 19,
+   "throw TypeError: Cannot destructure property 'followUpTo' of 'undefined' as it is undefined.": 3,
+   "return \"Invalid followUpTo format\"": 58
+  },
+  "factory.isFilePointerPilotEnabled": {
+   "return true": 74,
+   "return false": 113
+  },
+  "factory.createDispatchItem": {
+   "throw Error: createDispatchItem requires a dispatch store with addItem": 31,
+   "throw TypeError: Cannot destructure property 'store' of '(intermediate value)(intermediate value)(intermedi": 7,
+   "throw Error: createDispatchItem requires a urlKey": 63,
+   "throw TypeError: Cannot read properties of null (reading 'followUpTo')": 9,
+   "throw TypeError: Cannot read properties of null (reading 'promptName')": 2,
+   "return {_id,id,prompt,kind,…}": 54,
+   "return {_id,id,promptName,issueIdentifier,…}": 1271,
+   "return {_id,id,promptName,prompt,…}": 6,
+   "throw Error: A dispatch for this issue and kind was created moments ago": 203,
+   "return {_id,id,issueIdentifier,followUpTo,…}": 7,
+   "return {_id,id,issueIdentifier,abort,…}": 2,
+   "throw Error: Daily run limit reached (N of N today). Resets at midnight UTC.": 51,
+   "throw Error: Unable to verify the run limit for this account": 94,
+   "return {_id,id,issueIdentifier,sessionId,…}": 1,
+   "return {_id,id,cascade,prompt,…}": 1,
+   "throw Error: This run's task budget (N) has been reached": 19,
+   "throw Error: Could not verify the task budget for this run": 22,
+   "throw Error: This task has had N fresh sessions in this run. That looks like a runaway, not a normal fi": 38,
+   "throw Error: This run stops at its PR — close-out is the person's to send": 61,
+   "return {_id,id,sessionId,prompt,…}": 1,
+   "return {_id,id,sessionId,followUpTo,…}": 1,
+   "return {_id,id,sessionId,stopAt,…}": 2,
+   "throw Error: The anchor issue is terminal — refusing this composed-run dispatch": 262,
+   "throw Error: Could not verify the anchor issue is not terminal — refusing this composed-run dispatch": 96,
+   "throw Error: composedRunMarker must be a string": 37,
+   "throw Error: composedRunMarker exceeds maximum length of N": 16,
+   "throw Error: composedRunMarker contains invalid characters": 19,
+   "return {_id,id,followUpTo,issueId,…}": 4,
+   "return {_id,id,followUpTo,issueIdentifier,…}": 2,
+   "return {_id,id,followUpTo,issueSource,…}": 1,
+   "return {_id,id,followUpTo,sessionGroupId,…}": 2,
+   "return {_id,id,followUpTo,prompt,…}": 3,
+   "throw DataCloneError: function (...args) {\n    const r = pick() || { k: 'ret', v: { $u: N } };\n    ctx.rec.push(": 1,
+   "throw TypeError: Cannot read properties of null (reading 'dispatchDefaults')": 28,
+   "throw Error: prefs down": 1,
+   "return {_id,id,issueIdentifier,prompt,…}": 7,
+   "throw Error: mint": 1,
+   "throw TypeError: Cannot add property budgetPosition, object is not extensible": 2,
+   "throw TypeError: Cannot set properties of null (setting 'budgetPosition')": 1,
+   "return null": 42,
+   "throw Error: dup key": 1,
+   "return {issueIdentifier,sessionId,prompt,kind,…}": 1,
+   "return {_id,id,promptName,target,…}": 53,
+   "return {_id,id,issueUrl,dispatchedBy,…}": 5,
+   "return {_id,id,promptName,dispatchedBy,…}": 38,
+   "return {_id,id,promptName,issueUrl,…}": 48,
+   "return {_id,id,promptName,issueId,…}": 156,
+   "return {_id,id,issueIdentifier,issueTitle,…}": 32,
+   "throw Error: mint failed": 53,
+   "return {_id,id,issueIdentifier,issueId,…}": 81,
+   "return {_id,id,issueId,cascade,…}": 1,
+   "return {_id,id,target,followUpTo,…}": 4,
+   "throw Error: prefs failed": 21,
+   "throw Error: insert failed": 40,
+   "return {_id,id,promptName,issueTitle,…}": 75,
+   "throw Error: This run's task budget (N.N) has been reached": 4,
+   "throw Error: finalize sync throw": 34,
+   "return {_id,id,issueIdentifier,issueUrl,…}": 20,
+   "return {_id,id,promptName,followUpTo,…}": 21,
+   "return {_id,id,issueIdentifier,dispatchedBy,…}": 29,
+   "return {promptName,issueIdentifier,issueUrl,dispatchedBy,…}": 4,
+   "return {_id,id,issueTitle,dispatchedBy,…}": 5,
+   "throw Error: addItem sync throw": 24,
+   "return {_id,id,waitForFollowUps,prompt,…}": 1,
+   "return {_id,id,issueTitle,target,…}": 5,
+   "return {_id,id,promptName,force,…}": 3,
+   "return {_id,id,issueIdentifier,target,…}": 23,
+   "return {promptName,dispatchedBy,target,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,issueTitle,issueUrl,…}": 2,
+   "return {_id,id,issueId,issueTitle,…}": 8,
+   "return {_id,id,issueId,issueUrl,…}": 7,
+   "throw Error: Daily run limit reached (N of undefined today). Resets at midnight UTC.": 12,
+   "return {issueIdentifier,issueId,followUpTo,force,…}": 1,
+   "return {issueIdentifier,dispatchedBy,followUpTo,force,…}": 1,
+   "return {_id,id,followUpTo,abort,…}": 2,
+   "return {_id,id,promptName,repo,…}": 7,
+   "return {0,1,2,_id,…}": 7,
+   "return {issueIdentifier,target,followUpTo,force,…}": 1,
+   "return {promptName,issueIdentifier,issueTitle,followUpTo,…}": 2,
+   "return {_id,id,issueId,target,…}": 7,
+   "return {0,1,_id,id,…}": 5,
+   "return {issueUrl,target,followUpTo,force,…}": 1,
+   "return {promptName,issueIdentifier,issueId,issueTitle,…}": 5,
+   "return {_id,id,issueTitle,issueUrl,…}": 3,
+   "return {_id,id,followUpTo,cascade,…}": 1,
+   "return {_id,id,followUpTo,force,…}": 2,
+   "return {promptName,issueIdentifier,followUpTo,force,…}": 2,
+   "return {_id,id,dispatchedBy,followUpTo,…}": 1,
+   "return {_id,id,dispatchedBy,target,…}": 4,
+   "return {_id,id,repo,followUpTo,…}": 3,
+   "return {_id,id,issueId,dispatchedBy,…}": 6,
+   "return {_id,id,target,repo,…}": 2,
+   "return {issueIdentifier,issueId,dispatchedBy,target,…}": 1,
+   "return {promptName,issueIdentifier,issueId,issueUrl,…}": 2,
+   "return {promptName,issueId,repo,followUpTo,…}": 2,
+   "return {_id,id,dispatchedBy,repo,…}": 2,
+   "return {promptName,issueIdentifier,issueId,dispatchedBy,…}": 3,
+   "return {issueId,issueTitle,target,followUpTo,…}": 1,
+   "return {promptName,issueId,issueTitle,issueUrl,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,target,abort,…}": 1,
+   "return {promptName,followUpTo,abort,sessionId,…}": 1,
+   "return {issueIdentifier,target,repo,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,target,…}": 1,
+   "return {_id,id,issueUrl,target,…}": 3,
+   "return {promptName,issueIdentifier,issueTitle,dispatchedBy,…}": 1,
+   "return {_id,id,issueId,force,…}": 1,
+   "return {_id,id,promptName,abort,…}": 1,
+   "return {promptName,issueIdentifier,issueId,target,…}": 2,
+   "return {promptName,target,followUpTo,force,…}": 3,
+   "return {promptName,issueIdentifier,target,followUpTo,…}": 1,
+   "return {issueIdentifier,issueTitle,target,followUpTo,…}": 1,
+   "return {_id,id,issueUrl,followUpTo,…}": 1,
+   "return {_id,id,issueIdentifier,repo,…}": 2,
+   "return {_id,id,issueIdentifier,force,…}": 1,
+   "return {_id,id,issueId,followUpTo,…}": 1,
+   "return {_id,id,issueId,repo,…}": 1,
+   "return {promptName,issueUrl,target,followUpTo,…}": 1,
+   "return {_id,id,cascade,queueIfBusy,…}": 1,
+   "return {prompt,kind,model,harness,…}": 1,
+   "return {_id,id,issueTitle,followUpTo,…}": 1,
+   "return {promptName,issueIdentifier,dispatchedBy,repo,…}": 1,
+   "return {promptName,issueIdentifier,repo,abort,…}": 1,
+   "return {promptName,issueUrl,dispatchedBy,repo,…}": 1
+  },
+  "validation.DANGEROUS_CHARS_REGEX.test": {
+   "return false": 115,
+   "return true": 14
+  },
+  "validation.STRICT_CONTROL_CHARS_REGEX.test": {
+   "return false": 79,
+   "return true": 8
+  },
+  "validation.isValidAutopilotVariant": {
+   "return false": 62,
+   "return true": 25
+  },
+  "validation.UUID_REGEX.test": {
+   "return false": 88,
+   "return true": 8
+  }
+ },
+ "testTier": null,
+ "coverage": null
+}

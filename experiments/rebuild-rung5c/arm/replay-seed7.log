@@ -1,0 +1,4 @@
+replay: 10396 requests (seed 7; gen 6000, edge 3158, test 1238) in 48411 ms; differing: 539 in 2 groups
+    340  POST /api/proxy/dispatch  [header-derived:etag]  e.g. gen:2 POST /api/proxy/dispatch
+    199  POST /api/proxy/recommend-and-dispatch  [store:dispatchQueueStore]  e.g. gen:124 POST /api/proxy/recommend-and-dispatch
+report: /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung5c/arm/report-seed7.json

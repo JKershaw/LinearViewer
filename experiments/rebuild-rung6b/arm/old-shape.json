@@ -1,0 +1,1031 @@
+{
+  "file": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung6b/replay/pinned/origin-main/kpi-stats.js",
+  "nodeVersion": "v22.22.0",
+  "lines": {
+    "total": 1068,
+    "code": 598,
+    "comment": 421,
+    "blank": 49
+  },
+  "bytes": 51220,
+  "functions": {
+    "count": 47,
+    "byKind": {
+      "FunctionDeclaration": 16,
+      "ArrowFunctionExpression": 31
+    },
+    "longestBySpan": {
+      "name": "collectKpiStats",
+      "spanLines": 418,
+      "codeLines": 283,
+      "startLine": 641
+    },
+    "longestByCodeLines": {
+      "name": "collectKpiStats",
+      "spanLines": 418,
+      "codeLines": 283,
+      "startLine": 641
+    }
+  },
+  "maxNesting": 3,
+  "cyclomatic": {
+    "total": 200,
+    "totalConditionsOnly": 184,
+    "decisionPoints": 152,
+    "decisionPointsByKind": {
+      "ternary": 27,
+      "for": 3,
+      "forOf": 20,
+      "if": 47,
+      "and": 21,
+      "defaultValue": 7,
+      "or": 25,
+      "catch": 2
+    },
+    "max": {
+      "name": "collectKpiStats",
+      "cyclomatic": 77
+    },
+    "unitsOver10": [
+      "categorizeProxyEvent",
+      "collectKpiStats"
+    ]
+  },
+  "regexLiterals": 0,
+  "regexConstructors": 0,
+  "optionalChains": 2,
+  "stringLiterals": 137,
+  "templateLiterals": 2,
+  "imports": 9,
+  "topLevelDeclarations": {
+    "count": 30,
+    "items": [
+      {
+        "name": "HOUR_MS",
+        "kind": "const",
+        "exported": false,
+        "line": 37
+      },
+      {
+        "name": "DAY_MS",
+        "kind": "const",
+        "exported": false,
+        "line": 38
+      },
+      {
+        "name": "WEEK_MS",
+        "kind": "const",
+        "exported": false,
+        "line": 39
+      },
+      {
+        "name": "ACTIVITY_WINDOW_DAYS",
+        "kind": "const",
+        "exported": true,
+        "line": 41
+      },
+      {
+        "name": "HOURLY_WINDOW_HOURS",
+        "kind": "const",
+        "exported": true,
+        "line": 42
+      },
+      {
+        "name": "FREE_TIER_WINDOW_DAYS",
+        "kind": "const",
+        "exported": true,
+        "line": 43
+      },
+      {
+        "name": "OUTCOME_WINDOW_WEEKS",
+        "kind": "const",
+        "exported": true,
+        "line": 50
+      },
+      {
+        "name": "TOP_LIST_LIMIT",
+        "kind": "const",
+        "exported": false,
+        "line": 51
+      },
+      {
+        "name": "DISPATCH_DAY_KIND_LIMIT",
+        "kind": "const",
+        "exported": false,
+        "line": 52
+      },
+      {
+        "name": "dayKey",
+        "kind": "function",
+        "exported": false,
+        "line": 58
+      },
+      {
+        "name": "buildDayWindow",
+        "kind": "function",
+        "exported": false,
+        "line": 66
+      },
+      {
+        "name": "hourKey",
+        "kind": "function",
+        "exported": false,
+        "line": 78
+      },
+      {
+        "name": "buildHourWindow",
+        "kind": "function",
+        "exported": false,
+        "line": 86
+      },
+      {
+        "name": "bucketByDay",
+        "kind": "function",
+        "exported": false,
+        "line": 98
+      },
+      {
+        "name": "topCounts",
+        "kind": "function",
+        "exported": false,
+        "line": 111
+      },
+      {
+        "name": "countDistinctValues",
+        "kind": "function",
+        "exported": false,
+        "line": 130
+      },
+      {
+        "name": "excludedDistinctCount",
+        "kind": "function",
+        "exported": false,
+        "line": 146
+      },
+      {
+        "name": "addKeys",
+        "kind": "function",
+        "exported": false,
+        "line": 150
+      },
+      {
+        "name": "categorizeProxyEvent",
+        "kind": "function",
+        "exported": true,
+        "line": 165
+      },
+      {
+        "name": "PROXY_PHASES",
+        "kind": "const",
+        "exported": true,
+        "line": 182
+      },
+      {
+        "name": "median",
+        "kind": "function",
+        "exported": false,
+        "line": 187
+      },
+      {
+        "name": "PROXY_FIELDS",
+        "kind": "const",
+        "exported": false,
+        "line": 196
+      },
+      {
+        "name": "AGENT_STATUS_FIELDS",
+        "kind": "const",
+        "exported": false,
+        "line": 199
+      },
+      {
+        "name": "loadProxyBins",
+        "kind": "function",
+        "exported": false,
+        "line": 224
+      },
+      {
+        "name": "FRESH_DIGEST",
+        "kind": "const",
+        "exported": false,
+        "line": 295
+      },
+      {
+        "name": "loadDispatchHistory",
+        "kind": "function",
+        "exported": true,
+        "line": 346
+      },
+      {
+        "name": "feedbackLen",
+        "kind": "function",
+        "exported": false,
+        "line": 497
+      },
+      {
+        "name": "computeDispatchOutcomes",
+        "kind": "function",
+        "exported": false,
+        "line": 559
+      },
+      {
+        "name": "collectKpiStats",
+        "kind": "function",
+        "exported": true,
+        "line": 641
+      },
+      {
+        "name": "__internal",
+        "kind": "const",
+        "exported": true,
+        "line": 1068
+      }
+    ]
+  },
+  "exportedNames": [
+    "ACTIVITY_WINDOW_DAYS",
+    "HOURLY_WINDOW_HOURS",
+    "FREE_TIER_WINDOW_DAYS",
+    "OUTCOME_WINDOW_WEEKS",
+    "categorizeProxyEvent",
+    "PROXY_PHASES",
+    "loadDispatchHistory",
+    "collectKpiStats",
+    "__internal"
+  ],
+  "perFunction": [
+    {
+      "name": "<module>",
+      "kind": "module",
+      "startLine": 1,
+      "endLine": 1068,
+      "spanLines": null,
+      "codeLines": null,
+      "params": null,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": null
+    },
+    {
+      "name": "dayKey",
+      "kind": "FunctionDeclaration",
+      "startLine": 58,
+      "endLine": 61,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "buildDayWindow",
+      "kind": "FunctionDeclaration",
+      "startLine": 66,
+      "endLine": 72,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "for": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "hourKey",
+      "kind": "FunctionDeclaration",
+      "startLine": 78,
+      "endLine": 81,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "buildHourWindow",
+      "kind": "FunctionDeclaration",
+      "startLine": 86,
+      "endLine": 92,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "for": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "bucketByDay",
+      "kind": "FunctionDeclaration",
+      "startLine": 98,
+      "endLine": 105,
+      "spanLines": 8,
+      "codeLines": 8,
+      "params": 3,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "forOf": 1,
+        "if": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "bucketByDay/λ@99",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 99,
+      "endLine": 99,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "bucketByDay"
+    },
+    {
+      "name": "bucketByDay/λ@104",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 104,
+      "endLine": 104,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "bucketByDay"
+    },
+    {
+      "name": "topCounts",
+      "kind": "FunctionDeclaration",
+      "startLine": 111,
+      "endLine": 123,
+      "spanLines": 13,
+      "codeLines": 13,
+      "params": 3,
+      "cyclomatic": 6,
+      "cyclomaticConditionsOnly": 5,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "forOf": 1,
+        "ternary": 1,
+        "if": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "topCounts/λ@120",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 120,
+      "endLine": 120,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "topCounts"
+    },
+    {
+      "name": "topCounts/λ@122",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 122,
+      "endLine": 122,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "topCounts"
+    },
+    {
+      "name": "countDistinctValues",
+      "kind": "FunctionDeclaration",
+      "startLine": 130,
+      "endLine": 138,
+      "spanLines": 9,
+      "codeLines": 9,
+      "params": 2,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "forOf": 1,
+        "ternary": 1,
+        "if": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "excludedDistinctCount",
+      "kind": "FunctionDeclaration",
+      "startLine": 146,
+      "endLine": 148,
+      "spanLines": 3,
+      "codeLines": 3,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "defaultValue": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "addKeys",
+      "kind": "FunctionDeclaration",
+      "startLine": 150,
+      "endLine": 155,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 3,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "forOf": 1,
+        "if": 1,
+        "and": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "categorizeProxyEvent",
+      "kind": "FunctionDeclaration",
+      "startLine": 165,
+      "endLine": 180,
+      "spanLines": 16,
+      "codeLines": 14,
+      "params": 2,
+      "cyclomatic": 15,
+      "cyclomaticConditionsOnly": 15,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "ternary": 5,
+        "if": 4,
+        "or": 5
+      },
+      "enclosing": null
+    },
+    {
+      "name": "median",
+      "kind": "FunctionDeclaration",
+      "startLine": 187,
+      "endLine": 192,
+      "spanLines": 6,
+      "codeLines": 6,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "median/λ@189",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 189,
+      "endLine": 189,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "median"
+    },
+    {
+      "name": "loadProxyBins",
+      "kind": "FunctionDeclaration",
+      "startLine": 224,
+      "endLine": 274,
+      "spanLines": 51,
+      "codeLines": 46,
+      "params": 2,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "if": 1,
+        "ternary": 2,
+        "catch": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "loadProxyBins/λ@242",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 242,
+      "endLine": 250,
+      "spanLines": 9,
+      "codeLines": 9,
+      "params": 1,
+      "cyclomatic": 5,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 2,
+        "ternary": 2
+      },
+      "enclosing": "loadProxyBins"
+    },
+    {
+      "name": "loadProxyBins/λ@262",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 262,
+      "endLine": 273,
+      "spanLines": 12,
+      "codeLines": 12,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 2
+      },
+      "enclosing": "loadProxyBins"
+    },
+    {
+      "name": "loadDispatchHistory",
+      "kind": "FunctionDeclaration",
+      "startLine": 346,
+      "endLine": 491,
+      "spanLines": 146,
+      "codeLines": 118,
+      "params": 2,
+      "cyclomatic": 7,
+      "cyclomaticConditionsOnly": 6,
+      "maxNesting": 2,
+      "decisionPoints": {
+        "defaultValue": 1,
+        "if": 1,
+        "ternary": 2,
+        "catch": 1,
+        "or": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "feedbackLen",
+      "kind": "FunctionDeclaration",
+      "startLine": 497,
+      "endLine": 500,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 3,
+      "cyclomaticConditionsOnly": 3,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "ternary": 1
+      },
+      "enclosing": null
+    },
+    {
+      "name": "computeDispatchOutcomes",
+      "kind": "FunctionDeclaration",
+      "startLine": 559,
+      "endLine": 608,
+      "spanLines": 50,
+      "codeLines": 38,
+      "params": 2,
+      "cyclomatic": 10,
+      "cyclomaticConditionsOnly": 10,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "for": 1,
+        "forOf": 1,
+        "if": 5,
+        "or": 2
+      },
+      "enclosing": null
+    },
+    {
+      "name": "computeDispatchOutcomes/λ@582",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 582,
+      "endLine": 582,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "computeDispatchOutcomes"
+    },
+    {
+      "name": "asRate",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 594,
+      "endLine": 594,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 2,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "ternary": 1
+      },
+      "enclosing": "computeDispatchOutcomes"
+    },
+    {
+      "name": "computeDispatchOutcomes/λ@604",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 604,
+      "endLine": 604,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "computeDispatchOutcomes"
+    },
+    {
+      "name": "computeDispatchOutcomes/λ@605",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 605,
+      "endLine": 605,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "computeDispatchOutcomes"
+    },
+    {
+      "name": "collectKpiStats",
+      "kind": "FunctionDeclaration",
+      "startLine": 641,
+      "endLine": 1058,
+      "spanLines": 418,
+      "codeLines": 283,
+      "params": 2,
+      "cyclomatic": 77,
+      "cyclomaticConditionsOnly": 74,
+      "maxNesting": 3,
+      "decisionPoints": {
+        "defaultValue": 3,
+        "if": 29,
+        "forOf": 15,
+        "and": 12,
+        "ternary": 7,
+        "or": 10
+      },
+      "enclosing": null
+    },
+    {
+      "name": "collectKpiStats/λ@715",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 715,
+      "endLine": 718,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@721",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 721,
+      "endLine": 721,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@740",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 740,
+      "endLine": 743,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@744",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 744,
+      "endLine": 744,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@745",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 745,
+      "endLine": 748,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@749",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 749,
+      "endLine": 752,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@758",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 758,
+      "endLine": 758,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@784",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 784,
+      "endLine": 790,
+      "spanLines": 7,
+      "codeLines": 7,
+      "params": 2,
+      "cyclomatic": 4,
+      "cyclomaticConditionsOnly": 4,
+      "maxNesting": 1,
+      "decisionPoints": {
+        "if": 1,
+        "and": 1,
+        "or": 1
+      },
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@784/λ@785",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 785,
+      "endLine": 785,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats/λ@784"
+    },
+    {
+      "name": "collectKpiStats/λ@795",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 795,
+      "endLine": 795,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@802",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 802,
+      "endLine": 802,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@803",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 803,
+      "endLine": 803,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@820",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 820,
+      "endLine": 820,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@856",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 856,
+      "endLine": 856,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "and": 1
+      },
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@901",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 901,
+      "endLine": 901,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "rankEndpoints",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 950,
+      "endLine": 953,
+      "spanLines": 4,
+      "codeLines": 4,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "rankEndpoints/λ@951",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 951,
+      "endLine": 951,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 2,
+      "cyclomatic": 2,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {
+        "or": 1
+      },
+      "enclosing": "rankEndpoints"
+    },
+    {
+      "name": "rankEndpoints/λ@953",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 953,
+      "endLine": 953,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "rankEndpoints"
+    },
+    {
+      "name": "collectKpiStats/λ@990",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 990,
+      "endLine": 990,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    },
+    {
+      "name": "collectKpiStats/λ@1046",
+      "kind": "ArrowFunctionExpression",
+      "startLine": 1046,
+      "endLine": 1046,
+      "spanLines": 1,
+      "codeLines": 1,
+      "params": 1,
+      "cyclomatic": 1,
+      "cyclomaticConditionsOnly": 1,
+      "maxNesting": 0,
+      "decisionPoints": {},
+      "enclosing": "collectKpiStats"
+    }
+  ],
+  "definitions": {
+    "codeLines": "lines holding at least one non-whitespace character outside a comment (a line with code + trailing comment counts as code)",
+    "commentLines": "lines holding comment text and no code",
+    "blankLines": "lines with only whitespace",
+    "functions": "every FunctionDeclaration, FunctionExpression and ArrowFunctionExpression (callbacks and one-line arrows included); class methods would count too",
+    "functionLines": "spanLines = last line - first line + 1 of the function node; codeLines = code lines (as above) inside that span, including nested functions",
+    "maxNesting": "ESLint max-depth: +1 entering if / switch / try / for / for-in / for-of / while / do-while / with; an `else if` does not add a level; each function starts again at 0 (nested functions measured separately)",
+    "cyclomatic": "ESLint `complexity` style: 1 per function + 1 for each if (incl. else-if), ?: , && , || , ?? (anywhere, not only inside conditions, since each short-circuits), for, for-in, for-of, while, do-while, catch, case with a test (not default), logical assignment (&&= ||= ??=), and default value (AssignmentPattern). Optional chaining (?.) is NOT counted; it is reported separately as optionalChains. Module-level code is its own unit \"<module>\" with base 1. total = sum over all units.",
+    "cyclomaticConditionsOnly": "same as cyclomatic, except && / || / ?? are counted only when they sit inside the test of an if, ?:, while, do-while or for (classic McCabe \"boolean operators in conditions\")",
+    "regexLiterals": "regular-expression literals /.../ (new RegExp(...) calls reported separately as regexConstructors)",
+    "topLevelDeclarations": "top-level function / class declarations and variable declarators (exported or not); imports counted separately"
+  }
+}

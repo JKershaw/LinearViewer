@@ -1,0 +1,4320 @@
+{
+ "dataAttributes": [
+  {
+   "token": "data-action",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-brief-placeholder",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-completed-for",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-content",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-context-placeholder",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-count",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-decision-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-default-collapsed",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-depth",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-desc-id",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-details-for",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-disclosure-prefix",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-disposition",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-effect",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-end",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-feature",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-feedback",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-free",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-free-tier-status",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-free-tier-usage",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-id",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-identifier",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-instance-key",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-issue-id",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-issue-identifier",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-kind",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-lazy",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-lineage-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-localhost",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-loop-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-model-catalog",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-model-hint",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-model-price",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-node-key",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-option-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-original-src",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-parent",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-periodical-id",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-pr-state-url",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-preset-id",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-pricing",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-project-id",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-project-name",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-project-type",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-prompt-mount",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-proposal-action",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-proposal-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-proposal-status",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-provider",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-proxy-active",
+   "files": [
+    "render.js",
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-proxy-feature",
+   "files": [
+    "render.js",
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-proxy-force",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-raw-desc",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-recap-placeholder",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-record-on",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-run-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-run-live",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-scan-placeholder",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-scope",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-search-text",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": false
+  },
+  {
+   "token": "data-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-session-waiting",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-sessions-placeholder",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "data-since",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-source",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-stamp-loop-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-start",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-state",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-status",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-target",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-terminal",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-testid",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-title",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-top-task",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "data-url",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-url-key",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "data-why",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  }
+ ],
+ "testids": [
+  {
+   "token": "ai-kind-overrides",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "ai-kind-overrides-toggle",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "attachments-content",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "attachments-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "create-task",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "create-task-trigger",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "dispatch-default-row-default",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-kind-overrides-toggle",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-create-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-list",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "dispatch-preset-new-row",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-presets-empty",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "home-top-task-onboarding",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "issue-chat-link",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "issue-edit-link",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "issue-line",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "issue-source",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "issue-task-page-link",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "project",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "project-header",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "run-evidence",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "session-active-time",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-back",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-context-empty",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "session-cost",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-credential",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-elapsed",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-inline-reply",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-inline-reply-save",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-inline-reply-send",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-inline-reply-thread",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-lineage",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-next",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-not-found",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-page",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-paragraph",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-paragraph-text",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-pr-line",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-pr-state",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-progress",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-proposal",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-proposal-state",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-proposals",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-answer",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-dismiss",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-if-unanswered",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-input",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-option",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-options",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-question",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-readonly",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-thread",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "session-question-card-why",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-question-card-why-chunk",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-run",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-run-body",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-run-chat",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-run-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-run-transcript",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-seed",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-seed-title",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-step",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-step-summary",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-task",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "session-task-link",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "session-task-page-link",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "session-tasks",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-tiers",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-title",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "session-waiting-clock",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-account-add-email",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-account-emails",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-group-user",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-group-workspace",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-logout",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-openrouter-consent-grant",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-openrouter-consent-notice",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-openrouter-consent-status",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-activate",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-add-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-binding",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-notice",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-notice-activate",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-refresh",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-provider-remove",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-account",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-ai-model",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-ai-usage",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-ai-user",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-dispatch-defaults",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-dispatch-presets",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-experimental",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-providers",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-workflow",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-section-workspace-features",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-card",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-filter",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-page",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  }
+ ],
+ "ids": [
+  {
+   "token": "dispatch-presets",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-card",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-counter",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  }
+ ],
+ "classes": [
+  {
+   "token": "action-btn",
+   "files": [
+    "render-session.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "add-task-link",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "ai-kind-overrides",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "ai-kind-overrides-summary",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "ai-override-input",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "ai-override-row",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "ai-override-select",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "ai-overrides-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "ai-overrides-submit",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "attachment-image",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "attachment-item",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "attachments-grid",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "brief-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "chat-composer",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "chat-composer__actions",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "chat-composer__input",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "chat-thread",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "children",
+   "files": [
+    "render.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "code-review-options",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "comments-error",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "comments-list",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "comments-loading",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "completed-time",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "completed-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "connect",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "connected",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "consent-granted",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "consent-notice",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "consent-pending",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "context-section",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "desc-full",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "desc-full-content",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "desc-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "desc-truncated",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "detail-content",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "detail-line",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "detail-link",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "detail-meta",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "detail-text",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "detail-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "details",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "disconnect",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "disconnected",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-default-row",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-defaults-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-defaults-submit",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-disclosure-placeholder",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-effort-input",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-kind-overrides",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-kind-overrides-summary",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "dispatch-model-hint",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-model-input",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-model-input-other",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-create",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-create-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-create-submit",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "dispatch-preset-delete-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-empty",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "dispatch-preset-item",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-kind-overrides",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-name-input",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-name-line",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "dispatch-preset-save-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "dispatch-preset-toplevel-config",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "done",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "env",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "error",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "expandable",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "feature-desc",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "feature-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "feature-note",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "feature-toggle",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "feature-toggle-label",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "feedback-widget-options",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "field-label",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "field-muted",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "field-value",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "free",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "free-tier",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "harness-select",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "has-children",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "hero",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "hidden",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "home-onboarding-hint",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "home-prompt-mount",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "in-progress-header",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "in-progress-items",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "in-progress-project",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "in-progress-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "is-landing",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "issue-desc-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "issue-description",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "landing-hero",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "line",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "login",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "logout",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "model-current",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "model-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "model-id",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "model-input",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "model-or",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "model-price",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "model-pricing",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "model-select",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "nested-toggle",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "node",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "page-header",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "periodical-mode",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "periodical-state",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "project",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "project-description",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "project-header",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "project-meta",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "prompt-actions",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "prompt-container",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "prompt-copy",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "prompt-download",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "prompt-header",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "prompt-name",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "prompt-text",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "provider-active",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-add",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-add-blocked",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-add-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-binding",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-blocked",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "provider-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-remove-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "provider-scope",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "provider-token",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "recap-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "recent-activity-header",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "recent-activity-items",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "recent-activity-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "save",
+   "files": [
+    "render-session.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "scan-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "section",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "section-header",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "selected",
+   "files": [
+    "render.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "sess-back",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-context-section",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-cred",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-cred-token",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-ctx-issue",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-header",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-heading-title",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-inline-reply",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-inline-reply-actions",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-inline-reply-input",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-k",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-kv",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-kv-grid",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-lineage",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-lineage-runs",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-muted",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-notfound",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-page",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-paragraph",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-paragraph-slot",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-paragraph-text",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-pr-state",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-proposal",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-proposal-actions",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-proposal-apply",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-proposal-decline",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-proposal-list",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-proposal-prompt",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-proposal-state",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-proposals",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-proposals-title",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-qcard-actions",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-answer",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-case",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-case-chunk",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-dismiss",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-feedback",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-qcard-if-unanswered",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-input",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-option-input",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-option-label",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-options",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-question",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-readonly",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcard-why-summary",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-qcards",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-reply-feedback",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-reply-save",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-reply-send",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-run",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-run-body",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-run-chat",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-run-head",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-run-header",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-run-id",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-run-tx",
+   "files": [
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-runs",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-section",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-seed-title",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-step",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-step-summary",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-steps",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "sess-task",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-tasks",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-tasks-block",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-tasks-label",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sess-v",
+   "files": [
+    "render-session.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "sessions-section",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "settings-action",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-form",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-group",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-group-header",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "settings-group-subtitle",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "settings-header",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-link",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "settings-section",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "settings-subtitle",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "settings-value",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "setup-notice",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "source-badge",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "state",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "status-pill",
+   "files": [
+    "render.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "swipe-arrow",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-arrow-left",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-arrow-right",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": false,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-card",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-card-area",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "swipe-card-container",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "swipe-card-empty",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-counter",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-filter-bar",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "swipe-filter-select",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "swipe-header",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "swipe-nav-row",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "swipe-page",
+   "files": [
+    "render-swipe.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "task-page-link",
+   "files": [
+    "render.js",
+    "render-session.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "title",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "toggle",
+   "files": [
+    "render.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "toggle-btn",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "toggle-off",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "toggle-on",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": false
+  },
+  {
+   "token": "toggle-state",
+   "files": [
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": false,
+   "tests": true
+  },
+  {
+   "token": "tree",
+   "files": [
+    "render.js",
+    "render-session.js",
+    "render-swipe.js",
+    "render-settings.js"
+   ],
+   "js": true,
+   "css": true,
+   "llms": true,
+   "tests": true
+  },
+  {
+   "token": "truncation-notice",
+   "files": [
+    "render.js"
+   ],
+   "js": false,
+   "css": true,
+   "llms": false,
+   "tests": true
+  }
+ ],
+ "counts": {
+  "dataAttributes": 78,
+  "testids": 99,
+  "ids": 3,
+  "classes": 244
+ }
+}
