@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="345" viewBox="0 0 960 345" font-family="Inter, system-ui, sans-serif" font-size="12" role="img" aria-label="One decision in three states. Diffuse: six copies across four areas, one drifted. Consolidated: one authority in the area that owns it, callers ask it, still tangled inside. Rebuilt: the same boundary and callers, the inside replaced by small parts."><style data-figure-theme="1">@media (prefers-color-scheme: dark){rect[fill="#fff"]:not([fill-opacity]),rect[fill="#ffffff"]:not([fill-opacity]),rect[fill="white"]:not([fill-opacity]){fill:#16181d}[stroke="#fff"],[stroke="#ffffff"],[stroke="white"]{stroke:#16181d}circle[fill="#fff"]:not([fill-opacity]),circle[fill="#ffffff"]:not([fill-opacity]),circle[fill="white"]:not([fill-opacity]){fill:#16181d}path[fill="#fff"]:not([fill-opacity]),path[fill="#ffffff"]:not([fill-opacity]),path[fill="white"]:not([fill-opacity]){fill:#16181d}polygon[fill="#fff"]:not([fill-opacity]),polygon[fill="#ffffff"]:not([fill-opacity]),polygon[fill="white"]:not([fill-opacity]){fill:#16181d}ellipse[fill="#fff"]:not([fill-opacity]),ellipse[fill="#ffffff"]:not([fill-opacity]),ellipse[fill="white"]:not([fill-opacity]){fill:#16181d}text[fill="#111827"]:not([data-on-fill]),text[fill="#1f2937"]:not([data-on-fill]),text[fill="#333"]:not([data-on-fill]),text[fill="#1f2328"]:not([data-on-fill]),text[fill="#555"]:not([data-on-fill]),text[fill="#475569"]:not([data-on-fill]){fill:#e6e6e6}[stroke="#111827"],[stroke="#1f2937"],[stroke="#333"],[stroke="#1f2328"],[stroke="#555"],[stroke="#475569"]{stroke:#e6e6e6}text[fill="#6b7280"]:not([data-on-fill]),text[fill="#666"]:not([data-on-fill]),text[fill="#667085"]:not([data-on-fill]),text[fill="#888"]:not([data-on-fill]),text[fill="#6e7781"]:not([data-on-fill]),text[fill="#999"]:not([data-on-fill]),text[fill="#aaa"]:not([data-on-fill]),text[fill="#bbb"]:not([data-on-fill]),text[fill="#9ca3af"]:not([data-on-fill]),text[fill="#94a3b8"]:not([data-on-fill]){fill:#9aa0a6}[stroke="#6b7280"],[stroke="#666"],[stroke="#667085"],[stroke="#888"],[stroke="#6e7781"],[stroke="#999"],[stroke="#aaa"],[stroke="#bbb"],[stroke="#9ca3af"],[stroke="#94a3b8"]{stroke:#9aa0a6}[stroke="#e5e7eb"],[stroke="#eee"],[stroke="#d1d5db"],[stroke="#f0f0f0"],[stroke="#cbd5e1"],[stroke="#d9d9d9"]{stroke:#2c313a}[fill="#f3f4f6"],[fill="#f9fafb"]{fill:#1f222a}rect[fill="#f0f0f0"],rect[fill="#d1d5db"],rect[fill="#e5e7eb"],rect[fill="#eee"]{fill:#2c313a}text:not([fill]):not([class]):not([data-on-fill]){fill:#e6e6e6}rect[fill="#1f2937"],circle[fill="#1f2937"],path[fill="#1f2937"]{fill:#4b5563}rect[fill="#3b1f5e"],circle[fill="#3b1f5e"],path[fill="#3b1f5e"]{fill:#553185}svg .t,svg .h{fill:#e6e6e6}svg .a,svg .s{fill:#9aa0a6}svg .f{fill:#1f222a;stroke:#2c313a}svg .g{stroke:#2c313a}rect[fill="#dbeafe"]{fill:#1d2d44}rect[fill="#93c5fd"]{fill:#2a5a9a}rect[fill="#fff7ed"]{fill:#2a2118}}</style>
+<defs>
+<marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#6b7280"/></marker>
+<marker id="ab" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#2a78d6"/></marker>
+</defs>
+<rect x="0" y="0" width="960" height="345" fill="#fff"/>
+
+<!-- ===== Panel 1: diffuse ===== -->
+<g transform="translate(25,0)">
+<text x="5" y="30" font-size="15" font-weight="600" fill="#111827">1 · Diffuse</text>
+<text x="5" y="49" font-size="11.5" fill="#6b7280">one decision, copied across areas</text>
+<rect x="5" y="66" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="130" y="66" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="5" y="180" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="130" y="180" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<text x="14" y="83" font-size="10.5" fill="#6b7280">pages</text>
+<text x="139" y="83" font-size="10.5" fill="#6b7280">routes</text>
+<text x="14" y="276" font-size="10.5" fill="#6b7280">jobs</text>
+<text x="139" y="276" font-size="10.5" fill="#6b7280">core</text>
+<g stroke="#eb6834" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="3 3" fill="none">
+<path d="M35 110 L92 142"/><path d="M92 142 L66 226"/><path d="M35 110 L165 104"/>
+<path d="M165 104 L220 148"/><path d="M220 148 L195 232"/><path d="M66 226 L195 232"/>
+</g>
+<circle cx="35" cy="110" r="6.5" fill="#eb6834"/><circle cx="92" cy="142" r="6.5" fill="#eb6834"/>
+<circle cx="165" cy="104" r="6.5" fill="#eb6834"/><circle cx="220" cy="148" r="6.5" fill="#eb6834"/>
+<circle cx="66" cy="226" r="6.5" fill="#eb6834"/>
+<circle cx="195" cy="232" r="6" fill="#fff" stroke="#eb6834" stroke-width="2.2"/>
+<text x="207" y="236" font-size="10.5" fill="#6b7280">drifted</text>
+<text x="5" y="310" font-size="11" fill="#6b7280">lives in</text>
+<text x="62" y="310" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">6 places, 4 areas</text>
+<text x="5" y="330" font-size="11" fill="#6b7280">inside</text>
+<text x="62" y="330" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">6 versions</text>
+</g>
+
+<!-- step arrow 1 -->
+<text x="312" y="152" font-size="10.5" fill="#111827" text-anchor="middle">free the seam,</text>
+<text x="312" y="166" font-size="10.5" fill="#111827" text-anchor="middle">consolidate</text>
+<line x1="276" y1="178" x2="349" y2="178" stroke="#2a78d6" stroke-width="2" marker-end="url(#ab)"/>
+
+<!-- ===== Panel 2: consolidated ===== -->
+<g transform="translate(355,0)">
+<text x="5" y="30" font-size="15" font-weight="600" fill="#111827">2 · Consolidated</text>
+<text x="5" y="49" font-size="11.5" fill="#6b7280">one authority, in the area that owns it</text>
+<rect x="5" y="66" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="130" y="66" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="5" y="180" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="130" y="180" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<text x="14" y="83" font-size="10.5" fill="#6b7280">pages</text>
+<text x="139" y="83" font-size="10.5" fill="#6b7280">routes</text>
+<text x="14" y="276" font-size="10.5" fill="#6b7280">jobs · owner</text>
+<text x="139" y="276" font-size="10.5" fill="#6b7280">core</text>
+<rect x="22" y="196" width="88" height="60" rx="6" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.5"/>
+<path d="M30 246 C 47 202, 62 254, 72 210 S 104 246, 96 204 S 40 220, 58 250 S 106 234, 90 214 S 36 204, 46 232" fill="none" stroke="#2a78d6" stroke-width="1.3"/>
+<g stroke="#6b7280" stroke-width="1.2" fill="none">
+<path d="M35 116 L44 192" marker-end="url(#ah)"/><path d="M92 148 L86 192" marker-end="url(#ah)"/>
+<path d="M165 110 L114 202" marker-end="url(#ah)"/><path d="M216 152 L114 224" marker-end="url(#ah)"/>
+<path d="M189 233 L114 244" marker-end="url(#ah)"/>
+</g>
+<circle cx="35" cy="110" r="4.5" fill="#9ca3af"/><circle cx="92" cy="142" r="4.5" fill="#9ca3af"/>
+<circle cx="165" cy="104" r="4.5" fill="#9ca3af"/><circle cx="220" cy="148" r="4.5" fill="#9ca3af"/>
+<circle cx="195" cy="232" r="4.5" fill="#9ca3af"/>
+<text x="150" y="215" font-size="10.5" fill="#6b7280">callers ask it</text>
+<text x="5" y="310" font-size="11" fill="#6b7280">lives in</text>
+<text x="62" y="310" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">1 place</text>
+<text x="5" y="330" font-size="11" fill="#6b7280">inside</text>
+<text x="62" y="330" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">1 version, still tangled</text>
+</g>
+
+<!-- step arrow 2 -->
+<text x="642" y="152" font-size="10.5" fill="#111827" text-anchor="middle">rebuild,</text>
+<text x="642" y="166" font-size="10.5" fill="#111827" text-anchor="middle">design-first</text>
+<line x1="606" y1="178" x2="679" y2="178" stroke="#2a78d6" stroke-width="2" marker-end="url(#ab)"/>
+
+<!-- ===== Panel 3: rebuilt ===== -->
+<g transform="translate(685,0)">
+<text x="5" y="30" font-size="15" font-weight="600" fill="#111827">3 · Rebuilt</text>
+<text x="5" y="49" font-size="11.5" fill="#6b7280">same boundary and callers, new inside</text>
+<rect x="5" y="66" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="130" y="66" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="5" y="180" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<rect x="130" y="180" width="115" height="104" rx="10" fill="#f9fafb" stroke="#d1d5db"/>
+<text x="14" y="83" font-size="10.5" fill="#6b7280">pages</text>
+<text x="139" y="83" font-size="10.5" fill="#6b7280">routes</text>
+<text x="14" y="276" font-size="10.5" fill="#6b7280">jobs · owner</text>
+<text x="139" y="276" font-size="10.5" fill="#6b7280">core</text>
+<rect x="22" y="196" width="88" height="60" rx="6" fill="#dbeafe" stroke="#2a78d6" stroke-width="1.5"/>
+<rect x="30" y="204" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<rect x="70" y="204" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<rect x="30" y="230" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<rect x="70" y="230" width="32" height="18" rx="3" fill="#fff" stroke="#2a78d6" stroke-width="1.2"/>
+<g stroke="#6b7280" stroke-width="1.2" fill="none">
+<path d="M35 116 L44 192" marker-end="url(#ah)"/><path d="M92 148 L86 192" marker-end="url(#ah)"/>
+<path d="M165 110 L114 202" marker-end="url(#ah)"/><path d="M216 152 L114 224" marker-end="url(#ah)"/>
+<path d="M189 233 L114 244" marker-end="url(#ah)"/>
+</g>
+<circle cx="35" cy="110" r="4.5" fill="#9ca3af"/><circle cx="92" cy="142" r="4.5" fill="#9ca3af"/>
+<circle cx="165" cy="104" r="4.5" fill="#9ca3af"/><circle cx="220" cy="148" r="4.5" fill="#9ca3af"/>
+<circle cx="195" cy="232" r="4.5" fill="#9ca3af"/>
+<text x="150" y="215" font-size="10.5" fill="#6b7280">callers unchanged</text>
+<text x="5" y="310" font-size="11" fill="#6b7280">lives in</text>
+<text x="62" y="310" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">1 place</text>
+<text x="5" y="330" font-size="11" fill="#6b7280">inside</text>
+<text x="62" y="330" font-size="11" fill="#111827" font-family="JetBrains Mono, ui-monospace, monospace">small parts</text>
+</g>
+</svg>
