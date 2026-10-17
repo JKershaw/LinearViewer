@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/seams.test.mjs && playwright test",
+    "test": "node scripts/run-unit-tests.mjs tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/seams.test.mjs && playwright test",
     "test:ui": "playwright test --ui",
-    "test:unit": "node --test tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/seams.test.mjs",
+    "test:unit": "node scripts/run-unit-tests.mjs tests/unit/*.test.js scripts/eval/eval-dense.test.mjs scripts/code-shape/seams.test.mjs",
     "env:check": "bash scripts/env-check.sh",
     "setup": "bash scripts/setup.sh",
     "test:hermetic": "node scripts/assert-unit-suite-hermetic.mjs",
