@@ -637,6 +637,36 @@ const replaceOnce = (needle, replacement) => (src) => {
 
 const POST_DISPATCH_GATE = "          if (isFollowUp) {\n            return provisionResumeCredential({";
 
+/**
+ * LIN-3611 (A1): plant by POSITION, not by text. The follow-up gate of the first
+ * entrance call that carries followUpTo is found with the file's own scanner
+ * (scanDispatchCalls + findEntranceGate), so a witness survives any re-nesting or
+ * re-spelling of the entrance code. `transform(src, header)` gets the file's source and the
+ * span of the gate header (`if (<predicate>) {`, up to and including its brace) and
+ * returns the mutated source. Fails loudly if no gated entrance call exists.
+ */
+function plantAtEntranceGate(files, transform) {
+  for (const call of scanDispatchCalls(files)) {
+    if (!inE(call.file) || !call.carriesFollowUpTo) continue;
+    const found = findEntranceGate(call);
+    if (!found) continue;
+    const braceAt = found.gate.open;
+    const head = call.masked.slice(call.start, braceAt + 1);
+    const m = new RegExp(`if\\s*\\(\\s*${found.predicate}\\s*\\)\\s*\\{$`).exec(head);
+    assert.ok(m, `${call.file}: the gate is an if (${found.predicate}) { block`);
+    const header = { start: call.start + m.index, end: braceAt + 1 };
+    return files.map((f) => (f.file === call.file ? { file: f.file, src: transform(f.src, header) } : f));
+  }
+  assert.fail('no gated follow-up createDispatchItem call in the dispatch entrances to plant at');
+}
+
+/** The gate header replaced by `if (prompt) {`: the helper is then under a non-follow-up predicate. */
+const gateReplaced = (files) => plantAtEntranceGate(files, (src, h) => src.slice(0, h.start) + 'if (prompt) {' + src.slice(h.end));
+/** A declaredGrants literal planted on the line before the gate. */
+const literalBeforeGate = (files) => plantAtEntranceGate(files, (src, h) => src.slice(0, h.start) + "const launchGrant = { declaredGrants: ['dispatch'] };\n" + src.slice(h.start));
+/** The same sources, every line of the entrance authority shifted one level deeper. */
+const reindented = (files) => files.map((f) => (f.file === 'lib/dispatch-entrance.js' ? { file: f.file, src: f.src.replace(/\n(?=.)/g, '\n  ') } : f));
+
 describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields, no spread', () => {
   test('10 calls: 5 outside E exactly (4 listed non-follow-up/follow-up rows), at least 1 in E; the follow-up-carrying ones are the 2 lib sites plus at least 1 in E; every fields is inline, spread-free', () => {
     const calls = scanDispatchCalls(PRODUCTION);
@@ -702,6 +732,13 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
     assert.ok(censusC2(mutated).some(m => m.includes('under no follow-up gate')), censusC2(mutated).join('\n'));
   });
 
+  test('mutation 1 (position-planted, LIN-3611 A1): the gate rewritten to `if (prompt) {` fails (iii c), also after the authority is re-indented', () => {
+    for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
+      const mutated = gateReplaced(files);
+      assert.ok(censusC2(mutated).some(m => m.includes('under no follow-up gate')), censusC2(mutated).join('\n'));
+    }
+  });
+
   // LIN-3601: four mutation tests formerly here planted into routes/proxy-dispatch.js,
   // routes/dispatch.js text and asserted the positional scan failed. Their properties
   // are carried by behaviour: dispatch-entrance-mint-sweep.test.js (World R, one test
@@ -722,6 +759,13 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
   test('mutation 4 (iii d half, re-pointed): a declaredGrants literal planted in an entrance is caught by F3 as an unlisted writer', () => {
     const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, " const launchGrant = { declaredGrants: ['dispatch'] };\n" + POST_DISPATCH_GATE);
     assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer:')), checkF3(mutated).join('\n'));
+  });
+
+  test('mutation 4 (position-planted, LIN-3611 A1): a declaredGrants literal before the gate is caught by F3 as an unlisted writer, also after re-indenting', () => {
+    for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
+      const mutated = literalBeforeGate(files);
+      assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer:')), checkF3(mutated).join('\n'));
+    }
   });
 
   test('mutation 5: a direct provisionBootstrapToken( in a follow-up call fails (iii a/b)', () => {
@@ -782,6 +826,13 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
   test('mutation 1 (v): with the gate predicate gone, the helper becomes an unlisted launch-arm mint (location-free)', () => {
     const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
     assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('E | launch | provisionResumeCredential')), censusClassification(mutated).join('\n'));
+  });
+
+  test('mutation 1 (v, position-planted, LIN-3611 A1): with the gate predicate gone the helper is an unlisted launch-arm mint, also after re-indenting', () => {
+    for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
+      const mutated = gateReplaced(files);
+      assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('E | launch | provisionResumeCredential')), censusClassification(mutated).join('\n'));
+    }
   });
 
   // Re-targeted count-drift witness (LIN-3601, formerly `mutation: a second helper
