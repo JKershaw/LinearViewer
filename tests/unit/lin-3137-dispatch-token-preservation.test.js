@@ -127,28 +127,14 @@ describe('LIN-3137 — source pins', () => {
     assert.ok(!body.includes('role'), 'validateToken must not read a role edge');
   });
 
-  test('the POST mint chain is limiter → workspaceFromUrl → gate → createToken', () => {
-    const src = readFileSync(join(REPO, 'routes', 'dispatch.js'), 'utf8');
-    const handlerStart = src.indexOf("router.post('/workspace/:urlKey/api/dispatch/tokens'");
-    assert.notEqual(handlerStart, -1, 'the POST mint handler must exist');
-    const handlerEnd = src.indexOf("router.get('/workspace/:urlKey/api/dispatch/tokens'", handlerStart);
-    assert.notEqual(handlerEnd, -1, 'the POST handler slice must end before the GET');
-
-    const registration = src.slice(handlerStart, src.indexOf('\n', handlerStart));
-    assert.match(
-      registration,
-      /router\.post\('\/workspace\/:urlKey\/api\/dispatch\/tokens',\s*tokenCreationLimiter,\s*workspaceFromUrl,/,
-      'the limiter must stay first, then workspaceFromUrl'
-    );
-
-    const handler = src.slice(handlerStart, handlerEnd);
-    const iLimiter = handler.indexOf('tokenCreationLimiter');
-    const iResolve = handler.indexOf('workspaceFromUrl');
-    const iGate = handler.indexOf('resolveOwnerMintRefusal');
-    const iMint = handler.indexOf('dispatchTokenStore.createToken');
-    assert.ok(iLimiter > -1 && iResolve > -1 && iGate > -1 && iMint > -1, 'all four stages present');
-    assert.ok(iLimiter < iResolve, 'limiter before workspaceFromUrl');
-    assert.ok(iResolve < iGate, 'workspaceFromUrl (auth) before the owner gate');
-    assert.ok(iGate < iMint, 'the owner gate before createToken');
-  });
+  // LIN-3601: 'the POST mint chain is limiter → workspaceFromUrl → gate → createToken'
+  // sliced routes/dispatch.js and compared the source offsets of the four stages. It is
+  // replaced by dispatch-entrance-mint-limiter-order.test.js (its own file: the limiter
+  // is module-scope and its memory store is shared across a test process), which sends
+  // five non-owner POSTs under NODE_ENV=production and shows that the sixth is a 429
+  // that never reached workspaceFromUrl, that the first five were refused by the owner
+  // gate (403 GRANT_OWNER_ONLY) after workspaceFromUrl had run, and that
+  // dispatchTokenStore.createToken was never called. Each reordering of the chain
+  // (workspaceFromUrl ahead of the limiter, the gate after createToken, the gate or the
+  // limiter removed) fails that test in a scratch copy (PR evidence).
 });
