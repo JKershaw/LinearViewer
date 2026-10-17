@@ -484,16 +484,21 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
 // (or null), so without this a successful local write would read as
 // `success: undefined` and wrongly 502. Mirrors proxy.js's normalizeWritePayload.
 function normalizeIssueWrite(result) {
-  if (result && typeof result === 'object' && 'success' in result) return result;
-  return { success: !!result, issue: result ?? null };
+  return asWriteEnvelope(result, 'issue');
 }
 
 // Same normalization, keyed 'comment' instead of 'issue' (LIN-2154) — the
 // session-auth comment route's provider.createComment() result can be
 // Linear's `{success, comment}` envelope or a bare comment entity (Local).
 function normalizeCommentWrite(result) {
-  if (result && typeof result === 'object' && 'success' in result) return result;
-  return { success: !!result, comment: result ?? null };
+  return asWriteEnvelope(result, 'comment');
+}
+
+// A result that already carries `success` is the envelope; anything else is the
+// bare entity (or null), wrapped under `key`.
+function asWriteEnvelope(result, key) {
+  const isEnvelope = !!result && typeof result === 'object' && 'success' in result;
+  return isEnvelope ? result : { success: !!result, [key]: result ?? null };
 }
 
 // Input-side symbolic-ref resolution, mirroring the proxy write path
@@ -501,32 +506,28 @@ function normalizeCommentWrite(result) {
 // bare UUID short-circuits before any provider read, so existing UUID payloads
 // pay no network cost; a symbolic ref triggers the scoped list fetch and
 // resolves to a native id (or throws RefResolutionError → clean 422 below).
-async function resolveIssueTeamRef(provider, token, rawRef) {
+// A bare UUID passes straight through; anything else is looked up by `list()` and
+// matched by `match`.
+async function resolveRefVia(rawRef, list, match) {
   const { localRef } = parseSourceNamespace(rawRef);
   if (UUID_REGEX.test(localRef)) return localRef;
-  const teams = await provider.fetchTeams(token);
-  return resolveTeamRef(teams, localRef);
+  return match(await list(), localRef);
 }
-async function resolveIssueProjectRef(provider, token, rawRef) {
-  const { localRef } = parseSourceNamespace(rawRef);
-  if (UUID_REGEX.test(localRef)) return localRef;
-  const projects = await provider.fetchProjectsList(token);
-  return resolveProjectRef(projects, localRef);
-}
-async function resolveIssueStateRef(provider, token, teamId, rawRef) {
-  const { localRef } = parseSourceNamespace(rawRef);
-  if (UUID_REGEX.test(localRef)) return localRef;
-  // States are team-scoped; without a team we cannot scope the symbolic match,
-  // so fail loud (422) rather than guess across teams.
-  if (!teamId) {
+const resolveIssueTeamRef = (provider, token, rawRef) =>
+  resolveRefVia(rawRef, () => provider.fetchTeams(token), resolveTeamRef);
+const resolveIssueProjectRef = (provider, token, rawRef) =>
+  resolveRefVia(rawRef, () => provider.fetchProjectsList(token), resolveProjectRef);
+// States are team-scoped. Without a team the symbolic match cannot be scoped, so
+// it fails loud (422) rather than guessing across teams.
+const resolveIssueStateRef = (provider, token, teamId, rawRef) =>
+  resolveRefVia(rawRef, () => {
+    if (teamId) return provider.states(token, teamId);
+    const { localRef } = parseSourceNamespace(rawRef);
     throw new RefResolutionError(
       `Cannot resolve state '${localRef}' — the issue's team could not be determined`,
       { status: 422 },
     );
-  }
-  const states = await provider.states(token, teamId);
-  return resolveStateRef(states, localRef);
-}
+  }, resolveStateRef);
 
 // The first reason a create body is refused, or null. Order is the contract:
 // team, title, the shared field validation, then the LIN-1973 restrictive half.
@@ -721,6 +722,17 @@ function runLimitRefusal(err) {
     retryable: limit.code === 'RUN_LIMIT_UNVERIFIED',
     message: limit.error
   };
+}
+
+// The first 400 a feedback body earns before any provider is consulted, or null:
+// the model / harness overrides (LIN-1132), then the message.
+function feedbackBodyRefusal({ model, harness, message }) {
+  const override = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH })
+    || validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+  if (override) return override.error;
+  if (!message || typeof message !== 'string' || !message.trim()) return 'message is required';
+  if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) return 'message exceeds maximum length';
+  return null;
 }
 
 // The page URL and browser captured at submit time (LIN-635 S4), as a markdown
@@ -3141,55 +3153,29 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * @route POST /workspace/:urlKey/api/feedback
    */
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
-    const workspace = req.workspace;
-    // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's
-    // default (active) binding. The pair-era selector is gone;
-    // `resolveIssueBinding(workspace, null)` is the source-only default.
-    const issueBinding = resolveIssueBinding(workspace, null);
-    const provider = issueBinding.provider;
-    // LIN-3126 residual (producer sweep) / LIN-3335: the feedback triage/autopilot
-    // rows are issue-addressed and never reach the factory's §5.5a source
-    // inheritance (no `followUpTo`), so the row carries the created issue's
-    // kind-only source. It is taken from the SAME resolved binding that produced
-    // `provider`/`callScope` — one resolution, so the source the issue is created
-    // in and the stamped source cannot drift. Selection-only provenance, never a
-    // credential (B1).
-    const persistedBindingPair = provider?.name ? { issueSource: provider.name } : {};
-    // Provider call scope: bare token for Linear/local (byte-identical), or a
-    // { token, repo } GitHub App credential so createIssue builds a request-time
-    // client from the installation token (LIN-713). uploadFile is capability-gated
-    // off for GitHub; fetchTeams (via resolveFeedbackTeamId) ignores its arg.
-    const token = issueBinding.callScope;
-    const { message, title, teamId, projectId, image, url, userAgent } = req.body || {};
-    const priority = normalizeFeedbackPriority(req.body?.priority);
-    // Explicit post-create action (LIN-918). Only the three known actions branch;
-    // anything else (including an omitted `action`) is the legacy plain send.
-    const rawAction = typeof req.body?.action === 'string' ? req.body.action : null;
-    const action = FEEDBACK_ACTIONS.has(rawAction) ? rawAction : null;
+    const { workspace } = req;
+    // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's default
+    // (active) binding; the pair-era selector is gone, so `null` is the
+    // source-only default. Provider call scope: a bare token for Linear/local
+    // (byte-identical), or a { token, repo } GitHub App credential so createIssue
+    // builds a request-time client from the installation token (LIN-713).
+    // uploadFile is capability-gated off for GitHub; fetchTeams (via
+    // resolveFeedbackTeamId) ignores its arg.
+    const { provider, callScope: token } = resolveIssueBinding(workspace, null);
+    const body = req.body || {};
 
-    // Optional per-dispatch execution overrides from the feedback widget
-    // (LIN-1132). Validated with the SAME opaque-field helper the dispatch/proxy
-    // routes use (type/length/dangerous-chars only, NOT a model registry); blank/
-    // absent stays valid and falls through to the factory's default resolution.
-    const { model, harness } = req.body || {};
-    const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-    if (modelValidationError) {
-      return badRequest.json(res, modelValidationError.error);
-    }
-    const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-    if (harnessValidationError) {
-      return badRequest.json(res, harnessValidationError.error);
-    }
+    // The 400s that need no provider, first-error order: the widget's optional
+    // per-dispatch model / harness overrides (LIN-1132) — checked with the opaque-
+    // field helper the dispatch and proxy routes use (type, length, dangerous
+    // characters; NOT a model registry; blank or absent is valid and falls
+    // through to the factory's default) — then the message itself.
+    const bodyRefusal = feedbackBodyRefusal(body);
+    if (bodyRefusal) return badRequest.json(res, bodyRefusal);
+    const { message, title, teamId, projectId, image, url, userAgent, model, harness } = body;
+    const priority = normalizeFeedbackPriority(body.priority);
 
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      return badRequest.json(res, 'message is required');
-    }
-    if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
-      return badRequest.json(res, 'message exceeds maximum length');
-    }
-
-    // Capability gates — clean 422 (never 500) when the workspace's provider
-    // can't perform the op, mirroring the proxy write surface.
+    // Clean 422 (never 500) when the workspace's provider can't do the op,
+    // mirroring the proxy write surface.
     if (!provider.supports('createIssue')) {
       return refuseCapability(res, provider.name, 'createIssue', 'creating tickets');
     }
@@ -3203,106 +3189,106 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         code: 'TEAM_UNRESOLVED', provider: provider.name,
       });
     }
-    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim())
-      ? projectId.trim()
-      : (process.env.FEEDBACK_PROJECT_ID || null);
+    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim()) || process.env.FEEDBACK_PROJECT_ID || null;
 
     try {
       // The message, then the page / browser capture block (LIN-635 S4).
-      let description = message.trim() + feedbackCaptureBlock({ url, userAgent });
+      const parts = [message.trim() + feedbackCaptureBlock({ url, userAgent })];
 
       if (image) {
         const parsed = parseFeedbackImage(image);
-        if (!parsed) {
-          return badRequest.json(res, 'image must be a base64 data URL');
-        }
-        if (parsed.bytes.length > MAX_FEEDBACK_IMAGE_BYTES) {
-          return jsonError(res, 413, 'image too large');
-        }
+        if (!parsed) return badRequest.json(res, 'image must be a base64 data URL');
+        if (parsed.bytes.length > MAX_FEEDBACK_IMAGE_BYTES) return jsonError(res, 413, 'image too large');
         const assetUrl = await provider.uploadFile(token, parsed.bytes, {
           contentType: parsed.contentType,
           filename: parsed.filename,
         });
-        description += `\n\n![](${assetUrl})`;
+        parts.push(`![](${assetUrl})`);
       }
 
-      // LIN-1557: an explicit non-default priority the provider's headless
-      // write contract (apiWriteFields()) can't honour is folded into the
-      // description as visible text instead of being silently dropped, or
-      // refusing the whole submission — this is a fire-and-forget human form
-      // with no retry loop, so a hard failure would mean the report is never
-      // filed at all. 0 ("No priority") is indistinguishable from "unset", so
-      // it is never folded or forwarded, only omitted.
+      // LIN-1557: an explicit non-default priority the provider's headless write
+      // contract (apiWriteFields()) can't honour is folded into the description as
+      // visible text, not dropped silently or refused — this is a fire-and-forget
+      // human form with no retry loop, so a hard failure would mean the report is
+      // never filed. 0 ("No priority") is indistinguishable from "unset", so it is
+      // never folded or forwarded.
       const canSetPriority = provider.apiWriteFields().includes('priority');
       if (priority > 0 && !canSetPriority) {
-        description += `\n\n---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`;
+        parts.push(`---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`);
       }
 
-      // Origin/triage marker (LIN-947) — additive, deterministic, and always
-      // appended last so the stored ticket announces itself as raw, un-triaged
-      // feedback whose natural next step is triage. This is what activates the
-      // meta-prompt's existing triage routing; it does not alter the user
-      // message, capture block, or screenshot above.
-      description += `\n\n---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`;
+      // Origin/triage marker (LIN-947): always last, so the stored ticket announces
+      // itself as raw, un-triaged feedback and the meta-prompt's triage routing
+      // activates. It never alters the message, capture block or screenshot above.
+      parts.push(`---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`);
 
-      const createInput = { teamId: resolvedTeamId, title: await resolveFeedbackTitle(req, workspace, { title, message }), description };
+      const createInput = {
+        teamId: resolvedTeamId,
+        title: await resolveFeedbackTitle(req, workspace, { title, message }),
+        description: parts.join('\n\n'),
+      };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
       if (priority > 0 && canSetPriority) createInput.priority = priority;
 
-      const result = await provider.createIssue(token, createInput);
-      if (!result?.success || !result.issue) {
+      const created = await provider.createIssue(token, createInput);
+      if (!created?.success || !created.issue) {
         return jsonError(res, 502, 'Failed to create feedback ticket');
       }
 
-      // Post-create action (LIN-918) — all branches are best-effort and never
-      // fail the submission (the ticket already exists). An explicit widget
-      // action wins and is DECOUPLED from the `feedbackTriage` flag:
-      //   'save'      → file only, nothing further
-      //   'triage'    → always enqueue triage
-      //   'autopilot' → enqueue a scoped autopilot run carrying the feedback-origin brief
-      // With no explicit action (the legacy plain send) we preserve the old
-      // behaviour: triage only when the per-user `feedbackTriage` flag is on.
+      // Post-create action (LIN-918); every branch is best-effort and never fails
+      // the submission, the ticket already existing. An explicit widget action wins
+      // and is DECOUPLED from the `feedbackTriage` flag — 'save' files only,
+      // 'triage' always enqueues triage, 'autopilot' enqueues a scoped autopilot run
+      // carrying the feedback-origin brief. With none (the legacy plain send) the
+      // old behaviour holds: triage only when the per-user flag is on.
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      // Free-tier run gate (LIN-3238 Q10): the title step's `isFreeTier` is scoped
-      // to it, so re-derive it here at the dispatch point. The
-      // gate is passed through `overrides` to both feedback enqueue helpers; a
-      // refusal leaves the filed ticket intact and reports why no run started.
+      // LIN-3238 Q10 free-tier run gate: the title step's `isFreeTier` is scoped to
+      // it, so re-derive it at the dispatch point. It goes to both enqueue helpers
+      // through `overrides`; a refusal leaves the filed ticket intact and reports
+      // why no run started.
       const { isFreeTier: feedbackIsFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
       const runGate = buildRunGate({ isFreeTier: feedbackIsFreeTier, freeTierStore, accountId: req.session?.accountId, accountStore });
-      const overrides = { model, harness, runGate, bindingPair: persistedBindingPair };
-      // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only
-      // the workspace owner may start one. Checked only when a lane will
-      // actually run: a plain filed ticket reports no refusal, and a non-owner's
-      // feedback still saves. A refusal skips the enqueue and rides the existing
-      // `{launched:false, code, retryable, message}` response block below.
-      const lane = action === 'triage' ? 'triage'
-        : action === 'autopilot' ? 'autopilot'
-        : (!action && getFeatureFlags(req.session).feedbackTriage) ? 'triage'
-        : null;
-      const laneRefusal = lane
-        ? await resolveRunnerOwnerRefusal({
-          ownerCheck: workspaceOwnerCheck,
-          workspaceId: workspace.id,
-          accountId: req.session?.accountId,
-          target: 'cli'
-        })
-        : null;
+      // LIN-3126 residual (producer sweep) / LIN-3335: the feedback rows are
+      // issue-addressed and never reach the factory's §5.5a source inheritance (no
+      // `followUpTo`), so each carries the created issue's kind-only source — from
+      // the SAME resolved binding that produced `provider` / `token`, so the source
+      // the issue is created in and the stamped one cannot drift. Selection-only
+      // provenance, never a credential (B1).
+      const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {} };
+
+      // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only the
+      // workspace owner may start one. Checked only when a lane will actually run —
+      // a plain filed ticket reports no refusal and a non-owner's feedback still
+      // saves. A refusal skips the enqueue and rides the `{launched:false, code,
+      // retryable, message}` response block below.
+      // Only the three known actions branch (`save` names no lane); anything else,
+      // an omitted action included, is the legacy plain send.
+      const action = FEEDBACK_ACTIONS.has(body.action) ? body.action : null;
+      const lane = action
+        ? (action === 'save' ? null : action)
+        : (getFeatureFlags(req.session).feedbackTriage ? 'triage' : null);
+      const laneRefusal = lane && await resolveRunnerOwnerRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: workspace.id,
+        accountId: req.session?.accountId,
+        target: 'cli'
+      });
       let launch = null;
       if (laneRefusal) {
         launch = { launched: false, code: laneRefusal.code, retryable: laneRefusal.retryable, message: laneRefusal.error };
       } else if (lane === 'triage') {
-        launch = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, overrides);
+        launch = await enqueueFeedbackTriage(workspace, created.issue, priority, req.session, baseUrl, overrides);
       } else if (lane === 'autopilot') {
-        launch = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, overrides);
+        launch = await enqueueFeedbackAutopilot(workspace, created.issue, req.session, baseUrl, overrides);
       }
 
-      // LIN-3136 M4 / LIN-3238: the ticket is filed either way; a refused run
-      // launch (autopilot keeps its key, triage gets a new one) is reported so
-      // the widget can say why. Every other outcome keeps the response as it was.
+      // LIN-3136 M4 / LIN-3238: the ticket is filed either way. A refused run launch
+      // (autopilot keeps its key, triage gets a new one) is reported so the widget
+      // can say why; every other outcome leaves the response as it was.
       return res.status(201).json({
         success: true,
-        issue: result.issue,
-        ...(launch && launch.launched === false ? { [lane]: launch } : {})
+        issue: created.issue,
+        ...(launch?.launched === false ? { [lane]: launch } : {})
       });
     } catch (error) {
       console.error('Feedback submit error:', error);
