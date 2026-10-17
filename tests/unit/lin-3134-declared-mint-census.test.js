@@ -350,6 +350,30 @@ function topLevelProp(masked, src, objOpen, objClose, name) {
   return null;
 }
 
+/**
+ * LIN-3611 (A3): the one non-inline `fields` the census accepts. In the dispatch-entrance
+ * authority only, `fields` may be exactly one `rowFor(...)` call, where `rowFor` is that file's
+ * one module-level projection over its row-key table (so no key of its argument can add a row key;
+ * dispatch-entrance-addItem-key-sets.test.js is the behaviour witness of that bound). Three
+ * conditions, all required: the file is the authority; `rowFor` has exactly one binding in it
+ * (`soleBinding`: one occurrence that is not a call, which is the declaration, and no
+ * `function rowFor`); and the value is a single `rowFor(...)` call with nothing after its closing
+ * paren, so `rowFor(...) || body` and the like fail.
+ */
+const ROW_FOR_FILE = 'lib/dispatch-entrance.js';
+function soleBinding(masked, name) {
+  const nonCall = [...masked.matchAll(new RegExp(`\\b${name}\\b(?!\\s*\\()`, 'g'))].length;
+  return nonCall === 1 && !new RegExp(`\\bfunction\\s*\\*?\\s*${name}\\b`).test(masked);
+}
+function isRowForCall(file, masked, fields) {
+  if (file !== ROW_FOR_FILE || !soleBinding(masked, 'rowFor')) return false;
+  const at = fields.valueStart;
+  const m = /^rowFor\s*\(/.exec(masked.slice(at, fields.valueEnd));
+  if (!m) return false;
+  const close = matchClose(masked, at + m[0].length - 1);
+  return close > -1 && close < fields.valueEnd && masked.slice(close + 1, fields.valueEnd).trim() === '';
+}
+
 /** C2 (i)/(ii): every `createDispatchItem({` call (the definition excluded). */
 function scanDispatchCalls(files) {
   const calls = [];
@@ -366,17 +390,20 @@ function scanDispatchCalls(files) {
       const fields = topLevelProp(masked, src, open + 1, objClose, 'fields');
       let fieldsInline = false;
       let fieldsSpread = false;
+      let fieldsRowFor = false;
       if (fields && fields.valueStart > -1 && masked[fields.valueStart] === '{') {
         fieldsInline = true;
         const body = masked.slice(fields.valueStart, matchClose(masked, fields.valueStart) + 1);
         fieldsSpread = body.includes('...');
+      } else if (fields && fields.valueStart > -1) {
+        fieldsRowFor = isRowForCall(file, masked, fields);
       }
       calls.push({
         file, src, masked, start: open, end: close,
         construct: enclosingConstruct(src, m.index),
         kind: kind ? kind.text : '(none)',
         carriesFollowUpTo: /\bfollowUpTo\b/.test(masked.slice(open, close)),
-        fieldsInline, fieldsSpread
+        fieldsInline, fieldsSpread, fieldsRowFor
       });
     }
   }
@@ -476,7 +503,7 @@ function censusC2(files) {
   for (const call of calls) {
     const key = callKey(call);
     // The location-free shape checks, on every call (E or not).
-    if (!call.fieldsInline) v.push(`(ii) ${key}: fields is not an inline object`);
+    if (!call.fieldsInline && !call.fieldsRowFor) v.push(`(ii) ${key}: fields is not an inline object`);
     if (call.fieldsSpread) v.push(`(ii) ${key}: spread in fields`);
     if (inE(call.file)) {
       entranceCalls++;
@@ -635,7 +662,35 @@ const replaceOnce = (needle, replacement) => (src) => {
   return src.slice(0, i) + replacement + src.slice(i + needle.length);
 };
 
-const POST_DISPATCH_GATE = "          if (isFollowUp) {\n            return provisionResumeCredential({";
+/**
+ * LIN-3611 (A1): plant by POSITION, not by text. The follow-up gate of the first
+ * entrance call that carries followUpTo is found with the file's own scanner
+ * (scanDispatchCalls + findEntranceGate), so a witness survives any re-nesting or
+ * re-spelling of the entrance code. `transform(src, header)` gets the file's source and the
+ * span of the gate header (`if (<predicate>) {`, up to and including its brace) and
+ * returns the mutated source. Fails loudly if no gated entrance call exists.
+ */
+function plantAtEntranceGate(files, transform) {
+  for (const call of scanDispatchCalls(files)) {
+    if (!inE(call.file) || !call.carriesFollowUpTo) continue;
+    const found = findEntranceGate(call);
+    if (!found) continue;
+    const braceAt = found.gate.open;
+    const head = call.masked.slice(call.start, braceAt + 1);
+    const m = new RegExp(`if\\s*\\(\\s*${found.predicate}\\s*\\)\\s*\\{$`).exec(head);
+    assert.ok(m, `${call.file}: the gate is an if (${found.predicate}) { block`);
+    const header = { start: call.start + m.index, end: braceAt + 1 };
+    return files.map((f) => (f.file === call.file ? { file: f.file, src: transform(f.src, header) } : f));
+  }
+  assert.fail('no gated follow-up createDispatchItem call in the dispatch entrances to plant at');
+}
+
+/** The gate header replaced by `if (prompt) {`: the helper is then under a non-follow-up predicate. */
+const gateReplaced = (files) => plantAtEntranceGate(files, (src, h) => src.slice(0, h.start) + 'if (prompt) {' + src.slice(h.end));
+/** A declaredGrants literal planted on the line before the gate. */
+const literalBeforeGate = (files) => plantAtEntranceGate(files, (src, h) => src.slice(0, h.start) + "const launchGrant = { declaredGrants: ['dispatch'] };\n" + src.slice(h.start));
+/** The same sources, every line of the entrance authority shifted one level deeper. */
+const reindented = (files) => files.map((f) => (f.file === 'lib/dispatch-entrance.js' ? { file: f.file, src: f.src.replace(/\n(?=.)/g, '\n  ') } : f));
 
 describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields, no spread', () => {
   test('10 calls: 5 outside E exactly (4 listed non-follow-up/follow-up rows), at least 1 in E; the follow-up-carrying ones are the 2 lib sites plus at least 1 in E; every fields is inline, spread-free', () => {
@@ -645,7 +700,7 @@ describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields
     assert.ok(calls.length - outside.length >= 1, 'at least one createDispatchItem call in the dispatch entrances');
     assert.deepEqual(outside.filter(c => c.carriesFollowUpTo).map(callKey).sort(), FOLLOWUP_SITES.map(s => s.key).sort());
     assert.ok(calls.some(c => inE(c.file) && c.carriesFollowUpTo), 'at least one follow-up-carrying call in the dispatch entrances');
-    assert.ok(calls.every(c => c.fieldsInline && !c.fieldsSpread), 'every call, in E or not: fields is an inline, spread-free object');
+    assert.ok(calls.every(c => (c.fieldsInline || c.fieldsRowFor) && !c.fieldsSpread), 'every call: fields is an inline, spread-free object, or (the authority only) one rowFor(...) call');
     assert.deepEqual(censusC2(PRODUCTION), []);
   });
 
@@ -666,6 +721,48 @@ describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields
       assert.ok(censusC2(spread).some(m => m.includes('spread in fields')), file);
       const notInline = appendToE(PRODUCTION, file, 'export const planted2 = (store, fields) => createDispatchItem({ store, fields });');
       assert.ok(censusC2(notInline).some(m => m.includes('fields is not an inline object')), file);
+    }
+  });
+});
+
+// LIN-3611 (A3): the one non-inline `fields` form. Each witness is paired with the same
+// planting minus the condition it tests, which must be clean, so a witness cannot fail for an
+// unrelated reason.
+describe('C2 (ii) — fields: rowFor(...) is accepted in the authority only, as one call, over its sole rowFor', () => {
+  const AUTHORITY = 'lib/dispatch-entrance.js';
+  const plantedCall = (fieldsText, params = '(store, body)') => `export const planted = ${params} => createDispatchItem({ store, fields: ${fieldsText} });`;
+  const fieldsViolations = (files) => censusC2(files).filter(m => m.startsWith('(ii)'));
+
+  test('rowFor(lane, { ...body }) in the authority is accepted: the projection over its row keys is the bound on its argument', () => {
+    assert.deepEqual(fieldsViolations(appendToE(PRODUCTION, AUTHORITY, plantedCall("rowFor('proxy', { ...body })"))), []);
+  });
+
+  test('a trailing expression after the rowFor(...) call fails (ii), in the authority', () => {
+    for (const tail of ['|| body', '&& body', '?? body']) {
+      const v = fieldsViolations(appendToE(PRODUCTION, AUTHORITY, plantedCall(`rowFor('proxy', body) ${tail}`)));
+      assert.ok(v.some(m => m.includes('fields is not an inline object')), `${tail}: ${v.join('\n')}`);
+    }
+  });
+
+  test('fields: rowFor(...) planted in each of the three route files fails (ii)', () => {
+    for (const file of ['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js']) {
+      // A route's own `rowFor` can be any local function, so the file condition is what rejects it.
+      const local = `const rowFor = (lane, input) => ({ ...input });\n${plantedCall("rowFor('proxy', body)")}`;
+      const v = fieldsViolations(appendToE(PRODUCTION, file, local));
+      assert.ok(v.some(m => m.includes('fields is not an inline object')), `${file}: ${v.join('\n')}`);
+    }
+  });
+
+  test('a rowFor rebound in the authority fails (ii): parameter, local shadow, destructured binding, function declaration', () => {
+    const rebinds = {
+      parameter: plantedCall("rowFor('proxy', body)", '(store, rowFor, body)'),
+      'local shadow': "export const planted = (store, body) => { const rowFor = (l, b) => ({ ...b }); return createDispatchItem({ store, fields: rowFor('proxy', body) }); };",
+      destructured: plantedCall("rowFor('proxy', body)", '(store, { rowFor }, body)'),
+      'function declaration': "export function rowFor(l, b) { return { ...b }; }\nexport const planted = (store, body) => createDispatchItem({ store, fields: rowFor('proxy', body) });"
+    };
+    for (const [name, src] of Object.entries(rebinds)) {
+      const v = fieldsViolations(appendToE(PRODUCTION, AUTHORITY, src));
+      assert.ok(v.some(m => m.includes('fields is not an inline object')), `${name}: ${v.join('\n')}`);
     }
   });
 });
@@ -697,9 +794,11 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
   // catch is this scanner: an entrance call that carries followUpTo and whose first
   // helper is under neither gate form fails, here and in the C2 (v) classification
   // below (the helper becomes `E | launch | provisionResumeCredential`).
-  test('mutation 1 (re-pointed): the helper moved out from under the gate predicate fails the no-gate rule (iii c)', () => {
-    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
-    assert.ok(censusC2(mutated).some(m => m.includes('under no follow-up gate')), censusC2(mutated).join('\n'));
+  test('mutation 1 (position-planted, LIN-3611 A1): the gate rewritten to `if (prompt) {` fails (iii c), also after the authority is re-indented', () => {
+    for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
+      const mutated = gateReplaced(files);
+      assert.ok(censusC2(mutated).some(m => m.includes('under no follow-up gate')), censusC2(mutated).join('\n'));
+    }
   });
 
   // LIN-3601: four mutation tests formerly here planted into routes/proxy-dispatch.js,
@@ -719,9 +818,11 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
   // mutation 5 below (a direct provisionBootstrapToken( in lib/chat-tools.js) plants
   // outside E and stays exactly as it was.
 
-  test('mutation 4 (iii d half, re-pointed): a declaredGrants literal planted in an entrance is caught by F3 as an unlisted writer', () => {
-    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, " const launchGrant = { declaredGrants: ['dispatch'] };\n" + POST_DISPATCH_GATE);
-    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer:')), checkF3(mutated).join('\n'));
+  test('mutation 4 (position-planted, LIN-3611 A1): a declaredGrants literal before the gate is caught by F3 as an unlisted writer, also after re-indenting', () => {
+    for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
+      const mutated = literalBeforeGate(files);
+      assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer:')), checkF3(mutated).join('\n'));
+    }
   });
 
   test('mutation 5: a direct provisionBootstrapToken( in a follow-up call fails (iii a/b)', () => {
@@ -779,9 +880,11 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
     assert.deepEqual(E_MINT_ROWS.find(e => e.cls === 'followup-helper').modes, ['attach', 'pbt']);
   });
 
-  test('mutation 1 (v): with the gate predicate gone, the helper becomes an unlisted launch-arm mint (location-free)', () => {
-    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
-    assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('E | launch | provisionResumeCredential')), censusClassification(mutated).join('\n'));
+  test('mutation 1 (v, position-planted, LIN-3611 A1): with the gate predicate gone the helper is an unlisted launch-arm mint, also after re-indenting', () => {
+    for (const files of [PRODUCTION, reindented(PRODUCTION)]) {
+      const mutated = gateReplaced(files);
+      assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('E | launch | provisionResumeCredential')), censusClassification(mutated).join('\n'));
+    }
   });
 
   // Re-targeted count-drift witness (LIN-3601, formerly `mutation: a second helper
