@@ -339,3 +339,10 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - Prediction: 20 hits, 6 misses (the ruling; which A tests needed converting — A1 and A3, not A2 and A4; code lines 937 vs 720–830).
 
 **Inference.** The full sequence works on the hardest target in the codebase: free the seam (tests only), consolidate (95 sites → 26, worst 63 → 29), rebuild (worst 29 → 13, 45.7% verbatim), with behaviour held exactly throughout and John pressing two rulings. Each step was cheaper and safer because of the one before it. Lines are not the measure for either consolidation or rebuild here; complexity, sites per decision and knots are.
+
+## 17 Oct, evening: the write-up
+
+**Facts.**
+- Paper drafted by a sub-agent from this notebook, every score, the census report and fresh Periodicals runs at `d349e78c` and origin/main (`experiments/consolidate-exp3/periodicals.md`). John: "Yes, merge to main once completed."
+- One pre-launch record edited after the fact: `experiments/consolidate-lanes/ticket-cap.md` line 48 cited CLAUDE.md, line 22 in the colon-and-backticks anchor form, which `docs-architecture-anchor-resolver` reads as a line anchor and fails; reworded to "CLAUDE.md lines 22 and 23". The ticket as filed (LIN-3605) is unchanged in Harbour.
+- Fact-check of the draft: 3 must-fix (a wrong claim about which tickets hit the plan-loop bound; five inferences stated as findings; a Method section that named only Harbour's tools), 11 should-fix (including putting like with like for the 5c comparison: 62.9% for the whole entrance unit, 45.7% for the authority alone, against 5c's 86%). Numbers, quotes, code claims and cites all checked out.

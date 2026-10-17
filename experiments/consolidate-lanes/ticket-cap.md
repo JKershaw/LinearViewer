@@ -45,7 +45,7 @@ PARENT: LIN-3549 · PROJECT: Quality, Periodicals & Measurement · PRIORITY: Hig
     * Assert the argv it would run is exactly `['--test', ...files]`.
     * Use two or three placeholder file names; the dry run must not check that they exist.
 * **No census to update.** At `origin/main`, no test pins `package.json` script text. Check again at your base.
-* **Docs.** `CLAUDE.md:22` and `:23` both quote the bare `node --test tests/unit/*.test.js`, and an agent can copy either of them past the cap. Change both in place and add no line:
+* **Docs.** CLAUDE.md lines 22 and 23 both quote the bare `node --test tests/unit/*.test.js`, and an agent can copy either of them past the cap. Change both in place and add no line:
   * `:22` → "- `npm test` - Run all tests (unit via `npm run test:unit`, then Playwright E2E)". That is −15 bytes.
   * `:23` → "- `npm run test:unit` - Run unit tests only (`node --test` over `tests/unit/*.test.js` + two `scripts/` tests; locally at half the CPUs, `UNIT_TEST_CONCURRENCY=N` overrides; CI unchanged). Use this, not a bare `node --test` glob". That is +148 bytes.
   * CLAUDE.md is at **110/110 lines** and 10,587/12,000 bytes (`tests/unit/claude-md-line-budget.test.js:28-29`). The net +133 bytes takes it to 10,720 bytes, still at 110 lines.
