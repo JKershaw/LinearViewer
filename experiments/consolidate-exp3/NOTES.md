@@ -72,3 +72,14 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Predicted 2.5–5 h, 0 production lines; about 10× rung 4's four conversions.
 
 **Inference.** Freeing a seam can cost more than the consolidation it enables. John: "agreed, but that's kind of what I expected. It's also very cheap, from my perspective." So cost in the write-up is measured as his attention and wall clock first, then laptop load, and agent hours last.
+
+## 17 Oct: #4a fresh-reader check (not yet filed)
+
+**Facts.** About 30 inventory rows and every cited production line checked at `d349e78c`: 4 must-fix, 5 medium, 11 low, 1 info.
+- Nothing required a replacement to land, and be shown catching the removed guard, before its old pin was loosened. A worker could have turned the security counts into "at least one" first and added the sweeps last, or never.
+- Some pins guard entrance and non-entrance sites together. Replacing one in place would have silently dropped the LIN-1980 guard on 7 `routes/proxy-compute.js` sites.
+- The drafted redaction canary would fail on today's code (owners see their own prompt unmasked; the mask matches one token shape), and a token-shaped literal in a test trips the secret scan.
+- Six wrong line citations in the inventory.
+- Also: the route sweeps must walk nested routers (and the repo moved off `router.stack` on purpose, LIN-2505); one architecture doc line goes stale once the census is loosened.
+
+**Inference.** The fresh-reader step is worth most on security-weighted tickets: two of the four must-fix items would have weakened a guard without failing any test. Applied: a bold order-of-work rule, mixed pins change only their entrance part, the canary designed to pass today and fail with the mask removed, and the one stale doc line allowed.
