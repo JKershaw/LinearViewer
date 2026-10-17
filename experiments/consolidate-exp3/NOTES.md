@@ -136,3 +136,18 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Sites by the ticket's grep: 23 → 14 (the one definition plus the 13 expected stays). Seams 18 → 18, no new knot; `areas.json` untouched.
 - Divergences: D3, D8 kept as deliberate variations; D4 bounded fuzz; D9 fixed (stale parity comments, including ones that described `[pending]` as waiting); D5 (`[pending]` in the transcript highlight) and D7 (`[blocked]` checked before closed-row in `resolveDisposition`) kept and written up on LIN-3339 as open questions with recommendations; D1/D2/D6 out of scope.
 - The worker's replay: 0 differences over 13 callers at 1,000 inputs; a sensitivity check (adding `pending` to the set) made every caller but one differ, so it would have caught a change in who waits.
+
+## 17 Oct: #2 scored (`../consolidate-2-waiting/arm/score.md`)
+
+**Facts.**
+- Merge `ee9fcba9` (squash, parent `f885f44c`). Ticket grep 23 → 14 hits: the authority, the 10 expected stays, 3 comment lines. No copy of the set or inline check left elsewhere.
+- Seams: 18 pairs and one group of 9 before and after; knot and link tables byte-identical (one more import inside Runs & dispatch).
+- Census: 310 / 1,026 → 309 / 1,022. The marker-set group disappears (one definition is not a group); the `[blocked]` text group 15 → 14.
+- Independent replay: 0 differences over 51,046 inputs, two seeds; old vs old 0; 14 of 14 planted mutants caught; widening the set to `pending` caught on 13 callers; a mutant of the new case-fold caught (731 differences). The cross-caller divergence probe is byte-identical before and after: composition unchanged, as the ticket required.
+- The PR body carries the open questions (D5, D7) with recommendations and links the LIN-3339 comment.
+- Misses: production lines +73/−65 (net +8; predicted −10 to −25) because of an 18-line comment beside the authority gathering every ticket reference and reason (code alone +24/−22); tests +70 net; 35 minutes, not 1.5–3 hours.
+- Unasked: the PR fixed 6 more stale comments that described `[pending]` as waiting.
+
+**Inference.**
+- A consolidation can add lines. The reasons that were scattered beside each copy were gathered beside the one authority: line count is the wrong measure for it; sites per decision and the census are right.
+- The census sees this consolidation (one group gone); the knots don't (the decision moved within its area). The two instruments are complementary: #3 moved knots and not the census, #2 the reverse.
