@@ -11,6 +11,23 @@
  *
  * The scanners are pure functions over `{file, src}`, so the mutation witnesses
  * plant an omission in a synthetic source string and assert the scan fails.
+ *
+ * LIN-3601: the dispatch entrances (E: routes/dispatch.js, routes/proxy-dispatch.js,
+ * routes/proxy-kickoff.js, lib/dispatch-entrance.js) are judged as ONE unit, so a
+ * call may sit in any of the four and the three routes can share one authority:
+ *   - F3: E holds exactly 2 `declaredGrants: ['dispatch'],` literals (M1 + M2);
+ *   - C2 (i)-(iii): a createDispatchItem call in E that carries followUpTo takes its
+ *     gate from the two known predicate forms (`isFollowUp`, the `followUpTo`
+ *     ternary), and fails if it has none;
+ *   - C2 (v)/C3: an E mint site is keyed `E | arm | helper`, at least one each of
+ *     follow-up/provisionResumeCredential, -/provisionResumeCredential (the refire
+ *     broker) and launch/attachProxyContext; any other arm|helper in E fails;
+ *   - the location-free shape checks on every E call stay (see entranceShape).
+ * Which route reaches which mint, from which origin and with which grants, is
+ * carried by dispatch-entrance-mint-sweep.test.js, which spies the real token
+ * store boundary while every origin is driven over HTTP. Rows outside E (the lib
+ * follow-up sites, the wake, the M4 feedback lane, collective, the internals) are
+ * exactly as they were.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,6 +91,34 @@ function extractMethod(src, name) {
 
 const PRODUCTION = loadProductionSources();
 
+// LIN-3601: the four dispatch-entrance files, judged as one unit.
+const E_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js', 'lib/dispatch-entrance.js']);
+const inE = (file) => E_FILES.has(file);
+
+/**
+ * Applies a replacement at `needle` in whichever entrance file holds it (the
+ * witnesses must not care which of the four that is). Fails loudly if no entrance
+ * file contains the anchor, so a witness can never pass by planting nothing.
+ */
+function plantInE(files, needle, replacement) {
+  let planted = false;
+  const out = files.map((f) => {
+    if (planted || !inE(f.file)) return f;
+    const i = f.src.indexOf(needle);
+    if (i < 0) return f;
+    planted = true;
+    return { file: f.file, src: f.src.slice(0, i) + replacement + f.src.slice(i + needle.length) };
+  });
+  assert.ok(planted, `mutation anchor not found in the dispatch entrances: ${needle}`);
+  return out;
+}
+
+/** Appends `text` to one entrance file's source. */
+function appendToE(files, file, text) {
+  assert.ok(inE(file), `${file} is not an entrance file`);
+  return files.map((f) => (f.file === file ? { file, src: `${f.src}\n${text}\n` } : f));
+}
+
 // ── F3 — the declared-mint writer set ────────────────────────────────────────
 // LIN-3136 (T3) adds the first production writers: exactly the M1 (kickoff),
 // M2 (session dispatch, incl. M2b) and M4 (feedback autopilot) launch literals.
@@ -81,29 +126,33 @@ const PRODUCTION = loadProductionSources();
 // LIN-3099). The mutations below check against this allowed set, so a planted
 // writer cannot pass just because the set is no longer empty.
 
+// LIN-3601: M1 (kickoff) and M2 (session dispatch) are the two writers in E. The
+// declared-writer allow-list is the one place E is counted exactly: E holds 2,
+// wherever they sit. M4 (feedback autopilot) is outside E and stays exact.
 const F3_WRITERS = [
-  { site: 'M1', file: 'routes/proxy-kickoff.js', text: "declaredGrants: ['dispatch']," },
-  { site: 'M2', file: 'routes/dispatch.js', text: "declaredGrants: ['dispatch']," },
+  { site: 'M1+M2', unit: 'E', count: 2, text: "declaredGrants: ['dispatch']," },
   { site: 'M4', file: 'routes/workspace-api.js', text: "declaredGrants: ['dispatch']," }
 ];
 
-/** F3 against the allowed writer set: each listed writer exactly once, nothing unlisted. */
+/** F3 against the allowed writer set: each listed writer exactly as often as listed, nothing unlisted. */
 function checkF3(files, allowed = F3_WRITERS) {
   const v = [];
   const hits = scanF3(files);
+  const belongs = (w, h) => h.text === w.text && (w.unit === 'E' ? inE(h.file) : w.file === h.file);
   for (const w of allowed) {
-    const found = hits.filter(h => h.file === w.file && h.text === w.text).length;
-    if (found !== 1) v.push(`${w.site} (${w.file}): expected exactly one writer, found ${found}`);
+    const found = hits.filter(h => belongs(w, h)).length;
+    const expected = w.count ?? 1;
+    if (found !== expected) v.push(`${w.site} (${w.unit === 'E' ? 'the dispatch entrances' : w.file}): expected exactly ${expected === 1 ? 'one writer' : `${expected} writers`}, found ${found}`);
   }
   for (const h of hits) {
-    if (!allowed.some(w => w.file === h.file && w.text === h.text)) v.push(`unlisted writer: ${h.file}:${h.line} ${h.text}`);
+    if (!allowed.some(w => belongs(w, h))) v.push(`unlisted writer: ${h.file}:${h.line} ${h.text}`);
   }
   return v;
 }
 
-describe('F3 — the declared-mint writer set is exactly M1, M2 and M4', () => {
-  test('the production writers are exactly the three declared launch literals', () => {
-    assert.deepEqual(F3_WRITERS.map(w => w.site), ['M1', 'M2', 'M4']);
+describe('F3 — the declared-mint writer set is exactly M1+M2 (in E) and M4', () => {
+  test('the production writers are exactly the declared launch literals (E holds exactly 2, whichever file)', () => {
+    assert.deepEqual(F3_WRITERS.map(w => w.site), ['M1+M2', 'M4']);
     assert.deepEqual(checkF3(PRODUCTION), []);
   });
 
@@ -128,10 +177,25 @@ describe('F3 — the declared-mint writer set is exactly M1, M2 and M4', () => {
     assert.ok(checkF3(mutated).some(m => m.startsWith('M4 (routes/workspace-api.js): expected exactly one writer, found 2')));
   });
 
-  test('mutation: a listed writer removed fails F3 (the set never shrinks silently)', () => {
-    const mutated = PRODUCTION.map(f => (f.file === 'routes/proxy-kickoff.js'
-      ? { ...f, src: f.src.replace("declaredGrants: ['dispatch'],", '') } : f));
-    assert.ok(checkF3(mutated).some(m => m.startsWith('M1 (routes/proxy-kickoff.js): expected exactly one writer, found 0')));
+  test('mutation: a listed writer removed from E fails F3 (the set never shrinks silently)', () => {
+    const one = plantInE(PRODUCTION, "declaredGrants: ['dispatch'],", '');
+    assert.ok(checkF3(one).some(m => m.startsWith('M1+M2 (the dispatch entrances): expected exactly 2 writers, found 1')), checkF3(one).join('\n'));
+    const none = plantInE(one, "declaredGrants: ['dispatch'],", '');
+    assert.ok(checkF3(none).some(m => m.startsWith('M1+M2 (the dispatch entrances): expected exactly 2 writers, found 0')), checkF3(none).join('\n'));
+  });
+
+  test('mutation (re-targeted, LIN-3601): a third literal anywhere in E fails F3, including in lib/dispatch-entrance.js', () => {
+    for (const file of E_FILES) {
+      const mutated = appendToE(PRODUCTION, file, "          declaredGrants: ['dispatch'],");
+      assert.ok(checkF3(mutated).some(m => m.startsWith('M1+M2 (the dispatch entrances): expected exactly 2 writers, found 3')), file);
+    }
+  });
+
+  test('moving a writer literal between the entrance files keeps F3 clean (E is one unit)', () => {
+    const removed = plantInE(PRODUCTION, "declaredGrants: ['dispatch'],", '');
+    const moved = appendToE(removed, 'lib/dispatch-entrance.js', "export const m = {\ndeclaredGrants: ['dispatch'],\n};");
+    // the hit's text is the trimmed line, which must equal the listed literal exactly
+    assert.deepEqual(checkF3(moved).filter(m => m.startsWith('M1+M2')), []);
   });
 });
 
@@ -321,25 +385,26 @@ function scanDispatchCalls(files) {
 
 const callKey = (c) => `${c.file} | ${c.construct} | ${c.kind}`;
 
-// The six follow-up-carrying calls (Class F, ten branches). `predicate` is the
-// site's follow-up gate literal; null where the call is a follow-up by
-// construction (no launch arm).
+// The follow-up-carrying calls (Class F) OUTSIDE E. `predicate` is null where the
+// call is a follow-up by construction (no launch arm). LIN-3601: the four
+// follow-up-carrying calls in E (3 x routes/proxy-dispatch.js, 1 x routes/dispatch.js)
+// are no longer rows: an E call that carries followUpTo is recognised by that fact
+// and takes its gate from E_GATE_PREDICATES, wherever the call sits.
 const FOLLOWUP_SITES = [
-  { name: 'proxy-dispatch POST /dispatch', key: 'routes/proxy-dispatch.js | POST /api/proxy/dispatch | kind', predicate: 'isFollowUp', hasAttachArm: true },
-  { name: 'override arm', key: 'routes/proxy-dispatch.js | POST /api/proxy/recommend-and-dispatch | kind', predicate: 'isFollowUp', hasAttachArm: true },
-  { name: 'LLM arm', key: 'routes/proxy-dispatch.js | POST /api/proxy/recommend-and-dispatch | kind: effectiveKind', predicate: 'isFollowUp', hasAttachArm: true },
-  { name: 'dispatch session', key: 'routes/dispatch.js | POST /workspace/:urlKey/api/dispatch | kind', predicate: 'followUpTo', hasAttachArm: true },
   { name: 'follow-up-dispatch dispatchSessionFollowUp', key: 'lib/follow-up-dispatch.js | function dispatchSessionFollowUp | (none)', predicate: null, hasAttachArm: false },
   { name: 'chat-tools send_follow_up', key: 'lib/chat-tools.js | tool send_follow_up | (none)', predicate: null, hasAttachArm: false }
 ];
 
-// The four calls with no follow-up (launch or leaf only).
+// The calls outside E with no follow-up (launch or leaf only).
 const NON_FOLLOWUP_CALLS = [
   "routes/collective.js | POST /workspace/:urlKey/collective/start | kind: 'custom'",
-  "routes/proxy-kickoff.js | POST /api/proxy/autopilot/kickoff | kind: 'autopilot'",
   "routes/workspace-api.js | function enqueueFeedbackTriage | kind: 'triage'",
   "routes/workspace-api.js | function enqueueFeedbackAutopilot | kind: 'autopilot'"
 ];
+
+// The two follow-up gate forms an E call may use: `if (isFollowUp) {` (the proxy
+// routes) and the `...(followUpTo ? {` ternary (the session route).
+const E_GATE_PREDICATES = ['isFollowUp', 'followUpTo'];
 
 function indicesOf(masked, token, from, to) {
   const out = [];
@@ -357,6 +422,17 @@ function findGate(call, predicate, helperIdx) {
     const open = call.start + m.index + m[0].length - 1;
     const close = matchClose(call.masked, open);
     if (helperIdx > open && helperIdx < close) return { open, close };
+  }
+  return null;
+}
+
+/** The follow-up gate of an E call under either known predicate form, or null. */
+function findEntranceGate(call) {
+  const helper = indicesOf(call.masked, 'provisionResumeCredential(', call.start, call.end)[0] ?? -1;
+  if (helper < 0) return null;
+  for (const predicate of E_GATE_PREDICATES) {
+    const gate = findGate(call, predicate, helper);
+    if (gate) return { predicate, gate };
   }
   return null;
 }
@@ -395,10 +471,25 @@ function censusC2(files) {
   const calls = scanDispatchCalls(files);
   const siteByKey = new Map(FOLLOWUP_SITES.map(s => [s.key, s]));
   const seen = new Set();
+  let entranceCalls = 0;
+  let entranceFollowUps = 0;
   for (const call of calls) {
     const key = callKey(call);
+    // The location-free shape checks, on every call (E or not).
     if (!call.fieldsInline) v.push(`(ii) ${key}: fields is not an inline object`);
     if (call.fieldsSpread) v.push(`(ii) ${key}: spread in fields`);
+    if (inE(call.file)) {
+      entranceCalls++;
+      if (!call.carriesFollowUpTo) continue;
+      entranceFollowUps++;
+      const found = findEntranceGate(call);
+      if (!found) {
+        v.push(`(iii c) ${call.file}: a createDispatchItem call carries followUpTo but its first provisionResumeCredential( is under no follow-up gate (neither the \`isFollowUp\` nor the \`followUpTo ?\` form)`);
+        continue;
+      }
+      for (const msg of checkFollowUpCall(call, { predicate: found.predicate, hasAttachArm: true })) v.push(`dispatch entrance: ${msg}`);
+      continue;
+    }
     if (!call.carriesFollowUpTo) {
       if (!NON_FOLLOWUP_CALLS.includes(key)) v.push(`(i) unlisted createDispatchItem call: ${key}`);
       continue;
@@ -408,6 +499,8 @@ function censusC2(files) {
     seen.add(key);
     for (const msg of checkFollowUpCall(call, site)) v.push(`${site.name}: ${msg}`);
   }
+  if (entranceCalls < 1) v.push('(i) no createDispatchItem call left in the dispatch entrances');
+  if (entranceFollowUps < 1) v.push('(i) no follow-up-carrying createDispatchItem call left in the dispatch entrances');
   for (const s of FOLLOWUP_SITES) if (!seen.has(s.key)) v.push(`(i) stale follow-up site (not found): ${s.key}`);
   for (const k of NON_FOLLOWUP_CALLS) if (!calls.some(c => callKey(c) === k && !c.carriesFollowUpTo)) v.push(`(i) stale non-follow-up call (not found): ${k}`);
   return v;
@@ -429,6 +522,21 @@ function scanMintSites(files) {
         const call = calls.find(c => c.file === file && idx > c.start && idx < c.end);
         let construct;
         let arm;
+        if (inE(file)) {
+          // LIN-3601: an E site is keyed `E | arm | helper`, never by file, construct
+          // or kind. A call that carries followUpTo is a follow-up arm only INSIDE its
+          // gate (either known predicate form); a helper in no createDispatchItem
+          // call is `-` (the refire broker); everything else is a launch arm.
+          if (!call) arm = '-';
+          else if (!call.carriesFollowUpTo) arm = 'launch';
+          else {
+            const found = findEntranceGate(call);
+            arm = found && idx > found.gate.open && idx < found.gate.close ? 'follow-up' : 'launch';
+          }
+          const entranceKey = `E | ${arm} | ${fn}`;
+          counts.set(entranceKey, (counts.get(entranceKey) || 0) + 1);
+          continue;
+        }
         if (!call) {
           construct = enclosingConstruct(src, idx);
           arm = '-';
@@ -451,30 +559,31 @@ function scanMintSites(files) {
   return counts;
 }
 
-const KICKOFF = 'routes/proxy-kickoff.js | POST /api/proxy/autopilot/kickoff';
-const PD_DISPATCH = 'routes/proxy-dispatch.js | POST /api/proxy/dispatch [kind]';
-const PD_OVERRIDE = 'routes/proxy-dispatch.js | POST /api/proxy/recommend-and-dispatch [kind]';
-const PD_LLM = 'routes/proxy-dispatch.js | POST /api/proxy/recommend-and-dispatch [kind: effectiveKind]';
-const SESSION = 'routes/dispatch.js | POST /workspace/:urlKey/api/dispatch [kind]';
+// C2 (v): {file, construct [kind], arm, fn} -> class, with a reason.
+//
+// LIN-3601: the dispatch entrances are keyed `E | arm | helper` and counted as "at
+// least one": file, construct and kind are dropped, so the follow-up gate, the three
+// launch arms and the broker may sit in any of the four entrance files. The
+// M1/M2/M3 split inside `launch` is not a source distinction any more; it is the
+// per-origin table in dispatch-entrance-mint-sweep.test.js (World N: kickoff and
+// session-autopilot declare, the proxy-dispatch arms mint grant-less; World R:
+// follow-ups and the broker echo the record). Any other arm | helper in E (for
+// example `launch | provisionResumeCredential`, `launch | provisionBootstrapToken`
+// or `follow-up | attachProxyContext`) is an unlisted mint site and fails.
+const E_MINT_ROWS = [
+  { key: 'E | follow-up | provisionResumeCredential', min: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'the follow-up gate of POST /dispatch, the override arm, the LLM arm and the session route' },
+  { key: 'E | - | provisionResumeCredential', min: 1, cls: 'refire-helper', reason: 'declared refire re-mint, R2 (LIN-3135)' },
+  { key: 'E | launch | attachProxyContext', min: 1, cls: 'launch', reason: 'the launch attach, after the gate: declared M1 (kickoff) and M2/M2b (session), undeclared M3 (the three proxy-dispatch arms, deferred to LIN-3099)' }
+];
 
-// C2 (v): {file, construct [kind], arm, fn} -> class, with a reason. The four
-// attach branches are classed under the follow-up class (`followup-helper`,
-// modes attach+pbt), never as launch-M2/M3: a launch-M2/M3 entry is valid
-// only after the gate, so one line cannot be both.
+// The four attach branches are classed under the follow-up class (`followup-helper`,
+// modes attach+pbt), never as launch-M2/M3: a launch entry is valid only after the
+// gate, so one line cannot be both.
 const MINT_SITE_TABLE = [
-  { key: `${PD_DISPATCH} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'POST /dispatch follow-up gate' },
-  { key: `${PD_OVERRIDE} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'override arm follow-up gate' },
-  { key: `${PD_LLM} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'LLM arm follow-up gate' },
-  { key: `${SESSION} | follow-up | provisionResumeCredential`, count: 1, cls: 'followup-helper', modes: ['attach', 'pbt'], reason: 'session route follow-up arm of the arming ternary' },
+  ...E_MINT_ROWS,
   { key: 'lib/follow-up-dispatch.js | function dispatchSessionFollowUp [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'dispatchSessionFollowUp: a follow-up by construction (approve-follow-up + Apply)' },
   { key: 'lib/chat-tools.js | tool send_follow_up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'send_follow_up: a follow-up by construction' },
   { key: 'lib/wake-credential.js | function buildWakeCredentialProvisioner | - | provisionResumeCredential', count: 1, cls: 'wake-helper', reason: 'the wake (Class F eleventh member)' },
-  { key: 'routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential', count: 1, cls: 'refire-helper', reason: 'declared refire re-mint, R2 (LIN-3135)' },
-  { key: `${KICKOFF} [kind: 'autopilot'] | launch | attachProxyContext`, count: 1, cls: 'launch-M1', reason: 'kickoff launch: declared M1 (LIN-3136)' },
-  { key: `${SESSION} | launch | attachProxyContext`, count: 1, cls: 'launch-M2', reason: 'session route launch attach, after the gate: declared M2/M2b (LIN-3136)' },
-  { key: `${PD_DISPATCH} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'POST /dispatch launch attach, after the gate: undeclared, M3 deferred to LIN-3099' },
-  { key: `${PD_OVERRIDE} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'override arm launch attach, after the gate: undeclared, M3 deferred to LIN-3099' },
-  { key: `${PD_LLM} | launch | attachProxyContext`, count: 1, cls: 'launch-M3', reason: 'LLM arm launch attach, after the gate: undeclared, M3 deferred to LIN-3099' },
   { key: "routes/workspace-api.js | function enqueueFeedbackAutopilot [kind: 'autopilot'] | launch | attachProxyContext", count: 1, cls: 'launch-M4', reason: 'feedback autopilot launch: declared M4 (LIN-3136)' },
   { key: "routes/collective.js | POST /workspace/:urlKey/collective/start [kind: 'custom'] | launch | attachProxyContext", count: 1, cls: 'leaf', reason: 'collective participant: never holds dispatch' },
   { key: "routes/collective.js | POST /workspace/:urlKey/collective/start [kind: 'custom'] | launch | provisionBootstrapToken", count: 1, cls: 'leaf', reason: 'collective participant prose branch' },
@@ -492,6 +601,8 @@ function censusClassification(files, table = MINT_SITE_TABLE) {
   for (const [key, count] of found) {
     const entry = byKey.get(key);
     if (!entry) v.push(`unlisted mint site: ${key} (x${count})`);
+    // LIN-3601: an E row is "at least min", not an exact count.
+    else if (entry.min !== undefined) { if (count < entry.min) v.push(`count drift: ${key} expected at least x${entry.min}, found x${count}`); }
     else if (entry.count !== count) v.push(`count drift: ${key} expected x${entry.count}, found x${count}`);
   }
   for (const e of table) if (!found.has(e.key)) v.push(`stale table entry: ${e.key}`);
@@ -499,7 +610,7 @@ function censusClassification(files, table = MINT_SITE_TABLE) {
 }
 
 /** C3: the class-set view of the (v) table (one implementation). */
-function classSet(table = MINT_SITE_TABLE) {
+function classSet(table = MINT_SITE_TABLE.filter(e => e.min === undefined)) {
   const out = {};
   for (const e of table) {
     out[e.cls] = out[e.cls] || { calls: 0, branches: 0 };
@@ -527,10 +638,14 @@ const replaceOnce = (needle, replacement) => (src) => {
 const POST_DISPATCH_GATE = "          if (isFollowUp) {\n            return provisionResumeCredential({";
 
 describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields, no spread', () => {
-  test('10 calls; the 6 follow-up-carrying ones are exactly the Class F set; every fields is inline, spread-free', () => {
+  test('10 calls: 5 outside E exactly (4 listed non-follow-up/follow-up rows), at least 1 in E; the follow-up-carrying ones are the 2 lib sites plus at least 1 in E; every fields is inline, spread-free', () => {
     const calls = scanDispatchCalls(PRODUCTION);
-    assert.equal(calls.length, 10);
-    assert.deepEqual(calls.filter(c => c.carriesFollowUpTo).map(callKey).sort(), FOLLOWUP_SITES.map(s => s.key).sort());
+    const outside = calls.filter(c => !inE(c.file));
+    assert.equal(outside.length, 5);
+    assert.ok(calls.length - outside.length >= 1, 'at least one createDispatchItem call in the dispatch entrances');
+    assert.deepEqual(outside.filter(c => c.carriesFollowUpTo).map(callKey).sort(), FOLLOWUP_SITES.map(s => s.key).sort());
+    assert.ok(calls.some(c => inE(c.file) && c.carriesFollowUpTo), 'at least one follow-up-carrying call in the dispatch entrances');
+    assert.ok(calls.every(c => c.fieldsInline && !c.fieldsSpread), 'every call, in E or not: fields is an inline, spread-free object');
     assert.deepEqual(censusC2(PRODUCTION), []);
   });
 
@@ -543,44 +658,70 @@ describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields
     const mutated = plant(PRODUCTION, 'lib/chat-tools.js', replaceOnce('          fields: {\n            followUpTo,', '          fields: {\n            ...extraFields,\n            followUpTo,'));
     assert.ok(censusC2(mutated).some(m => m.includes('spread in fields')));
   });
+
+  // LIN-3601: the same two shape checks on a call in the entrances, wherever it sits.
+  test('mutation 6 (ii half, re-targeted): a spread or non-inline fields planted in a createDispatchItem call in ANY entrance file fails (ii)', () => {
+    for (const file of E_FILES) {
+      const spread = appendToE(PRODUCTION, file, "export const planted = (store) => createDispatchItem({ store, fields: { ...rest, followUpTo: null } });");
+      assert.ok(censusC2(spread).some(m => m.includes('spread in fields')), file);
+      const notInline = appendToE(PRODUCTION, file, 'export const planted2 = (store, fields) => createDispatchItem({ store, fields });');
+      assert.ok(censusC2(notInline).some(m => m.includes('fields is not an inline object')), file);
+    }
+  });
 });
 
 describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a follow-up arm', () => {
-  test('every follow-up call is clean (a–e)', () => {
+  test('every follow-up call is clean (a–e): the 2 lib sites by key, every entrance call by its own gate', () => {
     const calls = scanDispatchCalls(PRODUCTION);
     for (const site of FOLLOWUP_SITES) {
       const call = calls.find(c => callKey(c) === site.key);
       assert.ok(call, `${site.name} found`);
       assert.deepEqual(checkFollowUpCall(call, site), [], site.name);
     }
+    // The entrance calls that carry followUpTo (3 x routes/proxy-dispatch.js and 1 x
+    // routes/dispatch.js today): each takes its gate from the two known predicate
+    // forms, wherever it sits, and is clean under (a)-(e).
+    const entrance = calls.filter(c => inE(c.file) && c.carriesFollowUpTo);
+    assert.ok(entrance.length >= 1);
+    for (const call of entrance) {
+      const found = findEntranceGate(call);
+      assert.ok(found, `${call.file}: a follow-up-carrying call has a gate`);
+      assert.deepEqual(checkFollowUpCall(call, { predicate: found.predicate, hasAttachArm: true }), [], `${call.file} ${found.predicate}`);
+    }
   });
 
-  test('mutation 1: the pre-change attach branch as finalizePrompt\'s first statement fails (iii c)', () => {
-    const mutated = plant(PRODUCTION, 'routes/proxy-dispatch.js', replaceOnce(POST_DISPATCH_GATE,
-      "          if (prompt && shouldAppendProxyContext) return attachProxyContext({ proxyTokenStore });\n" + POST_DISPATCH_GATE));
-    assert.ok(censusC2(mutated).some(m => m.includes('(iii c) a direct attachProxyContext( before the end of the gated statement')));
+  // LIN-3601, re-pointed: `mutation 1: the helper moved out from under the gate
+  // predicate`. A launch with `followUpTo: null` now reaches the helper, which then
+  // finds no record and makes the same call a plain launch makes, so no behaviour row
+  // of the mint sweep can see this mutation (shown green there, PR evidence). Its
+  // catch is this scanner: an entrance call that carries followUpTo and whose first
+  // helper is under neither gate form fails, here and in the C2 (v) classification
+  // below (the helper becomes `E | launch | provisionResumeCredential`).
+  test('mutation 1 (re-pointed): the helper moved out from under the gate predicate fails the no-gate rule (iii c)', () => {
+    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
+    assert.ok(censusC2(mutated).some(m => m.includes('under no follow-up gate')), censusC2(mutated).join('\n'));
   });
 
-  test('mutation 1: the helper moved out from under the gate predicate fails (iii c)', () => {
-    const mutated = plant(PRODUCTION, 'routes/proxy-dispatch.js', replaceOnce(POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {')));
-    assert.ok(censusC2(mutated).some(m => m.includes('is not under the `isFollowUp` gate')));
-  });
+  // LIN-3601: four mutation tests formerly here planted into routes/proxy-dispatch.js,
+  // routes/dispatch.js text and asserted the positional scan failed. Their properties
+  // are carried by behaviour: dispatch-entrance-mint-sweep.test.js (World R, one test
+  // per follow-up arm in attach and pbt mode: a declaration record must be echoed by a
+  // mintGrantBootstrap and never by a plain createToken) and, as the plan names,
+  // lin-3134-followup-sites.test.js (the ten-branch matrix). Each mutation was shown
+  // failing both in a scratch copy first (PR evidence); none of the four can survive a
+  // move of the entrance code, because each anchors on its text.
+  //   mutation 1 (first form): the pre-change attach branch as finalizePrompt's first statement
+  //   mutation 2: a direct attachProxyContext( inside the gate arm
+  //   mutation 3: attach: dropped from the helper call at an attach-arm site
+  //   mutation 4 (iii d half): a declaredGrants literal before the gate
+  //     (behaviour-inert: an unused binding. Its catch is the F3 census over E above,
+  //     which reports it as an `unlisted writer` — the F3 test with the planted literal.)
+  // mutation 5 below (a direct provisionBootstrapToken( in lib/chat-tools.js) plants
+  // outside E and stays exactly as it was.
 
-  test('mutation 2: a direct attachProxyContext( inside the gate arm fails (iii c)', () => {
-    const mutated = plant(PRODUCTION, 'routes/proxy-dispatch.js', replaceOnce(POST_DISPATCH_GATE,
-      "          if (isFollowUp) {\n            if (shouldAppendProxyContext) return attachProxyContext({ proxyTokenStore });\n            return provisionResumeCredential({"));
-    assert.ok(censusC2(mutated).some(m => m.includes('(iii c) a direct attachProxyContext( before the end of the gated statement')));
-  });
-
-  test('mutation 3: attach: dropped from the helper call at a hasAttachArm site fails (iii e)', () => {
-    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce('                  attach: wantProxyContext\n', '                  unusedAttach: wantProxyContext\n'));
-    assert.ok(censusC2(mutated).some(m => m.includes('dispatch session: (iii e)')));
-  });
-
-  test('mutation 4 (iii d half): a declaredGrants literal before the gate fails (iii d)', () => {
-    const mutated = plant(PRODUCTION, 'routes/proxy-dispatch.js', replaceOnce(POST_DISPATCH_GATE,
-      "          const launchGrant = { declaredGrants: ['dispatch'] };\n" + POST_DISPATCH_GATE));
-    assert.ok(censusC2(mutated).some(m => m.includes('(iii d) declaredGrants before the gate')));
+  test('mutation 4 (iii d half, re-pointed): a declaredGrants literal planted in an entrance is caught by F3 as an unlisted writer', () => {
+    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, " const launchGrant = { declaredGrants: ['dispatch'] };\n" + POST_DISPATCH_GATE);
+    assert.ok(checkF3(mutated).some(m => m.startsWith('unlisted writer:')), checkF3(mutated).join('\n'));
   });
 
   test('mutation 5: a direct provisionBootstrapToken( in a follow-up call fails (iii a/b)', () => {
@@ -592,6 +733,12 @@ describe('C2 (iii) — branch-aware: helper under the gate, no direct mint on a 
 });
 
 describe('C2 (iv) — the wake routes through the helper', () => {
+  // LIN-3601: this test also asserted that routes/dispatch.js still builds the wake
+  // provisioner. That is the dispatch entrance's; the property (a declared wake mints
+  // through the helper, from the recorded authority) is carried by
+  // lin-3134-wake-declared.test.js, which drives createDispatchRoutes' feedback route
+  // and fails when the provisioner argument is removed from addFeedback's call (shown
+  // in a scratch copy, PR evidence). routes/proxy-runner.js (not E) is still checked.
   test('wake-credential calls the helper; addFeedback passes the record; both builders remain', () => {
     const src = (file) => PRODUCTION.find(f => f.file === file).src;
     assert.ok(maskSource(src('lib/wake-credential.js')).includes('provisionResumeCredential('), 'wake-credential mints through the helper');
@@ -599,7 +746,7 @@ describe('C2 (iv) — the wake routes through the helper', () => {
     const start = store.indexOf('async addFeedback(');
     const body = store.slice(start, matchClose(store, store.indexOf('{', store.indexOf(')', start))) + 1);
     assert.match(body, /provisionWakeCredential\([^)]*,\s*grantDeclaration\)/, 'addFeedback passes the record to the provider');
-    for (const file of ['routes/dispatch.js', 'routes/proxy-runner.js']) {
+    for (const file of ['routes/proxy-runner.js']) {
       assert.ok(maskSource(src(file)).includes('buildWakeCredentialProvisioner('), `${file} still builds the wake provisioner`);
     }
   });
@@ -610,18 +757,16 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
     assert.deepEqual(censusClassification(PRODUCTION), []);
   });
 
-  test('C3 class set: followup-helper 6 calls / 10 branches, wake 1, refire 1, M1 1, M2 1, M3 3, M4 1, leaf 3, internal 5', () => {
+  test('C3 class set: outside E followup-helper 2 calls / 2 branches, wake 1, M4 1, leaf 3, internal 5; inside E exactly the classes followup-helper, refire-helper and launch', () => {
     assert.deepEqual(classSet(), {
-      'followup-helper': { calls: 6, branches: 10 },
+      'followup-helper': { calls: 2, branches: 2 },
       'wake-helper': { calls: 1, branches: 1 },
-      'refire-helper': { calls: 1, branches: 1 },
-      'launch-M1': { calls: 1, branches: 1 },
-      'launch-M2': { calls: 1, branches: 1 },
-      'launch-M3': { calls: 3, branches: 3 },
       'launch-M4': { calls: 1, branches: 1 },
       leaf: { calls: 3, branches: 3 },
       internal: { calls: 5, branches: 5 }
     });
+    assert.deepEqual(E_MINT_ROWS.map(e => e.cls).sort(), ['followup-helper', 'launch', 'refire-helper']);
+    assert.ok(E_MINT_ROWS.every(e => e.min === 1), 'each E class is "at least one"');
     // Modes agree with the helper calls themselves: attach mode iff attach:.
     const calls = scanDispatchCalls(PRODUCTION);
     for (const site of FOLLOWUP_SITES) {
@@ -630,16 +775,45 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
       assert.deepEqual(row.modes, site.hasAttachArm ? ['attach', 'pbt'] : ['pbt'], site.name);
       assert.ok(calls.some(c => callKey(c) === site.key));
     }
+    // ...and every entrance follow-up call passes attach:, so its row carries both modes.
+    assert.deepEqual(E_MINT_ROWS.find(e => e.cls === 'followup-helper').modes, ['attach', 'pbt']);
   });
 
-  test('mutation 1 (v): with the gate predicate gone, the helper becomes an unlisted launch-arm mint', () => {
-    const mutated = plant(PRODUCTION, 'routes/proxy-dispatch.js', replaceOnce(POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {')));
-    assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('| launch | provisionResumeCredential')));
+  test('mutation 1 (v): with the gate predicate gone, the helper becomes an unlisted launch-arm mint (location-free)', () => {
+    const mutated = plantInE(PRODUCTION, POST_DISPATCH_GATE, POST_DISPATCH_GATE.replace('if (isFollowUp) {', 'if (prompt) {'));
+    assert.ok(censusClassification(mutated).some(m => m.startsWith('unlisted mint site') && m.includes('E | launch | provisionResumeCredential')), censusClassification(mutated).join('\n'));
+  });
+
+  // Re-targeted count-drift witness (LIN-3601, formerly `mutation: a second helper
+  // call in the route fails the census (count drift)`): a new arm | helper KIND in E
+  // fails this census, in any of the four entrance files; a new mint ROUTE in E fails
+  // dispatch-entrance-mint-sweep.test.js (its table and its route count).
+  for (const file of E_FILES) {
+    test(`a new arm | helper kind planted in ${file} fails the classification (unlisted mint site)`, () => {
+      for (const [src, expected] of [
+        ['export const planted = async (proxyTokenStore) => provisionBootstrapToken({ proxyTokenStore });', 'E | - | provisionBootstrapToken'],
+        ['export const planted = async (proxyTokenStore) => attachProxyContext({ proxyTokenStore });', 'E | - | attachProxyContext']
+      ]) {
+        const v = censusClassification(appendToE(PRODUCTION, file, src));
+        assert.ok(v.some(m => m.startsWith('unlisted mint site') && m.includes(expected)), `${file}: ${v.join('\n')}`);
+      }
+    });
+  }
+
+  test('moving the launch attach or the follow-up helper between the entrance files keeps the classification clean (E is one unit)', () => {
+    const moved = appendToE(PRODUCTION, 'lib/dispatch-entrance.js', 'export const m = (proxyTokenStore) => attachProxyContext({ proxyTokenStore });');
+    // a second launch | attachProxyContext in E is still "at least one"
+    assert.deepEqual(censusClassification(moved).filter(m => m.includes('E | launch')), []);
   });
 
   test('mutation 5: a stale table entry fails', () => {
     const table = [...MINT_SITE_TABLE, { key: 'routes/gone.js | POST /api/gone [kind] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'stale' }];
     assert.ok(censusClassification(PRODUCTION, table).some(m => m.startsWith('stale table entry')));
+  });
+
+  test('mutation 5: an E row whose site is gone fails (no refire helper left)', () => {
+    const mutated = plantInE(PRODUCTION, BROKER_HELPER_CALL, ' resumed = await Promise.resolve({');
+    assert.ok(censusClassification(mutated).includes('stale table entry: E | - | provisionResumeCredential'));
   });
 
   test('mutation 5: a new unlisted mint site fails', () => {
@@ -648,16 +822,22 @@ describe('C2 (v) / C3 — every credential mint call site is classified', () => 
   });
 });
 
-// ── LIN-3135 (R2): the broker route's inline mint stays grant-less ───────────
-// `MINT_FNS` sees the route's `provisionResumeCredential(` (the refire-helper
-// row above) but not its inline `proxyTokenStore.createToken(` — today's
-// grant-less mint for no itemId / none / row-missing. This witness pins that
-// mint's shape, that the route never calls `mintGrantBootstrap(` directly, and
-// that the helper call reads the record itself (ruling
-// lin3135-f3c4-census-conflict = helper-lookup: no route holds the record).
+// ── LIN-3135 (R2) + LIN-3601: the location-free shape checks on every E call ──
+// `MINT_FNS` sees the broker route's `provisionResumeCredential(` (the `E | - |
+// provisionResumeCredential` row above) but not its inline `proxyTokenStore.createToken(`
+// — today's grant-less mint for no itemId / none / row-missing. `brokerRouteWitness`
+// sliced routes/dispatch.js from the broker's registration and counted that route's
+// calls, so it could not survive the broker moving. It is retired as a file-and-route-
+// keyed function. What it guarded is carried by:
+//   - behaviour: dispatch-entrance-mint-sweep.test.js, World N (the broker mints once,
+//     grant-less, with exactly {kind, scope, label, ttl, createdBy}) and World R (it
+//     echoes the record, only for the recorded owner who took the live row), plus
+//     lin-3135-broker-refire-declared.test.js, whose "2b" test is the covering test for
+//     "the route never passes the record into the helper" (shown failing under that
+//     mutation, PR evidence);
+//   - the scans below, over the four entrance files as one unit, wherever a call sits.
 
-const BROKER_ROUTE = "router.post('/api/dispatch/broker-token'";
-const BROKER_CREATE_TOKEN_KEYS = ['kind', 'scope', 'label', 'ttl', 'createdBy'];
+const BROKER_HELPER_CALL = '          resumed = await provisionResumeCredential({';
 
 /** Depth-1 property names of the object literal spanning [objOpen, objClose]. */
 function topLevelKeys(masked, objOpen, objClose) {
@@ -680,77 +860,82 @@ function topLevelKeys(masked, objOpen, objClose) {
   return keys;
 }
 
-/** Violations of the broker-route mint shape in routes/dispatch.js; empty when clean. */
-function brokerRouteWitness(files) {
+/**
+ * Violations of the shape checks every entrance call must satisfy, wherever it sits
+ * (the four E files as one unit). Empty when clean:
+ *   - no direct `mintGrantBootstrap(` call (every mint goes through the helpers);
+ *   - no `provisionResumeCredential(` call passes `grantDeclaration`, `declaredGrants`
+ *     or `grantOwnerAccountId` (the helper reads the persisted record itself);
+ *   - no inline `proxyTokenStore.createToken(` call carries a `grants` key (the broker's
+ *     inline mint is grant-less);
+ *   - no `.addItem(` call (every enqueue goes through createDispatchItem).
+ * (`proxyTokenStore` as a direct key of each createDispatchItem call, and inline
+ * spread-free `fields`, are lin-3130's and C2 (ii) above.)
+ */
+function entranceShape(files) {
   const v = [];
-  const file = files.find(f => f.file === 'routes/dispatch.js');
-  if (!file) return ['routes/dispatch.js not found'];
-  const { src } = file;
-  const masked = maskSource(src);
-  if (masked.includes('mintGrantBootstrap(')) v.push('routes/dispatch.js calls mintGrantBootstrap( directly');
-  const start = src.indexOf(BROKER_ROUTE);
-  if (start < 0) return [...v, 'broker-token route not found'];
-  const end = matchClose(masked, start + 'router.post'.length);
-
-  const creates = indicesOf(masked, 'proxyTokenStore.createToken(', start, end);
-  if (creates.length !== 1) v.push(`broker route: expected 1 inline createToken, found ${creates.length}`);
-  for (const idx of creates) {
-    const objOpen = masked.indexOf('{', idx);
-    const keys = topLevelKeys(masked, objOpen, matchClose(masked, objOpen));
-    if (JSON.stringify(keys) !== JSON.stringify(BROKER_CREATE_TOKEN_KEYS)) {
-      v.push(`broker route: inline createToken keys ${JSON.stringify(keys)}, expected ${JSON.stringify(BROKER_CREATE_TOKEN_KEYS)}`);
+  for (const { file, src } of files) {
+    if (!inE(file)) continue;
+    const masked = maskSource(src);
+    for (const idx of indicesOf(masked, 'mintGrantBootstrap(', 0, masked.length)) {
+      if (!isDefinition(masked, idx)) v.push(`${file}: calls mintGrantBootstrap( directly`);
     }
-  }
-
-  const helpers = indicesOf(masked, 'provisionResumeCredential(', start, end);
-  if (helpers.length !== 1) v.push(`broker route: expected 1 provisionResumeCredential call, found ${helpers.length}`);
-  for (const idx of helpers) {
-    const objOpen = masked.indexOf('{', idx);
-    const objClose = matchClose(masked, objOpen);
-    const keys = topLevelKeys(masked, objOpen, objClose);
-    for (const forbidden of ['grantDeclaration', 'declaredGrants', 'grantOwnerAccountId', 'attach']) {
-      if (keys.includes(forbidden)) v.push(`broker route: helper call passes ${forbidden}`);
+    for (const idx of indicesOf(masked, 'provisionResumeCredential(', 0, masked.length)) {
+      if (/[\w$.]/.test(masked[idx - 1]) || isDefinition(masked, idx)) continue;
+      const objOpen = masked.indexOf('{', idx);
+      if (objOpen < 0 || objOpen > idx + 40) continue;
+      const keys = topLevelKeys(masked, objOpen, matchClose(masked, objOpen));
+      for (const forbidden of ['grantDeclaration', 'declaredGrants', 'grantOwnerAccountId']) {
+        if (keys.includes(forbidden)) v.push(`${file}: a provisionResumeCredential( call passes ${forbidden}`);
+      }
     }
-    for (const [name, text] of [['dispatchStore', 'dispatchStore: dispatchQueueStore'], ['followUpTo', 'followUpTo: itemId'], ['urlKey', 'urlKey: req.dispatchUrlKey'], ['label', "label: 'refire-broker'"]]) {
-      const prop = topLevelProp(masked, src, objOpen, objClose, name);
-      if (!prop || prop.text !== text) v.push(`broker route: helper call ${name} is ${prop ? prop.text : 'absent'}, expected ${text}`);
+    for (const idx of indicesOf(masked, 'proxyTokenStore.createToken(', 0, masked.length)) {
+      const objOpen = masked.indexOf('{', idx);
+      if (objOpen < 0) continue;
+      if (topLevelKeys(masked, objOpen, matchClose(masked, objOpen)).includes('grants')) v.push(`${file}: an inline proxyTokenStore.createToken( call carries grants`);
     }
+    for (const idx of indicesOf(masked, '.addItem(', 0, masked.length)) v.push(`${file}: calls .addItem( directly (offset ${idx})`);
   }
   return v;
 }
 
-const BROKER_CREATED_BY = '        createdBy: req.dispatchTokenOwner\n      });';
-const BROKER_HELPER_CALL = '          resumed = await provisionResumeCredential({';
-
-describe('LIN-3135 (R2) — the broker route: helper re-mint listed, inline mint grant-less', () => {
-  test('one grant-less inline createToken {kind, scope, label, ttl, createdBy}, one helper call reading the record itself, no direct mintGrantBootstrap', () => {
-    assert.deepEqual(brokerRouteWitness(PRODUCTION), []);
+describe('LIN-3135 (R2) + LIN-3601 — the entrances: no direct grant mint, the record never passed into the helper, the inline mint grant-less', () => {
+  test('the live entrances are clean', () => {
+    assert.deepEqual(entranceShape(PRODUCTION), []);
   });
 
-  test('mutation: grants planted on the inline createToken fails the witness', () => {
-    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_CREATED_BY, "        createdBy: req.dispatchTokenOwner,\n        grants: ['dispatch']\n      });"));
-    assert.ok(brokerRouteWitness(mutated).some(m => m.includes('inline createToken keys')));
+  // (formerly :751) A direct mintGrantBootstrap( in routes/dispatch.js. Widened from one
+  // file to all of E: a direct grant mint in ANY entrance file fails.
+  test('mutation: a direct mintGrantBootstrap( in any entrance file fails', () => {
+    for (const file of E_FILES) {
+      const v = entranceShape(appendToE(PRODUCTION, file, 'export const planted = (proxyTokenStore) => proxyTokenStore.mintGrantBootstrap({});'));
+      assert.ok(v.includes(`${file}: calls mintGrantBootstrap( directly`), `${file}: ${v.join('\n')}`);
+    }
   });
 
-  test('mutation: the record passed into the helper (grantDeclaration) fails the witness', () => {
-    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, `${BROKER_HELPER_CALL}\n            grantDeclaration: lookup.record,`));
-    assert.ok(brokerRouteWitness(mutated).includes('broker route: helper call passes grantDeclaration'));
+  // (formerly :735, kept as added tightening; the covering test is lin-3135 2b.) The
+  // helper re-reads the record itself; no route holds it.
+  test('mutation: the record passed into the broker\'s helper call (grantDeclaration) fails', () => {
+    const mutated = plantInE(PRODUCTION, BROKER_HELPER_CALL, `${BROKER_HELPER_CALL}\n            grantDeclaration: lookup.record,`);
+    assert.ok(entranceShape(mutated).some(m => m.endsWith('a provisionResumeCredential( call passes grantDeclaration')), entranceShape(mutated).join('\n'));
+    for (const key of ['declaredGrants', 'grantOwnerAccountId']) {
+      const planted = plantInE(PRODUCTION, BROKER_HELPER_CALL, `${BROKER_HELPER_CALL}\n            ${key}: 1,`);
+      assert.ok(entranceShape(planted).some(m => m.endsWith(`passes ${key}`)), key);
+    }
   });
 
-  test('mutation: a second helper call in the route fails the census (count drift) and the witness', () => {
-    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, `          await provisionResumeCredential({ proxyTokenStore, dispatchStore: dispatchQueueStore, urlKey: req.dispatchUrlKey, followUpTo: itemId });\n${BROKER_HELPER_CALL}`));
-    assert.ok(censusClassification(mutated).includes('count drift: routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential expected x1, found x2'));
-    assert.ok(brokerRouteWitness(mutated).some(m => m.includes('expected 1 provisionResumeCredential call, found 2')));
+  // (formerly :730) grants planted on the broker's inline createToken. Behaviour: the
+  // mint sweep's World N broker row. Shape (added, location-free): no inline
+  // createToken in E carries a grants key.
+  test('mutation: grants planted on an inline proxyTokenStore.createToken( fails', () => {
+    const mutated = plantInE(PRODUCTION, '        createdBy: req.dispatchTokenOwner\n      });\n    } catch (err) {\n      console.error(\'Broker-token mint failed:\'', "        createdBy: req.dispatchTokenOwner,\n        grants: ['dispatch']\n      });\n    } catch (err) {\n      console.error('Broker-token mint failed:'");
+    assert.ok(entranceShape(mutated).some(m => m.endsWith('an inline proxyTokenStore.createToken( call carries grants')), entranceShape(mutated).join('\n'));
   });
 
-  test('mutation: the helper call removed fails the census (stale refire-helper row)', () => {
-    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, '          resumed = await Promise.resolve({'));
-    assert.ok(censusClassification(mutated).includes('stale table entry: routes/dispatch.js | POST /api/dispatch/broker-token | - | provisionResumeCredential'));
-  });
-
-  test('mutation: a direct mintGrantBootstrap( in routes/dispatch.js fails the witness', () => {
-    const mutated = plant(PRODUCTION, 'routes/dispatch.js', replaceOnce(BROKER_HELPER_CALL, `          await proxyTokenStore.mintGrantBootstrap({});\n${BROKER_HELPER_CALL}`));
-    assert.ok(brokerRouteWitness(mutated).includes('routes/dispatch.js calls mintGrantBootstrap( directly'));
+  test('mutation: a direct .addItem( planted in any entrance file fails', () => {
+    for (const file of E_FILES) {
+      assert.ok(entranceShape(appendToE(PRODUCTION, file, 'export const planted = (store) => store.addItem(1, {});')).some(m => m.startsWith(`${file}: calls .addItem(`)), file);
+    }
   });
 });
 
