@@ -28,36 +28,23 @@ import path from 'path';
 import os from 'os';
 import { spawnClaudeSession } from '../lib/harbour-spawn.js';
 import { DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
-import { PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
-import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
-import {
-  validateDispatchPayload, abortFollowUpError, abortToError, cascadeAbortError,
-  dispatchKindError, periodicalIdError, isValidAutopilotVariant, targetError
-} from '../lib/dispatch-validation.js';
-import { validateRunField, isPositiveInteger } from '../lib/dispatch-fields.js';
-import { firstFailure, opaqueFieldError } from '../lib/dispatch-entrance.js';
-import { createDispatchItem } from '../lib/dispatch-factory.js';
-import { mapDispatchRefusal } from '../lib/dispatch-refusal.js';
-import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
-import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
-import { getWorkspaceCallScope, AMBIGUOUS_CALL_SCOPE, resolveIssueBinding, dispatchIssueSourceField } from '../lib/workspace.js';
-import { attachProxyContext, shouldUseMcpTokenField, provisionResumeCredential, isStructuralGrantRefusal, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
+import { isPositiveInteger } from '../lib/dispatch-fields.js';
+import { enterSessionDispatch, opaqueFieldError } from '../lib/dispatch-entrance.js';
+import { provisionResumeCredential, isStructuralGrantRefusal } from '../lib/proxy-preamble.js';
 import { BOOTSTRAP_TOKEN_TTL_SECONDS } from '../lib/proxy-tokens.js';
 import { READ_WRITE } from '../lib/proxy-scopes.js';
 import { validateFeedbackBody } from '../lib/dispatch-feedback-validation.js';
 import { buildWakeCredentialProvisioner } from '../lib/wake-credential.js';
 import { readHaltForPoll, projectHaltForPoll, POLL_HALT_READ_TIMEOUT_MS } from '../lib/poll-halt.js';
 import { ownerlessCompatEnabled } from '../lib/ownerless-token-policy.js';
-import { buildConsumerPollWarning, buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
+import { buildQueuedPollWarning, getConsumerLastSeenAt } from '../lib/consumer-poll-warning.js';
 import { HALT_MODES, HALT_MODE_ERROR } from '../lib/workspace-halt.js';
 import { deriveTerminalStatus } from '../lib/dispatch-terminal.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
 import { resolveRunnerOwnerRefusal, sendRunnerRefusal } from '../lib/runner-owner-gate.js';
-import { DISPATCH_RUNGS, SURFACES } from '../lib/task-mode-store.js';
-import { resolveChatCredential, buildRunGate } from '../lib/chat-request.js';
+import { resolveChatCredential } from '../lib/chat-request.js';
 import { resolveAccountGroup } from '../lib/account-group.js';
 import { redactSessionItem, redactSessionItems } from '../lib/dispatch-session-redaction.js';
-import { DISPATCH_TARGETS, POLLED_TARGETS } from '../lib/dispatch-targets.js';
 
 // Directory for Harbour OS dispatch prompt staging files. The OS tmp dir is
 // shared between the Node server and the Harbour OS terminal that reads the
@@ -142,54 +129,6 @@ const MAX_CUSTOM_PROMPT_LENGTH = 10000;
 function reportFailure(res, label, err, message) {
   console.error(label, err.message);
   return jsonError(res, 500, message);
-}
-
-// The shape every ladder / run-boundary modifier shares: only a FRESH dispatch for a
-// task (not an abort, a cascade or a follow-up) can carry it. A modifier that could never
-// be recorded is rejected rather than silently dropped (the cascade/abortTo precedent).
-const isFreshDispatch = ({ isAbort, cascade, followUpTo }) => !(isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null));
-
-// Ladder entry rung (LIN-2942): which rung of the opened task's ladder this dispatch was
-// pressed from. Optional; absent/null ⇒ no mode event and the route behaves exactly as
-// without it. Only a fresh dispatch for a task is a ladder press, so a modifier that could
-// never be recorded is rejected rather than silently dropped.
-function entryRungFailure({ entryRung, isAbort, cascade, followUpTo, issueIdentifier }) {
-  if (entryRung === undefined || entryRung === null) return null;
-  if (!DISPATCH_RUNGS.includes(entryRung)) return `entryRung must be one of: ${DISPATCH_RUNGS.join(', ')}`;
-  if (!isFreshDispatch({ isAbort, cascade, followUpTo })) return 'entryRung is only valid on a fresh dispatch (not abort, cascade or followUpTo)';
-  if (!issueIdentifier) return 'entryRung requires issueIdentifier';
-  return null;
-}
-
-// Run-boundary fact (LIN-3245 / LIN-2949 P1a): `stopAt: 'pr'` on a fresh
-// autopilot kickoff means this run stops at its PR — its close-out is the
-// person's to send. A DEDICATED, validated body field, never derived from
-// `entryRung` (a browser-sent measurement, not a gate). Only the value
-// `'pr'` is accepted, and only on a fresh autopilot dispatch for a task;
-// any modifier that could never carry the boundary is rejected rather than
-// silently dropped (the entryRung/cascade/abortTo precedent above).
-function stopAtFailure({ stopAt, kind, isAbort, cascade, followUpTo, issueIdentifier }) {
-  if (stopAt === undefined || stopAt === null) return null;
-  const stopAtMsg = validateRunField('stopAt', stopAt);
-  if (stopAtMsg) return stopAtMsg;
-  if (!isFreshDispatch({ isAbort, cascade, followUpTo })) return 'stopAt is only valid on a fresh dispatch (not abort, cascade or followUpTo)';
-  if (kind !== 'autopilot') return "stopAt requires kind 'autopilot'";
-  if (!issueIdentifier) return 'stopAt requires issueIdentifier';
-  return null;
-}
-
-// Run variant (LIN-3248 N2): the authoritative standard/stepper fact the
-// run page reads to decide whether the "Harbour stops this run at the PR"
-// promise is backed. A DEDICATED, validated body field (never sniffed
-// from promptName), only on a fresh autopilot dispatch for a task; absent
-// stays null, which the page reads as unknown and fails the promise
-// closed. Same freshness discipline as stopAt above.
-function variantFailure({ variant, kind, isAbort, cascade, followUpTo }) {
-  if (variant === undefined || variant === null) return null;
-  if (!isValidAutopilotVariant(variant)) return "variant must be 'standard' or 'stepper'";
-  if (!isFreshDispatch({ isAbort, cascade, followUpTo })) return 'variant is only valid on a fresh dispatch (not abort, cascade or followUpTo)';
-  if (kind !== 'autopilot') return "variant requires kind 'autopilot'";
-  return null;
 }
 
 // The prompt a recents / favourites POST accepts, trimmed — or why it is refused.
@@ -481,521 +420,55 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Rate limited to 30 requests per minute per IP.
    */
   router.post('/workspace/:urlKey/api/dispatch', dispatchQueueLimiter, workspaceFromUrl, async (req, res) => {
-    const { workspace } = req;
-
-    try {
-      const { prompt, promptName, kind, issueId, issueIdentifier, issueTitle, issueUrl, issueSource, target, repo, model, harness, terminal, effort, followUpTo, force, abort, abortTo, cascade, sessionId, periodicalId, waitForFollowUps, queueIfBusy, subscription, attachProxy, presetId, maxTasks, composedRunMarker, entryRung, surface, stopAt, variant } = req.body;
-
-      // Abort verb (LIN-743): an abort item asks the consumer to cancel/close an
-      // existing session (named by abortTo) instead of running a prompt, so it
-      // carries no prompt and skips the prompt-required check below. abort and
-      // followUpTo are mutually-exclusive verbs.
-      const isAbort = abort === true;
-
-      // The first checks, ahead of the owner gate: the verbs' own shape. prompt is
-      // required for a normal dispatch; an abort carries none. Target comes from the
-      // session vocabulary (cli, web, dash, local).
-      const shapeFailure = await firstFailure([
-        () => abortFollowUpError({ isAbort, followUpTo }),
-        () => (!isAbort && (!prompt || typeof prompt !== 'string') ? 'prompt is required and must be a string' : null),
-        () => targetError(target, DISPATCH_TARGETS)
-      ]);
-      if (shapeFailure) return badRequest.json(res, shapeFailure);
-
-      // LIN-3383 owner-only runner enqueue. Every write below (fresh, followUpTo,
-      // abort and the cascade expansion) is consumed by the owner's runner when
-      // target is cli/web (absent = cli), so only the workspace owner may reach
-      // them. Ahead of every write, provider call and run gate: a refusal spends
-      // nothing. dash/local pass untouched; an abort to dash stays ungated.
-      const enqueueRefusal = await resolveRunnerOwnerRefusal({
-        ownerCheck: workspaceOwnerCheck,
-        workspaceId: workspace.id,
-        accountId: req.session?.accountId,
-        target: target ?? 'cli'
-      });
-      if (enqueueRefusal) return sendRunnerRefusal(res, enqueueRefusal);
-
-      // LIN-3136 M2 / M2b: which launches declare the dispatch grant. An
-      // autopilot, or a periodical "+ Autopilot" variant: kind 'periodical', a
-      // periodicalId validated below, and the SERVER-OWNED handoff tail in
-      // the prompt (lib/periodicals.js). A plain Mint, or a prompt edited to drop
-      // the tail, launches a grant-less leaf as before. The client sends no
-      // grant intent at all; the owner check at the mint is the authority.
-      const isPeriodicalAutopilot = kind === 'periodical'
-        && periodicalId !== undefined
-        && typeof prompt === 'string'
-        && prompt.includes(PERIODICAL_AUTOPILOT_TAIL);
-      const launchesOrchestrator = kind === 'autopilot' || isPeriodicalAutopilot;
-
-      // Server-side proxy-context attach (LIN-1162). The dispatch UI used to mint a
-      // bootstrap token and append the "+proxy" access block IN THE BROWSER, then POST
-      // the finished prompt here — so this route never reached attachProxyContext and
-      // a claude-code dispatch could never take the MCP `bootstrapToken` field path.
-      // The client now sends `attachProxy:true` (a boolean intent, derived from its
-      // +proxy toggle / force) and lets the server attach the block, exactly like the
-      // proxy dispatch seams. Only meaningful for a real prompt — an abort carries none.
-      const wantProxyContext = attachProxy === true && !isAbort;
-
-      // LIN-2944 P1 (handover d610edd0): the opened-task surface a ladder press
-      // came from, recorded on the mode event. Optional — every other dispatch
-      // caller (periodical / Setup Prompt / dispatch page / autopilot kickoff)
-      // sends no surface, and it records null. Out of vocabulary ⇒ 400.
-      const hasSurface = surface !== undefined && surface !== null;
-      const hasEntryRung = entryRung !== undefined && entryRung !== null;
-
-      // The rest of the body, in the order the caller is told about it.
-      const bodyFailure = await firstFailure([
-        // Abort eligibility (LIN-743): the abort item's OWN target must be
-        // poll-eligible (cli/web/dash) — eligibility is NOT derived from the aborted
-        // session's substrate. 'local' (Harbour OS) spawns server-side and is never
-        // polled, so it cannot carry an abort. Default 'cli'.
-        () => abortToError({ isAbort, abortTo }),
-        () => (isAbort && !POLLED_TARGETS.includes(target || 'cli') ? 'abort target must be poll-eligible (cli, web, or dash)' : null),
-        // Cascade close (LIN-946): a boolean modifier on an abort. When true the
-        // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
-        // one call into an abort per discovered descendant session (the recursive
-        // sessionId-tree walk lands in a later beat). Like abortTo it is only
-        // meaningful alongside abort — reject cascade:true without it rather than
-        // storing an inert flag (mirroring the abortTo-requires-abort guard above).
-        // Stored + forwarded blindly for now; the walk consumes it, not the runner.
-        () => validateRunField('cascade', cascade),
-        () => cascadeAbortError({ isAbort, cascade }),
-        // Validate kind if provided; when omitted it is derived from promptName below.
-        () => dispatchKindError(kind),
-        // Periodical-template join key (LIN-1825): registry-membership check, not
-        // format validation, so it stays route-local rather than routing through
-        // validateDispatchPayload (deliberately format-only, never against a
-        // model registry). Optional; absent/undefined means a non-periodical
-        // dispatch and is left untouched.
-        () => periodicalIdError(periodicalId),
-        // Opt-in completion hold (LIN-797): boolean, default false. Stored +
-        // forwarded blindly — the runner owns the behaviour (see LIN-795).
-        () => validateRunField('waitForFollowUps', waitForFollowUps),
-        // Push-based inter-session comms. Both are stored + forwarded blindly,
-        // exactly like waitForFollowUps/force — Harbour owns no semantics beyond wake:
-        //   queueIfBusy  — the runner leaves a busy-target follow-up unclaimed
-        //                  rather than failing it (LIN-827 runner path).
-        //   subscription — edge declaration (LIN-900 §6): enum 'everything'|
-        //                  'terminal-only' governing which of this child's events wake
-        //                  the dispatching parent (§5 matrix). Declared, never inferred.
-        () => validateRunField('queueIfBusy', queueIfBusy),
-        () => validateRunField('subscription', subscription),
-        // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
-        // here, up front — the factory treats a presetId it can't resolve as "no
-        // preset" (a defensive fallback for this seam's own store lookup below),
-        // not a validation gate, so this is the one place that contract is enforced.
-        () => (presetId !== undefined && presetId !== null && (typeof presetId !== 'string' || !presetId.trim()) ? 'presetId must be a non-empty string' : null),
-        async () => {
-          if (presetId === undefined || presetId === null || !dispatchPresetsStore) return null;
-          const preset = await dispatchPresetsStore.get(workspace.urlKey, presetId);
-          return preset ? null : 'Invalid or unknown presetId';
-        },
-        // Task budget (LIN-1751/LIN-1737): a SCOPE bound on the run — up to this many
-        // distinct tasks — enforced deterministically at the dispatch-factory seam.
-        // Validated here inline, matching routes/proxy.js's kickoff-seam rule and
-        // error text exactly (LIN-1737 D3), so a run kicked off through either seam
-        // rejects an invalid budget identically. Optional; absent/null ⇒ no budget,
-        // byte-identical to today.
-        () => validateRunField('maxTasks', maxTasks),
-        () => (attachProxy !== undefined && typeof attachProxy !== 'boolean' ? 'attachProxy must be a boolean' : null),
-        () => entryRungFailure({ entryRung, isAbort, cascade, followUpTo, issueIdentifier }),
-        () => stopAtFailure({ stopAt, kind, isAbort, cascade, followUpTo, issueIdentifier }),
-        () => variantFailure({ variant, kind, isAbort, cascade, followUpTo }),
-        () => (hasSurface && !SURFACES.includes(surface) ? `surface must be one of: ${SURFACES.join(', ')}` : null),
-        // Reject local target from non-localhost requests
-        () => (target === 'local' && !['localhost', '127.0.0.1'].includes((req.get('host') || '').split(':')[0])
-          ? 'local target is only available on localhost'
-          : null),
-        // Shared payload validation for the two main handlers (LIN-1139): length
-        // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
-        // the issueId/followUpTo/force/sessionId format + combination rules. This
-        // block ran verbatim here and in the proxy twin; it now lives once in
-        // validateDispatchPayload so the two caller-supplied paths cannot drift.
-        // It gets the RAW body, never a rebuilt one: it reads fields this list does
-        // not name (ifParked, the length caps). dispatch.js owns its own reject
-        // response (no logEvent); the helper only returns the error structure.
-        () => validateDispatchPayload(req.body)?.error
-      ]);
-      if (bodyFailure) return badRequest.json(res, bodyFailure);
-
-      // Cascade close (LIN-946): a cascade request is not a single abort — it is a
-      // command Harbour expands into one plain abort per session in abortTo's whole
-      // descendant subtree (the recursive sessionId-tree walk). The store owns the
-      // walk + emission; the runner still executes each cancel and skips
-      // human-continued sessions (LIN-951). INERT: nothing issues a cascade at
-      // end-of-run yet — this is the mechanism the future guide-trigger will call.
-      if (cascade === true) {
-        const result = await dispatchQueueStore.expandCascadeAborts(workspace.urlKey, abortTo, {
-          target: target || 'cli',
-          dispatchedBy: req.session?.accountId || null
-        });
-        return res.status(201).json({ success: true, cascade: true, ...result });
-      }
-
-      // LIN-3335 (reduced from LIN-3242): an issue-addressed dispatch may name
-      // its provider-kind `issueSource` — a legitimate source-only routing hint
-      // (every issue row carries a source), resolved by `resolveIssueBinding`'s
-      // source-only rule and persisted as a kind-only stamp.
-      const persistedBindingFields = issueIdentifier
-        ? dispatchIssueSourceField(issueSource)
-        : {};
-
-      // Dangling-referent guard (LIN-1948, surface 2d). The session-cookie twin
-      // of the proxy-token check in routes/proxy.js — same hole, different auth
-      // lane: `issueIdentifier` is destructured straight off req.body and stored
-      // unresolved. MUST run before createDispatchItem, whose finalizePrompt
-      // mints a single-use bootstrap.
-      //
-      // LIN-3335: resolve the referent through the issue's own provider-kind
-      // `issueSource` when known, else the workspace's active binding. A legacy
-      // workspace whose active binding is ambiguous still yields
-      // AMBIGUOUS_CALL_SCOPE, treated as "no credential" and skipped — the same
-      // fail-open as every other non-definitive outcome.
-      if (!isAbort && issueIdentifier) {
-        const binding = resolveIssueBinding(workspace, issueSource);
-        const referentProvider = injectedProvider || binding.provider;
-        const referentToken = binding.callScope === AMBIGUOUS_CALL_SCOPE ? null : binding.callScope;
-        if (await isDanglingReferent({ provider: referentProvider, token: referentToken, issueIdentifier })) {
-          const { error, ...rest } = danglingReferentBody(issueIdentifier);
-          return jsonError(res, 422, error, rest);
-        }
-      }
-
-      // Create the dispatch item through the shared factory (LIN-1139): it
-      // resolves kind, fills blank model/harness from workspace dispatchDefaults
-      // (LIN-1094), and calls addItem.
-      //
-      // applyDefaultHarness:false — the session route deliberately does NOT
-      // interpose the claude-code default (LIN-1159 scoped that to the proxy
-      // dispatch boundary). The dispatch-page UI owns the harness default (its
-      // selector is pre-selected to claude-code, LIN-1111) AND offers an explicit
-      // "blank" option whose contract is "send null" (dispatch-page.spec.js's
-      // LIN-1111 escape-hatch test). A server-side interpose here would silently
-      // override that blank choice, so the null passthrough is load-bearing.
-      //
-      // Proxy context (LIN-1162): when the client asks (`attachProxy:true`), attach
-      // the workspace-API block through the SAME finalizePrompt→attachProxyContext
-      // seam the proxy dispatch routes use, so the harness gates the MCP-token-field
-      // vs prose branch (LIN-1155) — a claude-code dispatch stores `bootstrapToken`
-      // and its prompt carries no token/curl. The client no longer appends the block
-      // itself, so the two token-delivery mechanisms don't double-append. When the
-      // client does NOT ask, we pass the plain prompt and no finalizePrompt, byte-for-
-      // byte the pre-LIN-1162 path (and the copy/download flows still append client-side).
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      // Free-tier run gate (LIN-3238): only a free-tier session is gated.
-      // `buildRunGate` returns null for a paid/own key and for a null account
-      // (null attribution is not gated), so every other caller stays ungated.
-      // The factory invokes it only on a fresh row (step 1.55).
-      const { isFreeTier: dispatchIsFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
-      const runGate = buildRunGate({
-        isFreeTier: dispatchIsFreeTier,
-        freeTierStore,
-        accountId: req.session?.accountId,
-        accountStore
-      });
-      const item = await createDispatchItem({
-        store: dispatchQueueStore,
-        urlKey: workspace.urlKey,
-        workspacePreferencesStore,
-        dispatchPresetsStore,
-        presetId: presetId || null,
-        applyDefaultHarness: false,
-        kind,
-        model,
-        harness,
-        terminal,
-        effort,
-        dispatchTokenStore,
-        proxyTokenStore,
-        runGate,
-        // LIN-3200 P5: plan block for the file-pointer pilot on the session/UI
-        // dispatch path. Closes over this route's own provider resolution (the
-        // same getProviderForWorkspace + getWorkspaceCallScope pair the
-        // dangling-referent guard above uses) and the injected fetchIssueContext;
-        // a provider without the capability, an ambiguous call scope, or a test
-        // sentinel degrades to "no plan paths".
-        readPlanBlock: async () => {
-          if (!issueIdentifier || typeof fetchIssueContext !== 'function') return null;
-          const planProvider = injectedProvider || getProviderForWorkspace(workspace);
-          if (!planProvider?.fetchIssueContext) return null;
-          let planToken = null;
-          if (typeof getWorkspaceAccessToken === 'function') {
-            try { planToken = await getWorkspaceAccessToken(workspace.urlKey, req.session); } catch { planToken = null; }
+    await enterSessionDispatch({
+      req,
+      res,
+      workspace: req.workspace,
+      dispatchQueueStore,
+      dispatchTokenStore,
+      workspacePreferencesStore,
+      dispatchPresetsStore,
+      proxyTokenStore,
+      freeTierStore,
+      accountStore,
+      injectedProvider,
+      getWorkspaceAccessToken,
+      fetchIssueContext,
+      // LIN-3383: the owner gate is this route's (it runs in the authority at the one point it
+      // must: after the body's shape checks, before every read and write).
+      ownerGate: (target) => refuseNonOwner(req, res, target),
+      // D24: the task-mode record and the Harbour OS spawn stay here, with the route that owns them.
+      afterEnqueue: async ({ item, issueId, issueIdentifier, entryRung, surface, target }) => {
+        // LIN-2942: the item exists, so record the ladder press that created it, linked by
+        // dispatchId. Fire-and-forget: a failed record never fails or delays the dispatch, and the
+        // response is the same with or without it. Only a session account can be attributed; without
+        // one nothing is recorded.
+        if (entryRung !== undefined && entryRung !== null && taskModeStore && req.session?.accountId) {
+          try {
+            Promise.resolve(taskModeStore.record({
+              accountId: req.session.accountId,
+              urlKey: req.workspace.urlKey,
+              issueId: issueId || null,
+              issueIdentifier,
+              rung: entryRung,
+              ready: true,
+              needs: null,
+              act: 'dispatch',
+              dispatchId: item._id,
+              // LIN-2944 P1: the caller's validated surface, or null for the other dispatch callers
+              // that pass none.
+              surface: surface !== undefined && surface !== null ? surface : null
+            })).catch(err => console.error('Failed to record task-mode dispatch event:', err));
+          } catch (err) {
+            console.error('Failed to record task-mode dispatch event:', err);
           }
-          if (!planToken) {
-            const planScope = getWorkspaceCallScope(workspace);
-            planToken = planScope === AMBIGUOUS_CALL_SCOPE ? null : planScope;
-          }
-          if (!planToken) return null;
-          const ctx = await fetchIssueContext(planToken, issueIdentifier);
-          const issue = ctx?.issue || ctx || {};
-          return issue.description || null;
-        },
-        // LIN-2775 Area 8: threaded straight through, unvalidated here — the
-        // marker's own validation and the terminal-anchor guard it gates
-        // both live inside createDispatchItem (the one reusable, testable
-        // chokepoint), not duplicated at this route layer the way model/
-        // harness/terminal are via validateDispatchPayload above.
-        composedRunMarker,
-        // LIN-3124 PR3 (D16): pass the session so a connection-backed
-        // workspace's done-guard reads the session's own hydrated credential.
-        getWorkspaceAccessToken: (k) => getWorkspaceAccessToken(k, req.session),
-        fetchIssueContext,
-        // Follow-up credential provisioning (LIN-1431 S3 #1, LIN-3134 T2-ii). The
-        // human reply box (public/session.js) posts only { prompt, followUpTo,
-        // target, force } and never sets `attachProxy`; pre-LIN-1431 such a
-        // follow-up was enqueued with `bootstrapToken: null` and resumed a session
-        // whose local broker had died with its window (LIN-1362/1375). The fix is a
-        // SERVER-SIDE default, deliberately not a new client flag (LIN-1252/1298/
-        // 1309): EVERY follow-up arms the one resume helper, which takes its
-        // credential from the persisted parent record — declared or plain, the
-        // RECORDED owner and workspace, never the poster.
-        //
-        // `followUpTo` is tested first, so this gate covers both modes:
-        //   - attach mode when the client asked (`wantProxyContext`, LIN-1162) —
-        //     attach always mints, exactly as the launch attach below;
-        //   - otherwise pbt mode, `mint` = shouldUseMcpTokenField(RESOLVED harness).
-        //     The guard is load-bearing: a prose-harness token has no channel to
-        //     reach the worker (the prompt is untouched), and keying on the
-        //     resolved harness preserves LIN-1111 — a blank harness resolves null
-        //     here (applyDefaultHarness:false), so it never mints.
-        // A record never turns a non-minting follow-up into a mint. A follow-up is
-        // never an abort and always has a prompt (both are 400s above).
-        //
-        // Fail-closed is inherited (LIN-1162/LIN-525): a failed mint throws before
-        // addItem and the catch below maps it. The server attaches or throws.
-        ...(followUpTo
-          ? {
-              finalizePrompt: async (resolvedHarness) => {
-                const resumed = await provisionResumeCredential({
-                  proxyTokenStore,
-                  dispatchStore: dispatchQueueStore,
-                  urlKey: workspace.urlKey,
-                  baseUrl,
-                  label: 'dispatch-bootstrap',
-                  harness: resolvedHarness,
-                  followUpTo,
-                  // LIN-1376: stamp the launching account (ignored on a declared
-                  // resume, where the recorded owner is the authority).
-                  createdBy: req.session?.accountId || null,
-                  prompt,
-                  mint: shouldUseMcpTokenField(resolvedHarness),
-                  attach: wantProxyContext
-                    ? {
-                        issueIdentifier: issueIdentifier || null,
-                        prompt,
-                        providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
-                        providerUi: getProvider(workspace.provider)?.ui ?? null
-                      }
-                    : null
-                });
-                // LIN-1162's "surface, don't silently drop" check (see the launch
-                // attach below) applies to the attach-mode result: same condition,
-                // same error.
-                if (wantProxyContext && resumed.prompt === prompt) {
-                  const err = new Error('proxy context requested but could not be attached');
-                  err.proxyAttachFailed = true;
-                  throw err;
-                }
-                return resumed;
-              }
-            }
-          : wantProxyContext
-          ? {
-              finalizePrompt: async (resolvedHarness) => {
-                let attached;
-                try {
-                  attached = await attachProxyContext({
-                    proxyTokenStore,
-                    urlKey: workspace.urlKey,
-                    baseUrl,
-                    issueIdentifier: issueIdentifier || null,
-                    prompt,
-                    label: 'dispatch-bootstrap',
-                    harness: resolvedHarness,
-                    // LIN-2354: declared provider identity, fallback-free —
-                    // getProvider (unlike getProviderForWorkspace, used above for
-                    // capability shaping) never guesses Linear for an undeclared
-                    // workspace.
-                    providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
-                    // LIN-2804: capability summary, same source as the displayName above.
-                    providerUi: getProvider(workspace.provider)?.ui ?? null,
-                    // LIN-1376: stamp the launching account so the dispatched
-                    // session's token resolves under LIN-1366 owner-scoping.
-                    createdBy: req.session?.accountId || null,
-                    // LIN-3136 M2: an orchestrator launch holds the dispatch
-                    // grant, minted for this session's own account, which the
-                    // mint checks is the workspace owner. A non-owner is refused
-                    // (LIN-3085 owns delegation), never given a grant-less run.
-                    ...(launchesOrchestrator
-                      ? {
-                          declaredGrants: ['dispatch'],
-                          declaredSite: 'M2',
-                          grantOwnerAccountId: req.session?.accountId || null,
-                          workspaceId: workspace.id
-                        }
-                      : {})
-                  });
-                } catch (err) {
-                  // Mark a launch-arm refusal so the catch below answers it with
-                  // human text; a follow-up resume's refusal keeps its own relay.
-                  if (isCodedGrantRefusal(err)) err.launchRefusal = true;
-                  throw err;
-                }
-                // "Surface, don't silently drop" (LIN-525): the client dropped its
-                // own mint+append and trusted the server to attach the block. If the
-                // block did not get appended (mint failed / rate-limited, or no store/
-                // baseUrl), attachProxyContext returns the prompt UNCHANGED — enqueuing
-                // that would ship a bare prompt while the UI still shows +proxy active.
-                // Signal it instead of degrading silently (the buildProxyContextPreamble
-                // block always changes the prompt on success, prose or MCP).
-                if (attached.prompt === prompt) {
-                  const err = new Error('proxy context requested but could not be attached');
-                  err.proxyAttachFailed = true;
-                  throw err;
-                }
-                return attached;
-              }
-            }
-          : { prompt }),
-        fields: {
-          promptName: promptName || 'Prompt',
-          issueId: issueId || null,
-          issueIdentifier: issueIdentifier || null,
-          issueTitle: issueTitle || null,
-          issueUrl: issueUrl || null,
-          dispatchedBy: req.session?.accountId || null,
-          target: target || 'cli',
-          repo: repo || null,
-          followUpTo: followUpTo || null,
-          force: force === true,
-          abort: isAbort,
-          abortTo: isAbort ? abortTo : null,
-          cascade: cascade === true,
-          sessionId: sessionId || null,
-          periodicalId: periodicalId || null,
-          waitForFollowUps: waitForFollowUps === true,
-          queueIfBusy: queueIfBusy === true,
-          subscription: subscription ?? DEFAULT_SUBSCRIPTION,
-          maxTasks: maxTasks ?? null,
-          // Run-boundary fact (LIN-3245 / LIN-2949 P1a): stamped only when the
-          // validated `'pr'` value was supplied; null (the default) is
-          // byte-identical to today.
-          stopAt: stopAt ?? null,
-          // Run variant (LIN-3248 N2): stamped when the validated
-          // standard/stepper value was supplied; null otherwise.
-          variant: variant ?? null,
-          // LIN-3335: the kind-only issue source. Written here as null when
-          // absent (the existing route `fields` style), but the STORE writes it
-          // SPARSELY — an unstamped persisted row adds no key. Selection-only
-          // provenance (never a credential).
-          issueSource: persistedBindingFields.issueSource ?? null
         }
-      });
 
-      // LIN-2942: the item exists, so record the ladder press that created it,
-      // linked by dispatchId. Fire-and-forget: a failed record never fails or
-      // delays the dispatch, and the response is the same with or without it.
-      // Only a session account can be attributed; without one nothing is recorded.
-      if (hasEntryRung && taskModeStore && req.session?.accountId) {
-        try {
-          Promise.resolve(taskModeStore.record({
-            accountId: req.session.accountId,
-            urlKey: workspace.urlKey,
-            issueId: issueId || null,
-            issueIdentifier,
-            rung: entryRung,
-            ready: true,
-            needs: null,
-            act: 'dispatch',
-            dispatchId: item._id,
-            // LIN-2944 P1: the caller's validated surface, or null for the other
-            // dispatch callers that pass none.
-            surface: hasSurface ? surface : null
-          })).catch(err => console.error('Failed to record task-mode dispatch event:', err));
-        } catch (err) {
-          console.error('Failed to record task-mode dispatch event:', err);
-        }
+        // Harbour OS: a 'local' dispatch is staged to a file and spawned on this server's tty (see
+        // host above). Absent for every other target.
+        return target === 'local' ? await host(item, req, req.workspace) : undefined;
       }
-
-      // Harbour OS: a 'local' dispatch is staged to a file and spawned on this server's tty
-      // (see host above). Absent for every other target.
-      const spawn = target === 'local' ? await host(item, req, workspace) : undefined;
-
-      // Consumer poll-recency warning (LIN-2885): read-only telemetry derived
-      // from the stamp createDispatchItem already persisted on the item —
-      // never a refusal, and omitted entirely (not `warning: null`) when the
-      // workspace is being actively polled, per the ticket's own "a dispatch
-      // into a live workspace shows nothing new".
-      const consumerPollWarning = buildConsumerPollWarning(item.consumerLastSeenAt);
-      res.status(201).json({
-        success: true,
-        item: {
-          id: item._id,
-          promptName: item.promptName,
-          kind: item.kind,
-          issueIdentifier: item.issueIdentifier,
-          target: item.target,
-          dispatchedAt: item.dispatchedAt,
-          consumerLastSeenAt: item.consumerLastSeenAt,
-          ...(item.budgetPosition ? { budgetPosition: item.budgetPosition } : {})
-        },
-        ...(consumerPollWarning ? { warning: consumerPollWarning } : {}),
-        ...(spawn ? { spawn } : {})
-      });
-    } catch (err) {
-      // Tagged factory refusals (duplicate, run-limit 429/503, budget, close-out,
-      // per-task runaway): `lib/dispatch-refusal.js` owns the status/body/
-      // `Retry-After` mapping, shared with the proxy entrance. Ahead of the
-      // generic 500 — a 500 would be indistinguishable from a real fault. This
-      // route is session-auth'd (no proxy audit log), so the mapper's log note
-      // goes unused and there is no keepalive.
-      const refusal = mapDispatchRefusal(err);
-      if (refusal) {
-        if (refusal.retryAfter != null) res.set('Retry-After', String(refusal.retryAfter));
-        return jsonError(res, refusal.status, refusal.message, refusal.body);
-      }
-      // Proxy-context attach failure (LIN-1162): a requested `attachProxy:true`
-      // could not mint/append its block. Surface it (503, transient — mirrors the
-      // client's old token-rate-limit message) rather than the generic 500, and
-      // NEVER as a success: no item was enqueued (the throw fired before addItem).
-      // LIN-3136 M2: a declared launch the owner check refused (or could not
-      // run). Ahead of the attach-failure branch, because a transient
-      // OWNER_CHECK_UNAVAILABLE also carries `proxyAttachFailed` and would
-      // otherwise read as a token rate limit. Human text from the shared
-      // vocabulary; nothing was enqueued.
-      if (err && err.launchRefusal) {
-        const refusal = codedGrantRefusalResponse(err, 'an autopilot launch credential');
-        return jsonError(res, refusal.status, refusal.error, { code: refusal.code, retryable: refusal.retryable });
-      }
-      if (err && err.proxyAttachFailed) {
-        return serviceUnavailable.json(res, 'Proxy context was requested but a proxy token could not be created — you may have hit the token rate limit; wait a minute and try again.');
-      }
-      // A declared resume whose grant cannot be re-issued (LIN-3134): relay the
-      // coded refusal's own status and code rather than the generic 500 below.
-      if (isStructuralGrantRefusal(err)) {
-        return jsonError(res, err.status, err.message, { code: err.code, retryable: false });
-      }
-      // Terminal-anchor refusal (LIN-2775 Area 8): same tagged-throw relay
-      // convention as the duplicate/budget guards above — the body was
-      // already constructed once by createDispatchItem, this is a relay,
-      // not a second construction site. Beat 5 correction: this branch was
-      // MISSING entirely — a correct, deliberate safety refusal (409,
-      // `code: 'ANCHOR_TERMINAL'`) was falling through to the generic 500
-      // below, so the stable code this guard's own unit tests assert on
-      // never actually reached the wire.
-      if (err && err.anchorTerminalRefusal) {
-        return jsonError(res, 409, err.message, err.anchorTerminalRefusal);
-      }
-      // An invalid `composedRunMarker` (LIN-2775 Area 8): a genuine caller
-      // validation error, not a fault — same beat-5 correction, this was
-      // also falling through to the 500 below.
-      if (err && err.composedRunMarkerInvalid) {
-        return badRequest.json(res, err.message);
-      }
-      console.error('Dispatch error:', err.message);
-      jsonError(res, 500, 'Failed to dispatch prompt');
-    }
+    });
   });
 
   /**
