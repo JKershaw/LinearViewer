@@ -1,0 +1,4902 @@
+{
+  "tool": "workspace-api router behavioural replay (rung 7)",
+  "lib": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung7/arm/snap-603853c5",
+  "libHead": "603853c502d979f3c1164344933dec3a7a269358",
+  "seed": 7,
+  "n": 3000,
+  "tiers": "gen,edge,test",
+  "fatal": null,
+  "old": {
+    "main": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung7/arm/old-patched-ko/workspace-api.js"
+  },
+  "new": {
+    "main": "/tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung7/arm/new/workspace-api.js"
+  },
+  "importSideEffects": {
+    "old": {
+      "main": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "fetch": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 746,
+        "sideResolutions": [],
+        "importError": null
+      }
+    },
+    "new": {
+      "main": {
+        "console": [],
+        "unhandled": [],
+        "fs": [],
+        "fetch": [],
+        "envReads": [],
+        "newGlobals": [],
+        "socketEscapes": [],
+        "modulesFirstLoaded": 742,
+        "sideResolutions": [],
+        "importError": null
+      }
+    }
+  },
+  "exportsDiff": {
+    "main": []
+  },
+  "exports": {
+    "main": [
+      "buildMockRecommendationHop",
+      "createWorkspaceApiRoutes",
+      "decisionStampDedupe",
+      "generateMockRecommendation"
+    ]
+  },
+  "summary": {
+    "requests": 6592,
+    "differingRequests": 0,
+    "groups": 0,
+    "perTier": {
+      "gen": {
+        "requests": 3000,
+        "differing": 0
+      },
+      "edge": {
+        "requests": 3241,
+        "differing": 0
+      },
+      "test": {
+        "requests": 351,
+        "differing": 0
+      }
+    },
+    "elapsedMs": 32723,
+    "socketEscapesDuringReplay": 0
+  },
+  "perRoute": {
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName": {
+      "requests": 194,
+      "differing": 0,
+      "byTier": {
+        "gen": 89,
+        "edge": 103,
+        "test": 2
+      },
+      "oldStatus": {
+        "200": 73,
+        "400": 25,
+        "401": 21,
+        "404": 61,
+        "500": 13,
+        "NO_RESPONSE(server 404)": 1
+      },
+      "newStatus": {
+        "200": 73,
+        "400": 25,
+        "401": 21,
+        "404": 61,
+        "500": 13,
+        "NO_RESPONSE(server 404)": 1
+      },
+      "statusPairs": {
+        "200": 73,
+        "400": 25,
+        "401": 21,
+        "404": 61,
+        "500": 13,
+        "NO_RESPONSE(server 404)": 1
+      },
+      "tags": {
+        "variant:full": 176,
+        "ws:jiraws": 7,
+        "ws:acme": 94,
+        "ws:bare": 2,
+        "variant:seams": 7,
+        "ws:legacy": 7,
+        "ws:testws": 37,
+        "ws:notoken": 6,
+        "ws:localws": 10,
+        "ws:jiraamb": 4,
+        "ws:ghp": 2,
+        "variant:sparse": 11,
+        "ws:noguard": 4,
+        "ws:mixed": 11,
+        "ws:ghws": 5,
+        "clientGone": 1,
+        "ws:conn": 5,
+        "intent:auth:prompt:badKey": 5,
+        "intent:auth:prompt:noWorkspaces": 5,
+        "intent:auth:prompt:ghost": 5,
+        "intent:auth:prompt:emptySession": 5,
+        "intent:auth:prompt:noAccount": 5,
+        "intent:prompt:testMock": 6,
+        "intent:prompt:testMockMissing": 5,
+        "intent:prompt:testCustom": 5,
+        "intent:prompt:testCustomMissing": 5,
+        "intent:prompt:testCustomNoTemplate": 5,
+        "intent:prompt:ok": 6,
+        "intent:prompt:sources": 5,
+        "intent:prompt:providers": 6,
+        "intent:prompt:custom": 5,
+        "intent:prompt:customMissing": 5,
+        "intent:prompt:noTemplate": 5,
+        "intent:prompt:badId": 5,
+        "intent:prompt:401": 5,
+        "intent:prompt:404": 5,
+        "intent:prompt:500": 5,
+        "intent:recommend-one-path.test.js": 2
+      }
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire": {
+      "requests": 177,
+      "differing": 0,
+      "byTier": {
+        "gen": 75,
+        "edge": 97,
+        "test": 5
+      },
+      "oldStatus": {
+        "200": 36,
+        "400": 38,
+        "401": 26,
+        "404": 18,
+        "409": 8,
+        "422": 16,
+        "500": 22,
+        "503": 13
+      },
+      "newStatus": {
+        "200": 36,
+        "400": 38,
+        "401": 26,
+        "404": 18,
+        "409": 8,
+        "422": 16,
+        "500": 22,
+        "503": 13
+      },
+      "statusPairs": {
+        "200": 36,
+        "400": 38,
+        "401": 26,
+        "404": 16,
+        "500": 22,
+        "503": 13,
+        "422 CANONICAL_ID_REQUIRED": 11,
+        "404 ROW_GONE": 2,
+        "409 NOT_SELF_RESOLVED": 8,
+        "422 CAPABILITY_NOT_SUPPORTED": 5
+      },
+      "tags": {
+        "variant:full": 151,
+        "ws:localws": 14,
+        "ws:testws": 34,
+        "ws:acme": 99,
+        "variant:sparse": 18,
+        "variant:seams": 8,
+        "ws:jiraws": 4,
+        "ws:ghp": 8,
+        "ws:conn": 1,
+        "ws:ghws": 1,
+        "ws:jiraamb": 1,
+        "ws:mixed": 1,
+        "ws:bare": 11,
+        "ws:notoken": 1,
+        "ws:noguard": 1,
+        "ws:legacy": 1,
+        "intent:auth:unretire:badKey": 5,
+        "intent:auth:unretire:noWorkspaces": 5,
+        "intent:auth:unretire:ghost": 5,
+        "intent:auth:unretire:emptySession": 5,
+        "intent:auth:unretire:noAccount": 5,
+        "intent:unretire:badId": 5,
+        "intent:unretire:noRecordId": 6,
+        "intent:unretire:noStore": 5,
+        "intent:unretire:capViaIdentifier": 5,
+        "intent:unretire:uuidCap": 5,
+        "intent:unretire:identifier": 5,
+        "intent:unretire:identifierNoCanonical": 5,
+        "intent:unretire:testMock": 5,
+        "intent:unretire:testMockMissing": 5,
+        "intent:unretire:ctx401": 5,
+        "intent:unretire:ctx404": 5,
+        "intent:unretire:ctx500": 5,
+        "intent:unretire:ok": 5,
+        "intent:unretire:storeErrors": 6,
+        "intent:scan-routes.test.js": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId": {
+      "requests": 166,
+      "differing": 0,
+      "byTier": {
+        "gen": 70,
+        "edge": 76,
+        "test": 20
+      },
+      "oldStatus": {
+        "200": 81,
+        "400": 31,
+        "401": 20,
+        "403": 8,
+        "404": 20,
+        "500": 6
+      },
+      "newStatus": {
+        "200": 81,
+        "400": 31,
+        "401": 20,
+        "403": 8,
+        "404": 20,
+        "500": 6
+      },
+      "statusPairs": {
+        "200": 81,
+        "400": 31,
+        "401": 20,
+        "403": 8,
+        "404": 20,
+        "500": 6
+      },
+      "tags": {
+        "variant:full": 147,
+        "ws:testws": 41,
+        "ws:acme": 82,
+        "variant:seams": 7,
+        "variant:sparse": 12,
+        "ws:jiraws": 5,
+        "ws:ghws": 4,
+        "ws:mixed": 4,
+        "ws:localws": 15,
+        "ws:noguard": 2,
+        "ws:ghp": 3,
+        "ws:notoken": 2,
+        "ws:legacy": 4,
+        "ws:conn": 2,
+        "ws:jiraamb": 2,
+        "intent:auth:apIssue:badKey": 5,
+        "intent:auth:apIssue:noWorkspaces": 5,
+        "intent:auth:apIssue:ghost": 5,
+        "intent:auth:apIssue:emptySession": 5,
+        "intent:auth:apIssue:noAccount": 5,
+        "intent:ap:proxyOff": 5,
+        "intent:ap:badId": 5,
+        "intent:ap:stopAtBad": 5,
+        "intent:ap:stopAtPr": 5,
+        "intent:ap:testMock": 5,
+        "intent:ap:testMockMissing": 5,
+        "intent:ap:providers": 6,
+        "intent:ap:401": 5,
+        "intent:ap:404": 5,
+        "intent:ap:500": 5,
+        "intent:detail-route-binding-provider.test.js": 2,
+        "intent:lin-2944-p3-proxy-gates.test.js": 2,
+        "intent:workspace-api-autopilot-variant.test.js": 16
+      }
+    },
+    "GET /workspace/:urlKey/api/image": {
+      "requests": 207,
+      "differing": 0,
+      "byTier": {
+        "gen": 70,
+        "edge": 127,
+        "test": 10
+      },
+      "oldStatus": {
+        "200": 45,
+        "400": 65,
+        "401": 22,
+        "403": 6,
+        "404": 18,
+        "413": 6,
+        "418": 6,
+        "500": 33,
+        "502": 6
+      },
+      "newStatus": {
+        "200": 45,
+        "400": 65,
+        "401": 22,
+        "403": 6,
+        "404": 18,
+        "413": 6,
+        "418": 6,
+        "500": 33,
+        "502": 6
+      },
+      "statusPairs": {
+        "200": 45,
+        "400": 65,
+        "401": 22,
+        "403": 6,
+        "404": 18,
+        "413": 6,
+        "418": 6,
+        "500": 33,
+        "502": 6
+      },
+      "tags": {
+        "variant:sparse": 13,
+        "ws:jiraws": 11,
+        "fetch": 137,
+        "variant:full": 185,
+        "ws:acme": 133,
+        "variant:seams": 9,
+        "ws:ghws": 16,
+        "ws:notoken": 3,
+        "ws:testws": 4,
+        "ws:mixed": 3,
+        "ws:legacy": 11,
+        "ws:conn": 3,
+        "ws:jiraamb": 4,
+        "ws:localws": 14,
+        "intent:auth:image:badKey": 5,
+        "intent:auth:image:noWorkspaces": 5,
+        "intent:auth:image:ghost": 5,
+        "intent:auth:image:emptySession": 5,
+        "intent:auth:image:noAccount": 5,
+        "intent:image:missingUrl": 5,
+        "intent:image:notHttps": 5,
+        "intent:image:hostDenied": 6,
+        "intent:image:traversal": 5,
+        "intent:image:badFormat": 5,
+        "intent:image:arrayUrl": 5,
+        "intent:image:ok": 8,
+        "ws:bare": 2,
+        "ws:noguard": 2,
+        "intent:image:credentialEgress": 11,
+        "ws:ghp": 1,
+        "intent:image:nonRaster": 5,
+        "intent:image:upstreamStatus": 6,
+        "intent:image:tooLarge": 5,
+        "intent:image:fetchThrows": 6,
+        "intent:image:upstreamStatus5": 30,
+        "intent:image-proxy.test.js": 8,
+        "intent:lin-3124-pr1-s0-characterization.test.js": 1,
+        "intent:lin-3124-pr3-review-fixes.test.js": 1
+      }
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId": {
+      "requests": 266,
+      "differing": 0,
+      "byTier": {
+        "gen": 86,
+        "edge": 176,
+        "test": 4
+      },
+      "oldStatus": {
+        "200": 111,
+        "400": 17,
+        "401": 20,
+        "404": 41,
+        "422": 6,
+        "429": 15,
+        "500": 18,
+        "503": 25,
+        "NO_RESPONSE(server 499)": 8,
+        "NO_RESPONSE(server 200)": 5
+      },
+      "newStatus": {
+        "200": 111,
+        "400": 17,
+        "401": 20,
+        "404": 41,
+        "422": 6,
+        "429": 15,
+        "500": 18,
+        "503": 25,
+        "NO_RESPONSE(server 499)": 8,
+        "NO_RESPONSE(server 200)": 5
+      },
+      "statusPairs": {
+        "200": 83,
+        "400": 17,
+        "401": 20,
+        "404": 41,
+        "429": 15,
+        "500": 18,
+        "503": 25,
+        "422 CAPABILITY_NOT_SUPPORTED": 6,
+        "200 (flushed 503)": 7,
+        "200 (flushed 404)": 6,
+        "200 (flushed 401)": 6,
+        "200 (flushed 500)": 9,
+        "NO_RESPONSE(server 499)": 8,
+        "NO_RESPONSE(server 200)": 5
+      },
+      "tags": {
+        "variant:seams": 10,
+        "ws:localws": 43,
+        "variant:full": 241,
+        "ws:acme": 143,
+        "ws:ghp": 14,
+        "ws:testws": 39,
+        "seam:openrouter.getRecommendation": 104,
+        "variant:sparse": 15,
+        "ws:jiraws": 4,
+        "ws:mixed": 14,
+        "ws:bare": 7,
+        "ws:legacy": 2,
+        "intent:auth:rec:badKey": 5,
+        "intent:auth:rec:noWorkspaces": 5,
+        "intent:auth:rec:ghost": 5,
+        "intent:auth:rec:emptySession": 5,
+        "intent:auth:rec:noAccount": 5,
+        "intent:rec:badId": 5,
+        "intent:rec:cap422": 5,
+        "intent:rec:noKey503": 5,
+        "intent:rec:freeTierBlocked": 5,
+        "intent:rec:freeTierOk": 5,
+        "intent:rec:leaf": 5,
+        "intent:rec:descent": 5,
+        "intent:rec:mockLocalLeaf": 5,
+        "intent:rec:mockLocalDescent": 5,
+        "intent:rec:mockLocalNotFound": 5,
+        "intent:rec:mockLocalOtherErr": 5,
+        "intent:rec:mockLocalFreeTierBlocked": 5,
+        "intent:rec:testMock": 10,
+        "intent:rec:testMockMissing": 5,
+        "intent:rec:testFreeTierBlocked": 5,
+        "intent:rec:ctx401": 5,
+        "intent:rec:ctx404": 5,
+        "intent:rec:aiOpenRouter": 5,
+        "intent:rec:aiBoom": 5,
+        "intent:rec:aiStr": 5,
+        "intent:rec:slowKeepalive": 5,
+        "intent:rec:slowError": 5,
+        "intent:rec:clientGone": 5,
+        "clientGone": 13,
+        "intent:rec:ctxHang": 3,
+        "intent:rec:budget": 3,
+        "intent:rec:flushed": 20,
+        "intent:rec:gone499": 5,
+        "intent:recommend-one-path.test.js": 3,
+        "intent:recommend-provider-ui.test.js": 1
+      }
+    },
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id": {
+      "requests": 85,
+      "differing": 0,
+      "byTier": {
+        "gen": 60,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 47,
+        "400": 5,
+        "401": 13,
+        "404": 20
+      },
+      "newStatus": {
+        "200": 47,
+        "400": 5,
+        "401": 13,
+        "404": 20
+      },
+      "statusPairs": {
+        "200": 47,
+        "400": 5,
+        "401": 13,
+        "404": 20
+      },
+      "tags": {
+        "variant:sparse": 8,
+        "ws:ghws": 2,
+        "variant:seams": 7,
+        "ws:notoken": 4,
+        "variant:full": 70,
+        "ws:legacy": 2,
+        "ws:mixed": 4,
+        "ws:testws": 10,
+        "ws:acme": 47,
+        "ws:jiraamb": 2,
+        "ws:noguard": 3,
+        "ws:localws": 6,
+        "ws:jiraws": 4,
+        "ws:bare": 1,
+        "intent:auth:customDelete:badKey": 5,
+        "intent:auth:customDelete:noWorkspaces": 5,
+        "intent:auth:customDelete:ghost": 5,
+        "intent:auth:customDelete:emptySession": 5,
+        "intent:auth:customDelete:noAccount": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier": {
+      "requests": 119,
+      "differing": 0,
+      "byTier": {
+        "gen": 71,
+        "edge": 48
+      },
+      "oldStatus": {
+        "200": 69,
+        "400": 20,
+        "401": 12,
+        "404": 7,
+        "500": 11
+      },
+      "newStatus": {
+        "200": 69,
+        "400": 20,
+        "401": 12,
+        "404": 7,
+        "500": 11
+      },
+      "statusPairs": {
+        "200": 69,
+        "400": 20,
+        "401": 12,
+        "404": 7,
+        "500": 11
+      },
+      "tags": {
+        "variant:sparse": 10,
+        "ws:localws": 20,
+        "fetch": 34,
+        "ws:acme": 57,
+        "variant:full": 99,
+        "ws:ghws": 8,
+        "ws:mixed": 13,
+        "ws:testws": 9,
+        "variant:seams": 10,
+        "ws:notoken": 2,
+        "ws:noguard": 4,
+        "ws:ghp": 1,
+        "ws:legacy": 2,
+        "intent:auth:runEv:badKey": 5,
+        "intent:auth:runEv:noWorkspaces": 5,
+        "intent:auth:runEv:ghost": 5,
+        "intent:auth:runEv:emptySession": 5,
+        "intent:auth:runEv:noAccount": 5,
+        "intent:runEv:tooLong": 5,
+        "intent:runEv:ok": 8,
+        "ws:bare": 1,
+        "ws:jiraws": 1,
+        "ws:jiraamb": 1,
+        "intent:runEv:sources": 5,
+        "intent:runEv:500": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check": {
+      "requests": 164,
+      "differing": 0,
+      "byTier": {
+        "gen": 77,
+        "edge": 87
+      },
+      "oldStatus": {
+        "200": 91,
+        "400": 20,
+        "401": 24,
+        "403": 8,
+        "404": 8,
+        "500": 13
+      },
+      "newStatus": {
+        "200": 91,
+        "400": 20,
+        "401": 24,
+        "403": 8,
+        "404": 8,
+        "500": 13
+      },
+      "statusPairs": {
+        "200": 91,
+        "400": 20,
+        "401": 24,
+        "404": 8,
+        "500": 13,
+        "403 PERSON_SESSION_REQUIRED": 8
+      },
+      "tags": {
+        "variant:sparse": 13,
+        "ws:ghws": 27,
+        "fetch": 68,
+        "variant:full": 135,
+        "ws:mixed": 8,
+        "ws:localws": 17,
+        "variant:seams": 16,
+        "ws:testws": 2,
+        "ws:conn": 3,
+        "ws:noguard": 3,
+        "ws:acme": 98,
+        "ws:legacy": 3,
+        "ws:notoken": 1,
+        "ws:bare": 1,
+        "ws:jiraws": 1,
+        "intent:auth:check:badKey": 5,
+        "intent:auth:check:noWorkspaces": 5,
+        "intent:auth:check:ghost": 5,
+        "intent:auth:check:emptySession": 5,
+        "intent:auth:check:noAccount": 5,
+        "intent:check:tooLong": 5,
+        "intent:check:noAccount": 5,
+        "intent:check:notPerson": 5,
+        "intent:check:normalRun": 5,
+        "intent:check:mergedDone": 8,
+        "intent:check:mergedStore": 6,
+        "intent:check:ledgerOpen": 5,
+        "intent:check:twoPrs": 5,
+        "intent:check:seams": 8,
+        "intent:check:errors": 5,
+        "intent:check:prReadThrows": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId": {
+      "requests": 118,
+      "differing": 0,
+      "byTier": {
+        "gen": 68,
+        "edge": 50
+      },
+      "oldStatus": {
+        "200": 42,
+        "400": 18,
+        "401": 21,
+        "404": 24,
+        "500": 13
+      },
+      "newStatus": {
+        "200": 42,
+        "400": 18,
+        "401": 21,
+        "404": 24,
+        "500": 13
+      },
+      "statusPairs": {
+        "200": 42,
+        "400": 18,
+        "401": 21,
+        "404": 24,
+        "500": 13
+      },
+      "tags": {
+        "variant:full": 98,
+        "ws:acme": 65,
+        "ws:localws": 12,
+        "ws:testws": 5,
+        "ws:jiraws": 8,
+        "variant:seams": 7,
+        "variant:sparse": 13,
+        "ws:mixed": 7,
+        "ws:notoken": 3,
+        "ws:ghws": 6,
+        "ws:legacy": 2,
+        "ws:jiraamb": 3,
+        "ws:ghp": 4,
+        "ws:conn": 1,
+        "ws:noguard": 2,
+        "intent:auth:commentsGet:badKey": 5,
+        "intent:auth:commentsGet:noWorkspaces": 5,
+        "intent:auth:commentsGet:ghost": 5,
+        "intent:auth:commentsGet:emptySession": 5,
+        "intent:auth:commentsGet:noAccount": 5,
+        "intent:commentsGet:ok": 5,
+        "intent:commentsGet:badId": 5,
+        "intent:commentsGet:401": 5,
+        "intent:commentsGet:404": 5,
+        "intent:commentsGet:500": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/recommend/status": {
+      "requests": 111,
+      "differing": 0,
+      "byTier": {
+        "gen": 70,
+        "edge": 41
+      },
+      "oldStatus": {
+        "200": 73,
+        "400": 7,
+        "401": 14,
+        "404": 7,
+        "500": 10
+      },
+      "newStatus": {
+        "200": 73,
+        "400": 7,
+        "401": 14,
+        "404": 7,
+        "500": 10
+      },
+      "statusPairs": {
+        "200": 73,
+        "400": 7,
+        "401": 14,
+        "404": 7,
+        "500": 10
+      },
+      "tags": {
+        "variant:full": 96,
+        "ws:noguard": 1,
+        "variant:sparse": 9,
+        "ws:testws": 19,
+        "ws:acme": 51,
+        "variant:seams": 6,
+        "ws:conn": 3,
+        "ws:mixed": 6,
+        "ws:ghws": 4,
+        "ws:jiraamb": 5,
+        "ws:localws": 8,
+        "ws:jiraws": 4,
+        "ws:legacy": 3,
+        "ws:bare": 4,
+        "ws:ghp": 2,
+        "intent:auth:recStatus:badKey": 5,
+        "intent:auth:recStatus:noWorkspaces": 5,
+        "intent:auth:recStatus:ghost": 5,
+        "intent:auth:recStatus:emptySession": 5,
+        "intent:auth:recStatus:noAccount": 5,
+        "intent:recStatus:sources": 6,
+        "ws:notoken": 1,
+        "intent:recStatus:testws": 5,
+        "intent:recStatus:prefsThrow": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/feedback": {
+      "requests": 342,
+      "differing": 0,
+      "byTier": {
+        "gen": 88,
+        "edge": 177,
+        "test": 77
+      },
+      "oldStatus": {
+        "201": 204,
+        "400": 62,
+        "401": 12,
+        "404": 6,
+        "413": 9,
+        "422": 42,
+        "500": 3,
+        "502": 4
+      },
+      "newStatus": {
+        "201": 204,
+        "400": 62,
+        "401": 12,
+        "404": 6,
+        "413": 9,
+        "422": 42,
+        "500": 3,
+        "502": 4
+      },
+      "statusPairs": {
+        "201": 204,
+        "400": 62,
+        "401": 12,
+        "404": 6,
+        "413": 9,
+        "500": 3,
+        "502": 4,
+        "422 CAPABILITY_NOT_SUPPORTED": 34,
+        "422 TEAM_UNRESOLVED": 8
+      },
+      "tags": {
+        "variant:full": 309,
+        "ws:acme": 234,
+        "enqueued": 46,
+        "seam:openrouter.streamChat": 173,
+        "variant:sparse": 21,
+        "ws:jiraws": 12,
+        "variant:seams": 12,
+        "ws:mixed": 8,
+        "ws:testws": 16,
+        "ws:ghws": 12,
+        "ws:localws": 24,
+        "ws:ghp": 19,
+        "ws:conn": 4,
+        "ws:noguard": 2,
+        "intent:auth:feedback:badKey": 5,
+        "intent:auth:feedback:noWorkspaces": 5,
+        "intent:auth:feedback:ghost": 5,
+        "intent:auth:feedback:emptySession": 5,
+        "intent:auth:feedback:noAccount": 5,
+        "intent:feedback:validation": 10,
+        "intent:feedback:cap": 6,
+        "ws:jiraamb": 2,
+        "ws:bare": 6,
+        "intent:feedback:capBare": 5,
+        "intent:feedback:team": 6,
+        "intent:feedback:teamGithub": 5,
+        "intent:feedback:teamless": 5,
+        "intent:feedback:project": 5,
+        "intent:feedback:capture": 5,
+        "intent:feedback:priority": 8,
+        "ws:legacy": 2,
+        "ws:notoken": 1,
+        "intent:feedback:image": 6,
+        "intent:feedback:title": 8,
+        "intent:feedback:mockTitle": 5,
+        "intent:feedback:createFail": 6,
+        "intent:feedback:actions": 8,
+        "intent:feedback:legacyTriageFlag": 5,
+        "intent:feedback:ownerRefusal": 8,
+        "intent:feedback:noOwnerSeam": 5,
+        "intent:feedback:triageOverrides": 6,
+        "intent:feedback:runLimit": 6,
+        "intent:feedback:grantRefusal": 6,
+        "intent:feedback:enqueueFail": 6,
+        "intent:feedback:providersActions": 8,
+        "intent:feedback:noHost": 3,
+        "intent:feedback:bodies": 6,
+        "intent:feedback:413": 5,
+        "intent:feedback-attachment-roundtrip.test.js": 3,
+        "intent:feedback-route.test.js": 56,
+        "intent:feedback-title.test.js": 4,
+        "intent:lin-2353-feedback-triage-provider-ui.test.js": 7,
+        "intent:lin-2354-session-lane-no-provider.test.js": 4,
+        "intent:lin-2804-provider-ui-endpoint-hints.test.js": 3
+      }
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press": {
+      "requests": 145,
+      "differing": 0,
+      "byTier": {
+        "gen": 74,
+        "edge": 71
+      },
+      "oldStatus": {
+        "201": 35,
+        "400": 46,
+        "401": 25,
+        "403": 7,
+        "404": 7,
+        "409": 13,
+        "500": 12
+      },
+      "newStatus": {
+        "201": 35,
+        "400": 46,
+        "401": 25,
+        "403": 7,
+        "404": 7,
+        "409": 13,
+        "500": 12
+      },
+      "statusPairs": {
+        "201": 35,
+        "400": 46,
+        "401": 25,
+        "404": 7,
+        "500": 12,
+        "409 CLOSE_OUT_ALREADY_MERGED": 13,
+        "403 PERSON_SESSION_REQUIRED": 7
+      },
+      "tags": {
+        "variant:full": 129,
+        "ws:acme": 106,
+        "ws:testws": 6,
+        "ws:notoken": 3,
+        "ws:ghws": 13,
+        "ws:localws": 5,
+        "variant:sparse": 16,
+        "ws:bare": 2,
+        "ws:conn": 2,
+        "ws:noguard": 2,
+        "ws:legacy": 1,
+        "ws:ghp": 1,
+        "ws:mixed": 3,
+        "ws:jiraamb": 1,
+        "intent:auth:press:badKey": 5,
+        "intent:auth:press:noWorkspaces": 5,
+        "intent:auth:press:ghost": 5,
+        "intent:auth:press:emptySession": 5,
+        "intent:auth:press:noAccount": 5,
+        "intent:press:tooLong": 5,
+        "intent:press:noAccount": 5,
+        "intent:press:notPerson": 5,
+        "intent:press:ok": 6,
+        "intent:press:alreadyMerged": 5,
+        "intent:press:noStore": 5,
+        "intent:press:recordNull": 5,
+        "intent:press:storeErr": 5,
+        "intent:press:body": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/openrouter/models": {
+      "requests": 103,
+      "differing": 0,
+      "byTier": {
+        "gen": 62,
+        "edge": 36,
+        "test": 5
+      },
+      "oldStatus": {
+        "200": 78,
+        "400": 7,
+        "401": 12,
+        "404": 6
+      },
+      "newStatus": {
+        "200": 78,
+        "400": 7,
+        "401": 12,
+        "404": 6
+      },
+      "statusPairs": {
+        "200": 78,
+        "400": 7,
+        "401": 12,
+        "404": 6
+      },
+      "tags": {
+        "variant:full": 89,
+        "ws:acme": 58,
+        "fetch": 42,
+        "variant:sparse": 10,
+        "ws:ghp": 4,
+        "ws:legacy": 2,
+        "variant:seams": 4,
+        "ws:localws": 15,
+        "ws:ghws": 4,
+        "ws:bare": 1,
+        "ws:conn": 2,
+        "ws:jiraws": 3,
+        "ws:testws": 6,
+        "ws:jiraamb": 1,
+        "ws:notoken": 2,
+        "ws:noguard": 2,
+        "ws:mixed": 3,
+        "intent:auth:models:badKey": 5,
+        "intent:auth:models:noWorkspaces": 5,
+        "intent:auth:models:ghost": 5,
+        "intent:auth:models:emptySession": 5,
+        "intent:auth:models:noAccount": 5,
+        "intent:models:ok": 6,
+        "intent:models:mock": 5,
+        "intent:openrouter-models-endpoint.test.js": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/prompt-traces": {
+      "requests": 88,
+      "differing": 0,
+      "byTier": {
+        "gen": 58,
+        "edge": 25,
+        "test": 5
+      },
+      "oldStatus": {
+        "200": 48,
+        "400": 8,
+        "401": 13,
+        "404": 6,
+        "500": 13
+      },
+      "newStatus": {
+        "200": 48,
+        "400": 8,
+        "401": 13,
+        "404": 6,
+        "500": 13
+      },
+      "statusPairs": {
+        "200": 48,
+        "400": 8,
+        "401": 13,
+        "404": 6,
+        "500": 13
+      },
+      "tags": {
+        "variant:full": 72,
+        "ws:bare": 2,
+        "variant:sparse": 8,
+        "ws:ghws": 5,
+        "ws:ghp": 5,
+        "variant:seams": 8,
+        "ws:acme": 44,
+        "ws:testws": 14,
+        "ws:conn": 4,
+        "ws:localws": 7,
+        "ws:mixed": 3,
+        "ws:jiraamb": 1,
+        "ws:notoken": 2,
+        "ws:legacy": 1,
+        "intent:auth:promptTraces:badKey": 5,
+        "intent:auth:promptTraces:noWorkspaces": 5,
+        "intent:auth:promptTraces:ghost": 5,
+        "intent:auth:promptTraces:emptySession": 5,
+        "intent:auth:promptTraces:noAccount": 5,
+        "intent:prompt-traces-route.test.js": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream": {
+      "requests": 252,
+      "differing": 0,
+      "byTier": {
+        "gen": 81,
+        "edge": 161,
+        "test": 10
+      },
+      "oldStatus": {
+        "200": 126,
+        "400": 17,
+        "401": 14,
+        "404": 28,
+        "422": 7,
+        "429": 15,
+        "500": 7,
+        "503": 25,
+        "NO_RESPONSE(server 200)": 13
+      },
+      "newStatus": {
+        "200": 126,
+        "400": 17,
+        "401": 14,
+        "404": 28,
+        "422": 7,
+        "429": 15,
+        "500": 7,
+        "503": 25,
+        "NO_RESPONSE(server 200)": 13
+      },
+      "statusPairs": {
+        "400": 17,
+        "401": 14,
+        "404": 28,
+        "429": 15,
+        "500": 7,
+        "503": 25,
+        "200 sse:done": 83,
+        "200 sse:error": 43,
+        "422 CAPABILITY_NOT_SUPPORTED": 7,
+        "NO_RESPONSE(server 200) sse:phase": 8,
+        "NO_RESPONSE(server 200)": 5
+      },
+      "tags": {
+        "variant:full": 236,
+        "ws:ghp": 10,
+        "seam:openrouter.getRecommendationStream": 89,
+        "ws:testws": 38,
+        "ws:acme": 143,
+        "ws:localws": 37,
+        "variant:seams": 7,
+        "ws:mixed": 10,
+        "variant:sparse": 9,
+        "ws:jiraws": 2,
+        "ws:bare": 7,
+        "ws:jiraamb": 1,
+        "ws:ghws": 1,
+        "ws:conn": 1,
+        "ws:legacy": 2,
+        "intent:auth:stream:badKey": 5,
+        "intent:auth:stream:noWorkspaces": 5,
+        "intent:auth:stream:ghost": 5,
+        "intent:auth:stream:emptySession": 5,
+        "intent:auth:stream:noAccount": 5,
+        "intent:stream:badId": 5,
+        "intent:stream:cap422": 5,
+        "intent:stream:noKey503": 5,
+        "intent:stream:freeTierBlocked": 5,
+        "intent:stream:freeTierOk": 5,
+        "intent:stream:leaf": 5,
+        "intent:stream:descent": 5,
+        "intent:stream:mockLocalLeaf": 5,
+        "intent:stream:mockLocalDescent": 5,
+        "intent:stream:mockLocalNotFound": 5,
+        "intent:stream:mockLocalOtherErr": 5,
+        "intent:stream:mockLocalFreeTierBlocked": 5,
+        "intent:stream:testMock": 10,
+        "intent:stream:testMockMissing": 5,
+        "intent:stream:testFreeTierBlocked": 5,
+        "intent:stream:ctx401": 5,
+        "intent:stream:ctx404": 5,
+        "intent:stream:aiOpenRouter": 5,
+        "intent:stream:aiBoom": 5,
+        "intent:stream:aiStr": 5,
+        "intent:stream:slowKeepalive": 5,
+        "intent:stream:slowError": 5,
+        "intent:stream:clientGone": 5,
+        "clientGone": 13,
+        "intent:stream:ctxHang": 3,
+        "intent:stream:budget": 3,
+        "intent:stream:storeErr": 5,
+        "intent:stream:closedAfterGate": 5,
+        "intent:recommend-one-path.test.js": 4,
+        "intent:recommend-provider-ui.test.js": 4,
+        "intent:recommend-stream-attachments.test.js": 2
+      }
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId": {
+      "requests": 212,
+      "differing": 0,
+      "byTier": {
+        "gen": 74,
+        "edge": 135,
+        "test": 3
+      },
+      "oldStatus": {
+        "200": 88,
+        "400": 20,
+        "401": 19,
+        "404": 26,
+        "422": 5,
+        "429": 10,
+        "500": 20,
+        "503": 24
+      },
+      "newStatus": {
+        "200": 88,
+        "400": 20,
+        "401": 19,
+        "404": 26,
+        "422": 5,
+        "429": 10,
+        "500": 20,
+        "503": 24
+      },
+      "statusPairs": {
+        "200": 61,
+        "400": 20,
+        "401": 19,
+        "404": 26,
+        "429": 10,
+        "500": 20,
+        "503": 13,
+        "503 AI_NOT_CONFIGURED": 11,
+        "422 CAPABILITY_NOT_SUPPORTED": 5,
+        "200 (flushed 503)": 7,
+        "200 (flushed 500)": 10,
+        "200 (flushed 404)": 5,
+        "200 (flushed 401)": 5
+      },
+      "tags": {
+        "variant:seams": 6,
+        "ws:ghp": 18,
+        "seam:openrouter.streamChat": 87,
+        "variant:full": 197,
+        "ws:localws": 30,
+        "ws:noguard": 1,
+        "ws:acme": 133,
+        "ws:testws": 21,
+        "variant:sparse": 9,
+        "ws:ghws": 1,
+        "ws:notoken": 1,
+        "ws:jiraws": 1,
+        "ws:mixed": 1,
+        "intent:auth:recapPost:badKey": 5,
+        "intent:auth:recapPost:noWorkspaces": 5,
+        "intent:auth:recapPost:ghost": 5,
+        "intent:auth:recapPost:emptySession": 5,
+        "intent:auth:recapPost:noAccount": 5,
+        "intent:recapPost:badId": 5,
+        "intent:recapPost:noStore": 5,
+        "ws:bare": 5,
+        "intent:recapPost:cap422": 5,
+        "intent:recapPost:noAi503": 5,
+        "intent:recapPost:freeTierBlocked": 5,
+        "intent:recapPost:freeTierOk": 5,
+        "intent:recapPost:ok": 5,
+        "intent:recapPost:mockLocal": 5,
+        "intent:recapPost:testMock": 5,
+        "intent:recapPost:testMockMissing": 5,
+        "intent:recapPost:401": 5,
+        "intent:recapPost:404": 5,
+        "intent:recapPost:openrouter503": 5,
+        "intent:recapPost:500": 5,
+        "intent:recapPost:slow": 5,
+        "intent:recapPost:flushed": 30,
+        "intent:recapPost:freeTier429": 5,
+        "intent:brief-recap-ai-not-configured-contract.test.js": 3
+      }
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt": {
+      "requests": 132,
+      "differing": 0,
+      "byTier": {
+        "gen": 70,
+        "edge": 50,
+        "test": 12
+      },
+      "oldStatus": {
+        "200": 64,
+        "400": 38,
+        "401": 13,
+        "403": 9,
+        "404": 8
+      },
+      "newStatus": {
+        "200": 64,
+        "400": 38,
+        "401": 13,
+        "403": 9,
+        "404": 8
+      },
+      "statusPairs": {
+        "200": 64,
+        "400": 38,
+        "401": 13,
+        "403": 9,
+        "404": 8
+      },
+      "tags": {
+        "variant:full": 114,
+        "ws:acme": 64,
+        "ws:localws": 8,
+        "variant:sparse": 14,
+        "ws:conn": 6,
+        "ws:mixed": 8,
+        "ws:ghp": 7,
+        "variant:seams": 4,
+        "ws:legacy": 5,
+        "ws:ghws": 3,
+        "ws:testws": 18,
+        "ws:noguard": 2,
+        "ws:jiraws": 5,
+        "ws:jiraamb": 3,
+        "ws:notoken": 1,
+        "ws:bare": 2,
+        "intent:auth:apGeneral:badKey": 5,
+        "intent:auth:apGeneral:noWorkspaces": 5,
+        "intent:auth:apGeneral:ghost": 5,
+        "intent:auth:apGeneral:emptySession": 5,
+        "intent:auth:apGeneral:noAccount": 5,
+        "intent:apg:proxyOff": 5,
+        "intent:apg:maxTasks": 8,
+        "intent:apg:goal": 6,
+        "intent:apg:providers": 6,
+        "intent:workspace-api-autopilot-max-tasks.test.js": 8,
+        "intent:workspace-api-autopilot-variant.test.js": 4
+      }
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports": {
+      "requests": 82,
+      "differing": 0,
+      "byTier": {
+        "gen": 57,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 37,
+        "400": 7,
+        "401": 13,
+        "403": 19,
+        "404": 6
+      },
+      "newStatus": {
+        "200": 37,
+        "400": 7,
+        "401": 13,
+        "403": 19,
+        "404": 6
+      },
+      "statusPairs": {
+        "200": 37,
+        "400": 7,
+        "401": 13,
+        "403": 19,
+        "404": 6
+      },
+      "tags": {
+        "variant:full": 73,
+        "ws:conn": 2,
+        "ws:jiraamb": 1,
+        "variant:sparse": 7,
+        "ws:testws": 8,
+        "ws:ghp": 6,
+        "ws:acme": 39,
+        "ws:ghws": 3,
+        "variant:seams": 2,
+        "ws:legacy": 4,
+        "ws:mixed": 4,
+        "ws:noguard": 3,
+        "ws:localws": 7,
+        "ws:notoken": 3,
+        "ws:jiraws": 2,
+        "intent:auth:reportsList:badKey": 5,
+        "intent:auth:reportsList:noWorkspaces": 5,
+        "intent:auth:reportsList:ghost": 5,
+        "intent:auth:reportsList:emptySession": 5,
+        "intent:auth:reportsList:noAccount": 5
+      }
+    },
+    "UNMATCHED": {
+      "requests": 39,
+      "differing": 0,
+      "byTier": {
+        "gen": 39
+      },
+      "oldStatus": {
+        "404": 37,
+        "NO_RESPONSE(server 404)": 2
+      },
+      "newStatus": {
+        "404": 37,
+        "NO_RESPONSE(server 404)": 2
+      },
+      "statusPairs": {
+        "404": 37,
+        "NO_RESPONSE(server 404)": 2
+      },
+      "tags": {
+        "variant:full": 27,
+        "ws:acme": 11,
+        "variant:sparse": 7,
+        "ws:jiraws": 3,
+        "ws:noguard": 3,
+        "variant:seams": 5,
+        "ws:testws": 1,
+        "ws:localws": 13,
+        "ws:mixed": 3,
+        "clientGone": 2,
+        "ws:ghws": 1,
+        "ws:ghp": 1,
+        "ws:jiraamb": 2,
+        "ws:conn": 1
+      }
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId": {
+      "requests": 151,
+      "differing": 0,
+      "byTier": {
+        "gen": 66,
+        "edge": 85
+      },
+      "oldStatus": {
+        "200": 59,
+        "400": 16,
+        "401": 19,
+        "404": 27,
+        "422": 5,
+        "500": 12,
+        "503": 12,
+        "NO_RESPONSE(server 404)": 1
+      },
+      "newStatus": {
+        "200": 59,
+        "400": 16,
+        "401": 19,
+        "404": 27,
+        "422": 5,
+        "500": 12,
+        "503": 12,
+        "NO_RESPONSE(server 404)": 1
+      },
+      "statusPairs": {
+        "200": 59,
+        "400": 16,
+        "401": 19,
+        "404": 27,
+        "500": 12,
+        "503": 12,
+        "NO_RESPONSE(server 404)": 1,
+        "422 CAPABILITY_NOT_SUPPORTED": 5
+      },
+      "tags": {
+        "variant:full": 129,
+        "ws:localws": 13,
+        "variant:seams": 9,
+        "ws:acme": 86,
+        "ws:testws": 28,
+        "variant:sparse": 13,
+        "ws:conn": 4,
+        "ws:ghp": 7,
+        "ws:legacy": 2,
+        "ws:mixed": 2,
+        "ws:ghws": 1,
+        "ws:jiraamb": 1,
+        "clientGone": 1,
+        "ws:noguard": 1,
+        "ws:jiraws": 1,
+        "intent:auth:briefGet:badKey": 5,
+        "intent:auth:briefGet:noWorkspaces": 5,
+        "intent:auth:briefGet:ghost": 5,
+        "intent:auth:briefGet:emptySession": 5,
+        "intent:auth:briefGet:noAccount": 5,
+        "intent:briefGet:badId": 5,
+        "intent:briefGet:noStore": 5,
+        "ws:bare": 5,
+        "intent:briefGet:cap422": 5,
+        "intent:briefGet:missing": 5,
+        "intent:briefGet:stale": 5,
+        "intent:briefGet:fresh": 5,
+        "intent:briefGet:testMock": 5,
+        "intent:briefGet:testMockMissing": 5,
+        "intent:briefGet:noCanonical": 5,
+        "intent:briefGet:401": 5,
+        "intent:briefGet:404": 5,
+        "intent:briefGet:500": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId": {
+      "requests": 320,
+      "differing": 0,
+      "byTier": {
+        "gen": 91,
+        "edge": 170,
+        "test": 59
+      },
+      "oldStatus": {
+        "200": 29,
+        "201": 105,
+        "400": 49,
+        "401": 14,
+        "404": 17,
+        "409": 14,
+        "422": 21,
+        "500": 62,
+        "502": 9
+      },
+      "newStatus": {
+        "200": 29,
+        "201": 105,
+        "400": 49,
+        "401": 14,
+        "404": 17,
+        "409": 14,
+        "422": 21,
+        "500": 62,
+        "502": 9
+      },
+      "statusPairs": {
+        "200": 29,
+        "201": 105,
+        "400": 49,
+        "401": 14,
+        "404": 17,
+        "409": 14,
+        "502": 9,
+        "500 INTERNAL_ERROR": 20,
+        "500 LINEAR_AUTH": 33,
+        "422 CAPABILITY_NOT_SUPPORTED": 21,
+        "500 LINEAR_UNREACHABLE": 9
+      },
+      "tags": {
+        "variant:full": 287,
+        "ws:conn": 24,
+        "ws:mixed": 18,
+        "variant:sparse": 20,
+        "ws:localws": 20,
+        "ws:acme": 197,
+        "ws:jiraws": 11,
+        "ws:ghp": 14,
+        "ws:legacy": 2,
+        "variant:seams": 13,
+        "ws:testws": 19,
+        "ws:bare": 6,
+        "ws:ghws": 2,
+        "ws:notoken": 1,
+        "intent:auth:comment:badKey": 5,
+        "intent:auth:comment:noWorkspaces": 5,
+        "intent:auth:comment:ghost": 5,
+        "intent:auth:comment:emptySession": 5,
+        "intent:auth:comment:noAccount": 5,
+        "intent:comment:cap422": 5,
+        "intent:comment:capBare": 5,
+        "ws:noguard": 5,
+        "intent:comment:noGuard422": 5,
+        "intent:comment:badId": 5,
+        "intent:comment:bodyInvalid": 7,
+        "intent:comment:tooLong": 5,
+        "intent:comment:noBody": 5,
+        "intent:comment:trashed": 5,
+        "intent:comment:guardThrows": 5,
+        "intent:comment:okEnvelope": 5,
+        "intent:comment:okBare": 5,
+        "intent:comment:notCreated": 5,
+        "intent:comment:testMode": 5,
+        "intent:comment:stamps": 8,
+        "intent:comment:ledgerFail": 5,
+        "intent:comment:dedupe0:first": 1,
+        "intent:comment:dedupe0:second": 1,
+        "intent:comment:dedupe0:third": 1,
+        "intent:comment:dedupe1:first": 1,
+        "intent:comment:dedupe1:second": 1,
+        "intent:comment:dedupe1:third": 1,
+        "intent:comment:dedupe2:first": 1,
+        "intent:comment:dedupe2:second": 1,
+        "intent:comment:dedupe2:third": 1,
+        "intent:comment:dedupe3:first": 1,
+        "intent:comment:dedupe3:second": 1,
+        "intent:comment:dedupe3:third": 1,
+        "intent:comment:dedupe4:first": 1,
+        "intent:comment:dedupe4:second": 1,
+        "intent:comment:dedupe4:third": 1,
+        "intent:comment:dedupe5:first": 1,
+        "intent:comment:dedupe5:second": 1,
+        "intent:comment:dedupe5:third": 1,
+        "intent:comment:recoverDurable": 5,
+        "sessionMutated": 6,
+        "intent:comment:recoverSameToken": 5,
+        "intent:comment:recoverIneligible": 6,
+        "ws:jiraamb": 1,
+        "intent:comment:recoverIneligibleProvider": 5,
+        "intent:comment:recoverConnection": 6,
+        "intent:comment:recoverConnectionNoSeam": 5,
+        "intent:comment:500s": 10,
+        "intent:comment:adoptThrows": 5,
+        "intent:comment-write-route.test.js": 54,
+        "intent:harbour-comments-seam.test.js": 3,
+        "intent:lin-2933-cross-seam-witness.test.js": 2
+      }
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId": {
+      "requests": 205,
+      "differing": 0,
+      "byTier": {
+        "gen": 67,
+        "edge": 135,
+        "test": 3
+      },
+      "oldStatus": {
+        "200": 80,
+        "400": 13,
+        "401": 21,
+        "404": 26,
+        "422": 6,
+        "429": 11,
+        "500": 16,
+        "503": 32
+      },
+      "newStatus": {
+        "200": 80,
+        "400": 13,
+        "401": 21,
+        "404": 26,
+        "422": 6,
+        "429": 11,
+        "500": 16,
+        "503": 32
+      },
+      "statusPairs": {
+        "200": 53,
+        "400": 13,
+        "401": 21,
+        "404": 26,
+        "429": 11,
+        "500": 16,
+        "503": 22,
+        "422 CAPABILITY_NOT_SUPPORTED": 6,
+        "503 AI_NOT_CONFIGURED": 10,
+        "200 (flushed 503)": 7,
+        "200 (flushed 500)": 10,
+        "200 (flushed 404)": 5,
+        "200 (flushed 401)": 5
+      },
+      "tags": {
+        "variant:full": 183,
+        "ws:ghp": 15,
+        "ws:localws": 14,
+        "ws:bare": 6,
+        "ws:acme": 138,
+        "ws:testws": 23,
+        "variant:sparse": 18,
+        "seam:openrouter.streamChat": 81,
+        "ws:jiraws": 3,
+        "variant:seams": 4,
+        "ws:noguard": 1,
+        "ws:ghws": 4,
+        "ws:conn": 1,
+        "intent:auth:briefPost:badKey": 5,
+        "intent:auth:briefPost:noWorkspaces": 5,
+        "intent:auth:briefPost:ghost": 5,
+        "intent:auth:briefPost:emptySession": 5,
+        "intent:auth:briefPost:noAccount": 5,
+        "intent:briefPost:badId": 5,
+        "intent:briefPost:noStore": 5,
+        "intent:briefPost:cap422": 5,
+        "intent:briefPost:noAi503": 5,
+        "intent:briefPost:freeTierBlocked": 5,
+        "intent:briefPost:freeTierOk": 5,
+        "intent:briefPost:ok": 5,
+        "intent:briefPost:mockLocal": 5,
+        "intent:briefPost:testMock": 5,
+        "intent:briefPost:testMockMissing": 5,
+        "intent:briefPost:401": 5,
+        "intent:briefPost:404": 5,
+        "intent:briefPost:openrouter503": 5,
+        "intent:briefPost:500": 5,
+        "intent:briefPost:slow": 5,
+        "intent:briefPost:flushed": 30,
+        "intent:briefPost:freeTier429": 5,
+        "intent:brief-recap-ai-not-configured-contract.test.js": 3
+      }
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports/:id": {
+      "requests": 85,
+      "differing": 0,
+      "byTier": {
+        "gen": 60,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 15,
+        "400": 8,
+        "401": 17,
+        "403": 22,
+        "404": 23
+      },
+      "newStatus": {
+        "200": 15,
+        "400": 8,
+        "401": 17,
+        "403": 22,
+        "404": 23
+      },
+      "statusPairs": {
+        "200": 15,
+        "400": 8,
+        "401": 17,
+        "403": 22,
+        "404": 23
+      },
+      "tags": {
+        "variant:full": 72,
+        "ws:bare": 3,
+        "ws:legacy": 3,
+        "ws:ghws": 8,
+        "ws:acme": 42,
+        "ws:noguard": 6,
+        "ws:localws": 9,
+        "ws:testws": 6,
+        "ws:notoken": 2,
+        "ws:conn": 1,
+        "ws:mixed": 2,
+        "variant:seams": 5,
+        "variant:sparse": 8,
+        "ws:jiraws": 2,
+        "ws:ghp": 1,
+        "intent:auth:reportsGet:badKey": 5,
+        "intent:auth:reportsGet:noWorkspaces": 5,
+        "intent:auth:reportsGet:ghost": 5,
+        "intent:auth:reportsGet:emptySession": 5,
+        "intent:auth:reportsGet:noAccount": 5
+      }
+    },
+    "PUT /workspace/:urlKey/api/prompts/custom/:id": {
+      "requests": 88,
+      "differing": 0,
+      "byTier": {
+        "gen": 63,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 45,
+        "400": 7,
+        "401": 11,
+        "404": 25
+      },
+      "newStatus": {
+        "200": 45,
+        "400": 7,
+        "401": 11,
+        "404": 25
+      },
+      "statusPairs": {
+        "200": 45,
+        "400": 7,
+        "401": 11,
+        "404": 25
+      },
+      "tags": {
+        "variant:full": 67,
+        "ws:localws": 9,
+        "ws:ghws": 5,
+        "variant:seams": 9,
+        "ws:acme": 41,
+        "ws:ghp": 5,
+        "ws:testws": 9,
+        "ws:notoken": 3,
+        "ws:mixed": 4,
+        "ws:jiraws": 6,
+        "variant:sparse": 12,
+        "ws:legacy": 3,
+        "ws:conn": 1,
+        "ws:noguard": 2,
+        "intent:auth:customUpdate:badKey": 5,
+        "intent:auth:customUpdate:noWorkspaces": 5,
+        "intent:auth:customUpdate:ghost": 5,
+        "intent:auth:customUpdate:emptySession": 5,
+        "intent:auth:customUpdate:noAccount": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId": {
+      "requests": 149,
+      "differing": 0,
+      "byTier": {
+        "gen": 75,
+        "edge": 66,
+        "test": 8
+      },
+      "oldStatus": {
+        "200": 70,
+        "400": 19,
+        "401": 25,
+        "404": 28,
+        "500": 7
+      },
+      "newStatus": {
+        "200": 70,
+        "400": 19,
+        "401": 25,
+        "404": 28,
+        "500": 7
+      },
+      "statusPairs": {
+        "200": 70,
+        "400": 19,
+        "401": 25,
+        "404": 28,
+        "500": 7
+      },
+      "tags": {
+        "variant:seams": 9,
+        "ws:bare": 2,
+        "variant:full": 125,
+        "ws:jiraamb": 3,
+        "ws:acme": 80,
+        "ws:legacy": 2,
+        "ws:mixed": 4,
+        "variant:sparse": 15,
+        "ws:jiraws": 7,
+        "ws:testws": 22,
+        "ws:localws": 11,
+        "ws:ghp": 4,
+        "ws:ghws": 6,
+        "ws:notoken": 3,
+        "ws:conn": 2,
+        "ws:noguard": 3,
+        "intent:auth:detail:badKey": 5,
+        "intent:auth:detail:noWorkspaces": 5,
+        "intent:auth:detail:ghost": 5,
+        "intent:auth:detail:emptySession": 5,
+        "intent:auth:detail:noAccount": 5,
+        "intent:detail:ok": 6,
+        "intent:detail:testMock": 5,
+        "intent:detail:testMockMissing": 5,
+        "intent:detail:customFail": 5,
+        "intent:detail:badId": 5,
+        "intent:detail:401": 5,
+        "intent:detail:404": 5,
+        "intent:detail:500": 5,
+        "intent:detail-route-binding-provider.test.js": 8
+      }
+    },
+    "POST /workspace/:urlKey/api/issues": {
+      "requests": 193,
+      "differing": 0,
+      "byTier": {
+        "gen": 86,
+        "edge": 87,
+        "test": 20
+      },
+      "oldStatus": {
+        "201": 24,
+        "400": 67,
+        "401": 11,
+        "404": 9,
+        "422": 66,
+        "500": 8,
+        "502": 8
+      },
+      "newStatus": {
+        "201": 24,
+        "400": 67,
+        "401": 11,
+        "404": 9,
+        "422": 66,
+        "500": 8,
+        "502": 8
+      },
+      "statusPairs": {
+        "201": 24,
+        "400": 67,
+        "401": 11,
+        "404": 9,
+        "422": 39,
+        "500": 8,
+        "502": 8,
+        "422 CAPABILITY_NOT_SUPPORTED": 27
+      },
+      "tags": {
+        "variant:full": 171,
+        "ws:acme": 104,
+        "ws:jiraws": 14,
+        "ws:ghws": 19,
+        "ws:jiraamb": 3,
+        "ws:localws": 24,
+        "variant:sparse": 12,
+        "variant:seams": 10,
+        "ws:ghp": 10,
+        "ws:testws": 7,
+        "ws:mixed": 4,
+        "ws:bare": 4,
+        "ws:legacy": 2,
+        "ws:conn": 1,
+        "intent:auth:create:badKey": 5,
+        "intent:auth:create:noWorkspaces": 5,
+        "intent:auth:create:ghost": 5,
+        "intent:auth:create:emptySession": 5,
+        "intent:auth:create:noAccount": 5,
+        "intent:create:cap": 6,
+        "ws:noguard": 1,
+        "intent:create:validation": 10,
+        "intent:create:undeclared": 6,
+        "intent:create:jiraUndeclared": 5,
+        "intent:create:linearRefs": 8,
+        "intent:create:local": 6,
+        "intent:create:writeFail": 6,
+        "intent:create:teamFetchFail": 5,
+        "intent:create:body": 5,
+        "intent:create:502": 5,
+        "intent:issue-write-routes.test.js": 20
+      }
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier": {
+      "requests": 115,
+      "differing": 0,
+      "byTier": {
+        "gen": 70,
+        "edge": 45
+      },
+      "oldStatus": {
+        "200": 49,
+        "400": 17,
+        "401": 15,
+        "404": 7,
+        "500": 8,
+        "503": 19
+      },
+      "newStatus": {
+        "200": 49,
+        "400": 17,
+        "401": 15,
+        "404": 7,
+        "500": 8,
+        "503": 19
+      },
+      "statusPairs": {
+        "200": 49,
+        "400": 17,
+        "401": 15,
+        "404": 7,
+        "500": 8,
+        "503": 19
+      },
+      "tags": {
+        "variant:full": 94,
+        "ws:acme": 71,
+        "ws:testws": 7,
+        "ws:mixed": 9,
+        "variant:sparse": 19,
+        "ws:localws": 8,
+        "variant:seams": 2,
+        "ws:ghws": 4,
+        "ws:ghp": 2,
+        "ws:legacy": 1,
+        "ws:notoken": 3,
+        "ws:jiraws": 3,
+        "ws:jiraamb": 1,
+        "ws:noguard": 2,
+        "ws:conn": 2,
+        "ws:bare": 2,
+        "intent:auth:sessions:badKey": 5,
+        "intent:auth:sessions:noWorkspaces": 5,
+        "intent:auth:sessions:ghost": 5,
+        "intent:auth:sessions:emptySession": 5,
+        "intent:auth:sessions:noAccount": 5,
+        "intent:sessions:ok": 5,
+        "intent:sessions:tooLong": 5,
+        "intent:sessions:noStores": 5,
+        "intent:sessions:500": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId": {
+      "requests": 226,
+      "differing": 0,
+      "byTier": {
+        "gen": 72,
+        "edge": 127,
+        "test": 27
+      },
+      "oldStatus": {
+        "200": 94,
+        "400": 17,
+        "401": 14,
+        "404": 21,
+        "422": 19,
+        "429": 8,
+        "500": 13,
+        "502": 12,
+        "503": 26,
+        "NO_RESPONSE(server 404)": 2
+      },
+      "newStatus": {
+        "200": 94,
+        "400": 17,
+        "401": 14,
+        "404": 21,
+        "422": 19,
+        "429": 8,
+        "500": 13,
+        "502": 12,
+        "503": 26,
+        "NO_RESPONSE(server 404)": 2
+      },
+      "statusPairs": {
+        "200": 64,
+        "400": 17,
+        "401": 14,
+        "404": 21,
+        "429": 8,
+        "500": 13,
+        "503": 17,
+        "422 CANONICAL_ID_REQUIRED": 14,
+        "503 AI_NOT_CONFIGURED": 9,
+        "502 SCAN_PARSE_FAILED": 12,
+        "NO_RESPONSE(server 404)": 2,
+        "422 CAPABILITY_NOT_SUPPORTED": 5,
+        "200 (flushed 503)": 5,
+        "200 (flushed 500)": 10,
+        "200 (flushed 404)": 5,
+        "200 (flushed 401)": 5,
+        "200 SCAN_PARSE_FAILED (flushed 502)": 5
+      },
+      "tags": {
+        "variant:full": 205,
+        "ws:acme": 132,
+        "variant:sparse": 14,
+        "ws:testws": 46,
+        "ws:localws": 21,
+        "ws:ghws": 3,
+        "seam:openrouter.streamChat": 78,
+        "variant:seams": 7,
+        "ws:mixed": 1,
+        "ws:ghp": 12,
+        "ws:notoken": 1,
+        "ws:jiraamb": 3,
+        "ws:jiraws": 1,
+        "ws:legacy": 1,
+        "clientGone": 2,
+        "intent:auth:scanPost:badKey": 5,
+        "intent:auth:scanPost:noWorkspaces": 5,
+        "intent:auth:scanPost:ghost": 5,
+        "intent:auth:scanPost:emptySession": 5,
+        "intent:auth:scanPost:noAccount": 5,
+        "intent:scanPost:badId": 5,
+        "intent:scanPost:noStore": 5,
+        "ws:bare": 5,
+        "intent:scanPost:cap422": 5,
+        "intent:scanPost:noAi": 5,
+        "intent:scanPost:freeTier": 5,
+        "intent:scanPost:outcomes": 8,
+        "intent:scanPost:ledger": 5,
+        "intent:scanPost:recordNull": 5,
+        "intent:scanPost:noCanonical": 5,
+        "intent:scanPost:mockLocal": 5,
+        "intent:scanPost:testMock": 5,
+        "intent:scanPost:errors": 6,
+        "intent:scanPost:slow": 3,
+        "intent:scanPost:flushed": 30,
+        "intent:scanPost:freeTier429": 5,
+        "intent:scan-routes.test.js": 27
+      }
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId": {
+      "requests": 145,
+      "differing": 0,
+      "byTier": {
+        "gen": 60,
+        "edge": 85
+      },
+      "oldStatus": {
+        "200": 55,
+        "400": 15,
+        "401": 17,
+        "404": 26,
+        "422": 6,
+        "500": 12,
+        "503": 14
+      },
+      "newStatus": {
+        "200": 55,
+        "400": 15,
+        "401": 17,
+        "404": 26,
+        "422": 6,
+        "500": 12,
+        "503": 14
+      },
+      "statusPairs": {
+        "200": 55,
+        "400": 15,
+        "401": 17,
+        "404": 26,
+        "500": 12,
+        "503": 14,
+        "422 CAPABILITY_NOT_SUPPORTED": 6
+      },
+      "tags": {
+        "variant:sparse": 16,
+        "ws:testws": 21,
+        "variant:full": 126,
+        "ws:acme": 88,
+        "ws:localws": 8,
+        "ws:ghp": 8,
+        "ws:conn": 1,
+        "ws:noguard": 2,
+        "variant:seams": 3,
+        "ws:mixed": 4,
+        "ws:notoken": 1,
+        "ws:jiraamb": 2,
+        "ws:legacy": 3,
+        "ws:bare": 6,
+        "ws:ghws": 1,
+        "intent:auth:recapGet:badKey": 5,
+        "intent:auth:recapGet:noWorkspaces": 5,
+        "intent:auth:recapGet:ghost": 5,
+        "intent:auth:recapGet:emptySession": 5,
+        "intent:auth:recapGet:noAccount": 5,
+        "intent:recapGet:badId": 5,
+        "intent:recapGet:noStore": 5,
+        "intent:recapGet:cap422": 5,
+        "intent:recapGet:missing": 5,
+        "intent:recapGet:stale": 5,
+        "intent:recapGet:fresh": 5,
+        "intent:recapGet:testMock": 5,
+        "intent:recapGet:testMockMissing": 5,
+        "intent:recapGet:noCanonical": 5,
+        "intent:recapGet:401": 5,
+        "intent:recapGet:404": 5,
+        "intent:recapGet:500": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss": {
+      "requests": 185,
+      "differing": 0,
+      "byTier": {
+        "gen": 71,
+        "edge": 101,
+        "test": 13
+      },
+      "oldStatus": {
+        "200": 48,
+        "400": 46,
+        "401": 19,
+        "404": 34,
+        "422": 14,
+        "500": 14,
+        "503": 10
+      },
+      "newStatus": {
+        "200": 48,
+        "400": 46,
+        "401": 19,
+        "404": 34,
+        "422": 14,
+        "500": 14,
+        "503": 10
+      },
+      "statusPairs": {
+        "200": 48,
+        "400": 46,
+        "401": 19,
+        "404": 34,
+        "500": 14,
+        "503": 10,
+        "422 CANONICAL_ID_REQUIRED": 9,
+        "422 CAPABILITY_NOT_SUPPORTED": 5
+      },
+      "tags": {
+        "variant:full": 160,
+        "ws:acme": 104,
+        "variant:seams": 10,
+        "ws:testws": 41,
+        "ws:mixed": 1,
+        "variant:sparse": 15,
+        "ws:jiraamb": 2,
+        "ws:ghp": 9,
+        "ws:localws": 11,
+        "ws:jiraws": 1,
+        "ws:ghws": 3,
+        "ws:conn": 1,
+        "ws:legacy": 1,
+        "ws:bare": 11,
+        "intent:auth:dismiss:badKey": 5,
+        "intent:auth:dismiss:noWorkspaces": 5,
+        "intent:auth:dismiss:ghost": 5,
+        "intent:auth:dismiss:emptySession": 5,
+        "intent:auth:dismiss:noAccount": 5,
+        "intent:dismiss:badId": 5,
+        "intent:dismiss:noRecordId": 6,
+        "intent:dismiss:noStore": 5,
+        "intent:dismiss:capViaIdentifier": 5,
+        "intent:dismiss:uuidCap": 5,
+        "intent:dismiss:identifier": 5,
+        "intent:dismiss:identifierNoCanonical": 5,
+        "intent:dismiss:testMock": 5,
+        "intent:dismiss:testMockMissing": 5,
+        "intent:dismiss:ctx401": 5,
+        "intent:dismiss:ctx404": 5,
+        "intent:dismiss:ctx500": 5,
+        "intent:dismiss:ok": 5,
+        "intent:dismiss:notFound": 5,
+        "intent:dismiss:storeErr": 5,
+        "intent:scan-routes.test.js": 13
+      }
+    },
+    "GET /workspace/:urlKey/api/audit": {
+      "requests": 158,
+      "differing": 0,
+      "byTier": {
+        "gen": 80,
+        "edge": 70,
+        "test": 8
+      },
+      "oldStatus": {
+        "200": 81,
+        "400": 6,
+        "401": 29,
+        "404": 6,
+        "422": 29,
+        "500": 7
+      },
+      "newStatus": {
+        "200": 81,
+        "400": 6,
+        "401": 29,
+        "404": 6,
+        "422": 29,
+        "500": 7
+      },
+      "statusPairs": {
+        "200": 81,
+        "400": 6,
+        "401": 29,
+        "404": 6,
+        "500": 7,
+        "422 CAPABILITY_NOT_SUPPORTED": 29
+      },
+      "tags": {
+        "variant:full": 141,
+        "ws:jiraws": 15,
+        "ws:testws": 22,
+        "seam:audit.runAudit": 76,
+        "ws:legacy": 17,
+        "variant:sparse": 9,
+        "ws:acme": 62,
+        "ws:localws": 23,
+        "ws:mixed": 5,
+        "ws:bare": 1,
+        "variant:seams": 8,
+        "ws:notoken": 1,
+        "ws:conn": 7,
+        "ws:jiraamb": 2,
+        "ws:ghws": 2,
+        "ws:ghp": 1,
+        "intent:auth:audit:badKey": 5,
+        "intent:auth:audit:noWorkspaces": 5,
+        "intent:auth:audit:ghost": 5,
+        "intent:auth:audit:emptySession": 5,
+        "intent:auth:audit:noAccount": 5,
+        "intent:audit:testMock": 5,
+        "intent:audit:localMockInTest": 5,
+        "intent:audit:localRefusedInProd": 5,
+        "intent:audit:jira422": 5,
+        "intent:audit:linearOk": 5,
+        "intent:audit:legacyOk": 5,
+        "intent:audit:conn": 5,
+        "intent:audit:401": 5,
+        "intent:audit:500": 5,
+        "intent:audit-route-provider-guard.test.js": 6,
+        "intent:lin-3124-pr1-s0-characterization.test.js": 1,
+        "intent:lin-3124-pr3-review-fixes.test.js": 1
+      }
+    },
+    "GET /workspace/:urlKey/api/context/:issueId": {
+      "requests": 140,
+      "differing": 0,
+      "byTier": {
+        "gen": 69,
+        "edge": 71
+      },
+      "oldStatus": {
+        "200": 43,
+        "400": 20,
+        "401": 20,
+        "404": 47,
+        "500": 10
+      },
+      "newStatus": {
+        "200": 43,
+        "400": 20,
+        "401": 20,
+        "404": 47,
+        "500": 10
+      },
+      "statusPairs": {
+        "200": 43,
+        "400": 20,
+        "401": 20,
+        "404": 47,
+        "500": 10
+      },
+      "tags": {
+        "variant:full": 119,
+        "ws:acme": 81,
+        "variant:sparse": 11,
+        "ws:localws": 13,
+        "variant:seams": 10,
+        "ws:mixed": 9,
+        "ws:testws": 10,
+        "ws:notoken": 3,
+        "ws:bare": 2,
+        "ws:jiraws": 5,
+        "ws:jiraamb": 2,
+        "ws:legacy": 5,
+        "ws:ghws": 3,
+        "ws:ghp": 6,
+        "intent:auth:context:badKey": 5,
+        "intent:auth:context:noWorkspaces": 5,
+        "intent:auth:context:ghost": 5,
+        "intent:auth:context:emptySession": 5,
+        "intent:auth:context:noAccount": 5,
+        "intent:context:ok": 5,
+        "intent:context:notInSet": 5,
+        "intent:context:nullIssues": 5,
+        "intent:context:testMock": 5,
+        "intent:context:badId": 5,
+        "intent:context:401": 5,
+        "intent:context:404": 5,
+        "intent:context:500": 5,
+        "intent:context:providers": 6,
+        "ws:conn": 1
+      }
+    },
+    "POST /workspace/:urlKey/api/prompts/custom": {
+      "requests": 84,
+      "differing": 0,
+      "byTier": {
+        "gen": 59,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 48,
+        "400": 8,
+        "401": 14,
+        "404": 14
+      },
+      "newStatus": {
+        "200": 48,
+        "400": 8,
+        "401": 14,
+        "404": 14
+      },
+      "statusPairs": {
+        "200": 48,
+        "400": 8,
+        "401": 14,
+        "404": 14
+      },
+      "tags": {
+        "variant:full": 71,
+        "ws:jiraws": 5,
+        "ws:localws": 10,
+        "ws:legacy": 5,
+        "ws:testws": 6,
+        "ws:acme": 41,
+        "ws:mixed": 2,
+        "variant:sparse": 9,
+        "ws:bare": 3,
+        "ws:jiraamb": 4,
+        "ws:noguard": 1,
+        "variant:seams": 4,
+        "ws:ghp": 3,
+        "ws:ghws": 3,
+        "ws:notoken": 1,
+        "intent:auth:customCreate:badKey": 5,
+        "intent:auth:customCreate:noWorkspaces": 5,
+        "intent:auth:customCreate:ghost": 5,
+        "intent:auth:customCreate:emptySession": 5,
+        "intent:auth:customCreate:noAccount": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/scan-due": {
+      "requests": 159,
+      "differing": 0,
+      "byTier": {
+        "gen": 77,
+        "edge": 67,
+        "test": 15
+      },
+      "oldStatus": {
+        "200": 75,
+        "400": 37,
+        "401": 11,
+        "404": 8,
+        "422": 7,
+        "500": 7,
+        "503": 14
+      },
+      "newStatus": {
+        "200": 75,
+        "400": 37,
+        "401": 11,
+        "404": 8,
+        "422": 7,
+        "500": 7,
+        "503": 14
+      },
+      "statusPairs": {
+        "200": 75,
+        "400": 9,
+        "401": 11,
+        "404": 8,
+        "500": 7,
+        "503": 14,
+        "400 INVALID_CURSOR": 28,
+        "422 CAPABILITY_NOT_SUPPORTED": 7
+      },
+      "tags": {
+        "variant:full": 134,
+        "ws:acme": 94,
+        "ws:localws": 15,
+        "variant:seams": 11,
+        "ws:mixed": 13,
+        "ws:conn": 2,
+        "ws:testws": 3,
+        "ws:ghp": 12,
+        "ws:jiraws": 6,
+        "variant:sparse": 14,
+        "ws:ghws": 4,
+        "ws:noguard": 1,
+        "ws:bare": 7,
+        "intent:auth:scanDue:badKey": 5,
+        "intent:auth:scanDue:noWorkspaces": 5,
+        "intent:auth:scanDue:ghost": 5,
+        "intent:auth:scanDue:emptySession": 5,
+        "intent:auth:scanDue:noAccount": 5,
+        "intent:scanDue:noStore": 5,
+        "intent:scanDue:cap422": 5,
+        "intent:scanDue:badCursor": 7,
+        "intent:scanDue:ok": 6,
+        "intent:scanDue:sparseLedger": 5,
+        "intent:scanDue:storeErr": 5,
+        "intent:scanDue:slow": 3,
+        "intent:scanDue:providers": 6,
+        "ws:legacy": 1,
+        "ws:notoken": 1,
+        "intent:scan-due-route.test.js": 15
+      }
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId": {
+      "requests": 174,
+      "differing": 0,
+      "byTier": {
+        "gen": 71,
+        "edge": 85,
+        "test": 18
+      },
+      "oldStatus": {
+        "200": 69,
+        "400": 16,
+        "401": 19,
+        "404": 25,
+        "422": 22,
+        "500": 11,
+        "503": 12
+      },
+      "newStatus": {
+        "200": 69,
+        "400": 16,
+        "401": 19,
+        "404": 25,
+        "422": 22,
+        "500": 11,
+        "503": 12
+      },
+      "statusPairs": {
+        "200": 69,
+        "400": 16,
+        "401": 19,
+        "404": 25,
+        "500": 11,
+        "503": 12,
+        "422 CANONICAL_ID_REQUIRED": 16,
+        "422 CAPABILITY_NOT_SUPPORTED": 6
+      },
+      "tags": {
+        "variant:full": 154,
+        "ws:ghp": 16,
+        "variant:seams": 8,
+        "ws:testws": 43,
+        "ws:mixed": 4,
+        "ws:ghws": 2,
+        "ws:acme": 92,
+        "ws:localws": 10,
+        "variant:sparse": 12,
+        "ws:bare": 6,
+        "ws:jiraws": 1,
+        "intent:auth:scanGet:badKey": 5,
+        "intent:auth:scanGet:noWorkspaces": 5,
+        "intent:auth:scanGet:ghost": 5,
+        "intent:auth:scanGet:emptySession": 5,
+        "intent:auth:scanGet:noAccount": 5,
+        "intent:scanGet:badId": 5,
+        "intent:scanGet:noStore": 5,
+        "intent:scanGet:cap422": 5,
+        "intent:scanGet:noCanonical": 5,
+        "intent:scanGet:missing": 5,
+        "intent:scanGet:stale": 5,
+        "intent:scanGet:fresh": 5,
+        "intent:scanGet:testMock": 5,
+        "intent:scanGet:testMockMissing": 5,
+        "intent:scanGet:401": 5,
+        "intent:scanGet:404": 5,
+        "intent:scanGet:500": 5,
+        "intent:scan-routes.test.js": 18
+      }
+    },
+    "POST /workspace/:urlKey/api/roadmap/chat": {
+      "requests": 88,
+      "differing": 0,
+      "byTier": {
+        "gen": 63,
+        "edge": 25
+      },
+      "oldStatus": {
+        "400": 38,
+        "401": 11,
+        "403": 22,
+        "404": 7,
+        "503": 10
+      },
+      "newStatus": {
+        "400": 38,
+        "401": 11,
+        "403": 22,
+        "404": 7,
+        "503": 10
+      },
+      "statusPairs": {
+        "400": 38,
+        "401": 11,
+        "403": 22,
+        "404": 7,
+        "503": 10
+      },
+      "tags": {
+        "variant:full": 65,
+        "ws:testws": 10,
+        "ws:ghp": 3,
+        "variant:sparse": 13,
+        "ws:localws": 18,
+        "variant:seams": 10,
+        "ws:acme": 44,
+        "ws:ghws": 4,
+        "ws:conn": 1,
+        "ws:mixed": 2,
+        "ws:bare": 1,
+        "ws:legacy": 2,
+        "ws:jiraamb": 1,
+        "ws:noguard": 2,
+        "intent:auth:roadmapChat:badKey": 5,
+        "intent:auth:roadmapChat:noWorkspaces": 5,
+        "intent:auth:roadmapChat:ghost": 5,
+        "intent:auth:roadmapChat:emptySession": 5,
+        "intent:auth:roadmapChat:noAccount": 5
+      }
+    },
+    "PUT /workspace/:urlKey/api/roadmap/north-star": {
+      "requests": 86,
+      "differing": 0,
+      "byTier": {
+        "gen": 61,
+        "edge": 25
+      },
+      "oldStatus": {
+        "400": 43,
+        "401": 14,
+        "403": 21,
+        "404": 8
+      },
+      "newStatus": {
+        "400": 43,
+        "401": 14,
+        "403": 21,
+        "404": 8
+      },
+      "statusPairs": {
+        "400": 43,
+        "401": 14,
+        "403": 21,
+        "404": 8
+      },
+      "tags": {
+        "variant:full": 71,
+        "ws:acme": 41,
+        "ws:localws": 11,
+        "ws:testws": 8,
+        "variant:sparse": 10,
+        "ws:notoken": 1,
+        "ws:jiraws": 4,
+        "ws:conn": 1,
+        "ws:mixed": 6,
+        "ws:jiraamb": 3,
+        "variant:seams": 5,
+        "ws:ghp": 2,
+        "ws:legacy": 5,
+        "ws:bare": 2,
+        "ws:ghws": 1,
+        "ws:noguard": 1,
+        "intent:auth:northStarPut:badKey": 5,
+        "intent:auth:northStarPut:noWorkspaces": 5,
+        "intent:auth:northStarPut:ghost": 5,
+        "intent:auth:northStarPut:emptySession": 5,
+        "intent:auth:northStarPut:noAccount": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire": {
+      "requests": 247,
+      "differing": 0,
+      "byTier": {
+        "gen": 78,
+        "edge": 161,
+        "test": 8
+      },
+      "oldStatus": {
+        "200": 51,
+        "400": 55,
+        "401": 19,
+        "404": 36,
+        "409": 11,
+        "422": 24,
+        "429": 8,
+        "500": 12,
+        "502": 9,
+        "503": 22
+      },
+      "newStatus": {
+        "200": 51,
+        "400": 55,
+        "401": 19,
+        "404": 36,
+        "409": 11,
+        "422": 24,
+        "429": 8,
+        "500": 12,
+        "502": 9,
+        "503": 22
+      },
+      "statusPairs": {
+        "200": 39,
+        "400": 55,
+        "401": 19,
+        "404": 27,
+        "429": 8,
+        "500": 12,
+        "503": 10,
+        "503 AI_NOT_CONFIGURED": 12,
+        "502 SCAN_PARSE_FAILED": 9,
+        "404 ROW_GONE": 9,
+        "422 CAPABILITY_NOT_SUPPORTED": 11,
+        "409 ALREADY_TERMINAL": 11,
+        "422 CANONICAL_ID_REQUIRED": 13,
+        "200 SCAN_PARSE_FAILED (flushed 502)": 7,
+        "200 ROW_GONE (flushed 404)": 5
+      },
+      "tags": {
+        "variant:full": 224,
+        "ws:localws": 23,
+        "ws:acme": 162,
+        "variant:sparse": 13,
+        "ws:ghws": 1,
+        "seam:openrouter.streamChat": 67,
+        "ws:testws": 34,
+        "ws:bare": 12,
+        "ws:jiraws": 1,
+        "variant:seams": 10,
+        "ws:ghp": 8,
+        "ws:legacy": 4,
+        "ws:noguard": 1,
+        "ws:notoken": 1,
+        "intent:auth:retire:badKey": 5,
+        "intent:auth:retire:noWorkspaces": 5,
+        "intent:auth:retire:ghost": 5,
+        "intent:auth:retire:emptySession": 5,
+        "intent:auth:retire:noAccount": 5,
+        "intent:retire:badId": 5,
+        "intent:retire:noRecordId": 6,
+        "intent:retire:noStore": 5,
+        "intent:retire:capViaIdentifier": 5,
+        "intent:retire:uuidCap": 5,
+        "intent:retire:identifier": 5,
+        "intent:retire:identifierNoCanonical": 5,
+        "intent:retire:testMock": 5,
+        "intent:retire:testMockMissing": 5,
+        "intent:retire:ctx401": 5,
+        "intent:retire:ctx404": 5,
+        "intent:retire:ctx500": 5,
+        "intent:retire:noAi": 5,
+        "intent:retire:freeTier": 5,
+        "intent:retire:noCanonical": 5,
+        "intent:retire:texts": 6,
+        "intent:retire:markOutcomes": 6,
+        "intent:retire:mockLocal": 5,
+        "intent:retire:aiErr": 5,
+        "intent:retire:slow": 3,
+        "intent:retire:extra": 25,
+        "intent:retire:rowGone": 5,
+        "intent:retire:terminal": 5,
+        "intent:scan-routes.test.js": 8
+      }
+    },
+    "GET /workspace/:urlKey/api/prompts/custom": {
+      "requests": 86,
+      "differing": 0,
+      "byTier": {
+        "gen": 61,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 52,
+        "400": 6,
+        "401": 13,
+        "404": 7,
+        "500": 8
+      },
+      "newStatus": {
+        "200": 52,
+        "400": 6,
+        "401": 13,
+        "404": 7,
+        "500": 8
+      },
+      "statusPairs": {
+        "200": 52,
+        "400": 6,
+        "401": 13,
+        "404": 7,
+        "500": 8
+      },
+      "tags": {
+        "variant:full": 72,
+        "ws:testws": 7,
+        "ws:localws": 8,
+        "ws:acme": 36,
+        "variant:sparse": 7,
+        "ws:bare": 3,
+        "ws:mixed": 9,
+        "ws:jiraws": 6,
+        "ws:conn": 5,
+        "ws:noguard": 2,
+        "ws:legacy": 5,
+        "ws:ghws": 3,
+        "variant:seams": 7,
+        "ws:ghp": 2,
+        "intent:auth:customList:badKey": 5,
+        "intent:auth:customList:noWorkspaces": 5,
+        "intent:auth:customList:ghost": 5,
+        "intent:auth:customList:emptySession": 5,
+        "intent:auth:customList:noAccount": 5
+      }
+    },
+    "GET /workspace/:urlKey/api/roadmap/north-star": {
+      "requests": 88,
+      "differing": 0,
+      "byTier": {
+        "gen": 63,
+        "edge": 25
+      },
+      "oldStatus": {
+        "200": 32,
+        "400": 7,
+        "401": 13,
+        "403": 27,
+        "404": 9
+      },
+      "newStatus": {
+        "200": 32,
+        "400": 7,
+        "401": 13,
+        "403": 27,
+        "404": 9
+      },
+      "statusPairs": {
+        "200": 32,
+        "400": 7,
+        "401": 13,
+        "403": 27,
+        "404": 9
+      },
+      "tags": {
+        "variant:sparse": 10,
+        "ws:acme": 44,
+        "variant:full": 73,
+        "ws:noguard": 2,
+        "ws:mixed": 7,
+        "variant:seams": 5,
+        "ws:localws": 6,
+        "ws:jiraws": 6,
+        "ws:ghp": 3,
+        "ws:ghws": 3,
+        "ws:jiraamb": 2,
+        "ws:testws": 7,
+        "ws:legacy": 2,
+        "ws:notoken": 2,
+        "ws:conn": 1,
+        "ws:bare": 3,
+        "intent:auth:northStarGet:badKey": 5,
+        "intent:auth:northStarGet:noWorkspaces": 5,
+        "intent:auth:northStarGet:ghost": 5,
+        "intent:auth:northStarGet:emptySession": 5,
+        "intent:auth:northStarGet:noAccount": 5
+      }
+    },
+    "POST /workspace/:urlKey/api/roadmap/reports": {
+      "requests": 89,
+      "differing": 0,
+      "byTier": {
+        "gen": 64,
+        "edge": 25
+      },
+      "oldStatus": {
+        "400": 43,
+        "401": 14,
+        "403": 24,
+        "404": 8
+      },
+      "newStatus": {
+        "400": 43,
+        "401": 14,
+        "403": 24,
+        "404": 8
+      },
+      "statusPairs": {
+        "400": 43,
+        "401": 14,
+        "403": 24,
+        "404": 8
+      },
+      "tags": {
+        "variant:full": 67,
+        "ws:jiraws": 4,
+        "ws:testws": 9,
+        "variant:sparse": 15,
+        "ws:acme": 51,
+        "ws:mixed": 6,
+        "ws:notoken": 2,
+        "ws:localws": 3,
+        "variant:seams": 7,
+        "ws:legacy": 4,
+        "ws:conn": 2,
+        "ws:jiraamb": 2,
+        "ws:ghws": 4,
+        "ws:bare": 2,
+        "intent:auth:reportsSave:badKey": 5,
+        "intent:auth:reportsSave:noWorkspaces": 5,
+        "intent:auth:reportsSave:ghost": 5,
+        "intent:auth:reportsSave:emptySession": 5,
+        "intent:auth:reportsSave:noAccount": 5
+      }
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId": {
+      "requests": 211,
+      "differing": 0,
+      "byTier": {
+        "gen": 76,
+        "edge": 116,
+        "test": 19
+      },
+      "oldStatus": {
+        "200": 60,
+        "400": 47,
+        "401": 14,
+        "404": 17,
+        "409": 8,
+        "422": 30,
+        "500": 16,
+        "502": 14,
+        "NO_RESPONSE(server 500)": 5
+      },
+      "newStatus": {
+        "200": 60,
+        "400": 47,
+        "401": 14,
+        "404": 17,
+        "409": 8,
+        "422": 30,
+        "500": 16,
+        "502": 14,
+        "NO_RESPONSE(server 500)": 5
+      },
+      "statusPairs": {
+        "200": 60,
+        "400": 47,
+        "401": 14,
+        "404": 17,
+        "409": 8,
+        "422": 16,
+        "500": 10,
+        "502": 7,
+        "422 CAPABILITY_NOT_SUPPORTED": 14,
+        "502 PARTIAL_WRITE": 7,
+        "500 PARTIAL_WRITE": 6,
+        "NO_RESPONSE(server 500)": 5
+      },
+      "tags": {
+        "variant:full": 184,
+        "ws:conn": 1,
+        "ws:acme": 142,
+        "ws:jiraws": 13,
+        "variant:seams": 7,
+        "ws:ghws": 6,
+        "ws:mixed": 13,
+        "ws:localws": 12,
+        "variant:sparse": 20,
+        "ws:testws": 5,
+        "ws:ghp": 7,
+        "ws:bare": 2,
+        "ws:jiraamb": 1,
+        "ws:notoken": 2,
+        "ws:noguard": 7,
+        "intent:auth:patch:badKey": 5,
+        "intent:auth:patch:noWorkspaces": 5,
+        "intent:auth:patch:ghost": 5,
+        "intent:auth:patch:emptySession": 5,
+        "intent:auth:patch:noAccount": 5,
+        "intent:patch:cap": 6,
+        "intent:patch:badId": 5,
+        "intent:patch:validation": 6,
+        "intent:patch:empty": 5,
+        "intent:patch:noGuard": 5,
+        "intent:patch:trashed": 5,
+        "intent:patch:ok": 8,
+        "intent:patch:stateNoTeam": 5,
+        "intent:patch:stateUnresolved": 5,
+        "intent:patch:writeFail": 6,
+        "intent:patch:guardFail": 5,
+        "intent:patch:sources": 5,
+        "intent:patch:noCloser": 5,
+        "intent:patch:goneThen404": 5,
+        "clientGone": 5,
+        "intent:patch:extra": 15,
+        "intent:issue-write-routes.test.js": 13,
+        "intent:proxy-jira-write-routes.test.js": 1,
+        "intent:ticket-close-seams.test.js": 5
+      }
+    },
+    "CALL generateMockRecommendation": {
+      "requests": 64,
+      "differing": 0,
+      "byTier": {
+        "gen": 34,
+        "edge": 30
+      },
+      "oldStatus": {
+        "RETURN": 64
+      },
+      "newStatus": {
+        "RETURN": 64
+      },
+      "statusPairs": {
+        "RETURN": 64
+      },
+      "tags": {
+        "variant:-": 34,
+        "ws:-": 34,
+        "variant:full": 30,
+        "ws:acme": 30,
+        "intent:call:generateMockRecommendation": 30
+      }
+    },
+    "CALL buildMockRecommendationHop": {
+      "requests": 54,
+      "differing": 0,
+      "byTier": {
+        "gen": 24,
+        "edge": 30
+      },
+      "oldStatus": {
+        "RETURN": 54
+      },
+      "newStatus": {
+        "RETURN": 54
+      },
+      "statusPairs": {
+        "RETURN": 54
+      },
+      "tags": {
+        "variant:-": 24,
+        "ws:-": 24,
+        "variant:full": 30,
+        "ws:acme": 30,
+        "intent:call:buildMockRecommendationHop": 30
+      }
+    }
+  },
+  "edgeOutcomes": {
+    "GET /workspace/:urlKey/api/audit auth:audit:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/audit auth:audit:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/audit auth:audit:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/audit auth:audit:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/audit auth:audit:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName auth:prompt:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName auth:prompt:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName auth:prompt:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName auth:prompt:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName auth:prompt:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId auth:apIssue:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId auth:apIssue:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId auth:apIssue:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId auth:apIssue:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId auth:apIssue:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt auth:apGeneral:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt auth:apGeneral:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt auth:apGeneral:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt auth:apGeneral:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt auth:apGeneral:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/status auth:recStatus:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/status auth:recStatus:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/status auth:recStatus:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/status auth:recStatus:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/status auth:recStatus:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId auth:rec:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId auth:rec:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId auth:rec:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId auth:rec:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId auth:rec:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream auth:stream:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream auth:stream:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream auth:stream:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream auth:stream:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream auth:stream:noAccount": {
+      "200 sse:done": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId auth:commentsGet:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId auth:commentsGet:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId auth:commentsGet:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId auth:commentsGet:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId auth:commentsGet:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId auth:comment:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId auth:comment:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId auth:comment:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId auth:comment:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId auth:comment:noAccount": {
+      "200": 3,
+      "201": 2
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId auth:detail:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId auth:detail:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId auth:detail:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId auth:detail:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId auth:detail:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier auth:sessions:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier auth:sessions:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier auth:sessions:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier auth:sessions:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier auth:sessions:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId auth:recapGet:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId auth:recapGet:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId auth:recapGet:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId auth:recapGet:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId auth:recapGet:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId auth:recapPost:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId auth:recapPost:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId auth:recapPost:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId auth:recapPost:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId auth:recapPost:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId auth:context:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId auth:context:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId auth:context:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId auth:context:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId auth:context:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId auth:briefGet:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId auth:briefGet:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId auth:briefGet:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId auth:briefGet:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId auth:briefGet:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId auth:briefPost:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId auth:briefPost:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId auth:briefPost:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId auth:briefPost:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId auth:briefPost:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId auth:scanGet:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId auth:scanGet:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId auth:scanGet:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId auth:scanGet:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId auth:scanGet:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId auth:scanPost:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId auth:scanPost:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId auth:scanPost:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId auth:scanPost:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId auth:scanPost:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss auth:dismiss:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss auth:dismiss:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss auth:dismiss:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss auth:dismiss:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss auth:dismiss:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire auth:retire:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire auth:retire:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire auth:retire:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire auth:retire:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire auth:retire:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire auth:unretire:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire auth:unretire:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire auth:unretire:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire auth:unretire:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire auth:unretire:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due auth:scanDue:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due auth:scanDue:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due auth:scanDue:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due auth:scanDue:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due auth:scanDue:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/image auth:image:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/image auth:image:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/image auth:image:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/image auth:image:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/image auth:image:noAccount": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/feedback auth:feedback:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/feedback auth:feedback:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/feedback auth:feedback:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/feedback auth:feedback:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/feedback auth:feedback:noAccount": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/issues auth:create:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/issues auth:create:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/issues auth:create:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/issues auth:create:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/issues auth:create:noAccount": {
+      "422": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId auth:patch:badKey": {
+      "400": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId auth:patch:noWorkspaces": {
+      "401": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId auth:patch:ghost": {
+      "404": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId auth:patch:emptySession": {
+      "401": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId auth:patch:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/openrouter/models auth:models:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/openrouter/models auth:models:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/openrouter/models auth:models:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/openrouter/models auth:models:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/openrouter/models auth:models:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier auth:runEv:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier auth:runEv:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier auth:runEv:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier auth:runEv:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier auth:runEv:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check auth:check:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check auth:check:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check auth:check:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check auth:check:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check auth:check:noAccount": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompt-traces auth:promptTraces:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/prompt-traces auth:promptTraces:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompt-traces auth:promptTraces:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt-traces auth:promptTraces:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompt-traces auth:promptTraces:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/prompts/custom auth:customList:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/prompts/custom auth:customList:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompts/custom auth:customList:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompts/custom auth:customList:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompts/custom auth:customList:noAccount": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/prompts/custom auth:customCreate:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/prompts/custom auth:customCreate:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/prompts/custom auth:customCreate:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/prompts/custom auth:customCreate:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/prompts/custom auth:customCreate:noAccount": {
+      "200": 5
+    },
+    "PUT /workspace/:urlKey/api/prompts/custom/:id auth:customUpdate:badKey": {
+      "400": 5
+    },
+    "PUT /workspace/:urlKey/api/prompts/custom/:id auth:customUpdate:noWorkspaces": {
+      "401": 5
+    },
+    "PUT /workspace/:urlKey/api/prompts/custom/:id auth:customUpdate:ghost": {
+      "404": 5
+    },
+    "PUT /workspace/:urlKey/api/prompts/custom/:id auth:customUpdate:emptySession": {
+      "401": 5
+    },
+    "PUT /workspace/:urlKey/api/prompts/custom/:id auth:customUpdate:noAccount": {
+      "200": 5
+    },
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id auth:customDelete:badKey": {
+      "400": 5
+    },
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id auth:customDelete:noWorkspaces": {
+      "401": 5
+    },
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id auth:customDelete:ghost": {
+      "404": 5
+    },
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id auth:customDelete:emptySession": {
+      "401": 5
+    },
+    "DELETE /workspace/:urlKey/api/prompts/custom/:id auth:customDelete:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/north-star auth:northStarGet:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/north-star auth:northStarGet:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/north-star auth:northStarGet:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/north-star auth:northStarGet:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/north-star auth:northStarGet:noAccount": {
+      "200": 5
+    },
+    "PUT /workspace/:urlKey/api/roadmap/north-star auth:northStarPut:badKey": {
+      "400": 5
+    },
+    "PUT /workspace/:urlKey/api/roadmap/north-star auth:northStarPut:noWorkspaces": {
+      "401": 5
+    },
+    "PUT /workspace/:urlKey/api/roadmap/north-star auth:northStarPut:ghost": {
+      "404": 5
+    },
+    "PUT /workspace/:urlKey/api/roadmap/north-star auth:northStarPut:emptySession": {
+      "401": 5
+    },
+    "PUT /workspace/:urlKey/api/roadmap/north-star auth:northStarPut:noAccount": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports auth:reportsList:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports auth:reportsList:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports auth:reportsList:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports auth:reportsList:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports auth:reportsList:noAccount": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports/:id auth:reportsGet:badKey": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports/:id auth:reportsGet:noWorkspaces": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports/:id auth:reportsGet:ghost": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports/:id auth:reportsGet:emptySession": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/roadmap/reports/:id auth:reportsGet:noAccount": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/reports auth:reportsSave:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/reports auth:reportsSave:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/reports auth:reportsSave:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/reports auth:reportsSave:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/reports auth:reportsSave:noAccount": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/chat auth:roadmapChat:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/chat auth:roadmapChat:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/chat auth:roadmapChat:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/chat auth:roadmapChat:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/roadmap/chat auth:roadmapChat:noAccount": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press auth:press:badKey": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press auth:press:noWorkspaces": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press auth:press:ghost": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press auth:press:emptySession": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press auth:press:noAccount": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:testMock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:localMockInTest": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:localRefusedInProd": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:jira422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:linearOk": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:legacyOk": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:conn": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/audit audit:500": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:testMock": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:testCustom": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:testCustomMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:testCustomNoTemplate": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:ok": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:sources": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:providers": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:custom": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:customMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:noTemplate": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/prompt/:issueId/:labelName prompt:500": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:proxyOff": {
+      "403": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:stopAtBad": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:stopAtPr": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:testMock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:providers": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt/:issueId ap:500": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt apg:proxyOff": {
+      "403": 5
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt apg:maxTasks": {
+      "200": 4,
+      "400": 4
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt apg:goal": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/autopilot-prompt apg:providers": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/recommend/status recStatus:sources": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/recommend/status recStatus:testws": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:noKey503": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:freeTierBlocked": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:freeTierOk": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:leaf": {
+      "200": 4,
+      "404": 1
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:descent": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:mockLocalLeaf": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:mockLocalDescent": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:mockLocalNotFound": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:mockLocalOtherErr": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:mockLocalFreeTierBlocked": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:testMock": {
+      "200": 10
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:testFreeTierBlocked": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:ctx401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:ctx404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:aiOpenRouter": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:aiBoom": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:aiStr": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:slowKeepalive": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:slowError": {
+      "200 (flushed 503)": 2,
+      "200 (flushed 404)": 1,
+      "200 (flushed 401)": 1,
+      "200 (flushed 500)": 1
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:clientGone": {
+      "NO_RESPONSE(server 499)": 3,
+      "NO_RESPONSE(server 200)": 2
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:ctxHang": {
+      "NO_RESPONSE(server 200)": 3
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:budget": {
+      "200 (flushed 500)": 3
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:noKey503": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:freeTierBlocked": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:freeTierOk": {
+      "200 sse:done": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:leaf": {
+      "404": 1,
+      "200 sse:done": 4
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:descent": {
+      "200 sse:done": 3,
+      "200 sse:error": 2
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:mockLocalLeaf": {
+      "200 sse:done": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:mockLocalDescent": {
+      "200 sse:done": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:mockLocalNotFound": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:mockLocalOtherErr": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:mockLocalFreeTierBlocked": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:testMock": {
+      "200 sse:done": 10
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:testFreeTierBlocked": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:ctx401": {
+      "200 sse:error": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:ctx404": {
+      "200 sse:error": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:aiOpenRouter": {
+      "200 sse:error": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:aiBoom": {
+      "200 sse:error": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:aiStr": {
+      "200 sse:error": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:slowKeepalive": {
+      "200 sse:done": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:slowError": {
+      "200 sse:error": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:clientGone": {
+      "NO_RESPONSE(server 200) sse:phase": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:ctxHang": {
+      "200 sse:error": 3
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:budget": {
+      "NO_RESPONSE(server 200) sse:phase": 3
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:storeErr": {
+      "200 sse:done": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId/stream stream:closedAfterGate": {
+      "NO_RESPONSE(server 200)": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId commentsGet:ok": {
+      "200": 4,
+      "404": 1
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId commentsGet:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId commentsGet:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId commentsGet:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/comments/:issueId commentsGet:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:capBare": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:noGuard422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:bodyInvalid": {
+      "201": 1,
+      "400": 6
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:tooLong": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:noBody": {
+      "201": 1,
+      "400": 4
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:trashed": {
+      "409": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:guardThrows": {
+      "500 LINEAR_AUTH": 1,
+      "500 INTERNAL_ERROR": 3,
+      "500 LINEAR_UNREACHABLE": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:okEnvelope": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:okBare": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:notCreated": {
+      "502": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:testMode": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:stamps": {
+      "201": 8
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:ledgerFail": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe0:first": {
+      "201": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe0:second": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe0:third": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe1:first": {
+      "201": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe1:second": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe1:third": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe2:first": {
+      "201": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe2:second": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe2:third": {
+      "409": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe3:first": {
+      "201": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe3:second": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe3:third": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe4:first": {
+      "201": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe4:second": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe4:third": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe5:first": {
+      "201": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe5:second": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:dedupe5:third": {
+      "200": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:recoverDurable": {
+      "201": 1,
+      "409": 1,
+      "500 INTERNAL_ERROR": 2,
+      "500 LINEAR_AUTH": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:recoverSameToken": {
+      "500 LINEAR_AUTH": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:recoverIneligible": {
+      "500 LINEAR_AUTH": 4,
+      "500 LINEAR_UNREACHABLE": 1,
+      "422 CAPABILITY_NOT_SUPPORTED": 1
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:recoverIneligibleProvider": {
+      "500 LINEAR_AUTH": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:recoverConnection": {
+      "201": 2,
+      "500 LINEAR_AUTH": 2,
+      "500 INTERNAL_ERROR": 2
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:recoverConnectionNoSeam": {
+      "500 LINEAR_AUTH": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:ok": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:testMock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:customFail": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/detail/:issueId detail:500": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier sessions:ok": {
+      "200": 4,
+      "400": 1
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier sessions:tooLong": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier sessions:noStores": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/sessions/:identifier sessions:500": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:noStore": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:missing": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:stale": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:fresh": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:testMock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:noCanonical": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/recap/:issueId recapGet:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:noStore": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:noAi503": {
+      "503 AI_NOT_CONFIGURED": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:freeTierBlocked": {
+      "429": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:freeTierOk": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:ok": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:mockLocal": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:testMock": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:testMockMissing": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:401": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:404": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:openrouter503": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:slow": {
+      "200": 3,
+      "200 (flushed 503)": 2
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:noStore": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:missing": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:stale": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:fresh": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:testMock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:noCanonical": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/brief/:issueId briefGet:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:noStore": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:noAi503": {
+      "503 AI_NOT_CONFIGURED": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:freeTierBlocked": {
+      "429": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:freeTierOk": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:ok": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:mockLocal": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:testMock": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:testMockMissing": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:401": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:404": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:openrouter503": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:slow": {
+      "200": 3,
+      "200 (flushed 503)": 2
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:ok": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:notInSet": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:nullIssues": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:testMock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:500": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/context/:issueId context:providers": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:badId": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:noStore": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:noCanonical": {
+      "422 CANONICAL_ID_REQUIRED": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:missing": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:stale": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:fresh": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:testMock": {
+      "200": 4,
+      "422 CANONICAL_ID_REQUIRED": 1
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:testMockMissing": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:401": {
+      "401": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:404": {
+      "404": 5
+    },
+    "GET /workspace/:urlKey/api/scan/:issueId scanGet:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:noStore": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:noAi": {
+      "503 AI_NOT_CONFIGURED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:freeTier": {
+      "200": 2,
+      "429": 3
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:outcomes": {
+      "200": 3,
+      "502 SCAN_PARSE_FAILED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:ledger": {
+      "200": 4,
+      "500": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:recordNull": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:noCanonical": {
+      "422 CANONICAL_ID_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:mockLocal": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:testMock": {
+      "200": 3,
+      "404": 1,
+      "422 CANONICAL_ID_REQUIRED": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:errors": {
+      "401": 1,
+      "404": 1,
+      "500": 3,
+      "503": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:slow": {
+      "200": 3
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:noRecordId": {
+      "400": 6
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:noStore": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:capViaIdentifier": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:uuidCap": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:identifier": {
+      "200": 4,
+      "404": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:identifierNoCanonical": {
+      "422 CANONICAL_ID_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:testMock": {
+      "200": 3,
+      "422 CANONICAL_ID_REQUIRED": 2
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:testMockMissing": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:ctx401": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:ctx404": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:ctx500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:noRecordId": {
+      "400": 6
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:noStore": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:capViaIdentifier": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:uuidCap": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:identifier": {
+      "200": 4,
+      "404": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:identifierNoCanonical": {
+      "422 CANONICAL_ID_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:testMock": {
+      "200": 3,
+      "422 CANONICAL_ID_REQUIRED": 2
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:testMockMissing": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:ctx401": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:ctx404": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:ctx500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:badId": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:noRecordId": {
+      "400": 6
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:noStore": {
+      "503": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:capViaIdentifier": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:uuidCap": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:identifier": {
+      "200": 4,
+      "404": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:identifierNoCanonical": {
+      "422 CANONICAL_ID_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:testMock": {
+      "200": 3,
+      "422 CANONICAL_ID_REQUIRED": 2
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:testMockMissing": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:ctx401": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:ctx404": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:ctx500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:ok": {
+      "200": 4,
+      "503": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:notFound": {
+      "404": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/dismiss dismiss:storeErr": {
+      "401": 1,
+      "404": 1,
+      "500": 3
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:noAi": {
+      "503 AI_NOT_CONFIGURED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:freeTier": {
+      "200": 2,
+      "429": 3
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:noCanonical": {
+      "422 CANONICAL_ID_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:texts": {
+      "200": 4,
+      "502 SCAN_PARSE_FAILED": 2
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:markOutcomes": {
+      "200": 2,
+      "500": 2,
+      "404 ROW_GONE": 1,
+      "409 ALREADY_TERMINAL": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:mockLocal": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:aiErr": {
+      "401": 1,
+      "404": 1,
+      "500": 2,
+      "503": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:slow": {
+      "200": 1,
+      "200 SCAN_PARSE_FAILED (flushed 502)": 2
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:ok": {
+      "200": 4,
+      "503": 1
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/unretire unretire:storeErrors": {
+      "401": 1,
+      "500": 3,
+      "404 ROW_GONE": 1,
+      "409 NOT_SELF_RESOLVED": 1
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:noStore": {
+      "503": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:cap422": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:badCursor": {
+      "400 INVALID_CURSOR": 7
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:ok": {
+      "200": 5,
+      "400 INVALID_CURSOR": 1
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:sparseLedger": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:storeErr": {
+      "500": 5
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:slow": {
+      "200": 3
+    },
+    "GET /workspace/:urlKey/api/scan-due scanDue:providers": {
+      "200": 5,
+      "422 CAPABILITY_NOT_SUPPORTED": 1
+    },
+    "GET /workspace/:urlKey/api/image image:missingUrl": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/image image:notHttps": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/image image:hostDenied": {
+      "400": 5,
+      "500": 1
+    },
+    "GET /workspace/:urlKey/api/image image:traversal": {
+      "400": 1,
+      "500": 4
+    },
+    "GET /workspace/:urlKey/api/image image:badFormat": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/image image:arrayUrl": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/image image:ok": {
+      "200": 8
+    },
+    "GET /workspace/:urlKey/api/image image:credentialEgress": {
+      "200": 11
+    },
+    "GET /workspace/:urlKey/api/image image:nonRaster": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/image image:upstreamStatus": {
+      "401": 1,
+      "403": 1,
+      "404": 1,
+      "418": 1,
+      "500": 1,
+      "502": 1
+    },
+    "GET /workspace/:urlKey/api/image image:tooLarge": {
+      "413": 5
+    },
+    "GET /workspace/:urlKey/api/image image:fetchThrows": {
+      "400": 2,
+      "500": 4
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:validation": {
+      "400": 10
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:cap": {
+      "201": 2,
+      "422 CAPABILITY_NOT_SUPPORTED": 4
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:capBare": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:team": {
+      "201": 3,
+      "422 TEAM_UNRESOLVED": 3
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:teamGithub": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:teamless": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:project": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:capture": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:priority": {
+      "201": 6,
+      "422 CAPABILITY_NOT_SUPPORTED": 2
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:image": {
+      "201": 1,
+      "400": 4,
+      "413": 1
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:title": {
+      "201": 8
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:mockTitle": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:createFail": {
+      "500": 2,
+      "502": 4
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:actions": {
+      "201": 8
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:legacyTriageFlag": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:ownerRefusal": {
+      "201": 8
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:noOwnerSeam": {
+      "201": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:triageOverrides": {
+      "201": 6
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:runLimit": {
+      "201": 6
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:grantRefusal": {
+      "201": 6
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:enqueueFail": {
+      "201": 6
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:providersActions": {
+      "201": 5,
+      "422 CAPABILITY_NOT_SUPPORTED": 3
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:noHost": {
+      "400": 3
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:bodies": {
+      "201": 2,
+      "400": 3,
+      "413": 1
+    },
+    "POST /workspace/:urlKey/api/issues create:cap": {
+      "201": 1,
+      "422": 2,
+      "422 CAPABILITY_NOT_SUPPORTED": 3
+    },
+    "POST /workspace/:urlKey/api/issues create:validation": {
+      "400": 8,
+      "422": 2
+    },
+    "POST /workspace/:urlKey/api/issues create:undeclared": {
+      "201": 1,
+      "400": 4,
+      "422": 1
+    },
+    "POST /workspace/:urlKey/api/issues create:jiraUndeclared": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "POST /workspace/:urlKey/api/issues create:linearRefs": {
+      "201": 3,
+      "422": 5
+    },
+    "POST /workspace/:urlKey/api/issues create:local": {
+      "201": 4,
+      "422": 1,
+      "502": 1
+    },
+    "POST /workspace/:urlKey/api/issues create:writeFail": {
+      "422": 6
+    },
+    "POST /workspace/:urlKey/api/issues create:teamFetchFail": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/issues create:body": {
+      "400": 4,
+      "422": 1
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:cap": {
+      "200": 4,
+      "422 CAPABILITY_NOT_SUPPORTED": 2
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:badId": {
+      "400": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:validation": {
+      "200": 3,
+      "400": 3
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:empty": {
+      "400": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:noGuard": {
+      "422 CAPABILITY_NOT_SUPPORTED": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:trashed": {
+      "409": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:ok": {
+      "200": 7,
+      "422": 1
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:stateNoTeam": {
+      "200": 1,
+      "422": 4
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:stateUnresolved": {
+      "200": 2,
+      "422": 3
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:writeFail": {
+      "422": 1,
+      "500": 1,
+      "502": 2,
+      "502 PARTIAL_WRITE": 1,
+      "500 PARTIAL_WRITE": 1
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:guardFail": {
+      "500": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:sources": {
+      "200": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:noCloser": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/openrouter/models models:ok": {
+      "200": 6
+    },
+    "GET /workspace/:urlKey/api/openrouter/models models:mock": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier runEv:tooLong": {
+      "400": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier runEv:ok": {
+      "200": 8
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier runEv:sources": {
+      "200": 5
+    },
+    "GET /workspace/:urlKey/api/run-evidence/:issueIdentifier runEv:500": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:tooLong": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:noAccount": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:notPerson": {
+      "403 PERSON_SESSION_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:normalRun": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:mergedDone": {
+      "200": 8
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:mergedStore": {
+      "200": 4,
+      "500": 2
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:ledgerOpen": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:twoPrs": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:seams": {
+      "200": 7,
+      "500": 1
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:errors": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check check:prReadThrows": {
+      "200": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:tooLong": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:noAccount": {
+      "401": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:notPerson": {
+      "403 PERSON_SESSION_REQUIRED": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:ok": {
+      "201": 6
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:alreadyMerged": {
+      "409 CLOSE_OUT_ALREADY_MERGED": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:noStore": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:recordNull": {
+      "400": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:storeErr": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press press:body": {
+      "201": 3,
+      "400": 2
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:flushed": {
+      "200": 5,
+      "200 (flushed 503)": 5,
+      "200 (flushed 500)": 10,
+      "200 (flushed 404)": 5,
+      "200 (flushed 401)": 5
+    },
+    "POST /workspace/:urlKey/api/recap/:issueId recapPost:freeTier429": {
+      "429": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:flushed": {
+      "200": 5,
+      "200 (flushed 503)": 5,
+      "200 (flushed 500)": 10,
+      "200 (flushed 404)": 5,
+      "200 (flushed 401)": 5
+    },
+    "POST /workspace/:urlKey/api/brief/:issueId briefPost:freeTier429": {
+      "429": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:flushed": {
+      "200 (flushed 503)": 5,
+      "200 (flushed 500)": 10,
+      "200 (flushed 404)": 5,
+      "200 (flushed 401)": 5,
+      "200 SCAN_PARSE_FAILED (flushed 502)": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId scanPost:freeTier429": {
+      "429": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:flushed": {
+      "200 (flushed 503)": 5,
+      "200 (flushed 404)": 5,
+      "200 (flushed 401)": 5,
+      "200 (flushed 500)": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/:issueId rec:gone499": {
+      "NO_RESPONSE(server 499)": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:500s": {
+      "500 LINEAR_UNREACHABLE": 5,
+      "500 INTERNAL_ERROR": 5
+    },
+    "POST /workspace/:urlKey/api/issues create:502": {
+      "502": 5
+    },
+    "GET /workspace/:urlKey/api/image image:upstreamStatus5": {
+      "401": 5,
+      "403": 5,
+      "404": 5,
+      "418": 5,
+      "500": 5,
+      "502": 5
+    },
+    "GET /workspace/:urlKey/api/recommend/status recStatus:prefsThrow": {
+      "500": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:extra": {
+      "429": 5,
+      "502 SCAN_PARSE_FAILED": 5,
+      "200 ROW_GONE (flushed 404)": 5,
+      "409 ALREADY_TERMINAL": 3,
+      "404 ROW_GONE": 2,
+      "200 SCAN_PARSE_FAILED (flushed 502)": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:rowGone": {
+      "404 ROW_GONE": 5
+    },
+    "POST /workspace/:urlKey/api/comments/:issueId comment:adoptThrows": {
+      "500 INTERNAL_ERROR": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:goneThen404": {
+      "NO_RESPONSE(server 500)": 5
+    },
+    "POST /workspace/:urlKey/api/scan/:issueId/retire retire:terminal": {
+      "409 ALREADY_TERMINAL": 5
+    },
+    "PATCH /workspace/:urlKey/api/issues/:issueId patch:extra": {
+      "502": 5,
+      "502 PARTIAL_WRITE": 5,
+      "500 PARTIAL_WRITE": 5
+    },
+    "POST /workspace/:urlKey/api/feedback feedback:413": {
+      "413": 5
+    },
+    "CALL generateMockRecommendation call:generateMockRecommendation": {
+      "RETURN": 30
+    },
+    "CALL buildMockRecommendationHop call:buildMockRecommendationHop": {
+      "RETURN": 30
+    }
+  },
+  "thinStatusPairs": [
+    {
+      "route": "GET /workspace/:urlKey/api/prompt/:issueId/:labelName",
+      "pair": "NO_RESPONSE(server 404)",
+      "count": 1
+    },
+    {
+      "route": "POST /workspace/:urlKey/api/scan/:issueId/unretire",
+      "pair": "404 ROW_GONE",
+      "count": 2
+    },
+    {
+      "route": "POST /workspace/:urlKey/api/feedback",
+      "pair": "500",
+      "count": 3
+    },
+    {
+      "route": "POST /workspace/:urlKey/api/feedback",
+      "pair": "502",
+      "count": 4
+    },
+    {
+      "route": "UNMATCHED",
+      "pair": "NO_RESPONSE(server 404)",
+      "count": 2
+    },
+    {
+      "route": "GET /workspace/:urlKey/api/brief/:issueId",
+      "pair": "NO_RESPONSE(server 404)",
+      "count": 1
+    },
+    {
+      "route": "POST /workspace/:urlKey/api/scan/:issueId",
+      "pair": "NO_RESPONSE(server 404)",
+      "count": 2
+    }
+  ],
+  "slowRequests": [],
+  "differences": []
+}

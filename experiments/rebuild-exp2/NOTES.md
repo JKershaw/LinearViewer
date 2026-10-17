@@ -616,3 +616,30 @@ Launched 23:14Z, merged as #1907 (`91fca7dd`), Done ~00:03Z: about 50 minutes, n
 **Prediction:** 8 hits. Miss: code shrank further than predicted (463 against 480–580), because the five derived fields came from one shared builder.
 
 The cleanest rung so far: a genuine rebuild, a large cut, and a real fix.
+
+## 17 Oct ~03:00Z: rung 7 (LIN-3596, `workspace-api.js`, the XL single file) done and scored. All targets merged.
+
+Launched 00:23Z, merged as #1908 (`603853c5`), Done about 02:30Z: about 2h07m, not split, no ruling on the issue.
+
+**Review enforced the rebuild.** The first head was 79.3% verbatim, an edit, and review 1 sent it back citing the ticket's new Done-when line. The redo reached 54.3% by the PR's definition (51.4% by ours; 57.6% if trailing semicolons are ignored, since the new file adds them). The PR admits the design step was still done with the old file open.
+
+**Independent replay** (6,592 requests per seed, plus a live tier of 178 test files per side):
+- **(a) 2 fixes, both listed:**
+  - a throwing `adoptConnectionCredential` on comment POST now gets the classified error instead of a bare 500;
+  - a repeated `?url=` on `/image` is a 400, not a TypeError 500.
+
+  Both are in security areas, and both tighten: nothing is echoed or sent, and the session is untouched.
+- **(b), harmless:** retire, unretire and dismiss 200s put `scannedAt` earlier in the JSON (one shared builder). Same values.
+- With the fixes and the key order patched into the old copy, there are 0 differences on both seeds.
+
+**Shape:**
+- code lines 2,816 → 2,223 (−21%), the largest cut of the round;
+- decision points 769 → 589 (−23%);
+- functions over 10 decision points 29 → 19;
+- worst function 57 → 31.
+
+One helper module was added. All 8 source-text pins pass. Ticket references 106 → 107, but LIN-772/773 was dropped although its code remains.
+
+**Prediction:** 10 of 11 hits. Miss: the cut beat the 6–18% range.
+
+**Measure note:** the verbatim share moves about 6 points on semicolons alone. From now on, normalise trailing `;`.

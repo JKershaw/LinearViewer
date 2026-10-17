@@ -1,0 +1,42 @@
+{
+  "files": 177,
+  "tests": 5399,
+  "failingOnOld": 9,
+  "differingFiles": 2,
+  "diffs": [
+    {
+      "file": "tests/unit/free-tier-model-clamp-wiring.test.js",
+      "exit": {
+        "old": 0,
+        "new": 1
+      },
+      "tests": [
+        {
+          "test": "every billed resolveWorkspaceModel / resolveAiOperationModel call threads forceDefault: isFreeTier",
+          "old": "ok",
+          "new": "not ok: |-"
+        }
+      ]
+    },
+    {
+      "file": "tests/unit/workspace-accesstoken-linear-egress-census.test.js",
+      "exit": {
+        "old": 0,
+        "new": 1
+      },
+      "tests": [
+        {
+          "test": "LIN-1899 census (b) — scalar feeds, by owner > routes/ has exactly 1 runAudit call site (LIN-1899, guarded)",
+          "old": "ok",
+          "new": "not ok: |-"
+        },
+        {
+          "test": "LIN-1899 census (b) — scalar feeds, by owner",
+          "old": "ok",
+          "new": "not ok: '1 subtest failed'"
+        }
+      ]
+    }
+  ],
+  "elapsedMs": 64051
+}

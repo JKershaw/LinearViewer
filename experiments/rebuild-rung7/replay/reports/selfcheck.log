@@ -1,0 +1,22 @@
+self-check: 17 replay runs (4 at a time), identity n=3000 (+edge+test) on seeds 1,7, mutants n=1500
+PASS  identity-seed1         old vs an independent copy of old  differing=0
+PASS  identity-seed7         old vs an independent copy of old  differing=0
+PASS  m01-egress             image proxy sends the workspace credential for every provider (LIN-1899 guard dropped)  differing=29  detected: egressFetch x29
+PASS  m02-attribution        comment attribution 'via Harbour' → 'by Harbour'  differing=179  detected: depCalls x142, body x104
+PASS  m03-owner-gate         feedback triage/autopilot lane loses its owner gate (LIN-3383)  differing=94  detected: depCalls x87, body x15, store:dispatchQueueStore x9, store:proxyTokenStore x9, store:workspacePreferencesStore x9, console x1
+PASS  m04-page-size          scan-due page size 40 → 39  differing=67  detected: store:taskDecisionsStore x67
+PASS  m05-order              sessions served oldest-first  differing=4  detected: body x4
+PASS  m06-code               press 409 code renamed  differing=12  detected: body x12
+PASS  m07-fire-and-forget    PATCH fires onTicketWrite on every write, not only state writes  differing=27  detected: depCalls x27, console x1
+PASS  m08-sse                stream drops its 'fetching_context' phase event  differing=123  detected: body x118
+PASS  m09-capability         audit 422 capability 'audit' → 'Audit'  differing=24  detected: body x24
+PASS  m10-free-clamp         recap POST free tier no longer clamped to the default model (LIN-513)  differing=9  detected: store:workspacePreferencesStore x9
+PASS  m11-store-arg          retire stamps outcomeBasisHash null  differing=53  detected: store:taskDecisionsStore x53, body x26
+PASS  m12-header             image Cache-Control 'private' → 'public'  differing=36  detected: header:cache-control x36
+PASS  m13-whitelist          detail section whitelist drops 'recent-activity'  differing=6  detected: header-derived:content-length x6, header-derived:etag x6, body x6
+PASS  m14-stamp-arg          decision stamp drops the optionId argument  differing=4  detected: store:dispatchQueueStore x4
+PASS  m15-session            LIN-2933 recovery mirrors the adopted token without its expiry (session mutation)  differing=7  detected: session x7
+coverage seed1 workspace-api.js: 98.79% (2782/2816); uncovered: 468, 469, 470, 471, 550, 551, 763, 764, 765, 1725, 2128, 2129, 2361, 2362, 2363, 2364, 2367, 2368, 2369, 2370, 2371, 2673, 2674, 2675, 2676, 2975, 2976, 2977, 2978, 3874, 3875, 4324, 4325, 4326
+coverage seed7 workspace-api.js: 98.79% (2782/2816); uncovered: 468, 469, 470, 471, 550, 551, 763, 764, 765, 1725, 2128, 2129, 2361, 2362, 2363, 2364, 2367, 2368, 2369, 2370, 2371, 2673, 2674, 2675, 2676, 2975, 2976, 2977, 2978, 3874, 3875, 4324, 4325, 4326
+min requests per route: 55; thin status pairs (<5): 1
+self-check report: /tmp/claude-0/-home-user/61183684-9674-527e-9fe5-98f9bb5cc446/scratchpad/rung7/replay/reports/selfcheck.json
