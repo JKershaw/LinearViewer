@@ -114,3 +114,9 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Cost to John: nothing. 16 minutes wall clock, one run slot.
 
 **Inference.** Untying a single-import knot by moving code to its owner is close to free when the ownership call is clear, and the Periodical moves exactly as predicted. The hard part was the judgement (which side owns the decision), done before launch; `knots.md` has that call for all seven single-import knots, so five more are ready to ticket.
+
+## 17 Oct: #2 fresh-reader check, then filed
+
+**Facts.** 5 must-fix, 7 should-fix, 4 nits; all code claims held at `f885f44c`. The must-fix items: the seams baseline was stale (LIN-3600 had merged: 18 pairs now); "raise a DECISION" for the unclear items would have blocked the run waiting on John (a `DECISION:` line pairs with `BLOCKED:` in the runner contract); LIN-3339 not framed as the source; a census step the worker couldn't run (the tool isn't in the repo); an unclear out-of-scope list. Applied: compare with the origin/main the worker branches from (prediction revised to 18 → 18 before launch); unclear items keep today's behaviour and are written up in the PR and one LIN-3339 comment; a tested `git grep` lists the sites that should remain, so "copies deleted" is checkable.
+
+**Inference.** Two lessons for the method. A ticket that waits on the base moving needs its baseline taken from the branch point, not from the drafting commit. And "raise a DECISION" in a ticket costs John attention; where the safe default (keep today's behaviour) exists, the ticket should say so and send the question to the standing ticket instead.
