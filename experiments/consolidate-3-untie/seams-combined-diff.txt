@@ -1,0 +1,10 @@
+before: files 432, links 64, cross-area imports 902, knots 20, groups 9, unresolved 4, unmapped 0
+after: files 432, links 62, cross-area imports 899, knots 18, groups 9, unresolved 4, unmapped 0
+MOVED Front end: server-rendered pages <-> LLM & prompts 14/7 -> 15/7
+GONE  Front end: server-rendered pages <-> Other features 2/1
+MOVED LLM & prompts <-> Other features 2/3 -> 2/2
+GONE  Providers (Linear, GitHub, Jira, local) <-> Runs & dispatch 1/7
+link  Front end: server-rendered pages -> LLM & prompts: 14 -> 15
+link  Front end: server-rendered pages -> Other features: 2 -> 0
+link  Other features -> LLM & prompts: 3 -> 2
+link  Providers (Linear, GitHub, Jira, local) -> Runs & dispatch: 1 -> 0
