@@ -16,7 +16,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import { createProxyRoutes } from '../../routes/proxy.js';
-import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
+import { buildPeriodicalGateMarker } from '../../lib/periodicals.js';
 
 const TEAM_UUID = '11111111-1111-1111-1111-111111111111';
 const STATES = [

@@ -25,7 +25,7 @@ import { createProxyRoutes } from '../../routes/proxy.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 import { testMockData } from '../../lib/sample-data/mock-data.js';
-import { buildPeriodicalGateMarker } from '../../lib/periodical-report-gate.js';
+import { buildPeriodicalGateMarker } from '../../lib/periodicals.js';
 import { setFetchImpl } from '../../lib/openrouter.js';
 import { ProviderInterface } from '../../lib/providers/interface.js';
 import { guardNetwork } from '../fixtures/network-guard.js';

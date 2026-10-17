@@ -1,13 +1,15 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  slugifyPeriodicalTitle,
-  buildPeriodicalGateMarker,
-  extractPeriodicalGateId,
   hasReportEvidenceComment,
   hasAdversarialReadEvidenceComment,
   checkPeriodicalReportGate
 } from '../../lib/periodical-report-gate.js';
+import {
+  slugifyPeriodicalTitle,
+  buildPeriodicalGateMarker,
+  extractPeriodicalGateId
+} from '../../lib/periodicals.js';
 
 describe('slugifyPeriodicalTitle', () => {
   test('lowercases and hyphenates', () => {
