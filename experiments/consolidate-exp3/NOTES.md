@@ -83,3 +83,9 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Also: the route sweeps must walk nested routers (and the repo moved off `router.stack` on purpose, LIN-2505); one architecture doc line goes stale once the census is loosened.
 
 **Inference.** The fresh-reader step is worth most on security-weighted tickets: two of the four must-fix items would have weakened a guard without failing any test. Applied: a bold order-of-work rule, mixed pins change only their entrance part, the canary designed to pass today and fail with the mask removed, and the one stale doc line allowed.
+
+## 17 Oct, 08:06Z: LIN-3600 merged (#1910); 4a filed as LIN-3601
+
+**Facts.**
+- LIN-3600: kickoff 07:50:53Z, PR #1910 opened 07:53:50Z, merged 08:06:50Z as `f885f44c`. 16 minutes kickoff to merge; no rulings; nothing asked of John. Scoring is running.
+- LIN-3601 (4a) filed after the fresh-reader fixes (ticket, inventory and prediction committed before launch); autopilot kicked off 08:09Z. One stray line was removed from the draft before filing (an operating rule of mine about dispatch, meaningless to the worker).
