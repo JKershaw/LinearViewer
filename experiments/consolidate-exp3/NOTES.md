@@ -254,3 +254,9 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - The consolidation alone took the worst function from 63 to 29 — further than 5c's whole rebuild got it (122 → 63). Moving decisions to one place simplified the code before any rebuild.
 - The authority is now the natural rebuild target: one file holding every entrance decision, 268 decision points, no location pins in the way.
 - The replay sorting `addItem` keys is a blind spot worth fixing in the kit (it would miss a key-order change in a stored row built by spread).
+
+## 17 Oct: K1–K3 fresh-reader check; K2 dropped
+
+**Facts.** No high-severity findings; all three merge cleanly in any order (18 → 15) and the full suite passes on the combined branch. K1: two comments the move makes false now get rewritten. K3: baseline wording only. **K2 is dropped:** the fresh reader found that Auth also throws `TokenRefreshError` and defines what its codes mean (including one code only Auth uses), and only one provider throws it; the premise of the move (that it belongs to every provider refresher) is false. `knots.md` had flagged K2 as a judgement call.
+
+**Inference.** The ownership rule held, but applying it needs every throw and catch site, not just the import that ties the knot. The fresh-reader step overturned a pre-launch ownership call before it cost a run.
