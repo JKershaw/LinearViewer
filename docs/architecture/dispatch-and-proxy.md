@@ -4,6 +4,8 @@ Scope: the Dispatch API and the proxy consumer integration. Moved verbatim from 
 
 The Dispatch feature allows users to queue prompts for external consumers (AI agents, automation tools).
 
+The four enqueue handlers (`POST /workspace/:urlKey/api/dispatch`, `POST /api/proxy/dispatch`, `POST /api/proxy/recommend-and-dispatch`, `POST /api/proxy/autopilot/kickoff`) are thin forwarders: the decisions they share (body checks and their order, the issue credential, the proxy-context policy, the free-tier run gate, the one `createDispatchItem` call, the 201, the failure mapping) are made once in `lib/dispatch-entrance.js` (LIN-3604). The route files keep the registrations and middleware chains, including `requireGrant('dispatch')`, and the session route passes its owner gate in.
+
 **User-facing endpoints** (session auth, workspace-prefixed):
 - `POST /workspace/:urlKey/api/dispatch` - Queue a prompt
 - `GET /workspace/:urlKey/api/dispatch` - List queued items
