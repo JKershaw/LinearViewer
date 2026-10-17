@@ -23,6 +23,16 @@
  *
  * Pure scanners over `{file, src}`; the mutation witnesses plant a fake in a
  * synthetic copy and assert the scan fails (lin-3136-enqueue-census style).
+ *
+ * LIN-3601: the dispatch entrances (E: routes/dispatch.js, routes/proxy-dispatch.js,
+ * routes/proxy-kickoff.js, lib/dispatch-entrance.js) are judged as one unit so the
+ * three routes can share one authority. A site in an E ROUTE file is still keyed
+ * by its registration (an unlisted one fails), but its exact count is no longer
+ * pinned and a row whose site has moved is not stale; a site in
+ * lib/dispatch-entrance.js has no row at all. Inside E what is pinned is the
+ * reader KIND (each listed kind occurs, an unlisted one fails). Which response a
+ * row may leave in is carried by dispatch-entrance-redaction-canary-sweep.test.js,
+ * which drives every read route with a runtime-built canary token.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -92,8 +102,9 @@ function scanSites(files) {
       if (/^\s*(\/\/|\*|\/\*)/.test(lines[idx])) continue;
       const { key, body } = enclosing(lines, idx);
       const id = `${file} :: ${key}`;
-      const cur = sites.get(id) || { count: 0, body };
+      const cur = sites.get(id) || { count: 0, body, kinds: [] };
       cur.count += 1;
+      cur.kinds.push(m[1] || m[2] || 'raw-collection-read');
       sites.set(id, cur);
     }
   }
@@ -146,19 +157,35 @@ const TABLE = {
 
 const REDACTOR = /\bredactSessionItems?\s*\(/;
 
+// LIN-3601: the entrances as one unit.
+const E_ROUTE_FILES = new Set(['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js']);
+const E_LIB_FILE = 'lib/dispatch-entrance.js';
+// The reader kinds the entrances use today. Each must still occur somewhere in E;
+// a kind that is not here (a direct formatter call, a raw collection read) fails.
+const E_READER_KINDS = ['listItems', 'getItemStatus', 'listHistory', 'trimSessionBudget', 'pollAvailable', 'takeItem'];
+
 /** Violations of the table against a set of `{file, src}`; [] means clean. */
 function check(files, table = TABLE) {
   const v = [];
   const sites = scanSites(files);
-  for (const [id, { count, body }] of sites) {
+  const eKinds = new Set();
+  for (const [id, { count, body, kinds }] of sites) {
+    const file = id.split(' :: ')[0];
+    if (file === E_LIB_FILE) { kinds.forEach(k => eKinds.add(k)); continue; }
+    if (E_ROUTE_FILES.has(file)) kinds.forEach(k => eKinds.add(k));
     const row = table[id];
     if (!row) { v.push(`unlisted site: ${id} (${count} call${count > 1 ? 's' : ''}) — classify it redacted|runner|server-side-only|projection|test-only`); continue; }
     const [verdict, expected] = row;
-    if (count !== expected) v.push(`${id}: ${count} calls, table says ${expected}`);
+    if (count !== expected && !E_ROUTE_FILES.has(file)) v.push(`${id}: ${count} calls, table says ${expected}`);
     if (verdict === R && !REDACTOR.test(body)) v.push(`${id}: verdict redacted but the handler body never calls redactSessionItem(s)`);
     if (verdict === RUN && /redactSession/.test(body)) v.push(`${id}: verdict runner but the handler redacts — runners must receive the live token`);
   }
-  for (const id of Object.keys(table)) if (!sites.has(id)) v.push(`stale row: ${id} no longer has a call site`);
+  for (const id of Object.keys(table)) {
+    const file = id.split(' :: ')[0];
+    if (!sites.has(id) && !E_ROUTE_FILES.has(file)) v.push(`stale row: ${id} no longer has a call site`);
+  }
+  for (const kind of E_READER_KINDS) if (!eKinds.has(kind)) v.push(`E reader kind ${kind}: no call left in the entrances — stale, or it moved out of E`);
+  for (const kind of eKinds) if (!E_READER_KINDS.includes(kind)) v.push(`E reader kind ${kind}: an unlisted reader kind in the entrances — classify it and add a canary-sweep row`);
   return v;
 }
 
@@ -175,7 +202,11 @@ describe('LIN-3384 census — every token-reachable call site is classified', ()
   test('verdicts are from the closed set and all four redacted routes are present', () => {
     const verdicts = new Set(Object.values(TABLE).map(r => r[0]));
     for (const v of verdicts) assert.ok([R, RUN, SRV, PRJ, TST].includes(v), v);
-    assert.equal(Object.values(TABLE).filter(r => r[0] === R).length, 4);
+    // LIN-3601: was `=== 4`. How many routes redact is a statement about how the
+    // entrances are split; that every redacted read still redacts is the canary
+    // sweep's. The table keeps its redacted rows, and the scan above still fails a
+    // redacted row whose handler body lost the redactor.
+    assert.ok(Object.values(TABLE).filter(r => r[0] === R).length >= 1);
   });
 });
 
@@ -193,13 +224,32 @@ describe('LIN-3384 census — mutation witnesses (each fake must fail the scan)'
     assert.ok(v.some(x => x.includes('unlisted site') && x.includes('/leak/:id')), v.join('\n'));
   });
 
-  test('M4b: an extra call inside an already-classified handler changes its count', () => {
-    const files = patch(clone(), 'routes/dispatch.js', src => src.replace(
-      'const items = await dispatchQueueStore.listItems(workspace.urlKey);',
-      'const items = await dispatchQueueStore.listItems(workspace.urlKey);\n      const leak = await dispatchQueueStore.listItems(workspace.urlKey);'
-    ));
+  // M4b (re-targeted, LIN-3601). It used to plant a second `listItems(` call in an
+  // already-classified route and expect the exact count to fail. Count and position
+  // inside E are no longer pinned (the entrances are one unit), so the witness is
+  // planted two ways:
+  //   - a new reader KIND in any entrance file fails this census (below);
+  //   - a new read ROUTE that returns a raw row fails
+  //     dispatch-entrance-redaction-canary-sweep.test.js (shown failing in a scratch
+  //     copy: a `GET /api/proxy/dispatch/:id/raw` planted in routes/proxy-dispatch.js).
+  for (const file of [...E_ROUTE_FILES, E_LIB_FILE]) {
+    test(`M4b (re-targeted): a new reader kind planted in ${file} fails the census`, () => {
+      const files = patch(clone(), file, src => `${src}\nexport const rawLeak = (dispatchStore) => dispatchStore\n  .historyCollection\n  .find({});\n`);
+      const v = check(files);
+      assert.ok(v.some(x => x.includes('E reader kind raw-collection-read') && x.includes('unlisted reader kind')), v.join('\n'));
+    });
+  }
+
+  test('moving a reader call from a route into lib/dispatch-entrance.js keeps the census clean (E is one unit)', () => {
+    const files = patch(patch(clone(), 'routes/dispatch.js', src => src.replace('const count = await dispatchQueueStore.countItems(workspace.urlKey);', 'const count = 0;')),
+      E_LIB_FILE, src => `${src}\nexport const moved = (dispatchQueueStore, urlKey) => dispatchQueueStore.listItems(urlKey);\n`);
+    assert.deepEqual(check(files), []);
+  });
+
+  test('a reader KIND that no longer occurs anywhere in E fails the census', () => {
+    const files = clone().map(f => (E_ROUTE_FILES.has(f.file) || f.file === E_LIB_FILE ? { ...f, src: f.src.replaceAll('.pollAvailable(', '.nothingPolls(') } : f));
     const v = check(files);
-    assert.ok(v.some(x => x.includes('/workspace/:urlKey/api/dispatch:') && x.includes('2 calls')), v.join('\n'));
+    assert.ok(v.some(x => x.includes('E reader kind pollAvailable') && x.includes('no call left')), v.join('\n'));
   });
 
   test('M5: a new lib reader calling getItemStatus', () => {
@@ -220,14 +270,12 @@ describe('LIN-3384 census — mutation witnesses (each fake must fail the scan)'
     assert.ok(v.some(x => x.includes('lib/zz-fmt.js :: fmt')), v.join('\n'));
   });
 
-  test('M3: removing the redactor from a redacted handler is caught', () => {
-    const files = patch(clone(), 'routes/dispatch.js', src => src.replace(
-      'res.json({ ...result, items: redactSessionItems(result.items, req.session?.accountId || null) });',
-      'res.json(result);'
-    ));
-    const v = check(files);
-    assert.ok(v.some(x => x.includes('dispatch/history') && x.includes('never calls redactSessionItem')), v.join('\n'));
-  });
+  // M3 ('removing the redactor from a redacted handler is caught') planted into
+  // routes/dispatch.js text, which only holds while the redactor sits in that
+  // handler body. LIN-3601: carried by dispatch-entrance-redaction-canary-sweep.test.js,
+  // which fails when `redactSessionItems` is dropped from the history route, when
+  // `maskBootstrapTokens` is skipped in `redactSessionItem`, and when the list route
+  // stops redacting (all shown failing in a scratch copy: PR evidence).
 
   test('a runner handler that starts redacting is caught', () => {
     const files = patch(clone(), 'routes/proxy-runner.js', src => src.replace(
