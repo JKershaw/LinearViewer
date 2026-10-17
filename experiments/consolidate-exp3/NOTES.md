@@ -301,3 +301,4 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - K1's first commit added tests that pin *where* the code lives; review replaced them before merge. K3 repointed an importer the ticket missed and left one stale test comment.
 
 **Inference.** Workers create new location pins by default when asked to prove a move: the natural witness for "this moved" is "it's in the new file". A ticket asking for an untie should say the witness is behaviour (and the seams output), not location — or the next move pays for this one's pins. Another tests-as-seam data point.
+- simple-dispatcher#272 (the wrong-repo copy of LIN-3605) was already closed unmerged at 14:06Z, by the run's own close-out. John: "This wrong- repo issue has come up a few times. I suspect there's a fix, and a better solution. Might not be one for now." Parked for the later discussion; #4c's ticket names its repository on line 5 as a stopgap.
