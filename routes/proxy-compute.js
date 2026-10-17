@@ -17,7 +17,7 @@ import { getNorthStarDocVersion } from '../lib/north-star-resolver.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { hashContext } from '../lib/recap-cache.js';
-import { isTerminalState } from '../lib/tree.js';
+import { isTerminalState } from '../lib/providers/state-map.js';
 import { buildTaskStack } from '../lib/task-stack.js';
 import { generatePrompt, hasPrompt, deriveDispatchKind } from '../lib/prompt-templates.js';
 import { getPeriodicals } from '../lib/periodicals.js';
