@@ -260,3 +260,4 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 **Facts.** No high-severity findings; all three merge cleanly in any order (18 → 15) and the full suite passes on the combined branch. K1: two comments the move makes false now get rewritten. K3: baseline wording only. **K2 is dropped:** the fresh reader found that Auth also throws `TokenRefreshError` and defines what its codes mean (including one code only Auth uses), and only one provider throws it; the premise of the move (that it belongs to every provider refresher) is false. `knots.md` had flagged K2 as a judgement call.
 
 **Inference.** The ownership rule held, but applying it needs every throw and catch site, not just the import that ties the knot. The fresh-reader step overturned a pre-launch ownership call before it cost a run.
+- 14:02Z: light lane 2: LIN-3606 (K1) filed and kicked off. K3 queued for the next free light lane.
