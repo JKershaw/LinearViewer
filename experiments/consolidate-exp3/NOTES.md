@@ -235,3 +235,4 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - A small factory change (`createDispatchItem` drops caller fields left `undefined`) reaches five out-of-scope callers; the PR reasons each saved row is unchanged.
 - The worker's replay: 0 differences on 2,455 requests (every single fault, every ordered pair of check steps, triples; 574 multi-fault pairs, 0 vacuous on the old tree). Seams 18 → 18; counts inside pairs moved with the code.
 - 8 open questions in the PR, all kept. One needs a human: the proxy and recommend launch arms stay undeclared (M3), and the ticket the docs cite for M3 (LIN-3099) is unrelated, so nothing tracks it. The PR also flags LIN-3603 (Backlog) as a likely duplicate of LIN-3604.
+- 13:33Z: light lane 1: LIN-3605 (node --test concurrency cap) filed and kicked off after the fresh-reader check (3 medium, 6 low, applied).
