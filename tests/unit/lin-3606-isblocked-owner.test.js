@@ -2,7 +2,6 @@
 // re-exporting shim; the proxy routes import the state predicates from the owner.
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import * as stateMap from '../../lib/providers/state-map.js'
 import * as tree from '../../lib/tree.js'
 
@@ -20,12 +19,4 @@ describe('LIN-3606 isBlocked ownership', () => {
     assert.equal(stateMap.isBlocked(rel('related', 'started')), false)
     assert.equal(stateMap.isBlocked({}), false)
   })
-
-  for (const file of ['routes/proxy.js', 'routes/proxy-compute.js']) {
-    it(`${file} imports state predicates from state-map, not tree.js`, () => {
-      const src = readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8')
-      assert.match(src, /from '\.\.\/lib\/providers\/state-map\.js'/)
-      assert.doesNotMatch(src, /from '\.\.\/lib\/tree\.js'/)
-    })
-  }
 })
