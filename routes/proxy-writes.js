@@ -43,7 +43,8 @@ import {
 } from '../lib/issue-write-validation.js';
 import { canonicalPriorityToLinear } from '../lib/providers/models.js';
 import { isTrashed } from '../lib/trashed-signal.js';
-import { extractPeriodicalGateId, checkPeriodicalReportGate } from '../lib/periodical-report-gate.js';
+import { checkPeriodicalReportGate } from '../lib/periodical-report-gate.js';
+import { extractPeriodicalGateId } from '../lib/periodicals.js';
 import { flattenIssue, MAX_ATTACHMENT_BYTES } from '../lib/proxy-wire.js';
 import { UUID_REGEX, isValidIssueId } from '../lib/workspace.js';
 import { appendBlock, replace as replaceInDescription, DescriptionEditError } from '../lib/description-edit.js';
