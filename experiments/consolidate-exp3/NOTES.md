@@ -326,3 +326,16 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 - Conversions: A1 (the gate text pin) — position-planted mutation tests added first and green, then `POST_DISPATCH_GATE` and its three text tests removed; A3 (inline `fields` literal) — a key-set test over all five lanes with a canary key added first, then the census narrowed to "exactly one `rowFor(…)` with one binding". A2, A4, A5, A7 cost the design nothing.
 - Replay 0 differences on 2,455 inputs (one earlier run had 1 keepalive/hang-up difference attributed to socket-teardown timing; three re-runs and old vs old were 0). Seams 16 → 16. The #4a sweeps and owner-gate test unmodified and green.
 - The open questions are now tracked: M3 by LIN-3607, the other seven by LIN-3608 (filed during the run).
+
+## 17 Oct: #4c scored (`../consolidate-4-entrance/arm-4c/score.md`) — all experiments done
+
+**Facts.**
+- Independent replay: 0 differences on two seeds (21,089 inputs each, plus 1,506 re-captured test calls and 600 direct calls per seed); old vs old 0; 23 of 23 planted mutants caught on the new tree. The PR's one keepalive difference never recurred in 30 runs of this replay and 20 of the worker's (some under load).
+- Verbatim 45.7% (confirmed). Against the four files 5c produced, the new authority is 25.2% verbatim, and the whole entrance unit 62.9%.
+- The sequence on the four entrance files (code lines / decision points / worst function): 5c 2,450 / 708 / 122 → 2,158 / 649 / 63; after #4b 2,056 / 585 / 29; after #4c 2,115 / 555 / 13. 5c cut lines; consolidation and the rebuild after it cut complexity.
+- Conversions: replacement commits before loosening in both; A1 (re-indented authority now passes 89/89, fails 3 at old); A3 narrowed, not exempted (a widened `rowFor` slips past the census but the new behaviour test catches it).
+- Security: the #4a sweeps and owner-gate test 0-line diff, 165/165; dropped grants on R and K and a moved owner gate caught by sweeps and replay.
+- Seams 16 → 16. Census 309 / 1,021 → 310 / 1,023 (a near-copy of `relayDispatchRefusal` in `routes/proxy.js`, which predates this). Suite 17,467 / 17,467.
+- Prediction: 20 hits, 6 misses (the ruling; which A tests needed converting — A1 and A3, not A2 and A4; code lines 937 vs 720–830).
+
+**Inference.** The full sequence works on the hardest target in the codebase: free the seam (tests only), consolidate (95 sites → 26, worst 63 → 29), rebuild (worst 29 → 13, 45.7% verbatim), with behaviour held exactly throughout and John pressing two rulings. Each step was cheaper and safer because of the one before it. Lines are not the measure for either consolidation or rebuild here; complexity, sites per decision and knots are.
