@@ -1,5 +1,7 @@
 /**
- * Dispatch queue routes for prompt dispatch feature.
+ * Dispatch queue routes for prompt dispatch feature (rebuilt design-first in LIN-3592:
+ * the same routes, bodies and refusals, each body's checks written down once as an
+ * ordered list).
  *
  * Two types of endpoints:
  * 1. User-facing API (workspace-prefixed, session auth):
@@ -29,10 +31,11 @@ import { DISPATCH_DEFAULT_KINDS } from '../lib/prompt-templates.js';
 import { PERIODICAL_AUTOPILOT_TAIL } from '../lib/periodicals.js';
 import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import {
-  validateDispatchPayload, validateOpaqueDispatchField, abortFollowUpError, abortToError, cascadeAbortError,
+  validateDispatchPayload, abortFollowUpError, abortToError, cascadeAbortError,
   dispatchKindError, periodicalIdError, isValidAutopilotVariant, targetError
 } from '../lib/dispatch-validation.js';
 import { validateRunField, isPositiveInteger } from '../lib/dispatch-fields.js';
+import { firstFailure, opaqueFieldError } from '../lib/dispatch-entrance.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { mapDispatchRefusal } from '../lib/dispatch-refusal.js';
 import { isDanglingReferent, danglingReferentBody } from '../lib/dispatch-referent-guard.js';
@@ -129,6 +132,155 @@ const MAX_NAME_LENGTH = 1000;          // Names/labels/titles
 
 // Pattern to detect null bytes and dangerous control characters (except common whitespace)
 const DANGEROUS_CHARS_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
+
+// Maximum recent / favourite custom prompts handling (the favourites cap is the store's).
+const MAX_RECENT_PROMPTS = 10;
+const MAX_CUSTOM_PROMPT_LENGTH = 10000;
+
+// A failed handler answers 500 with a fixed message and logs why; nothing else of the
+// error leaves the server.
+function reportFailure(res, label, err, message) {
+  console.error(label, err.message);
+  return jsonError(res, 500, message);
+}
+
+// The shape every ladder / run-boundary modifier shares: only a FRESH dispatch for a
+// task (not an abort, a cascade or a follow-up) can carry it. A modifier that could never
+// be recorded is rejected rather than silently dropped (the cascade/abortTo precedent).
+const isFreshDispatch = ({ isAbort, cascade, followUpTo }) => !(isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null));
+
+// Ladder entry rung (LIN-2942): which rung of the opened task's ladder this dispatch was
+// pressed from. Optional; absent/null ⇒ no mode event and the route behaves exactly as
+// without it. Only a fresh dispatch for a task is a ladder press, so a modifier that could
+// never be recorded is rejected rather than silently dropped.
+function entryRungFailure({ entryRung, isAbort, cascade, followUpTo, issueIdentifier }) {
+  if (entryRung === undefined || entryRung === null) return null;
+  if (!DISPATCH_RUNGS.includes(entryRung)) return `entryRung must be one of: ${DISPATCH_RUNGS.join(', ')}`;
+  if (!isFreshDispatch({ isAbort, cascade, followUpTo })) return 'entryRung is only valid on a fresh dispatch (not abort, cascade or followUpTo)';
+  if (!issueIdentifier) return 'entryRung requires issueIdentifier';
+  return null;
+}
+
+// Run-boundary fact (LIN-3245 / LIN-2949 P1a): `stopAt: 'pr'` on a fresh
+// autopilot kickoff means this run stops at its PR — its close-out is the
+// person's to send. A DEDICATED, validated body field, never derived from
+// `entryRung` (a browser-sent measurement, not a gate). Only the value
+// `'pr'` is accepted, and only on a fresh autopilot dispatch for a task;
+// any modifier that could never carry the boundary is rejected rather than
+// silently dropped (the entryRung/cascade/abortTo precedent above).
+function stopAtFailure({ stopAt, kind, isAbort, cascade, followUpTo, issueIdentifier }) {
+  if (stopAt === undefined || stopAt === null) return null;
+  const stopAtMsg = validateRunField('stopAt', stopAt);
+  if (stopAtMsg) return stopAtMsg;
+  if (!isFreshDispatch({ isAbort, cascade, followUpTo })) return 'stopAt is only valid on a fresh dispatch (not abort, cascade or followUpTo)';
+  if (kind !== 'autopilot') return "stopAt requires kind 'autopilot'";
+  if (!issueIdentifier) return 'stopAt requires issueIdentifier';
+  return null;
+}
+
+// Run variant (LIN-3248 N2): the authoritative standard/stepper fact the
+// run page reads to decide whether the "Harbour stops this run at the PR"
+// promise is backed. A DEDICATED, validated body field (never sniffed
+// from promptName), only on a fresh autopilot dispatch for a task; absent
+// stays null, which the page reads as unknown and fails the promise
+// closed. Same freshness discipline as stopAt above.
+function variantFailure({ variant, kind, isAbort, cascade, followUpTo }) {
+  if (variant === undefined || variant === null) return null;
+  if (!isValidAutopilotVariant(variant)) return "variant must be 'standard' or 'stepper'";
+  if (!isFreshDispatch({ isAbort, cascade, followUpTo })) return 'variant is only valid on a fresh dispatch (not abort, cascade or followUpTo)';
+  if (kind !== 'autopilot') return "variant requires kind 'autopilot'";
+  return null;
+}
+
+// The prompt a recents / favourites POST accepts, trimmed — or why it is refused.
+// Validation is the same for both lists so a favourite and its recent counterpart
+// accept/reject the same strings (and stay in sync by value).
+function promptTextFailure(rawPrompt) {
+  const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
+  if (!prompt || typeof prompt !== 'string') return { error: 'prompt is required and must be a string' };
+  if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) return { error: `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}` };
+  if (DANGEROUS_CHARS_REGEX.test(prompt)) return { error: 'prompt contains invalid characters' };
+  return { prompt };
+}
+
+// Recents and favourites are per account: the signed-in account id, or null once the 401
+// has been sent.
+function signedInAccount(req, res) {
+  const accountId = req.session.accountId;
+  if (!accountId) unauthorized.json(res, 'Authentication required');
+  return accountId || null;
+}
+
+/**
+ * Normalize + validate a `byKind` map from a preset CRUD request body,
+ * mirroring the `server.js` dispatch-defaults per-kind loop: only known
+ * `DISPATCH_DEFAULT_KINDS` keys are read, each entry is trimmed to
+ * `{ model?, harness? }`, and a kind with neither field set is dropped.
+ * Throws `{ error }` (via `badRequest`-shaped return, not an exception) on
+ * the first invalid field, same convention as the top-level model/harness
+ * checks below.
+ *
+ * @param {*} byKind - Caller-supplied byKind value (any shape)
+ * @returns {{ error: string }|{ byKind: Object }}
+ */
+function normalizeDispatchPresetByKind(byKind) {
+  if (byKind === undefined) return { byKind: undefined };
+  if (typeof byKind !== 'object' || byKind === null || Array.isArray(byKind)) {
+    return { error: 'byKind must be an object' };
+  }
+  const normalized = {};
+  for (const kind of DISPATCH_DEFAULT_KINDS) {
+    const entry = byKind[kind];
+    if (entry === undefined) continue;
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      return { error: `byKind.${kind} must be an object` };
+    }
+    const model = typeof entry.model === 'string' ? entry.model.trim() : '';
+    const harness = typeof entry.harness === 'string' ? entry.harness.trim() : '';
+    const effort = typeof entry.effort === 'string' ? entry.effort.trim() : '';
+    const error = opaqueFieldError(model, 'model', { maxLength: MAX_NAME_LENGTH })
+      || opaqueFieldError(harness, 'harness', { maxLength: MAX_NAME_LENGTH })
+      || opaqueFieldError(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+    if (error) return { error };
+    if (model || harness || effort) {
+      normalized[kind] = {};
+      if (model) normalized[kind].model = model;
+      if (harness) normalized[kind].harness = harness;
+      if (effort) normalized[kind].effort = effort;
+    }
+  }
+  return { byKind: normalized };
+}
+
+function buildDispatchPresetConfig({ model, harness, effort, byKind }) {
+  const config = {};
+  const trimmedModel = typeof model === 'string' ? model.trim() : '';
+  const trimmedHarness = typeof harness === 'string' ? harness.trim() : '';
+  const trimmedEffort = typeof effort === 'string' ? effort.trim() : '';
+  if (trimmedModel) config.model = trimmedModel;
+  if (trimmedHarness) config.harness = trimmedHarness;
+  if (trimmedEffort) config.effort = trimmedEffort;
+  if (byKind && typeof byKind === 'object' && Object.keys(byKind).length) config.byKind = byKind;
+  return config;
+}
+
+// Preset store validation errors (name/config shape, custom cap) are the
+// only ones this route can cause; anything else is a genuine 500. Mirrors
+// the same status-by-message-pattern convention routes/collective.js uses
+// for its own preset store.
+function dispatchPresetErrorStatus(message) {
+  return /required|characters or less|must be|maximum of/.test(message) ? 400 : 500;
+}
+
+// What a preset create / update body must satisfy before the store sees it: the opaque
+// execution fields (model, harness, effort), then the per-kind map. `{ error }` on the
+// first failure, else `{ byKind }` (undefined when the body omits it).
+function presetBodyCheck({ model, harness, effort, byKind }) {
+  const error = opaqueFieldError(model, 'model', { maxLength: MAX_NAME_LENGTH })
+    || opaqueFieldError(harness, 'harness', { maxLength: MAX_NAME_LENGTH })
+    || opaqueFieldError(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
+  return error ? { error } : normalizeDispatchPresetByKind(byKind);
+}
 
 /**
  * Creates dispatch routes with injected dependencies.
@@ -240,6 +392,86 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   }
 
   // =========================================================================
+  // Owner gate and Harbour OS spawn (shared by the session routes below)
+  // =========================================================================
+
+  // LIN-3398: owner-only gate for the session-side runner mutations below (halt
+  // POST/DELETE, delete, trim, dispatch-token revoke). One call shape for all
+  // five: resolve through the shared runner-owner gate, answer through
+  // `sendRunnerRefusal`, and return true when the caller must stop. Always runs
+  // BEFORE the route's first store write. `target` is the queue row's own target
+  // for delete/trim (dash/local stay member-reachable); halt and revoke pass
+  // none, which means `cli` and is always checked. The refusal carries only the
+  // envelope: never the row read to find `target` (it holds `bootstrapToken`).
+  async function refuseNonOwner(req, res, target) {
+    const refusal = await resolveRunnerOwnerRefusal({
+      ownerCheck: workspaceOwnerCheck,
+      workspaceId: req.workspace.id,
+      accountId: req.session?.accountId,
+      target
+    });
+    if (!refusal) return false;
+    sendRunnerRefusal(res, refusal);
+    return true;
+  }
+
+  // Spawn a Harbour OS Claude session when target is 'local' (the API value
+  // 'local' is preserved for backward compatibility; user-facing surfaces
+  // refer to this as "Harbour OS"). We ALWAYS stage the prompt to a file
+  // for target='local' — regardless of whether a repo was picked — so
+  // the prompt never lands inline on jsh's stdin line (where embedded
+  // newlines break single-quote parsing and appear as "pasted over many
+  // lines"). When a feedback token store is wired we also mint a short-
+  // lived token and pass the feedback URL in the OSC env; when a repo
+  // is set, spawnClaudeSession prepends `git clone` + `cd`. Successful
+  // spawns move the item into history with tokenLabel 'harbour' so the
+  // addFeedback ownership check accepts the hook callback.
+  //
+  // Answers the `spawn` field of the 201: the session's own result, or a failed-setup
+  // marker when staging or minting threw.
+  async function host(item, req, workspace) {
+    try {
+      // Use item.prompt (not the request-body `prompt`): addItem may have
+      // amended it — e.g. the LIN-599 autopilot session-id block — and the
+      // spawned session must see exactly what cli/web consumers receive.
+      const stagingFilePath = writeHarbourStagingFile(item._id, item.prompt);
+
+      let feedbackUrl;
+      let mintedToken;
+      if (harbourFeedbackTokenStore) {
+        const minted = await harbourFeedbackTokenStore.mintToken(item._id, workspace.urlKey);
+        feedbackUrl = `${req.protocol}://${req.get('host')}/api/dispatch/feedback/${item._id}`;
+        mintedToken = minted.token;
+      }
+
+      const spawn = spawnClaudeSession(item.prompt, {
+        repo: item.repo || undefined,
+        dispatchId: item._id,
+        feedbackUrl,
+        token: mintedToken,
+        stagingFilePath
+      });
+
+      if (spawn.success && harbourFeedbackTokenStore) {
+        // Best-effort take so the hook can post feedback against an
+        // archived "taken" item. If the take fails (e.g. the user
+        // already cancelled the queued item between insert and now),
+        // the spawn still proceeds — the hook callback will simply
+        // 404, which is acceptable.
+        try {
+          await dispatchQueueStore.takeItem(item._id, workspace.urlKey, 'harbour');
+        } catch (takeErr) {
+          console.error('Harbour take after spawn failed:', takeErr.message);
+        }
+      }
+      return spawn;
+    } catch (err) {
+      console.error('Harbour spawn setup failed:', err.message);
+      return { success: false, error: 'Harbour spawn setup failed' };
+    }
+  }
+
+  // =========================================================================
   // User-Facing API (Session Auth)
   // =========================================================================
 
@@ -259,22 +491,16 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // carries no prompt and skips the prompt-required check below. abort and
       // followUpTo are mutually-exclusive verbs.
       const isAbort = abort === true;
-      const abortFollowUpMsg = abortFollowUpError({ isAbort, followUpTo });
-      if (abortFollowUpMsg) {
-        return badRequest.json(res, abortFollowUpMsg);
-      }
 
-      // Validate required fields. prompt is required for a normal dispatch; an
-      // abort carries none.
-      if (!isAbort && (!prompt || typeof prompt !== 'string')) {
-        return badRequest.json(res, 'prompt is required and must be a string');
-      }
-
-      // Validate target if provided
-      const targetMsg = targetError(target, DISPATCH_TARGETS);
-      if (targetMsg) {
-        return badRequest.json(res, targetMsg);
-      }
+      // The first checks, ahead of the owner gate: the verbs' own shape. prompt is
+      // required for a normal dispatch; an abort carries none. Target comes from the
+      // session vocabulary (cli, web, dash, local).
+      const shapeFailure = await firstFailure([
+        () => abortFollowUpError({ isAbort, followUpTo }),
+        () => (!isAbort && (!prompt || typeof prompt !== 'string') ? 'prompt is required and must be a string' : null),
+        () => targetError(target, DISPATCH_TARGETS)
+      ]);
+      if (shapeFailure) return badRequest.json(res, shapeFailure);
 
       // LIN-3383 owner-only runner enqueue. Every write below (fresh, followUpTo,
       // abort and the cascade expansion) is consumed by the owner's runner when
@@ -289,56 +515,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       });
       if (enqueueRefusal) return sendRunnerRefusal(res, enqueueRefusal);
 
-      // Abort eligibility (LIN-743): the abort item's OWN target must be
-      // poll-eligible (cli/web/dash) — eligibility is NOT derived from the aborted
-      // session's substrate. 'local' (Harbour OS) spawns server-side and is never
-      // polled, so it cannot carry an abort. Default 'cli'.
-      const abortToMsg = abortToError({ isAbort, abortTo });
-      if (abortToMsg) {
-        return badRequest.json(res, abortToMsg);
-      }
-      if (isAbort) {
-        const abortTarget = target || 'cli';
-        if (!POLLED_TARGETS.includes(abortTarget)) {
-          return badRequest.json(res, 'abort target must be poll-eligible (cli, web, or dash)');
-        }
-      }
-
-      // Cascade close (LIN-946): a boolean modifier on an abort. When true the
-      // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
-      // one call into an abort per discovered descendant session (the recursive
-      // sessionId-tree walk lands in a later beat). Like abortTo it is only
-      // meaningful alongside abort — reject cascade:true without it rather than
-      // storing an inert flag (mirroring the abortTo-requires-abort guard above).
-      // Stored + forwarded blindly for now; the walk consumes it, not the runner.
-      const cascadeRuleError = validateRunField('cascade', cascade);
-      if (cascadeRuleError) {
-        return badRequest.json(res, cascadeRuleError);
-      }
-      const cascadeAbortMsg = cascadeAbortError({ isAbort, cascade });
-      if (cascadeAbortMsg) {
-        return badRequest.json(res, cascadeAbortMsg);
-      }
-
-      // Validate kind if provided; when omitted it is derived from promptName below.
-      const kindMsg = dispatchKindError(kind);
-      if (kindMsg) {
-        return badRequest.json(res, kindMsg);
-      }
-
-      // Periodical-template join key (LIN-1825): registry-membership check, not
-      // format validation, so it stays route-local rather than routing through
-      // validateDispatchPayload (deliberately format-only, never against a
-      // model registry). Optional; absent/undefined means a non-periodical
-      // dispatch and is left untouched.
-      const periodicalIdMsg = periodicalIdError(periodicalId);
-      if (periodicalIdMsg) {
-        return badRequest.json(res, periodicalIdMsg);
-      }
-
       // LIN-3136 M2 / M2b: which launches declare the dispatch grant. An
       // autopilot, or a periodical "+ Autopilot" variant: kind 'periodical', a
-      // periodicalId validated just above, and the SERVER-OWNED handoff tail in
+      // periodicalId validated below, and the SERVER-OWNED handoff tail in
       // the prompt (lib/periodicals.js). A plain Mint, or a prompt edited to drop
       // the tail, launches a grant-less leaf as before. The client sends no
       // grant intent at all; the owner check at the mint is the authority.
@@ -348,56 +527,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         && prompt.includes(PERIODICAL_AUTOPILOT_TAIL);
       const launchesOrchestrator = kind === 'autopilot' || isPeriodicalAutopilot;
 
-      // Opt-in completion hold (LIN-797): boolean, default false. Stored +
-      // forwarded blindly — the runner owns the behaviour (see LIN-795).
-      const waitForFollowUpsRuleError = validateRunField('waitForFollowUps', waitForFollowUps);
-      if (waitForFollowUpsRuleError) {
-        return badRequest.json(res, waitForFollowUpsRuleError);
-      }
-
-      // Push-based inter-session comms. Both are stored + forwarded blindly,
-      // exactly like waitForFollowUps/force — Harbour owns no semantics beyond wake:
-      //   queueIfBusy  — the runner leaves a busy-target follow-up unclaimed
-      //                  rather than failing it (LIN-827 runner path).
-      //   subscription — edge declaration (LIN-900 §6): enum 'everything'|
-      //                  'terminal-only' governing which of this child's events wake
-      //                  the dispatching parent (§5 matrix). Declared, never inferred.
-      const queueIfBusyRuleError = validateRunField('queueIfBusy', queueIfBusy);
-      if (queueIfBusyRuleError) {
-        return badRequest.json(res, queueIfBusyRuleError);
-      }
-      const subscriptionRuleError = validateRunField('subscription', subscription);
-      if (subscriptionRuleError) {
-        return badRequest.json(res, subscriptionRuleError);
-      }
-
-      // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
-      // here, up front — the factory treats a presetId it can't resolve as "no
-      // preset" (a defensive fallback for this seam's own store lookup below),
-      // not a validation gate, so this is the one place that contract is enforced.
-      if (presetId !== undefined && presetId !== null) {
-        if (typeof presetId !== 'string' || !presetId.trim()) {
-          return badRequest.json(res, 'presetId must be a non-empty string');
-        }
-        if (dispatchPresetsStore) {
-          const preset = await dispatchPresetsStore.get(workspace.urlKey, presetId);
-          if (!preset) {
-            return badRequest.json(res, 'Invalid or unknown presetId');
-          }
-        }
-      }
-
-      // Task budget (LIN-1751/LIN-1737): a SCOPE bound on the run — up to this many
-      // distinct tasks — enforced deterministically at the dispatch-factory seam.
-      // Validated here inline, matching routes/proxy.js's kickoff-seam rule and
-      // error text exactly (LIN-1737 D3), so a run kicked off through either seam
-      // rejects an invalid budget identically. Optional; absent/null ⇒ no budget,
-      // byte-identical to today.
-      const maxTasksRuleError = validateRunField('maxTasks', maxTasks);
-      if (maxTasksRuleError) {
-        return badRequest.json(res, maxTasksRuleError);
-      }
-
       // Server-side proxy-context attach (LIN-1162). The dispatch UI used to mint a
       // bootstrap token and append the "+proxy" access block IN THE BROWSER, then POST
       // the finished prompt here — so this route never reached attachProxyContext and
@@ -405,103 +534,89 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // The client now sends `attachProxy:true` (a boolean intent, derived from its
       // +proxy toggle / force) and lets the server attach the block, exactly like the
       // proxy dispatch seams. Only meaningful for a real prompt — an abort carries none.
-      if (attachProxy !== undefined && typeof attachProxy !== 'boolean') {
-        return badRequest.json(res, 'attachProxy must be a boolean');
-      }
       const wantProxyContext = attachProxy === true && !isAbort;
-
-      // Ladder entry rung (LIN-2942): which rung of the opened task's ladder
-      // this dispatch was pressed from. Optional; absent/null ⇒ no mode event
-      // and the route behaves exactly as without it. Only a fresh dispatch for
-      // a task is a ladder press, so a modifier that could never be recorded is
-      // rejected rather than silently dropped (the cascade/abortTo precedent).
-      const hasEntryRung = entryRung !== undefined && entryRung !== null;
-      if (hasEntryRung) {
-        if (!DISPATCH_RUNGS.includes(entryRung)) {
-          return badRequest.json(res, `entryRung must be one of: ${DISPATCH_RUNGS.join(', ')}`);
-        }
-        if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
-          return badRequest.json(res, 'entryRung is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
-        }
-        if (!issueIdentifier) {
-          return badRequest.json(res, 'entryRung requires issueIdentifier');
-        }
-      }
-
-      // Run-boundary fact (LIN-3245 / LIN-2949 P1a): `stopAt: 'pr'` on a fresh
-      // autopilot kickoff means this run stops at its PR — its close-out is the
-      // person's to send. A DEDICATED, validated body field, never derived from
-      // `entryRung` (a browser-sent measurement, not a gate). Only the value
-      // `'pr'` is accepted, and only on a fresh autopilot dispatch for a task;
-      // any modifier that could never carry the boundary is rejected rather than
-      // silently dropped (the entryRung/cascade/abortTo precedent above).
-      const hasStopAt = stopAt !== undefined && stopAt !== null;
-      if (hasStopAt) {
-        const stopAtMsg = validateRunField('stopAt', stopAt);
-        if (stopAtMsg) {
-          return badRequest.json(res, stopAtMsg);
-        }
-        if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
-          return badRequest.json(res, 'stopAt is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
-        }
-        if (kind !== 'autopilot') {
-          return badRequest.json(res, "stopAt requires kind 'autopilot'");
-        }
-        if (!issueIdentifier) {
-          return badRequest.json(res, 'stopAt requires issueIdentifier');
-        }
-      }
-
-      // Run variant (LIN-3248 N2): the authoritative standard/stepper fact the
-      // run page reads to decide whether the "Harbour stops this run at the PR"
-      // promise is backed. A DEDICATED, validated body field (never sniffed
-      // from promptName), only on a fresh autopilot dispatch for a task; absent
-      // stays null, which the page reads as unknown and fails the promise
-      // closed. Same freshness discipline as stopAt above.
-      const hasVariant = variant !== undefined && variant !== null;
-      if (hasVariant) {
-        if (!isValidAutopilotVariant(variant)) {
-          return badRequest.json(res, "variant must be 'standard' or 'stepper'");
-        }
-        if (isAbort || cascade === true || (followUpTo !== undefined && followUpTo !== null)) {
-          return badRequest.json(res, 'variant is only valid on a fresh dispatch (not abort, cascade or followUpTo)');
-        }
-        if (kind !== 'autopilot') {
-          return badRequest.json(res, "variant requires kind 'autopilot'");
-        }
-      }
 
       // LIN-2944 P1 (handover d610edd0): the opened-task surface a ladder press
       // came from, recorded on the mode event. Optional — every other dispatch
       // caller (periodical / Setup Prompt / dispatch page / autopilot kickoff)
       // sends no surface, and it records null. Out of vocabulary ⇒ 400.
       const hasSurface = surface !== undefined && surface !== null;
-      if (hasSurface && !SURFACES.includes(surface)) {
-        return badRequest.json(res, `surface must be one of: ${SURFACES.join(', ')}`);
-      }
+      const hasEntryRung = entryRung !== undefined && entryRung !== null;
 
-      // Reject local target from non-localhost requests
-      if (target === 'local') {
-        const host = (req.get('host') || '').split(':')[0];
-        if (!['localhost', '127.0.0.1'].includes(host)) {
-          return badRequest.json(res, 'local target is only available on localhost');
-        }
-      }
-
-      // Shared payload validation for the two main handlers (LIN-1139): length
-      // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
-      // the issueId/followUpTo/force/sessionId format + combination rules. This
-      // block ran verbatim here and in the proxy twin; it now lives once in
-      // validateDispatchPayload so the two caller-supplied paths cannot drift.
-      // dispatch.js owns its own reject response (no logEvent); the helper only
-      // returns the error structure. The caller-specific checks that DIFFER
-      // between the two handlers (prompt-required, target vocab, abort/cascade/
-      // kind/waitForFollowUps/queueIfBusy/subscription, local-target) already ran
-      // above, preserving the original interleaving.
-      const payloadError = validateDispatchPayload(req.body);
-      if (payloadError) {
-        return badRequest.json(res, payloadError.error);
-      }
+      // The rest of the body, in the order the caller is told about it.
+      const bodyFailure = await firstFailure([
+        // Abort eligibility (LIN-743): the abort item's OWN target must be
+        // poll-eligible (cli/web/dash) — eligibility is NOT derived from the aborted
+        // session's substrate. 'local' (Harbour OS) spawns server-side and is never
+        // polled, so it cannot carry an abort. Default 'cli'.
+        () => abortToError({ isAbort, abortTo }),
+        () => (isAbort && !POLLED_TARGETS.includes(target || 'cli') ? 'abort target must be poll-eligible (cli, web, or dash)' : null),
+        // Cascade close (LIN-946): a boolean modifier on an abort. When true the
+        // abort's `abortTo` names the ROOT session of a subtree; Harbour expands the
+        // one call into an abort per discovered descendant session (the recursive
+        // sessionId-tree walk lands in a later beat). Like abortTo it is only
+        // meaningful alongside abort — reject cascade:true without it rather than
+        // storing an inert flag (mirroring the abortTo-requires-abort guard above).
+        // Stored + forwarded blindly for now; the walk consumes it, not the runner.
+        () => validateRunField('cascade', cascade),
+        () => cascadeAbortError({ isAbort, cascade }),
+        // Validate kind if provided; when omitted it is derived from promptName below.
+        () => dispatchKindError(kind),
+        // Periodical-template join key (LIN-1825): registry-membership check, not
+        // format validation, so it stays route-local rather than routing through
+        // validateDispatchPayload (deliberately format-only, never against a
+        // model registry). Optional; absent/undefined means a non-periodical
+        // dispatch and is left untouched.
+        () => periodicalIdError(periodicalId),
+        // Opt-in completion hold (LIN-797): boolean, default false. Stored +
+        // forwarded blindly — the runner owns the behaviour (see LIN-795).
+        () => validateRunField('waitForFollowUps', waitForFollowUps),
+        // Push-based inter-session comms. Both are stored + forwarded blindly,
+        // exactly like waitForFollowUps/force — Harbour owns no semantics beyond wake:
+        //   queueIfBusy  — the runner leaves a busy-target follow-up unclaimed
+        //                  rather than failing it (LIN-827 runner path).
+        //   subscription — edge declaration (LIN-900 §6): enum 'everything'|
+        //                  'terminal-only' governing which of this child's events wake
+        //                  the dispatching parent (§5 matrix). Declared, never inferred.
+        () => validateRunField('queueIfBusy', queueIfBusy),
+        () => validateRunField('subscription', subscription),
+        // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
+        // here, up front — the factory treats a presetId it can't resolve as "no
+        // preset" (a defensive fallback for this seam's own store lookup below),
+        // not a validation gate, so this is the one place that contract is enforced.
+        () => (presetId !== undefined && presetId !== null && (typeof presetId !== 'string' || !presetId.trim()) ? 'presetId must be a non-empty string' : null),
+        async () => {
+          if (presetId === undefined || presetId === null || !dispatchPresetsStore) return null;
+          const preset = await dispatchPresetsStore.get(workspace.urlKey, presetId);
+          return preset ? null : 'Invalid or unknown presetId';
+        },
+        // Task budget (LIN-1751/LIN-1737): a SCOPE bound on the run — up to this many
+        // distinct tasks — enforced deterministically at the dispatch-factory seam.
+        // Validated here inline, matching routes/proxy.js's kickoff-seam rule and
+        // error text exactly (LIN-1737 D3), so a run kicked off through either seam
+        // rejects an invalid budget identically. Optional; absent/null ⇒ no budget,
+        // byte-identical to today.
+        () => validateRunField('maxTasks', maxTasks),
+        () => (attachProxy !== undefined && typeof attachProxy !== 'boolean' ? 'attachProxy must be a boolean' : null),
+        () => entryRungFailure({ entryRung, isAbort, cascade, followUpTo, issueIdentifier }),
+        () => stopAtFailure({ stopAt, kind, isAbort, cascade, followUpTo, issueIdentifier }),
+        () => variantFailure({ variant, kind, isAbort, cascade, followUpTo }),
+        () => (hasSurface && !SURFACES.includes(surface) ? `surface must be one of: ${SURFACES.join(', ')}` : null),
+        // Reject local target from non-localhost requests
+        () => (target === 'local' && !['localhost', '127.0.0.1'].includes((req.get('host') || '').split(':')[0])
+          ? 'local target is only available on localhost'
+          : null),
+        // Shared payload validation for the two main handlers (LIN-1139): length
+        // caps, opaque model/harness (LIN-438/1084), dangerous-char rejection, and
+        // the issueId/followUpTo/force/sessionId format + combination rules. This
+        // block ran verbatim here and in the proxy twin; it now lives once in
+        // validateDispatchPayload so the two caller-supplied paths cannot drift.
+        // It gets the RAW body, never a rebuilt one: it reads fields this list does
+        // not name (ifParked, the length caps). dispatch.js owns its own reject
+        // response (no logEvent); the helper only returns the error structure.
+        () => validateDispatchPayload(req.body)?.error
+      ]);
+      if (bodyFailure) return badRequest.json(res, bodyFailure);
 
       // Cascade close (LIN-946): a cascade request is not a single abort — it is a
       // command Harbour expands into one plain abort per session in abortTo's whole
@@ -803,58 +918,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         }
       }
 
-      // Spawn a Harbour OS Claude session when target is 'local' (the API value
-      // 'local' is preserved for backward compatibility; user-facing surfaces
-      // refer to this as "Harbour OS"). We ALWAYS stage the prompt to a file
-      // for target='local' — regardless of whether a repo was picked — so
-      // the prompt never lands inline on jsh's stdin line (where embedded
-      // newlines break single-quote parsing and appear as "pasted over many
-      // lines"). When a feedback token store is wired we also mint a short-
-      // lived token and pass the feedback URL in the OSC env; when a repo
-      // is set, spawnClaudeSession prepends `git clone` + `cd`. Successful
-      // spawns move the item into history with tokenLabel 'harbour' so the
-      // addFeedback ownership check accepts the hook callback.
-      let spawn = undefined;
-      if (target === 'local') {
-        try {
-          // Use item.prompt (not the request-body `prompt`): addItem may have
-          // amended it — e.g. the LIN-599 autopilot session-id block — and the
-          // spawned session must see exactly what cli/web consumers receive.
-          const stagingFilePath = writeHarbourStagingFile(item._id, item.prompt);
-
-          let feedbackUrl;
-          let mintedToken;
-          if (harbourFeedbackTokenStore) {
-            const minted = await harbourFeedbackTokenStore.mintToken(item._id, workspace.urlKey);
-            feedbackUrl = `${req.protocol}://${req.get('host')}/api/dispatch/feedback/${item._id}`;
-            mintedToken = minted.token;
-          }
-
-          spawn = spawnClaudeSession(item.prompt, {
-            repo: item.repo || undefined,
-            dispatchId: item._id,
-            feedbackUrl,
-            token: mintedToken,
-            stagingFilePath
-          });
-
-          if (spawn.success && harbourFeedbackTokenStore) {
-            // Best-effort take so the hook can post feedback against an
-            // archived "taken" item. If the take fails (e.g. the user
-            // already cancelled the queued item between insert and now),
-            // the spawn still proceeds — the hook callback will simply
-            // 404, which is acceptable.
-            try {
-              await dispatchQueueStore.takeItem(item._id, workspace.urlKey, 'harbour');
-            } catch (takeErr) {
-              console.error('Harbour take after spawn failed:', takeErr.message);
-            }
-          }
-        } catch (err) {
-          console.error('Harbour spawn setup failed:', err.message);
-          spawn = { success: false, error: 'Harbour spawn setup failed' };
-        }
-      }
+      // Harbour OS: a 'local' dispatch is staged to a file and spawned on this server's tty
+      // (see host above). Absent for every other target.
+      const spawn = target === 'local' ? await host(item, req, workspace) : undefined;
 
       // Consumer poll-recency warning (LIN-2885): read-only telemetry derived
       // from the stamp createDispatchItem already persisted on the item —
@@ -959,8 +1025,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const callerId = req.session?.accountId || null;
       res.json({ items: items.map(item => ({ ...redactSessionItem(item, callerId), consumerPollWarning: buildQueuedPollWarning('queued', liveLastSeenAt) })) });
     } catch (err) {
-      console.error('List dispatch items error:', err.message);
-      jsonError(res, 500, 'Failed to list dispatch items');
+      return reportFailure(res, 'List dispatch items error:', err, 'Failed to list dispatch items');
     }
   });
 
@@ -975,8 +1040,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const count = await dispatchQueueStore.countItems(workspace.urlKey);
       res.json({ count });
     } catch (err) {
-      console.error('Count dispatch items error:', err.message);
-      jsonError(res, 500, 'Failed to count dispatch items');
+      return reportFailure(res, 'Count dispatch items error:', err, 'Failed to count dispatch items');
     }
   });
 
@@ -1004,8 +1068,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         resetsAt: usage.resetsAt
       });
     } catch (err) {
-      console.error('Read dispatch quota error:', err.message);
-      jsonError(res, 500, 'Failed to read dispatch quota');
+      return reportFailure(res, 'Read dispatch quota error:', err, 'Failed to read dispatch quota');
     }
   });
 
@@ -1024,8 +1087,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // LIN-3384: mask prose-mode bootstrap lines in non-owned prompts.
       res.json({ ...result, items: redactSessionItems(result.items, req.session?.accountId || null) });
     } catch (err) {
-      console.error('List dispatch history error:', err.message);
-      jsonError(res, 500, 'Failed to list dispatch history');
+      return reportFailure(res, 'List dispatch history error:', err, 'Failed to list dispatch history');
     }
   });
 
@@ -1033,18 +1095,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   // Recent Custom Prompts API (Session Auth)
   // =========================================================================
 
-  const MAX_RECENT_PROMPTS = 10;
-  const MAX_CUSTOM_PROMPT_LENGTH = 10000;
-
   /**
    * GET /workspace/:urlKey/api/dispatch/recent-prompts
    * Fetch recent custom prompts for the current user and workspace.
    */
   router.get('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
-    const accountId = req.session.accountId;
-    if (!accountId) {
-      return unauthorized.json(res, 'Authentication required');
-    }
+    const accountId = signedInAccount(req, res);
+    if (!accountId) return;
     if (!userPreferencesStore) {
       return res.json({ prompts: [] });
     }
@@ -1065,25 +1122,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Save a custom prompt to the recent list for the current user and workspace.
    */
   router.post('/workspace/:urlKey/api/dispatch/recent-prompts', workspaceFromUrl, async (req, res) => {
-    const accountId = req.session.accountId;
-    if (!accountId) {
-      return unauthorized.json(res, 'Authentication required');
-    }
+    const accountId = signedInAccount(req, res);
+    if (!accountId) return;
     if (!userPreferencesStore) {
       return jsonError(res, 503, 'Service unavailable');
     }
 
-    const { prompt: rawPrompt } = req.body;
-    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
-    if (!prompt || typeof prompt !== 'string') {
-      return badRequest.json(res, 'prompt is required and must be a string');
-    }
-    if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
-      return badRequest.json(res, `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}`);
-    }
-    if (DANGEROUS_CHARS_REGEX.test(prompt)) {
-      return badRequest.json(res, 'prompt contains invalid characters');
-    }
+    const { prompt, error } = promptTextFailure(req.body.prompt);
+    if (error) return badRequest.json(res, error);
 
     try {
       const prefs = await userPreferencesStore.getUserPreferences(accountId);
@@ -1106,8 +1152,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Failed to save recent prompt:', err.message);
-      jsonError(res, 500, 'Failed to save recent prompt');
+      return reportFailure(res, 'Failed to save recent prompt:', err, 'Failed to save recent prompt');
     }
   });
 
@@ -1127,10 +1172,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
    * Fetch favourite custom prompts for the current user and workspace.
    */
   router.get('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
-    const accountId = req.session.accountId;
-    if (!accountId) {
-      return unauthorized.json(res, 'Authentication required');
-    }
+    const accountId = signedInAccount(req, res);
+    if (!accountId) return;
     if (!userPreferencesStore) {
       return res.json({ prompts: [] });
     }
@@ -1147,49 +1190,37 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   /**
    * POST /workspace/:urlKey/api/dispatch/favorite-prompts
    * Add a custom prompt to the favourites list for the current user and workspace.
-   * Validation is copied verbatim from the recents POST so a favourite and its
+   * Validation is the recents POST's (promptTextFailure) so a favourite and its
    * recent counterpart accept/reject the same strings (and stay in sync by value).
    */
   router.post('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
-    const accountId = req.session.accountId;
-    if (!accountId) {
-      return unauthorized.json(res, 'Authentication required');
-    }
+    const accountId = signedInAccount(req, res);
+    if (!accountId) return;
     if (!userPreferencesStore) {
       return jsonError(res, 503, 'Service unavailable');
     }
 
-    const { prompt: rawPrompt } = req.body;
-    const prompt = typeof rawPrompt === 'string' ? rawPrompt.trim() : rawPrompt;
-    if (!prompt || typeof prompt !== 'string') {
-      return badRequest.json(res, 'prompt is required and must be a string');
-    }
-    if (prompt.length > MAX_CUSTOM_PROMPT_LENGTH) {
-      return badRequest.json(res, `prompt exceeds maximum length of ${MAX_CUSTOM_PROMPT_LENGTH}`);
-    }
-    if (DANGEROUS_CHARS_REGEX.test(prompt)) {
-      return badRequest.json(res, 'prompt contains invalid characters');
-    }
+    const { prompt, error } = promptTextFailure(req.body.prompt);
+    if (error) return badRequest.json(res, error);
 
     try {
       const prompts = await userPreferencesStore.addFavoritePrompt(accountId, req.workspace.urlKey, prompt);
       res.json({ success: true, prompts });
     } catch (err) {
-      console.error('Failed to save favorite prompt:', err.message);
-      jsonError(res, 500, 'Failed to save favorite prompt');
+      return reportFailure(res, 'Failed to save favorite prompt:', err, 'Failed to save favorite prompt');
     }
   });
 
   /**
    * DELETE /workspace/:urlKey/api/dispatch/favorite-prompts
    * Remove (un-star) a custom prompt from the favourites list. Prompt comes in
-   * the body `{ prompt }` (or `?prompt=`). Same auth gate as the add path.
+   * the body `{ prompt }` (or `?prompt=`). Same auth gate as the add path. Unlike the
+   * add path it checks only that a string came: it removes by exact value, so an
+   * over-long or odd string simply matches nothing.
    */
   router.delete('/workspace/:urlKey/api/dispatch/favorite-prompts', workspaceFromUrl, async (req, res) => {
-    const accountId = req.session.accountId;
-    if (!accountId) {
-      return unauthorized.json(res, 'Authentication required');
-    }
+    const accountId = signedInAccount(req, res);
+    if (!accountId) return;
     if (!userPreferencesStore) {
       return jsonError(res, 503, 'Service unavailable');
     }
@@ -1204,8 +1235,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const prompts = await userPreferencesStore.removeFavoritePrompt(accountId, req.workspace.urlKey, prompt);
       res.json({ success: true, prompts });
     } catch (err) {
-      console.error('Failed to remove favorite prompt:', err.message);
-      jsonError(res, 500, 'Failed to remove favorite prompt');
+      return reportFailure(res, 'Failed to remove favorite prompt:', err, 'Failed to remove favorite prompt');
     }
   });
 
@@ -1241,30 +1271,9 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const doc = await workspaceHaltStore.getWorkspaceHalt(req.workspace.urlKey);
       res.json({ halt: projectHaltForPoll(doc) });
     } catch (err) {
-      console.error('Workspace halt read error:', err.message);
-      jsonError(res, 500, 'Failed to read halt');
+      return reportFailure(res, 'Workspace halt read error:', err, 'Failed to read halt');
     }
   });
-
-  // LIN-3398: owner-only gate for the session-side runner mutations below (halt
-  // POST/DELETE, delete, trim, dispatch-token revoke). One call shape for all
-  // five: resolve through the shared runner-owner gate, answer through
-  // `sendRunnerRefusal`, and return true when the caller must stop. Always runs
-  // BEFORE the route's first store write. `target` is the queue row's own target
-  // for delete/trim (dash/local stay member-reachable); halt and revoke pass
-  // none, which means `cli` and is always checked. The refusal carries only the
-  // envelope: never the row read to find `target` (it holds `bootstrapToken`).
-  async function refuseNonOwner(req, res, target) {
-    const refusal = await resolveRunnerOwnerRefusal({
-      ownerCheck: workspaceOwnerCheck,
-      workspaceId: req.workspace.id,
-      accountId: req.session?.accountId,
-      target
-    });
-    if (!refusal) return false;
-    sendRunnerRefusal(res, refusal);
-    return true;
-  }
 
   /**
    * POST /workspace/:urlKey/api/dispatch/halt
@@ -1291,8 +1300,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       await workspaceHaltStore.setWorkspaceHalt(req.workspace.urlKey, { mode, setBy, now });
       res.json({ success: true, halt: { mode, setAt: now, setBy } });
     } catch (err) {
-      console.error('Workspace halt set error:', err.message);
-      jsonError(res, 500, 'Failed to set halt');
+      return reportFailure(res, 'Workspace halt set error:', err, 'Failed to set halt');
     }
   });
 
@@ -1312,8 +1320,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       await workspaceHaltStore.clearWorkspaceHalt(req.workspace.urlKey);
       res.json({ success: true });
     } catch (err) {
-      console.error('Workspace halt clear error:', err.message);
-      jsonError(res, 500, 'Failed to clear halt');
+      return reportFailure(res, 'Workspace halt clear error:', err, 'Failed to clear halt');
     }
   });
 
@@ -1345,8 +1352,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Remove dispatch item error:', err.message);
-      jsonError(res, 500, 'Failed to remove item');
+      return reportFailure(res, 'Remove dispatch item error:', err, 'Failed to remove item');
     }
   });
 
@@ -1402,8 +1408,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // fresh kickoff, not this control.
       return jsonError(res, 409, 'Trim must reduce the run\'s task budget below its current value');
     } catch (err) {
-      console.error('Trim session budget error:', err.message);
-      jsonError(res, 500, 'Failed to trim run');
+      return reportFailure(res, 'Trim session budget error:', err, 'Failed to trim run');
     }
   });
 
@@ -1462,8 +1467,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
         message: 'Token created. Save this token now - it cannot be retrieved later.'
       });
     } catch (err) {
-      console.error('Create token error:', err.message);
-      jsonError(res, 500, 'Failed to create token');
+      return reportFailure(res, 'Create token error:', err, 'Failed to create token');
     }
   });
 
@@ -1478,8 +1482,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const tokens = await dispatchTokenStore.listTokens(workspace.urlKey);
       res.json({ tokens });
     } catch (err) {
-      console.error('List tokens error:', err.message);
-      jsonError(res, 500, 'Failed to list tokens');
+      return reportFailure(res, 'List tokens error:', err, 'Failed to list tokens');
     }
   });
 
@@ -1507,8 +1510,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json({ success: true });
     } catch (err) {
-      console.error('Revoke token error:', err.message);
-      jsonError(res, 500, 'Failed to revoke token');
+      return reportFailure(res, 'Revoke token error:', err, 'Failed to revoke token');
     }
   });
 
@@ -1528,69 +1530,6 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
   // =========================================================================
 
   /**
-   * Normalize + validate a `byKind` map from a preset CRUD request body,
-   * mirroring the `server.js` dispatch-defaults per-kind loop: only known
-   * `DISPATCH_DEFAULT_KINDS` keys are read, each entry is trimmed to
-   * `{ model?, harness? }`, and a kind with neither field set is dropped.
-   * Throws `{ error }` (via `badRequest`-shaped return, not an exception) on
-   * the first invalid field, same convention as the top-level model/harness
-   * checks below.
-   *
-   * @param {*} byKind - Caller-supplied byKind value (any shape)
-   * @returns {{ error: string }|{ byKind: Object }}
-   */
-  function normalizeDispatchPresetByKind(byKind) {
-    if (byKind === undefined) return { byKind: undefined };
-    if (typeof byKind !== 'object' || byKind === null || Array.isArray(byKind)) {
-      return { error: 'byKind must be an object' };
-    }
-    const normalized = {};
-    for (const kind of DISPATCH_DEFAULT_KINDS) {
-      const entry = byKind[kind];
-      if (entry === undefined) continue;
-      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
-        return { error: `byKind.${kind} must be an object` };
-      }
-      const model = typeof entry.model === 'string' ? entry.model.trim() : '';
-      const harness = typeof entry.harness === 'string' ? entry.harness.trim() : '';
-      const effort = typeof entry.effort === 'string' ? entry.effort.trim() : '';
-      const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-      if (modelError) return { error: modelError.error };
-      const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-      if (harnessError) return { error: harnessError.error };
-      const effortError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
-      if (effortError) return { error: effortError.error };
-      if (model || harness || effort) {
-        normalized[kind] = {};
-        if (model) normalized[kind].model = model;
-        if (harness) normalized[kind].harness = harness;
-        if (effort) normalized[kind].effort = effort;
-      }
-    }
-    return { byKind: normalized };
-  }
-
-  function buildDispatchPresetConfig({ model, harness, effort, byKind }) {
-    const config = {};
-    const trimmedModel = typeof model === 'string' ? model.trim() : '';
-    const trimmedHarness = typeof harness === 'string' ? harness.trim() : '';
-    const trimmedEffort = typeof effort === 'string' ? effort.trim() : '';
-    if (trimmedModel) config.model = trimmedModel;
-    if (trimmedHarness) config.harness = trimmedHarness;
-    if (trimmedEffort) config.effort = trimmedEffort;
-    if (byKind && typeof byKind === 'object' && Object.keys(byKind).length) config.byKind = byKind;
-    return config;
-  }
-
-  // Preset store validation errors (name/config shape, custom cap) are the
-  // only ones this route can cause; anything else is a genuine 500. Mirrors
-  // the same status-by-message-pattern convention routes/collective.js uses
-  // for its own preset store.
-  function dispatchPresetErrorStatus(message) {
-    return /required|characters or less|must be|maximum of/.test(message) ? 400 : 500;
-  }
-
-  /**
    * GET /workspace/:urlKey/api/dispatch/presets
    * List saved dispatch presets for this workspace.
    */
@@ -1600,8 +1539,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const presets = await dispatchPresetsStore.list(req.workspace.urlKey);
       res.json({ presets });
     } catch (err) {
-      console.error('List dispatch presets error:', err.message);
-      jsonError(res, 500, 'Failed to list dispatch presets');
+      return reportFailure(res, 'List dispatch presets error:', err, 'Failed to list dispatch presets');
     }
   });
 
@@ -1613,19 +1551,13 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
 
     const { name, model, harness, effort, byKind } = req.body || {};
-    const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-    if (modelError) return badRequest.json(res, modelError.error);
-    const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-    if (harnessError) return badRequest.json(res, harnessError.error);
-    const effortError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
-    if (effortError) return badRequest.json(res, effortError.error);
-    const byKindResult = normalizeDispatchPresetByKind(byKind);
-    if (byKindResult.error) return badRequest.json(res, byKindResult.error);
+    const checked = presetBodyCheck({ model, harness, effort, byKind });
+    if (checked.error) return badRequest.json(res, checked.error);
 
     try {
       const preset = await dispatchPresetsStore.createCustom(req.workspace.urlKey, {
         name,
-        config: buildDispatchPresetConfig({ model, harness, effort, byKind: byKindResult.byKind })
+        config: buildDispatchPresetConfig({ model, harness, effort, byKind: checked.byKind })
       });
       res.status(201).json({ success: true, preset });
     } catch (error) {
@@ -1644,20 +1576,14 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     if (!dispatchPresetsStore) return jsonError(res, 503, 'Preset storage is not configured');
 
     const { name, model, harness, effort, byKind } = req.body || {};
-    const modelError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-    if (modelError) return badRequest.json(res, modelError.error);
-    const harnessError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-    if (harnessError) return badRequest.json(res, harnessError.error);
-    const effortError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
-    if (effortError) return badRequest.json(res, effortError.error);
-    const byKindResult = normalizeDispatchPresetByKind(byKind);
-    if (byKindResult.error) return badRequest.json(res, byKindResult.error);
+    const checked = presetBodyCheck({ model, harness, effort, byKind });
+    if (checked.error) return badRequest.json(res, checked.error);
 
     try {
       const existing = await dispatchPresetsStore.get(req.workspace.urlKey, req.params.presetId);
       if (!existing) return notFound.json(res, 'Preset not found');
 
-      const effectiveByKind = byKind !== undefined ? byKindResult.byKind : existing.config?.byKind;
+      const effectiveByKind = byKind !== undefined ? checked.byKind : existing.config?.byKind;
       const config = buildDispatchPresetConfig({ model, harness, effort, byKind: effectiveByKind });
       const preset = await dispatchPresetsStore.update(req.workspace.urlKey, req.params.presetId, {
         name: name !== undefined ? name : existing.name,
@@ -1682,8 +1608,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       if (!deleted) return notFound.json(res, 'Preset not found');
       res.json({ success: true });
     } catch (error) {
-      console.error('Delete dispatch preset error:', error.message);
-      jsonError(res, 500, 'Failed to delete preset');
+      return reportFailure(res, 'Delete dispatch preset error:', error, 'Failed to delete preset');
     }
   });
 
@@ -1720,8 +1645,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       const items = await itemsPromise;
       res.json({ items, ...(halt ? { halt } : {}) });
     } catch (err) {
-      console.error('Poll error:', err.message);
-      jsonError(res, 500, 'Failed to poll dispatch queue');
+      return reportFailure(res, 'Poll error:', err, 'Failed to poll dispatch queue');
     }
   });
 
@@ -1962,8 +1886,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       // consumers that destructure `{ item }` are unaffected.
       res.json({ item, dispatchId: item.id });
     } catch (err) {
-      console.error('Take error:', err.message);
-      jsonError(res, 500, 'Failed to take item');
+      return reportFailure(res, 'Take error:', err, 'Failed to take item');
     }
   });
 
@@ -2032,8 +1955,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
 
       res.json(result);
     } catch (err) {
-      console.error('Feedback error:', err.message);
-      jsonError(res, 500, 'Failed to post feedback');
+      return reportFailure(res, 'Feedback error:', err, 'Failed to post feedback');
     }
   });
 

@@ -7,6 +7,18 @@
  * - Recommendations: AI-generated prompts via OpenRouter
  * - Comments: Fetch issue comments
  * - Images: Proxy Linear-hosted images with auth
+ *
+ * Shape (LIN-3596): every route is registered explicitly, in the order below, as a
+ * thin handler over a small set of shared steps. The steps sit in two places:
+ *   - module level, where they need no dependency (`openIssue`, `failureOf`,
+ *     `refuseCapability`, `refuseFreeTier`, `scanRow`, `loadContext`, ...);
+ *   - inside `createWorkspaceApiRoutes`, where they close over the injected stores.
+ * The AI pre-flight calls (`resolveChatCredential`, `checkFreeTierGate`, the
+ * `forceDefault` model clamp) are deliberately NOT shared: each route names its own,
+ * because the source-text censuses scan this file for every one of them.
+ *
+ * Test-mode builders (mock recommendation, recap, brief, scan, audit data, ...) live
+ * in lib/workspace-api-mocks.js.
  */
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { Router, json } from 'express';
@@ -15,9 +27,8 @@ import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
 import { createRoadmapRoutes } from './workspace-api-roadmap.js';
 import { createPromptsRoutes } from './workspace-api-prompts.js';
-import { generatePrompt, generateCustomPrompt, hasPrompt, getAvailablePrompts } from '../lib/prompt-templates.js';
+import { generatePrompt, generateCustomPrompt, hasPrompt } from '../lib/prompt-templates.js';
 import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
-import { WORK_ISSUE_LABELS } from '../lib/workflow-config.js';
 import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
@@ -27,25 +38,6 @@ import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { sniffRasterType, parseFeedbackImage } from '../lib/attachment-upload.js';
-
-// Shared cross-hop budget for the recommend recursion (LIN-329) on the human UI
-// path. Matches the proxy's budget; defer hops are cheap (no prompt body) so a deep
-// descent stays well inside it. Checked between hops by resolveRecommendation, and
-// enforced in-flight per hop via armHopSignal (gap #3, LIN-346).
-const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
-
-// Per-fetch bound for a single Linear context fetch. Composes (via AbortSignal.any)
-// with the client-disconnect signal and the shared descent budget so a stalled Linear
-// call can't hold the SSE socket open until Heroku's H15 fires (LIN-346, gap #1).
-const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
-
-// GET /api/scan-due paging + fan-out bounds (LIN-2649 WS2/S3). Page size
-// mirrors BASIS_CHECK_MAX_PER_PAGE (public/observation.js) and its reasoning
-// — each check fetches live task context, so N candidates is N provider
-// reads. Concurrency mirrors pumpBasisChecks's shape, server-side over the
-// DB-sourced candidate list.
-const DUE_CHECK_PAGE_SIZE = 40;
-const DUE_CHECK_CONCURRENCY = 5;
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
 import { validateOpaqueDispatchField, MAX_NAME_LENGTH } from '../lib/dispatch-validation.js';
@@ -53,7 +45,6 @@ import { validateRunField } from '../lib/dispatch-fields.js';
 import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
-import { TaskDecisionsStore } from '../lib/task-decisions-store.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
 import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
 import { readPrStatusFailOpen, prReadToken } from '../lib/github-pr-status.js';
@@ -91,10 +82,196 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { dedupeKey, createDedupeCache } from '../lib/proxy-dedupe.js';
 import { commentDedupe, commentDedupeGenerations } from './proxy.js';
 import { armKeepalive, armSseKeepalive, clientGoneSignal } from '../lib/http-keepalive.js';
-import { isTerminalState, isBlocked } from '../lib/tree.js';
-import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
+import { testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { sendSSE } from '../lib/sse.js';
+import {
+  generateMockRecommendation,
+  buildMockRecommendationHop,
+  planMockDescent,
+  buildMockPromptInput,
+  buildMockRecapContext,
+  buildMockRecap,
+  buildMockBrief,
+  buildMockScanText,
+  buildMockFeedbackTitle,
+  buildMockAuditData,
+} from '../lib/workspace-api-mocks.js';
+
+// The two mock builders other modules import from this router (tests, the dashboard).
+export { generateMockRecommendation, buildMockRecommendationHop };
+
+// Shared cross-hop budget for the recommend recursion (LIN-329) on the human UI
+// path. Matches the proxy's budget; defer hops are cheap (no prompt body) so a deep
+// descent stays well inside it. Checked between hops by resolveRecommendation, and
+// enforced in-flight per hop via armHopSignal (gap #3, LIN-346).
+const RECOMMEND_DESCENT_BUDGET_MS = 180_000;
+
+// Per-fetch bound for a single Linear context fetch. Composes (via AbortSignal.any)
+// with the client-disconnect signal and the shared descent budget so a stalled Linear
+// call can't hold the SSE socket open until Heroku's H15 fires (LIN-346, gap #1).
+const CONTEXT_FETCH_TIMEOUT_MS = 45_000;
+
+// GET /api/scan-due paging + fan-out bounds (LIN-2649 WS2/S3). Page size
+// mirrors BASIS_CHECK_MAX_PER_PAGE (public/observation.js) and its reasoning
+// — each check fetches live task context, so N candidates is N provider
+// reads. Concurrency mirrors pumpBasisChecks's shape, server-side over the
+// DB-sourced candidate list.
+const DUE_CHECK_PAGE_SIZE = 40;
+const DUE_CHECK_CONCURRENCY = 5;
+
+// Max image size: 10MB to prevent memory exhaustion
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+
+// The render sections the lazy detail route whitelists (LIN-732).
+const KNOWN_SECTIONS = ['project', 'in-progress', 'recent-activity'];
+
+// LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
+// `key` have already succeeded — separate from `commentDedupe` itself (which
+// caches the WRITTEN COMMENT and is spread verbatim into the JSON response;
+// piggybacking stamp bookkeeping onto that value would leak new fields into
+// the wire contract). Same TTL discipline as `commentDedupe`: an entry ages
+// out with the comment dedupe window it tracks, so a stamp that never
+// succeeds within 5 minutes simply falls out of both caches together, at
+// which point a resubmission mints a fresh (unrelated) comment+stamp attempt
+// rather than being treated as a retry forever.
+export const decisionStampDedupe = createDedupeCache();
+
+// ===========================================================================
+// Shared steps that need no dependency
+// ===========================================================================
+
+/**
+ * The test-token workspace (`/test/set-session`): data comes from `testMockData`,
+ * never from a provider. `mockAi` (lib/should-mock-ai.js) is the separate, wider
+ * predicate for the AI mock, which local-provider sessions also trip (LIN-388/LIN-405).
+ */
+const isTestToken = (workspace) => process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+
+/** The session is on the shared free-tier key: flagged on, no own key, no paid env key. */
+const sessionIsFreeTier = (session) => session.freeTierEnabled && !session.openRouterApiKey && !hasPaidEnvKey();
+
+/** The `freeTier` block every 429 from the free-tier gate carries. */
+const freeTierBody = (check) => ({ freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+
+const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierBody(check));
+
+const aiNotConfigured = (res, noun) =>
+  jsonError(res, 503, `AI ${noun} is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.`, { code: 'AI_NOT_CONFIGURED' });
+
+/**
+ * Clean 422 (never a raw NotImplementedError) when the provider cannot do `capability`.
+ * @param {string} doing - the tail of "This workspace's provider does not support …"
+ */
+function refuseCapability(res, providerName, capability, doing) {
+  return jsonError(res, 422, `This workspace's provider does not support ${doing}`, {
+    code: 'CAPABILITY_NOT_SUPPORTED', capability, provider: providerName,
+  });
+}
+
+// Never let a durable scan record be keyed under a non-canonical fallback
+// (LIN-2197 Phase 2 close-out ledger item 3). Spread into jsonError / keepaliveError.
+const CANONICAL_ID_REFUSAL = [422, "This task's canonical id could not be resolved; scan requires a canonical identity", { code: 'CANONICAL_ID_REQUIRED' }];
+
+/**
+ * The error ladder shared by the upstream-calling routes, as `[status, message, extra]`
+ * ready to spread into `jsonError(res, …)` or `keepaliveError(keepalive, …)`. Arms, in
+ * order: a provider 401; "not found" (the message is relayed); an OpenRouter failure.
+ * Anything else is the route's own 500.
+ * @param {{notFound?: boolean, openRouter?: boolean}} [arms] - which optional arms the route has
+ */
+function failureOf(error, fallbackMessage, { notFound: hasNotFoundArm = true, openRouter: hasOpenRouterArm = false } = {}) {
+  if (error.response?.status === 401) return [401, 'Token expired or invalid'];
+  if (hasNotFoundArm && error.message?.includes('not found')) return [404, error.message];
+  if (hasOpenRouterArm && error.message?.includes('OpenRouter')) return [503, 'AI service temporarily unavailable', { message: error.message }];
+  return [500, fallbackMessage, { message: error.message }];
+}
+
+/** The catch tail of the keepalive routes: stop the keepalive, log, and reply through it with the ladder's answer. */
+function keepaliveFailure(keepalive, label, error, fallbackMessage, arms) {
+  keepalive.stop();
+  console.error(label, error);
+  keepaliveError(keepalive, ...failureOf(error, fallbackMessage, arms));
+}
+
+/**
+ * The preamble every issue-addressed route opens with: resolve the issue's own binding
+ * (LIN-1904: per the `source` provenance stamp, not always the workspace's active
+ * provider), then refuse, in this order, a malformed id, a missing scan-record id, an
+ * unconfigured store, and a provider without recommendation context (LIN-1910). Replies
+ * and returns null when it refuses.
+ * @param {Object} [checks]
+ * @param {boolean} [checks.recordId] - the body must carry a scan record `id`
+ * @param {*} [checks.store] - the store the route needs, checked with `storeName`
+ * @param {string} [checks.storeName] - "<storeName> not configured" (503)
+ * @param {string} [checks.capability] - require `fetchRecommendationContext`, worded "<capability> for this issue"
+ * @param {boolean} [checks.bind=true] - false where the route resolves the binding only on a branch
+ */
+function openIssue(req, res, { recordId = false, store, storeName, capability, bind = true } = {}) {
+  const workspace = req.workspace;
+  const { issueId } = req.params;
+  const binding = bind ? resolveIssueBinding(workspace, req.query.source) : null;
+
+  if (!isValidIssueId(issueId)) {
+    badRequest.json(res, 'Invalid issue ID format');
+    return null;
+  }
+  if (recordId && (typeof req.body?.id !== 'string' || !req.body.id)) {
+    badRequest.json(res, 'A scan record id is required');
+    return null;
+  }
+  if (storeName && !store) {
+    jsonError(res, 503, `${storeName} not configured`);
+    return null;
+  }
+  if (capability && !binding.provider.supports('fetchRecommendationContext')) {
+    refuseCapability(res, binding.provider.name, 'fetchRecommendationContext', `${capability} for this issue`);
+    return null;
+  }
+  return { workspace, issueId, recordId: req.body?.id, provider: binding?.provider, callScope: binding?.callScope };
+}
+
+/**
+ * The context a recommend-family route works from: the fixtures under a test token,
+ * otherwise the provider's. `missing` is true only when the fixture issue is absent;
+ * a provider's answer is taken as given.
+ */
+async function loadContext(workspace, issueId, { provider, callScope }) {
+  if (isTestToken(workspace)) {
+    const context = buildMockRecapContext(issueId);
+    return { context, missing: !context };
+  }
+  return { context: await provider.fetchRecommendationContext(callScope, issueId), missing: false };
+}
+
+/**
+ * The scan routes' common first steps: the task's context and the canonical id a durable
+ * scan record is keyed under (LIN-2197 Phase 2 close-out ledger item 3: never a
+ * non-canonical fallback). A refusal comes back as `[status, message, extra]` for the
+ * route to reply with, plain or through its keepalive.
+ */
+async function loadScanSubject(workspace, issueId, binding) {
+  const { context, missing } = await loadContext(workspace, issueId, binding);
+  if (missing) return { refusal: [404, 'Issue not found'] };
+  const canonicalId = context.issue?.id || issueId;
+  if (!UUID_REGEX.test(canonicalId)) return { refusal: CANONICAL_ID_REFUSAL };
+  return { context, canonicalId };
+}
+
+/** The non-null slice of a scan row the scan routes return; `raw` keeps absent fields absent (retire, unretire). */
+function scanRow(record, { raw = false } = {}) {
+  const orNull = (value) => (raw ? value : (value ?? null));
+  return {
+    id: record.id,
+    issueId: record.issueId,
+    decision: record.decision,
+    scannedAt: record.scannedAt,
+    outcome: record.outcome,
+    outcomeAt: record.outcomeAt,
+    outcomeReason: orNull(record.outcomeReason),
+    outcomeBasisHash: orNull(record.outcomeBasisHash),
+  };
+}
 
 /**
  * Send a generated prompt as JSON (default) or as a downloadable markdown
@@ -119,109 +296,113 @@ function sendPromptResult(req, res, { json, prompt, identifier, downloadName }) 
   return res.json(json);
 }
 
-/**
- * Generate mock recommendation content for the AI mock (LIN-185, LIN-405).
- *
- * Shared by the streaming and non-streaming recommend endpoints. Kept
- * SHAPE-TOLERANT so it serves BOTH the canonical provider issue (local
- * sessions, post-LIN-405) and the Linear-shaped `testMockData` issue still
- * passed by the `isTestMode` stream / GET blocks. (LIN-413 verdict: those
- * blocks are RETAINED — free-tier.spec still drives the stream on the
- * test-token path and the recommend GET directly, so they are not orphaned.):
- *   - labels arrive either as a plain `['bug']` array or as `{ nodes: [...] }`;
- *   - the identifier is read from `issue.identifier` (canonical urls end in a
- *     UUID, so the historic `url.split('/').pop()` is only a last-ditch fallback).
- * @param {Object} mockIssue - A canonical or Linear-shaped issue.
- * @returns {{ reasoning: string, prompt: string, identifier: string }}
- */
-export function generateMockRecommendation(mockIssue) {
-  const rawLabels = mockIssue.labels;
-  const labels = Array.isArray(rawLabels)
-    ? rawLabels
-    : (rawLabels?.nodes || []).map(l => l.name);
-  let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.';
-  let goal = 'Summarize what this task involves and how it fits into the broader project context.';
-
-  if (isBlocked(mockIssue)) {
-    // LIN-357: blocked-ness is the incomplete blocking relationship, not a label.
-    reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.';
-    goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.';
-  } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
-    reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.';
-    goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.';
-  } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
-    reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.';
-    goal = 'Research the codebase, identify files to modify, and create a step-by-step implementation plan.';
-  }
-
-  const identifier = mockIssue.identifier || mockIssue.url?.split('/').pop() || 'ISSUE';
-
-  const prompt = `Help me with task ${identifier}
-
-## Context
-
-**Project:** Test Project
-**Status:** ${mockIssue.state?.name || 'Unknown'}
-${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
-
-## Goal
-
-${goal}`;
-
-  return { reasoning, prompt, identifier };
+// LIN-836: surface the stepper variant in the UI. Validate against the shared
+// list (unknown/absent → standard), thread it into the kickoff body, and let
+// ONLY the stepper branch change label/promptName/downloadName — the standard
+// strings stay byte-identical to preserve the LIN-791 additive invariant.
+function autopilotParams(req) {
+  const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT;
+  const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT;
+  return { mode, variant, stepper: variant === 'stepper', baseUrl: `${req.protocol}://${req.get('host')}` };
 }
 
-/**
- * Build one mock recommendation hop from provider context for the resolver's
- * `computeOne` (LIN-405). Deterministically mirrors what a single
- * getRecommendation(Stream) call would return so a local (AI-mocked) session
- * drives the SAME `resolveRecommendation` descent the real path uses:
- *   - a parent whose focused child is non-terminal synthesises a `defer` to that
- *     child (passing `children`/`state` through so the resolver's LIN-353
- *     terminal-edge guard can validate the hop), so e.g. TEST-1 → TEST-2 descends;
- *   - a leaf returns a real (non-defer) action carrying the mock prompt.
- * @param {Object} ctx - provider.fetchRecommendationContext result.
- * @returns {Object} A computeOne hop record.
- */
-export function buildMockRecommendationHop(ctx) {
-  const base = {
-    identifier: ctx.issue.identifier,
-    truncated: false,
-    completionTokens: null,
-    issueUrl: ctx.issue.url,
-    state: ctx.issue.state,
-    children: ctx.children,
-  };
-  const focusChild = ctx.focusedChild?.issue;
-  if (focusChild) {
-    return {
-      ...base,
-      reasoning: `${ctx.issue.identifier} is a container → routing to ${focusChild.identifier}`,
-      prompt: null,
-      recommendedAction: 'defer',
-      deferTo: focusChild.identifier,
-    };
-  }
-  const { reasoning, prompt } = generateMockRecommendation(ctx.issue);
-  return {
-    ...base,
-    reasoning,
+function sendAutopilotPrompt(req, res, { stepper, identifier, promptName, prompt }) {
+  const label = stepper ? 'autopilot-stepper' : 'autopilot';
+  sendPromptResult(req, res, {
+    identifier,
+    downloadName: label,
     prompt,
-    recommendedAction: 'recommend',
-    deferTo: null,
+    json: { label, promptName, kind: 'autopilot', prompt }
+  });
+}
+
+const autopilotTitle = (stepper) => (stepper ? 'Autopilot (stepped)' : 'Autopilot');
+
+/** The recommendation call options the buffered GET and both stream paths pass the model. */
+function recommendCallOptions({ apiKey, model, session, provider, workspace, identifier, signal }) {
+  return {
+    apiKey,
+    model,
+    featureFlags: getFeatureFlags(session),
+    providerUi: provider.ui || null,
+    signal,
+    callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: identifier }
   };
 }
 
-// LIN-2208: whether the decision-answer stamp(s) for a given comment-dedupe
-// `key` have already succeeded — separate from `commentDedupe` itself (which
-// caches the WRITTEN COMMENT and is spread verbatim into the JSON response;
-// piggybacking stamp bookkeeping onto that value would leak new fields into
-// the wire contract). Same TTL discipline as `commentDedupe`: an entry ages
-// out with the comment dedupe window it tracks, so a stamp that never
-// succeeds within 5 minutes simply falls out of both caches together, at
-// which point a resubmission mints a fresh (unrelated) comment+stamp attempt
-// rather than being treated as a retry forever.
-export const decisionStampDedupe = createDedupeCache();
+/** One recommend hop as the resolver's `computeOne` returns it, from the hop's context and the model's answer. */
+function toHopRecord(ctx, r) {
+  return {
+    identifier: ctx.issue.identifier,
+    reasoning: r.reasoning,
+    prompt: r.prompt,
+    truncated: r.truncated,
+    completionTokens: r.completionTokens,
+    recommendedAction: r.recommendedAction,
+    deferTo: r.deferTo,
+    issueUrl: ctx.issue.url,
+    // Node state + children (with state) feed the resolver's terminal-state
+    // descent guard (LIN-353) — already in ctx, no extra round-trip.
+    state: ctx.issue.state,
+    children: ctx.children
+  };
+}
+
+function openSse(res) {
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  });
+  res.flushHeaders();
+}
+
+/** The mock stream's reasoning and prompt, each split into 2 chunks so the multi-chunk assembly assertions hold (LIN-405). */
+function sendMockSections(res, { reasoning, prompt }) {
+  sendSSE(res, 'phase', { phase: 'reasoning' });
+  const reasoningMid = Math.floor(reasoning.length / 2);
+  sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(0, reasoningMid) });
+  sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(reasoningMid) });
+  sendSSE(res, 'phase', { phase: 'prompt' });
+  const promptMid = Math.floor(prompt.length / 2);
+  sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(0, promptMid) });
+  sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(promptMid) });
+}
+
+/** The test-token stream over a fixture issue (LIN-185): a container descends (LIN-327), a leaf streams its mock. */
+function streamMockFixture(res, mockIssue) {
+  const descent = planMockDescent(mockIssue);
+
+  // Node-shaped mock issue (LIN-327): mirror the live node path — stream a
+  // descent breadcrumb for each container, then the terminal child's mock
+  // recommendation. Keeps the descent-streaming behaviour E2E-covered.
+  if (descent) {
+    const { path, terminal, deferredVia, idOf } = descent;
+    openSse(res);
+    sendSSE(res, 'phase', { phase: 'reasoning' });
+    for (let k = 0; k < path.length - 1; k++) {
+      sendSSE(res, 'delta', { section: 'reasoning', content: `\n\n↳ ${idOf(path[k])} is a container → routing to ${idOf(path[k + 1])}\n\n` });
+    }
+    const term = generateMockRecommendation(terminal);
+    sendSSE(res, 'delta', { section: 'reasoning', content: term.reasoning });
+    sendSSE(res, 'phase', { phase: 'prompt' });
+    sendSSE(res, 'delta', { section: 'prompt', content: term.prompt });
+    sendSSE(res, 'done', {
+      truncated: false, completionTokens: null,
+      issueUrl: terminal.url,
+      identifier: idOf(terminal), deferredVia, deferTruncated: false
+    });
+    res.end();
+    return;
+  }
+
+  const mock = generateMockRecommendation(mockIssue);
+  openSse(res);
+  sendSSE(res, 'phase', { phase: 'fetching_context' });
+  sendMockSections(res, mock);
+  sendSSE(res, 'done', { truncated: false, completionTokens: null, issueUrl: mockIssue.url });
+  res.end();
+}
 
 /**
  * Best-effort decision-answer stamp(s) for a human comment write (LIN-1728
@@ -238,58 +419,380 @@ export const decisionStampDedupe = createDedupeCache();
  *   try again.
  */
 async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache = null }) {
-  const { decisionLoopId, decisionId, taskDecisionId, taskDecisionIssueId, optionId } = decision || {};
-  let ok = true;
+  const given = (v) => typeof v === 'string' && v !== '';
+  const d = decision || {};
+  const { urlKey } = workspace;
 
-  if (typeof decisionLoopId === 'string' && decisionLoopId && typeof decisionId === 'string' && decisionId) {
-    try {
-      // LIN-2792: `optionId` rides this same stamp, undefined `outcome`
-      // (this helper is never reached for a dismissal, so there is no risk
-      // of it leaking onto one) — `markDecisionAnswered`'s 5th argument,
-      // added by LIN-2754 Track B.
-      const stamped = await dispatchQueueStore.markDecisionAnswered(decisionLoopId, workspace.urlKey, decisionId, undefined, optionId);
-      if (!stamped) {
-        console.error(`Decision-answer stamp not applied: no matching item ${decisionLoopId} in workspace ${workspace.urlKey}`);
-        ok = false;
-      } else if (sessionsFeedCache) {
-        // LIN-2755: this stamp writes into dispatchQueueStore feedback, which
-        // is exactly what the cached loop reconstruction (mergeLoops/
-        // loadLoops) reads — invalidate only on a genuine success.
-        sessionsFeedCache.clear(workspace.urlKey);
+  // Each requested stamp is an attempt that resolves to null when it landed, or
+  // to the "not applied" log line when it matched nothing. A throw is logged
+  // under the attempt's own `failure` label.
+  const attempts = [];
+  if (given(d.decisionLoopId) && given(d.decisionId)) {
+    attempts.push({
+      failure: 'Decision-answer stamp failed:',
+      // LIN-2792: `optionId` rides this stamp with an undefined `outcome` (never
+      // reached for a dismissal, so it cannot leak onto one) — the 5th argument
+      // `markDecisionAnswered` gained in LIN-2754 Track B.
+      run: async () => (await dispatchQueueStore.markDecisionAnswered(d.decisionLoopId, urlKey, d.decisionId, undefined, d.optionId))
+        ? null
+        : `Decision-answer stamp not applied: no matching item ${d.decisionLoopId} in workspace ${urlKey}`
+    });
+  }
+  if (taskDecisionsStore && given(d.taskDecisionId) && given(d.taskDecisionIssueId)) {
+    attempts.push({
+      failure: 'Task-decision answer stamp failed:',
+      // LIN-2889/LIN-2724: the shared answer() op un-retires a self-resolved row
+      // before re-stamping it, and firstStampWins comes from a conditional write
+      // (matchedCount), not markOutcome's earlier read — so a truthy record alone
+      // does not prove this call's own write landed.
+      run: async () => {
+        const { record, firstStampWins } = await taskDecisionsStore.answer({
+          urlKey, issueId: d.taskDecisionIssueId, id: d.taskDecisionId
+        });
+        const settled = firstStampWins || record?.outcome === 'answered' || record?.outcome === 'dismissed';
+        return record && settled
+          ? null
+          : `Task-decision answer stamp not applied: no matching row ${d.taskDecisionId} for issue ${d.taskDecisionIssueId} in workspace ${urlKey} (outcome=${record?.outcome ?? 'none'})`;
       }
-    } catch (stampErr) {
-      console.error('Decision-answer stamp failed:', stampErr.message);
-      ok = false;
-    }
+    });
   }
 
-  if (taskDecisionsStore && typeof taskDecisionId === 'string' && taskDecisionId && typeof taskDecisionIssueId === 'string' && taskDecisionIssueId) {
+  let everyStampLanded = true;
+  for (const attempt of attempts) {
     try {
-      // LIN-2889/LIN-2724: the shared answer() op un-retires a self-resolved
-      // row before re-stamping it, and firstStampWins comes from a
-      // conditional write (matchedCount), not from markOutcome's earlier
-      // read — a truthy return here is not itself proof this call's own
-      // write landed.
-      const { record, firstStampWins } = await taskDecisionsStore.answer({
-        urlKey: workspace.urlKey, issueId: taskDecisionIssueId, id: taskDecisionId
-      });
-      const success = !!record && (firstStampWins || record.outcome === 'answered' || record.outcome === 'dismissed');
-      if (!success) {
-        console.error(`Task-decision answer stamp not applied: no matching row ${taskDecisionId} for issue ${taskDecisionIssueId} in workspace ${workspace.urlKey} (outcome=${record?.outcome ?? 'none'})`);
-        ok = false;
-      } else if (sessionsFeedCache) {
-        // LIN-2755: uniform invalidation, per the ticket's Proposal — this
-        // store is read live/uncached, so it's defensive rather than fixing
-        // an observable staleness bug (see the loop-half comment above).
-        sessionsFeedCache.clear(workspace.urlKey);
+      const notApplied = await attempt.run();
+      if (notApplied) {
+        console.error(notApplied);
+        everyStampLanded = false;
+      } else {
+        // LIN-2755: both stamps write into state the cached loop reconstruction
+        // (mergeLoops / loadLoops) may read, so drop the cache only on a
+        // genuine success. For the task-decision store, read live and uncached,
+        // this is defensive rather than a fix for observable staleness.
+        sessionsFeedCache?.clear(urlKey);
       }
     } catch (stampErr) {
-      console.error('Task-decision answer stamp failed:', stampErr.message);
-      ok = false;
+      console.error(attempt.failure, stampErr.message);
+      everyStampLanded = false;
     }
   }
+  return everyStampLanded;
+}
 
-  return ok;
+// Normalize a provider write result to `{ success, issue }`. Linear/GitHub
+// return that shape already; the local provider returns a bare canonical issue
+// (or null), so without this a successful local write would read as
+// `success: undefined` and wrongly 502. Mirrors proxy.js's normalizeWritePayload.
+function normalizeIssueWrite(result) {
+  return asWriteEnvelope(result, 'issue');
+}
+
+// Same normalization, keyed 'comment' instead of 'issue' (LIN-2154) — the
+// session-auth comment route's provider.createComment() result can be
+// Linear's `{success, comment}` envelope or a bare comment entity (Local).
+function normalizeCommentWrite(result) {
+  return asWriteEnvelope(result, 'comment');
+}
+
+// A result that already carries `success` is the envelope; anything else is the
+// bare entity (or null), wrapped under `key`.
+function asWriteEnvelope(result, key) {
+  const isEnvelope = !!result && typeof result === 'object' && 'success' in result;
+  return isEnvelope ? result : { success: !!result, [key]: result ?? null };
+}
+
+// Input-side symbolic-ref resolution, mirroring the proxy write path
+// (routes/proxy.js resolveTeamInput/resolveStateInput/resolveProjectInput): a
+// bare UUID short-circuits before any provider read, so existing UUID payloads
+// pay no network cost; a symbolic ref triggers the scoped list fetch and
+// resolves to a native id (or throws RefResolutionError → clean 422 below).
+// A bare UUID passes straight through; anything else is looked up by `list()` and
+// matched by `match`.
+async function resolveRefVia(rawRef, list, match) {
+  const { localRef } = parseSourceNamespace(rawRef);
+  if (UUID_REGEX.test(localRef)) return localRef;
+  return match(await list(), localRef);
+}
+const resolveIssueTeamRef = (provider, token, rawRef) =>
+  resolveRefVia(rawRef, () => provider.fetchTeams(token), resolveTeamRef);
+const resolveIssueProjectRef = (provider, token, rawRef) =>
+  resolveRefVia(rawRef, () => provider.fetchProjectsList(token), resolveProjectRef);
+// States are team-scoped. Without a team the symbolic match cannot be scoped, so
+// it fails loud (422) rather than guessing across teams.
+const resolveIssueStateRef = (provider, token, teamId, rawRef) =>
+  resolveRefVia(rawRef, () => {
+    if (teamId) return provider.states(token, teamId);
+    const { localRef } = parseSourceNamespace(rawRef);
+    throw new RefResolutionError(
+      `Cannot resolve state '${localRef}' — the issue's team could not be determined`,
+      { status: 422 },
+    );
+  }, resolveStateRef);
+
+// The first reason a create body is refused, or null. Order is the contract:
+// team, title, the shared field validation, then the LIN-1973 restrictive half.
+function issueCreateRefusal({ title, description, teamId, stateId, priority }, declared) {
+  if (declared.includes('teamId') && (!teamId || typeof teamId !== 'string')) return 'Valid teamId is required';
+  if (!title || typeof title !== 'string') return 'title is required';
+  // Shared seam (length caps, control characters, priority range). Unlike the
+  // proxy surface, this session-auth one opts into priority rejection so a bad
+  // priority is a clean 400 rather than a silent drop (LIN-1552 Session A spec).
+  const fieldError = validateIssueWriteFields({ title, description, priority }, { mode: 'create', validatePriority: true });
+  if (fieldError) return fieldError;
+  // LIN-1973: a stateId/priority the provider's createFields() does not declare
+  // is a 400, not a silent drop. Checked by presence, not truthiness, so an
+  // explicit `stateId: ''` is still caught.
+  if (stateId !== undefined && !declared.includes('stateId')) return 'stateId is not supported by this provider';
+  if (priority !== undefined && !declared.includes('priority')) return 'priority is not supported by this provider';
+  return null;
+}
+
+// The first reason an update body is refused, or null: field validation, then a
+// wholly empty body — both before any provider read.
+function issueUpdateRefusal({ title, description, priority, stateRef }) {
+  const fieldError = validateIssueWriteFields({ title, description, priority }, { mode: 'update', validatePriority: true });
+  if (fieldError) return fieldError;
+  const anySupplied = [title, description, stateRef, priority].some((v) => v !== undefined);
+  return anySupplied ? null : 'No valid fields to update';
+}
+
+// Normalize a provider's write result and answer 502 (with the raw result as
+// `detail`) when it did not produce an issue. Returns the result on success,
+// otherwise null once the 502 is sent.
+function answerIssueWrite(res, rawResult, failureMessage) {
+  const result = normalizeIssueWrite(rawResult);
+  if (result.success && result.issue) return result;
+  jsonError(res, 502, failureMessage, { detail: result || null });
+  return null;
+}
+
+// retire's two ways to find the row not stamped, as `[status, message, extras]`
+// for the response helpers. `markOutcome` returns null for a row pruned or
+// replaced (`_pruneToCapacity`, a superseding scan), and a record that is not
+// 'self-resolved' when first-stamp-wins hit an already-terminal row — reachable
+// with no client bug, since the route's own re-scan runs before its write and
+// leaves a window for a dismiss/answer/earlier retire to land first.
+const RETIRE_ROW_GONE = [404, 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', { code: 'ROW_GONE' }];
+const RETIRE_ALREADY_TERMINAL = [409, 'This ruling changed while the check was running and was not retired', { code: 'ALREADY_TERMINAL' }];
+
+// The raw model text of retire's re-scan, or null when the scan prompt could not
+// be built (the Principle 0 gate was skipped). Deliberately not `generateScan`,
+// whose own `has_decision !== true` collapse is right for raising and wrong for
+// retiring (see lib/scan.js).
+async function rawRetireRescan({ context, workspace, apiKey, model }) {
+  const messages = buildScanMessages(context.issue, context);
+  if (!messages) return null;
+  let text = '';
+  await streamChat(
+    messages,
+    {
+      apiKey, model, maxTokens: 1000, temperature: 0,
+      callMeta: { feature: 'scan-retire', issueIdentifier: context.issue?.identifier || null, urlKey: workspace?.urlKey }
+    },
+    (type, data) => { if (type === 'token' && data?.token) text += data.token; }
+  );
+  return text;
+}
+
+// Map a RefResolutionError to a clean 422 (with candidate ids for an ambiguous
+// match). Returns true when handled so the catch can `if (...) return;`.
+function issueRefResolutionFailed(res, err) {
+  if (!(err instanceof RefResolutionError)) return false;
+  jsonError(res, err.status || 422, err.message, err.candidates ? { candidates: err.candidates } : undefined);
+  return true;
+}
+
+// Map a PartialWriteError (LIN-2012) the same way the proxy route does —
+// same structured envelope, same non-2xx PARTIAL_WRITE code — so a caller
+// sees identical shapes on both lanes. This route has no logEvent-equivalent
+// audit trail today (unlike the proxy lane), so the provider-level
+// console.warn in lib/providers/jira/index.js is what covers this lane;
+// adding one here is a separate, out-of-scope concern.
+function partialWriteFailed(res, err) {
+  if (!(err instanceof PartialWriteError)) return false;
+  jsonError(res, err.status || 500, err.message, {
+    code: 'PARTIAL_WRITE',
+    category: 'upstream',
+    retryable: true,
+    detail: err.cause?.message || null,
+    context: { applied: err.applied, failed: err.failed },
+  });
+  return true;
+}
+
+// ===========================================================================
+// Feedback intake constants (LIN-636 route / LIN-635 widget)
+// ===========================================================================
+//
+// POST /workspace/:urlKey/api/feedback creates a fresh ticket from a feedback
+// message — priority, captured page URL + browser, and an optional embedded
+// screenshot — then enqueues a triage-style follow-up. It is the ONLY consumer
+// of the provider `uploadFile` seam (LIN-636); the feedback widget (LIN-635)
+// POSTs here.
+//
+// Body-size exception, scoped to THIS route only: the global
+// `express.json({ limit: '250kb' })` (server.js) is left untouched. That
+// global parser only matches `application/json`, so a larger body sent with a
+// non-JSON content type (e.g. text/plain) passes through it unparsed; the
+// per-route parser below (permissive `type`, raised limit) then parses it.
+// Small `application/json` bodies are already parsed by the global parser and
+// are skipped here, so they keep the 250kb ceiling — the exception cannot leak
+// to other routes.
+const FEEDBACK_BODY_LIMIT = '12mb';
+const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
+const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
+const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
+
+// The three explicit post-create actions the feedback widget can request
+// (LIN-918). Anything else (including an omitted action) is the legacy plain
+// send, which still honours the per-user `feedbackTriage` flag.
+const FEEDBACK_ACTIONS = new Set(['save', 'triage', 'autopilot']);
+
+// Shared framing core: a widget-filed feedback ticket is a raw, un-triaged user
+// report, not a scoped task (LIN-918 / LIN-947). Both the persisted description
+// marker (LIN-947, stored ON the ticket) and the autopilot kickoff note (LIN-918,
+// injected into a run) build on this one sentence so the "raw feedback" framing
+// cannot drift apart between the two surfaces.
+const FEEDBACK_ORIGIN_FRAMING =
+  'this ticket was filed directly from the in-app feedback widget, so it is an ' +
+  'unfiltered user report, not a triaged or scoped task';
+
+// Feedback-origin brief injected into a feedback → autopilot kickoff (LIN-918).
+// A scoped kickoff now also appends a non-empty caller `goal` as additional
+// context (LIN-2818), but this call site passes none — it threads the framing in
+// via the dedicated `originNote` seam, which stays the distinct, system-authored
+// carrier. It tells the run the ticket is a raw, un-triaged user report whose
+// first job is understanding.
+const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
+  `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
+  'your first job is to *understand* it: read the report closely, reproduce or ground the problem ' +
+  'against the current code, and work out what is actually being asked. Treat the description as a ' +
+  'starting hypothesis, not a specification.';
+
+// Persisted origin/triage marker written into every widget-filed feedback
+// description (LIN-947). Unlike FEEDBACK_AUTOPILOT_ORIGIN_NOTE — which is only
+// threaded into an autopilot run — this is stored ON the ticket, so the
+// meta-prompt's next-action scorer sees the "raw, un-triaged" signal and routes
+// to `triage` (sort intent, confirm priority, scope) instead of skipping ahead
+// to look-into/research/implement on a report that only looks intentional.
+const FEEDBACK_ORIGIN_TRIAGE_MARKER =
+  `**Origin — raw feedback (triage first):** ${FEEDBACK_ORIGIN_FRAMING}. ` +
+  'Its natural next step is **triage**: work out what is actually being asked, ' +
+  'confirm the real priority, and scope it before any research or implementation.';
+
+// Linear's priority scale is 0 (none) … 4 (low); anything outside it, or not a
+// number, files as 0 ("No priority").
+function normalizeFeedbackPriority(value) {
+  const parsed = typeof value === 'number' ? value : parseInt(value, 10);
+  const inScale = Number.isInteger(parsed) && parsed >= 0 && parsed <= 4;
+  return inScale ? parsed : 0;
+}
+
+/**
+ * The team a feedback ticket is filed under, or null when none can be found (the
+ * caller answers that with a 422). First hit wins: an explicit body `teamId`,
+ * then the `FEEDBACK_TEAM_ID` env, then the provider's first team.
+ */
+async function resolveFeedbackTeamId(provider, token, bodyTeamId) {
+  const explicit = typeof bodyTeamId === 'string' ? bodyTeamId.trim() : '';
+  if (explicit) return explicit;
+  if (process.env.FEEDBACK_TEAM_ID) return process.env.FEEDBACK_TEAM_ID;
+  const cannotListTeams = typeof provider.supports === 'function' && !provider.supports('fetchTeams');
+  if (cannotListTeams) return null;
+  try {
+    const teams = await provider.fetchTeams(token);
+    return (Array.isArray(teams) && teams[0]?.id) || null;
+  } catch (err) {
+    console.error('Feedback team resolution failed:', err.message);
+    return null;
+  }
+}
+
+// A factory run-limit refusal (LIN-3238) in the M4 feedback-widget shape
+// `{ launched:false, code, retryable, message }`. RUN_LIMIT_REACHED is terminal;
+// RUN_LIMIT_UNVERIFIED (the count could not be read) is retryable. `null` for
+// any other error, so the caller keeps its existing logging path. The ticket is
+// already filed — this only says why no run started.
+function runLimitRefusal(err) {
+  const limit = err ? err.runLimit : null;
+  if (!limit) return null;
+  return {
+    launched: false,
+    code: limit.code,
+    retryable: limit.code === 'RUN_LIMIT_UNVERIFIED',
+    message: limit.error
+  };
+}
+
+// The first 400 a feedback body earns before any provider is consulted, or null:
+// the model / harness overrides (LIN-1132), then the message.
+function feedbackBodyRefusal({ model, harness, message }) {
+  const override = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH })
+    || validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
+  if (override) return override.error;
+  if (!message || typeof message !== 'string' || !message.trim()) return 'message is required';
+  if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) return 'message exceeds maximum length';
+  return null;
+}
+
+// The page URL and browser captured at submit time (LIN-635 S4), as a markdown
+// tail for the ticket body. Both come from the client, so each is length-clamped
+// and fenced as inline code so it cannot break the body. '' when neither was sent.
+function feedbackCaptureBlock({ url, userAgent }) {
+  const bullets = [['Page', url], ['Browser', userAgent]]
+    .filter(([, value]) => typeof value === 'string' && value.trim())
+    .map(([label, value]) => `- **${label}:** \`${value.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH)}\``);
+  return bullets.length ? `\n\n---\n${bullets.join('\n')}` : '';
+}
+
+// ===========================================================================
+// Close-out helpers (LIN-3248, P3 of LIN-2949)
+// ===========================================================================
+
+// The PR head the reader saw, or null.
+function statusHeadSha(status) {
+  return status?.readable === true ? (status.head?.sha || status.ref || null) : null;
+}
+
+// The open-ledger-item counts at merge: review-ledger items not yet
+// discharged, by scope. Content-free — counts only (the audit trail says what
+// "Done" meant).
+function countOpenLedgerItems(review) {
+  const open = (review?.ledger?.items || []).filter((item) => item && !item.discharged);
+  const inScope = (scope) => open.filter((item) => item.scope === scope).length;
+  const inside = inScope('inside');
+  const outside = inScope('outside');
+  return { inside, outside, unknown: open.length - inside - outside, total: open.length };
+}
+
+// A usable close-out/run-evidence identifier: present and at most 100 chars.
+const validCloseOutIdentifier = (identifier) => !!identifier && identifier.length <= 100;
+
+// The signed-in person's own session: an authenticated session (workspaceFromUrl
+// already required one) and NOT a worker/proxy token. Computed from the
+// request, never from the body, so the route can never be handed
+// `byPersonCheck: true`.
+function isPersonSession(req) {
+  return !!req.session?.accountId && !req.proxyTokenId && !req.proxyUrlKey;
+}
+
+// Set the tracker issue Done. Resolves the issue's team, its completed
+// workflow state, then transitions it. Throws on failure so the caller can
+// record the error and retry on the next check.
+async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
+  const { issue } = await provider.fetchIssueContext(callScope, issueIdentifier);
+  const issueRef = issue?.id || issueIdentifier;
+  const teamOf = (record) => record?.team?.id || null;
+
+  let teamId = teamOf(issue);
+  if (!teamId && typeof provider.issueWriteGuard === 'function') {
+    teamId = teamOf(await provider.issueWriteGuard(callScope, issueRef));
+  }
+  if (!teamId) throw new Error('could not resolve the issue team for Done');
+
+  const states = await provider.states(callScope, teamId);
+  const completedId = (states || []).find((state) => state?.type === 'completed')?.id;
+  return provider.updateIssue(callScope, issueRef, { stateId: completedId || resolveStateRef(states, 'Done') });
 }
 
 /**
@@ -309,6 +812,27 @@ async function stampDecisionAnswers(workspace, decision, { dispatchQueueStore, t
  */
 export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getOpenRouterSource, userPreferencesStore, workspacePreferencesStore, customPromptsStore, recapCacheStore, briefCacheStore, reportHistoryStore, dispatchQueueStore, agentStatusStore, promptTraceStore, proxyTokenStore, taskDecisionsStore, harbourCommentsStore = null, sessionsFeedCache = null, ownerCredentialStore = null, adoptConnectionCredential = null, accountStore = null, runEvidence = null, closeOutEventsStore = null, closeOut = null, workspaceOwnerCheck = null, onTicketWrite = null }) {
   const router = Router();
+
+  // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
+  // scoped to !isTestMode). Returns the denying check, or null when the call may proceed.
+  const chargeTestFreeTier = async (workspace, session) => {
+    if (!sessionIsFreeTier(session)) return null;
+    const check = await freeTierStore.tryUse(workspace.urlKey);
+    return check.allowed ? null : check;
+  };
+
+  // LIN-2649 WS2: the ledger-store null guard, in one place for both of its call sites
+  // (the scan-time write and the scan-due check). An absent harbourCommentsStore means
+  // "we cannot tell which comments are Harbour's", not "no comments changed" — an empty
+  // set filters nothing, so the worst case is a false DUE, never a false not-due and
+  // never a fabricated unknown (a dueBasisHash stored with the store absent and later
+  // compared with one computed while it IS present differs). `harbourCommentsStore`
+  // defaults to null in createWorkspaceApiRoutes, and tests/unit/scan-routes.test.js
+  // mounts the real router with no ledger store while driving the scan route end to
+  // end — an unguarded call would be a TypeError on a shipped route.
+  const recordedByHarbour = async (workspace, comments) => (harbourCommentsStore
+    ? harbourCommentsStore.wereRecordedByHarbour(workspace.urlKey, comments)
+    : new Set());
 
   // Prompt-traces + custom-prompts API endpoints (LIN-2246: extracted to
   // workspace-api-prompts.js). Mounted first, at the same relative position
@@ -338,26 +862,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // the local-seed identity only affects session/workspace resolution.
       if (process.env.NODE_ENV === 'test' &&
           (workspace.accessToken === 'test-token' || workspace.provider === 'local')) {
-        const mockAuditData = {
-          teams: testMockTeams,
-          projects: testMockData.projects.map(p => ({ ...p, state: 'started' })),
-          workflowStates: [
-            { id: 'ws1', name: 'Backlog', type: 'backlog', team: { id: 'team1', name: 'Test Team' } },
-            { id: 'ws2', name: 'In Progress', type: 'started', team: { id: 'team1', name: 'Test Team' } },
-            { id: 'ws3', name: 'Done', type: 'completed', team: { id: 'team1', name: 'Test Team' } }
-          ],
-          labels: [
-            { id: 'l1', name: 'breakdown', color: '#000', issues: { nodes: [{ id: 'i1' }] } },
-            { id: 'l2', name: 'ready', color: '#000', issues: { nodes: [{ id: 'i2' }, { id: 'i3' }] } },
-            { id: 'l3', name: 'bug', color: '#f00', issues: { nodes: [] } }
-          ],
-          issues: testMockData.issues.map(i => ({
-            ...i,
-            labels: { nodes: [] }
-          }))
-        };
-        const report = computeAuditFromData(mockAuditData);
-        return res.json(report);
+        return res.json(computeAuditFromData(buildMockAuditData()));
       }
 
       // LIN-1899: the audit is a Linear-SPECIFIC capability — it reads the
@@ -380,24 +885,14 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
       // sibling asset relay withholds the header instead of refusing, because
       // capability endpoints refuse and asset relays degrade (see /api/image).
       if (!isActiveProviderLinear(workspace)) {
-        return jsonError(res, 422, `This workspace's provider does not support this`, {
-          code: 'CAPABILITY_NOT_SUPPORTED',
-          capability: 'audit',
-          provider: workspace.provider,
-        });
+        return refuseCapability(res, workspace.provider, 'audit', 'this');
       }
 
       const report = await runAudit(getWorkspaceToken(workspace));
       res.json(report);
     } catch (error) {
       console.error('Audit error:', error);
-
-      // Handle 401 from Linear API
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-
-      jsonError(res, 500, 'Audit failed', { message: error.message });
+      jsonError(res, ...failureOf(error, 'Audit failed', { notFound: false }));
     }
   });
 
@@ -415,12 +910,11 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * @returns {Object} { label, promptName, prompt } or error
    */
   router.get('/workspace/:urlKey/api/prompt/:issueId/:labelName', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-
-    const { issueId, labelName } = req.params
+    const workspace = req.workspace;
+    const { issueId, labelName } = req.params;
 
     if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format')
+      return badRequest.json(res, 'Invalid issue ID format');
     }
 
     // Check if this is a custom prompt request (format: custom:promptId)
@@ -428,130 +922,59 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
 
     // Check if label has a prompt template (unless it's a custom prompt)
     if (!isCustomPrompt && !hasPrompt(labelName)) {
-      return notFound.json(res, `No prompt template for label: ${labelName}`)
+      return notFound.json(res, `No prompt template for label: ${labelName}`);
     }
 
     // Capability-aware prompt generation (LIN-177 S4/S5): thread the active
     // provider's UI surface into prompt generation. Resolved from the workspace
     // (source isn't populated on canonical issues); falls back to Linear for
     // legacy workspaces. For Linear this is a no-op — output stays byte-identical.
-    const providerUi = getProviderForWorkspace(workspace)?.ui || null
+    const providerUi = getProviderForWorkspace(workspace)?.ui || null;
 
     try {
-      // Use mock data in test mode
-      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId)
-        if (!mockIssue) {
-          return notFound.json(res, 'Issue not found')
+      // The issue and the context the template reads: fixtures in test mode, else the provider's.
+      let identifier, issue, context;
+      if (isTestToken(workspace)) {
+        const mock = buildMockPromptInput(issueId);
+        if (!mock) {
+          return notFound.json(res, 'Issue not found');
         }
-
-        // Extract identifier from URL (e.g., https://linear.app/test/issue/TEST-6 -> TEST-6)
-        const identifier = mockIssue.url.split('/').pop()
-
-        // Find project for the mock issue
-        const mockProject = testMockData.projects.find(p => p.id === mockIssue.project?.id)
-
-        // Extract labels as array of strings
-        const labels = (mockIssue.labels?.nodes || []).map(l => l.name)
-
-        // Find parent issue if exists
-        const mockParent = mockIssue.parent
-          ? testMockData.issues.find(i => i.id === mockIssue.parent.id)
-          : null
-
-        // Find siblings (other children of same parent)
-        const mockSiblings = mockParent
-          ? testMockData.issues
-              .filter(i => i.parent?.id === mockParent.id && i.id !== issueId)
-              .slice(0, 5)
-              .map(s => ({
-                id: s.id,
-                identifier: s.url.split('/').pop(),
-                title: s.title,
-                state: s.state
-              }))
-          : []
-
-        // Find children of this issue
-        const mockChildren = testMockData.issues
-          .filter(i => i.parent?.id === issueId)
-          .map(c => ({
-            id: c.id,
-            identifier: c.url.split('/').pop(),
-            title: c.title,
-            state: c.state
-          }))
-
-        const mockContext = {
-          parent: mockParent ? {
-            id: mockParent.id,
-            identifier: mockParent.url.split('/').pop(),
-            title: mockParent.title,
-            state: mockParent.state
-          } : null,
-          siblings: mockSiblings,
-          project: mockProject ? { name: mockProject.name, description: mockProject.content } : null,
-          children: mockChildren
-        };
-
-        const issueObj = { ...mockIssue, identifier, labels };
-        let result;
-
-        if (isCustomPrompt) {
-          const customPromptId = labelName.slice('custom:'.length);
-          const customPromptDef = await customPromptsStore.get(req.workspace.urlKey, customPromptId);
-          if (!customPromptDef) {
-            return notFound.json(res, 'Custom prompt not found');
-          }
-          result = generateCustomPrompt(customPromptDef, issueObj, mockContext, getFeatureFlags(req.session), providerUi);
-        } else {
-          result = generatePrompt(labelName, issueObj, mockContext, getFeatureFlags(req.session), providerUi);
-        }
-
-        return sendPromptResult(req, res, {
-          identifier,
-          downloadName: result.name,
-          prompt: result.prompt,
-          json: {
-            label: labelName,
-            promptName: result.name,
-            prompt: result.prompt
-          }
-        })
+        ({ identifier, issue, context } = mock);
+      } else {
+        // LIN-1904: resolve the issue's OWN binding (per the `source` provenance
+        // stamp LIN-561 puts on every merged-tree row, LIN-544) rather than
+        // always the workspace's active provider — same fix as /api/detail
+        // (LIN-1903), same helper.
+        const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, req.query.source);
+        const { issue: fetched, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId);
+        issue = fetched;
+        identifier = issue.identifier;
+        // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
+        // worker-facing Attachments section, matching the proxy /prompt route.
+        context = { parent, siblings, project, children, comments, attachments };
       }
 
-      // LIN-1904: resolve the issue's OWN binding (per the `source` provenance
-      // stamp LIN-561 puts on every merged-tree row, LIN-544) rather than
-      // always the workspace's active provider — same fix as /api/detail
-      // (LIN-1903), same helper.
-      const issueBinding = resolveIssueBinding(workspace, req.query.source)
-      const { provider: issueProvider, callScope: issueCallScope } = issueBinding
-      const { issue, parent, siblings, project, children, comments, attachments } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
-
-      // Generate the prompt
       let result;
       if (isCustomPrompt) {
-        const customPromptId = labelName.slice('custom:'.length);
-        const customPromptDef = await customPromptsStore.get(req.workspace.urlKey, customPromptId);
+        const customPromptDef = await customPromptsStore.get(workspace.urlKey, labelName.slice('custom:'.length));
         if (!customPromptDef) {
           return notFound.json(res, 'Custom prompt not found');
         }
         // NOTE: generateCustomPrompt renders no Attachments section (variable
         // substitution only) — passing `attachments` would be a no-op, so it's left
         // out here; that's a separate pre-existing gap, not part of LIN-776.
-        result = generateCustomPrompt(customPromptDef, issue, { parent, siblings, project, children, comments }, getFeatureFlags(req.session), providerUi);
+        const { attachments: _unused, ...customContext } = context;
+        result = generateCustomPrompt(customPromptDef, issue, customContext, getFeatureFlags(req.session), providerUi);
       } else {
-        // Forward `attachments` (LIN-776) so the in-app /prompt endpoint surfaces the
-        // worker-facing Attachments section, matching the proxy /prompt route.
-        result = generatePrompt(labelName, issue, { parent, siblings, project, children, comments, attachments }, getFeatureFlags(req.session), providerUi);
+        result = generatePrompt(labelName, issue, context, getFeatureFlags(req.session), providerUi);
       }
 
       if (!result) {
-        return jsonError(res, 500, 'Failed to generate prompt')
+        return jsonError(res, 500, 'Failed to generate prompt');
       }
 
       sendPromptResult(req, res, {
-        identifier: issue.identifier,
+        identifier,
         downloadName: result.name,
         prompt: result.prompt,
         json: {
@@ -559,23 +982,12 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           promptName: result.name,
           prompt: result.prompt
         }
-      })
+      });
     } catch (error) {
-      console.error('Prompt generation error:', error)
-
-      // Handle 401 from Linear API
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid')
-      }
-
-      // Handle issue not found
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message)
-      }
-
-      jsonError(res, 500, 'Failed to generate prompt', { message: error.message })
+      console.error('Prompt generation error:', error);
+      jsonError(res, ...failureOf(error, 'Failed to generate prompt'));
     }
-  })
+  });
 
   /**
    * Generate an Autopilot kickoff prompt scoped to a specific issue — the
@@ -595,49 +1007,41 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * @returns {Object} { label, promptName, kind, prompt, repo } or error
    */
   router.get('/workspace/:urlKey/api/autopilot-prompt/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-    const { issueId } = req.params
+    const workspace = req.workspace;
+    const { issueId } = req.params;
 
-    const featureFlags = getFeatureFlags(req.session)
-    if (featureFlags.proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled')
+    if (getFeatureFlags(req.session).proxy !== true) {
+      return jsonError(res, 403, 'Proxy feature is not enabled');
     }
 
     if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format')
+      return badRequest.json(res, 'Invalid issue ID format');
     }
 
-    const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
-    // LIN-836: surface the stepper variant in the UI. Validate against the shared
-    // list (unknown/absent → standard), thread it into the kickoff body, and let
-    // ONLY the stepper branch change label/promptName/downloadName — the standard
-    // strings stay byte-identical to preserve the LIN-791 additive invariant.
-    const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT
-    const stepper = variant === 'stepper'
-    const baseUrl = `${req.protocol}://${req.get('host')}`
+    const { mode, variant, stepper, baseUrl } = autopilotParams(req);
 
     // Run boundary (LIN-3246 / LIN-2949 P1b): optional `?stopAt=pr`. Query params
     // are always strings, so blank/whitespace-only is ABSENT, not an error — the
     // same rule maxTasks follows on the general twin below. Only the literal 'pr'
     // is valid; any other non-blank value is a 400, matching the dispatch route's
     // contract (`routes/dispatch.js`).
-    let stopAt = null
+    let stopAt = null;
     if (typeof req.query.stopAt === 'string' && req.query.stopAt.trim() !== '') {
-      const stopAtMsg = validateRunField('stopAt', req.query.stopAt.trim())
+      const stopAtMsg = validateRunField('stopAt', req.query.stopAt.trim());
       if (stopAtMsg) {
-        return badRequest.json(res, stopAtMsg)
+        return badRequest.json(res, stopAtMsg);
       }
-      stopAt = 'pr'
+      stopAt = 'pr';
     }
 
     try {
       // Use mock data in test mode
-      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId)
+      if (isTestToken(workspace)) {
+        const mockIssue = testMockData.issues.find(i => i.id === issueId);
         if (!mockIssue) {
-          return notFound.json(res, 'Issue not found')
+          return notFound.json(res, 'Issue not found');
         }
-        const identifier = mockIssue.url?.split('/').pop() || ''
+        const identifier = mockIssue.url?.split('/').pop() || '';
         const prompt = buildAutopilotKickoff({
           baseUrl,
           issue: { identifier, title: mockIssue.title },
@@ -645,24 +1049,13 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           variant,
           stopAt,
           standalone: true
-        })
-        return sendPromptResult(req, res, {
-          identifier,
-          downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
-          prompt,
-          json: {
-            label: stepper ? 'autopilot-stepper' : 'autopilot',
-            promptName: stepper ? `Autopilot (stepped) — ${identifier}` : `Autopilot — ${identifier}`,
-            kind: 'autopilot',
-            prompt
-          }
-        })
+        });
+        return sendAutopilotPrompt(req, res, { stepper, identifier, prompt, promptName: `${autopilotTitle(stepper)} — ${identifier}` });
       }
 
       // LIN-1904: resolve the issue's own binding via `source`, same as /api/prompt.
-      const issueBinding = resolveIssueBinding(workspace, req.query.source)
-      const { provider: issueProvider, callScope: issueCallScope } = issueBinding
-      const { issue, project } = await issueProvider.fetchIssueContext(issueCallScope, issueId)
+      const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, req.query.source);
+      const { issue } = await issueProvider.fetchIssueContext(issueCallScope, issueId);
       const prompt = buildAutopilotKickoff({
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
@@ -674,29 +1067,13 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         // lines 948/1299/1388 in this file — issueProvider is the actually
         // resolved (possibly cross-source) provider for this issue.
         providerUi: issueProvider.ui || null
-      })
-      sendPromptResult(req, res, {
-        identifier: issue.identifier,
-        downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
-        prompt,
-        json: {
-          label: stepper ? 'autopilot-stepper' : 'autopilot',
-          promptName: stepper ? `Autopilot (stepped) — ${issue.identifier}` : `Autopilot — ${issue.identifier}`,
-          kind: 'autopilot',
-          prompt
-        }
-      })
+      });
+      sendAutopilotPrompt(req, res, { stepper, identifier: issue.identifier, prompt, promptName: `${autopilotTitle(stepper)} — ${issue.identifier}` });
     } catch (error) {
-      console.error('Autopilot prompt error:', error)
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid')
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message)
-      }
-      jsonError(res, 500, 'Failed to generate autopilot prompt', { message: error.message })
+      console.error('Autopilot prompt error:', error);
+      jsonError(res, ...failureOf(error, 'Failed to generate autopilot prompt'));
     }
-  })
+  });
 
   /**
    * Generate a general (stack-walking) Autopilot kickoff — no issue scope.
@@ -708,23 +1085,19 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * @returns {Object} { label, promptName, kind, prompt } or error
    */
   router.get('/workspace/:urlKey/api/autopilot-prompt', workspaceFromUrl, async (req, res) => {
-    const featureFlags = getFeatureFlags(req.session)
-    if (featureFlags.proxy !== true) {
-      return jsonError(res, 403, 'Proxy feature is not enabled')
+    if (getFeatureFlags(req.session).proxy !== true) {
+      return jsonError(res, 403, 'Proxy feature is not enabled');
     }
 
-    const mode = AUTOPILOT_MODES.includes(req.query.mode) ? req.query.mode : AUTOPILOT_MODE_DEFAULT
     // LIN-836: same variant wiring as the issue-scoped twin above (stepper only
     // changes the response strings; standard stays byte-identical).
-    const variant = AUTOPILOT_VARIANTS.includes(req.query.variant) ? req.query.variant : AUTOPILOT_VARIANT_DEFAULT
-    const stepper = variant === 'stepper'
+    const { mode, variant, stepper, baseUrl } = autopilotParams(req);
     // LIN-2818: stays at 1000 on purpose. This general/stack-walk goal arrives in
     // the URL query string (the dispatch page's goal textarea round-trips it via
     // `?goal=`), and Node's default 16KB header ceiling can't reliably carry more;
     // it is matched to the textarea's own maxlength. The scoped POST body cap
     // (routes/proxy-kickoff.js) is the surface that rose to MAX_DESCRIPTION_LENGTH.
-    const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : ''
-    const baseUrl = `${req.protocol}://${req.get('host')}`
+    const goal = typeof req.query.goal === 'string' ? req.query.goal.slice(0, 1000) : '';
 
     // Task budget (LIN-1737 D3/Beat 1 seam #3): an optional scope bound threaded
     // into the kickoff so its prose states it, then forwarded by the client to
@@ -733,37 +1106,185 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // error — distinct from the JSON-body validation at the dispatch route,
     // which has no such "blank" case to account for. A non-blank value follows
     // the same integer->=1 rule and error text as every other maxTasks entry point.
-    let maxTasks = null
+    let maxTasks = null;
     if (typeof req.query.maxTasks === 'string' && req.query.maxTasks.trim() !== '') {
-      const parsedMaxTasks = Number(req.query.maxTasks.trim())
-      const maxTasksRuleError = validateRunField('maxTasks', parsedMaxTasks)
+      const parsedMaxTasks = Number(req.query.maxTasks.trim());
+      const maxTasksRuleError = validateRunField('maxTasks', parsedMaxTasks);
       if (maxTasksRuleError) {
-        return badRequest.json(res, maxTasksRuleError)
+        return badRequest.json(res, maxTasksRuleError);
       }
-      maxTasks = parsedMaxTasks
+      maxTasks = parsedMaxTasks;
     }
 
     try {
       // LIN-2804: mirrors the identical generatePrompt pattern at lines 439/3415.
-      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, providerUi: getProviderForWorkspace(req.workspace)?.ui || null })
-      sendPromptResult(req, res, {
+      const prompt = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true, maxTasks, providerUi: getProviderForWorkspace(req.workspace)?.ui || null });
+      sendAutopilotPrompt(req, res, {
+        stepper,
         identifier: '',
-        downloadName: stepper ? 'autopilot-stepper' : 'autopilot',
         prompt,
-        json: {
-          label: stepper ? 'autopilot-stepper' : 'autopilot',
-          promptName: stepper
-            ? (goal.trim() ? `Autopilot (stepped) — ${goal.trim().slice(0, 60)}` : 'Autopilot (stepped, stack walk)')
-            : (goal.trim() ? `Autopilot — ${goal.trim().slice(0, 60)}` : 'Autopilot (stack walk)'),
-          kind: 'autopilot',
-          prompt
-        }
-      })
+        promptName: goal.trim()
+          ? `${autopilotTitle(stepper)} — ${goal.trim().slice(0, 60)}`
+          : (stepper ? 'Autopilot (stepped, stack walk)' : 'Autopilot (stack walk)')
+      });
     } catch (error) {
-      console.error('Autopilot kickoff error:', error)
-      jsonError(res, 500, 'Failed to generate autopilot kickoff', { message: error.message })
+      console.error('Autopilot kickoff error:', error);
+      jsonError(res, 500, 'Failed to generate autopilot kickoff', { message: error.message });
     }
-  })
+  });
+
+  // What one recommendation model call takes — the issue, its prepared input and
+  // the call options — as the argument list for `getRecommendation` /
+  // `getRecommendationStream`. `call` carries the per-request pieces (apiKey,
+  // model, session, provider, workspace) and the abort `signal` of the hop.
+  // Forwards `attachments` (LIN-777) so routing and stage prompts carry the
+  // ## Attachments section on every hop, matching the proxy recommendation path.
+  async function modelCallArgs(ctx, { signal, ...call }) {
+    const identifier = ctx.issue.identifier;
+    const input = await prepareRecommendationInput(ctx, { dispatchQueueStore, urlKey: call.workspace.urlKey, identifier });
+    return [ctx.issue, input, recommendCallOptions({ ...call, identifier, signal })];
+  }
+
+  // The production half of GET …/recommend/:issueId/stream, after the pre-flight
+  // refusals. Opens the SSE response and then streams one of two shapes:
+  //   - a node task (children) resolves its `defer` descent, streaming every hop;
+  //   - a leaf task token-streams its single recommendation.
+  // A hang-up aborts the in-flight work and silences everything after it.
+  async function streamRecommendation({ req, res, issueId, mockAi, workspace, provider, callScope, apiKey, isFreeTier }) {
+    openSse(res);
+    // A comment line every 15s keeps the router's 55s window open through any
+    // silent stretch, such as a slow routing call.
+    const sseKeepalive = armSseKeepalive(res);
+
+    const abort = new AbortController();
+    let closed = false;
+    const onClientGone = () => {
+      closed = true;
+      abort.abort();
+    };
+    req.on('close', onClientGone);
+    // A client that left during the awaits before this point (the free-tier gate)
+    // closed before the listener was there: it is gone already, so no model call starts.
+    if (res.destroyed) onClientGone();
+
+    // Gap #1 (LIN-346): every context fetch is bound by its caller's abort signal
+    // ∪ a per-fetch timeout, so a stalled Linear call can't silently idle the socket.
+    const fetchContext = (id, signal) => provider.fetchRecommendationContext(
+      callScope,
+      id,
+      { signal: AbortSignal.any([signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
+    );
+    const emit = (type, data) => {
+      if (!closed) sendSSE(res, type, data);
+    };
+
+    try {
+      // Sent even when the client is already gone, as the fetch below is too.
+      sendSSE(res, 'phase', { phase: 'fetching_context' });
+      const context = await fetchContext(issueId, abort.signal);
+      const { issue: contextIssue, children } = context;
+      if (closed) return;
+
+      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
+      const call = { apiKey, model, session: req.session, provider, workspace };
+
+      if (children?.length > 0) {
+        await streamDescent({ res, issueId, mockAi, call, fetchContext, abort, emit, isClosed: () => closed });
+      } else if (mockAi) {
+        // AI mock (local session) leaf fast-path: the same SSE phase/delta/done
+        // sequence the real token stream emits, 2 chunks per section so the
+        // multi-chunk assembly assertions hold (LIN-405). The leaf TEST-11 reaches
+        // here (children=[]), so mocking only the descent's computeOne would miss it.
+        sendMockSections(res, generateMockRecommendation(contextIssue));
+        sendSSE(res, 'done', { truncated: false, completionTokens: null, issueUrl: contextIssue.url });
+      } else {
+        // Phase 2: a leaf task is true token streaming, with the issue url merged
+        // into the final done event so all its data arrives in one event.
+        await getRecommendationStream(
+          ...await modelCallArgs(context, { ...call, signal: abort.signal }),
+          (type, data) => emit(type, type === 'done' ? { ...data, issueUrl: contextIssue.url } : data)
+        );
+      }
+    } catch (error) {
+      if (closed) return;
+      console.error('Streaming recommendation error:', error);
+      sendSSE(res, 'error', { error: error.message });
+    } finally {
+      sseKeepalive.stop();
+      if (!closed) res.end();
+    }
+  }
+
+  // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
+  // which can't be token-streamed. The descent is resolved and surfaced LIVE —
+  // each defer hop streams a breadcrumb into the reasoning section as it routes,
+  // so the UI shows progress instead of sitting on "fetching" — and only the
+  // terminal hop carries a prompt.
+  async function streamDescent({ res, issueId, mockAi, call, fetchContext, abort, emit, isClosed }) {
+    // Unhide the reasoning section up front so the breadcrumbs render live.
+    sendSSE(res, 'phase', { phase: 'reasoning' });
+    const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
+
+    // Option B (LIN-346): stream EVERY hop, the terminal one included, rather than
+    // buffering it and writing reasoning and prompt only after up to 8000 tokens.
+    // Each hop's getRecommendationStream emits phase/delta events that go straight
+    // to the client, so the socket stays warm and Heroku H15 can't fire on an
+    // all-complete parent that recommends real work at hop 0. The streaming fn's
+    // structured return drives the descent (defer parsing is byte-identical: it
+    // routes through the same routeStage as the buffered path).
+    const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
+      startIdentifier: issueId,
+      deadline,
+      onHop: (hop) => {
+        if (hop.recommendedAction !== 'defer' || !hop.deferTo) return;
+        // LIN-329: a breadcrumb per container routed through, in blank lines so it
+        // renders as its own paragraph between the deferring hop's reasoning and
+        // the next hop's rather than running on into the surrounding text.
+        emit('delta', { section: 'reasoning', content: `\n\n↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n\n` });
+      },
+      computeOne: async (id) => {
+        // Gap #3: a per-hop in-flight guard (client hang-up ∪ remaining descent
+        // budget), released on settle so its timer can't leak into the next hop.
+        const hop = armHopSignal({ clientSignal: abort.signal, deadline });
+        try {
+          const ctx = await fetchContext(id, hop.signal);
+          if (mockAi) {
+            // AI mock (local session): the terminal hop streams its reasoning and
+            // prompt like getRecommendationStream; a defer hop streams nothing
+            // here, its breadcrumb coming from onHop (LIN-405).
+            const mockHop = buildMockRecommendationHop(ctx);
+            if (!isClosed() && mockHop.recommendedAction !== 'defer') {
+              emit('phase', { phase: 'reasoning' });
+              emit('delta', { section: 'reasoning', content: mockHop.reasoning });
+              emit('phase', { phase: 'prompt' });
+              emit('delta', { section: 'prompt', content: mockHop.prompt });
+            }
+            return mockHop;
+          }
+          return toHopRecord(ctx, await getRecommendationStream(
+            ...await modelCallArgs(ctx, { ...call, signal: hop.signal }),
+            // Phase + delta go live; the per-hop done is swallowed, since the final
+            // done below carries the descent metadata once.
+            (type, data) => { if (type !== 'done') emit(type, data); }
+          ));
+        } finally {
+          hop.release();
+        }
+      }
+    });
+    if (isClosed()) return;
+
+    if (rec.recommendedAction === 'defer' || !rec.prompt) {
+      // An abnormal stop (depth / cycle / unresolved / timeout) is surfaced, never
+      // shipped as a defer. The terminal hop's reasoning already streamed live.
+      emit('error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
+    } else {
+      emit('done', { truncated: rec.truncated, completionTokens: rec.completionTokens, issueUrl: rec.issueUrl, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason });
+    }
+    // The caller's `finally` ends the response again; the descent has always ended
+    // it itself first, and the double end is what a client's socket sees today.
+    res.end();
+  }
 
   // ===========================================================================
   // AI Recommendation API
@@ -777,23 +1298,20 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * @returns {Object} { enabled: boolean }
    */
   router.get('/workspace/:urlKey/api/recommend/status', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
+    const workspace = req.workspace;
 
     // In test mode, always report as enabled for testing
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
-    const sessionApiKey = req.session.openRouterApiKey
-    const source = getOpenRouterSource(req)
+    const sessionApiKey = req.session.openRouterApiKey;
+    const source = getOpenRouterSource(req);
 
-    const enabled = isTestMode || isRecommendationEnabled(sessionApiKey) || source === 'free'
+    const enabled = isTestToken(workspace) || isRecommendationEnabled(sessionApiKey) || source === 'free';
 
     // Resolve the workspace's configured LLM model so the footer can surface it.
     // Same single-source-of-truth helper every LLM call site uses.
     const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend' })
 
-    const result = { enabled, source, model, modelName: getModelDisplayName(model) }
-
-    res.json(result)
-  })
+    res.json({ enabled, source, model, modelName: getModelDisplayName(model) });
+  });
 
   /**
    * Get AI-generated prompt for a task.
@@ -804,48 +1322,34 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * @returns {Object} { reasoning, prompt } or error
    */
   router.get('/workspace/:urlKey/api/recommend/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-
-    const { issueId } = req.params
-    const issueBinding = resolveIssueBinding(workspace, req.query.source)
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format')
-    }
-
     // Capability backstop — clean 422 (never a raw NotImplementedError) for a
     // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support recommendations for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      })
-    }
+    const issue = openIssue(req, res, { capability: 'recommendations' });
+    if (!issue) return;
+    const { workspace, issueId, provider: issueProvider, callScope: issueCallScope } = issue;
 
     // Check if feature is enabled (except in test mode)
     // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
     // the AI mock for local-provider sessions, whose data comes from the provider
     // (LIN-388/LIN-405). The 503/free-tier guards key off `mockAi` so a migrated
     // local session isn't 503'd for lacking an OpenRouter key.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
-    const mockAi = shouldMockAi(workspace)
-    const sessionApiKey = req.session.openRouterApiKey
-    const credential = resolveChatCredential({ sessionApiKey })
-    const { apiKey: apiKeyToUse, isFreeTier } = credential
+    const isTestMode = isTestToken(workspace);
+    const mockAi = shouldMockAi(workspace);
+    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
+    const { apiKey: apiKeyToUse, isFreeTier } = credential;
     // Free-tier on the AI-mock path is the session flag (CI sets no env key, so
     // `isFreeTier` is always false there); the test-token DATA mock charges its
     // own inside the isTestMode block below, so this is scoped to !isTestMode.
-    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey()
-    const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier)
+    const surfaceFreeTier = !isTestMode && (mockAi ? sessionIsFreeTier(req.session) : isFreeTier);
     if (isAiUnavailable({ credential, mockAi })) {
-      return jsonError(res, 503, 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.')
+      return jsonError(res, 503, 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.');
     }
 
     // Atomically check rate limits and record usage before proceeding
     if (surfaceFreeTier) {
-      const check = await checkFreeTierGate({ isFreeTier: surfaceFreeTier, urlKey: workspace.urlKey, freeTierStore })
+      const check = await checkFreeTierGate({ isFreeTier: surfaceFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } })
+        return refuseFreeTier(res, check);
       }
     }
 
@@ -856,70 +1360,25 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     try {
       // Use mock data in test mode
       if (isTestMode) {
-        const mockIssue = testMockData.issues.find(i => i.id === issueId)
+        const mockIssue = testMockData.issues.find(i => i.id === issueId);
         if (!mockIssue) {
-          return keepaliveError(keepalive, 404, 'Issue not found')
+          return keepaliveError(keepalive, 404, 'Issue not found');
         }
 
         // Atomically check free tier limits and record usage in test mode
-        const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !hasPaidEnvKey()
-        if (testIsFreeTier) {
-          const check = await freeTierStore.tryUse(workspace.urlKey)
-          if (!check.allowed) {
-            return keepaliveError(keepalive, 429, check.reason, {
-              freeTier: {
-                used: true,
-                remaining: check.remaining,
-                limit: check.limit,
-                resetsAt: check.resetsAt
-              }
-            })
-          }
+        const denied = await chargeTestFreeTier(workspace, req.session);
+        if (denied) {
+          return keepaliveError(keepalive, 429, denied.reason, freeTierBody(denied));
         }
 
-        // Generate a mock prompt based on the issue
-        const labels = (mockIssue.labels?.nodes || []).map(l => l.name)
-        let reasoning = 'Start by getting an overview of what this task involves before deciding on the next steps.'
-        let goal = 'Summarize what this task involves and how it fits into the broader project context.'
-
-        // Provide contextual mock prompts based on blocking relationship / labels
-        if (isBlocked(mockIssue)) {
-          // LIN-357: blocked-ness is the incomplete blocking relationship, not a label.
-          reasoning = 'This task is blocked. Analyzing the blocker will help identify ways to unblock progress.'
-          goal = 'Identify the blocker type and root cause, evaluate options to unblock, and recommend the best path.'
-        } else if (labels.includes(WORK_ISSUE_LABELS.BUG)) {
-          reasoning = 'This is a bug. Investigating the issue systematically will help find the root cause and fix.'
-          goal = 'Identify reproduction steps, hypothesize likely causes, and suggest a debugging approach.'
-        } else if (mockIssue.state?.type === 'backlog' || mockIssue.state?.type === 'unstarted') {
-          reasoning = 'This task is ready to start. Creating an implementation plan will provide a clear path forward.'
-          goal = 'Research the codebase, identify files to modify, and create a step-by-step implementation plan.'
-        }
-
-        // Build the mock prompt
-        // Extract identifier from URL (e.g., "https://linear.app/test/issue/TEST-6" -> "TEST-6")
-        const identifier = mockIssue.url?.split('/').pop() || 'ISSUE'
-
-        const prompt = `Help me with task ${identifier}
-
-## Context
-
-**Project:** Test Project
-**Status:** ${mockIssue.state?.name || 'Unknown'}
-${labels.length > 0 ? `**Labels:** ${labels.join(', ')}` : ''}
-
-## Goal
-
-${goal}`
-
-        const result = {
+        const { reasoning, prompt } = generateMockRecommendation(mockIssue);
+        return keepalive.send(200, {
           reasoning,
           prompt,
           truncated: false,
           completionTokens: null,
           issueUrl: mockIssue.url
-        }
-
-        return keepalive.send(200, result)
+        });
       }
 
       // Get AI-generated prompt, following any `defer` decisions to a terminal
@@ -927,51 +1386,29 @@ ${goal}`
       // pinned is transparently resolved to its actionable descendant, with the
       // descent breadcrumb returned. Free-tier usage is charged once per request
       // (above, before this point), not per hop.
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier })
-      const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS
+      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
+      const call = { apiKey: apiKeyToUse, model: selectedModel, session: req.session, provider: issueProvider, workspace };
+      const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
       const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
         startIdentifier: issueId,
         deadline,
         computeOne: async (id) => {
           // Two-tier context for parent tasks; the focused child seeds the defer choice.
-          const ctx = await issueProvider.fetchRecommendationContext(issueCallScope, id)
+          const ctx = await issueProvider.fetchRecommendationContext(issueCallScope, id);
           // AI mock (local session): synthesise the hop deterministically so the
           // SAME resolver drives the descent without an OpenRouter call (LIN-405).
-          if (mockAi) return buildMockRecommendationHop(ctx)
+          if (mockAi) return buildMockRecommendationHop(ctx);
           // A client hang-up or the descent budget aborts the hop's model calls.
-          const hop = armHopSignal({ clientSignal: gone.signal, deadline })
-          let r
+          const hop = armHopSignal({ clientSignal: gone.signal, deadline });
           try {
-            r = await getRecommendation(
-              ctx.issue,
-              // Forward `attachments` (LIN-777) so the routing prompt and the stage
-              // prompt carry the ## Attachments section on this recommendation hop.
-              await prepareRecommendationInput(ctx, { dispatchQueueStore, urlKey: workspace.urlKey, identifier: ctx.issue.identifier }),
-              { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null,
-                signal: hop.signal,
-                callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } }
-            )
+            return toHopRecord(ctx, await getRecommendation(...await modelCallArgs(ctx, { ...call, signal: hop.signal })));
           } finally {
-            hop.release()
-          }
-          return {
-            identifier: ctx.issue.identifier,
-            reasoning: r.reasoning,
-            prompt: r.prompt,
-            truncated: r.truncated,
-            completionTokens: r.completionTokens,
-            recommendedAction: r.recommendedAction,
-            deferTo: r.deferTo,
-            issueUrl: ctx.issue.url,
-            // Node state + children (with state) feed the resolver's terminal-state
-            // descent guard (LIN-353) — already fetched in ctx, no extra round-trip.
-            state: ctx.issue.state,
-            children: ctx.children
+            hop.release();
           }
         }
-      })
+      });
 
-      const result = {
+      keepalive.send(200, {
         reasoning: rec.reasoning,
         prompt: rec.prompt,
         truncated: rec.truncated,
@@ -982,31 +1419,19 @@ ${goal}`
         deferredVia,
         deferTruncated,
         deferStopReason
-      }
-
-      keepalive.send(200, result)
+      });
     } catch (error) {
       // A hang-up aborts the model call, which surfaces as a timeout: the client
       // left, and that is not an AI outage.
       if (gone.gone) {
-        return keepaliveError(keepalive, 499, 'Client closed the request')
+        return keepaliveError(keepalive, 499, 'Client closed the request');
       }
-      console.error('Recommendation error:', error)
-
-      if (error.response?.status === 401) {
-        return keepaliveError(keepalive, 401, 'Token expired or invalid')
-      }
-      if (error.message?.includes('not found')) {
-        return keepaliveError(keepalive, 404, error.message)
-      }
-      if (error.message?.includes('OpenRouter')) {
-        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message })
-      }
-      keepaliveError(keepalive, 500, 'Failed to get recommendation', { message: error.message })
+      console.error('Recommendation error:', error);
+      keepaliveError(keepalive, ...failureOf(error, 'Failed to get recommendation', { openRouter: true }));
     } finally {
       gone.release();
     }
-  })
+  });
 
   // ===========================================================================
   // AI Recommendation Streaming API (SSE)
@@ -1023,34 +1448,19 @@ ${goal}`
    * @returns SSE stream with phase, delta, done, and error events
    */
   router.get('/workspace/:urlKey/api/recommend/:issueId/stream', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-
     // --- Pre-flight validation (regular HTTP errors) ---
 
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support recommendations for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
+    const issue = openIssue(req, res, { capability: 'recommendations' });
+    if (!issue) return;
+    const { workspace, issueId, provider: issueProvider, callScope: issueCallScope } = issue;
 
     // See the GET handler: `isTestMode` gates the DATA mock; `mockAi` fires the
     // AI mock for local sessions; 503/free-tier guards key off `mockAi` (LIN-405).
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
+    const isTestMode = isTestToken(workspace);
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const credential = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
-    const testIsFreeTier = req.session.freeTierEnabled && !sessionApiKey && !hasPaidEnvKey();
-    const surfaceFreeTier = !isTestMode && (mockAi ? testIsFreeTier : isFreeTier);
+    const surfaceFreeTier = !isTestMode && (mockAi ? sessionIsFreeTier(req.session) : isFreeTier);
 
     if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI recommendation feature is not configured.');
@@ -1076,7 +1486,7 @@ ${goal}`
     if (surfaceFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier: surfaceFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return refuseFreeTier(res, check);
       }
     }
 
@@ -1089,288 +1499,23 @@ ${goal}`
       }
 
       // Free tier check in test mode
-      const testIsFreeTier = req.session.freeTierEnabled && !req.session.openRouterApiKey && !hasPaidEnvKey();
-      if (testIsFreeTier) {
-        const check = await freeTierStore.tryUse(workspace.urlKey);
-        if (!check.allowed) {
-          return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
-        }
+      const denied = await chargeTestFreeTier(workspace, req.session);
+      if (denied) {
+        return refuseFreeTier(res, denied);
       }
 
-      const idOf = (iss) => iss.url?.split('/').pop() || iss.identifier;
-      const incompleteChild = (iss) => testMockData.issues.find(
-        i => i.parent?.id === iss.id && i.state?.type !== 'completed' && i.state?.type !== 'canceled'
-      );
-
-      // Node-shaped mock issue (LIN-327): mirror the live node path — stream a
-      // descent breadcrumb for each container, then the terminal child's mock
-      // recommendation. Keeps the descent-streaming behaviour E2E-covered.
-      if (incompleteChild(mockIssue)) {
-        res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
-        res.flushHeaders();
-        sendSSE(res, 'phase', { phase: 'reasoning' });
-
-        const path = [];
-        const seen = new Set();
-        let node = mockIssue;
-        while (node && !seen.has(node.id) && path.length < 10) {
-          seen.add(node.id);
-          path.push(node);
-          node = incompleteChild(node);
-        }
-        const terminal = path[path.length - 1];
-        const deferredVia = path.map(idOf);
-        for (let k = 0; k < path.length - 1; k++) {
-          sendSSE(res, 'delta', { section: 'reasoning', content: `\n\n↳ ${idOf(path[k])} is a container → routing to ${idOf(path[k + 1])}\n\n` });
-        }
-        const term = generateMockRecommendation(terminal);
-        sendSSE(res, 'delta', { section: 'reasoning', content: term.reasoning });
-        sendSSE(res, 'phase', { phase: 'prompt' });
-        sendSSE(res, 'delta', { section: 'prompt', content: term.prompt });
-        const doneData = {
-          truncated: false, completionTokens: null,
-          issueUrl: terminal.url,
-          identifier: idOf(terminal), deferredVia, deferTruncated: false
-        };
-        sendSSE(res, 'done', doneData);
-        res.end();
-        return;
-      }
-
-      const { reasoning, prompt } = generateMockRecommendation(mockIssue);
-
-      // Start SSE
-      res.set({
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-      });
-      res.flushHeaders();
-
-      // Emit phases and deltas
-      sendSSE(res, 'phase', { phase: 'fetching_context' });
-
-      // Split into multiple chunks to test assembly
-      sendSSE(res, 'phase', { phase: 'reasoning' });
-      const reasoningMid = Math.floor(reasoning.length / 2);
-      sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(0, reasoningMid) });
-      sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(reasoningMid) });
-
-      sendSSE(res, 'phase', { phase: 'prompt' });
-      const promptMid = Math.floor(prompt.length / 2);
-      sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(0, promptMid) });
-      sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(promptMid) });
-
-      // Done event with metadata
-      const doneData = {
-        truncated: false,
-        completionTokens: null,
-        issueUrl: mockIssue.url
-      };
-
-      sendSSE(res, 'done', doneData);
-      res.end();
-      return;
+      return streamMockFixture(res, mockIssue);
     }
 
     // --- Production mode: real streaming ---
 
-    // Start SSE
-    res.set({
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+    return streamRecommendation({
+      req, res, issueId, mockAi,
+      workspace, provider: issueProvider, callScope: issueCallScope,
+      apiKey: apiKeyToUse, isFreeTier
     });
-    res.flushHeaders();
-    // A comment line every 15s keeps the router's 55s window open through any
-    // silent stretch, such as a slow routing call.
-    const sseKeepalive = armSseKeepalive(res);
-
-    // Track client disconnection
-    const abortController = new AbortController();
-    let closed = false;
-    const onClientGone = () => {
-      closed = true;
-      abortController.abort();
-    };
-    req.on('close', onClientGone);
-    // A client that left during the awaits above (the free-tier gate) closed before
-    // the listener was there: it is gone already, so no model call starts.
-    if (res.destroyed) onClientGone();
-
-    try {
-      // Phase 1: Fetch context from Linear
-      sendSSE(res, 'phase', { phase: 'fetching_context' });
-      // Gap #1 (LIN-346): bound this fetch by the client-disconnect signal ∪ a
-      // per-fetch timeout so a stalled Linear call can't silently idle the socket.
-      const context = await issueProvider.fetchRecommendationContext(
-        issueCallScope,
-        issueId,
-        { signal: AbortSignal.any([abortController.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
-      );
-      const { issue, children } = context;
-
-      if (closed) return;
-
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recommend', forceDefault: isFreeTier });
-      const deadline = Date.now() + RECOMMEND_DESCENT_BUDGET_MS;
-
-      // Node-shaped tasks (LIN-327): the first hop is a `defer` with no prompt body,
-      // which can't be token-streamed. We resolve the descent and surface it LIVE —
-      // each defer hop streams a breadcrumb into the reasoning section as it routes,
-      // so the UI shows progress instead of sitting on "fetching" — then the terminal
-      // node's reasoning and prompt are delivered (only the terminal hop has a prompt).
-      // Leaf tasks fall through to true token streaming below — the common path is unchanged.
-      if (children?.length > 0) {
-        // Unhide the reasoning section up front so the descent breadcrumbs render live.
-        sendSSE(res, 'phase', { phase: 'reasoning' });
-
-        // Option B (LIN-346): stream EVERY hop — including the terminal one — instead
-        // of buffering the terminal getRecommendation() and only writing its reasoning
-        // and prompt after up to 8000 tokens. Each hop's getRecommendationStream emits
-        // phase/delta events that we forward straight to the client, so the socket stays
-        // warm on every hop and Heroku H15 can't fire on an all-complete parent that
-        // recommends real work at hop 0. The streaming fn's structured return drives the
-        // descent (defer parsing stays byte-identical — it routes through the same
-        // routeStage as the buffered path).
-        const { recommendation: rec, deferredVia, deferTruncated, deferStopReason } = await resolveRecommendation({
-          startIdentifier: issueId,
-          deadline,
-          onHop: (hop) => {
-            // Stream a breadcrumb for each container we route through (LIN-329).
-            if (closed || !(hop.recommendedAction === 'defer' && hop.deferTo)) return;
-            // Wrap the breadcrumb in blank lines so it renders as its own paragraph
-            // between the deferring hop's reasoning and the next hop's — otherwise the
-            // descent runs on into the surrounding reasoning text.
-            sendSSE(res, 'delta', { section: 'reasoning', content: `\n\n↳ ${hop.identifier} is a container → routing to ${hop.deferTo}\n\n` });
-          },
-          computeOne: async (id) => {
-            // Per-hop in-flight guard (gap #3): client-disconnect ∪ remaining descent
-            // budget. Released on settle so its timer can't leak into the next hop.
-            const hop = armHopSignal({ clientSignal: abortController.signal, deadline });
-            try {
-              // Gap #1: bound the per-hop Linear fetch by the hop signal ∪ a per-fetch timeout.
-              const ctx = await issueProvider.fetchRecommendationContext(
-                issueCallScope,
-                id,
-                { signal: AbortSignal.any([hop.signal, AbortSignal.timeout(CONTEXT_FETCH_TIMEOUT_MS)]) }
-              );
-              // AI mock (local session): synthesise the hop; the terminal hop streams
-              // its reasoning+prompt deltas (mirroring getRecommendationStream), while a
-              // defer hop streams nothing here — its breadcrumb comes from onHop (LIN-405).
-              if (mockAi) {
-                const mockHop = buildMockRecommendationHop(ctx);
-                if (!closed && mockHop.recommendedAction !== 'defer') {
-                  sendSSE(res, 'phase', { phase: 'reasoning' });
-                  sendSSE(res, 'delta', { section: 'reasoning', content: mockHop.reasoning });
-                  sendSSE(res, 'phase', { phase: 'prompt' });
-                  sendSSE(res, 'delta', { section: 'prompt', content: mockHop.prompt });
-                }
-                return mockHop;
-              }
-              const r = await getRecommendationStream(
-                ctx.issue,
-                // Forward `attachments` (LIN-777) so the routing and stage prompts
-                // carry the ## Attachments section on each descent hop.
-                await prepareRecommendationInput(ctx, { dispatchQueueStore, urlKey: workspace.urlKey, identifier: ctx.issue.identifier }),
-                { apiKey: apiKeyToUse, model: selectedModel, featureFlags: getFeatureFlags(req.session), providerUi: issueProvider.ui || null, signal: hop.signal,
-                  callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: ctx.issue.identifier } },
-                (type, data) => {
-                  if (closed) return;
-                  // Forward phase + delta live; swallow the per-hop done — the handler
-                  // emits the single final done with descent metadata after the descent.
-                  if (type === 'done') return;
-                  sendSSE(res, type, data);
-                }
-              );
-              return {
-                identifier: ctx.issue.identifier, reasoning: r.reasoning, prompt: r.prompt,
-                truncated: r.truncated, completionTokens: r.completionTokens,
-                recommendedAction: r.recommendedAction, deferTo: r.deferTo,
-                issueUrl: ctx.issue.url,
-                // Node state + children (with state) feed the resolver's terminal-state
-                // descent guard (LIN-353) — already in ctx, no extra round-trip.
-                state: ctx.issue.state, children: ctx.children
-              };
-            } finally {
-              hop.release();
-            }
-          }
-        });
-        if (closed) return;
-
-        const metadata = { issueUrl: rec.issueUrl, identifier: rec.identifier, deferredVia, deferTruncated, deferStopReason };
-
-        if (rec.recommendedAction === 'defer' || !rec.prompt) {
-          // Abnormal stop (depth/cycle/unresolved/timeout) — surface, don't ship a defer.
-          // The terminal hop's reasoning already streamed live before we got here.
-          sendSSE(res, 'error', { error: 'Recommendation did not resolve to an actionable task', deferredVia, deferTruncated, deferStopReason });
-        } else {
-          // Reasoning and prompt already streamed live per hop above; just close out
-          // with the single final done carrying descent + truncation metadata.
-          sendSSE(res, 'done', { truncated: rec.truncated, completionTokens: rec.completionTokens, ...metadata });
-        }
-        res.end();
-        return;
-      }
-
-      // Phase 2: Stream AI recommendation (leaf task — true token streaming)
-
-      // Build metadata to merge into the done event
-      const metadata = {
-        issueUrl: issue.url
-      };
-
-      // AI mock (local session) leaf fast-path: emit the same SSE phase/delta/done
-      // sequence the real token stream would, split into 2 chunks per section so
-      // the multi-chunk assembly assertions hold (LIN-405). The leaf TEST-11 reaches
-      // here (children=[]), so mocking only the descent computeOne would miss it.
-      if (mockAi) {
-        const { reasoning, prompt } = generateMockRecommendation(issue);
-        sendSSE(res, 'phase', { phase: 'reasoning' });
-        const reasoningMid = Math.floor(reasoning.length / 2);
-        sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(0, reasoningMid) });
-        sendSSE(res, 'delta', { section: 'reasoning', content: reasoning.slice(reasoningMid) });
-        sendSSE(res, 'phase', { phase: 'prompt' });
-        const promptMid = Math.floor(prompt.length / 2);
-        sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(0, promptMid) });
-        sendSSE(res, 'delta', { section: 'prompt', content: prompt.slice(promptMid) });
-        sendSSE(res, 'done', { truncated: false, completionTokens: null, ...metadata });
-      } else {
-        await getRecommendationStream(
-          issue,
-          // Forward `attachments` (LIN-777) so the terminal hop's routing and stage
-          // prompts carry the ## Attachments section, matching the proxy
-          // recommendation path. fetchRecommendationContext carries it (LIN-772/773).
-          await prepareRecommendationInput(context, { dispatchQueueStore, urlKey: workspace.urlKey, identifier: issue.identifier }),
-          {
-            apiKey: apiKeyToUse,
-            model: selectedModel,
-            featureFlags: getFeatureFlags(req.session),
-            providerUi: issueProvider.ui || null,
-            signal: abortController.signal,
-            callMeta: { urlKey: workspace.urlKey, feature: 'recommend', issueIdentifier: issue.identifier }
-          },
-          (type, data) => {
-            if (closed) return;
-            // Merge metadata into the done event so all data arrives in one event
-            if (type === 'done') {
-              sendSSE(res, 'done', { ...data, ...metadata });
-            } else {
-              sendSSE(res, type, data);
-            }
-          }
-        );
-      }
-    } catch (error) {
-      if (closed) return;
-      console.error('Streaming recommendation error:', error);
-      sendSSE(res, 'error', { error: error.message });
-    } finally {
-      sseKeepalive.stop();
-      if (!closed) res.end();
-    }
   });
+
 
   // ===========================================================================
   // Comments API
@@ -1385,37 +1530,22 @@ ${goal}`
    * @returns {Object} { comments: Array<{id, body, createdAt, user}> }
    */
   router.get('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-    const { issueId } = req.params
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format')
-    }
+    // The detail-surface comments path is fully provider-backed: the dashboard
+    // (interactions.spec) reads comments through the local provider and no
+    // test-token spec reaches this endpoint, so the old `testMockData` data-mock
+    // branch was orphaned and removed (LIN-413). Linear + local both serve here.
+    // LIN-1904: the issue's own binding via `source`, same as /api/detail.
+    const issue = openIssue(req, res);
+    if (!issue) return;
 
     try {
-      // The detail-surface comments path is fully provider-backed: the dashboard
-      // (interactions.spec) reads comments through the local provider and no
-      // test-token spec reaches this endpoint, so the old `testMockData` data-mock
-      // branch was orphaned and removed (LIN-413). Linear + local both serve here.
-      // LIN-1904: resolve the issue's own binding via `source`, same as /api/detail.
-      const issueBinding = resolveIssueBinding(workspace, req.query.source)
-      const { provider: issueProvider, callScope: issueCallScope } = issueBinding
-      const comments = await issueProvider.fetchIssueComments(issueCallScope, issueId)
-      res.json({ comments })
+      const comments = await issue.provider.fetchIssueComments(issue.callScope, issue.issueId);
+      res.json({ comments });
     } catch (error) {
-      console.error('Comments fetch error:', error)
-
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid')
-      }
-
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message)
-      }
-
-      jsonError(res, 500, 'Failed to fetch comments', { message: error.message })
+      console.error('Comments fetch error:', error);
+      jsonError(res, ...failureOf(error, 'Failed to fetch comments'));
     }
-  })
+  });
 
   /**
    * Add a human comment to an issue (LIN-2154) — the session-auth twin of the
@@ -1463,30 +1593,28 @@ ${goal}`
    * `docs/escalation-philosophy.md` is computed from).
    */
   router.post('/workspace/:urlKey/api/comments/:issueId', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace
+    const workspace = req.workspace;
     // LIN-3240 / LIN-3335: the issue's own provider-kind source, source-only.
-    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null
-    const issueBinding = resolveIssueBinding(workspace, req.query.source)
-    const { provider, callScope: token } = issueBinding
+    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
+    const issueBinding = resolveIssueBinding(workspace, req.query.source);
+    const { provider, callScope: token } = issueBinding;
 
     if (!provider.supports('createComment')) {
-      return jsonError(res, 422, "This workspace's provider does not support commenting on issues", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'createComment', provider: provider.name,
-      })
+      return refuseCapability(res, provider.name, 'createComment', 'commenting on issues');
     }
 
-    const { issueId } = req.params
+    const { issueId } = req.params;
     if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format')
+      return badRequest.json(res, 'Invalid issue ID format');
     }
 
-    const { body } = req.body || {}
-    const bodyValidation = validateCommentBody(body, { required: true })
+    const { body } = req.body || {};
+    const bodyValidation = validateCommentBody(body, { required: true });
     if (!bodyValidation.valid) {
-      return badRequest.json(res, bodyValidation.error)
+      return badRequest.json(res, bodyValidation.error);
     }
     if (body.length > MAX_COMMENT_LENGTH) {
-      return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`)
+      return badRequest.json(res, `body exceeds maximum length of ${MAX_COMMENT_LENGTH}`);
     }
 
     // test-token/testMockData branch (matches the codebase-wide `isTestMode`
@@ -1503,50 +1631,147 @@ ${goal}`
     // a `const` declared inside the `try` — a bare read from there would
     // throw a ReferenceError outside the inner error boundary and hang the
     // request exactly the way an unguarded failed retry would.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token'
+    const isTestMode = isTestToken(workspace);
 
     // Dedupe key and attribution are pure — neither calls the provider — so
     // both are computed once, up front, and reused unchanged by a recovered
     // retry (LIN-2933): an identical resubmission must still hit the same
     // dedupe entry, and the written body must not diverge between attempts.
-    const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment')
-    const attributedBody = `${body}\n\n— Ruling recorded via Harbour`
+    const key = dedupeKey(workspace.urlKey, issueId, body, commentDedupeGenerations.current(workspace.urlKey), 'human-comment');
+    const attributedBody = `${body}\n\n— Ruling recorded via Harbour`;
+
+    // Attribution (OQ2): a static fallback line, not a `provider.fetchViewer`
+    // round-trip — see the plan's Attribution note for why. Reversible,
+    // revisit as its own follow-up if the fallback proves unsatisfying.
+    //
+    // Deliberately identifier-agnostic in test mode — it echoes whichever
+    // :issueId the caller sent, so every spec's own seeded issueIdentifier
+    // is accepted, not one hardcoded fixture.
+    const writeComment = async ({ provider: writer, callScope }) => (isTestMode
+      ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } }
+      : normalizeCommentWrite(await writer.createComment(callScope, issueId, attributedBody)));
+
+    const refuseTrashed = () => jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue');
+
+    // Best-effort answer stamp(s) (LIN-1728 decision 1 / LIN-2197 Phase 5;
+    // factored into stampDecisionAnswers, shared with the dedupe-hit retry
+    // path — LIN-2208). Failure is logged only: the comment already
+    // succeeded and is the durable half of this write; the stamp is a
+    // secondary annotation the rulings predicate tolerates missing (the
+    // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
+    // is what makes an identical-text retry one such later attempt).
+    const stampAnswers = async () => {
+      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache });
+      if (stampOk) decisionStampDedupe.set(key, true);
+    };
+
+    // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
+    // mirrors the stampDecisionAnswers discipline — a single attempt, caught and
+    // logged, never propagated, never retried. The comment already succeeded and is
+    // the durable half of this write; a ledger-write failure must never fail it.
+    const recordInLedger = async (commentId, failureLabel) => {
+      if (!harbourCommentsStore) return;
+      try {
+        if (commentId) {
+          await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId });
+        }
+      } catch (ledgerErr) {
+        console.error(failureLabel, ledgerErr.message);
+      }
+    };
 
     // Shared success tail (dedupe write + best-effort ledger + best-effort
     // stamp + the 201 response). Used by both the original attempt and a
     // LIN-2933 recovered retry, so a successful write reaches this exactly
     // once per request, on whichever attempt produced it — never duplicated.
     const finishCommentSuccess = async (commentCreate) => {
-      commentDedupe.set(key, commentCreate)
+      commentDedupe.set(key, commentCreate);
+      await recordInLedger(commentCreate.comment?.id, 'Harbour-comments ledger record failed:');
+      await stampAnswers();
+      return res.status(201).json(commentCreate);
+    };
 
-      // Best-effort Harbour-comments ledger record (LIN-2648, WS1 of LIN-2241):
-      // mirrors the stampDecisionAnswers discipline immediately below — a single
-      // attempt, caught and logged, never propagated, never retried. The comment
-      // already succeeded and is the durable half of this write; a ledger-write
-      // failure must never fail it.
-      if (harbourCommentsStore) {
-        try {
-          const newCommentId = commentCreate.comment?.id
-          if (newCommentId) {
-            await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId: newCommentId })
-          }
-        } catch (ledgerErr) {
-          console.error('Harbour-comments ledger record failed:', ledgerErr.message)
+    // LIN-3124 PR3 (D7 adopt entrant): a connection-backed active workspace
+    // adopts from its Connection (connection-keyed) and hydrates the
+    // per-request side-table — `applyAccessTokenToWorkspace` no-ops for such
+    // a workspace, so without this the retry would read the stale credential.
+    // The legacy path is byte-identical. Returns `{ token, expiresAt }`, or null
+    // when there is nothing newer to adopt.
+    const adoptReplacementCredential = async () => {
+      const activeConnectionId = activeConnectionBackedBinding(workspace)?.connectionId ?? null;
+      if (activeConnectionId && typeof adoptConnectionCredential === 'function') {
+        const adoptedConnection = await adoptConnectionCredential({
+          workspace,
+          ownerAccountId: req.session.accountId,
+          fingerprint: fingerprintCredential(token),
+        });
+        if (!adoptedConnection) return null;
+        setBindingCredential(adoptedConnection.binding, adoptedConnection.credentialBag);
+        setWorkspaceCredential(workspace, adoptedConnection.credentialBag);
+        return { token: adoptedConnection.token, expiresAt: adoptedConnection.expiresAt };
+      }
+      return adoptDurableCredentialIfDifferent({
+        fingerprint: fingerprintCredential(token),
+        urlKey: workspace.urlKey,
+        ownerAccountId: req.session.accountId,
+        provider: provider.name,
+        store: ownerCredentialStore,
+      });
+    };
+
+    // The recovery sequence once a replacement credential exists: mirror it onto the
+    // workspace, save the session, re-resolve the binding and retry the guard and the
+    // write. Resolves true once the request is answered, false when there was nothing
+    // newer to adopt. This is the ONLY path that mutates or saves the session (it is
+    // reached from the catch below, never in test mode, never for a `?source` binding).
+    const retryWithAdoptedCredential = async () => {
+      const adopted = await adoptReplacementCredential();
+      if (!adopted) return false;
+
+      applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt);
+      await saveSession(req.session);
+      // LIN-3186: same observability shape as the headless lane's
+      // [credential-adopted] line — this lane's write-back is the request's
+      // own session row via applyAccessTokenToWorkspace. Digests only,
+      // never token bytes.
+      console.log('[credential-adopted]', JSON.stringify({
+        source: 'session-comment-recovery',
+        urlKey: workspace.urlKey,
+        provider: provider.name,
+        fromFingerprint: fingerprintCredential(token),
+        toFingerprint: fingerprintCredential(adopted.token),
+        writeBack: { rows: 1, ok: true },
+      }));
+
+      // Re-resolve the binding to pick up the freshly-mirrored token.
+      // `requestedSource` is null here (the eligibility check in the catch),
+      // so this re-read is guaranteed to land on the same active
+      // binding `applyAccessTokenToWorkspace` just mirrored into.
+      const retried = resolveIssueBinding(workspace, requestedSource);
+
+      if (!isTestMode) {
+        const retryGuard = await retried.provider.issueWriteGuard(retried.callScope, issueId);
+        if (isTrashed(retryGuard)) {
+          // Same terminal outcome the main path gives a trashed issue —
+          // plan-review implementation note 4.
+          refuseTrashed();
+          return true;
         }
       }
 
-      // Best-effort answer stamp(s) (LIN-1728 decision 1 / LIN-2197 Phase 5;
-      // factored into stampDecisionAnswers, shared with the dedupe-hit retry
-      // path above — LIN-2208). Failure is logged only: the comment already
-      // succeeded and is the durable half of this write; the stamp is a
-      // secondary annotation the rulings predicate tolerates missing (the
-      // loop just stays "unanswered" until a later attempt succeeds — LIN-2208
-      // above is what makes an identical-text retry one such later attempt).
-      const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache })
-      if (stampOk) decisionStampDedupe.set(key, true)
+      const retryCommentCreate = await writeComment(retried);
 
-      return res.status(201).json(commentCreate)
-    }
+      if (!retryCommentCreate.success || !retryCommentCreate.comment) {
+        // Unlike the main path's direct 502, a non-success shape here is
+        // treated as a thrown synthetic error so there is exactly one
+        // exit from this catch block downstream of it: the classified
+        // 500 below.
+        throw new Error('Comment was not created on retry');
+      }
+
+      await finishCommentSuccess(retryCommentCreate);
+      return true;
+    };
 
     try {
       if (!isTestMode) {
@@ -1554,13 +1779,11 @@ ${goal}`
         // speak for this route-internal read, so a provider that implements
         // createComment but not issueWriteGuard gets a clean 422, not a 500.
         if (typeof provider.issueWriteGuard !== 'function') {
-          return jsonError(res, 422, "This workspace's provider does not support commenting on issues", {
-            code: 'CAPABILITY_NOT_SUPPORTED', capability: 'issueWriteGuard', provider: provider.name,
-          })
+          return refuseCapability(res, provider.name, 'issueWriteGuard', 'commenting on issues');
         }
-        const guard = await provider.issueWriteGuard(token, issueId)
+        const guard = await provider.issueWriteGuard(token, issueId);
         if (isTrashed(guard)) {
-          return jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue')
+          return refuseTrashed();
         }
       }
 
@@ -1568,9 +1791,9 @@ ${goal}`
       // lane's digest stream can never collide with the agent lane's own
       // 4-argument call (routes/proxy.js) — see the comment there. Keyed on the
       // RAW, pre-attribution operator text (not the final attributed body,
-      // composed below): an identical resubmission must hit the same cache
+      // composed above): an identical resubmission must hit the same cache
       // entry even though attribution makes the two *written* bodies diverge.
-      const prior = commentDedupe.get(key)
+      const prior = commentDedupe.get(key);
       if (prior) {
         // LIN-2208: the dedupe cache protects the COMMENT WRITE (never mint a
         // second comment for an identical resubmission) — it must not also
@@ -1583,45 +1806,26 @@ ${goal}`
         // stamp attempt once one has already landed (the pre-existing "a
         // deduped resubmission does not re-stamp" success-path coverage).
         if (!decisionStampDedupe.get(key)) {
-          const stampOk = await stampDecisionAnswers(workspace, req.body || {}, { dispatchQueueStore, taskDecisionsStore, sessionsFeedCache })
-          if (stampOk) decisionStampDedupe.set(key, true)
+          await stampAnswers();
         }
 
         // Dedupe-hit ledger repair (LIN-2649 S1, F2): a dedupe hit means the
-        // ORIGINAL create's own ledger-record attempt (below) may have failed
+        // ORIGINAL create's own ledger-record attempt may have failed
         // silently, leaving a Harbour-written comment unrecorded. Re-attempt
         // it here before returning — idempotent upsert, same best-effort
         // discipline as the non-dedupe path, never gates the response.
-        if (harbourCommentsStore) {
-          try {
-            const priorCommentId = prior.comment?.id
-            if (priorCommentId) {
-              await harbourCommentsStore.record({ urlKey: workspace.urlKey, commentId: priorCommentId })
-            }
-          } catch (ledgerErr) {
-            console.error('Harbour-comments ledger repair failed:', ledgerErr.message)
-          }
-        }
+        await recordInLedger(prior.comment?.id, 'Harbour-comments ledger repair failed:');
 
-        return res.status(200).json({ ...prior, deduped: true })
+        return res.status(200).json({ ...prior, deduped: true });
       }
 
-      // Attribution (OQ2): a static fallback line, not a `provider.fetchViewer`
-      // round-trip — see the plan's Attribution note for why. Reversible,
-      // revisit as its own follow-up if the fallback proves unsatisfying.
-      //
-      // Deliberately identifier-agnostic in test mode — it echoes whichever
-      // :issueId the caller sent, so every spec's own seeded issueIdentifier
-      // is accepted, not one hardcoded fixture.
-      const commentCreate = isTestMode
-        ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } }
-        : normalizeCommentWrite(await provider.createComment(token, issueId, attributedBody))
+      const commentCreate = await writeComment(issueBinding);
 
       if (!commentCreate.success || !commentCreate.comment) {
-        return jsonError(res, 502, 'Comment was not created', { detail: commentCreate || null })
+        return jsonError(res, 502, 'Comment was not created', { detail: commentCreate || null });
       }
 
-      return await finishCommentSuccess(commentCreate)
+      return await finishCommentSuccess(commentCreate);
     } catch (err) {
       // LIN-2933: one-shot, server-side adopt-first recovery for a provider
       // auth rejection. Bounded to the comment route's single consumer — see
@@ -1629,7 +1833,7 @@ ${goal}`
       // for what this can and cannot recover (a session copy superseded by a
       // DIFFERENT durable credential, not a dead/byte-identical one; the
       // latter is LIN-3018).
-      let errorToClassify = err
+      let errorToClassify = err;
 
       // Eligibility, all of which must hold before attempting recovery:
       // - only ever a provider-auth rejection, never any other failure shape
@@ -1644,99 +1848,30 @@ ${goal}`
       //   active-binding calls.
       // - only Linear: the adopt arm only ever returns a credential for a
       //   bare-token (Linear) provider (isBareTokenCredentialProvider).
-      const classification = classifyUpstreamError(err, provider.ui?.displayName ?? null)
+      const classification = classifyUpstreamError(err, provider.ui?.displayName ?? null);
       const recoveryEligible = classification.category === 'auth'
         && !isTestMode
         && Boolean(ownerCredentialStore)
         && !requestedSource
-        && provider.name === 'linear'
+        && provider.name === 'linear';
 
       if (recoveryEligible) {
-        // LIN-3124 PR3 (D7 adopt entrant): a connection-backed active workspace
-        // adopts from its Connection (connection-keyed) and hydrates the
-        // per-request side-table — `applyAccessTokenToWorkspace` no-ops for such
-        // a workspace, so without this the retry would read the stale credential.
-        // The legacy path is byte-identical.
-        const activeConnectionId = activeConnectionBackedBinding(workspace)?.connectionId ?? null
-        let adopted = null
-        if (activeConnectionId && typeof adoptConnectionCredential === 'function') {
-          const adoptedConnection = await adoptConnectionCredential({
-            workspace,
-            ownerAccountId: req.session.accountId,
-            fingerprint: fingerprintCredential(token),
-          })
-          if (adoptedConnection) {
-            setBindingCredential(adoptedConnection.binding, adoptedConnection.credentialBag)
-            setWorkspaceCredential(workspace, adoptedConnection.credentialBag)
-            adopted = { token: adoptedConnection.token, expiresAt: adoptedConnection.expiresAt }
-          }
-        } else {
-          adopted = await adoptDurableCredentialIfDifferent({
-            fingerprint: fingerprintCredential(token),
-            urlKey: workspace.urlKey,
-            ownerAccountId: req.session.accountId,
-            provider: provider.name,
-            store: ownerCredentialStore,
-          })
-        }
-
-        if (adopted) {
-          // Inner error boundary (plan-review R1): the route's outer `catch`
-          // is not itself inside a `try` from Express's point of view (a bare
-          // async handler, no `.catch(next)`), so a throw from mirror → save
-          // → retry would otherwise have no home but the logging-only
-          // `unhandledRejection` handler — no response sent, `restore()`
-          // never runs client-side, and a bulk Agree row hangs forever. Every
-          // throw in this inner sequence is caught here and reassigned to
-          // errorToClassify; it is NEVER re-thrown, so nothing below this
-          // point can escape the handler unresolved.
-          try {
-            applyAccessTokenToWorkspace(workspace, adopted.token, adopted.expiresAt)
-            await saveSession(req.session)
-            // LIN-3186: same observability shape as the headless lane's
-            // [credential-adopted] line — this lane's write-back is the request's
-            // own session row via applyAccessTokenToWorkspace. Digests only,
-            // never token bytes.
-            console.log('[credential-adopted]', JSON.stringify({
-              source: 'session-comment-recovery',
-              urlKey: workspace.urlKey,
-              provider: provider.name,
-              fromFingerprint: fingerprintCredential(token),
-              toFingerprint: fingerprintCredential(adopted.token),
-              writeBack: { rows: 1, ok: true },
-            }))
-
-            // Re-resolve the binding to pick up the freshly-mirrored token.
-            // `requestedSource` is null here (the eligibility check above),
-            // so this re-read is guaranteed to land on the same active
-            // binding `applyAccessTokenToWorkspace` just mirrored into.
-            const retried = resolveIssueBinding(workspace, requestedSource)
-
-            if (!isTestMode) {
-              const retryGuard = await retried.provider.issueWriteGuard(retried.callScope, issueId)
-              if (isTrashed(retryGuard)) {
-                // Same terminal outcome the main path gives a trashed issue —
-                // plan-review implementation note 4.
-                return jsonError(res, 409, 'Issue is trashed; refusing to comment on a deleted issue')
-              }
-            }
-
-            const retryCommentCreate = isTestMode
-              ? { success: true, comment: { id: `test-comment-${key}`, body: attributedBody, createdAt: new Date().toISOString(), user: { name: 'Harbour' } } }
-              : normalizeCommentWrite(await retried.provider.createComment(retried.callScope, issueId, attributedBody))
-
-            if (!retryCommentCreate.success || !retryCommentCreate.comment) {
-              // Unlike the main path's direct 502, a non-success shape here is
-              // treated as a thrown synthetic error so there is exactly one
-              // exit from this catch block downstream of it: the classified
-              // 500 below.
-              throw new Error('Comment was not created on retry')
-            }
-
-            return await finishCommentSuccess(retryCommentCreate)
-          } catch (recoveryErr) {
-            errorToClassify = recoveryErr
-          }
+        // Inner error boundary (plan-review R1): the route's outer `catch`
+        // is not itself inside a `try` from Express's point of view (a bare
+        // async handler, no `.catch(next)`), so a throw from adopt → mirror →
+        // save → retry would otherwise have no home but the logging-only
+        // `unhandledRejection` handler — no response sent, `restore()`
+        // never runs client-side, and a bulk Agree row hangs forever. Every
+        // throw in this sequence is caught here and reassigned to
+        // errorToClassify; it is NEVER re-thrown, so nothing below this
+        // point can escape the handler unresolved. The adopt read itself is
+        // inside the boundary (LIN-3596): it can throw (the connection
+        // authorisation reads are unguarded), and the one exit from this catch
+        // is the classified 500 below.
+        try {
+          if (await retryWithAdoptedCredential()) return;
+        } catch (recoveryErr) {
+          errorToClassify = recoveryErr;
         }
       }
 
@@ -1744,12 +1879,12 @@ ${goal}`
       // proxy lane's `[credential-rejected]` logging convention. Logs
       // errorToClassify, not the original err, so the log reflects what
       // actually produced the response when recovery was attempted.
-      const loggedClassification = errorToClassify === err ? classification : classifyUpstreamError(errorToClassify, provider.ui?.displayName ?? null)
+      const loggedClassification = errorToClassify === err ? classification : classifyUpstreamError(errorToClassify, provider.ui?.displayName ?? null);
       console.error('Workspace-api create comment error:', errorToClassify.message, {
         code: loggedClassification.code,
         category: loggedClassification.category,
         credentialFingerprint: fingerprintCredential(token),
-      })
+      });
 
       // Never the raw upstream message (LIN-1511/LIN-2260): `detail`/`code`/
       // `category`/`retryable` come from the classifier alone, attributed to
@@ -1758,10 +1893,10 @@ ${goal}`
       // never locally overridden — `classifyUpstreamError` already returns
       // `false` for an auth rejection, matching docs/proxy-integration.md's
       // contract, whether recovery was skipped, found nothing, or was
-      // attempted and the retry (or the session save) itself failed.
-      return jsonError(res, 500, 'Failed to create comment', loggedClassification)
+      // attempted and the adopt, the retry (or the session save) itself failed.
+      return jsonError(res, 500, 'Failed to create comment', loggedClassification);
     }
-  })
+  });
 
   /**
    * Render one issue's detail block for the lazy dashboard (LIN-442).
@@ -1781,54 +1916,47 @@ ${goal}`
    * @returns {Object} { html } - inner HTML for the issue's `.details` block
    */
   router.get('/workspace/:urlKey/api/detail/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-    const { issueId } = req.params
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format')
-    }
+    // LIN-1903: the dashboard tree merges issues across ALL of a workspace's
+    // bindings (LIN-544), but a bare id-only drill-down defaulted to the
+    // WORKSPACE's active provider/scope — misrouting a foreign-source row's id
+    // to the wrong provider/credential. The client-supplied `source` (the
+    // issue's own provenance, LIN-561) lets us resolve that issue's own
+    // binding instead, via resolveIssueBinding — bounded to this workspace's
+    // OWN bindings, so it can only select among credentials the caller
+    // already has access to (LIN-1904).
+    const found = openIssue(req, res);
+    if (!found) return;
+    const { workspace, issueId, provider, callScope } = found;
 
     try {
-      // LIN-1903: the dashboard tree merges issues across ALL of a workspace's
-      // bindings (LIN-544), but a bare id-only drill-down defaulted to the
-      // WORKSPACE's active provider/scope — misrouting a foreign-source row's id
-      // to the wrong provider/credential. The client-supplied `source` (the
-      // issue's own provenance, LIN-561) lets us resolve that issue's own
-      // binding instead, via resolveIssueBinding — bounded to this workspace's
-      // OWN bindings, so it can only select among credentials the caller
-      // already has access to (LIN-1904).
-      const detailSelector = req.query.source
-      const { provider, callScope } = resolveIssueBinding(workspace, detailSelector)
-
       // Test mode (test-token + testMockData): the homepage renders from the mock
       // fixtures, not the provider API, so the lazy detail must too — fetching via
       // the Linear provider with 'test-token' would hit the network. Mirrors the
       // prompt route's test-mode branch.
-      let issue
-      if (process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token') {
-        issue = testMockData.issues.find(i => i.id === issueId)
+      let issue;
+      if (isTestToken(workspace)) {
+        issue = testMockData.issues.find(i => i.id === issueId);
         if (!issue) {
-          return notFound.json(res, 'Issue not found')
+          return notFound.json(res, 'Issue not found');
         }
       } else {
-        issue = await provider.fetchIssueFields(callScope, issueId)
+        issue = await provider.fetchIssueFields(callScope, issueId);
       }
 
       // Custom prompts (non-blocking, fallback to empty) — matches the homepage.
-      let customPrompts = []
+      let customPrompts = [];
       try {
-        customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }))
+        customPrompts = (await customPromptsStore.list(workspace.urlKey)).map(p => ({ id: p.id, name: p.name }));
       } catch (e) { /* non-fatal */ }
 
-      const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h))
+      const isLocalhost = ['localhost', '127.0.0.1'].some(h => req.get('host')?.startsWith(h));
 
       // The same issue can be lazily expanded in two sections at once (e.g. In
       // Progress + its project tree). `section` disambiguates the dispatch
       // disclosure panel ids so the second appearance's "Dispatch ▾" resolves to
       // its OWN panel, not the first one's (LIN-732). Whitelisted to the known
       // render sections; anything else falls back to '' (pre-LIN-732 id scheme).
-      const KNOWN_SECTIONS = ['project', 'in-progress', 'recent-activity']
-      const section = KNOWN_SECTIONS.includes(req.query.section) ? req.query.section : ''
+      const section = KNOWN_SECTIONS.includes(req.query.section) ? req.query.section : '';
 
       const html = renderDetailsContent(issue, {
         isLanding: false,
@@ -1839,21 +1967,14 @@ ${goal}`
         isLocalhost,
         provider,
         section
-      })
+      });
 
-      res.json({ html })
+      res.json({ html });
     } catch (error) {
-      console.error('Detail fetch error:', error)
-
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid')
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message)
-      }
-      jsonError(res, 500, 'Failed to fetch detail', { message: error.message })
+      console.error('Detail fetch error:', error);
+      jsonError(res, ...failureOf(error, 'Failed to fetch detail'));
     }
-  })
+  });
 
   // ===========================================================================
   // Dispatched Sessions API
@@ -1896,48 +2017,25 @@ ${goal}`
   });
 
   // ===========================================================================
-  // Recap API (LIN-261)
+  // Recap API (LIN-261) and Brief API (current-state task brief)
   // ===========================================================================
 
-  /**
-   * GET recap status + body (if fresh).
-   *
-   * @route GET /workspace/:urlKey/api/recap/:issueId
-   * @returns {Object} { status: 'fresh'|'stale'|'missing', recap?, generatedAt?, model? }
-   */
-  router.get('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (!recapCacheStore) {
-      return jsonError(res, 503, 'Recap cache not configured');
-    }
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support recap for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
+  // The GET half of both: the cache status for one issue, read against the issue's
+  // CURRENT content hash. `fresh` carries the stored body, `stale` (the content moved)
+  // and `missing` (never generated) do not.
+  //   @returns {Object} { status: 'fresh'|'stale'|'missing', <kind>?, generatedAt?, model? }
+  const cachedStatusHandler = (kind, store, storeName) => async (req, res) => {
+    const issue = openIssue(req, res, { store, storeName, capability: kind });
+    if (!issue) return;
+    const { workspace, issueId } = issue;
 
     try {
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) return notFound.json(res, 'Issue not found');
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
+      const { context, missing } = await loadContext(workspace, issueId, issue);
+      if (missing) return notFound.json(res, 'Issue not found');
 
       const canonicalId = context.issue?.id || issueId;
       const inputHash = hashContext(context);
-      const cached = await recapCacheStore.get(workspace.urlKey, canonicalId);
+      const cached = await store.get(workspace.urlKey, canonicalId);
 
       if (!cached) {
         return res.json({ status: 'missing' });
@@ -1951,21 +2049,68 @@ ${goal}`
       }
       return res.json({
         status: 'fresh',
-        recap: cached.recap,
+        [kind]: cached[kind],
         generatedAt: cached.generatedAt,
         model: cached.model
       });
     } catch (error) {
-      console.error('Recap GET error:', error);
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message);
-      }
-      jsonError(res, 500, 'Failed to fetch recap status', { message: error.message });
+      console.error(`${kind === 'recap' ? 'Recap' : 'Brief'} GET error:`, error);
+      jsonError(res, ...failureOf(error, `Failed to fetch ${kind} status`));
     }
-  });
+  };
+
+  // The POST half of both, after each route's own AI pre-flight: read the context, generate
+  // the body (the deterministic mock under `mockAi`, the model otherwise), persist it under
+  // the issue's content hash, read the stored row back for its timestamp, and reply fresh.
+  // Force-regenerate always calls OpenRouter; the keepalive is a Heroku H12 guard.
+  //   @param {'recap'|'brief'} kind
+  //   @param {Object} ai - the route's resolved credential: `{ mockAi, apiKey, isFreeTier }`
+  const generateCachedDocument = async (kind, store, res, issue, ai, { generate, buildMock }) => {
+    const { workspace, issueId } = issue;
+    const { isFreeTier } = ai;
+    const keepalive = armKeepalive(res);
+    try {
+      const { context, missing } = await loadContext(workspace, issueId, issue);
+      if (missing) {
+        return keepaliveError(keepalive, 404, 'Issue not found');
+      }
+
+      const canonicalId = context.issue?.id || issueId;
+      const inputHash = hashContext(context);
+      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: kind, forceDefault: isFreeTier });
+
+      let body;
+      let modelUsed;
+      if (ai.mockAi) {
+        body = buildMock(context);
+        modelUsed = model;
+      } else {
+        const result = await generate(context.issue, context, { apiKey: ai.apiKey, model, callMeta: { urlKey: workspace?.urlKey } });
+        body = result[kind];
+        modelUsed = result.model;
+      }
+
+      await store.put(workspace.urlKey, canonicalId, { inputHash, [kind]: body, model: modelUsed });
+      const stored = await store.get(workspace.urlKey, canonicalId);
+
+      keepalive.send(200, {
+        status: 'fresh',
+        [kind]: stored?.[kind] ?? body,
+        generatedAt: stored?.generatedAt ?? new Date(),
+        model: modelUsed
+      });
+    } catch (error) {
+      keepaliveFailure(keepalive, `${kind === 'recap' ? 'Recap' : 'Brief'} POST error:`, error, `Failed to generate ${kind}`, { openRouter: true });
+    }
+  };
+
+  /**
+   * GET recap status + body (if fresh).
+   *
+   * @route GET /workspace/:urlKey/api/recap/:issueId
+   * @returns {Object} { status: 'fresh'|'stale'|'missing', recap?, generatedAt?, model? }
+   */
+  router.get('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, cachedStatusHandler('recap', recapCacheStore, 'Recap cache'));
 
   /**
    * POST recap generate.
@@ -1975,106 +2120,30 @@ ${goal}`
    * @returns {Object} { status: 'fresh', recap, generatedAt, model }
    */
   router.post('/workspace/:urlKey/api/recap/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (!recapCacheStore) {
-      return jsonError(res, 503, 'Recap cache not configured');
-    }
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support recap for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
+    const issue = openIssue(req, res, { store: recapCacheStore, storeName: 'Recap cache', capability: 'recap' });
+    if (!issue) return;
+    const { workspace, issueId } = issue;
 
     // `isTestMode` (test-token) gates the DATA mock; `mockAi` additionally fires
     // the AI mock for local-provider sessions, whose data comes from the
     // provider (LIN-388). The AI-config + free-tier guards key off `mockAi` so a
     // migrated local session isn't 503'd for lacking an OpenRouter key.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const credential = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
     if (isAiUnavailable({ credential, mockAi })) {
-      return jsonError(res, 503, 'AI recap is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
+      return aiNotConfigured(res, 'recap');
     }
 
     if (!mockAi && isFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return refuseFreeTier(res, check);
       }
     }
 
-    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
-    const keepalive = armKeepalive(res);
-    try {
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) {
-          return keepaliveError(keepalive, 404, 'Issue not found');
-        }
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'recap', forceDefault: isFreeTier });
-
-      let recap;
-      let modelUsed;
-      if (mockAi) {
-        const mocked = buildMockRecap(context);
-        recap = mocked;
-        modelUsed = selectedModel;
-      } else {
-        const result = await generateRecap(
-          context.issue,
-          context,
-          { apiKey: apiKeyToUse, model: selectedModel, callMeta: { urlKey: workspace?.urlKey } }
-        );
-        recap = result.recap;
-        modelUsed = result.model;
-      }
-
-      await recapCacheStore.put(workspace.urlKey, canonicalId, {
-        inputHash,
-        recap,
-        model: modelUsed
-      });
-      const stored = await recapCacheStore.get(workspace.urlKey, canonicalId);
-
-      keepalive.send(200, {
-        status: 'fresh',
-        recap: stored?.recap ?? recap,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
-    } catch (error) {
-      keepalive.stop();
-      console.error('Recap POST error:', error);
-      if (error.response?.status === 401) {
-        return keepaliveError(keepalive, 401, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return keepaliveError(keepalive, 404, error.message);
-      }
-      if (error.message?.includes('OpenRouter')) {
-        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
-      }
-      keepaliveError(keepalive, 500, 'Failed to generate recap', { message: error.message });
-    }
+    return generateCachedDocument('recap', recapCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateRecap, buildMock: buildMockRecap });
   });
 
   // ===========================================================================
@@ -2097,22 +2166,16 @@ ${goal}`
    *   the issue is absent from the loaded set.
    */
   router.get('/workspace/:urlKey/api/context/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-
-    // LIN-3240 (LIN-3126 \\u00a72): this is an ISSUE-neighbourhood read — fetch the
+    // LIN-3240 (LIN-3126 §2): this is an ISSUE-neighbourhood read — fetch the
     // issue's OWN binding (strict), not the workspace's active one.
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
+    const found = openIssue(req, res);
+    if (!found) return;
+    const { workspace, issueId } = found;
 
     try {
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-      const issues = isTestMode
+      const issues = isTestToken(workspace)
         ? testMockData.issues
-        : (await issueBinding.provider.fetchProjects(issueBinding.callScope)).issues;
+        : (await found.provider.fetchProjects(found.callScope)).issues;
 
       // Resolve the root by canonical id or human identifier (LIN-123), since the
       // section mounts with whichever the surface has to hand.
@@ -2130,19 +2193,9 @@ ${goal}`
       return res.json(graph);
     } catch (error) {
       console.error('Context GET error:', error);
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message);
-      }
-      jsonError(res, 500, 'Failed to build context', { message: error.message });
+      jsonError(res, ...failureOf(error, 'Failed to build context'));
     }
   });
-
-  // ===========================================================================
-  // Brief API (current-state task brief)
-  // ===========================================================================
 
   /**
    * GET brief status + body (if fresh).
@@ -2150,67 +2203,7 @@ ${goal}`
    * @route GET /workspace/:urlKey/api/brief/:issueId
    * @returns {Object} { status: 'fresh'|'stale'|'missing', brief?, generatedAt?, model? }
    */
-  router.get('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (!briefCacheStore) {
-      return jsonError(res, 503, 'Brief cache not configured');
-    }
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support brief for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
-
-    try {
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) return notFound.json(res, 'Issue not found');
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const cached = await briefCacheStore.get(workspace.urlKey, canonicalId);
-
-      if (!cached) {
-        return res.json({ status: 'missing' });
-      }
-      if (cached.inputHash !== inputHash) {
-        return res.json({
-          status: 'stale',
-          generatedAt: cached.generatedAt,
-          model: cached.model
-        });
-      }
-      return res.json({
-        status: 'fresh',
-        brief: cached.brief,
-        generatedAt: cached.generatedAt,
-        model: cached.model
-      });
-    } catch (error) {
-      console.error('Brief GET error:', error);
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message);
-      }
-      jsonError(res, 500, 'Failed to fetch brief status', { message: error.message });
-    }
-  });
+  router.get('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, cachedStatusHandler('brief', briefCacheStore, 'Brief cache'));
 
   /**
    * POST brief generate.
@@ -2220,210 +2213,29 @@ ${goal}`
    * @returns {Object} { status: 'fresh', brief, generatedAt, model }
    */
   router.post('/workspace/:urlKey/api/brief/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (!briefCacheStore) {
-      return jsonError(res, 503, 'Brief cache not configured');
-    }
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support brief for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
+    const issue = openIssue(req, res, { store: briefCacheStore, storeName: 'Brief cache', capability: 'brief' });
+    if (!issue) return;
+    const { workspace, issueId } = issue;
 
     // See the recap POST note: `isTestMode` gates the DATA mock, `mockAi` the AI
     // mock (incl. local-provider sessions) and the AI-config/free-tier guards.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const credential = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
     if (isAiUnavailable({ credential, mockAi })) {
-      return jsonError(res, 503, 'AI brief is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
+      return aiNotConfigured(res, 'brief');
     }
 
     if (!mockAi && isFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return refuseFreeTier(res, check);
       }
     }
 
-    // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
-    const keepalive = armKeepalive(res);
-    try {
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) {
-          return keepaliveError(keepalive, 404, 'Issue not found');
-        }
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
-
-      const canonicalId = context.issue?.id || issueId;
-      const inputHash = hashContext(context);
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'brief', forceDefault: isFreeTier });
-
-      let brief;
-      let modelUsed;
-      if (mockAi) {
-        brief = buildMockBrief(context);
-        modelUsed = selectedModel;
-      } else {
-        const result = await generateBrief(
-          context.issue,
-          context,
-          { apiKey: apiKeyToUse, model: selectedModel, callMeta: { urlKey: workspace?.urlKey } }
-        );
-        brief = result.brief;
-        modelUsed = result.model;
-      }
-
-      await briefCacheStore.put(workspace.urlKey, canonicalId, {
-        inputHash,
-        brief,
-        model: modelUsed
-      });
-      const stored = await briefCacheStore.get(workspace.urlKey, canonicalId);
-
-      keepalive.send(200, {
-        status: 'fresh',
-        brief: stored?.brief ?? brief,
-        generatedAt: stored?.generatedAt ?? new Date(),
-        model: modelUsed
-      });
-    } catch (error) {
-      keepalive.stop();
-      console.error('Brief POST error:', error);
-      if (error.response?.status === 401) {
-        return keepaliveError(keepalive, 401, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return keepaliveError(keepalive, 404, error.message);
-      }
-      if (error.message?.includes('OpenRouter')) {
-        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
-      }
-      keepaliveError(keepalive, 500, 'Failed to generate brief', { message: error.message });
-    }
+    return generateCachedDocument('brief', briefCacheStore, res, issue, { mockAi, apiKey: apiKeyToUse, isFreeTier }, { generate: generateBrief, buildMock: buildMockBrief });
   });
-
-  /** Build a small deterministic brief (Markdown) for test mode. */
-  function buildMockBrief(context) {
-    const issue = context.issue || {};
-    const remaining = (context.children || []).filter(c => !isTerminalState(c.state?.type));
-
-    const lines = [];
-    lines.push('## Current');
-    lines.push(`${issue.title || 'Untitled task'} — ${issue.description ? issue.description.split('\n')[0] : 'No description provided.'}`);
-    if (remaining.length > 0) {
-      lines.push('');
-      lines.push(`Remaining: ${remaining.map(c => c.identifier).join(', ')}.`);
-    }
-    lines.push('');
-
-    lines.push('## Constraints');
-    lines.push('- _None._');
-    lines.push('');
-
-    lines.push('## Open questions');
-    lines.push('- _None._');
-    lines.push('');
-
-    lines.push('## Changelog');
-    if ((context.comments || []).length > 0) {
-      lines.push(`- **Discussion captured in ${context.comments.length} comment(s)** — context lives in the thread, not yet folded into the spec.`);
-    } else {
-      lines.push('- _None._');
-    }
-
-    return lines.join('\n');
-  }
-
-  /** Build a mock recommendation context from test fixtures. */
-  async function buildMockRecapContext(issueId) {
-    const mockIssue = testMockData.issues.find(i => i.id === issueId || i.identifier === issueId || i.url?.endsWith(`/${issueId}`));
-    if (!mockIssue) return null;
-    const project = testMockData.projects.find(p => p.id === mockIssue.project?.id) || null;
-    const labels = (mockIssue.labels?.nodes || []).map(l => l.name);
-    const comments = (mockIssue.comments?.nodes || []).map(c => ({
-      id: c.id,
-      body: c.body,
-      createdAt: c.createdAt,
-      user: { name: c.user?.name || 'Unknown' }
-    }));
-    const children = (mockIssue.children?.nodes || []).map(c => ({
-      id: c.id,
-      identifier: c.identifier || c.id,
-      title: c.title,
-      state: c.state || { type: 'unstarted', name: 'Todo' },
-      labels: (c.labels?.nodes || []).map(l => l.name)
-    }));
-    return {
-      issue: {
-        id: mockIssue.id,
-        identifier: mockIssue.identifier || mockIssue.id,
-        title: mockIssue.title,
-        description: mockIssue.description || '',
-        state: mockIssue.state,
-        labels,
-        url: mockIssue.url
-      },
-      parent: null,
-      siblings: [],
-      project: project ? { id: project.id, name: project.name } : null,
-      children,
-      comments,
-      focusedChild: null
-    };
-  }
-
-  /** Build a small deterministic recap for test mode. */
-  function buildMockRecap(context) {
-    const done = [];
-    const pending = [];
-    const deviations = [];
-
-    if ((context.comments || []).length > 0) {
-      done.push({
-        item: 'Discussion captured in comments',
-        evidence: `${context.comments.length} comment(s) recorded`
-      });
-    }
-    if (context.issue?.description) {
-      done.push({
-        item: 'Description documented',
-        evidence: 'Description is present on the issue'
-      });
-    }
-    const remainingChildren = (context.children || []).filter(
-      c => !isTerminalState(c.state?.type)
-    );
-    for (const c of remainingChildren.slice(0, 3)) {
-      pending.push({
-        item: `Complete subtask ${c.identifier}`,
-        predicted: c.title || ''
-      });
-    }
-    if (pending.length === 0) {
-      pending.push({
-        item: 'Continue implementation',
-        predicted: 'Pick up from current state'
-      });
-    }
-    return { done, pending, deviations };
-  }
 
   // ===========================================================================
   // Scan API (LIN-2197 Phase 4) — the third producer into the operator
@@ -2435,6 +2247,33 @@ ${goal}`
   // unlike the 7-day brief/recap caches), and a scan additionally carries a
   // fail-closed Principle 0 gate and an outcome (dismiss) write path.
   // ===========================================================================
+
+  // The canonical id dismiss and unretire act on. When `:issueId` is already
+  // UUID-shaped it IS the canonical id — `markOutcome` filters on `{_id, urlKey,
+  // issueId}`, so the row's own stored key is the authority and there is no reason
+  // to pay for a provider context fetch just to re-derive an id already in hand.
+  // This also fixes the trashed/deleted-task case: a stale ruling on a task the
+  // provider can no longer fetch could previously never be dismissed (the fetch
+  // 404s before `markOutcome` is ever reached). A non-UUID `:issueId` (an
+  // identifier, or a caller that hasn't been updated to pass the canonical id
+  // GET/POST scan now return) still resolves it via the context fetch. Returns
+  // null after replying when it cannot be resolved.
+  const resolveCanonicalScanId = async (req, res, workspace, issueId) => {
+    if (UUID_REGEX.test(issueId)) return issueId;
+
+    const binding = resolveIssueBinding(workspace, req.query.source);
+    if (!binding.provider.supports('fetchRecommendationContext')) {
+      refuseCapability(res, binding.provider.name, 'fetchRecommendationContext', 'scan for this issue');
+      return null;
+    }
+
+    const subject = await loadScanSubject(workspace, issueId, binding);
+    if (subject.refusal) {
+      jsonError(res, ...subject.refusal);
+      return null;
+    }
+    return subject.canonicalId;
+  };
 
   /**
    * GET scan status. `fresh` means the stored row matches the task's CURRENT
@@ -2454,44 +2293,15 @@ ${goal}`
    *   `stale` as a bare `{status, scannedAt}` shape.
    */
   router.get('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (!taskDecisionsStore) {
-      return jsonError(res, 503, 'Scan store not configured');
-    }
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
+    const issue = openIssue(req, res, { store: taskDecisionsStore, storeName: 'Scan store', capability: 'scan' });
+    if (!issue) return;
+    const { workspace, issueId } = issue;
 
     try {
-      const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) return notFound.json(res, 'Issue not found');
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
+      const subject = await loadScanSubject(workspace, issueId, issue);
+      if (subject.refusal) return jsonError(res, ...subject.refusal);
+      const { context, canonicalId } = subject;
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        // Never let a durable scan record be keyed under a non-canonical
-        // fallback (LIN-2197 Phase 2 close-out ledger item 3) — this task's
-        // canonical id could not be resolved from the fetched context.
-        return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
-          code: 'CANONICAL_ID_REQUIRED'
-        });
-      }
       const inputHash = hashContext(context);
       const cached = await taskDecisionsStore.getStatus(workspace.urlKey, canonicalId, inputHash);
 
@@ -2521,41 +2331,14 @@ ${goal}`
         raisedBasisVersion: cached.basisVersion,
         currentBasisHash: scanBasisHashFromContext(context)
       });
-      if (cached.inputHash !== inputHash) {
-        return res.json({
-          status: 'stale',
-          id: cached.id,
-          issueId: cached.issueId,
-          decision: cached.decision,
-          scannedAt: cached.scannedAt,
-          outcome: cached.outcome,
-          outcomeAt: cached.outcomeAt,
-          outcomeReason: cached.outcomeReason ?? null,
-          outcomeBasisHash: cached.outcomeBasisHash ?? null,
-          basisChanged
-        });
-      }
       return res.json({
-        status: 'fresh',
-        id: cached.id,
-        issueId: cached.issueId,
-        decision: cached.decision,
-        scannedAt: cached.scannedAt,
-        outcome: cached.outcome,
-        outcomeAt: cached.outcomeAt,
-        outcomeReason: cached.outcomeReason ?? null,
-        outcomeBasisHash: cached.outcomeBasisHash ?? null,
+        status: cached.inputHash !== inputHash ? 'stale' : 'fresh',
+        ...scanRow(cached),
         basisChanged
       });
     } catch (error) {
       console.error('Scan GET error:', error);
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message);
-      }
-      jsonError(res, 500, 'Failed to fetch scan status', { message: error.message });
+      jsonError(res, ...failureOf(error, 'Failed to fetch scan status'));
     }
   });
 
@@ -2573,10 +2356,9 @@ ${goal}`
    * @returns {Object} { status: 'fresh', id, issueId, decision, scannedAt, outcome, outcomeAt, model }
    */
   router.post('/workspace/:urlKey/api/scan/:issueId', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
+    const issue = openIssue(req, res, { store: taskDecisionsStore, storeName: 'Scan store', capability: 'scan' });
+    if (!issue) return;
+    const { workspace, issueId } = issue;
 
     // LIN-3126 residual / LIN-3335: persist the validated kind-only `issueSource`
     // onto the durable scan row so a later rulings anchor
@@ -2589,59 +2371,31 @@ ${goal}`
       ? { issueSource: req.query.source.trim() }
       : {};
 
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (!taskDecisionsStore) {
-      return jsonError(res, 503, 'Scan store not configured');
-    }
-    // Capability backstop — clean 422 (never a raw NotImplementedError) for a
-    // provider that never implements recommendation context (LIN-1910).
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
-
     // See the recap/brief POST notes: `isTestMode` gates the DATA mock,
     // `mockAi` the AI mock (incl. local-provider sessions), and the
     // AI-config/free-tier guards.
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const credential = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
     if (isAiUnavailable({ credential, mockAi })) {
-      return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
+      return aiNotConfigured(res, 'scan');
     }
 
     if (!mockAi && isFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return refuseFreeTier(res, check);
       }
     }
 
     // Force-regenerate always calls OpenRouter; arm a Heroku H12 guard.
     const keepalive = armKeepalive(res);
     try {
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) {
-          return keepaliveError(keepalive, 404, 'Issue not found');
-        }
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
+      const subject = await loadScanSubject(workspace, issueId, issue);
+      if (subject.refusal) return keepaliveError(keepalive, ...subject.refusal);
+      const { context, canonicalId } = subject;
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        return keepaliveError(keepalive, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
-          code: 'CANONICAL_ID_REQUIRED'
-        });
-      }
       const inputHash = hashContext(context);
       const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
 
@@ -2683,20 +2437,8 @@ ${goal}`
         });
       }
 
-      // LIN-2649 WS2: [C-3] scan-time ledger-store null guard. Same fail-open
-      // asymmetry as the route-side call site (routes/workspace-api.js's
-      // comment-create seams above) — this is the SECOND place it lives, not
-      // a re-derivation: a dueBasisHash stored while harbourCommentsStore is
-      // absent (nothing filtered) and later compared against one computed
-      // while it IS present differs -> a false DUE, never a false not-due,
-      // and never a fabricated unknown. `harbourCommentsStore` defaults to
-      // null in createWorkspaceApiRoutes, and tests/unit/scan-routes.test.js
-      // mounts the real router with no ledger store while driving this exact
-      // route end to end — an unguarded call here would be a TypeError on a
-      // shipped route.
-      const recordedCommentIds = harbourCommentsStore
-        ? await harbourCommentsStore.wereRecordedByHarbour(workspace.urlKey, context.comments)
-        : new Set();
+      // LIN-2649 WS2: [C-3] scan-time ledger-store null guard (see recordedByHarbour).
+      const recordedCommentIds = await recordedByHarbour(workspace, context.comments);
 
       // 'decision' or 'zero-finding' — both are normal, persisted outcomes.
       const record = await taskDecisionsStore.recordScan({
@@ -2732,31 +2474,9 @@ ${goal}`
         return keepaliveError(keepalive, 500, 'Failed to record scan result');
       }
 
-      keepalive.send(200, {
-        status: 'fresh',
-        id: record.id,
-        issueId: record.issueId,
-        decision: record.decision,
-        scannedAt: record.scannedAt,
-        outcome: record.outcome,
-        outcomeAt: record.outcomeAt,
-        outcomeReason: record.outcomeReason ?? null,
-        outcomeBasisHash: record.outcomeBasisHash ?? null,
-        model: modelUsed
-      });
+      keepalive.send(200, { status: 'fresh', ...scanRow(record), model: modelUsed });
     } catch (error) {
-      keepalive.stop();
-      console.error('Scan POST error:', error);
-      if (error.response?.status === 401) {
-        return keepaliveError(keepalive, 401, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return keepaliveError(keepalive, 404, error.message);
-      }
-      if (error.message?.includes('OpenRouter')) {
-        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
-      }
-      keepaliveError(keepalive, 500, 'Failed to run scan', { message: error.message });
+      keepaliveFailure(keepalive, 'Scan POST error:', error, 'Failed to run scan', { openRouter: true });
     }
   });
 
@@ -2769,64 +2489,20 @@ ${goal}`
    * response, not just the task's issueId, so a stale client can't
    * accidentally dismiss whatever happens to be current server-side.
    *
-   * LIN-2197 Phase 5 (Phase 4 close-out ledger item L3): when `:issueId` is
-   * already UUID-shaped, it IS the canonical id — `markOutcome` filters on
-   * `{_id, urlKey, issueId}`, so the row's own stored key is the authority
-   * and there is no reason to pay for a provider context fetch just to
-   * re-derive an id already in hand. This also fixes the trashed/deleted-task
-   * case: a stale ruling on a task the provider can no longer fetch could
-   * previously never be dismissed (the fetch 404s before `markOutcome` is
-   * ever reached). A non-UUID `:issueId` (an identifier, or a caller that
-   * hasn't been updated to pass the canonical id GET/POST scan now return)
-   * still resolves it via the context fetch, unchanged.
+   * LIN-2197 Phase 5 (Phase 4 close-out ledger item L3): the canonical id comes
+   * from resolveCanonicalScanId (UUID fast path; a context fetch otherwise).
    *
    * @route POST /workspace/:urlKey/api/scan/:issueId/dismiss
    * @returns {Object} { status: 'fresh', id, issueId, decision, outcome, outcomeAt, scannedAt }
    */
   router.post('/workspace/:urlKey/api/scan/:issueId/dismiss', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const recordId = req.body?.id;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (typeof recordId !== 'string' || !recordId) {
-      return badRequest.json(res, 'A scan record id is required');
-    }
-    if (!taskDecisionsStore) {
-      return jsonError(res, 503, 'Scan store not configured');
-    }
+    const found = openIssue(req, res, { recordId: true, store: taskDecisionsStore, storeName: 'Scan store', bind: false });
+    if (!found) return;
+    const { workspace, issueId, recordId } = found;
 
     try {
-      let canonicalId;
-      if (UUID_REGEX.test(issueId)) {
-        canonicalId = issueId;
-      } else {
-        const issueBinding = resolveIssueBinding(workspace, req.query.source);
-        const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-        if (!issueProvider.supports('fetchRecommendationContext')) {
-          return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
-            code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-          });
-        }
-
-        const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-        let context;
-        if (isTestMode) {
-          context = await buildMockRecapContext(issueId);
-          if (!context) return notFound.json(res, 'Issue not found');
-        } else {
-          context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-        }
-
-        canonicalId = context.issue?.id || issueId;
-        if (!UUID_REGEX.test(canonicalId)) {
-          return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
-            code: 'CANONICAL_ID_REQUIRED'
-          });
-        }
-      }
+      const canonicalId = await resolveCanonicalScanId(req, res, workspace, issueId);
+      if (!canonicalId) return;
 
       const record = await taskDecisionsStore.markOutcome({
         urlKey: workspace.urlKey, issueId: canonicalId, id: recordId, outcome: 'dismissed'
@@ -2839,26 +2515,10 @@ ${goal}`
       // fixing an observable staleness bug.
       if (sessionsFeedCache) sessionsFeedCache.clear(workspace.urlKey);
 
-      return res.json({
-        status: 'fresh',
-        id: record.id,
-        issueId: record.issueId,
-        decision: record.decision,
-        outcome: record.outcome,
-        outcomeAt: record.outcomeAt,
-        outcomeReason: record.outcomeReason ?? null,
-        outcomeBasisHash: record.outcomeBasisHash ?? null,
-        scannedAt: record.scannedAt
-      });
+      return res.json({ status: 'fresh', ...scanRow(record) });
     } catch (error) {
       console.error('Scan dismiss error:', error);
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return notFound.json(res, error.message);
-      }
-      jsonError(res, 500, 'Failed to dismiss scan result', { message: error.message });
+      jsonError(res, ...failureOf(error, 'Failed to dismiss scan result'));
     }
   });
 
@@ -2903,157 +2563,79 @@ ${goal}`
    *   POST scan already uses for the latter two.
    */
   router.post('/workspace/:urlKey/api/scan/:issueId/retire', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const recordId = req.body?.id;
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
+    const issue = openIssue(req, res, { recordId: true, store: taskDecisionsStore, storeName: 'Scan store', capability: 'scan' });
+    if (!issue) return;
+    const { workspace, issueId, recordId } = issue;
 
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (typeof recordId !== 'string' || !recordId) {
-      return badRequest.json(res, 'A scan record id is required');
-    }
-    if (!taskDecisionsStore) {
-      return jsonError(res, 503, 'Scan store not configured');
-    }
-    if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
-    }
-
-    const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
     const mockAi = shouldMockAi(workspace);
-    const sessionApiKey = req.session.openRouterApiKey;
-    const credential = resolveChatCredential({ sessionApiKey });
+    const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
 
     if (isAiUnavailable({ credential, mockAi })) {
-      return jsonError(res, 503, 'AI scan is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.', { code: 'AI_NOT_CONFIGURED' });
+      return aiNotConfigured(res, 'scan');
     }
     if (!mockAi && isFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return refuseFreeTier(res, check);
       }
     }
 
-    // Retire always re-scans, so — unlike dismiss's UUID fast path — it
-    // always needs fresh content, never just the stored row.
+    // Retire always re-scans, so — unlike dismiss's UUID fast path — it needs
+    // fresh content every time, never just the stored row.
     const keepalive = armKeepalive(res);
     try {
-      let context;
-      if (isTestMode) {
-        context = await buildMockRecapContext(issueId);
-        if (!context) {
-          return keepaliveError(keepalive, 404, 'Issue not found');
-        }
-      } else {
-        context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-      }
+      const subject = await loadScanSubject(workspace, issueId, issue);
+      if (subject.refusal) return keepaliveError(keepalive, ...subject.refusal);
+      const { context, canonicalId } = subject;
 
-      const canonicalId = context.issue?.id || issueId;
-      if (!UUID_REGEX.test(canonicalId)) {
-        return keepaliveError(keepalive, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
-          code: 'CANONICAL_ID_REQUIRED'
+      const inputHash = hashContext(context);
+      const model = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
+
+      // The raw text of THIS call's own re-scan is the only input to the
+      // retirement decision — nothing the client sent, which is just the row `id`.
+      const rescanned = mockAi
+        ? buildMockScanText(context)
+        : await rawRetireRescan({ context, workspace, apiKey: apiKeyToUse, model });
+      if (rescanned === null) {
+        // Same fail-closed discipline as raising: no scan prompt without the
+        // Principle 0 gate, and the row is untouched when it was skipped.
+        return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {
+          code: 'PRINCIPLE_ZERO_UNAVAILABLE'
         });
       }
-      const inputHash = hashContext(context);
-      const selectedModel = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'scan', forceDefault: isFreeTier });
 
-      let raw;
-      if (mockAi) {
-        raw = buildMockScanText(context);
-      } else {
-        const messages = buildScanMessages(context.issue, context);
-        if (!messages) {
-          // Same fail-closed discipline as raising: never send a scan prompt
-          // without the Principle 0 gate, and never touch the row when it
-          // was skipped.
-          return keepaliveError(keepalive, 503, 'Scan rubric is temporarily unavailable; nothing was evaluated', {
-            code: 'PRINCIPLE_ZERO_UNAVAILABLE'
-          });
-        }
-        let buffer = '';
-        await streamChat(
-          messages,
-          {
-            apiKey: apiKeyToUse, model: selectedModel, maxTokens: 1000, temperature: 0,
-            callMeta: { feature: 'scan-retire', issueIdentifier: context.issue?.identifier || null, urlKey: workspace?.urlKey }
-          },
-          (type, data) => { if (type === 'token' && data?.token) buffer += data.token; }
-        );
-        raw = buffer;
-      }
-
-      // The client's request body carries only `id` (never a verdict) — but
-      // even if it did, `raw` here is what THIS call's own re-scan just
-      // produced, never anything the caller sent.
-      if (!isExplicitRetirementSignal(raw)) {
+      if (!isExplicitRetirementSignal(rescanned)) {
         keepalive.stop();
-        const { payload } = extractScanPayload(raw);
-        if (payload === null) {
-          // A genuine parse/model failure — same shape POST scan already uses.
+        // A genuine parse/model failure: the same shape POST scan uses.
+        if (extractScanPayload(rescanned).payload === null) {
           return keepaliveError(keepalive, 502, 'Scan produced an unusable response; please retry', { code: 'SCAN_PARSE_FAILED' });
         }
-        // Covers a live decision, and absent/malformed input alike — all four
-        // of the ticket's named negative cases collapse to "leave it standing".
+        // A live decision, or absent/malformed input alike — all four of the
+        // ticket's negative cases collapse to "leave it standing".
         return keepalive.send(200, { retired: false, reason: 'The rescan did not find an explicit "nothing pending" signal — the ruling stands.' });
       }
 
-      const outcomeReason = `Retired automatically: a rescan on ${new Date().toISOString()} found no pending decision.`;
       const record = await taskDecisionsStore.markOutcome({
         urlKey: workspace.urlKey, issueId: canonicalId, id: recordId,
-        outcome: 'self-resolved', outcomeReason,
-        // Same formula as `inputHash` above, applied to the SAME context —
-        // "what was checked when this was retired," reused rather than a
-        // fourth hash scheme.
+        outcome: 'self-resolved',
+        outcomeReason: `Retired automatically: a rescan on ${new Date().toISOString()} found no pending decision.`,
+        // The same formula as `inputHash`, over the SAME context: "what was
+        // checked when this was retired", not a fourth hash scheme.
         outcomeBasisHash: inputHash
       });
 
       keepalive.stop();
-      if (!record) {
-        return keepaliveError(keepalive, 404, 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', {
-          code: 'ROW_GONE'
-        });
-      }
-      if (record.outcome !== 'self-resolved') {
-        return keepaliveError(keepalive, 409, 'This ruling changed while the check was running and was not retired', {
-          code: 'ALREADY_TERMINAL'
-        });
-      }
-      // LIN-2755: uniform invalidation on every ruling write, only past the
-      // ALREADY_TERMINAL race check above (this call's own write must have
-      // actually landed) — taskDecisionsStore is read live (not cached), so
-      // this is defensive/uniform rather than fixing an observable staleness bug.
-      if (sessionsFeedCache) sessionsFeedCache.clear(workspace.urlKey);
+      const unstamped = !record ? RETIRE_ROW_GONE : record.outcome !== 'self-resolved' ? RETIRE_ALREADY_TERMINAL : null;
+      if (unstamped) return keepaliveError(keepalive, ...unstamped);
 
-      return keepalive.send(200, {
-        retired: true,
-        id: record.id,
-        issueId: record.issueId,
-        decision: record.decision,
-        outcome: record.outcome,
-        outcomeAt: record.outcomeAt,
-        outcomeReason: record.outcomeReason,
-        outcomeBasisHash: record.outcomeBasisHash,
-        scannedAt: record.scannedAt
-      });
+      // LIN-2755: uniform invalidation on every ruling write, only past the race
+      // check above (this call's own write must have landed). The store is read
+      // live, so this is defensive rather than a fix for observable staleness.
+      sessionsFeedCache?.clear(workspace.urlKey);
+      return keepalive.send(200, { retired: true, ...scanRow(record, { raw: true }) });
     } catch (error) {
-      keepalive.stop();
-      console.error('Scan retire error:', error);
-      if (error.response?.status === 401) {
-        return keepaliveError(keepalive, 401, 'Token expired or invalid');
-      }
-      if (error.message?.includes('not found')) {
-        return keepaliveError(keepalive, 404, error.message);
-      }
-      if (error.message?.includes('OpenRouter')) {
-        return keepaliveError(keepalive, 503, 'AI service temporarily unavailable', { message: error.message });
-      }
-      keepaliveError(keepalive, 500, 'Failed to retire scan result', { message: error.message });
+      keepaliveFailure(keepalive, 'Scan retire error:', error, 'Failed to retire scan result', { openRouter: true });
     }
   });
 
@@ -3072,49 +2654,13 @@ ${goal}`
    *   when it isn't currently self-resolved.
    */
   router.post('/workspace/:urlKey/api/scan/:issueId/unretire', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
-    const { issueId } = req.params;
-    const recordId = req.body?.id;
-
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-    if (typeof recordId !== 'string' || !recordId) {
-      return badRequest.json(res, 'A scan record id is required');
-    }
-    if (!taskDecisionsStore) {
-      return jsonError(res, 503, 'Scan store not configured');
-    }
+    const found = openIssue(req, res, { recordId: true, store: taskDecisionsStore, storeName: 'Scan store', bind: false });
+    if (!found) return;
+    const { workspace, issueId, recordId } = found;
 
     try {
-      let canonicalId;
-      if (UUID_REGEX.test(issueId)) {
-        canonicalId = issueId;
-      } else {
-        const issueBinding = resolveIssueBinding(workspace, req.query.source);
-        const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
-        if (!issueProvider.supports('fetchRecommendationContext')) {
-          return jsonError(res, 422, "This workspace's provider does not support scan for this issue", {
-            code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-          });
-        }
-
-        const isTestMode = process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
-        let context;
-        if (isTestMode) {
-          context = await buildMockRecapContext(issueId);
-          if (!context) return notFound.json(res, 'Issue not found');
-        } else {
-          context = await issueProvider.fetchRecommendationContext(issueCallScope, issueId);
-        }
-
-        canonicalId = context.issue?.id || issueId;
-        if (!UUID_REGEX.test(canonicalId)) {
-          return jsonError(res, 422, "This task's canonical id could not be resolved; scan requires a canonical identity", {
-            code: 'CANONICAL_ID_REQUIRED'
-          });
-        }
-      }
+      const canonicalId = await resolveCanonicalScanId(req, res, workspace, issueId);
+      if (!canonicalId) return;
 
       const record = await taskDecisionsStore.reverseOutcome({ urlKey: workspace.urlKey, issueId: canonicalId, id: recordId });
       // LIN-2755: uniform invalidation on every ruling write — reverseOutcome's
@@ -3124,17 +2670,7 @@ ${goal}`
       // fixing an observable staleness bug.
       if (sessionsFeedCache) sessionsFeedCache.clear(workspace.urlKey);
 
-      return res.json({
-        status: 'fresh',
-        id: record.id,
-        issueId: record.issueId,
-        decision: record.decision,
-        outcome: record.outcome,
-        outcomeAt: record.outcomeAt,
-        outcomeReason: record.outcomeReason,
-        outcomeBasisHash: record.outcomeBasisHash,
-        scannedAt: record.scannedAt
-      });
+      return res.json({ status: 'fresh', ...scanRow(record, { raw: true }) });
     } catch (error) {
       if (error.message === 'reverseOutcome: row not found (pruned or replaced)') {
         return jsonError(res, 404, 'This ruling no longer exists — it may have been pruned or superseded by a newer scan', { code: 'ROW_GONE' });
@@ -3143,37 +2679,9 @@ ${goal}`
         return jsonError(res, 409, 'This ruling is not currently self-resolved and cannot be un-retired', { code: 'NOT_SELF_RESOLVED' });
       }
       console.error('Scan unretire error:', error);
-      if (error.response?.status === 401) {
-        return unauthorized.json(res, 'Token expired or invalid');
-      }
-      jsonError(res, 500, 'Failed to un-retire scan result', { message: error.message });
+      jsonError(res, ...failureOf(error, 'Failed to un-retire scan result', { notFound: false }));
     }
   });
-
-  /**
-   * A small deterministic mock scan response for test mode, mirroring
-   * buildMockRecap/buildMockBrief's "derive from context" convention. Unlike
-   * those, this returns raw JSON TEXT (not a pre-parsed shape) — see the
-   * POST route's mockAi branch for why the mock is deliberately routed
-   * through the same parseScanResponse gate as a real LLM response.
-   */
-  function buildMockScanText(context) {
-    const haystack = `${context.issue?.description || ''} ${(context.comments || []).map(c => c.body || '').join(' ')}`;
-    const triggersDecision = /\b(waiting|blocked|research|unclear|decide|decision|question)\b/i.test(haystack);
-    if (!triggersDecision) {
-      return JSON.stringify({ has_decision: false });
-    }
-    return JSON.stringify({
-      has_decision: true,
-      question: `How should ${context.issue?.identifier || 'this task'} proceed?`,
-      options: [
-        { id: 'proceed', label: 'Proceed with the current approach' },
-        { id: 'wait', label: 'Wait for the blocker to clear' }
-      ],
-      recommended: 'wait',
-      free_text: false
-    });
-  }
 
   /**
    * GET paginated scan-due candidates for a workspace (LIN-2649 WS2/S3): which
@@ -3208,8 +2716,7 @@ ${goal}`
     const workspace = req.workspace;
     // LIN-3240 / LIN-3335: scan-due is a WORKSPACE-LEVEL batch (no :issueId).
     // It uses the source-only default binding, so it never 422s for ambiguity.
-    const issueBinding = resolveIssueBinding(workspace, null);
-    const { provider: issueProvider, callScope: issueCallScope } = issueBinding;
+    const { provider: issueProvider, callScope: issueCallScope } = resolveIssueBinding(workspace, null);
 
     if (!taskDecisionsStore) {
       return jsonError(res, 503, 'Scan store not configured');
@@ -3220,9 +2727,7 @@ ${goal}`
     // each 422ing individually. Same resolve-then-gate convention as the scan
     // routes above (and the recommend/recap/brief routes elsewhere in this file).
     if (!issueProvider.supports('fetchRecommendationContext')) {
-      return jsonError(res, 422, "This workspace's provider does not support scan-due checks", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'fetchRecommendationContext', provider: issueProvider.name,
-      });
+      return refuseCapability(res, issueProvider.name, 'fetchRecommendationContext', 'scan-due checks');
     }
 
     // Parse the opaque keyset cursor BEFORE any store call. Anything present
@@ -3249,17 +2754,16 @@ ${goal}`
     try {
       const page = await taskDecisionsStore.listCandidatesForWorkspace(workspace.urlKey, { cursor, limit: DUE_CHECK_PAGE_SIZE });
 
+      // LIN-3126 residual / LIN-3335: the row's own kind-only source, recorded when it
+      // was scanned, rides the item so the client's bulk-scan POST can forward it
+      // (public/observation.js startDueBulkScan). SPARSE — a row with no source emits no key.
+      const sourceOf = (row) => (row.issueSource != null ? { source: row.issueSource } : {});
+
       const results = await settleWithConcurrency(page.items, DUE_CHECK_CONCURRENCY, async (row) => {
         const context = await issueProvider.fetchRecommendationContext(issueCallScope, row.issueId);
-        // LIN-2649 WS2 null-ledger guard — same fail-open asymmetry as the
-        // scan-time write path above (this route's second call site, not a
-        // re-derivation): an absent harbourCommentsStore means "we cannot
-        // tell which comments are Harbour's", not "no comments changed" — an
-        // empty set filters nothing, so the worst case is a false DUE, never
-        // a false not-due and never a fabricated unknown.
-        const recordedCommentIds = harbourCommentsStore
-          ? await harbourCommentsStore.wereRecordedByHarbour(workspace.urlKey, context.comments)
-          : new Set();
+        // LIN-2649 WS2 null-ledger guard — this route's second call site of
+        // recordedByHarbour: a false DUE at worst, never a false not-due.
+        const recordedCommentIds = await recordedByHarbour(workspace, context.comments);
         const currentDueBasisHash = dueBasisHashFromContext(context, { recordedCommentIds });
         return {
           issueId: row.issueId,
@@ -3269,11 +2773,7 @@ ${goal}`
             raisedDueBasisVersion: row.dueBasisVersion,
             currentDueBasisHash
           }),
-          // LIN-3126 residual / LIN-3335: the row's own kind-only source,
-          // recorded when it was scanned, rides the item so the client's
-          // bulk-scan POST can forward it (public/observation.js
-          // startDueBulkScan). SPARSE — a row with no source emits no key.
-          ...(row.issueSource != null ? { source: row.issueSource } : {}),
+          ...sourceOf(row),
         };
       });
 
@@ -3288,7 +2788,7 @@ ${goal}`
             issueIdentifier: page.items[i].issueIdentifier,
             dueStatus: null,
             error: true,
-            ...(page.items[i].issueSource != null ? { source: page.items[i].issueSource } : {})
+            ...sourceOf(page.items[i])
           });
 
       keepalive.send(200, {
@@ -3325,38 +2825,40 @@ ${goal}`
    * @returns {Stream} Image data with appropriate content-type
    */
   router.get('/workspace/:urlKey/api/image', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace
-    const imageUrl = req.query.url
+    const workspace = req.workspace;
+    const imageUrl = req.query.url;
 
     // Validate URL
     if (!imageUrl) {
-      return badRequest.json(res, 'Missing url parameter')
+      return badRequest.json(res, 'Missing url parameter');
+    }
+
+    // A repeated `?url=` parses to an array (LIN-3596): bad input is a 400 here,
+    // not a TypeError out of `startsWith` that surfaces as a 500 (LIN-1158).
+    if (typeof imageUrl !== 'string') {
+      return badRequest.json(res, 'Invalid image URL format');
     }
 
     // Only allow HTTPS URLs (security)
     if (!imageUrl.startsWith('https://')) {
-      return badRequest.json(res, 'Invalid image URL: must be HTTPS')
+      return badRequest.json(res, 'Invalid image URL: must be HTTPS');
     }
 
     // Only allow Linear-hosted images (security - prevent SSRF)
     // Use exact hostname matching to prevent bypass via evillinear.app
-    const allowedHosts = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app'])
-    let urlObj
+    const allowedHosts = new Set(['uploads.linear.app', 'cdn.linear.app', 'linear.app']);
     try {
-      urlObj = new URL(imageUrl)
+      const urlObj = new URL(imageUrl);
       if (!allowedHosts.has(urlObj.hostname)) {
-        return badRequest.json(res, 'Invalid image URL: must be from Linear')
+        return badRequest.json(res, 'Invalid image URL: must be from Linear');
       }
       // Prevent path traversal attacks
       if (urlObj.pathname.includes('..')) {
-        return badRequest.json(res, 'Invalid image URL: path traversal not allowed')
+        return badRequest.json(res, 'Invalid image URL: path traversal not allowed');
       }
     } catch {
-      return badRequest.json(res, 'Invalid image URL format')
+      return badRequest.json(res, 'Invalid image URL format');
     }
-
-    // Max image size: 10MB to prevent memory exhaustion
-    const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
     try {
       // LIN-1899: attach the workspace credential ONLY when the active binding
@@ -3377,27 +2879,27 @@ ${goal}`
       // path-traversal checks above — none of which are reordered or relaxed.
       const fetchHeaders = isActiveProviderLinear(workspace)
         ? { Authorization: `Bearer ${getWorkspaceToken(workspace)}` }
-        : {}
+        : {};
       const response = await fetch(imageUrl, {
         headers: fetchHeaders,
         // Prevent redirects that could bypass SSRF protection
         redirect: 'error'
-      })
+      });
 
       if (!response.ok) {
-        return jsonError(res, response.status, 'Failed to fetch image')
+        return jsonError(res, response.status, 'Failed to fetch image');
       }
 
       // Check content-length if available
-      const contentLength = parseInt(response.headers.get('content-length') || '0', 10)
+      const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
       if (contentLength > MAX_IMAGE_SIZE) {
-        return jsonError(res, 413, 'Image too large')
+        return jsonError(res, 413, 'Image too large');
       }
 
       // Read response with size limit
-      const arrayBuffer = await response.arrayBuffer()
+      const arrayBuffer = await response.arrayBuffer();
       if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
-        return jsonError(res, 413, 'Image too large')
+        return jsonError(res, 413, 'Image too large');
       }
 
       // Security (LIN-682): do NOT relay the upstream content type verbatim — the
@@ -3412,207 +2914,103 @@ ${goal}`
       // both the feedback render and the LIN-652 gallery, so attachment would
       // force a download and break legitimate inline raster rendering. The
       // raster allowlist + `nosniff` close the hole while preserving inline use.
-      const buffer = Buffer.from(arrayBuffer)
-      const rasterType = sniffRasterType(buffer)
+      const buffer = Buffer.from(arrayBuffer);
+      const rasterType = sniffRasterType(buffer);
       if (!rasterType) {
-        return badRequest.json(res, 'Invalid response: not a supported raster image')
+        return badRequest.json(res, 'Invalid response: not a supported raster image');
       }
 
-      res.set('Content-Type', rasterType)
-      res.set('X-Content-Type-Options', 'nosniff')
-      res.set('Cache-Control', 'private, max-age=3600')
-      res.send(buffer)
+      res.set('Content-Type', rasterType);
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.set('Cache-Control', 'private, max-age=3600');
+      res.send(buffer);
     } catch (error) {
       // Handle redirect errors specifically
       if (error.cause?.code === 'ERR_FR_TOO_MANY_REDIRECTS' || error.message?.includes('redirect')) {
-        return badRequest.json(res, 'Redirects not allowed')
+        return badRequest.json(res, 'Redirects not allowed');
       }
-      console.error('Image proxy error:', error)
-      jsonError(res, 500, 'Failed to fetch image')
+      console.error('Image proxy error:', error);
+      jsonError(res, 500, 'Failed to fetch image');
     }
-  })
+  });
 
   // ===========================================================================
-  // Feedback intake (LIN-636 route / LIN-635 widget)
+  // Feedback intake (LIN-636 route / LIN-635 widget) — constants above
   // ===========================================================================
-  //
-  // POST /workspace/:urlKey/api/feedback creates a fresh ticket from a feedback
-  // message — priority, captured page URL + browser, and an optional embedded
-  // screenshot — then enqueues a triage-style follow-up. It is the ONLY consumer
-  // of the provider `uploadFile` seam (LIN-636); the feedback widget (LIN-635)
-  // POSTs here.
-  //
-  // Body-size exception, scoped to THIS route only: the global
-  // `express.json({ limit: '250kb' })` (server.js) is left untouched. That
-  // global parser only matches `application/json`, so a larger body sent with a
-  // non-JSON content type (e.g. text/plain) passes through it unparsed; the
-  // per-route parser below (permissive `type`, raised limit) then parses it.
-  // Small `application/json` bodies are already parsed by the global parser and
-  // are skipped here, so they keep the 250kb ceiling — the exception cannot leak
-  // to other routes.
-  const FEEDBACK_BODY_LIMIT = '12mb';
-  const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
-  const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
-  const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
-  const MAX_FEEDBACK_MOCK_TITLE_LENGTH = 120; // mirrors lib/feedback-title.js's MAX_TITLE_LENGTH
+
   const feedbackBodyParser = json({ type: () => true, limit: FEEDBACK_BODY_LIMIT });
 
-  // The three explicit post-create actions the feedback widget can request
-  // (LIN-918). Anything else (including an omitted action) is the legacy plain
-  // send, which still honours the per-user `feedbackTriage` flag.
-  const FEEDBACK_ACTIONS = new Set(['save', 'triage', 'autopilot']);
-
-  // Shared framing core: a widget-filed feedback ticket is a raw, un-triaged user
-  // report, not a scoped task (LIN-918 / LIN-947). Both the persisted description
-  // marker (LIN-947, stored ON the ticket) and the autopilot kickoff note (LIN-918,
-  // injected into a run) build on this one sentence so the "raw feedback" framing
-  // cannot drift apart between the two surfaces.
-  const FEEDBACK_ORIGIN_FRAMING =
-    'this ticket was filed directly from the in-app feedback widget, so it is an ' +
-    'unfiltered user report, not a triaged or scoped task';
-
-  // Feedback-origin brief injected into a feedback → autopilot kickoff (LIN-918).
-  // A scoped kickoff now also appends a non-empty caller `goal` as additional
-  // context (LIN-2818), but this call site passes none — it threads the framing in
-  // via the dedicated `originNote` seam, which stays the distinct, system-authored
-  // carrier. It tells the run the ticket is a raw, un-triaged user report whose
-  // first job is understanding.
-  const FEEDBACK_AUTOPILOT_ORIGIN_NOTE =
-    `**Origin — raw feedback:** ${FEEDBACK_ORIGIN_FRAMING}. Before driving toward a fix, ` +
-    'your first job is to *understand* it: read the report closely, reproduce or ground the problem ' +
-    'against the current code, and work out what is actually being asked. Treat the description as a ' +
-    'starting hypothesis, not a specification.';
-
-  // Persisted origin/triage marker written into every widget-filed feedback
-  // description (LIN-947). Unlike FEEDBACK_AUTOPILOT_ORIGIN_NOTE — which is only
-  // threaded into an autopilot run — this is stored ON the ticket, so the
-  // meta-prompt's next-action scorer sees the "raw, un-triaged" signal and routes
-  // to `triage` (sort intent, confirm priority, scope) instead of skipping ahead
-  // to look-into/research/implement on a report that only looks intentional.
-  const FEEDBACK_ORIGIN_TRIAGE_MARKER =
-    `**Origin — raw feedback (triage first):** ${FEEDBACK_ORIGIN_FRAMING}. ` +
-    'Its natural next step is **triage**: work out what is actually being asked, ' +
-    'confirm the real priority, and scope it before any research or implementation.';
-
-  // Clamp an incoming priority to Linear's 0-4 scale (0 = none … 4 = low);
-  // anything else falls back to 0 ("No priority").
-  function normalizeFeedbackPriority(value) {
-    const n = typeof value === 'number' ? value : parseInt(value, 10);
-    return Number.isInteger(n) && n >= 0 && n <= 4 ? n : 0;
-  }
-
-  /**
-   * Resolve the team a feedback ticket should be filed under. Precedence:
-   * explicit body `teamId` → `FEEDBACK_TEAM_ID` env → the provider's first team.
-   * Returns null when none can be resolved (the caller turns that into a 422).
-   */
-  async function resolveFeedbackTeamId(provider, token, bodyTeamId) {
-    if (typeof bodyTeamId === 'string' && bodyTeamId.trim()) return bodyTeamId.trim();
-    if (process.env.FEEDBACK_TEAM_ID) return process.env.FEEDBACK_TEAM_ID;
-    if (typeof provider.supports === 'function' && !provider.supports('fetchTeams')) return null;
-    try {
-      const teams = await provider.fetchTeams(token);
-      return (Array.isArray(teams) && teams[0] && teams[0].id) || null;
-    } catch (err) {
-      console.error('Feedback team resolution failed:', err.message);
-      return null;
-    }
-  }
-
-  // Map a factory run-limit refusal (LIN-3238) to the M4 feedback-widget shape
-  // `{ launched:false, code, retryable, message }`: RUN_LIMIT_REACHED is
-  // terminal (retryable:false), RUN_LIMIT_UNVERIFIED (the count could not be
-  // read) is retryable. Returns null for any other error so the caller keeps its
-  // existing logging path. The ticket is already filed; this only says why no
-  // run started.
-  function runLimitRefusal(err) {
-    if (!err || !err.runLimit) return null;
+  // What both post-create follow-ups hand `attachProxyContext`: the workspace
+  // proxy block for the filed ticket. LIN-2354 / LIN-2804: provider identity and
+  // capability summary come from the declared provider, fallback-free (unlike
+  // the capability-shaping `getProviderForWorkspace` read elsewhere). LIN-1376:
+  // `createdBy` stamps the launching account so the dispatched session's token
+  // resolves under LIN-1366 owner-scoping.
+  function feedbackProxyContext({ workspace, issue, baseUrl, session, label, prompt, harness }) {
+    const declared = getProvider(workspace.provider)?.ui ?? null;
     return {
-      launched: false,
-      code: err.runLimit.code,
-      retryable: err.runLimit.code === 'RUN_LIMIT_UNVERIFIED',
-      message: err.runLimit.error
+      proxyTokenStore,
+      urlKey: workspace.urlKey,
+      baseUrl,
+      issueIdentifier: issue.identifier,
+      prompt,
+      label,
+      harness,
+      providerDisplayName: declared?.displayName ?? null,
+      providerUi: declared,
+      createdBy: session?.accountId || null
     };
   }
 
-  // Best-effort triage follow-up after a feedback ticket is filed (LIN-635 S6).
-  // Non-fatal: a failure here must not fail the submission — the ticket already
-  // exists. Reuses the existing dispatch substrate (no separate queue).
-  //
-  // Gated behind the per-user `feedbackTriage` flag (default off, LIN-733): the
-  // caller only invokes this when the flag is on. When it runs, the triage
-  // prompt always carries this workspace's API proxy details (a short-lived,
-  // best-effort readWrite token + the standard "Workspace API access" block)
-  // so the triage agent can ground itself and update the ticket — the same
-  // preamble the proxy dispatch endpoints append.
+  // Why a follow-up that threw produced no run (LIN-3238 free-tier run limit),
+  // logged once and handed back in the widget's `{ launched:false, ... }` shape.
+  // `null` for any failure the caller should log as a plain enqueue error.
+  function reportUnlaunched(lane, err, workspace, issue) {
+    const refusal = runLimitRefusal(err);
+    if (!refusal) return null;
+    console.warn(`Feedback ${lane} not launched: ${refusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
+    return refusal;
+  }
+
+  // Best-effort triage follow-up after a feedback ticket is filed (LIN-635 S6),
+  // on the existing dispatch substrate. Non-fatal: the ticket already exists, so
+  // a failure here must not fail the submission. The caller invokes it only when
+  // the per-user `feedbackTriage` flag is on (default off, LIN-733); the prompt
+  // then always carries this workspace's API proxy block, as the proxy dispatch
+  // endpoints' preamble does.
   async function enqueueFeedbackTriage(workspace, issue, priority, session, baseUrl, overrides = {}) {
     if (!dispatchQueueStore || !issue?.identifier) return;
     try {
-      const triageIssue = {
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        url: issue.url,
-        state: issue.state,
-        priority,
-        labels: []
-      };
-      const generated = generatePrompt('triage', triageIssue, { project: null, parent: null, siblings: [] }, {}, getProviderForWorkspace(workspace)?.ui || null);
-      const basePrompt = generated?.prompt;
+      const { prompt: basePrompt } = generatePrompt(
+        'triage',
+        { id: issue.id, identifier: issue.identifier, title: issue.title, url: issue.url, state: issue.state, priority, labels: [] },
+        { project: null, parent: null, siblings: [] },
+        {},
+        getProviderForWorkspace(workspace)?.ui || null
+      ) || {};
       if (!basePrompt) return;
 
-      // Create the dispatch item through the shared factory (LIN-1139): it
-      // resolves model/harness from workspace dispatchDefaults (LIN-1138 — this
-      // site takes no user-supplied model/harness, so resolution is purely from
-      // workspace defaults) and calls addItem. The proxy-context append always
-      // runs here (LIN-733); it moves inside finalizePrompt AFTER the harness is
-      // resolved so it can still gate its MCP-token-vs-prose branch on a resolved
-      // (workspace-default) claude-code harness (LIN-1155) and hand back the
-      // bootstrapToken. A fresh single-use BOOTSTRAP token (LIN-376) is minted per
-      // dispatch, never a standing readWrite token; if minting is unavailable/
-      // fails, attachProxyContext returns the prompt unchanged so the triage still
-      // dispatches (best-effort, like the enqueue).
-      //
-      // The feedback path now inherits the factory's default harness interpose
-      // (LIN-1164, discharging the deferral the LIN-1139 refactor named here):
-      // a blank workspace harness resolves to claude-code, so attachProxyContext
-      // takes the LIN-1155 MCP-token-field branch — the item carries a
-      // bootstrapToken and the prompt no longer embeds Bearer/curl exchange prose.
-      // An explicit non-claude-code workspace harness (e.g. opencode) is left
-      // untouched by applyDefaultDispatchHarness and keeps token-in-prose delivery.
+      // LIN-1139 factory: model/harness resolve from workspace dispatchDefaults
+      // (LIN-1138 — no user-supplied pair here beyond the widget override below,
+      // LIN-1132) and a blank harness interposes claude-code (LIN-1164). The
+      // proxy block is appended inside finalizePrompt, after the harness is
+      // known, so its MCP-token-vs-prose branch can follow it (LIN-1155); a
+      // single-use bootstrap token is minted per dispatch (LIN-376) and a failed
+      // mint leaves the prompt unchanged, so triage still dispatches.
       await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
         proxyTokenStore,
         kind: 'triage',
-        // Free-tier run gate (LIN-3238): the route builds it at the dispatch
-        // point (the title block's isFreeTier is scoped). Only a fresh triage row
-        // reaches step 1.55; a refusal leaves the filed ticket intact.
+        // LIN-3238 free-tier run gate, built by the route at the dispatch point;
+        // a refusal leaves the filed ticket intact.
         runGate: overrides.runGate || null,
-        // Optional per-dispatch override from the feedback widget (LIN-1132).
-        // Blank/absent falls through to the factory's default resolution
-        // (workspace dispatchDefaults → claude-code interpose), byte-identical to
-        // before this override path existed.
         model: overrides.model,
         harness: overrides.harness,
-        finalizePrompt: (resolvedHarness) => attachProxyContext({
-          proxyTokenStore,
-          urlKey: workspace.urlKey,
-          baseUrl,
-          issueIdentifier: issue.identifier,
-          prompt: basePrompt,
-          label: 'feedback-triage',
-          harness: resolvedHarness,
-          // LIN-2354: declared provider identity, fallback-free (unlike the
-          // getProviderForWorkspace capability-shaping read above this function).
-          providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
-          // LIN-2804: capability summary, same source.
-          providerUi: getProvider(workspace.provider)?.ui ?? null,
-          // LIN-1376: stamp the launching account so the dispatched session's
-          // token resolves under LIN-1366 owner-scoping.
-          createdBy: session?.accountId || null
-        }),
+        finalizePrompt: (harness) => attachProxyContext(
+          feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: basePrompt, label: 'feedback-triage' })
+        ),
         fields: {
           promptName: 'Triage',
           issueId: issue.id || null,
@@ -3621,47 +3019,33 @@ ${goal}`
           issueUrl: issue.url || null,
           dispatchedBy: session?.accountId || null,
           target: 'cli',
-          // LIN-3126 residual (producer sweep) / LIN-3335: the created issue's
-          // own kind-only source, so a reply/Close out on this run resolves the
-          // same provider. `?? null` (never a `fields` spread — the LIN-3138
-          // census forbids one here); the store's `addItem` writes a null source
-          // sparsely, so a legacy/marker-less workspace keeps the S0 key set.
+          // LIN-3126 residual / LIN-3335: the created issue's own kind-only source,
+          // so a reply/Close out on this run resolves the same provider. `?? null`,
+          // never a `fields` spread (the LIN-3138 census forbids one here).
           issueSource: overrides.bindingPair?.issueSource ?? null
         }
       });
       return null;
     } catch (err) {
-      const refusal = runLimitRefusal(err);
-      if (refusal) {
-        console.warn(`Feedback triage not launched: ${refusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
-        return refusal;
-      }
+      const unlaunched = reportUnlaunched('triage', err, workspace, issue);
+      if (unlaunched) return unlaunched;
       console.error('Feedback triage enqueue failed:', err.message);
       return null;
     }
   }
 
-  // Best-effort autopilot follow-up after a feedback ticket is filed (LIN-918).
-  // Mirrors `enqueueFeedbackTriage`: it builds a SCOPED autopilot kickoff for the
-  // freshly-created ticket, injects the feedback-origin brief (so the run knows the
-  // ticket came straight from the widget and needs understanding — a scoped kickoff
-  // can also carry caller `goal` as context since LIN-2818, so this system-authored
-  // framing uses the dedicated `originNote` seam), mints a best-effort
-  // readWrite proxy token, and enqueues on the SAME dispatch substrate with
-  // `kind: 'autopilot'`. Non-fatal — a failure here must not fail the submission,
-  // the ticket already exists. Unlike triage this is NOT flag-gated: the user chose
-  // it explicitly in the widget.
+  // Best-effort autopilot follow-up (LIN-918): a SCOPED kickoff for the new
+  // ticket carrying the feedback-origin brief through the dedicated `originNote`
+  // seam (LIN-2818 lets a kickoff also take a caller `goal`; this system-authored
+  // framing stays separate). Same substrate as triage with `kind: 'autopilot'`,
+  // and not flag-gated — the user chose it in the widget. The kickoff relies on
+  // the +proxy block for API access, so `attachProxyContext` (LIN-1157) mints it
+  // here; the store appends the autopilot session-id block.
   //
-  // The kickoff assumes a readWrite token is "supplied alongside this prompt (the
-  // +proxy block)", so the `attachProxyContext` mint+append (LIN-1157) is how
-  // the run gets its API access — the same append the triage path makes. (The store
-  // then appends the "Your autopilot session id" block for `kind: 'autopilot'`.)
-  //
-  // LIN-3136 M4: the run is launched holding the dispatch grant, owner-checked
-  // for the submitting session. Returns `{ launched: true }`, or — only when
-  // that owner-checked mint is refused — `{ launched: false, code, retryable,
-  // message }` for the route to report (no grant-less fallback). Every other
-  // failure, and the early return, stay swallowed and return null.
+  // LIN-3136 M4: the run holds the dispatch grant, owner-checked for the
+  // submitting session. Resolves `{ launched: true }`, or `{ launched: false,
+  // code, retryable, message }` when the run limit or that owner-checked mint
+  // refuses (no grant-less fallback); every other failure is swallowed as null.
   async function enqueueFeedbackAutopilot(workspace, issue, session, baseUrl, overrides = {}) {
     if (!dispatchQueueStore || !issue?.identifier || !baseUrl) return null;
     try {
@@ -3669,55 +3053,24 @@ ${goal}`
         baseUrl,
         issue: { identifier: issue.identifier, title: issue.title },
         originNote: FEEDBACK_AUTOPILOT_ORIGIN_NOTE,
-        // LIN-2804: capability summary, same source as the attachProxyContext
-        // call below.
         providerUi: getProvider(workspace.provider)?.ui ?? null
       });
 
-      // Create the dispatch item through the shared factory (LIN-1139): it
-      // resolves model/harness from workspace dispatchDefaults (LIN-1138 — this
-      // site takes no user-supplied model/harness) and calls addItem. The
-      // proxy-context append (the "+proxy block" the kickoff refers to for its
-      // token) moves inside finalizePrompt AFTER the harness is resolved so it can
-      // still gate its MCP-token-vs-prose branch on a resolved (workspace-default)
-      // claude-code harness (LIN-1155) and hand back the bootstrapToken. LIN-376: a
-      // single-use bootstrap is minted, exchanged by the run for a working token.
-      //
-      // This path inherits the factory default harness interpose (LIN-1164) — see
-      // the triage twin above: a blank workspace harness resolves to claude-code so
-      // the bootstrap travels via the MCP bootstrapToken field, while an explicit
-      // non-claude-code workspace harness still keeps token-in-prose delivery.
+      // Same factory contract as the triage twin: LIN-1139/1138 defaults, the
+      // LIN-1164 harness interpose, LIN-376 single-use bootstrap minted inside
+      // finalizePrompt once the harness is resolved (LIN-1155).
       await createDispatchItem({
         store: dispatchQueueStore,
         urlKey: workspace.urlKey,
         workspacePreferencesStore,
         proxyTokenStore,
         kind: 'autopilot',
-        // Free-tier run gate (LIN-3238): built by the route at the dispatch
-        // point. A refusal leaves the filed ticket intact and no bootstrap minted.
+        // LIN-3238: a refusal leaves the filed ticket intact and mints nothing.
         runGate: overrides.runGate || null,
-        // Optional per-dispatch override from the feedback widget (LIN-1132).
-        // Blank/absent falls through to the factory's default resolution
-        // (workspace dispatchDefaults → claude-code interpose), byte-identical to
-        // before this override path existed.
         model: overrides.model,
         harness: overrides.harness,
-        finalizePrompt: (resolvedHarness) => attachProxyContext({
-          proxyTokenStore,
-          urlKey: workspace.urlKey,
-          baseUrl,
-          issueIdentifier: issue.identifier,
-          prompt: kickoff,
-          label: 'feedback-autopilot',
-          harness: resolvedHarness,
-          // LIN-2354: declared provider identity, fallback-free (unlike the
-          // getProviderForWorkspace capability-shaping reads elsewhere here).
-          providerDisplayName: getProvider(workspace.provider)?.ui?.displayName ?? null,
-          // LIN-2804: capability summary, same source.
-          providerUi: getProvider(workspace.provider)?.ui ?? null,
-          // LIN-1376: stamp the launching account so the dispatched session's
-          // token resolves under LIN-1366 owner-scoping.
-          createdBy: session?.accountId || null,
+        finalizePrompt: (harness) => attachProxyContext({
+          ...feedbackProxyContext({ workspace, issue, baseUrl, session, harness, prompt: kickoff, label: 'feedback-autopilot' }),
           // LIN-3136 M4: an orchestrator launch, owner-checked for this session.
           declaredGrants: ['dispatch'],
           declaredSite: 'M4',
@@ -3732,22 +3085,16 @@ ${goal}`
           issueUrl: issue.url || null,
           dispatchedBy: session?.accountId || null,
           target: 'cli',
-          // LIN-3126 residual (producer sweep) / LIN-3335: same created-issue
-          // kind-only source as `enqueueFeedbackTriage` above (`?? null`; the
-          // store writes it sparsely).
+          // Same created-issue kind-only source as the triage twin (LIN-3126/3335).
           issueSource: overrides.bindingPair?.issueSource ?? null
         }
       });
       return { launched: true };
     } catch (err) {
-      // Free-tier run-limit refusal (LIN-3238) — ahead of the grant-refusal
-      // branch, since a run-limit THROW is not a coded grant refusal. The ticket
-      // is already filed; report why no run started.
-      const runRefusal = runLimitRefusal(err);
-      if (runRefusal) {
-        console.warn(`Feedback autopilot not launched: ${runRefusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
-        return runRefusal;
-      }
+      // The run-limit check precedes the grant branch: a run-limit THROW is not
+      // a coded grant refusal.
+      const unlaunched = reportUnlaunched('autopilot', err, workspace, issue);
+      if (unlaunched) return unlaunched;
       if (isCodedGrantRefusal(err)) {
         const refusal = codedGrantRefusalResponse(err, 'an autopilot launch credential');
         console.warn(`Feedback autopilot not launched: ${refusal.code} (urlKey=${workspace.urlKey}, issue=${issue.identifier})`);
@@ -3758,18 +3105,42 @@ ${goal}`
     }
   }
 
-  /**
-   * A small deterministic mock feedback-ticket title for test mode, mirroring
-   * buildMockScanText/buildMockRecap's "derive from input, no LLM" convention.
-   * Intercepts BEFORE generateFeedbackTitle so a test-mode (shouldMockAi)
-   * session never opens the live streamChat socket that function wraps
-   * (LIN-2981) — the real non-test path is untouched.
-   * @param {string} message - The raw feedback message text.
-   * @returns {string} A short, deterministic title derived from the message.
-   */
-  function buildMockFeedbackTitle(message) {
-    const firstLine = message.trim().split('\n')[0];
-    return `Triage: ${firstLine}`.slice(0, MAX_FEEDBACK_MOCK_TITLE_LENGTH);
+  // Title resolution (LIN-643). An explicit title always wins (trimmed to
+  // 250). Otherwise: when AI is enabled for this user/workspace, generate a
+  // concise whole-thought title from the feedback body via the LLM; when AI
+  // is off — or generation fails — keep the deterministic first-line slice.
+  // Title generation must happen BEFORE provider.createIssue, and never
+  // applies the 60-char truncation on the AI path. The post-create triage
+  // enqueue is untouched.
+  async function resolveFeedbackTitle(req, workspace, { title, message }) {
+    if (typeof title === 'string' && title.trim()) {
+      return title.trim().slice(0, 250);
+    }
+    let ticketTitle = `Feedback: ${message.trim().split('\n')[0].slice(0, 60)}`;
+    // Key resolution mirrors the recommendation path: user OAuth > env >
+    // free-tier. When only the shared free-tier key is available the model
+    // is clamped to DEFAULT (forceDefault: isFreeTier), matching every other
+    // billed call site (the LIN-513 wiring invariant).
+    const mockAi = shouldMockAi(workspace);
+    const { apiKey: aiApiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
+    if (mockAi || aiApiKey) {
+      try {
+        if (mockAi) {
+          // LIN-2981: a test-mode/local session never reaches the live
+          // streamChat call this wraps, matching the other AI call sites in
+          // this file that already branch on shouldMockAi.
+          ticketTitle = buildMockFeedbackTitle(message);
+        } else {
+          const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
+          const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
+          if (generated) ticketTitle = generated;
+        }
+      } catch (error) {
+        // Best-effort: never block ticket creation on title generation.
+        console.error('Feedback AI title generation failed, using fallback:', error.message);
+      }
+    }
+    return ticketTitle;
   }
 
   /**
@@ -3778,64 +3149,34 @@ ${goal}`
    * @route POST /workspace/:urlKey/api/feedback
    */
   router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
-    const workspace = req.workspace;
-    // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's
-    // default (active) binding. The pair-era selector is gone;
-    // `resolveIssueBinding(workspace, null)` is the source-only default.
-    const issueBinding = resolveIssueBinding(workspace, null);
-    const provider = issueBinding.provider;
-    // LIN-3126 residual (producer sweep) / LIN-3335: the feedback triage/autopilot
-    // rows are issue-addressed and never reach the factory's §5.5a source
-    // inheritance (no `followUpTo`), so the row carries the created issue's
-    // kind-only source. It is taken from the SAME resolved binding that produced
-    // `provider`/`callScope` — one resolution, so the source the issue is created
-    // in and the stamped source cannot drift. Selection-only provenance, never a
-    // credential (B1).
-    const persistedBindingPair = provider?.name ? { issueSource: provider.name } : {};
-    // Provider call scope: bare token for Linear/local (byte-identical), or a
-    // { token, repo } GitHub App credential so createIssue builds a request-time
-    // client from the installation token (LIN-713). uploadFile is capability-gated
-    // off for GitHub; fetchTeams (via resolveFeedbackTeamId) ignores its arg.
-    const token = issueBinding.callScope;
-    const { message, title, teamId, projectId, image, url, userAgent } = req.body || {};
-    const priority = normalizeFeedbackPriority(req.body?.priority);
-    // Explicit post-create action (LIN-918). Only the three known actions branch;
-    // anything else (including an omitted `action`) is the legacy plain send.
-    const rawAction = typeof req.body?.action === 'string' ? req.body.action : null;
-    const action = FEEDBACK_ACTIONS.has(rawAction) ? rawAction : null;
+    const { workspace } = req;
+    // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's default
+    // (active) binding; the pair-era selector is gone, so `null` is the
+    // source-only default. Provider call scope: a bare token for Linear/local
+    // (byte-identical), or a { token, repo } GitHub App credential so createIssue
+    // builds a request-time client from the installation token (LIN-713).
+    // uploadFile is capability-gated off for GitHub; fetchTeams (via
+    // resolveFeedbackTeamId) ignores its arg.
+    const { provider, callScope: token } = resolveIssueBinding(workspace, null);
+    const body = req.body || {};
 
-    // Optional per-dispatch execution overrides from the feedback widget
-    // (LIN-1132). Validated with the SAME opaque-field helper the dispatch/proxy
-    // routes use (type/length/dangerous-chars only, NOT a model registry); blank/
-    // absent stays valid and falls through to the factory's default resolution.
-    const { model, harness } = req.body || {};
-    const modelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-    if (modelValidationError) {
-      return badRequest.json(res, modelValidationError.error);
-    }
-    const harnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-    if (harnessValidationError) {
-      return badRequest.json(res, harnessValidationError.error);
-    }
+    // The 400s that need no provider, first-error order: the widget's optional
+    // per-dispatch model / harness overrides (LIN-1132) — checked with the opaque-
+    // field helper the dispatch and proxy routes use (type, length, dangerous
+    // characters; NOT a model registry; blank or absent is valid and falls
+    // through to the factory's default) — then the message itself.
+    const bodyRefusal = feedbackBodyRefusal(body);
+    if (bodyRefusal) return badRequest.json(res, bodyRefusal);
+    const { message, title, teamId, projectId, image, url, userAgent, model, harness } = body;
+    const priority = normalizeFeedbackPriority(body.priority);
 
-    if (!message || typeof message !== 'string' || !message.trim()) {
-      return badRequest.json(res, 'message is required');
-    }
-    if (message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
-      return badRequest.json(res, 'message exceeds maximum length');
-    }
-
-    // Capability gates — clean 422 (never 500) when the workspace's provider
-    // can't perform the op, mirroring the proxy write surface.
+    // Clean 422 (never 500) when the workspace's provider can't do the op,
+    // mirroring the proxy write surface.
     if (!provider.supports('createIssue')) {
-      return jsonError(res, 422, "This workspace's provider does not support creating tickets", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'createIssue', provider: provider.name,
-      });
+      return refuseCapability(res, provider.name, 'createIssue', 'creating tickets');
     }
     if (image && !provider.supports('uploadFile')) {
-      return jsonError(res, 422, "This workspace's provider does not support file uploads", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'uploadFile', provider: provider.name,
-      });
+      return refuseCapability(res, provider.name, 'uploadFile', 'file uploads');
     }
 
     const resolvedTeamId = await resolveFeedbackTeamId(provider, token, teamId);
@@ -3844,161 +3185,106 @@ ${goal}`
         code: 'TEAM_UNRESOLVED', provider: provider.name,
       });
     }
-    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim())
-      ? projectId.trim()
-      : (process.env.FEEDBACK_PROJECT_ID || null);
+    const resolvedProjectId = (typeof projectId === 'string' && projectId.trim()) || process.env.FEEDBACK_PROJECT_ID || null;
 
     try {
-      let description = message.trim();
-
-      // Capture block — page URL + browser, recorded at submit time (LIN-635
-      // S4). Both come from the client; clamp length and let markdown escape
-      // them as inline code so they can't break the ticket body.
-      const captured = [];
-      if (typeof url === 'string' && url.trim()) {
-        captured.push(`- **Page:** \`${url.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH)}\``);
-      }
-      if (typeof userAgent === 'string' && userAgent.trim()) {
-        captured.push(`- **Browser:** \`${userAgent.trim().slice(0, MAX_FEEDBACK_CONTEXT_LENGTH)}\``);
-      }
-      if (captured.length) {
-        description += `\n\n---\n${captured.join('\n')}`;
-      }
+      // The message, then the page / browser capture block (LIN-635 S4).
+      const parts = [message.trim() + feedbackCaptureBlock({ url, userAgent })];
 
       if (image) {
         const parsed = parseFeedbackImage(image);
-        if (!parsed) {
-          return badRequest.json(res, 'image must be a base64 data URL');
-        }
-        if (parsed.bytes.length > MAX_FEEDBACK_IMAGE_BYTES) {
-          return jsonError(res, 413, 'image too large');
-        }
+        if (!parsed) return badRequest.json(res, 'image must be a base64 data URL');
+        if (parsed.bytes.length > MAX_FEEDBACK_IMAGE_BYTES) return jsonError(res, 413, 'image too large');
         const assetUrl = await provider.uploadFile(token, parsed.bytes, {
           contentType: parsed.contentType,
           filename: parsed.filename,
         });
-        description += `\n\n![](${assetUrl})`;
+        parts.push(`![](${assetUrl})`);
       }
 
-      // LIN-1557: an explicit non-default priority the provider's headless
-      // write contract (apiWriteFields()) can't honour is folded into the
-      // description as visible text instead of being silently dropped, or
-      // refusing the whole submission — this is a fire-and-forget human form
-      // with no retry loop, so a hard failure would mean the report is never
-      // filed at all. 0 ("No priority") is indistinguishable from "unset", so
-      // it is never folded or forwarded, only omitted.
+      // LIN-1557: an explicit non-default priority the provider's headless write
+      // contract (apiWriteFields()) can't honour is folded into the description as
+      // visible text, not dropped silently or refused — this is a fire-and-forget
+      // human form with no retry loop, so a hard failure would mean the report is
+      // never filed. 0 ("No priority") is indistinguishable from "unset", so it is
+      // never folded or forwarded.
       const canSetPriority = provider.apiWriteFields().includes('priority');
       if (priority > 0 && !canSetPriority) {
-        description += `\n\n---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`;
+        parts.push(`---\n**Reported priority:** ${PRIORITY_OPTION_LABELS[priority]}`);
       }
 
-      // Origin/triage marker (LIN-947) — additive, deterministic, and always
-      // appended last so the stored ticket announces itself as raw, un-triaged
-      // feedback whose natural next step is triage. This is what activates the
-      // meta-prompt's existing triage routing; it does not alter the user
-      // message, capture block, or screenshot above.
-      description += `\n\n---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`;
+      // Origin/triage marker (LIN-947): always last, so the stored ticket announces
+      // itself as raw, un-triaged feedback and the meta-prompt's triage routing
+      // activates. It never alters the message, capture block or screenshot above.
+      parts.push(`---\n${FEEDBACK_ORIGIN_TRIAGE_MARKER}`);
 
-      // Title resolution (LIN-643). An explicit title always wins (trimmed to
-      // 250). Otherwise: when AI is enabled for this user/workspace, generate a
-      // concise whole-thought title from the feedback body via the LLM; when AI
-      // is off — or generation fails — keep the deterministic first-line slice.
-      // Title generation must happen BEFORE provider.createIssue, and never
-      // applies the 60-char truncation on the AI path. The post-create triage
-      // enqueue below is untouched.
-      const fallbackTitle = `Feedback: ${message.trim().split('\n')[0].slice(0, 60)}`;
-      let ticketTitle;
-      if (typeof title === 'string' && title.trim()) {
-        ticketTitle = title.trim().slice(0, 250);
-      } else {
-        ticketTitle = fallbackTitle;
-        // Key resolution mirrors the recommendation path: user OAuth > env >
-        // free-tier. When only the shared free-tier key is available the model
-        // is clamped to DEFAULT (forceDefault: isFreeTier), matching every other
-        // billed call site (the LIN-513 wiring invariant).
-        const mockAi = shouldMockAi(workspace);
-        const { apiKey: aiApiKey, isFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
-        if (mockAi || aiApiKey) {
-          try {
-            if (mockAi) {
-              // LIN-2981: a test-mode/local session never reaches the live
-              // streamChat call this wraps, matching the other 6 AI call
-              // sites in this file that already branch on shouldMockAi.
-              ticketTitle = buildMockFeedbackTitle(message);
-            } else {
-              const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
-              const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
-              if (generated) ticketTitle = generated;
-            }
-          } catch (error) {
-            // Best-effort: never block ticket creation on title generation.
-            console.error('Feedback AI title generation failed, using fallback:', error.message);
-          }
-        }
-      }
-
-      const createInput = { teamId: resolvedTeamId, title: ticketTitle, description };
+      const createInput = {
+        teamId: resolvedTeamId,
+        title: await resolveFeedbackTitle(req, workspace, { title, message }),
+        description: parts.join('\n\n'),
+      };
       if (resolvedProjectId) createInput.projectId = resolvedProjectId;
       if (priority > 0 && canSetPriority) createInput.priority = priority;
 
-      const result = await provider.createIssue(token, createInput);
-      if (!result?.success || !result.issue) {
+      const created = await provider.createIssue(token, createInput);
+      if (!created?.success || !created.issue) {
         return jsonError(res, 502, 'Failed to create feedback ticket');
       }
 
-      // Post-create action (LIN-918) — all branches are best-effort and never
-      // fail the submission (the ticket already exists). An explicit widget
-      // action wins and is DECOUPLED from the `feedbackTriage` flag:
-      //   'save'      → file only, nothing further
-      //   'triage'    → always enqueue triage
-      //   'autopilot' → enqueue a scoped autopilot run carrying the feedback-origin brief
-      // With no explicit action (the legacy plain send) we preserve the old
-      // behaviour: triage only when the per-user `feedbackTriage` flag is on.
+      // Post-create action (LIN-918); every branch is best-effort and never fails
+      // the submission, the ticket already existing. An explicit widget action wins
+      // and is DECOUPLED from the `feedbackTriage` flag — 'save' files only,
+      // 'triage' always enqueues triage, 'autopilot' enqueues a scoped autopilot run
+      // carrying the feedback-origin brief. With none (the legacy plain send) the
+      // old behaviour holds: triage only when the per-user flag is on.
       const baseUrl = `${req.protocol}://${req.get('host')}`;
-      // Free-tier run gate (LIN-3238 Q10): the title block's `isFreeTier` above
-      // is scoped to that block, so re-derive it here at the dispatch point. The
-      // gate is passed through `overrides` to both feedback enqueue helpers; a
-      // refusal leaves the filed ticket intact and reports why no run started.
+      // LIN-3238 Q10 free-tier run gate: the title step's `isFreeTier` is scoped to
+      // it, so re-derive it at the dispatch point. It goes to both enqueue helpers
+      // through `overrides`; a refusal leaves the filed ticket intact and reports
+      // why no run started.
       const { isFreeTier: feedbackIsFreeTier } = resolveChatCredential({ sessionApiKey: req.session?.openRouterApiKey });
       const runGate = buildRunGate({ isFreeTier: feedbackIsFreeTier, freeTierStore, accountId: req.session?.accountId, accountStore });
-      let autopilot = null;
-      let triage = null;
-      // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only
-      // the workspace owner may start one. Checked only when a lane will
-      // actually run: a plain filed ticket reports no refusal, and a non-owner's
-      // feedback still saves. A refusal skips the enqueue and rides the existing
-      // `{launched:false, code, retryable, message}` response block below.
-      const lane = action === 'triage' ? 'triage'
-        : action === 'autopilot' ? 'autopilot'
-        : (!action && getFeatureFlags(req.session).feedbackTriage) ? 'triage'
-        : null;
-      const laneRefusal = lane
-        ? await resolveRunnerOwnerRefusal({
-          ownerCheck: workspaceOwnerCheck,
-          workspaceId: workspace.id,
-          accountId: req.session?.accountId,
-          target: 'cli'
-        })
-        : null;
+      // LIN-3126 residual (producer sweep) / LIN-3335: the feedback rows are
+      // issue-addressed and never reach the factory's §5.5a source inheritance (no
+      // `followUpTo`), so each carries the created issue's kind-only source — from
+      // the SAME resolved binding that produced `provider` / `token`, so the source
+      // the issue is created in and the stamped one cannot drift. Selection-only
+      // provenance, never a credential (B1).
+      const overrides = { model, harness, runGate, bindingPair: provider?.name ? { issueSource: provider.name } : {} };
+
+      // LIN-3383: both lanes enqueue a `cli` row for the owner's runner, so only the
+      // workspace owner may start one. Checked only when a lane will actually run —
+      // a plain filed ticket reports no refusal and a non-owner's feedback still
+      // saves. A refusal skips the enqueue and rides the `{launched:false, code,
+      // retryable, message}` response block below.
+      // Only the three known actions branch (`save` names no lane); anything else,
+      // an omitted action included, is the legacy plain send.
+      const action = FEEDBACK_ACTIONS.has(body.action) ? body.action : null;
+      const lane = action
+        ? (action === 'save' ? null : action)
+        : (getFeatureFlags(req.session).feedbackTriage ? 'triage' : null);
+      const laneRefusal = lane && await resolveRunnerOwnerRefusal({
+        ownerCheck: workspaceOwnerCheck,
+        workspaceId: workspace.id,
+        accountId: req.session?.accountId,
+        target: 'cli'
+      });
+      let launch = null;
       if (laneRefusal) {
-        const refused = { launched: false, code: laneRefusal.code, retryable: laneRefusal.retryable, message: laneRefusal.error };
-        if (lane === 'triage') triage = refused; else autopilot = refused;
-      } else if (action === 'triage') {
-        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
-      } else if (action === 'autopilot') {
-        autopilot = await enqueueFeedbackAutopilot(workspace, result.issue, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
-      } else if (!action && getFeatureFlags(req.session).feedbackTriage) {
-        triage = await enqueueFeedbackTriage(workspace, result.issue, priority, req.session, baseUrl, { model, harness, runGate, bindingPair: persistedBindingPair });
+        launch = { launched: false, code: laneRefusal.code, retryable: laneRefusal.retryable, message: laneRefusal.error };
+      } else if (lane === 'triage') {
+        launch = await enqueueFeedbackTriage(workspace, created.issue, priority, req.session, baseUrl, overrides);
+      } else if (lane === 'autopilot') {
+        launch = await enqueueFeedbackAutopilot(workspace, created.issue, req.session, baseUrl, overrides);
       }
 
-      // LIN-3136 M4 / LIN-3238: the ticket is filed either way; a refused run
-      // launch (autopilot keeps its key, triage gets a new one) is reported so
-      // the widget can say why. Every other outcome keeps the response as it was.
+      // LIN-3136 M4 / LIN-3238: the ticket is filed either way. A refused run launch
+      // (autopilot keeps its key, triage gets a new one) is reported so the widget
+      // can say why; every other outcome leaves the response as it was.
       return res.status(201).json({
         success: true,
-        issue: result.issue,
-        ...(triage && triage.launched === false ? { triage } : {}),
-        ...(autopilot && autopilot.launched === false ? { autopilot } : {})
+        issue: created.issue,
+        ...(launch?.launched === false ? { [lane]: launch } : {})
       });
     } catch (error) {
       console.error('Feedback submit error:', error);
@@ -4020,182 +3306,67 @@ ${goal}`
   // write to 502. This is the surface the in-app UI (Session B) will call.
   // ===========================================================================
 
-  // Normalize a provider write result to `{ success, issue }`. Linear/GitHub
-  // return that shape already; the local provider returns a bare canonical issue
-  // (or null), so without this a successful local write would read as
-  // `success: undefined` and wrongly 502. Mirrors proxy.js's normalizeWritePayload.
-  function normalizeIssueWrite(result) {
-    if (result && typeof result === 'object' && 'success' in result) return result;
-    return { success: !!result, issue: result ?? null };
-  }
-
-  // Same normalization, keyed 'comment' instead of 'issue' (LIN-2154) — the
-  // session-auth comment route's provider.createComment() result can be
-  // Linear's `{success, comment}` envelope or a bare comment entity (Local).
-  function normalizeCommentWrite(result) {
-    if (result && typeof result === 'object' && 'success' in result) return result;
-    return { success: !!result, comment: result ?? null };
-  }
-
-  // Input-side symbolic-ref resolution, mirroring the proxy write path
-  // (routes/proxy.js resolveTeamInput/resolveStateInput/resolveProjectInput): a
-  // bare UUID short-circuits before any provider read, so existing UUID payloads
-  // pay no network cost; a symbolic ref triggers the scoped list fetch and
-  // resolves to a native id (or throws RefResolutionError → clean 422 below).
-  async function resolveIssueTeamRef(provider, token, rawRef) {
-    const { localRef } = parseSourceNamespace(rawRef);
-    if (UUID_REGEX.test(localRef)) return localRef;
-    const teams = await provider.fetchTeams(token);
-    return resolveTeamRef(teams, localRef);
-  }
-  async function resolveIssueProjectRef(provider, token, rawRef) {
-    const { localRef } = parseSourceNamespace(rawRef);
-    if (UUID_REGEX.test(localRef)) return localRef;
-    const projects = await provider.fetchProjectsList(token);
-    return resolveProjectRef(projects, localRef);
-  }
-  async function resolveIssueStateRef(provider, token, teamId, rawRef) {
-    const { localRef } = parseSourceNamespace(rawRef);
-    if (UUID_REGEX.test(localRef)) return localRef;
-    // States are team-scoped; without a team we cannot scope the symbolic match,
-    // so fail loud (422) rather than guess across teams.
-    if (!teamId) {
-      throw new RefResolutionError(
-        `Cannot resolve state '${localRef}' — the issue's team could not be determined`,
-        { status: 422 },
-      );
-    }
-    const states = await provider.states(token, teamId);
-    return resolveStateRef(states, localRef);
-  }
-
-  // Map a RefResolutionError to a clean 422 (with candidate ids for an ambiguous
-  // match). Returns true when handled so the catch can `if (...) return;`.
-  function issueRefResolutionFailed(res, err) {
-    if (!(err instanceof RefResolutionError)) return false;
-    jsonError(res, err.status || 422, err.message, err.candidates ? { candidates: err.candidates } : undefined);
-    return true;
-  }
-
-  // Map a PartialWriteError (LIN-2012) the same way the proxy route does —
-  // same structured envelope, same non-2xx PARTIAL_WRITE code — so a caller
-  // sees identical shapes on both lanes. This route has no logEvent-equivalent
-  // audit trail today (unlike the proxy lane), so the provider-level
-  // console.warn in lib/providers/jira/index.js is what covers this lane;
-  // adding one here is a separate, out-of-scope concern.
-  function partialWriteFailed(res, err) {
-    if (!(err instanceof PartialWriteError)) return false;
-    jsonError(res, err.status || 500, err.message, {
-      code: 'PARTIAL_WRITE',
-      category: 'upstream',
-      retryable: true,
-      detail: err.cause?.message || null,
-      context: { applied: err.applied, failed: err.failed },
-    });
-    return true;
-  }
-
   /**
    * Create an issue on the workspace provider (session-auth).
    * @route POST /workspace/:urlKey/api/issues
    */
   router.post('/workspace/:urlKey/api/issues', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
     // LIN-3240 / LIN-3335: creation targets the workspace's default (active)
-    // binding, source-only. The call scope comes from the resolved binding.
-    const issueBinding = resolveIssueBinding(workspace, null);
-    const provider = issueBinding.provider;
-    const token = issueBinding.callScope;
+    // binding, source-only; the call scope comes from that resolved binding.
+    const { provider, callScope: token } = resolveIssueBinding(req.workspace, null);
 
-    // Capability gate — clean 422 (never 500) when the provider can't create.
+    // Clean 422 (never 500) when the provider can't create.
     if (!provider.supports('createIssue')) {
-      return jsonError(res, 422, "This workspace's provider does not support creating issues", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'createIssue', provider: provider.name,
-      });
+      return refuseCapability(res, provider.name, 'createIssue', 'creating issues');
     }
+
+    // LIN-1972: teamId is required only when the provider's create contract
+    // declares it, so a teamless provider (Local, GitHub) is never asked for one.
+    // The contract comes from createFields(), never supports()/fetchTeams().
+    const declared = provider.createFields();
+    const refusal = issueCreateRefusal(req.body || {}, declared);
+    if (refusal) return badRequest.json(res, refusal);
 
     const { title, description, teamId, projectId, stateId, priority } = req.body || {};
-
-    // LIN-1972: teamId is only required when the provider's create contract
-    // declares it — a teamless provider (Local, GitHub) must never be asked
-    // for one. Sourced from createFields(), never supports()/fetchTeams().
-    const fields = provider.createFields();
-    const requiresTeam = fields.includes('teamId');
-
-    if (requiresTeam && (!teamId || typeof teamId !== 'string')) {
-      return badRequest.json(res, 'Valid teamId is required');
-    }
-    if (!title || typeof title !== 'string') {
-      return badRequest.json(res, 'title is required');
-    }
-    // Shared validation seam (length caps + control-char guard + priority range)
-    // — 400 on failure. Unlike the proxy surface, this session-auth surface opts
-    // into priority rejection (validatePriority) so a bad priority is a clean 400,
-    // not a silent drop (LIN-1552 Session A spec).
-    const fieldError = validateIssueWriteFields({ title, description, priority }, { mode: 'create', validatePriority: true });
-    if (fieldError) {
-      return badRequest.json(res, fieldError);
-    }
-
-    // LIN-1973: the restrictive half of the LIN-1972 contract. A submitted
-    // stateId/priority the provider's createFields() does NOT declare is now a
-    // clean 400, not a silent drop (the one-layer-down forwarding guard below is
-    // unchanged and still applies to every OTHER undeclared field). This is safe
-    // only now that the inline create form is gone — that form submitted an
-    // unconditional priority number for every provider, which would 400 here.
-    // Checked by presence, not truthiness, so an explicit `stateId: ''` from a
-    // non-form caller is still caught.
-    if (stateId !== undefined && !fields.includes('stateId')) {
-      return badRequest.json(res, 'stateId is not supported by this provider');
-    }
-    if (priority !== undefined && !fields.includes('priority')) {
-      return badRequest.json(res, 'priority is not supported by this provider');
-    }
+    const needsTeam = declared.includes('teamId');
 
     try {
-      // LIN-1972: a create has no fetched issue to derive a team from (unlike
-      // the PATCH path's issueWriteGuard placeholder), so supply provider.name
-      // directly when the contract excludes teamId — a real non-empty string
-      // every teamless states() implementation accepts and ignores, and one
-      // that provably never reaches createIssue since input.teamId is only
-      // set below when requiresTeam.
-      const resolvedTeamId = requiresTeam
-        ? await resolveIssueTeamRef(provider, token, teamId)
-        : provider.name;
-      const input = {
-        title,
-        // LIN-1552: stamp the creating account from the session (NOT
-        // linearUserId), mirroring the LIN-1376 owner-stamping convention.
-        // Pre-existing, unrelated to LIN-1973, and unverifiable offline against
-        // a real Linear IssueCreateInput — per LIN-1579 the discharge is the
-        // NAMED monitor below (the catch block's own error log), not a bare
-        // "watch for a spike".
-        createdBy: req.session?.accountId || null,
-      };
-      if (requiresTeam) input.teamId = resolvedTeamId;
-      // LIN-1972: only forward optional fields the provider both declares AND
-      // the caller submitted — restrictive but lossless (an undeclared field
-      // is already dropped one layer down by every in-tree provider write).
-      if (fields.includes('description') && description) input.description = description;
-      if (fields.includes('projectId') && projectId) input.projectId = await resolveIssueProjectRef(provider, token, projectId);
-      if (fields.includes('stateId') && stateId) input.stateId = await resolveIssueStateRef(provider, token, resolvedTeamId, stateId);
-      if (fields.includes('priority') && priority !== undefined && isValidPriority(priority)) input.priority = priority;
+      // A create has no fetched issue to take a team from (unlike PATCH's
+      // issueWriteGuard), so a teamless contract gets `provider.name`: a real
+      // non-empty string that teamless states() implementations accept and
+      // ignore, and that never reaches createIssue because `teamId` is only set
+      // on the input when the contract asks for it (LIN-1972).
+      const scopeTeam = needsTeam ? await resolveIssueTeamRef(provider, token, teamId) : provider.name;
 
-      const result = normalizeIssueWrite(await provider.createIssue(token, input));
-      if (!result.success || !result.issue) {
-        return jsonError(res, 502, 'Issue was not created', { detail: result || null });
+      // LIN-1552: stamp the creating account from the session (NOT linearUserId),
+      // the LIN-1376 owner-stamping convention. Unverifiable offline against a
+      // real Linear IssueCreateInput, so per LIN-1579 the discharge is the NAMED
+      // monitor in the catch below, not a bare "watch for a spike".
+      const input = { title, createdBy: req.session?.accountId || null };
+      if (needsTeam) input.teamId = scopeTeam;
+
+      // LIN-1972: forward only optional fields the provider declares AND the
+      // caller sent — restrictive but lossless (every in-tree provider already
+      // drops an undeclared field one layer down). Refs resolve in this order.
+      const optional = [
+        ['description', description, (v) => v],
+        ['projectId', projectId, (v) => resolveIssueProjectRef(provider, token, v)],
+        ['stateId', stateId, (v) => resolveIssueStateRef(provider, token, scopeTeam, v)]
+      ];
+      for (const [field, supplied, resolve] of optional) {
+        if (declared.includes(field) && supplied) input[field] = await resolve(supplied);
       }
-      return res.status(201).json({ success: true, issue: result.issue });
+      if (declared.includes('priority') && priority !== undefined && isValidPriority(priority)) input.priority = priority;
+
+      const created = answerIssueWrite(res, await provider.createIssue(token, input), 'Issue was not created');
+      if (created) res.status(201).json({ success: true, issue: created.issue });
     } catch (err) {
       if (issueRefResolutionFailed(res, err)) return;
-      // NAMED MONITOR (LIN-1579) for the createdBy stamp above: this is the
-      // discharge path for "does Linear ever reject the unconditional
-      // createdBy stamp with a 5xx/502", not a bare post-landing "watch for a
-      // spike". A createdBy-related rejection surfaces here as a caught error
-      // and is logged with this exact message — grep server logs for
-      // "Workspace-api create issue error" to check it. No dedicated
-      // metric/oplog entry exists for this specific cause; a spike in this
-      // log line correlated with Linear-backed workspaces is the signal.
+      // NAMED MONITOR (LIN-1579) for the createdBy stamp: a createdBy-related
+      // Linear rejection (5xx/502) surfaces here as a caught error under this
+      // exact message — grep server logs for "Workspace-api create issue error".
+      // No dedicated metric/oplog entry exists for that cause; a spike in this
+      // line on Linear-backed workspaces is the signal.
       console.error('Workspace-api create issue error:', err.message);
       return jsonError(res, 500, 'Failed to create issue');
     }
@@ -4207,89 +3378,62 @@ ${goal}`
    * @route PATCH /workspace/:urlKey/api/issues/:issueId
    */
   router.patch('/workspace/:urlKey/api/issues/:issueId', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
-    // LIN-1904: resolve the issue's own binding via `source` (thread from the
-    // edit-link → task-edit → PATCH provenance hop), same helper as the read
-    // routes. Guard-read and write both derive from this single pairing, so
-    // they cannot land on different bindings (the invariant LIN-1903's review
-    // mutation-tested).
-    const issueBinding = resolveIssueBinding(workspace, req.query.source);
-    const { provider, callScope: token } = issueBinding;
+    // LIN-1904: the issue's own binding via `source` (threaded from the edit-link
+    // → task-edit → PATCH provenance hop), as on the read routes. The guard read
+    // and the write both use this one pairing, so they cannot land on different
+    // bindings (the invariant LIN-1903's review mutation-tested).
+    const { provider, callScope: token } = resolveIssueBinding(req.workspace, req.query.source);
 
     if (!provider.supports('updateIssue')) {
-      return jsonError(res, 422, "This workspace's provider does not support updating issues", {
-        code: 'CAPABILITY_NOT_SUPPORTED', capability: 'updateIssue', provider: provider.name,
-      });
+      return refuseCapability(res, provider.name, 'updateIssue', 'updating issues');
     }
+    if (!isValidIssueId(req.params.issueId)) return badRequest.json(res, 'Invalid issue ID format');
 
-    const { issueId } = req.params;
-    if (!isValidIssueId(issueId)) {
-      return badRequest.json(res, 'Invalid issue ID format');
-    }
-
-    // v1 edit fields only: title, description, state/status, priority. `stateId`
-    // is the primary field; `state`/`status` are accepted aliases (all resolve
-    // through the same symbolic state resolver).
+    // v1 edit fields: title, description, state, priority. `stateId` is primary;
+    // `state` / `status` are aliases and all go through the symbolic state resolver.
     const { title, description, priority } = req.body || {};
-    const stateId = req.body?.stateId ?? req.body?.state ?? req.body?.status;
+    const stateRef = req.body?.stateId ?? req.body?.state ?? req.body?.status;
 
-    const fieldError = validateIssueWriteFields({ title, description, priority }, { mode: 'update', validatePriority: true });
-    if (fieldError) {
-      return badRequest.json(res, fieldError);
-    }
-
-    // Reject a wholly empty body before any provider read (no-network 400).
-    const hasUpdatableField = [title, description, stateId, priority].some(v => v !== undefined);
-    if (!hasUpdatableField) {
-      return badRequest.json(res, 'No valid fields to update');
-    }
+    const refusal = issueUpdateRefusal({ title, description, priority, stateRef });
+    if (refusal) return badRequest.json(res, refusal);
 
     try {
-      // One guard read serves BOTH the trashed refusal (409) AND the team scope a
-      // symbolic stateId needs, mirroring the proxy update path.
+      // One guard read serves both the trashed refusal (409) and the team scope a
+      // symbolic state needs, as on the proxy update path.
       //
       // LIN-1559: `issueWriteGuard` is a ROUTE-INTERNAL read, deliberately off the
       // declared PROVIDER_SURFACE, so the `supports('updateIssue')` gate above
-      // cannot speak for it — a provider can pass that gate and still lack this
-      // read, which used to throw a TypeError inside this `try` and answer 500.
-      // Keyed on method existence (the property this route actually depends on),
-      // in this route's own inline 422 idiom rather than importing the proxy's.
+      // cannot vouch for it: a provider can pass that gate and still lack the read,
+      // which used to throw a TypeError in this `try` and answer 500. So key on the
+      // method's existence, in this route's own inline 422 idiom.
       if (typeof provider.issueWriteGuard !== 'function') {
-        return jsonError(res, 422, "This workspace's provider does not support updating issues", {
-          code: 'CAPABILITY_NOT_SUPPORTED', capability: 'issueWriteGuard', provider: provider.name,
-        });
+        return refuseCapability(res, provider.name, 'issueWriteGuard', 'updating issues');
       }
+      const { issueId } = req.params;
       const guard = await provider.issueWriteGuard(token, issueId);
       if (isTrashed(guard)) {
         return jsonError(res, 409, 'Issue is trashed; refusing to modify a deleted issue');
       }
-      const teamId = guard?.team?.id || null;
 
       const input = {};
       if (title) input.title = title;
       if (description !== undefined) input.description = description; // full-body replace
-      if (stateId) input.stateId = await resolveIssueStateRef(provider, token, teamId, stateId);
+      if (stateRef) input.stateId = await resolveIssueStateRef(provider, token, guard?.team?.id || null, stateRef);
       if (priority !== undefined && isValidPriority(priority)) input.priority = priority;
+      if (!Object.keys(input).length) return badRequest.json(res, 'No valid fields to update');
 
-      if (Object.keys(input).length === 0) {
-        return badRequest.json(res, 'No valid fields to update');
-      }
+      const updated = answerIssueWrite(res, await provider.updateIssue(token, issueId, input), 'Issue was not updated');
+      if (!updated) return;
+      res.json({ success: true, issue: updated.issue });
 
-      const result = normalizeIssueWrite(await provider.updateIssue(token, issueId, input));
-      if (!result.success || !result.issue) {
-        return jsonError(res, 502, 'Issue was not updated', { detail: result || null });
-      }
-      res.json({ success: true, issue: result.issue });
       // Seam 2 (LIN-3366): a state write may have made the ticket terminal.
-      if (onTicketWrite && stateId) {
+      if (onTicketWrite && stateRef) {
         void Promise.resolve()
-          .then(() => onTicketWrite({ urlKey: workspace.urlKey, written: result.issue, readBack: () => provider.fetchIssueContext(token, issueId) }))
+          .then(() => onTicketWrite({ urlKey: req.workspace.urlKey, written: updated.issue, readBack: () => provider.fetchIssueContext(token, issueId) }))
           .catch(e => console.error('[ticket-closer] seam 2 failure:', e?.message || e));
       }
-      return;
     } catch (err) {
-      if (issueRefResolutionFailed(res, err)) return;
-      if (partialWriteFailed(res, err)) return;
+      if (issueRefResolutionFailed(res, err) || partialWriteFailed(res, err)) return;
       console.error('Workspace-api update issue error:', err.message);
       return jsonError(res, 500, 'Failed to update issue');
     }
@@ -4330,36 +3474,30 @@ ${goal}`
    * Run evidence (LIN-3247, P2 of LIN-2949). The data half of the page seam:
    * returns `{ state, evidence, ledger, closeOut }` for a run's issue. The PR
    * URL comes from the run's OWN tracker comments (newest first); the live PR
-   * state comes from the shared
-   * fail-open reader (never throws — unreadable → `state: 'unknown'`). This
-   * fabricates nothing: `deriveCloseOutState` and the press are P3.
+   * state comes from the shared fail-open reader (never throws — unreadable →
+   * `state: 'unknown'`). This fabricates nothing: `deriveCloseOutState` and the
+   * press are P3.
    *
    * @route GET /workspace/:urlKey/api/run-evidence/:issueIdentifier
    */
   router.get('/workspace/:urlKey/api/run-evidence/:issueIdentifier', workspaceFromUrl, async (req, res) => {
-    const workspace = req.workspace;
     const { issueIdentifier } = req.params;
+    if (!validCloseOutIdentifier(issueIdentifier)) return badRequest.json(res, 'Invalid issue identifier');
 
-    if (!issueIdentifier || issueIdentifier.length > 100) {
-      return badRequest.json(res, 'Invalid issue identifier');
-    }
-
-    const resolveProvider = (runEvidence && runEvidence.resolveProvider) || resolveIssueBinding;
-    const viewerIsOwner = (runEvidence && runEvidence.viewerIsOwner) || (() => true);
-    const requestedSource = typeof req.query.source === 'string' ? req.query.source : null;
-
+    const seam = runEvidence || {};
+    const source = typeof req.query.source === 'string' ? req.query.source : null;
     try {
-      const { provider, callScope } = resolveProvider(workspace, requestedSource);
-      const model = await readRunEvidence({
+      const { provider, callScope } = (seam.resolveProvider || resolveIssueBinding)(req.workspace, source);
+      const { state, evidence, ledger, closeOut: closeOutModel } = await readRunEvidence({
         issueIdentifier,
         provider,
         callScope,
-        viewerIsOwner: viewerIsOwner(req),
-        urlKey: workspace.urlKey,
-        readPrStatus: (runEvidence && runEvidence.readPrStatus) || undefined,
-        githubFetch: (runEvidence && runEvidence.githubFetch) || null,
+        viewerIsOwner: (seam.viewerIsOwner || (() => true))(req),
+        urlKey: req.workspace.urlKey,
+        readPrStatus: seam.readPrStatus || undefined,
+        githubFetch: seam.githubFetch || null,
       });
-      res.json({ state: model.state, evidence: model.evidence, ledger: model.ledger, closeOut: model.closeOut });
+      res.json({ state, evidence, ledger, closeOut: closeOutModel });
     } catch (error) {
       console.error('Run evidence error:', error);
       jsonError(res, 500, 'Failed to build run evidence', { message: error.message });
@@ -4370,61 +3508,129 @@ ${goal}`
   // Close-out (LIN-3248, P3 of LIN-2949)
   // ===========================================================================
 
-  // The PR head the reader saw, or null.
-  function statusHeadSha(status) {
-    if (!status || status.readable !== true) return null;
-    return (status.head && status.head.sha) || status.ref || null;
-  }
-
-  // The open-ledger-item counts at merge: review-ledger items not yet
-  // discharged, by scope. Content-free — counts only (the audit trail says what
-  // "Done" meant).
-  function countOpenLedgerItems(review) {
-    const items = (review && review.ledger && review.ledger.items) || [];
-    const counts = { inside: 0, outside: 0, unknown: 0, total: 0 };
-    for (const item of items) {
-      if (!item || item.discharged) continue;
-      const scope = item.scope === 'inside' ? 'inside' : item.scope === 'outside' ? 'outside' : 'unknown';
-      counts[scope] += 1;
-      counts.total += 1;
-    }
-    return counts;
-  }
-
   // Is the task's run a stop-at-PR run? Keyed by TASK (LIN-3340): the shared
   // reader checks the task's own rows and, for a subtask worked under a parent's
   // stop-at run, hops through each row's `sessionId` to the parent run row — the
   // same read the dispatch guard makes. `lib/task-run-facts.js`; this keeps the
   // check route's Done path and the guard on one definition.
   async function defaultIsStopAtRun({ urlKey, issueIdentifier }) {
-    const { stopAt } = await readTaskRunFacts({ store: dispatchQueueStore, urlKey, issueIdentifier });
-    return stopAt;
+    return (await readTaskRunFacts({ store: dispatchQueueStore, urlKey, issueIdentifier })).stopAt;
   }
 
-  // Set the tracker issue Done. Resolves the issue's team, its completed
-  // workflow state, then transitions it. Throws on failure so the caller can
-  // record the error and retry on the next check.
-  async function defaultMarkDone({ provider, callScope, issueIdentifier }) {
-    const { issue } = await provider.fetchIssueContext(callScope, issueIdentifier);
-    const issueRef = (issue && issue.id) || issueIdentifier;
-    let teamId = (issue && issue.team && issue.team.id) || null;
-    if (!teamId && typeof provider.issueWriteGuard === 'function') {
-      const guard = await provider.issueWriteGuard(callScope, issueRef);
-      teamId = (guard && guard.team && guard.team.id) || null;
+  // Answers the close-out POST routes' two refusals — a bad identifier, then a
+  // caller that is not the signed-in person's own session (never a worker or
+  // proxy token) — and says whether it answered.
+  function refusedCloseOutRequest(req, res, what) {
+    if (!validCloseOutIdentifier(req.params.issueIdentifier)) {
+      badRequest.json(res, 'Invalid issue identifier');
+    } else if (!req.session?.accountId) {
+      unauthorized.json(res, 'Not authenticated');
+    } else if (!isPersonSession(req)) {
+      jsonError(res, 403, `The close-out ${what} must use the signed-in person's own session`, { code: 'PERSON_SESSION_REQUIRED' });
+    } else {
+      return false;
     }
-    if (!teamId) throw new Error('could not resolve the issue team for Done');
-    const states = await provider.states(callScope, teamId);
-    const completed = (states || []).find(s => s && s.type === 'completed');
-    const stateId = (completed && completed.id) || resolveStateRef(states, 'Done');
-    return provider.updateIssue(callScope, issueRef, { stateId });
+    return true;
   }
 
-  // The signed-in person's own session: an authenticated session (workspaceFromUrl
-  // already required one) and NOT a worker/proxy token. Computed from the
-  // request, never from the body, so the route can never be handed
-  // `byPersonCheck: true`.
-  function isPersonSession(req) {
-    return !!req.session?.accountId && !req.proxyTokenId && !req.proxyUrlKey;
+  // The stored merged event for one merged PR: the one already on record, or one
+  // recorded now. LIN-3395: one event per merge — reusing the stored one matters
+  // because re-deriving `by` (a press row stored after the merge) would flip it,
+  // and `by` is part of the idempotency key, so a second merged event and a
+  // second Done write would follow. Without an events store there is no event.
+  async function mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha, openItems }) {
+    if (!closeOutEventsStore) return null;
+    const { urlKey } = workspace;
+    const stored = await closeOutEventsStore.findMergedByPr({ urlKey, prUrl: pr.url });
+    if (stored) return stored;
+    // F1/F4: a press recorded for this PR at ANY head means the close-out worker
+    // merged it, not "you" (the head is dropped from the lookup so a push between
+    // the press and the merge cannot hide the press).
+    const pressed = await closeOutEventsStore.findAnyByPr({ urlKey, prUrl: pr.url, by: 'press' });
+    return closeOutEventsStore.record({
+      accountId,
+      urlKey,
+      issueId: null,
+      issueIdentifier,
+      by: pressed ? 'close-out' : 'person',
+      prUrl: pr.url,
+      headSha,
+      merged: true,
+      openItems,
+    });
+  }
+
+  // The check's merge bookkeeping: one stored merged event per merged PR, as
+  // `recorded` entries, plus the first of them and its PR's index.
+  async function recordMergedPrs({ workspace, accountId, issueIdentifier, prUrls, prStatuses, ledger }) {
+    const openItems = countOpenLedgerItems(ledger);
+    const recorded = [];
+    let first = { mergedEvent: null, mergedPrIndex: -1 };
+    for (const [index, pr] of prUrls.entries()) {
+      const status = prStatuses[index];
+      if (status?.readable !== true || status.merged !== true) continue;
+      const event = await mergedEventFor({ workspace, accountId, issueIdentifier, pr, headSha: statusHeadSha(status), openItems });
+      if (!event) continue;
+      recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
+      if (!first.mergedEvent) first = { mergedEvent: event, mergedPrIndex: index };
+    }
+    return { recorded, ...first };
+  }
+
+  // Stamp the merge's Done outcome on its stored event (when there is one).
+  const stampMergeDone = (workspace, mergedEvent, outcome) => (
+    mergedEvent && closeOutEventsStore
+      ? closeOutEventsStore.stampDone({
+        urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, ...outcome,
+      })
+      : null
+  );
+
+  // R1: set Done only when all four bounds hold (the caller checks them). F2: write
+  // it once per merge — skip when this merge already carries a successful `doneAt`,
+  // and retry only after a failed attempt. Returns what the response reports.
+  async function settleDone({ workspace, provider, callScope, issueIdentifier, seam, mergedEvent }) {
+    if (mergedEvent?.doneAt) {
+      // already written for this merge; never repeat the provider write
+      return { done: true, doneNow: false, doneError: null, mergedEvent };
+    }
+    try {
+      const written = await (seam.markDone || defaultMarkDone)({ provider, callScope, issueIdentifier });
+      // Seam 3 (LIN-3366): fires only on this fresh write, never on the
+      // `doneAt` branch above, so a merge that already carries `doneAt` never
+      // re-fires. `defaultMarkDone` returns `{success, issue}`; the helper unwraps.
+      if (onTicketWrite) {
+        void Promise.resolve()
+          .then(() => onTicketWrite({ urlKey: workspace.urlKey, written, readBack: () => provider.fetchIssueContext(callScope, issueIdentifier) }))
+          .catch(e => console.error('[ticket-closer] seam 3 failure:', e?.message || e));
+      }
+      const stamped = await stampMergeDone(workspace, mergedEvent, { doneAt: new Date(), doneError: null });
+      return { done: true, doneNow: true, doneError: null, mergedEvent: stamped || mergedEvent };
+    } catch (err) {
+      const doneError = err?.message || 'could not set the task Done';
+      await stampMergeDone(workspace, mergedEvent, { doneAt: null, doneError });
+      return { done: false, doneNow: false, doneError, mergedEvent };
+    }
+  }
+
+  // Live status of every PR the run's comments mention. LIN-3443: a bound repo is
+  // read with the workspace's own token. Fail open: an unreadable PR is "unknown",
+  // never a 500.
+  function readPrStatuses({ prUrls, callScope, workspace, seam }) {
+    const readPrStatus = seam.readPrStatus || readPrStatusFailOpen;
+    return Promise.all(prUrls.map(async ({ repo, number }) => {
+      const token = prReadToken(callScope, repo);
+      try {
+        return await readPrStatus({
+          repo,
+          number,
+          doFetch: seam.githubFetch || null,
+          ...(token ? { token, scopeKey: workspace.urlKey } : {}),
+        });
+      } catch (err) {
+        return { repo, readable: false, state: 'unknown', reason: err?.message || 'not checked' };
+      }
+    }));
   }
 
   /**
@@ -4440,163 +3646,62 @@ ${goal}`
    * @route POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/check
    */
   router.post('/workspace/:urlKey/api/run-evidence/:issueIdentifier/check', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
+    if (refusedCloseOutRequest(req, res, 'check')) return;
+
+    const { workspace } = req;
     const { issueIdentifier } = req.params;
-
-    if (!issueIdentifier || issueIdentifier.length > 100) {
-      return badRequest.json(res, 'Invalid issue identifier');
-    }
-    if (!req.session?.accountId) {
-      return unauthorized.json(res, 'Not authenticated');
-    }
-    if (!isPersonSession(req)) {
-      return jsonError(res, 403, "The close-out check must use the signed-in person's own session", { code: 'PERSON_SESSION_REQUIRED' });
-    }
-
-    const accountId = req.session.accountId;
     const seam = closeOut || {};
-    const resolveProvider = seam.resolveProvider || resolveIssueBinding;
-    const requestedSource = typeof req.body?.source === 'string' ? req.body.source : (typeof req.query.source === 'string' ? req.query.source : null);
+    const source = [req.body?.source, req.query.source].find((v) => typeof v === 'string') ?? null;
 
     try {
-      const { provider, callScope } = resolveProvider(workspace, requestedSource);
+      const { provider, callScope } = (seam.resolveProvider || resolveIssueBinding)(workspace, source);
 
       const comments = await provider.fetchIssueComments(callScope, issueIdentifier);
       const prUrls = extractPrUrls(comments);
-      const readPrStatus = seam.readPrStatus || readPrStatusFailOpen;
-      const prStatuses = await Promise.all(prUrls.map(async pr => {
-        // LIN-3443: the bound repo is read with the workspace's own token.
-        const token = prReadToken(callScope, pr.repo);
-        try {
-          return await readPrStatus({
-            repo: pr.repo,
-            number: pr.number,
-            doFetch: seam.githubFetch || null,
-            ...(token ? { token, scopeKey: workspace.urlKey } : {}),
-          });
-        } catch (err) {
-          // Fail open: an unreadable PR state is "unknown", never a 500.
-          return { repo: pr.repo, readable: false, state: 'unknown', reason: err?.message || 'not checked' };
-        }
-      }));
+      const prStatuses = await readPrStatuses({ prUrls, callScope, workspace, seam });
 
       const ledger = readRunLedger(comments);
-      const runStopAt = seam.isStopAtRun
-        ? await seam.isStopAtRun({ workspace, issueIdentifier })
-        : await defaultIsStopAtRun({ urlKey: workspace.urlKey, issueIdentifier });
-      const runnerReady = seam.runnerReady
-        ? !!seam.runnerReady(req)
-        : getFeatureFlags(req.session).dispatch === true;
-
+      const stopAt = await (seam.isStopAtRun
+        ? seam.isStopAtRun({ workspace, issueIdentifier })
+        : defaultIsStopAtRun({ urlKey: workspace.urlKey, issueIdentifier }));
       const state = deriveCloseOutState({
         prs: prUrls,
         prStatuses,
         review: ledger,
-        runnerReady,
+        runnerReady: seam.runnerReady ? !!seam.runnerReady(req) : getFeatureFlags(req.session).dispatch === true,
         owner: true,
-        stopAt: runStopAt,
+        stopAt,
         byPersonCheck: true,
       });
 
-      const recorded = [];
-      let done = false;
       // B1' (review `a1845467`): `done` is true on EVERY later call once a merge
       // is recorded, so a client that reloads on `done` loops on a reopened task
       // (Done recorded, tracker back to In Progress). `doneNow` is true only on
       // the call that actually wrote the provider's Done, so the client reloads
       // on the real transition, never on a page that merely reports the record.
-      let doneNow = false;
-      let doneError = null;
+      let outcome = { done: false, doneNow: false, doneError: null };
+      let recorded = [];
 
       // Close-out is a stop-at-PR surface only: a normal run records and sets
       // nothing here.
-      if (runStopAt === 'pr') {
-        const openItems = countOpenLedgerItems(ledger);
-        let mergedEvent = null;
-        let mergedPrIndex = -1;
-        for (let i = 0; i < prUrls.length; i += 1) {
-          const status = prStatuses[i];
-          if (!(status && status.readable === true && status.merged === true)) continue;
-          const headSha = statusHeadSha(status);
-          // F1/F4: a press recorded for this PR at ANY head means the close-out
-          // worker merged it — not "by you". (Dropping the head constraint: a
-          // push between the press and the merge must not hide the press.)
-          // LIN-3395: one stored merged event per merge. If this PR's merge is
-          // already on record, reuse it — re-deriving `by` here would flip it
-          // (a press row stored after the merge) and, since `by` is part of the
-          // idempotency key, record a second merged event and a second Done write.
-          const existing = closeOutEventsStore
-            ? await closeOutEventsStore.findMergedByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url })
-            : null;
-          let by = 'person';
-          if (closeOutEventsStore && !existing) {
-            const press = await closeOutEventsStore.findAnyByPr({ urlKey: workspace.urlKey, prUrl: prUrls[i].url, by: 'press' });
-            if (press) by = 'close-out';
-          }
-          const event = existing || (closeOutEventsStore
-            ? await closeOutEventsStore.record({
-              accountId,
-              urlKey: workspace.urlKey,
-              issueId: null,
-              issueIdentifier,
-              by,
-              prUrl: prUrls[i].url,
-              headSha,
-              merged: true,
-              openItems,
-            })
-            : null);
-          if (event) {
-            recorded.push({ id: event._id, by: event.by, prUrl: event.prUrl, headSha: event.headSha });
-            if (!mergedEvent) { mergedEvent = event; mergedPrIndex = i; }
-          }
-        }
+      if (stopAt === 'pr') {
+        const merges = await recordMergedPrs({ workspace, accountId: req.session.accountId, issueIdentifier, prUrls, prStatuses, ledger });
+        recorded = merges.recorded;
+        let { mergedEvent } = merges;
 
-        // R1: set Done only when all four bounds hold. F2: write it once per
-        // merge — skip when this merge already carries a successful `doneAt`,
-        // and retry only after a failed attempt.
-        const targetIndex = mergedPrIndex >= 0 ? mergedPrIndex : 0;
-        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prIndex: targetIndex, review: ledger, byPersonCheck: true })) {
-          if (mergedEvent && mergedEvent.doneAt) {
-            done = true; // already written for this merge; never repeat the provider write
-          } else {
-            try {
-              const markDone = seam.markDone || defaultMarkDone;
-              const written = await markDone({ provider, callScope, issueIdentifier });
-              done = true;
-              doneNow = true;
-              // Seam 3 (LIN-3366): only here, never on the `mergedEvent.doneAt`
-              // branch above, so a merge that already carries `doneAt` never re-fires.
-              // `defaultMarkDone` returns `{success, issue}`; the helper unwraps it.
-              if (onTicketWrite) {
-                void Promise.resolve()
-                  .then(() => onTicketWrite({ urlKey: workspace.urlKey, written, readBack: () => provider.fetchIssueContext(callScope, issueIdentifier) }))
-                  .catch(e => console.error('[ticket-closer] seam 3 failure:', e?.message || e));
-              }
-              if (mergedEvent && closeOutEventsStore) {
-                mergedEvent = await closeOutEventsStore.stampDone({
-                  urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: new Date(), doneError: null,
-                }) || mergedEvent;
-              }
-            } catch (err) {
-              doneError = err?.message || 'could not set the task Done';
-              if (mergedEvent && closeOutEventsStore) {
-                await closeOutEventsStore.stampDone({
-                  urlKey: workspace.urlKey, prUrl: mergedEvent.prUrl, headSha: mergedEvent.headSha, by: mergedEvent.by, doneAt: null, doneError,
-                });
-              }
-            }
-          }
+        const prIndex = Math.max(merges.mergedPrIndex, 0);
+        if (state.status === 'merged' && closeOutSetsDone({ prStatuses, prIndex, review: ledger, byPersonCheck: true })) {
+          ({ mergedEvent, ...outcome } = await settleDone({ workspace, provider, callScope, issueIdentifier, seam, mergedEvent }));
         }
 
         // Show a press-then-merge as a close-out merge.
-        if (mergedEvent && mergedEvent.by === 'close-out') {
+        if (mergedEvent?.by === 'close-out') {
           state.mergedBy = 'close-out';
           state.message = 'the pull request was merged by close-out';
         }
       }
 
-      return res.json({ state, recorded, done, doneNow, doneError });
+      return res.json({ state, recorded, done: outcome.done, doneNow: outcome.doneNow, doneError: outcome.doneError });
     } catch (error) {
       console.error('Close-out check error:', error);
       jsonError(res, 500, 'Failed to check close-out state', { message: error.message });
@@ -4612,44 +3717,30 @@ ${goal}`
    * @route POST /workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press
    */
   router.post('/workspace/:urlKey/api/run-evidence/:issueIdentifier/close-out-press', workspaceFromUrl, json(), async (req, res) => {
-    const workspace = req.workspace;
-    const { issueIdentifier } = req.params;
+    if (refusedCloseOutRequest(req, res, 'press')) return;
 
-    if (!issueIdentifier || issueIdentifier.length > 100) {
-      return badRequest.json(res, 'Invalid issue identifier');
-    }
-    if (!req.session?.accountId) {
-      return unauthorized.json(res, 'Not authenticated');
-    }
-    if (!isPersonSession(req)) {
-      return jsonError(res, 403, "The close-out press must use the signed-in person's own session", { code: 'PERSON_SESSION_REQUIRED' });
-    }
-
+    const { urlKey } = req.workspace;
     const { prUrl, headSha, dispatchId } = req.body || {};
     try {
       // LIN-3395: once the PR's merge is on record, a press (e.g. from a stale
       // tab after a self-merge) is refused before anything is written, so the
       // next check cannot add a second `close-out` event or a second Done write.
-      if (closeOutEventsStore && await closeOutEventsStore.hasMergedEvent({ urlKey: workspace.urlKey, prUrl })) {
+      if (closeOutEventsStore && await closeOutEventsStore.hasMergedEvent({ urlKey, prUrl })) {
         return jsonError(res, 409, 'This pull request is already merged; the close-out press was not recorded', { code: 'CLOSE_OUT_ALREADY_MERGED' });
       }
-      const event = closeOutEventsStore
-        ? await closeOutEventsStore.record({
-          accountId: req.session.accountId,
-          urlKey: workspace.urlKey,
-          issueId: null,
-          issueIdentifier,
-          by: 'press',
-          dispatchId,
-          prUrl,
-          headSha: headSha ?? null,
-          merged: false,
-          openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
-        })
-        : null;
-      if (!event) {
-        return badRequest.json(res, 'Invalid close-out press');
-      }
+      const event = closeOutEventsStore && await closeOutEventsStore.record({
+        accountId: req.session.accountId,
+        urlKey,
+        issueId: null,
+        issueIdentifier: req.params.issueIdentifier,
+        by: 'press',
+        dispatchId,
+        prUrl,
+        headSha: headSha ?? null,
+        merged: false,
+        openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
+      });
+      if (!event) return badRequest.json(res, 'Invalid close-out press');
       return res.status(201).json({
         success: true,
         event: { id: event._id, by: event.by, dispatchId: event.dispatchId, prUrl: event.prUrl, headSha: event.headSha },

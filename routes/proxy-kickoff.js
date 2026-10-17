@@ -1,13 +1,15 @@
 /**
  * Group H kickoff routes (LIN-679 Stage 5 / LIN-2539: extracted from
- * routes/proxy.js, byte-identical handler bodies).
+ * routes/proxy.js, byte-identical handler bodies; rebuilt design-first in LIN-3592:
+ * the same routes, refusals and audit events, with the POST's checks written down
+ * once as an ordered list).
  *
  * Autopilot kickoff (GET+POST), Autopilot manual, Passage Runner kickoff prompt.
  */
 import { Router } from 'express';
 import { badRequest, jsonError, notFound, classifyUpstreamError } from '../lib/errors.js';
 import { MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../lib/issue-write-validation.js';
-import { validateOpaqueDispatchField, validateSessionId, DISPATCH_EFFORT_LEVELS, isValidAutopilotVariant, targetError } from '../lib/dispatch-validation.js';
+import { validateSessionId, DISPATCH_EFFORT_LEVELS, isValidAutopilotVariant, targetError } from '../lib/dispatch-validation.js';
 import { validateRunField } from '../lib/dispatch-fields.js';
 import { DEFAULT_SUBSCRIPTION } from '../lib/dispatch-wake.js';
 import { createDispatchItem } from '../lib/dispatch-factory.js';
@@ -20,6 +22,7 @@ import { declaredProviderDisplayName, resolvedProviderUi } from '../lib/proxy-gr
 import { buildConsumerPollWarning } from '../lib/consumer-poll-warning.js';
 import { buildRunGate, resolveChatCredential } from '../lib/chat-request.js';
 import { POLLED_TARGETS } from '../lib/dispatch-targets.js';
+import { firstFailure, opaqueFieldError } from '../lib/dispatch-entrance.js';
 
 /**
  * @param {Object} deps
@@ -67,6 +70,14 @@ export function createKickoffRoutes({
 }) {
   const router = Router();
 
+  // The kickoff POST's 400 answers: every one is audited, then relayed in the same
+  // envelope. (Literal tag, not a shared constant: the credential-stamping census
+  // reads the endpoint tag out of each handler's own workspaceUnavailable call.)
+  function rejectBody(req, res, message) {
+    logEvent(req, '/api/proxy/autopilot/kickoff', 400);
+    return badRequest.json(res, message);
+  }
+
   /**
    * GET /api/proxy/autopilot/kickoff
    * Returns the Autopilot kickoff prompt as plain text — the briefing that
@@ -92,6 +103,75 @@ export function createKickoffRoutes({
     const kickoff = buildAutopilotKickoff({ baseUrl, goal, mode, variant, standalone: true });
     res.type('text/plain').send(kickoff);
   });
+
+  /**
+   * The first thing wrong with a kickoff POST body, in the order the caller is
+   * told about it (mode, variant, goal, target, repo, issueIdentifier, sessionId,
+   * subscription, model, harness, effort, presetId, maxTasks), or null. (The
+   * composed body is server-generated and trusted, so only these raw inputs are
+   * checked — same split as the recommend-and-dispatch override path.) The one
+   * async step is the preset lookup; it sits where the presetId shape check ends,
+   * so a body that fails any earlier check never reads the store.
+   */
+  function kickoffBodyFailure(req, body, resolvedMode, resolvedVariant) {
+    const { goal, target, repo, issueIdentifier, sessionId, subscription, model, harness, effort, presetId, maxTasks } = body;
+    return firstFailure([
+      () => (AUTOPILOT_MODES.includes(resolvedMode) ? null : `mode must be one of: ${AUTOPILOT_MODES.join(', ')}`),
+      () => (isValidAutopilotVariant(resolvedVariant) ? null : `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`),
+      // LIN-2818: `goal` is caller-authored prose, so its POST cap is the
+      // goal-specific MAX_DESCRIPTION_LENGTH (100000), NOT the shared opaque-field
+      // default (MAX_NAME_LENGTH, 1000). Raised at this call site only — `repo`,
+      // `model`, `harness`, and `effort` below keep the shared 1000 cap.
+      () => opaqueFieldError(goal, 'goal', { maxLength: MAX_DESCRIPTION_LENGTH, reportReceivedLength: true }),
+      () => targetError(target, POLLED_TARGETS),
+      () => opaqueFieldError(repo, 'repo', { maxLength: MAX_NAME_LENGTH, reportReceivedLength: true }),
+      () => (issueIdentifier !== undefined && !isValidIssueId(issueIdentifier) ? 'Invalid identifier format' : null),
+      // Coordinator up-chain wiring (LIN-813): an autopilot acting as a coordinator
+      // dispatches a task-altitude CHILD autopilot for a whole task, stamping its
+      // OWN session id as `sessionId` (the up-chain wake target) and declaring
+      // `subscription: 'everything'` so the child's PENDING/terminal reports wake it.
+      // Both are stored + forwarded blindly onto the dispatched item (same contract
+      // as POST /dispatch); validate shape only. This is a guide capability, not a
+      // variant — any autopilot can use it contextually.
+      // Opaque string, not a UUID (LIN-1118) — shared rule, same as POST /dispatch.
+      () => validateSessionId(sessionId)?.error ?? null,
+      () => validateRunField('subscription', subscription),
+      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
+      // via the shared helper (type/length/dangerous-chars only — NOT checked
+      // against a model registry). Mirrors POST /dispatch + recommend-and-dispatch.
+      () => opaqueFieldError(model, 'model', { maxLength: MAX_NAME_LENGTH }),
+      () => opaqueFieldError(harness, 'harness', { maxLength: MAX_NAME_LENGTH }),
+      // Execution effort (LIN-2615): opaque string, same helper/convention as
+      // model/harness above — closes the ingress gap review flagged (kickoff
+      // forwarded effort without validating it, unlike every other write verb).
+      () => opaqueFieldError(effort, 'effort', { maxLength: MAX_NAME_LENGTH }),
+      // An out-of-set level stays accepted (fail-soft, never a 400) but is
+      // logged, the same as the other three write verbs. Symmetry only — the
+      // caller-observable contract is identical either way; without it the
+      // runtime-served `## Effort` docs describe a warning this verb alone
+      // never emitted.
+      () => {
+        if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) console.warn(`Unknown dispatch effort level: ${effort}`);
+        return null;
+      },
+      // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
+      // here, up front — the factory treats a presetId it can't resolve as "no
+      // preset" (a defensive fallback for this seam's own store lookup below),
+      // not a validation gate, so this is the one place that contract is enforced.
+      () => (presetId !== undefined && presetId !== null && (typeof presetId !== 'string' || !presetId.trim()) ? 'presetId must be a non-empty string' : null),
+      async () => {
+        if (presetId === undefined || presetId === null || !dispatchPresetsStore) return null;
+        const preset = await dispatchPresetsStore.get(req.proxyUrlKey, presetId);
+        return preset ? null : 'Invalid or unknown presetId';
+      },
+      // Task budget (LIN-1751): a SCOPE bound on the run — up to this many
+      // distinct tasks — enforced deterministically at the dispatch-factory seam
+      // (never a cost control; see the kickoff prose). Optional; validated here,
+      // up front, following the presetId precedent just above. Absent/null ⇒ no
+      // budget, byte-identical to today.
+      () => validateRunField('maxTasks', maxTasks)
+    ]);
+  }
 
   /**
    * POST /api/proxy/autopilot/kickoff
@@ -130,124 +210,13 @@ export function createKickoffRoutes({
     }
 
     try {
-      const { goal, mode, variant, issueIdentifier, issueSource, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks } = req.body || {};
+      const body = req.body || {};
+      const { goal, mode, variant, issueIdentifier, issueSource, target, repo, appendProxyContext, sessionId, subscription, model, harness, effort, presetId, maxTasks } = body;
 
-      // Validate caller-supplied inputs. (The composed body is server-generated
-      // and trusted, so only these raw inputs are checked — same split as the
-      // recommend-and-dispatch override path.)
       const resolvedMode = mode === undefined ? AUTOPILOT_MODE_DEFAULT : mode;
-      if (!AUTOPILOT_MODES.includes(resolvedMode)) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, `mode must be one of: ${AUTOPILOT_MODES.join(', ')}`);
-      }
       const resolvedVariant = variant === undefined ? AUTOPILOT_VARIANT_DEFAULT : variant;
-      if (!isValidAutopilotVariant(resolvedVariant)) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, `variant must be one of: ${AUTOPILOT_VARIANTS.join(', ')}`);
-      }
-      // LIN-2818: `goal` is caller-authored prose, so its POST cap is the
-      // goal-specific MAX_DESCRIPTION_LENGTH (100000), NOT the shared opaque-field
-      // default (MAX_NAME_LENGTH, 1000). Raised at this call site only — `repo`,
-      // `model`, `harness`, and `effort` below keep the shared 1000 cap.
-      const kickoffGoalValidationError = validateOpaqueDispatchField(goal, 'goal', {
-        maxLength: MAX_DESCRIPTION_LENGTH,
-        reportReceivedLength: true,
-      });
-      if (kickoffGoalValidationError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, kickoffGoalValidationError.error);
-      }
-      const targetMsg = targetError(target, POLLED_TARGETS);
-      if (targetMsg) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, targetMsg);
-      }
-      const kickoffRepoValidationError = validateOpaqueDispatchField(repo, 'repo', {
-        maxLength: MAX_NAME_LENGTH,
-        reportReceivedLength: true,
-      });
-      if (kickoffRepoValidationError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, kickoffRepoValidationError.error);
-      }
-      if (issueIdentifier !== undefined && !isValidIssueId(issueIdentifier)) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, 'Invalid identifier format');
-      }
-      // Coordinator up-chain wiring (LIN-813): an autopilot acting as a coordinator
-      // dispatches a task-altitude CHILD autopilot for a whole task, stamping its
-      // OWN session id as `sessionId` (the up-chain wake target) and declaring
-      // `subscription: 'everything'` so the child's PENDING/terminal reports wake it.
-      // Both are stored + forwarded blindly onto the dispatched item (same contract
-      // as POST /dispatch); validate shape only. This is a guide capability, not a
-      // variant — any autopilot can use it contextually.
-      // Opaque string, not a UUID (LIN-1118) — shared rule, same as POST /dispatch.
-      const kickoffSessionIdError = validateSessionId(sessionId);
-      if (kickoffSessionIdError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, kickoffSessionIdError.error);
-      }
-      const subscriptionRuleError = validateRunField('subscription', subscription);
-      if (subscriptionRuleError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, subscriptionRuleError);
-      }
-      // Execution model + harness (LIN-438, LIN-1084): opaque strings, validated
-      // via the shared helper (type/length/dangerous-chars only — NOT checked
-      // against a model registry). Mirrors POST /dispatch + recommend-and-dispatch.
-      const kickoffModelValidationError = validateOpaqueDispatchField(model, 'model', { maxLength: MAX_NAME_LENGTH });
-      if (kickoffModelValidationError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, kickoffModelValidationError.error);
-      }
-      const kickoffHarnessValidationError = validateOpaqueDispatchField(harness, 'harness', { maxLength: MAX_NAME_LENGTH });
-      if (kickoffHarnessValidationError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, kickoffHarnessValidationError.error);
-      }
-      // Execution effort (LIN-2615): opaque string, same helper/convention as
-      // model/harness above — closes the ingress gap review flagged (kickoff
-      // forwarded effort without validating it, unlike every other write verb).
-      const kickoffEffortValidationError = validateOpaqueDispatchField(effort, 'effort', { maxLength: MAX_NAME_LENGTH });
-      if (kickoffEffortValidationError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, kickoffEffortValidationError.error);
-      }
-      // An out-of-set level stays accepted (fail-soft, never a 400) but is
-      // logged, the same as the other three write verbs. Symmetry only — the
-      // caller-observable contract is identical either way; without it the
-      // runtime-served `## Effort` docs describe a warning this verb alone
-      // never emitted.
-      if (effort && !DISPATCH_EFFORT_LEVELS.includes(effort)) {
-        console.warn(`Unknown dispatch effort level: ${effort}`);
-      }
-      // Selected dispatch preset (LIN-1390): an unknown/invalid id is rejected
-      // here, up front — the factory treats a presetId it can't resolve as "no
-      // preset" (a defensive fallback for this seam's own store lookup below),
-      // not a validation gate, so this is the one place that contract is enforced.
-      if (presetId !== undefined && presetId !== null) {
-        if (typeof presetId !== 'string' || !presetId.trim()) {
-          logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-          return badRequest.json(res, 'presetId must be a non-empty string');
-        }
-        if (dispatchPresetsStore) {
-          const preset = await dispatchPresetsStore.get(req.proxyUrlKey, presetId);
-          if (!preset) {
-            logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-            return badRequest.json(res, 'Invalid or unknown presetId');
-          }
-        }
-      }
-      // Task budget (LIN-1751): a SCOPE bound on the run — up to this many
-      // distinct tasks — enforced deterministically at the dispatch-factory seam
-      // (never a cost control; see the kickoff prose). Optional; validated here,
-      // up front, following the presetId precedent just above. Absent/null ⇒ no
-      // budget, byte-identical to today.
-      const maxTasksRuleError = validateRunField('maxTasks', maxTasks);
-      if (maxTasksRuleError) {
-        logEvent(req, '/api/proxy/autopilot/kickoff', 400);
-        return badRequest.json(res, maxTasksRuleError);
-      }
+      const bodyFailure = await kickoffBodyFailure(req, body, resolvedMode, resolvedVariant);
+      if (bodyFailure) return rejectBody(req, res, bodyFailure);
 
       // Subscription is DECLARED on the edge (LIN-900 §6), never reconstructed from
       // incidental fields: an undeclared edge is `terminal-only`, full stop. (This
@@ -262,7 +231,7 @@ export function createKickoffRoutes({
       // SCOPED run: resolve the named issue so the goal line can name it and we
       // can inherit the project repo (mirrors /prompt + recommend-and-dispatch).
       let issue = null;
-      let resolvedRepo = repo || null;
+      const resolvedRepo = repo || null;
       // LIN-3335 (reduced from LIN-3242): the kind-only issue source to stamp on
       // a scoped run row. Stays empty for a goal-only kickoff, so the store's
       // sparse write adds no key.
@@ -294,7 +263,6 @@ export function createKickoffRoutes({
           return notFound.json(res, 'Issue not found');
         }
         issue = { identifier: ctx.issue.identifier, title: ctx.issue.title };
-        resolvedRepo = repo || null;
         persistedBindingFields = dispatchIssueSourceField(issueSource);
       }
 
