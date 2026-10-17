@@ -302,3 +302,9 @@ Light-lane queue: the concurrency cap; knot Agent API ↔ pages (terminal-state 
 
 **Inference.** Workers create new location pins by default when asked to prove a move: the natural witness for "this moved" is "it's in the new file". A ticket asking for an untie should say the witness is behaviour (and the seams output), not location — or the next move pays for this one's pins. Another tests-as-seam data point.
 - simple-dispatcher#272 (the wrong-repo copy of LIN-3605) was already closed unmerged at 14:06Z, by the run's own close-out. John: "This wrong- repo issue has come up a few times. I suspect there's a fix, and a better solution. Might not be one for now." Parked for the later discussion; #4c's ticket names its repository on line 5 as a stopgap.
+
+## 17 Oct, 15:12Z: LIN-3611 (#4c) blocked on the plan-review loop bound
+
+**Facts.** Research 14:26Z, then three plan revisions; each plan review requested changes on the same item, A3 (the rebuilt file passing `fields: rowFor(…)` instead of the inline literal the `createDispatchItem` shape census pins). Ruling `lin3611-a3-loop`: one more revision with the reviewer's fix (check `rowFor` is defined once; already 44/44 and 863/863 on a scratch copy), drop A3 and keep the 22-line repeated literal, or hold. Pre-filled "one more revision" for John to press. Nothing built yet.
+
+**Inference.** The second plan-loop ruling of the round, again on the heaviest ticket, and again on a test that pins *how* code is written. The plan reviewer guards the text pin as if it were the property; the "what the plan must contain" list helped #4b converge but here the sticking point is the conversion rule itself. A tests-as-seam item for the discussion: the reviewer needs the same rule the ticket gives the worker (a text pin may go once a behaviour check of the same property lands first).
