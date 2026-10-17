@@ -179,3 +179,15 @@ John: "Isn't 1 just the Periodicals? If we're finding info outside of those, tha
 - Prediction misses: 139 tests (predicted 30–70), 7 new files (1–3), faster (2 h 34 min vs 3–5.5 h), a ruling on an unpredicted topic (the plan-review loop bound). Cost to the unit suite: about 13 s.
 
 **Inference.** The seam is genuinely free: a real move now passes. Both constraints (the forwarder form; the vacuous sink checks) go into #4b's ticket.
+
+## 17 Oct: #4b drafted (`../consolidate-4-entrance/4b/`)
+
+**Facts.**
+- 28 steps across the four POST handlers in the three entrance files. 24 are made by two or more entrances, at 96 sites: 13 plain copies and 11 the same decision with a per-entrance input. 4 belong to one lane only (session owner gate vs proxy grant, session spawn and task-mode record, proxy audit logging, recommend-and-dispatch's keepalive).
+- Divergences: (a) 7, all stale comments; (b) about 20, kept as named parameters; (c) 9; (d) 7, e.g. proxy dispatch silently ignoring `presetId`/`stopAt`/`variant`, and kickoff answering a transient owner-check failure with the token-rate-limit 503 (pinned by a test).
+- Home: `lib/dispatch-entrance.js` (Runs & dispatch), already treated as part of the entrance unit by every census; one `createDispatchItem` call with the follow-up gate and launch mint inside it. Route files keep registrations, factory signatures, limiters and the block-bodied forwarder form one C pin needs.
+- Knots modelled: 18 → 18, no new link.
+- Independent replay over HTTP: 21,077 requests per seed (≥3,000 generated per entrance, 3,158 edges, 1,489 captured); old vs old 0 on two seeds; 16 of 16 mutants caught on exactly their entrances, including a key-order-only swap; dropping `requireGrant('dispatch')` on recommend-and-dispatch or kickoff is caught (the gap #4a's sweeps left); coverage 99.67%.
+- Census: 12 groups touch the entrance files, but of the 24 shared decisions it sees one (the 201 receipt).
+
+**Inference.** The census is nearly blind here: the entrance copies are procedures (read, gate, build, mint, enqueue, reply), not data or small helpers. Sites-per-decision by hand (the decision map) is the measure for this kind of consolidation.
