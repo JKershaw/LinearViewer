@@ -18,6 +18,13 @@
  *
  * Positive controls (the same three mounts with the grant DO reach the sink)
  * stop the sweep from passing because its fixtures never get past validation.
+ *
+ * LIN-3604: the `{ issueIdentifier: 'LIN-1' }` fixtures above name an issue the
+ * test-mode mock does not know, so recommend-and-dispatch and kickoff answer 404
+ * before they reach the enqueue point and their "reaches no sink" checks pass
+ * whether or not the grant gate is there. REACHING_BODIES names an issue the mock
+ * knows (`TEST-1`, as dispatch-entrance-pins.test.js does), each with a positive
+ * control, so a dropped `requireGrant('dispatch')` on either route fails here.
  */
 process.env.NODE_ENV = 'test';
 
@@ -47,6 +54,15 @@ const ENQUEUE_MOUNTS = [
   { path: '/api/proxy/dispatch', body: { prompt: 'p' } },
   { path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'LIN-1' } },
   { path: '/api/proxy/autopilot/kickoff', body: { issueIdentifier: 'LIN-1' } }
+];
+
+// Bodies that reach the enqueue point WITH the dispatch grant (LIN-3604). Both
+// recommend-and-dispatch arms: `kind` set (the verb override) and absent (the
+// recommendation-derived arm); and kickoff.
+const REACHING_BODIES = [
+  { path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'TEST-1', kind: 'implementation' } },
+  { path: '/api/proxy/recommend-and-dispatch', body: { issueIdentifier: 'TEST-1' } },
+  { path: '/api/proxy/autopilot/kickoff', body: { issueIdentifier: 'TEST-1' } }
 ];
 
 function makeWorld({ scope, grants }) {
@@ -141,5 +157,38 @@ describe('LIN-3601 proxy-grant sweep — the composer', () => {
     });
     assert.equal(abort.status, 201, abort.text);
     assert.deepEqual(cascade.sinks(), ['expandCascadeAborts']);
+  });
+
+  // LIN-3604 additions: the same checks with a body that gets past the issue lookup.
+  for (const token of [{ scope: 'readWrite', grants: [] }, { scope: 'read', grants: [] }]) {
+    test(`recommend-and-dispatch and kickoff with a known issue and a ${token.scope} token lacking dispatch reach no sink`, async () => {
+      const failures = [];
+      for (const m of REACHING_BODIES) {
+        const world = makeWorld(token);
+        const res = await request(world.app, 'POST', m.path, { body: m.body, headers: { Authorization: 'Bearer anything' } });
+        if (res.status !== 403) failures.push(`${m.path} ${JSON.stringify(m.body)}: answered ${res.status}, not 403`);
+        if (world.sinks().length) failures.push(`${m.path} ${JSON.stringify(m.body)}: reached ${world.sinks().join(',')}`);
+      }
+      assert.deepEqual(failures, []);
+    });
+  }
+
+  test('a readWrite token lacking dispatch gets 403 DISPATCH_GRANT_REQUIRED from recommend-and-dispatch and kickoff, with a known issue', async () => {
+    for (const m of REACHING_BODIES) {
+      const world = makeWorld({ scope: 'readWrite', grants: [] });
+      const res = await request(world.app, 'POST', m.path, { body: m.body, headers: { Authorization: 'Bearer anything' } });
+      assert.equal(res.status, 403, `${m.path}: ${res.text}`);
+      assert.equal(res.body.code, 'DISPATCH_GRANT_REQUIRED', res.text);
+      assert.deepEqual(world.sinks(), []);
+    }
+  });
+
+  test('positive control: with the dispatch grant, recommend-and-dispatch (both arms) and kickoff reach addItem', async () => {
+    for (const m of REACHING_BODIES) {
+      const world = makeWorld({ scope: 'readWrite', grants: ['dispatch'] });
+      const res = await request(world.app, 'POST', m.path, { body: m.body, headers: { Authorization: 'Bearer anything' } });
+      assert.equal(res.status, 201, `${m.path} ${JSON.stringify(m.body)}: ${res.text}`);
+      assert.deepEqual(world.sinks(), ['addItem'], `${m.path} ${JSON.stringify(m.body)}`);
+    }
   });
 });
