@@ -350,6 +350,30 @@ function topLevelProp(masked, src, objOpen, objClose, name) {
   return null;
 }
 
+/**
+ * LIN-3611 (A3): the one non-inline `fields` the census accepts. In the dispatch-entrance
+ * authority only, `fields` may be exactly one `rowFor(...)` call, where `rowFor` is that file's
+ * one module-level projection over its row-key table (so no key of its argument can add a row key;
+ * dispatch-entrance-addItem-key-sets.test.js is the behaviour witness of that bound). Three
+ * conditions, all required: the file is the authority; `rowFor` has exactly one binding in it
+ * (`soleBinding`: one occurrence that is not a call, which is the declaration, and no
+ * `function rowFor`); and the value is a single `rowFor(...)` call with nothing after its closing
+ * paren, so `rowFor(...) || body` and the like fail.
+ */
+const ROW_FOR_FILE = 'lib/dispatch-entrance.js';
+function soleBinding(masked, name) {
+  const nonCall = [...masked.matchAll(new RegExp(`\\b${name}\\b(?!\\s*\\()`, 'g'))].length;
+  return nonCall === 1 && !new RegExp(`\\bfunction\\s*\\*?\\s*${name}\\b`).test(masked);
+}
+function isRowForCall(file, masked, fields) {
+  if (file !== ROW_FOR_FILE || !soleBinding(masked, 'rowFor')) return false;
+  const at = fields.valueStart;
+  const m = /^rowFor\s*\(/.exec(masked.slice(at, fields.valueEnd));
+  if (!m) return false;
+  const close = matchClose(masked, at + m[0].length - 1);
+  return close > -1 && close < fields.valueEnd && masked.slice(close + 1, fields.valueEnd).trim() === '';
+}
+
 /** C2 (i)/(ii): every `createDispatchItem({` call (the definition excluded). */
 function scanDispatchCalls(files) {
   const calls = [];
@@ -366,17 +390,20 @@ function scanDispatchCalls(files) {
       const fields = topLevelProp(masked, src, open + 1, objClose, 'fields');
       let fieldsInline = false;
       let fieldsSpread = false;
+      let fieldsRowFor = false;
       if (fields && fields.valueStart > -1 && masked[fields.valueStart] === '{') {
         fieldsInline = true;
         const body = masked.slice(fields.valueStart, matchClose(masked, fields.valueStart) + 1);
         fieldsSpread = body.includes('...');
+      } else if (fields && fields.valueStart > -1) {
+        fieldsRowFor = isRowForCall(file, masked, fields);
       }
       calls.push({
         file, src, masked, start: open, end: close,
         construct: enclosingConstruct(src, m.index),
         kind: kind ? kind.text : '(none)',
         carriesFollowUpTo: /\bfollowUpTo\b/.test(masked.slice(open, close)),
-        fieldsInline, fieldsSpread
+        fieldsInline, fieldsSpread, fieldsRowFor
       });
     }
   }
@@ -476,7 +503,7 @@ function censusC2(files) {
   for (const call of calls) {
     const key = callKey(call);
     // The location-free shape checks, on every call (E or not).
-    if (!call.fieldsInline) v.push(`(ii) ${key}: fields is not an inline object`);
+    if (!call.fieldsInline && !call.fieldsRowFor) v.push(`(ii) ${key}: fields is not an inline object`);
     if (call.fieldsSpread) v.push(`(ii) ${key}: spread in fields`);
     if (inE(call.file)) {
       entranceCalls++;
@@ -673,7 +700,7 @@ describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields
     assert.ok(calls.length - outside.length >= 1, 'at least one createDispatchItem call in the dispatch entrances');
     assert.deepEqual(outside.filter(c => c.carriesFollowUpTo).map(callKey).sort(), FOLLOWUP_SITES.map(s => s.key).sort());
     assert.ok(calls.some(c => inE(c.file) && c.carriesFollowUpTo), 'at least one follow-up-carrying call in the dispatch entrances');
-    assert.ok(calls.every(c => c.fieldsInline && !c.fieldsSpread), 'every call, in E or not: fields is an inline, spread-free object');
+    assert.ok(calls.every(c => (c.fieldsInline || c.fieldsRowFor) && !c.fieldsSpread), 'every call: fields is an inline, spread-free object, or (the authority only) one rowFor(...) call');
     assert.deepEqual(censusC2(PRODUCTION), []);
   });
 
@@ -694,6 +721,48 @@ describe('C2 (i)/(ii) — createDispatchItem calls: follow-up set, inline fields
       assert.ok(censusC2(spread).some(m => m.includes('spread in fields')), file);
       const notInline = appendToE(PRODUCTION, file, 'export const planted2 = (store, fields) => createDispatchItem({ store, fields });');
       assert.ok(censusC2(notInline).some(m => m.includes('fields is not an inline object')), file);
+    }
+  });
+});
+
+// LIN-3611 (A3): the one non-inline `fields` form. Each witness is paired with the same
+// planting minus the condition it tests, which must be clean, so a witness cannot fail for an
+// unrelated reason.
+describe('C2 (ii) — fields: rowFor(...) is accepted in the authority only, as one call, over its sole rowFor', () => {
+  const AUTHORITY = 'lib/dispatch-entrance.js';
+  const plantedCall = (fieldsText, params = '(store, body)') => `export const planted = ${params} => createDispatchItem({ store, fields: ${fieldsText} });`;
+  const fieldsViolations = (files) => censusC2(files).filter(m => m.startsWith('(ii)'));
+
+  test('rowFor(lane, { ...body }) in the authority is accepted: the projection over its row keys is the bound on its argument', () => {
+    assert.deepEqual(fieldsViolations(appendToE(PRODUCTION, AUTHORITY, plantedCall("rowFor('proxy', { ...body })"))), []);
+  });
+
+  test('a trailing expression after the rowFor(...) call fails (ii), in the authority', () => {
+    for (const tail of ['|| body', '&& body', '?? body']) {
+      const v = fieldsViolations(appendToE(PRODUCTION, AUTHORITY, plantedCall(`rowFor('proxy', body) ${tail}`)));
+      assert.ok(v.some(m => m.includes('fields is not an inline object')), `${tail}: ${v.join('\n')}`);
+    }
+  });
+
+  test('fields: rowFor(...) planted in each of the three route files fails (ii)', () => {
+    for (const file of ['routes/dispatch.js', 'routes/proxy-dispatch.js', 'routes/proxy-kickoff.js']) {
+      // A route's own `rowFor` can be any local function, so the file condition is what rejects it.
+      const local = `const rowFor = (lane, input) => ({ ...input });\n${plantedCall("rowFor('proxy', body)")}`;
+      const v = fieldsViolations(appendToE(PRODUCTION, file, local));
+      assert.ok(v.some(m => m.includes('fields is not an inline object')), `${file}: ${v.join('\n')}`);
+    }
+  });
+
+  test('a rowFor rebound in the authority fails (ii): parameter, local shadow, destructured binding, function declaration', () => {
+    const rebinds = {
+      parameter: plantedCall("rowFor('proxy', body)", '(store, rowFor, body)'),
+      'local shadow': "export const planted = (store, body) => { const rowFor = (l, b) => ({ ...b }); return createDispatchItem({ store, fields: rowFor('proxy', body) }); };",
+      destructured: plantedCall("rowFor('proxy', body)", '(store, { rowFor }, body)'),
+      'function declaration': "export function rowFor(l, b) { return { ...b }; }\nexport const planted = (store, body) => createDispatchItem({ store, fields: rowFor('proxy', body) });"
+    };
+    for (const [name, src] of Object.entries(rebinds)) {
+      const v = fieldsViolations(appendToE(PRODUCTION, AUTHORITY, src));
+      assert.ok(v.some(m => m.includes('fields is not an inline object')), `${name}: ${v.join('\n')}`);
     }
   });
 });
