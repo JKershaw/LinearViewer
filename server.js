@@ -94,7 +94,6 @@ import { SavedChatStore } from './lib/saved-chat-store.js'
 import { RunProposalsStore } from './lib/run-proposals-store.js'
 import { LlmCallLogStore } from './lib/llm-call-log.js'
 import { TaskModeStore } from './lib/task-mode-store.js'
-import { FunnelEventStore } from './lib/funnel-event-store.js'
 import { CloseOutEventsStore } from './lib/close-out-events-store.js'
 import { PromptTraceStore } from './lib/prompt-trace-store.js'
 import { getProvider, getProviderForWorkspace, getAllProviders, localProvider } from './lib/providers/index.js' // barrel: owns the five self-registering provider imports (LIN-2010)
@@ -717,14 +716,6 @@ const taskModeStore = new TaskModeStore({ collection: taskModeEventsCollection }
 // person's merge or their close-out press. Lifetime-retained, idempotent on
 // urlKey + prUrl + headSha + by (lib/close-out-events-store.js).
 const closeOutEventsStore = new CloseOutEventsStore({ collection: db.collection('close-out-events') })
-
-// Funnel events (LIN-2952): append-only record of a milestone step a person
-// witnessed per account — today just the merge click LIN-2949 will record.
-// Generic seam, never a dispatch-row stamp, so the funnel reports merge-click
-// as "no signal available" until LIN-2949's close-out calls record(). The route
-// and the KPI aggregate that consume it land in later beats.
-const funnelEventsCollection = db.collection('funnel-events')
-const funnelEventStore = new FunnelEventStore({ collection: funnelEventsCollection })
 
 // Durable observer-instance state (LIN-2129, P1-2 of the LIN-2114 observer-harness
 // epic). One current, versioned state document per observer instance, advanced by
@@ -2255,7 +2246,7 @@ async function refreshKpiStats() {
       taskModeStore,
       accountStore,
       accountWorkspaceStore,
-      funnelEventStore,
+      closeOutEventsStore,
       dispatchQueue: dispatchQueueCollection,
       dispatchHistory: dispatchHistoryCollection
     }
@@ -2356,7 +2347,7 @@ app.use(createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspace
 // Task-mode routes (LIN-2942): the ladder's client-side press record and the
 // per-account per-task mode read.
 app.use(createTaskModeRoutes({ taskModeStore, accountStore, workspaceFromUrl }))
-app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, funnelEventStore, workspaceFromUrl }))
+app.use(createMilestoneFunnelRoutes({ taskModeStore, accountStore, accountWorkspaceStore, dispatchQueue: dispatchQueueCollection, dispatchHistory: dispatchHistoryCollection, closeOutEventsStore, workspaceFromUrl }))
 
 // The ONE PR-state store (LIN-3311): the LIN-3251 cache,
 // sliding 36/h GitHub budget and PR-state cache. The dashboard router

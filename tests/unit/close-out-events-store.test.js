@@ -280,3 +280,39 @@ describe('CloseOutEventsStore.findMergedByPr (LIN-3395)', () => {
     assert.strictEqual(await failing.findMergedByPr({ urlKey: 'ws', prUrl: PR_URL }), null);
   });
 });
+
+describe('firstPressAt (LIN-3500)', () => {
+  let store;
+  let raw;
+  beforeEach(() => {
+    raw = harness.freshDb().collection('close-out-events');
+    store = new CloseOutEventsStore({ collection: raw });
+  });
+
+  const doc = (id, accountId, by, at) => ({ ...pressEvent({ accountId }), _id: id, by, dispatchId: by === 'press' ? 'd-1' : null, at: new Date(at) });
+
+  test('the earliest by:press time across the group; person, close-out and other accounts are ignored', async () => {
+    await raw.insertMany([
+      doc('1', 'a', 'person', '2026-01-01T00:00:00.000Z'),
+      doc('2', 'a', 'press', '2026-01-03T00:00:00.000Z'),
+      doc('3', 'b', 'press', '2026-01-02T00:00:00.000Z'),
+      doc('4', 'c', 'press', '2026-01-01T12:00:00.000Z'),
+      doc('5', null, 'press', '2026-01-01T06:00:00.000Z'),
+    ]);
+    assert.strictEqual(await store.firstPressAt({ accountIds: ['a', 'b'] }), '2026-01-02T00:00:00.000Z');
+  });
+
+  test('null when there is no press, or no usable id', async () => {
+    await raw.insertOne(doc('1', 'a', 'person', '2026-01-01T00:00:00.000Z'));
+    assert.strictEqual(await store.firstPressAt({ accountIds: ['a'] }), null);
+    assert.strictEqual(await store.firstPressAt({ accountIds: [] }), null);
+    assert.strictEqual(await store.firstPressAt({ accountIds: [null] }), null);
+    assert.strictEqual(await store.firstPressAt(), null);
+  });
+
+  test('THROWS on a failing or missing collection, unlike the swallowing siblings', async () => {
+    const failing = new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); } } });
+    await assert.rejects(() => failing.firstPressAt({ accountIds: ['a'] }), /db down/);
+    await assert.rejects(() => new CloseOutEventsStore({}).firstPressAt({ accountIds: ['a'] }), /not available/);
+  });
+});

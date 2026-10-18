@@ -14,7 +14,7 @@ import assert from 'node:assert';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { TaskModeStore } from '../../lib/task-mode-store.js';
-import { FunnelEventStore } from '../../lib/funnel-event-store.js';
+import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { buildCanonicalMap, isPullRequestUrl, stepsForAccountGroup, collectMilestoneFunnel, STEP_STATES } from '../../lib/milestone-funnel.js';
 import { isFreshRun, DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
@@ -32,7 +32,7 @@ function freshStores() {
 }
 
 // A full funnel world: the three account/edge/dispatch stores plus the
-// funnel-event store, all real, on one fresh db.
+// close-out-events store, all real, on one fresh db.
 function freshWorld() {
   const db = harness.freshDb();
   return {
@@ -41,15 +41,26 @@ function freshWorld() {
     taskModeStore: new TaskModeStore({ collection: db.collection('task-mode-events') }),
     dispatchQueue: db.collection('dispatch-queue'),
     dispatchHistory: db.collection('dispatch-history'),
-    funnelEventStore: new FunnelEventStore({ collection: db.collection('funnel-events') })
+    closeOutEventsStore: new CloseOutEventsStore({ collection: db.collection('close-out-events') })
   };
 }
+
+// A raw close-out event with a controlled `at` (record() stamps `new Date()`).
+// Only the fields the funnel reads matter, plus SECRET prUrl/issue canaries.
+let closeOutSeq = 0;
+const closeOutDoc = (accountId, by, at, over = {}) => ({
+  _id: `co-${++closeOutSeq}`, urlKey: 'ws', accountId, issueId: null, issueIdentifier: 'SECRET-ISSUE',
+  by, dispatchId: by === 'press' ? 'dispatch-1' : null, prUrl: 'https://github.com/SECRET-OWNER/SECRET-REPO/pull/9',
+  headSha: null, merged: by !== 'press', openItems: { inside: 0, outside: 0, unknown: 0, total: 0 },
+  doneAt: null, doneError: null, at, ...over
+});
+const throwingCloseOut = () => new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); } } });
 
 const aggDeps = (w) => ({
   taskModeStore: w.taskModeStore,
   accountStore: w.accountStore,
   accountWorkspaceStore: w.accountWorkspaceStore,
-  funnelEventStore: w.funnelEventStore,
+  closeOutEventsStore: w.closeOutEventsStore,
   dispatchQueue: w.dispatchQueue,
   dispatchHistory: w.dispatchHistory
 });
@@ -263,11 +274,11 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
     accountWorkspaceStore: w.accountWorkspaceStore,
     dispatchQueue: w.dispatchQueue,
     dispatchHistory: w.dispatchHistory,
-    funnelEventStore: w.funnelEventStore,
+    closeOutEventsStore: w.closeOutEventsStore,
     ...overrides
   });
 
-  test('reads each step\'s own recorded time; merge-clicked is no-signal until instrumented', async () => {
+  test('reads each step\'s own recorded time; merge-clicked reads the close-out press', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
     const loginAt = PAST(4000);
@@ -282,14 +293,17 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
       feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/9', timestamp: prAt }]
     }));
 
+    const mergeAt = PAST(500);
+    await w.closeOutEventsStore.collection.insertOne(closeOutDoc(a._id, 'press', mergeAt));
+
     const { steps, outOfOrder } = await readSteps(w, [a._id]);
     assert.equal(steps.login.state, STEP_STATES.REACHED);
     assert.equal(steps.login.at, loginAt.toISOString());
     assert.equal(steps.connected.at, connectedAt.toISOString());
     assert.equal(steps.firstGo.at, goAt.toISOString(), 'first Go is the earliest dispatch');
     assert.equal(steps.prOpened.at, prAt.toISOString(), 'PR opened is the evidence-entry time');
-    assert.equal(steps.mergeClicked.state, STEP_STATES.NO_SIGNAL);
-    assert.equal(steps.mergeClicked.at, null, 'no timestamp is synthesized for a no-signal step');
+    assert.equal(steps.mergeClicked.state, STEP_STATES.REACHED);
+    assert.equal(steps.mergeClicked.at, mergeAt.toISOString(), 'merge clicked is the press event time');
     assert.deepEqual(outOfOrder, []);
   });
 
@@ -436,24 +450,97 @@ describe('stepsForAccountGroup — five steps, three states (LIN-2952)', () => {
     assert.equal(steps.prOpened.state, STEP_STATES.NO_SIGNAL);
   });
 
-  test('R2: an instrumented merge-click read that throws is no-signal, never not-reached', async () => {
+  test('R2: a merge-click read that throws is no-signal, never not-reached', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
-    const throwing = new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } });
 
-    const { steps } = await readSteps(w, [a._id], { funnelEventStore: throwing, instrumentedSteps: ['merge-clicked'] });
+    const { steps } = await readSteps(w, [a._id], { closeOutEventsStore: throwingCloseOut() });
     assert.equal(steps.mergeClicked.state, STEP_STATES.NO_SIGNAL);
     assert.equal(steps.mergeClicked.at, null);
   });
 
-  test('an empty group reads every un-instrumented step as not-reached (merge-click no-signal)', async () => {
+  test('an absent close-out store, or one with no collection, is no-signal (LIN-3500)', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+
+    const absent = await readSteps(w, [a._id], { closeOutEventsStore: null });
+    assert.equal(absent.steps.mergeClicked.state, STEP_STATES.NO_SIGNAL);
+    const noCollection = await readSteps(w, [a._id], { closeOutEventsStore: new CloseOutEventsStore({}) });
+    assert.equal(noCollection.steps.mergeClicked.state, STEP_STATES.NO_SIGNAL, 'the store\'s swallow-and-empty siblings must not apply to this read');
+  });
+
+  test('LIN-3500: only a by:press event reaches merge-clicked; no events is not-reached', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const clicked = (steps) => steps.mergeClicked.state;
+
+    assert.equal(clicked((await readSteps(w, [a._id])).steps), STEP_STATES.NOT_REACHED, 'no events');
+    await w.closeOutEventsStore.collection.insertMany([
+      closeOutDoc(a._id, 'person', PAST(3000)),
+      closeOutDoc(a._id, 'close-out', PAST(2000)),
+      closeOutDoc(null, 'press', PAST(1000)),
+      closeOutDoc('someone-else', 'press', PAST(500))
+    ]);
+    const controls = await readSteps(w, [a._id]);
+    assert.equal(clicked(controls.steps), STEP_STATES.NOT_REACHED, 'person / close-out / null-account / other-account presses are controls');
+    assert.equal(controls.steps.mergeClicked.at, null);
+  });
+
+  test('LIN-3500: the earliest press counts, merged or not, and a merged-away id counts for its group', async () => {
+    const w = freshWorld();
+    const canonical = await w.accountStore.createAccount();
+    const merged = await w.accountStore.createAccount();
+    assert.equal((await w.accountStore.mergeAccounts(canonical._id, merged._id)).ok, true);
+    const first = PAST(2000);
+    await w.closeOutEventsStore.collection.insertMany([
+      closeOutDoc(canonical._id, 'press', PAST(1000), { merged: true }),
+      closeOutDoc(merged._id, 'press', first, { merged: false })
+    ]);
+
+    const { steps } = await readSteps(w, [canonical._id, merged._id]);
+    assert.equal(steps.mergeClicked.state, STEP_STATES.REACHED);
+    assert.equal(steps.mergeClicked.at, first.toISOString(), 'earliest press of the group, even unmerged');
+  });
+
+  test('LIN-3500: a press before the PR opened is flagged out of order, not repaired', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    await w.accountStore.collection.updateOne({ _id: a._id }, { $set: { createdAt: PAST(5000) } });
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(3000), {
+      feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/9', timestamp: PAST(1000) }]
+    }));
+    await w.closeOutEventsStore.collection.insertOne(closeOutDoc(a._id, 'press', PAST(2000)));
+
+    const { steps, outOfOrder } = await readSteps(w, [a._id]);
+    assert.equal(steps.mergeClicked.state, STEP_STATES.REACHED);
+    assert.deepEqual(outOfOrder, ['mergeClicked']);
+  });
+
+  test('LIN-3500: the read projects only accountId and at', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const seen = [];
+    const spy = new CloseOutEventsStore({ collection: {
+      find: (query, options) => {
+        seen.push({ query, options });
+        return w.closeOutEventsStore.collection.find(query, options);
+      }
+    } });
+
+    await readSteps(w, [a._id], { closeOutEventsStore: spy });
+    assert.equal(seen.length, 1);
+    assert.deepEqual(seen[0].options.projection, { accountId: 1, at: 1 });
+    assert.equal(seen[0].query.by, 'press');
+  });
+
+  test('an empty group reads every step as not-reached (LIN-3500)', async () => {
     const w = freshWorld();
     const { steps } = await readSteps(w, []);
     assert.equal(steps.login.state, STEP_STATES.NOT_REACHED);
     assert.equal(steps.connected.state, STEP_STATES.NOT_REACHED);
     assert.equal(steps.firstGo.state, STEP_STATES.NOT_REACHED);
     assert.equal(steps.prOpened.state, STEP_STATES.NOT_REACHED);
-    assert.equal(steps.mergeClicked.state, STEP_STATES.NO_SIGNAL);
+    assert.equal(steps.mergeClicked.state, STEP_STATES.NOT_REACHED);
   });
 });
 
@@ -488,8 +575,12 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     const result = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
     assert.equal(result.steps.firstGo.state, 'reached');
     assert.equal(result.steps.firstGo.count, 0, 'an instrument present with no events is an honest zero');
-    assert.equal(result.steps.mergeClicked.state, 'no-signal');
-    assert.equal(result.steps.mergeClicked.count, null, 'an absent instrument is no-signal, never 0');
+    assert.equal(result.steps.mergeClicked.state, 'reached');
+    assert.equal(result.steps.mergeClicked.count, 0, 'an instrument present with no presses is an honest zero');
+
+    const absent = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), closeOutEventsStore: null });
+    assert.equal(absent.steps.mergeClicked.state, 'no-signal');
+    assert.equal(absent.steps.mergeClicked.count, null, 'an absent instrument is no-signal, never 0');
 
     // With no dispatch deps at all, firstGo degrades to no-signal (not 0).
     const noDispatch = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchQueue: null, dispatchHistory: null });
@@ -497,16 +588,30 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(noDispatch.steps.firstGo.count, null);
   });
 
-  test('R2: an instrumented merge-click read that throws is no-signal, never count 0', async () => {
+  test('R2: a merge-click read that throws is no-signal, never count 0', async () => {
     const w = freshWorld();
     await w.accountStore.createAccount();
-    const throwing = new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } });
 
     const result = await collectMilestoneFunnel({
-      since: WINDOW_START, ...aggDeps(w), funnelEventStore: throwing, instrumentedSteps: ['merge-clicked']
+      since: WINDOW_START, ...aggDeps(w), closeOutEventsStore: throwingCloseOut()
     });
     assert.equal(result.steps.mergeClicked.state, 'no-signal');
     assert.equal(result.steps.mergeClicked.count, null);
+  });
+
+  test('LIN-3500: /kpis counts a signed-up person with a press as 1; controls stay 0', async () => {
+    const w = freshWorld();
+    const pressed = await w.accountStore.createAccount();
+    const other = await w.accountStore.createAccount();
+    await w.closeOutEventsStore.collection.insertMany([
+      closeOutDoc(pressed._id, 'press', PAST(1000)),
+      closeOutDoc(other._id, 'person', PAST(1000)),
+      closeOutDoc(other._id, 'close-out', PAST(900))
+    ]);
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(steps.mergeClicked.state, 'reached');
+    assert.equal(steps.mergeClicked.count, 1, 'one person pressed; person/close-out events do not count');
   });
 
   test('G1a: continuations never inflate firstGo — a world of follow-up/worker/cascade/wake rows counts 0', async () => {
@@ -806,12 +911,12 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(steps.firstGo.count, 1, 'a second Go is not a second person');
   });
 
-  test('an empty cohort reads an absent or uninstrumented step as no-signal, a present one as zero', async () => {
+  test('an empty cohort reads an absent step as no-signal, a present one as zero', async () => {
     const w = freshWorld();
     const empty = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
     assert.equal(empty.steps.login.count, 0);
     assert.equal(empty.steps.firstGo.count, 0);
-    assert.equal(empty.steps.mergeClicked.state, STEP_STATES.NO_SIGNAL, 'not instrumented');
+    assert.equal(empty.steps.mergeClicked.count, 0);
 
     const noDispatch = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchQueue: null, dispatchHistory: null });
     assert.equal(noDispatch.steps.firstGo.state, STEP_STATES.NO_SIGNAL);
@@ -827,6 +932,8 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
       urlKey: 'SECRET-WSKEY', issueIdentifier: 'SECRET-ISSUE',
       feedback: [{ kind: 'evidence', url: 'https://github.com/SECRET-OWNER/SECRET-REPO/pull/9', timestamp: PAST(500) }]
     }));
+
+    await w.closeOutEventsStore.collection.insertOne(closeOutDoc(a._id, 'press', PAST(400)));
 
     const serialized = JSON.stringify(await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) }));
     for (const canary of [a._id, 'SECRET-WSID', 'SECRET-WSKEY', 'SECRET-ISSUE', 'SECRET-OWNER', '/pull/9']) {
