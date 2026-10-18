@@ -1283,6 +1283,21 @@ describe('class-not-member enumeration rule — plan-review template (LIN-1871, 
       'a member-only verdict must be named as incomplete, however correct the member');
   });
 
+  test('Check 5 accepts a permitted pin conversion whose behaviour replacement lands first, and keeps its guards (LIN-3615)', () => {
+    const { prompt } = generatePrompt('plan-review', reviewIssue, ctx);
+    const start = prompt.indexOf('5. **Relaxation guard.**');
+    const end = prompt.indexOf('6. **Prerequisite refactor');
+    assert.ok(start > -1 && end > start, 'Check 5 is bounded by Checks 5 and 6');
+    const check5 = prompt.slice(start, end);
+    const clause = /Converting a source-text or location pin the ticket permits is no loosening once its behaviour replacement lands first and fails with the guard removed/;
+    assert.ok(clause.test(check5), 'Check 5 carries the conversion rule: permitted, replacement first, fails without the guard');
+    assert.ok(!clause.test(prompt.slice(0, start) + prompt.slice(end)), 'the rule sits in Check 5 only');
+    assert.ok(check5.includes('a ticket naming security guards keeps every check here'),
+      'a ticket that names security guards keeps every check');
+    assert.ok(check5.includes('adversarial follow-up') && check5.includes('an unnamed one is **Request Changes**'),
+      'the existing follow-up wording is kept');
+  });
+
   test('re-derives the plan\'s own bound before searching independently', () => {
     const result = generatePrompt('plan-review', reviewIssue, ctx);
     assert.ok(/re-derive that bound yourself/i.test(result.prompt),
@@ -1748,6 +1763,16 @@ describe('review template', () => {
     assert.ok(result.prompt.includes('e2e'), 'should reference e2e in test-level guidance');
     assert.ok(/UI\/route\/cross-module → e2e; pure function → unit/.test(result.prompt),
       'the test-level rule is stated once, in Test Quality Check');
+  });
+
+  test('Test Quality Check takes behaviour, not source location, as the witness for a move (LIN-3615)', () => {
+    const { prompt } = generatePrompt('review', mockIssue, mockContext);
+    const start = prompt.indexOf('### Test Quality Check');
+    const end = prompt.indexOf('### Review Checklist');
+    assert.ok(start > -1 && end > start, 'Test Quality Check precedes Review Checklist');
+    const bullet = 'A test that reads source to show where code sits is no witness for a move; behaviour is (a replay, the seams import map)';
+    assert.ok(prompt.slice(start, end).includes(bullet), 'the bullet sits in Test Quality Check');
+    assert.ok(!(prompt.slice(0, start) + prompt.slice(end)).includes(bullet), 'and only there');
   });
 
   test('Test Quality Check is positioned between Gap Analysis and Review Checklist', () => {
