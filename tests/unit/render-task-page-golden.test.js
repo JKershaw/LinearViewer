@@ -25,6 +25,7 @@ import { renderTaskPage, renderOwnerControls, renderTaskTrack, renderTaskStatus,
 import { renderCloseOutBox } from '../../lib/render-run-evidence.js';
 import { buildTaskPageModel } from '../../lib/task-page-loader.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
+import { buildRunEvidence } from '../../lib/run-evidence.js';
 import { CLOSE_OUT_STATUS, deriveCloseOutState } from '../../lib/run-closeout-state.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -260,6 +261,16 @@ describe('task page structure', () => {
     const html = renderTaskPage(bare, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
     assert.doesNotMatch(html, /task-page-pr-mount/, 'no section');
     assert.doesNotMatch(html, /run-evidence/);
+  });
+
+  // LIN-3497: the model comes from the real builder, so a comment-less task
+  // cannot paint "A review is on record" or an empty Pull request section.
+  test('a built evidence model with no PR and no review comment renders no Pull request section', () => {
+    const m = model('running-blocked-repeat');
+    const built = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [{ body: 'just a note', createdAt: '2026-07-01T00:00:00.000Z' }], owner: true });
+    const html = renderTaskPage({ ...m, evidence: built }, { viewer: 'owner', urlKey: 'acme', binding: BINDING, now: NOW, pageOptions: PAGE_OPTIONS });
+    assert.doesNotMatch(html, /task-page-pr-mount/, 'no section');
+    assert.doesNotMatch(html, /A review is on record/);
   });
 
   test('description and comments render as closed disclosures, outside the repainted mounts', () => {

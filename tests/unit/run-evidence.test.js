@@ -159,4 +159,13 @@ describe('run-evidence: evidence rows and close-out', () => {
     assert.equal(m.ledger.verdict, 'approve-conditional');
     assert.equal(m.ledger.ledger.items.length, 1);
   });
+
+  // LIN-3497: a review is on record only when a review comment exists.
+  test('no review comment: review and ledger are null, not an empty parse', () => {
+    const m = buildRunEvidence({ issueIdentifier: 'LIN-1', comments: [comment('just a note', '2026-07-01T00:00:00.000Z')] });
+    assert.equal(m.ledger, null);
+    assert.equal(m.evidence.checked.review, null);
+    assert.equal(m.closeOut.review.verdict, null);
+    assert.equal(m.closeOut.review.approved, false);
+  });
 });
