@@ -101,8 +101,8 @@ const MEMBERS = [
     handler: "router.post('/workspace/:urlKey/api/feedback'", before: ['enqueueFeedbackTriage(', 'enqueueFeedbackAutopilot('],
     onlyCalledIn: ['enqueueFeedbackTriage(', 'enqueueFeedbackAutopilot('] },
   { id: 5, file: 'lib/follow-up-dispatch.js', sink: 'createDispatchItem', count: 1, verdict: 'gated',
-    reason: 'dispatchSessionFollowUp: fail-closed owner seam after derivation, before the factory',
-    fn: 'export async function dispatchSessionFollowUp(', before: ['createDispatchItem('] },
+    reason: 'enqueueFollowUp (dispatchSessionFollowUp and the CI wake sweep, LIN-3661): fail-closed owner seam after derivation, before the factory',
+    fn: 'export async function enqueueFollowUp(', before: ['createDispatchItem('] },
   { id: '5a', file: 'routes/dashboard.js', sink: 'dispatchSessionFollowUp', count: 1, verdict: 'gated',
     reason: 'dashboard run-proposal Apply: route-level owner check BEFORE the CAS claim (LIN-3254 refused-before-claiming), seam inside as backstop',
     handler: "router.post('/workspace/:urlKey/api/run/:runId/proposals/:id/apply'", before: ['runProposalsStore.apply(', 'dispatchSessionFollowUp('],
@@ -404,7 +404,7 @@ describe('LIN-3383 census — mutation witnesses', () => {
     assert.ok(scanSinks(mutate('routes/flight-companion.js', s => s.replace('        ownerCheck: workspaceOwnerCheck,\n        workspaceId: workspace.id,\n      });\n      res.status', '      });\n      res.status'))).some(m => m.includes('does not pass ownerCheck:')));
   });
 
-  test('removing the seam gate inside dispatchSessionFollowUp fails the census', () => {
+  test('removing the seam gate inside enqueueFollowUp fails the census', () => {
     const v = scanSinks(mutate('lib/follow-up-dispatch.js', s => s.replace('const refusal = await resolveRunnerOwnerRefusal(', 'const refusal = await (async () => null)(')));
     assert.ok(v.some(m => m.startsWith('lib/follow-up-dispatch.js')), v.join('\n'));
   });

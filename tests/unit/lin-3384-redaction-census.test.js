@@ -148,6 +148,7 @@ const TABLE = {
   'lib/dispatch-factory.js :: anchor': [SRV, 1],
   'lib/dispatch-factory.js :: defaultFetchPilotPrFiles': [SRV, 2],
   'lib/dispatch-factory.js :: run': [SRV, 1],
+  'lib/ci-wake-sweep.js :: readLineageRows': [SRV, 2],
   'lib/liveness-alarm-sweep.js :: sweepD2': [SRV, 2],
   'lib/observation-sessions-materializer.js :: _collectSessionIssues': [SRV, 7],
   'lib/observation-sessions-materializer.js :: _sessionsTouchingIssue': [SRV, 2],
