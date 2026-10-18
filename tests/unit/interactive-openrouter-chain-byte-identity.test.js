@@ -226,20 +226,17 @@ describe('Interactive OpenRouter chain: byte-identity census (LIN-2412 / LIN-297
       'every routes/ or lib/ file calling checkFreeTierGate( must be a key in expectedGateCalls');
   });
 
-  test('server.js getOpenRouterSource (the priority predicate behind the footer/settings status) is byte-identical to its pinned shape', () => {
+  // LIN-3658: the priority ladder moved to lib/chat-request.js
+  // (resolveOpenRouterSource); its behavioural replacement for the old byte pin
+  // is tests/unit/chat-request-free-tier-rule.test.js (truth table + the home
+  // never reads the LIN-2412 consent fields). Here: server.js keeps only a
+  // delegate that hands the home exactly the two session fields.
+  test('server.js getOpenRouterSource is a delegate to the home, passing only the key and the flag', () => {
     const src = read('server.js');
     const expected = `function getOpenRouterSource(req) {
-  if (req.session.openRouterApiKey) return 'oauth';
-  // hasPaidEnvKey() trims, so a blank/whitespace OPENROUTER_API_KEY is NOT
-  // classified as a paid \`env\` source (LIN-961). This keeps the operator-facing
-  // status honest: the footer can no longer read a blank key as \`env\` while the
-  // token-authed proxy path silently runs on the free tier — the exact
-  // divergence that hid this bug.
-  if (hasPaidEnvKey()) return 'env';
-  if (process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) return 'free';
-  return null;
+  return resolveOpenRouterSource({ sessionApiKey: req.session.openRouterApiKey, sessionFreeTierFlag: req.session.freeTierEnabled });
 }`;
-    assert.ok(src.includes(expected), 'getOpenRouterSource must remain byte-identical — LIN-2412 must never read consent here');
+    assert.ok(src.includes(expected), 'getOpenRouterSource must stay a one-expression delegate — LIN-2412 must never read consent here');
   });
 
   test('getOpenRouterSource itself never references the new durable consent field', () => {

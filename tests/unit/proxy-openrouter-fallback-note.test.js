@@ -164,7 +164,7 @@ function noopWorkspacePreferencesStore() {
  * value so isTestMode is false and the witness call is live — see file
  * header. Pass `accessToken: 'test-token'` for the isTestMode negative cases.
  */
-function buildApp({ getWorkspaceOpenRouterKey, events, accessToken = 'not-a-real-linear-token', dispatchQueueStore }) {
+function buildApp({ getWorkspaceOpenRouterKey, events, accessToken = 'not-a-real-linear-token', dispatchQueueStore, freeTierStore }) {
   const app = express();
   app.use(express.json());
   const proxyTokenStore = new ProxyTokenStore({ collection: inMemoryCollection() });
@@ -181,7 +181,7 @@ function buildApp({ getWorkspaceOpenRouterKey, events, accessToken = 'not-a-real
     resolveWorkspaceAccess: async () => ({ token: accessToken, reason: null }),
     getWorkspaceOpenRouterKey,
     workspacePreferencesStore: noopWorkspacePreferencesStore(),
-    freeTierStore: { tryUse: async () => ({ allowed: true, remaining: 19, limit: 20, resetsAt: null }) },
+    freeTierStore: freeTierStore || { tryUse: async () => ({ allowed: true, remaining: 19, limit: 20, resetsAt: null }) },
   }));
   return { app, proxyTokenStore };
 }
@@ -213,8 +213,8 @@ async function request(app, path, { method = 'GET', token, body } = {}) {
  * this file's per-case entry point, replacing the old getHandler+baseReq
  * direct-call shape with a real HTTP round trip.
  */
-async function mintAndRequest({ getWorkspaceOpenRouterKey, events, accessToken, dispatchQueueStore, scope = 'read' }, path, opts = {}) {
-  const { app, proxyTokenStore } = buildApp({ getWorkspaceOpenRouterKey, events, accessToken, dispatchQueueStore });
+async function mintAndRequest({ getWorkspaceOpenRouterKey, events, accessToken, dispatchQueueStore, freeTierStore, scope = 'read' }, path, opts = {}) {
+  const { app, proxyTokenStore } = buildApp({ getWorkspaceOpenRouterKey, events, accessToken, dispatchQueueStore, freeTierStore });
   // fixture:LIN-3136: a readWrite writer holds the dispatch grant (the enqueue mounts require it)
   if (scope === 'readWrite') armDispatchWriterOnce(proxyTokenStore, { ownerAccountId: ACCOUNT_A });
   // /fixture:LIN-3136
@@ -385,5 +385,24 @@ describe('LIN-1458 — OpenRouter fallback-credential-source audit note', () => 
     assert.equal(briefResult.status, 200, `isTestMode must serve the mock brief directly, got ${briefResult.status}`);
     assert.ok(!briefEvents.some(e => e.note === PAID_NOTE || e.note === FREE_NOTE),
       `isTestMode must suppress the witness on POST /brief: ${JSON.stringify(briefEvents)}`);
+  });
+
+  // LIN-3658: the proxy's free-tier 429 body, byte for byte — `reason` sits
+  // between `error` and the shared `freeTier` block (lib/chat-request.js).
+  test('GET /recommend: free-tier denial → 429 body is exactly {error, reason, freeTier} in that key order', async (t) => {
+    withEnv(t, 'OPENROUTER_API_KEY', undefined);
+    withEnv(t, 'OPENROUTER_FREE_TIER_KEY', 'sk-or-fake-free-tier-key');
+    const freeTierStore = { tryUse: async () => ({ allowed: false, reason: 'Free tier hourly limit reached', remaining: 0, limit: 20, resetsAt: '2026-10-18T22:00:00.000Z' }) };
+
+    const { status, body } = await mintAndRequest(
+      { getWorkspaceOpenRouterKey: async () => null, events: [], freeTierStore },
+      `/api/proxy/issues/${ISSUE_IDENTIFIER}/recommend`
+    );
+
+    assert.equal(status, 429);
+    assert.equal(
+      JSON.stringify(body),
+      '{"error":"Free tier hourly limit reached","reason":"no_paid_key_resolved","freeTier":{"used":true,"remaining":0,"limit":20,"resetsAt":"2026-10-18T22:00:00.000Z"}}'
+    );
   });
 });

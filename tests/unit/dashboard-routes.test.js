@@ -114,7 +114,7 @@ function makeReqRes({ session = {}, workspace = null, params = {}, query = {} } 
   return { req, res };
 }
 
-function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore, prState } = {}) {
+function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheStore, runParagraphStore, issues, observationSessionsStore, prState, freeTierStore } = {}) {
   const { dispatchQueueStore, agentStatusStore } = makeStores(perWorkspace);
   return createDashboardRoutes({
     workspaceFromUrl: (req, res, next) => next(),
@@ -125,7 +125,7 @@ function makeRouter(perWorkspace, { runSummaryCacheStore, sessionSummaryCacheSto
     sessionSummaryCacheStore: sessionSummaryCacheStore || new InMemorySessionSummaryCacheStore(),
     runParagraphStore: runParagraphStore || new InMemoryRunParagraphStore(),
     prState: prState || null,
-    freeTierStore: { async tryUse() { return { allowed: true }; } },
+    freeTierStore: freeTierStore || { async tryUse() { return { allowed: true }; } },
     getWorkspaceAccessToken: async () => 'token',
     // Default touched-task state is NOT done, so the LIN-1258 bounded feed
     // hydration leaves an eligible (terminal+error) session at 'error' — the
@@ -3498,6 +3498,30 @@ describe('GET /api/dashboard/sessions — Sessions view (LIN-1194)', () => {
   });
 });
 
+
+// LIN-3658: the free-tier refusal body at each summary route, byte for byte. A
+// free-tier session (no session key, no paid env key, a free-tier key set)
+// reaching the REAL model path (the offline mock is off) is denied by the store;
+// the 429 must carry exactly `error` then the four-field `freeTier` block.
+const DENIED_RECORD = { allowed: false, reason: 'Free tier limit reached', remaining: 0, limit: 10, resetsAt: '2026-09-01T00:00:00.000Z' };
+const DENIED_429_BODY = '{"error":"Free tier limit reached","freeTier":{"used":true,"remaining":0,"limit":10,"resetsAt":"2026-09-01T00:00:00.000Z"}}';
+
+async function withFreeTierRealPathEnv(fn) {
+  const keys = ['NODE_ENV', 'HARBOUR_DISABLE_AI_MOCK', 'OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
+  const prev = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+  process.env.NODE_ENV = 'test';
+  process.env.HARBOUR_DISABLE_AI_MOCK = '1';
+  delete process.env.OPENROUTER_API_KEY;
+  process.env.OPENROUTER_FREE_TIER_KEY = 'free-tier-test-key';
+  try {
+    return await fn();
+  } finally {
+    for (const k of keys) {
+      if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k];
+    }
+  }
+}
+
 // ─── run-summary ─────────────────────────────────────────────────────────────
 
 describe('run-summary endpoint', () => {
@@ -3539,6 +3563,23 @@ describe('run-summary endpoint', () => {
     const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'a-hist' }, query: { cachedOnly: '1' } });
     await handler(req, res);
     assert.equal(res.statusCode, 204);
+  });
+
+  test('LIN-3658: a free-tier denial is a 429 with the exact error + freeTier body (key order)', async () => {
+    await withFreeTierRealPathEnv(async () => {
+      const calls = [];
+      const freeTierStore = { async tryUse(urlKey) { calls.push(urlKey); return DENIED_RECORD; } };
+      const router = makeRouter(
+        { 'ws-a': { history: [historyItem('a-hist', 'LIN-2')], live: [], agentStatus: [agentStatusDone('a-hist', 'LIN-2')] } },
+        { freeTierStore }
+      );
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/run-summary/:loopId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { loopId: 'a-hist' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 429);
+      assert.equal(JSON.stringify(res.jsonBody), DENIED_429_BODY);
+      assert.deepEqual(calls, ['ws-a'], 'the gate charged the store once for the workspace');
+    });
   });
 
   test('test-mode returns and caches a deterministic summary for a terminal run', async () => {
@@ -3685,6 +3726,20 @@ describe('session-summary endpoint', () => {
     } finally {
       process.env.NODE_ENV = prev;
     }
+  });
+
+  test('LIN-3658: a free-tier denial is a 429 with the exact error + freeTier body (key order)', async () => {
+    await withFreeTierRealPathEnv(async () => {
+      const calls = [];
+      const freeTierStore = { async tryUse(urlKey) { calls.push(urlKey); return DENIED_RECORD; } };
+      const router = makeRouter(terminalSessionWorkspace(), { freeTierStore });
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/dashboard/session-summary/:sessionId');
+      const { req, res } = makeReqRes({ session: ENABLED, workspace: { urlKey: 'ws-a' }, params: { sessionId: 'sess-1' } });
+      await handler(req, res);
+      assert.equal(res.statusCode, 429);
+      assert.equal(JSON.stringify(res.jsonBody), DENIED_429_BODY);
+      assert.deepEqual(calls, ['ws-a'], 'the gate charged the store once for the workspace');
+    });
   });
 
   test('test-mode returns and caches a deterministic rollup for a terminal session', async () => {

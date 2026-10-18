@@ -399,3 +399,56 @@ describe('LIN-3383: the Task Chat route enqueueGuard consults the owner seam (ex
     assert.strictEqual(ownerCalls.length, 1);
   });
 });
+
+// LIN-3658: the free-tier refusal body at the Task Chat turn route, byte for
+// byte. The shared builder (lib/chat-request.js freeTierRefusalBlock) is proven
+// in chat-request-free-tier-rule.test.js; this proves THIS route still sends it.
+describe('LIN-3658: the Task Chat turn route 429s a free-tier denial with the exact error + freeTier body', () => {
+  const PROVIDER_NAME = 'lin3658-task-chat-fake';
+  registerProvider({
+    name: PROVIDER_NAME,
+    supports: () => true,
+    ui: { displayName: 'Fake' },
+    async fetchRecommendationContext() { throw new Error('the gate must refuse before any context fetch'); },
+  });
+
+  test('a free-tier session denied by the store gets {error, freeTier:{used,remaining,limit,resetsAt}} in that order', async () => {
+    const keys = ['OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
+    const prev = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+    delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_FREE_TIER_KEY = 'free-tier-test-key';
+    try {
+      const tryUseCalls = [];
+      const router = createTaskChatRoutes({
+        workspaceFromUrl: (req, res, next) => next(),
+        freeTierStore: {
+          async tryUse(urlKey) {
+            tryUseCalls.push(urlKey);
+            return { allowed: false, reason: 'Free tier limit reached', remaining: 0, limit: 10, resetsAt: '2026-09-01T00:00:00.000Z' };
+          },
+        },
+      });
+      const handler = getHandler(router, 'post', '/workspace/:urlKey/api/task-chat/:issueId');
+      const req = {
+        workspace: { urlKey: 'acme', provider: PROVIDER_NAME, accessToken: 'tok' },
+        session: { features: { taskChat: true } },
+        params: { urlKey: 'acme', issueId: 'LIN-500' },
+        query: {},
+        body: { question: 'where are we?' },
+      };
+      const res = makeRes();
+      await handler(req, res);
+
+      assert.strictEqual(res.statusCode, 429);
+      assert.strictEqual(
+        JSON.stringify(res.jsonBody),
+        '{"error":"Free tier limit reached","freeTier":{"used":true,"remaining":0,"limit":10,"resetsAt":"2026-09-01T00:00:00.000Z"}}'
+      );
+      assert.deepStrictEqual(tryUseCalls, ['acme'], 'the gate charged the store once');
+    } finally {
+      for (const k of keys) {
+        if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k];
+      }
+    }
+  });
+});
