@@ -24,6 +24,10 @@ import {
 import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 
+// LIN-3635: feedbackSubmitLimiter skips only under NODE_ENV=test; this file posts the
+// route more than its 5-per-window budget.
+process.env.NODE_ENV = 'test';
+
 // -----------------------------------------------------------------------------
 // Pure helpers
 // -----------------------------------------------------------------------------
@@ -87,7 +91,7 @@ function makeFakeProvider() {
   return { provider, calls };
 }
 
-function buildApp({ provider, sessionApiKey = null }) {
+function buildApp({ provider, sessionApiKey = null, freeTierStore = {} }) {
   registerProvider(provider);
   const app = express();
   app.use(express.json({ limit: '250kb' }));
@@ -102,7 +106,7 @@ function buildApp({ provider, sessionApiKey = null }) {
     workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) },
     // Triage enqueue is best-effort; a no-op store keeps the focus on titles.
     dispatchQueueStore: { addItem: async () => ({ _id: 'd1' }) },
-    freeTierStore: {}, getOpenRouterSource: () => null, userPreferencesStore: {},
+    freeTierStore, getOpenRouterSource: () => null, userPreferencesStore: {},
     customPromptsStore: {}, recapCacheStore: {}, briefCacheStore: {},
     reportHistoryStore: {}, agentStatusStore: {}, promptTraceStore: {},
   });
@@ -131,10 +135,11 @@ async function submit(app, urlKey, payload) {
 // Fake OpenRouter SSE stream yielding the given content tokens. The route's
 // own loopback submit uses real fetch, so the stub forwards anything that
 // isn't the OpenRouter completions endpoint to the original fetch.
-function installFetchStub(tokens, { ok = true } = {}) {
+function installFetchStub(tokens, { ok = true, counter = null } = {}) {
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, options) => {
     if (typeof url === 'string' && url.includes('openrouter.ai')) {
+      if (counter) counter.n++;
       if (!ok) return { ok: false, status: 500, text: async () => 'boom', json: async () => ({}) };
       async function* gen() {
         for (const t of tokens) {
@@ -234,5 +239,73 @@ describe('feedback title resolution (LIN-643)', () => {
 
     assert.strictEqual(status, 201);
     assert.strictEqual(calls.createIssue[0].title, 'My explicit title');
+  });
+
+  // LIN-3635: the live title call on the shared free-tier key is charged to the
+  // hourly net; a refusal or fault falls back to the first-line title.
+  describe('free-tier gate (LIN-3635)', () => {
+    const fallback = `Feedback: ${LONG_MESSAGE.slice(0, 60)}`;
+    function gateStore(tryUse) {
+      const calls = [];
+      return { calls, store: { tryUse: async (urlKey) => { calls.push(urlKey); return tryUse(); } } };
+    }
+
+    test('refusal falls back to the first-line title with no LLM call', async () => {
+      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
+      const counter = { n: 0 };
+      restoreFetch = installFetchStub(['LLM title'], { counter });
+      const { calls, store } = gateStore(() => ({ allowed: false, reason: 'Service busy, try again later' }));
+      const { provider, calls: pc } = makeFakeProvider();
+      const { status } = await submit(buildApp({ provider, freeTierStore: store }), 'acme', { message: LONG_MESSAGE });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(pc.createIssue[0].title, fallback);
+      assert.strictEqual(counter.n, 0);
+      assert.deepStrictEqual(calls, ['acme']);
+    });
+
+    test('allowed charges the gate once and uses the LLM title', async () => {
+      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
+      const counter = { n: 0 };
+      restoreFetch = installFetchStub(['LLM title'], { counter });
+      const { calls, store } = gateStore(() => ({ allowed: true }));
+      const { provider, calls: pc } = makeFakeProvider();
+      const { status } = await submit(buildApp({ provider, freeTierStore: store }), 'acme', { message: LONG_MESSAGE });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(pc.createIssue[0].title, 'LLM title');
+      assert.strictEqual(counter.n, 1);
+      assert.deepStrictEqual(calls, ['acme']);
+    });
+
+    test('gate fault fails closed: fallback title, no LLM call', async () => {
+      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
+      const counter = { n: 0 };
+      restoreFetch = installFetchStub(['LLM title'], { counter });
+      const { store } = gateStore(() => { throw new Error('store down'); });
+      const { provider, calls: pc } = makeFakeProvider();
+      const { status } = await submit(buildApp({ provider, freeTierStore: store }), 'acme', { message: LONG_MESSAGE });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(pc.createIssue[0].title, fallback);
+      assert.strictEqual(counter.n, 0);
+    });
+
+    test('explicit title is not charged', async () => {
+      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
+      const { calls, store } = gateStore(() => ({ allowed: true }));
+      const { provider } = makeFakeProvider();
+      const { status } = await submit(buildApp({ provider, freeTierStore: store }), 'acme', { message: LONG_MESSAGE, title: 'Mine' });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(calls.length, 0);
+    });
+
+    test('own-key (non-free-tier) user is not charged', async () => {
+      process.env.OPENROUTER_FREE_TIER_KEY = 'free-key';
+      restoreFetch = installFetchStub(['LLM title']);
+      const { calls, store } = gateStore(() => ({ allowed: false, reason: 'x' }));
+      const { provider, calls: pc } = makeFakeProvider();
+      const { status } = await submit(buildApp({ provider, sessionApiKey: 'own-key', freeTierStore: store }), 'acme', { message: LONG_MESSAGE });
+      assert.strictEqual(status, 201);
+      assert.strictEqual(calls.length, 0);
+      assert.strictEqual(pc.createIssue[0].title, 'LLM title');
+    });
   });
 });

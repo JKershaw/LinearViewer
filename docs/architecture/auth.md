@@ -164,6 +164,7 @@ When `OPENROUTER_FREE_TIER_KEY` is set, users without an OpenRouter connection g
 - API key source priority: user OAuth > env key > free tier key > none
 - Per-account daily limit: `FREE_TIER_RUN_LIMIT` fresh runs per UTC day (default 10, resets at midnight UTC); the count is read by `GET /workspace/:urlKey/api/dispatch/quota`, and a run-gate denial is a `RUN_LIMIT_REACHED` 429 carrying `freeTier.used: true` + `runsUsed`
 - Prompts are never refused for a person's daily usage. The only prompt refusal is the global hourly safety net (`Service busy, try again later`, 50/hour across all workspaces), which resets at the top of the next UTC hour
+- Feedback intake title generation (`POST /workspace/:urlKey/api/feedback`, LIN-3635) draws on the same hourly net when it would use the shared key; on refusal (or a gate fault) the ticket is still filed with the `Feedback: <first line>` title. The route is also limited to 5 submissions per 10 minutes per account (IP fallback)
 - Per-workspace prompt counts are still recorded best-effort for the KPI chart, but they never refuse a prompt
 - Uses atomic check-and-increment (`tryUse()`) to prevent race conditions
 - Settings shows `N of L runs left today`; Go and the run-step rung show the run allowance and are disabled at 0 (copy and generation stay enabled)

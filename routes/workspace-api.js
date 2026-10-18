@@ -22,6 +22,7 @@
  */
 import { resolveRunnerOwnerRefusal } from '../lib/runner-owner-gate.js';
 import { Router, json } from 'express';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { badRequest, jsonError, keepaliveError, notFound, unauthorized, classifyUpstreamError } from '../lib/errors.js';
 import { getProviderForWorkspace, getProvider } from '../lib/providers/registry.js';
 import '../lib/providers/linear/index.js'; // side effect: self-registers the Linear provider into the registry
@@ -634,11 +635,36 @@ function partialWriteFailed(res, err) {
 // `express.json({ limit: '250kb' })` (server.js) is left untouched. That
 // global parser only matches `application/json`, so a larger body sent with a
 // non-JSON content type (e.g. text/plain) passes through it unparsed; the
-// per-route parser below (permissive `type`, raised limit) then parses it.
-// Small `application/json` bodies are already parsed by the global parser and
-// are skipped here, so they keep the 250kb ceiling — the exception cannot leak
-// to other routes.
+// per-route parser below (raised limit) then parses it. LIN-3635: that parser
+// matches `text/plain` ONLY — the one type the widget sends — rather than every
+// content type, so an arbitrary-type 12mb body is no longer buffered. Small
+// `application/json` bodies are already parsed by the global parser (larger
+// ones are refused 413 there), so they keep the 250kb ceiling — the exception
+// cannot leak to other routes.
+// Open question (LIN-3635): the widget caps images at 7 MB (~9.4 MB base64), so
+// this could drop to ~10mb; left at 12mb to preserve current behaviour.
 const FEEDBACK_BODY_LIMIT = '12mb';
+
+// LIN-3635 (June review M3): per-ACCOUNT request budget on feedback intake, IP
+// fallback when there is no session account (same keying as
+// `defaultCopyTokenCreationLimiter`, routes/proxy.js). Not per-IP alone: the
+// route is session-authenticated, so the abuser is an account and an office NAT
+// would share one budget. 5 / 10 min is a judgment call for a human filing
+// feedback (<= 30/hour/account, under the 50/hour free-tier net, so one account
+// cannot exhaust the net through this route alone); the net's per-account share
+// is LIN-3422. Exported so a test can drive the same instance. Mounted BEFORE
+// workspaceFromUrl and the body parser; the skip is for the test environment only.
+export const feedbackSubmitLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many feedback submissions, please try again later' },
+  keyGenerator: (req) => req.session?.accountId
+    ? `account:${req.session.accountId}`
+    : ipKeyGenerator(req.ip),
+  skip: () => process.env.NODE_ENV === 'test'
+});
 const MAX_FEEDBACK_IMAGE_BYTES = 10 * 1024 * 1024; // matches the image-proxy ceiling
 const MAX_FEEDBACK_MESSAGE_LENGTH = 10_000;
 const MAX_FEEDBACK_CONTEXT_LENGTH = 2_000; // url / userAgent clamp
@@ -2938,7 +2964,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // Feedback intake (LIN-636 route / LIN-635 widget) — constants above
   // ===========================================================================
 
-  const feedbackBodyParser = json({ type: () => true, limit: FEEDBACK_BODY_LIMIT });
+  const feedbackBodyParser = json({ type: 'text/plain', limit: FEEDBACK_BODY_LIMIT });
 
   // What both post-create follow-ups hand `attachProxyContext`: the workspace
   // proxy block for the filed ticket. LIN-2354 / LIN-2804: provider identity and
@@ -3111,7 +3137,10 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // is off — or generation fails — keep the deterministic first-line slice.
   // Title generation must happen BEFORE provider.createIssue, and never
   // applies the 60-char truncation on the AI path. The post-create triage
-  // enqueue is untouched.
+  // enqueue is untouched. LIN-3635: the live LLM call is charged to the hourly
+  // free-tier net (`checkFreeTierGate`) when it would bill the shared key; a
+  // refusal or gate fault keeps the first-line title (the ticket is never
+  // refused). Explicit titles and the mock path spend nothing, so are not charged.
   async function resolveFeedbackTitle(req, workspace, { title, message }) {
     if (typeof title === 'string' && title.trim()) {
       return title.trim().slice(0, 250);
@@ -3131,6 +3160,13 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
           // this file that already branch on shouldMockAi.
           ticketTitle = buildMockFeedbackTitle(message);
         } else {
+          // A throw from the gate (store fault) lands in the catch below:
+          // fail closed, no LLM call, fallback title.
+          const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
+          if (check) {
+            console.warn(`Feedback AI title skipped, free-tier gate refused (urlKey=${workspace.urlKey}): ${check.reason}`);
+            return ticketTitle;
+          }
           const model = await resolveWorkspaceModel({ urlKey: workspace.urlKey, workspacePreferencesStore, forceDefault: isFreeTier });
           const generated = await generateFeedbackTitle(message.trim(), { apiKey: aiApiKey, model });
           if (generated) ticketTitle = generated;
@@ -3148,7 +3184,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
    * then run the widget's chosen post-create action (save / triage / autopilot).
    * @route POST /workspace/:urlKey/api/feedback
    */
-  router.post('/workspace/:urlKey/api/feedback', workspaceFromUrl, feedbackBodyParser, async (req, res) => {
+  router.post('/workspace/:urlKey/api/feedback', feedbackSubmitLimiter, workspaceFromUrl, feedbackBodyParser, async (req, res) => {
     const { workspace } = req;
     // LIN-3240 (LIN-3126 §2) / LIN-3335: creation targets the workspace's default
     // (active) binding; the pair-era selector is gone, so `null` is the

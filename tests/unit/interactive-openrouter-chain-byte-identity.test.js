@@ -144,7 +144,8 @@ const SHARED_CHAIN_EXPR = 'sessionApiKey || getPaidEnvKey() || freeTierKey';
 const expectedGateCalls = {
   'routes/next-run.js': 1,
   'routes/ship-biscuit.js': 1,
-  'routes/workspace-api.js': 6,
+  // Six full-adopt sites + the feedback-title live call (LIN-3635).
+  'routes/workspace-api.js': 7,
   'routes/dashboard.js': 2,
   'routes/workspace-api-roadmap.js': 1,
   'routes/flight-companion.js': 2,

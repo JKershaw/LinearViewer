@@ -27,6 +27,10 @@ import { createWorkspaceApiRoutes } from '../../routes/workspace-api.js';
 import { registerProvider } from '../../lib/providers/registry.js';
 import { flattenIssue, decodeAttachmentHandle } from '../../lib/proxy-wire.js';
 
+// LIN-3635: feedbackSubmitLimiter skips only under NODE_ENV=test; this file posts the
+// route more than its 5-per-window budget.
+process.env.NODE_ENV = 'test';
+
 const PROVIDER_NAME = 'feedback-roundtrip-fake';
 
 // Minimal controllable provider, mirroring tests/unit/feedback-route.test.js.
