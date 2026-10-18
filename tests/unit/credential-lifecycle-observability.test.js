@@ -365,6 +365,18 @@ describe('runCredentialInvariantSweep (LIN-2236, Block D — orchestration, real
     assert.equal(logged[0].urlKey, 'acme');
   });
 
+  test('LIN-3506: a session row expired at the sweep\'s own now is dropped — no violation (pins the run passing now into the map fn)', async () => {
+    const stores = freshStores();
+    const account = await stores.accountStore.createAccount();
+    await stores.accountWorkspaceStore.bindAccountToWorkspace(account._id, 'org-1');
+    const sweepNow = NOW + 100 * 24 * 60 * 60 * 1000;
+    const row = { ...sessionRowFor('org-1', 'acme', 'linear'), expires: new Date(sweepNow - 1000) };
+    const sessionsCollection = { find: () => ({ toArray: async () => [row] }) };
+
+    const result = await runCredentialInvariantSweep({ ...stores, sessionsCollection, now: sweepNow });
+    assert.deepEqual(result.violations, []);
+  });
+
   test('an edge on a MERGED account resolves through the canonical account\'s own credential — a merge is never itself a violation', async () => {
     const stores = freshStores();
     const canonical = await stores.accountStore.createAccount();

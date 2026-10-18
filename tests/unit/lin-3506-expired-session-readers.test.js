@@ -8,7 +8,7 @@ import { createObserverPassRun } from '../../lib/observer-pass.js';
 import { getUnattendedOpenRouterKey } from '../../lib/openrouter-key-resolver.js';
 import { createWorkspaceTitleResolver } from '../../lib/workspace-title-resolver.js';
 
-const NOW = Date.parse('2026-10-18T12:00:00Z');
+const NOW = Date.parse('2040-01-01T00:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
 
 function row(expires, urlKey = 'only-in-expired') {
