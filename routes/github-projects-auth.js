@@ -33,7 +33,7 @@
  * board-picker renderer, and the descriptor's copy/knobs.
  */
 import { renderGitHubProjectSelectPage } from '../lib/render-pages.js'
-import { createGitHubInstallFlowRoutes } from '../lib/github-install-flow.js'
+import { createGitHubInstallFlowRoutes, installationIdsOf } from '../lib/github-install-flow.js'
 
 // A Projects binding's scope is an `org/projectNumber` board slug: an owner login
 // followed by a NUMERIC board number. Validate the shape before writing it.
@@ -71,7 +71,7 @@ export function createGitHubProjectsAuthRoutes({ provider, accountStore, account
     slugRegex: BOARD_SLUG_REGEX,
     rebindMapKey: 'boardInstallations',
     listReboundable: (p, userToken) => p.listReboundableBoards(userToken),
-    listUserInstallationIds: async (p, userToken) => (await p.listUserInstallations(userToken)).map((i) => String(i.id)),
+    listUserInstallationIds: async (p, userToken) => installationIdsOf(await p.listUserInstallations(userToken)),
     rebindSlugOf: (b) => `${b.login}/${b.number}`,
     listChoices: (p, creds) => p.listBoards(creds.token, creds.login),
     renderPicker: (choices, opts) => renderGitHubProjectSelectPage(choices, opts),

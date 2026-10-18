@@ -173,6 +173,19 @@ describe('GET /t/:token — guest page matrix', () => {
     } catch (e) { await storeThrow.close(); await ownerThrow.close(); throw e; }
   });
 
+  test('LIN-3648: a function-shaped owner answer fails closed to the 404, on both entry points', async () => {
+    const throwing = Object.defineProperty(() => {}, 'status', { get() { throw new Error('getter'); } });
+    for (const answer of [Object.assign(() => {}, { status: 'owner' }), throwing]) {
+      const { base, close } = await build({ store: fakeStore({ getByToken: async () => RECORD }), owner: async () => answer });
+      try {
+        for (const path of [`/t/${TOKEN}`, `/t/${TOKEN}/state`]) {
+          const res = await get(base, path);
+          assert.equal(res.status, 404, path);
+        }
+      } finally { await close(); }
+    }
+  });
+
   test('row 5: no usable owner credential is a 503, never a stored-only page', async () => {
     const loader = fakeLoader();
     const { base, close } = await build({ store: fakeStore({ getByToken: async () => RECORD }), loader, access: async () => null });
