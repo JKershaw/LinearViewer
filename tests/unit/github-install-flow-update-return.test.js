@@ -71,6 +71,8 @@ function spyProvider(name) {
     beginInstall: ({ state }) => { calls.push('beginInstall'); return `https://github.com/apps/my-app/installations/new?state=${state}`; },
     completeAuth: async (code) => { calls.push(`completeAuth:${code}`); return { access_token: 'gho_user' }; },
     fetchViewer: async () => { calls.push('fetchViewer'); return { id: 'human-42', login: 'octocat' }; },
+    // LIN-3404: the signed-in user's own installations; the fresh-install branch mints only for a listed id.
+    listUserInstallations: async () => { calls.push('listUserInstallations'); return [{ id: INSTALLATION_ID, account: { login: 'octocat' } }]; },
     completeInstallation: async (id) => {
       calls.push(`completeInstallation:${id}`);
       return { token: 'ghs_inst', login: 'octocat', userId: '42', installationId: String(id), tokenExpiresAt: '2099-01-01T00:00:00Z' };
@@ -246,9 +248,22 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
       const provider = spyProvider(s.providerName);
       const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
       const session = makeSession({ oauthState: 'live', oauthIntent: { mode: 'add-source', provider: s.providerName } });
-      const res = await get(router, callbackPath, { installation_id: INSTALLATION_ID, setup_action: 'update', state: 'live' }, session);
+      // LIN-3404: the live-state install return must carry the OAuth `code` so the user's
+      // access to the installation can be proven before it is minted.
+      const res = await get(router, callbackPath, { code: 'live-code', installation_id: INSTALLATION_ID, setup_action: 'update', state: 'live' }, session);
       assert.equal(res.statusCode, 200);
       assert.ok(res.body.includes(`value="${s.newSlug}"`));
+      assert.ok(provider.calls.includes(`completeInstallation:${INSTALLATION_ID}`));
+    });
+
+    test(`${callbackPath}: control — the same live-state update query WITHOUT a code is refused and never minted (LIN-3404)`, async () => {
+      const provider = spyProvider(s.providerName);
+      const router = s.createRoutes({ ...withResolver(), provider, ...freshAccountStores() });
+      const session = makeSession({ oauthState: 'live', oauthIntent: { mode: 'add-source', provider: s.providerName } });
+      const res = await get(router, callbackPath, { installation_id: INSTALLATION_ID, setup_action: 'update', state: 'live' }, session);
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.redirectedTo, null);
+      assert.deepEqual(provider.calls, []);
     });
   }
 
@@ -547,7 +562,8 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
       workspaces: [{ id: 'ws-acme', name: 'Acme', urlKey: 'acme', provider: 'linear', accessToken: 'lin_tok' }],
       activeWorkspaceId: 'ws-acme',
     });
-    const install = { state: 'live', installation_id: INSTALLATION_ID, setup_action: 'install' };
+    // LIN-3404: `code` so these cases still reach the install-branch sites they name.
+    const install = { state: 'live', code: 'c', installation_id: INSTALLATION_ID, setup_action: 'install' };
     const SITES = [
       [':325 error=', {}, () => get, { error: 'access_denied' }, cbSession],
       [':377 state guard', {}, () => get, { state: 'wrong', installation_id: INSTALLATION_ID, setup_action: 'update' }, cbSession],
@@ -571,6 +587,8 @@ describe('LIN-2882 acceptance witness: a GitHub-initiated update return complete
         const res = await verb()(router, path, input, session());
         assert.ok(res.body, `expected an error page, got ${res.statusCode} redirect=${res.redirectedTo}`);
         assert.equal(actionUrlOf(res), want);
+        // The three install-branch sites must be the ones that fired, not the no-code refusal page.
+        if (input === install) assert.ok(provider.calls.includes('listUserInstallations'), 'reached the membership check');
       });
     }
   }

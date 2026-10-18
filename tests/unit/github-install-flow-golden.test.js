@@ -28,7 +28,7 @@
  * Everything else — every character of every error page, every picker page,
  * every redirect target's non-nonce portion — is asserted verbatim.
  *
- * Scope: this is a broad, explicitly-bounded matrix (34 branches per router,
+ * Scope: this is a broad, explicitly-bounded matrix (38 branches per router,
  * covering the config gate, every begin/callback/link error page, every
  * success redirect, and every documented LIN-2397 characterization gap) — not
  * a literal enumeration of all ~50+ branches in the two routers (the
@@ -73,6 +73,7 @@ function fakeGithubProvider() {
       return { access_token: 'gho_user' };
     },
     listReboundableRepos: async () => ([{ slug: 'octocat/hello-world', name: 'octocat/hello-world', private: false, installationId: '77' }]),
+    listUserInstallations: async () => ([{ id: '99', account: { login: 'octocat' } }]),
     fetchViewer: async () => ({ id: 'human-42', login: 'octocat', name: 'The Octocat' }),
   };
 }
@@ -92,6 +93,7 @@ function fakeGithubProjectsProvider() {
       return { access_token: 'gho_user' };
     },
     listReboundableBoards: async () => ([{ login: 'octocat', number: 5, title: 'Roadmap', url: 'u', shortDescription: null, closed: false, installationId: '77' }]),
+    listUserInstallations: async () => ([{ id: '99', account: { login: 'octocat' } }]),
     fetchViewer: async () => ({ id: 'human-42', login: 'octocat', name: 'The Octocat' }),
   };
 }
