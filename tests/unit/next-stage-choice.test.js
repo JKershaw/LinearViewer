@@ -349,6 +349,13 @@ describe('a converging plan gets another round, up to a ceiling (LIN-3651)', () 
     assert.equal(reviewLoopConverging(assemblePlanReviewFacts(run).run), false);
   });
 
+  test('a Needs Discussion latest verdict that carries a count line is still not converging (LIN-3651)', () => {
+    const nd = { createdAt: '2026-01-03T00:00:00Z', body: '### Plan Review Verdict\n\n**Verdict: Needs Discussion.**\n\nBlocking findings: 1' };
+    const run = [RCn('2026-01-01T00:00:00Z', 3), RCn('2026-01-02T00:00:00Z', 2), nd];
+    assert.equal(reviewLoopExhausted(leaf(), run), true);
+    assert.equal(assemblePlanReviewFacts(run).run[2].blocking, null);
+  });
+
   test('person comment, landed work and Approve still lift it, at the ceiling too', () => {
     const five = counted(3, 2, 2, 1, 1);
     assert.equal(reviewLoopExhausted(leaf(), [...five, after('go on, take it to implementation')]), false);
