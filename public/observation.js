@@ -1699,8 +1699,15 @@ async function pollRulings() {
 //      node invisible to the operator (a plain failure would then show no
 //      error at all). Reusing the exact same <li> while pending means every
 //      write the closure makes lands on the node that stays attached.
+//   3. A row holding unsent input (LIN-3631, `rulingRowHoldsInput`): text in
+//      the free-text answer, a focused field, or an open shelve panel. A
+//      rebuilt row hands back fresh empty controls, so a poll landing while
+//      the operator types wiped the answer and dropped focus mid-word. The
+//      row is reused until it holds no input; its payload catches up on the
+//      first poll after that (the run page's card never repaints at all, so
+//      answering from a row that is a few polls old is not new).
 //
-// `renderedRulingRows` is the single map behind both: it tracks whichever
+// `renderedRulingRows` is the single map behind all three: it tracks whichever
 // <li> is CURRENTLY attached for a decision_id, independent of whether that
 // decision still appears in this poll's payload.
 function renderRulings(rulings) {
@@ -1728,8 +1735,8 @@ function renderRulings(rulings) {
     if (key && rulingEffectOverride.has(key) && rulingEffectOverride.get(key) !== row?.alternate) {
       rulingEffectOverride.delete(key);
     }
-    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key));
     const existing = key && renderedRulingRows.get(key);
+    const mustReuse = key && (rulingsPending.has(key) || preservedRulingRows.has(key) || rulingsSettled.has(key) || rulingRowHoldsInput(existing));
     const li = (mustReuse && existing) ? existing : renderRulingRow(row);
     nodes.push(li);
     if (key) {
@@ -1812,10 +1819,33 @@ function renderRulings(rulings) {
     }
   }
 
-  list.textContent = '';
-  for (const node of nodes) list.appendChild(node);
+  // Reconcile in place (LIN-3631) rather than clearing and re-appending:
+  // detaching a node, even one re-attached a moment later, blurs a focused
+  // field inside it. Stale rows go first, so a kept row is never moved
+  // unless the order itself changed.
+  const keep = new Set(nodes);
+  for (const child of Array.from(list.children)) {
+    if (!keep.has(child)) list.removeChild(child);
+  }
+  nodes.forEach((node, i) => {
+    if (list.children[i] !== node) list.insertBefore(node, list.children[i] || null);
+  });
   if (empty) empty.hidden = nodes.length > 0;
   syncRulingsBulkBar();
+}
+
+// Does this attached ruling row hold input a repaint would discard
+// (LIN-3631)? Unsent free-text, an open shelve panel (its reason and
+// duration live only in the DOM), or focus on any field in the row: a
+// rebuilt row loses the focus even when the box is still empty, and the
+// next keystrokes then land nowhere.
+function rulingRowHoldsInput(li) {
+  if (!li) return false;
+  const answer = li.querySelector('.obs-ruling-answer-input');
+  if (answer && answer.value) return true;
+  if (li.querySelector('.obs-ruling-shelve-panel')) return true;
+  const active = document.activeElement;
+  return !!(active && /^(input|textarea|select)$/i.test(active.tagName) && li.contains(active));
 }
 
 // ─── Basis-freshness check for a task-bound ruling (LIN-2241 tier 1) ────────
@@ -2081,6 +2111,10 @@ function renderRulingRow(row) {
         rulingEffectOverride.set(effectKey, row.alternate);
       }
       const fresh = renderRulingRow(row);
+      // LIN-3631: the flip rebuilds the row, so carry a typed answer across.
+      const draft = li.querySelector('.obs-ruling-answer-input');
+      const freshInput = fresh.querySelector('.obs-ruling-answer-input');
+      if (draft && freshInput) freshInput.value = draft.value;
       if (li.parentNode) li.parentNode.replaceChild(fresh, li);
       renderedRulingRows.set(effectKey, fresh);
     });
