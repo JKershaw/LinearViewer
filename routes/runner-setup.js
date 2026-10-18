@@ -28,7 +28,7 @@ import { Router } from 'express';
 import { renderRunnerSetupPage } from '../lib/render-runner-setup.js';
 import { renderErrorPage } from '../lib/render.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
-import { checkWorkspaceOwner } from '../lib/workspace-owner.js';
+import { checkWorkspaceOwner, readOwnerStatus } from '../lib/workspace-owner.js';
 import { buildRunnerKickoff } from '../lib/prompts/runner-kickoff.js';
 
 /**
@@ -64,7 +64,10 @@ export function createRunnerSetupRoutes({
     } else {
       let status;
       try {
-        ({ status } = await ownerCheck({ workspaceId: workspace.id, accountId }));
+        status = readOwnerStatus(await ownerCheck({ workspaceId: workspace.id, accountId }));
+        if (status === 'unavailable') {
+          console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): unrecognised owner answer`);
+        }
       } catch (err) {
         console.warn(`Runner setup: owner check unavailable (urlKey=${workspace.urlKey}): ${err.message}`);
         status = 'unavailable';

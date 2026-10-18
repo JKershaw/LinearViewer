@@ -217,6 +217,31 @@ describe('the route', () => {
     });
   }
 
+  test('LIN-3648: an unrecognised answer is "unavailable", with one fixed-tail warn and no raw answer in it', async () => {
+    const fn = Object.assign(() => {}, { status: 'owner' });
+    const throwingGetterFn = Object.defineProperty(() => {}, 'status', { get() { throw new Error('getter'); } });
+    const answers = [fn, throwingGetterFn, null, undefined, 5, { status: 'weird' }, { status: 'unavailable' }, {}];
+    for (const answer of answers) {
+      const warns = [];
+      const orig = console.warn;
+      console.warn = (...a) => warns.push(a.join(' '));
+      let r;
+      try { r = await get(app({ ownerCheck: () => answer }).app); } finally { console.warn = orig; }
+      assert.match(r.body, /data-state="unavailable"/);
+      assert.deepEqual(warns, ['Runner setup: owner check unavailable (urlKey=acme): unrecognised owner answer']);
+    }
+  });
+
+  test('LIN-3648: a recognised answer does not warn', async () => {
+    const warns = [];
+    const orig = console.warn;
+    console.warn = (...a) => warns.push(a.join(' '));
+    try {
+      for (const status of ['owner', 'not-owner', 'no-owner']) await get(app({ ownerCheck: () => ({ status }) }).app);
+    } finally { console.warn = orig; }
+    assert.deepEqual(warns, []);
+  });
+
   test('the owner check is asked with this workspace and the session account', async () => {
     const { app: a, calls } = app({ ownerCheck: () => ({ status: 'owner' }) });
     await get(a);

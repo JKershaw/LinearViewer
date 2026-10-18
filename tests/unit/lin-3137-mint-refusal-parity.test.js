@@ -98,7 +98,9 @@ const SCENARIOS = [
   { code: 'GRANT_OWNERLESS', ownerCheck: async () => ({ status: 'owner' }), session: NO_ACCOUNT },
   { code: 'OWNER_CHECK_UNAVAILABLE (seam throws)', ownerCheck: async () => { throw new Error('owner store down'); }, session: SESSION, expectedCode: 'OWNER_CHECK_UNAVAILABLE' },
   { code: 'OWNER_CHECK_UNAVAILABLE (seam unwired)', ownerCheck: null, session: SESSION, expectedCode: 'OWNER_CHECK_UNAVAILABLE' },
-  { code: 'OWNER_CHECK_UNAVAILABLE (malformed status)', ownerCheck: async () => ({ status: 'bogus' }), session: SESSION, expectedCode: 'OWNER_CHECK_UNAVAILABLE' }
+  { code: 'OWNER_CHECK_UNAVAILABLE (malformed status)', ownerCheck: async () => ({ status: 'bogus' }), session: SESSION, expectedCode: 'OWNER_CHECK_UNAVAILABLE' },
+  { code: 'OWNER_CHECK_UNAVAILABLE (function-shaped not-owner)', ownerCheck: async () => Object.assign(() => {}, { status: 'not-owner' }), session: SESSION, expectedCode: 'OWNER_CHECK_UNAVAILABLE' },
+  { code: 'OWNER_CHECK_UNAVAILABLE (function-shaped no-owner)', ownerCheck: async () => Object.assign(() => {}, { status: 'no-owner' }), session: SESSION, expectedCode: 'OWNER_CHECK_UNAVAILABLE' }
 ];
 
 describe('LIN-3137 — runner and dispatch mints refuse identically (end to end)', () => {
