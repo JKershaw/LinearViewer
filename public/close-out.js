@@ -162,6 +162,36 @@
   }
 
   /**
+   * Whether a text field on the page holds unsent text or has focus (LIN-3631).
+   * A reload would discard it, so the Done reload below waits for the person.
+   * Read-only fields (the share link's copy box) hold nothing to lose. A missing
+   * document or one without `querySelectorAll` (unit seams) reports false.
+   *
+   * @param {Document} [doc]
+   * @returns {boolean}
+   */
+  function pageHoldsDraft(doc) {
+    const d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d || typeof d.querySelectorAll !== 'function') return false;
+    const fields = d.querySelectorAll('textarea, input[type="text"]');
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i];
+      if (f.readOnly) continue;
+      if (f.value || d.activeElement === f) return true;
+    }
+    return false;
+  }
+
+  /** Say, under the close-out box's line, that the page is behind and reloading would drop the draft. */
+  function noteReloadDeferred(box) {
+    if (!box || typeof box.appendChild !== 'function') return;
+    const p = document.createElement('p');
+    p.setAttribute('data-testid', 'run-evidence-closeout-reload-note');
+    p.textContent = 'Done — reload to update';
+    box.appendChild(p);
+  }
+
+  /**
    * The self-merge / state check. Stop-at-PR runs only, and only while the box
    * is `ready`/`merged`/`partial` (the same gate the run page uses).
    *
@@ -184,8 +214,11 @@
       // `done: true` — that is true on EVERY later call once a merge is
       // recorded, so a reopened task (recorded Done, tracker back In Progress)
       // would loop forever. `pageAlreadyDone` stays as a second safeguard.
+      // LIN-3631: a reload throws away text the person has typed and not sent, so
+      // while a text field holds text or focus the page says so and waits for them.
       if (result && result.doneNow && !pageAlreadyDone(doc) && typeof window.location !== 'undefined' && window.location.reload) {
-        window.location.reload();
+        if (pageHoldsDraft(doc)) noteReloadDeferred(box);
+        else window.location.reload();
       }
       return result;
     }).catch(function () { return null; });
@@ -245,6 +278,7 @@
     runCheck: runCheck,
     applyCloseOutState: applyCloseOutState,
     pageAlreadyDone: pageAlreadyDone,
+    pageHoldsDraft: pageHoldsDraft,
   };
 
   if (typeof document !== 'undefined' && document.addEventListener) {
@@ -252,6 +286,6 @@
   }
 
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { promptUrl, checkUrl, checkBody, boxContext, pressCloseOut, runCheck, applyCloseOutState, pageAlreadyDone };
+    module.exports = { promptUrl, checkUrl, checkBody, boxContext, pressCloseOut, runCheck, applyCloseOutState, pageAlreadyDone, pageHoldsDraft };
   }
 })();
