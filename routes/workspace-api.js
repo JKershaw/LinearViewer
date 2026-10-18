@@ -47,11 +47,9 @@ import { generateRecap } from '../lib/recap.js';
 import { generateBrief } from '../lib/brief.js';
 import { generateScan, parseScanResponse, buildScanMessages, isExplicitRetirementSignal, extractScanPayload } from '../lib/scan.js';
 import { generateFeedbackTitle } from '../lib/feedback-title.js';
-import { readRunEvidence, extractPrUrls } from '../lib/run-evidence.js';
-import { readPrStatusFailOpen, prReadToken } from '../lib/github-pr-status.js';
-import { readRunLedger } from '../lib/run-ledger.js';
-import { deriveCloseOutState, closeOutSetsDone } from '../lib/run-closeout-state.js';
-import { readTaskRunFacts } from '../lib/task-run-facts.js';
+import { readRunEvidence } from '../lib/run-evidence.js';
+import { closeOutSetsDone } from '../lib/run-closeout-state.js';
+import { readCloseOutChain } from '../lib/close-out-readiness.js';
 import { buildContextGraph } from '../lib/context-graph.js';
 import { hashContext } from '../lib/recap-cache.js';
 import { scanBasisHashFromContext, dueBasisHashFromContext, dueChanged, basisChanged as computeBasisChanged, BASIS_VERSION } from '../lib/scan-fingerprint.js';
@@ -3544,15 +3542,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // Close-out (LIN-3248, P3 of LIN-2949)
   // ===========================================================================
 
-  // Is the task's run a stop-at-PR run? Keyed by TASK (LIN-3340): the shared
-  // reader checks the task's own rows and, for a subtask worked under a parent's
-  // stop-at run, hops through each row's `sessionId` to the parent run row — the
-  // same read the dispatch guard makes. `lib/task-run-facts.js`; this keeps the
-  // check route's Done path and the guard on one definition.
-  async function defaultIsStopAtRun({ urlKey, issueIdentifier }) {
-    return (await readTaskRunFacts({ store: dispatchQueueStore, urlKey, issueIdentifier })).stopAt;
-  }
-
   // Answers the close-out POST routes' two refusals — a bad identifier, then a
   // caller that is not the signed-in person's own session (never a worker or
   // proxy token) — and says whether it answered.
@@ -3649,26 +3638,6 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     }
   }
 
-  // Live status of every PR the run's comments mention. LIN-3443: a bound repo is
-  // read with the workspace's own token. Fail open: an unreadable PR is "unknown",
-  // never a 500.
-  function readPrStatuses({ prUrls, callScope, workspace, seam }) {
-    const readPrStatus = seam.readPrStatus || readPrStatusFailOpen;
-    return Promise.all(prUrls.map(async ({ repo, number }) => {
-      const token = prReadToken(callScope, repo);
-      try {
-        return await readPrStatus({
-          repo,
-          number,
-          doFetch: seam.githubFetch || null,
-          ...(token ? { token, scopeKey: workspace.urlKey } : {}),
-        });
-      } catch (err) {
-        return { repo, readable: false, state: 'unknown', reason: err?.message || 'not checked' };
-      }
-    }));
-  }
-
   /**
    * Close-out check (LIN-3248, P3 of LIN-2949). The page calls this on load and
    * on tab focus, only while the close-out state is `ready`. It re-reads the PR
@@ -3690,23 +3659,17 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const source = [req.body?.source, req.query.source].find((v) => typeof v === 'string') ?? null;
 
     try {
-      const { provider, callScope } = (seam.resolveProvider || resolveIssueBinding)(workspace, source);
-
-      const comments = await provider.fetchIssueComments(callScope, issueIdentifier);
-      const prUrls = extractPrUrls(comments);
-      const prStatuses = await readPrStatuses({ prUrls, callScope, workspace, seam });
-
-      const ledger = readRunLedger(comments);
-      const stopAt = await (seam.isStopAtRun
-        ? seam.isStopAtRun({ workspace, issueIdentifier })
-        : defaultIsStopAtRun({ urlKey: workspace.urlKey, issueIdentifier }));
-      const state = deriveCloseOutState({
-        prs: prUrls,
-        prStatuses,
-        review: ledger,
+      // LIN-3634: the read chain is `lib/close-out-readiness.js`, shared with the
+      // dispatch guard. Same order as before: comments, PR urls, every PR status,
+      // ledger, stop-at, then `deriveCloseOutState`.
+      const { provider, callScope, prUrls, prStatuses, ledger, stopAt, state } = await readCloseOutChain({
+        workspace,
+        issueIdentifier,
+        source,
+        store: dispatchQueueStore,
+        seam,
         runnerReady: seam.runnerReady ? !!seam.runnerReady(req) : getFeatureFlags(req.session).dispatch === true,
         owner: true,
-        stopAt,
         byPersonCheck: true,
       });
 

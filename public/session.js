@@ -848,6 +848,10 @@
       .catch(function (err) {
         btn.disabled = false;
         btn.textContent = original;
+        // LIN-3634: the server refused a press whose PR head moved after the review
+        // approved it. Repaint the box from the refusal's state.
+        var body = err && err.body;
+        if (body && body.code === 'CLOSE_OUT_NOT_READY' && body.state) applyCloseOutState(ctx.box, body.state);
         console.error('Close-out press failed:', err && err.message);
       });
   }

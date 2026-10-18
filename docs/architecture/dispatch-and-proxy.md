@@ -34,6 +34,7 @@ The four enqueue handlers (`POST /workspace/:urlKey/api/dispatch`, `POST /api/pr
   who owns a workspace with their own runner can still start a no-`stopAt` run that merges without
   the press (stated in the close-out box line and `docs/v1.md` step 7). The proxy-side halt and runner-credential
   revoke are not yet covered (LIN-3409).
+- `POST /workspace/:urlKey/api/dispatch` close-out readiness (LIN-3634, LIN-3418 step 2): a `close-out` (effective kind, fresh or follow-up) on a stop-at-PR task whose sole open PR is `head-moved` answers `409 CLOSE_OUT_NOT_READY` (`reason:'head-moved'`, `state`) before any mint or row; every other state and every unreadable read is admitted. `stopAt` is read first from the store, so an ordinary close-out makes no provider or GitHub read. Session lane only: the proxy, recommend and kickoff lanes are not guarded (token enforcement is LIN-3417). `lib/close-out-readiness.js` holds the read chain shared with the check route.
 - `GET /workspace/:urlKey/api/dispatch/halt` - Read the workspace's halt request
 - `POST /workspace/:urlKey/api/dispatch/halt` - Request a pause or stop (LIN-2994)
 - `DELETE /workspace/:urlKey/api/dispatch/halt` - Clear the halt request

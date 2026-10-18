@@ -259,7 +259,7 @@ function presetBodyCheck({ model, harness, effort, byKind }) {
  *   closed with OWNER_CHECK_UNAVAILABLE. Never consulted on the verify path.
  * @returns {Router} Express router with dispatch routes
  */
-export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null }) {
+export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, workspaceFromUrl, userPreferencesStore, harbourFeedbackTokenStore, workspacePreferencesStore, dispatchPresetsStore, proxyTokenStore, provider: injectedProvider = null, getWorkspaceAccessToken = null, fetchIssueContext = null, workspaceHaltStore = null, haltReadTimeoutMs = POLL_HALT_READ_TIMEOUT_MS, sessionsFeedCache = null, workspaceOwnerCheck = null, taskModeStore = null, freeTierStore = null, accountStore = null, consumerHeartbeatStore = null, closeOut = null }) {
   const router = Router();
 
   // =========================================================================
@@ -447,6 +447,8 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
       injectedProvider,
       getWorkspaceAccessToken,
       fetchIssueContext,
+      // LIN-3634: test seam for the close-out readiness stage; production passes none.
+      closeOut,
       // LIN-3383: the owner gate is this route's (it runs in the authority at the one point it
       // must: after the body's shape checks, before every read and write).
       ownerGate: (target) => refuseNonOwner(req, res, target),

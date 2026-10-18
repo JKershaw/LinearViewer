@@ -5,7 +5,8 @@
  * `renderCloseOutBox` renders: the task's tracker UUID (`data-issue-id`), its
  * provider kind (`data-source`), the stop-at fact and the PR ref. It never
  * reads a session reply box — the task page has none, and the run page's copy
- * (public/session.js) is left for LIN-3349.
+ * (public/session.js) is left for LIN-3349 (its redesign; the not-ready 409
+ * branch below is mirrored there, LIN-3634).
  *
  * The press reuses the ordinary dispatch path (GET /api/prompt/:issueId/close-out
  * + window.dispatchPrompt) then records the press; the check re-reads the PR and
@@ -136,6 +137,11 @@
       .catch(function (err) {
         btn.disabled = false;
         btn.textContent = original;
+        // LIN-3634: the server refused a press whose PR head moved after the review
+        // approved it. Repaint the box from the refusal's state so a stale "ready"
+        // does not stay up for another 409.
+        const body = err && err.body;
+        if (body && body.code === 'CLOSE_OUT_NOT_READY' && body.state) applyCloseOutState(box, body.state);
         console.error('Close-out press failed:', err && err.message);
       });
   }

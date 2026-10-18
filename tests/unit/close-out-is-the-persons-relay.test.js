@@ -81,7 +81,11 @@ function buildSessionApp(store) {
     userPreferencesStore: {},
     harbourFeedbackTokenStore: null,
     workspacePreferencesStore: undefined,
-    dispatchPresetsStore: undefined
+    dispatchPresetsStore: undefined,
+    // LIN-3634: case 5 is a stop-at-PR close-out, so it reaches the readiness chain.
+    // No PR url → not head-moved → admitted; without this it would fall through to
+    // the real tracker read and only the hermetic transport's refusal would admit it.
+    closeOut: { resolveProvider: () => ({ provider: { async fetchIssueComments() { return []; } }, callScope: 'scope' }) }
   }));
   return app;
 }
