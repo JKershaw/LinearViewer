@@ -15,6 +15,11 @@
  * Flight Companion (flight-companion-*-route.test.js). The rest are here:
  * next-run, roadmap generate and chat, and workspace-api's `refuseFreeTier`
  * (recap) and `keepaliveError` mock-path (recommend) sites.
+ *
+ * The recommend routes' AI-mock charge (LIN-405) is the one place the session
+ * free-tier flag is a named parameter (`sessionFreeTierFlag`): the last two rows
+ * pin that wiring on both the GET and the stream route. Replacing the flag with
+ * `undefined` on either line turns that route's row red.
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
@@ -32,6 +37,17 @@ registerProvider({
   async fetchProjects() { return { organizationName: 'Acme', projects: [], issues: [] }; },
   async fetchTeams() { return []; },
   async fetchRecommendationContext() { throw new Error('the gate must refuse before any context fetch'); },
+});
+
+// The AI mock fires for `provider: 'local'` (shouldMockAi), whose data comes
+// from the provider; the stream route checks the issue exists before the gate.
+registerProvider({
+  name: 'local',
+  supports: () => true,
+  ui: { displayName: 'Local' },
+  async fetchProjects() { return { organizationName: 'Acme', projects: [], issues: [] }; },
+  async fetchTeams() { return []; },
+  async fetchRecommendationContext() { return { issue: { id: 'LIN-500' } }; },
 });
 
 const DENIED_RECORD = { allowed: false, reason: 'Free tier limit reached', remaining: 0, limit: 10, resetsAt: '2026-09-01T00:00:00.000Z' };
@@ -149,6 +165,28 @@ describe('LIN-3658: workspace-api 429s a free-tier denial with the exact body', 
       const mockIssue = testMockData.issues[0];
       const req = { workspace: { urlKey: 'ws-a', accessToken: 'test-token' }, session: { features: {}, freeTierEnabled: true }, params: { urlKey: 'ws-a', issueId: mockIssue.id }, query: {}, body: {} };
       await assertRefused(handler, req, store, 'ws-a');
+    });
+  });
+
+  // AI mock (local provider, not the test token): free-tier is the session flag,
+  // since CI sets no env key. `isTestMode` is false, so the route's own gate
+  // charges (not `chargeTestFreeTier`).
+  const AI_MOCK_ENV = { NODE_ENV: 'test', OPENROUTER_API_KEY: undefined, OPENROUTER_FREE_TIER_KEY: undefined };
+  const aiMockReq = () => ({ workspace: { urlKey: 'ws-a', provider: 'local', accessToken: 'local-token' }, session: { features: {}, freeTierEnabled: true }, params: { urlKey: 'ws-a', issueId: 'LIN-500' }, query: {}, body: {} });
+
+  test('AI-mock gate: GET /api/recommend/:issueId charges on the session flag', async () => {
+    await withEnv(AI_MOCK_ENV, async () => {
+      const store = deniedStore();
+      const handler = getHandler(workspaceApiRouter(store), 'get', '/workspace/:urlKey/api/recommend/:issueId');
+      await assertRefused(handler, aiMockReq(), store, 'ws-a');
+    });
+  });
+
+  test('AI-mock gate: GET /api/recommend/:issueId/stream charges on the session flag', async () => {
+    await withEnv(AI_MOCK_ENV, async () => {
+      const store = deniedStore();
+      const handler = getHandler(workspaceApiRouter(store), 'get', '/workspace/:urlKey/api/recommend/:issueId/stream');
+      await assertRefused(handler, aiMockReq(), store, 'ws-a');
     });
   });
 });
