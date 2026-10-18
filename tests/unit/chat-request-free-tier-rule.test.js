@@ -1,10 +1,11 @@
 // LIN-3658: lib/chat-request.js is the one home for "who is on the free tier"
 // (resolveOpenRouterSource, isFlagFreeTier) and for the prompt refusal's
-// `freeTier` block (freeTierRefusalBlock). Hand-written expectations, not a
-// re-derivation of the rule: every row below was read off the pre-LIN-3658
-// copies (server.js getOpenRouterSource, routes/workspace-api.js
-// sessionIsFreeTier / freeTierBody). Includes the class (d) answers that are
-// kept today, byte for byte, even where they look wrong.
+// `freeTier` block (freeTierRefusalBlock). Expectations derived from the
+// pre-LIN-3658 copies (server.js getOpenRouterSource, routes/workspace-api.js
+// sessionIsFreeTier / freeTierBody), with the class (d) answers pinned by
+// explicit rows: kept today, byte for byte, even where they look wrong. The
+// proxy's error, reason, freeTier key order is witnessed over HTTP in
+// proxy-openrouter-fallback-note.test.js, not here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -104,10 +105,4 @@ test('freeTierRefusalBlock: exact bytes, key order, only the four denial fields'
   const block = freeTierRefusalBlock(denial);
   assert.equal(JSON.stringify(block), '{"freeTier":{"used":true,"remaining":0,"limit":50,"resetsAt":"2026-10-18T22:00:00.000Z"}}');
   assert.equal(JSON.stringify(freeTierRefusalBlock({ remaining: undefined, limit: 3, resetsAt: 'r' })), '{"freeTier":{"used":true,"limit":3,"resetsAt":"r"}}');
-});
-
-test('the proxy 429 body keeps key order error, reason, freeTier when the block is spread', () => {
-  const check = { reason: 'hourly', remaining: 0, limit: 5, resetsAt: 't' };
-  const body = { error: check.reason, reason: 'no_paid_key_resolved', ...freeTierRefusalBlock(check) };
-  assert.deepEqual(Object.keys(body), ['error', 'reason', 'freeTier']);
 });
