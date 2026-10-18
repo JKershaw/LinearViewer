@@ -22,6 +22,7 @@ import { renderRoadmapPage } from '../../lib/render-roadmap.js';
 import { summarizeRoadmapModel, buildRoadmapNarrativeMessages, buildRoadmapNarrativePrompt } from '../../lib/prompts/roadmap-narrative-template.js';
 import { buildRoadmapChatMessages, buildRoadmapChatPrompt } from '../../lib/prompts/roadmap-chat-template.js';
 import { summarizeRoadmapPosition } from '../../lib/prompts/roadmap-digest-template.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 // =============================================================================
 // Shared test data factory
@@ -501,11 +502,9 @@ describe('renderRoadmapPage with real model', () => {
       { urlKey: 'test-ws' }
     );
 
-    assert.ok(html.includes('window.__ROADMAP_DATA__'), 'should embed roadmap data');
+    assert.ok(embeddedDataText(html, '__ROADMAP_DATA__') !== null, 'should embed roadmap data');
     // Verify it's valid JSON by extracting and parsing
-    const match = html.match(/window\.__ROADMAP_DATA__\s*=\s*(.+?);<\/script>/);
-    assert.ok(match, 'should find embedded JSON');
-    const parsed = JSON.parse(match[1].replace(/\\u003c/g, '<'));
+    const parsed = extractEmbeddedData(html, '__ROADMAP_DATA__');
     assert.ok('velocity' in parsed);
     assert.ok('milestones' in parsed);
     assert.ok('hasAI' in parsed);

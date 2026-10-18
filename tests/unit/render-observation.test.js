@@ -1,6 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderObservationPage } from '../../lib/render-observation.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 describe('render-observation: poll-status banner', () => {
   test('initial banner placeholder is "loading…", not "connecting…" (LIN-617)', () => {
@@ -163,9 +164,7 @@ describe('render-observation: scan cost estimate wiring (LIN-2706 §B.1)', () =>
   // plain JSON.stringify plus a few XSS-hardening char escapes that don't touch
   // any of these fixtures, so a straight JSON.parse round-trips it.
   function embeddedData(html) {
-    const match = html.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/);
-    assert.ok(match, 'window.__OBSERVATION_DATA__ is embedded in the page');
-    return JSON.parse(match[1]);
+    return extractEmbeddedData(html, '__OBSERVATION_DATA__');
   }
 
   test('an unknown estimate reaches the embedded JSON with unknown:true, never collapsed to $0.00 or a number', () => {

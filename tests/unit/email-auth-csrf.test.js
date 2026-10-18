@@ -223,7 +223,7 @@ describe('email confirm login-CSRF defence (G1)', () => {
   test('the confirm button submits once (double-click guard)', async () => {
     const { legit, t } = await freshLink();
     const { res } = await legit.openConfirm(t);
-    assert.match(res.text, /data-testid="email-confirm-form"[^>]*onsubmit="[^"]*b\.disabled=true/);
+    assert.match(res.text, /data-testid="email-confirm-form"[^>]*data-submit-once/);
   });
 });
 
