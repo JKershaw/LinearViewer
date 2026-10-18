@@ -68,7 +68,7 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
  * lowering the other three to their size after its format asks left the templates. */
 export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 109931, // LIN-3615: -11 (109942), Check 5's pin-conversion rule and review's move-witness bullet paid by four unpinned cuts. Earlier: // LIN-3614: -1 (109943), the three close-out/review rules paid by cuts; net of the three touched ceilings is -2. Earlier: // LIN-3378: +16 net, retrospective-audit's whenNot names merged-and-approved but not Done (+72), paid by blocked's, context's and recap's route text (-56)
-  'lib/prompt-templates.js': 19955, // LIN-3378: +20, defer's whenNot names plan-review (+36), its requires tightened (-16)
+  'lib/prompt-templates.js': 19970, // LIN-3612: +15, the isTerminalState import path now names providers/state-map.js (code, not prompt text; no template byte added). Earlier: // LIN-3378: +20, defer's whenNot names plan-review (+36), its requires tightened (-16)
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
   'lib/prompt-contract.js': 3424, // LIN-3300: at 3424 since the one-path recommendation change
 };
@@ -150,7 +150,7 @@ export const RUNNER_PROMPT_RENDERED_CEILING = 15789; // LIN-3451: at 15789 since
  * LIN-3326 lowered it again (364994 -> 342621): close-out and review shed the authoring
  * bound and the pre-merge risk gates (-22455), less close-out's Scope and Authority line (+82).
  */
-export const FROZEN_TOTAL_BYTES = 342577; // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
+export const FROZEN_TOTAL_BYTES = 342592; // LIN-3612: +15 (342577), prompt-templates.js import path. Earlier: // LIN-3615: -22 (342599), net of plan-review -99, review +88, defs -11. Earlier: // LIN-3614: -2 (342601), net of review -521, close-out +520, defs -1. Earlier: // LIN-3378: -20 (342621)
 
 const BASE_URL = 'https://harbour.example';
 
