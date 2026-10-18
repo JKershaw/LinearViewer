@@ -94,10 +94,10 @@ function buildStats(overrides = {}) {
     funnel: { dispatched: 20, taken: 15, reported: 12, completed: 9 },
     milestoneFunnel: {
       steps: {
-        login: { state: 'reached', count: 4, coverage: 'accounts created in the window (distinct canonical people)' },
-        connected: { state: 'reached', count: 3, coverage: 'membership edges created in the window (distinct canonical people)' },
-        firstGo: { state: 'reached', count: 2, coverage: 'dispatches in the window (distinct canonical people)' },
-        prOpened: { state: 'reached', count: 1, coverage: 'evidence feedback with a PR url in the window (distinct canonical people)' },
+        login: { state: 'reached', count: 4, coverage: 'account.createdAt (first sign-in across the group)' },
+        connected: { state: 'reached', count: 3, coverage: 'account↔workspace membership-edge createdAt' },
+        firstGo: { state: 'reached', count: 2, coverage: 'fresh Go presses (one Go press = one fresh dispatch row), oldest first' },
+        prOpened: { state: 'reached', count: 1, coverage: 'runner [evidence] feedback with a PR URL — a witnessed proxy for open time' },
         mergeClicked: { state: 'no-signal', count: null, coverage: 'awaiting instrumentation (LIN-2949)' }
       },
       mode: { total: 3, byRung: [{ rung: 'copy', entries: 2, notReady: 1 }], coverage: { surfaces: ['swipe'] } }
@@ -181,6 +181,49 @@ describe('renderKpisPage', () => {
     assert.ok(html.includes('<span class="kpi-tree-glyph">├─</span>'), 'tree glyph preserved');
     // titleClass:'' leaves the h3 unclassed so `.kpi-chart-box h3` still styles it.
     assert.ok(html.includes('<h3><span><span class="kpi-tree-glyph">'), 'chart h3 stays unclassed');
+  });
+
+  describe('milestone funnel (LIN-3501)', () => {
+    const step = (state, count) => ({ state, count, coverage: 'a coverage label' });
+
+    test('the caption says who is counted', () => {
+      const html = renderKpisPage(buildStats());
+      assert.ok(html.includes('people who signed up in the last 30 days, and how many have reached each step so far'));
+    });
+
+    test('every no-signal step is a text row, naming the step and its coverage', () => {
+      const html = renderKpisPage(buildStats());
+      assert.ok(html.includes('data-milestone-step="mergeClicked"'));
+      assert.ok(html.includes('merge clicked: no signal, awaiting instrumentation (LIN-2949)'));
+
+      const all = renderKpisPage(buildStats({
+        milestoneFunnel: { steps: {
+          login: step('no-signal', null), connected: step('no-signal', null), firstGo: step('no-signal', null),
+          prOpened: step('no-signal', null), mergeClicked: step('no-signal', null)
+        }, mode: null }
+      }));
+      for (const label of ['signed up', 'connected', 'first go', 'pr opened', 'merge clicked']) {
+        assert.ok(all.includes(`${label}: no signal, a coverage label`), `${label} row`);
+      }
+    });
+
+    test('a reached step with a zero count is a bar, never a no-signal row', () => {
+      const html = renderKpisPage(buildStats({
+        milestoneFunnel: { steps: {
+          login: step('reached', 0), connected: step('reached', 0), firstGo: step('reached', 0),
+          prOpened: step('reached', 0), mergeClicked: step('reached', 0)
+        }, mode: null }
+      }));
+      assert.ok(!html.includes('data-milestone-step'));
+      assert.ok(!html.includes('no signal,'));
+    });
+
+    test('the rows sit outside the canvas wrapper the client replaces on an empty chart', () => {
+      const html = renderKpisPage(buildStats());
+      const canvasBlock = html.match(/<div class="kpi-chart-canvas"><canvas id="chart-milestone-funnel"><\/canvas><\/div>/);
+      assert.ok(canvasBlock, 'canvas wrapper present');
+      assert.ok(html.indexOf('data-milestone-step="mergeClicked"') > html.indexOf(canvasBlock[0]) + canvasBlock[0].length - 1);
+    });
   });
 
   test('renders all chart canvases and loads Chart.js + page script', () => {

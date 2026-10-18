@@ -235,13 +235,13 @@
     });
   }
 
-  // --- Milestone funnel: login → connected → pr opened (people per step) ---
-  // Counts canonical people, so it is separate from the work funnel above. A
-  // step whose instrument does not exist (merge clicked) is reported no-signal
-  // server-side and simply is not a bar here — never a zero.
+  // --- Milestone funnel: signed up → connected → first go → pr opened (people per step) ---
+  // Counts the people who signed up in the window, so it is separate from the
+  // work funnel above. A no-signal step (merge clicked) is a server-rendered
+  // text row, not a bar here — never a zero.
   const milestone = data.milestoneFunnel;
   if (milestone && milestone.steps) {
-    const stepLabels = { login: 'login', connected: 'connected', firstGo: 'first go', prOpened: 'pr opened' };
+    const stepLabels = { login: 'signed up', connected: 'connected', firstGo: 'first go', prOpened: 'pr opened' };
     const stepKeys = ['login', 'connected', 'firstGo', 'prOpened'];
     const reached = stepKeys
       .map(function (key) { return { key: key, step: milestone.steps[key] }; })
