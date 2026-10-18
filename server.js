@@ -78,6 +78,7 @@ import { createPricingConformanceSweepRun } from './lib/pricing-conformance-swee
 import { getSeenModels } from './lib/unpriced-models.js' // LIN-3094: models whose derived cost was null
 import { LivenessAlarmStore } from './lib/liveness-alarm-store.js'
 import { createLivenessAlarmSweepRun } from './lib/liveness-alarm-sweep.js'
+import { createCiWakeSweepRun, createTickWorkspaceResolver } from './lib/ci-wake-sweep.js'
 import { SessionSummaryCacheStore } from './lib/session-summary-cache.js'
 import { RunParagraphStore } from './lib/run-paragraph-store.js'
 import { createRunParagraphPrecompute } from './lib/run-paragraph-hook.js'
@@ -932,6 +933,41 @@ scheduler.register({
 // state is diagnosable rather than inferred.
 }).catch((err) => {
   console.error(`[liveness-alarm-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
+})
+
+// CI wake sweep (LIN-3661): a worker parked `[pending]` on its PR's CI is never
+// woken by anything else (CI is not a session), so this posts ONE follow-up to
+// the parked worker's own lineage tail when the PR's checks finish. Tick-time
+// inputs, no request session: workspaceId from the sessions collection,
+// provider and call scope from resolveWorkspaceAccess, baseUrl from the
+// canonical email link origin. The sweep is inert (and says so once) when that
+// is unset.
+const CI_WAKE_SWEEP_INTERVAL_MS = 5 * 60 * 1000
+const CI_WAKE_SWEEP_LEASE_MS = 2 * 60 * 1000
+const ciWakeBaseUrl = resolveEmailLinkOrigin(process.env)
+if (!ciWakeBaseUrl) {
+  console.warn('[ci-wake-sweep] no canonical link origin is configured: the sweep is registered but will post nothing')
+}
+scheduler.register({
+  name: 'ci-wake-sweep',
+  intervalMs: CI_WAKE_SWEEP_INTERVAL_MS,
+  leaseMs: CI_WAKE_SWEEP_LEASE_MS,
+  run: createCiWakeSweepRun({
+    dispatchStore: dispatchQueueStore,
+    agentStatusStore,
+    proxyTokenStore,
+    workspacePreferencesStore,
+    ownerCheck: workspaceOwnerCheck,
+    resolver: createTickWorkspaceResolver({
+      sessionsCollection,
+      resolveWorkspaceAccess,
+      getProviderByName: (name) => getProviderForWorkspace({ provider: name })
+    }),
+    baseUrl: ciWakeBaseUrl
+  })
+// Same discipline as the sweeps above: not awaited, with a purpose-written catch.
+}).catch((err) => {
+  console.error(`[ci-wake-sweep] scheduler.register failed — the sweep will NOT run this boot: ${err.message}`)
 })
 
 // =============================================================================

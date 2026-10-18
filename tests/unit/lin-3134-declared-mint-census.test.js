@@ -418,7 +418,7 @@ const callKey = (c) => `${c.file} | ${c.construct} | ${c.kind}`;
 // are no longer rows: an E call that carries followUpTo is recognised by that fact
 // and takes its gate from E_GATE_PREDICATES, wherever the call sits.
 const FOLLOWUP_SITES = [
-  { name: 'follow-up-dispatch dispatchSessionFollowUp', key: 'lib/follow-up-dispatch.js | function dispatchSessionFollowUp | (none)', predicate: null, hasAttachArm: false },
+  { name: 'follow-up-dispatch enqueueFollowUp', key: 'lib/follow-up-dispatch.js | function enqueueFollowUp | (none)', predicate: null, hasAttachArm: false },
   { name: 'chat-tools send_follow_up', key: 'lib/chat-tools.js | tool send_follow_up | (none)', predicate: null, hasAttachArm: false }
 ];
 
@@ -608,7 +608,7 @@ const E_MINT_ROWS = [
 // gate, so one line cannot be both.
 const MINT_SITE_TABLE = [
   ...E_MINT_ROWS,
-  { key: 'lib/follow-up-dispatch.js | function dispatchSessionFollowUp [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'dispatchSessionFollowUp: a follow-up by construction (approve-follow-up + Apply)' },
+  { key: 'lib/follow-up-dispatch.js | function enqueueFollowUp [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'enqueueFollowUp: a follow-up by construction (dispatchSessionFollowUp: approve-follow-up + Apply; the CI wake sweep, LIN-3661)' },
   { key: 'lib/chat-tools.js | tool send_follow_up [(none)] | follow-up | provisionResumeCredential', count: 1, cls: 'followup-helper', modes: ['pbt'], reason: 'send_follow_up: a follow-up by construction' },
   { key: 'lib/wake-credential.js | function buildWakeCredentialProvisioner | - | provisionResumeCredential', count: 1, cls: 'wake-helper', reason: 'the wake (Class F eleventh member)' },
   { key: "routes/workspace-api.js | function enqueueFeedbackAutopilot [kind: 'autopilot'] | launch | attachProxyContext", count: 1, cls: 'launch-M4', reason: 'feedback autopilot launch: declared M4 (LIN-3136)' },

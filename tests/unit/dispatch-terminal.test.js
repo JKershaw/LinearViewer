@@ -10,7 +10,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback } from '../../lib/dispatch-terminal.js';
+import { findTerminalFeedback, deriveTerminalStatus, deriveLifecycleStatus, deriveCompletedAt, isWakeEvent, findWakeEvent, harvestAbortedTargets, feedbackWithHarvestedAbort, mergeLineageFeedback, isLiveParkedWaiter, derivePendingPark } from '../../lib/dispatch-terminal.js';
 
 describe('deriveTerminalStatus', () => {
   test('null when feedback is missing or not an array', () => {
@@ -691,5 +691,41 @@ describe('mergeLineageFeedback — order-independent ties (LIN-1465)', () => {
     ];
     const out = msgs([], rows);
     assert.deepEqual(out, ['a1', 'b1', 'anon-1', 'anon-2']);
+  });
+});
+
+describe('isLiveParkedWaiter (LIN-3661, the sweepD2 predicate)', () => {
+  const parked = { wakeMarker: 'pending', terminalStatus: null, bookkeeping: null, historyStatus: 'taken' };
+  test('a pending, open, non-terminal loop is a live parked waiter', () => {
+    assert.equal(isLiveParkedWaiter(parked), true);
+    assert.equal(isLiveParkedWaiter({ wakeMarker: 'pending' }), true);
+  });
+  test('each exclusion', () => {
+    assert.equal(isLiveParkedWaiter(null), false);
+    assert.equal(isLiveParkedWaiter({ ...parked, wakeMarker: 'blocked' }), false);
+    assert.equal(isLiveParkedWaiter({ ...parked, wakeMarker: null }), false);
+    assert.equal(isLiveParkedWaiter({ ...parked, terminalStatus: 'aborted' }), false);
+    assert.equal(isLiveParkedWaiter({ ...parked, bookkeeping: { closedAt: 1 } }), false);
+    for (const historyStatus of ['done', 'failed', 'aborted', 'cancelled', 'expired']) {
+      assert.equal(isLiveParkedWaiter({ ...parked, historyStatus }), false, historyStatus);
+    }
+  });
+});
+
+describe('derivePendingPark (LIN-3661)', () => {
+  test('returns the [pending] entry when it is the last wake event', () => {
+    const entry = { message: '[pending] waiting on PR #1' };
+    assert.equal(derivePendingPark([{ message: '[working] x' }, entry, { message: '[working] heartbeat' }]), entry);
+  });
+  test('null after a resume marker, after a later wake event, and for empty input', () => {
+    assert.equal(derivePendingPark([{ message: '[pending] a' }, { message: '[working] Session resumed.' }]), null);
+    assert.equal(derivePendingPark([{ message: '[pending] a' }, { message: '[blocked] b' }]), null);
+    assert.equal(derivePendingPark([{ message: '[pending] a' }, { message: '[done] b' }]), null);
+    assert.equal(derivePendingPark([]), null);
+    assert.equal(derivePendingPark(undefined), null);
+  });
+  test('a pending after a resume is a fresh park', () => {
+    const entry = { message: '[pending] again' };
+    assert.equal(derivePendingPark([{ message: '[pending] a' }, { message: '[working] Session resumed.' }, entry]), entry);
   });
 });
