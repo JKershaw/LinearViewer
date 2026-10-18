@@ -714,6 +714,35 @@ test.describe('Rulings tab (LIN-1728 Phase 4)', () => {
     // just an absence check.
     await expect(page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-1728-Q' })).toHaveCount(0, { timeout: 20000 });
   });
+
+  test('LIN-3631: a background poll landing while the operator types keeps the text, the box and its focus', async ({ page }) => {
+    await page.goto(`/test/set-session?urlKey=${URL_KEY}`);
+    await clearRuns(page);
+    await seedDecisionWorker(page, { issueIdentifier: 'LIN-3631-T', issueTitle: 'Typing ruling', decisionId: 'd-rulings-typing', blocked: true });
+
+    await page.goto(OBSERVATION_URL);
+    await page.waitForLoadState('networkidle');
+    await page.locator('.obs-tab[data-view="rulings"]').click();
+
+    const row = page.locator('#obs-rulings .obs-ruling').filter({ hasText: 'LIN-3631-T' });
+    const box = row.locator('.obs-ruling-answer-input');
+    await expect(box).toBeVisible();
+    // Identity, not just text: a rebuilt row with the text copied back would
+    // still have dropped the focus and any keystrokes typed mid-repaint.
+    await box.evaluate((el) => { el.dataset.testMarker = 'original'; });
+
+    await box.click();
+    await page.keyboard.type('half typed');
+    // Wait for a real background poll (POLL_MS = 5s) to land and repaint.
+    await page.waitForResponse(r => r.url().includes('/api/dashboard/rulings') && r.request().method() === 'GET', { timeout: 7000 });
+    await page.waitForTimeout(200);
+    // Keep typing with no re-click: the keys go to whatever holds focus.
+    await page.keyboard.type(' and more');
+
+    await expect(box).toHaveAttribute('data-test-marker', 'original');
+    await expect(box).toHaveValue('half typed and more');
+    await expect(box).toBeFocused();
+  });
 });
 
 // LIN-2444 review F4 — no e2e coverage existed anywhere for the suggested-

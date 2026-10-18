@@ -258,6 +258,57 @@ describe('close-out.js: the check', () => {
     await runCheck(box({ 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' }), doc);
     assert.equal(reloads, 1);
   });
+
+  /**
+   * LIN-3631: the Done reload must not discard unsent text. A non-empty or
+   * focused text field defers it (and says so); a read-only or empty, unfocused
+   * one does not.
+   */
+  describe('the Done reload leaves unsent text alone (LIN-3631)', () => {
+    const attrs = { 'data-url-key': 'acme', 'data-issue-identifier': 'LIN-50', 'data-stop-at': 'pr', 'data-state': 'merged' };
+
+    async function checkWith(fields, activeElement) {
+      let reloads = 0;
+      const window = {
+        api() { return Promise.resolve({ state: { status: 'merged' }, done: true, doneNow: true }); },
+        location: { reload() { reloads++; } },
+      };
+      const notes = [];
+      const document = {
+        createElement() { return { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' }; },
+        addEventListener() {},
+      };
+      const { runCheck } = load({ window, document });
+      const doc = {
+        querySelector: () => ({ getAttribute: () => 'running' }),
+        querySelectorAll: () => fields,
+        activeElement,
+      };
+      const b = box(attrs);
+      b.appendChild = (n) => notes.push(n);
+      await runCheck(b, doc);
+      return { reloads, notes };
+    }
+
+    test('a field holding text defers the reload and shows the note', async () => {
+      const { reloads, notes } = await checkWith([{ value: 'half typed' }], null);
+      assert.equal(reloads, 0);
+      assert.equal(notes.length, 1);
+      assert.equal(notes[0].textContent, 'Done — reload to update');
+    });
+
+    test('an empty but focused field defers the reload', async () => {
+      const field = { value: '' };
+      const { reloads } = await checkWith([field], field);
+      assert.equal(reloads, 0);
+    });
+
+    test('read-only and empty unfocused fields do not hold the reload', async () => {
+      const { reloads, notes } = await checkWith([{ value: 'https://x/share', readOnly: true }, { value: '' }], null);
+      assert.equal(reloads, 1);
+      assert.equal(notes.length, 0);
+    });
+  });
 });
 
 describe('close-out.js: applyCloseOutState repaints a merge neutrally', () => {

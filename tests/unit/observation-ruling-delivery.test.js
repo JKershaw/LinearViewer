@@ -101,6 +101,20 @@ class FakeElement {
   setAttribute(name, value) { this.attrs[name] = String(value); }
   getAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
   appendChild(child) { this.children.push(child); child.parentNode = this; return child; }
+  // LIN-3631: renderRulings reconciles #obs-rulings in place.
+  removeChild(child) {
+    const idx = this.children.indexOf(child);
+    if (idx !== -1) this.children.splice(idx, 1);
+    child.parentNode = null;
+    return child;
+  }
+  insertBefore(child, ref) {
+    if (child.parentNode) child.parentNode.removeChild(child);
+    const idx = ref ? this.children.indexOf(ref) : -1;
+    if (idx === -1) this.children.push(child); else this.children.splice(idx, 0, child);
+    child.parentNode = this;
+    return child;
+  }
   // LIN-2775 Area 5's flip control swaps its own <li> in place
   // (li.parentNode.replaceChild(fresh, li)) — the one production caller of
   // either method in this whole shim.
@@ -114,6 +128,14 @@ class FakeElement {
   addEventListener(type, handler) {
     (this.listeners[type] = this.listeners[type] || []).push(handler);
   }
+  // LIN-3631: renderRulings asks whether the focused element sits inside a
+  // row (`li.contains(document.activeElement)`), and the shelve panel focuses
+  // its reason box on open.
+  contains(node) {
+    for (let n = node; n; n = n.parentNode) if (n === this) return true;
+    return false;
+  }
+  focus() {}
   click() { (this.listeners.click || []).forEach(fn => fn({ type: 'click' })); }
   _matches(el, selector) {
     // rulingRowControls(li) queries a COMMA-separated list of class
@@ -4328,5 +4350,110 @@ describe('LIN-3126 residual — the ruling anchors forward source to ReplyDelive
     assert.ok(capturedExtra, 'the task-bound comment write happened');
     assert.equal(capturedExtra.source, 'github');
     assert.equal('bindingScope' in capturedExtra, false);
+  });
+});
+
+// LIN-3631 — a poll must never wipe what the operator is typing. The Rulings
+// tab repaints on every 5s poll, and before this fix renderRulings rebuilt
+// every row that was not pending/preserved/settled: a half-typed free-text
+// answer, the focus in an empty answer box, and an open shelve panel (with
+// its reason) were all replaced by fresh empty controls. These pin the
+// repaint deferral: a row holding unsent input is reused as-is, and is
+// rebuilt again as soon as it holds none.
+describe('renderRulings — a poll keeps unsent input (LIN-3631)', () => {
+  function makeDraftSandbox() {
+    const list = new FakeElement('ul');
+    const empty = new FakeElement('p');
+    const sandbox = makeSandbox({
+      postComment: async () => ({ ok: true, status: 201, data: {} }),
+      dispatchPrompt: async () => ({ id: 'd' }),
+      elements: { 'obs-rulings': list, 'obs-rulings-empty': empty }
+    });
+    return { sandbox, module: sandbox.module, list };
+  }
+  const draftRow = (rest = {}) => makeResumableRow({ decision: { decision_id: 'd-draft-1' }, canReply: true, ...rest });
+
+  test('typed text in the free-text answer survives a repaint, in the same box', () => {
+    const { module, list } = makeDraftSandbox();
+    const { renderRulings } = module.exports;
+    const row = draftRow();
+
+    renderRulings([row]);
+    const box = list.children[0].querySelector('.obs-ruling-answer-input');
+    assert.ok(box, 'a repliable row renders the free-text answer box');
+    box.value = 'half-typed answer';
+
+    renderRulings([row]); // the next 5s poll
+
+    const after = list.children[0].querySelector('.obs-ruling-answer-input');
+    assert.equal(after, box, 'the box being typed in must not be replaced');
+    assert.equal(after.value, 'half-typed answer');
+  });
+
+  test('a focused (still empty) answer box is not replaced', () => {
+    const { sandbox, module, list } = makeDraftSandbox();
+    const { renderRulings } = module.exports;
+    const row = draftRow();
+
+    renderRulings([row]);
+    const box = list.children[0].querySelector('.obs-ruling-answer-input');
+    sandbox.document.activeElement = box;
+
+    renderRulings([row]);
+
+    assert.equal(list.children[0].querySelector('.obs-ruling-answer-input'), box,
+      'replacing a focused field drops the keystrokes that follow');
+  });
+
+  test('an open shelve panel and its reason survive a repaint', () => {
+    const { module, list } = makeDraftSandbox();
+    const { renderRulings } = module.exports;
+    const row = draftRow();
+
+    renderRulings([row]);
+    list.children[0].querySelector('.obs-ruling-shelve').click();
+    const reason = list.children[0].querySelector('.obs-ruling-shelve-reason');
+    assert.ok(reason, 'shelve opens its reason panel');
+    reason.value = 'waiting on the vendor';
+
+    renderRulings([row]);
+
+    assert.equal(list.children[0].querySelector('.obs-ruling-shelve-reason'), reason);
+    assert.equal(reason.value, 'waiting on the vendor');
+  });
+
+  test('a row holding no input is still rebuilt, and is rebuilt again once its draft is cleared', () => {
+    const { module, list } = makeDraftSandbox();
+    const { renderRulings } = module.exports;
+    const row = draftRow();
+
+    renderRulings([row]);
+    const first = list.children[0];
+    renderRulings([row]);
+    assert.notEqual(list.children[0], first, 'an idle row repaints so payload changes still land');
+
+    const second = list.children[0];
+    second.querySelector('.obs-ruling-answer-input').value = 'draft';
+    renderRulings([row]);
+    assert.equal(list.children[0], second, 'held while it has a draft');
+
+    second.querySelector('.obs-ruling-answer-input').value = '';
+    renderRulings([row]);
+    assert.notEqual(list.children[0], second, 'released once the draft is gone');
+  });
+
+  test('the effect flip re-render carries the typed answer into the fresh row', () => {
+    const { module, list } = makeDraftSandbox();
+    const { renderRulings } = module.exports;
+    const row = draftRow({ effect: 'resume', alternate: 'record' });
+
+    renderRulings([row]);
+    const li = list.children[0];
+    li.querySelector('.obs-ruling-answer-input').value = 'keep me';
+    li.querySelector('.obs-ruling-effect-flip').click();
+
+    const fresh = list.children[0];
+    assert.notEqual(fresh, li, 'the flip swaps in a fresh row');
+    assert.equal(fresh.querySelector('.obs-ruling-answer-input').value, 'keep me');
   });
 });
