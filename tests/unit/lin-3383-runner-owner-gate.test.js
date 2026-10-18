@@ -131,3 +131,19 @@ describe('LIN-3383 — the mint callers of resolveOwnerMintRefusal are unchanged
     assert.equal(r.error, "Only this workspace's owner can act on its runner.");
   });
 });
+
+describe('LIN-3648 — a function-shaped answer is not a verdict', () => {
+  for (const status of ['owner', 'not-owner', 'no-owner']) {
+    test(`a function carrying status:'${status}' → OWNER_CHECK_UNAVAILABLE 503`, async () => {
+      const r = await resolveRunnerOwnerRefusal(args({ ownerCheck: async () => Object.assign(() => {}, { status }) }));
+      assert.equal(r.code, 'OWNER_CHECK_UNAVAILABLE');
+      assert.equal(r.status, 503);
+    });
+  }
+
+  test('a throwing status getter on an object is unavailable too', async () => {
+    const answer = Object.defineProperty({}, 'status', { get() { throw new Error('getter'); } });
+    const r = await resolveRunnerOwnerRefusal(args({ ownerCheck: async () => answer }));
+    assert.equal(r.code, 'OWNER_CHECK_UNAVAILABLE');
+  });
+});

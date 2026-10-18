@@ -527,6 +527,45 @@ describe('GitHub Projects auth routes', () => {
       assert.deepEqual(calls, []);
     });
 
+    // LIN-3626: /user/installations is walked with a bound; a miss on a read that hit
+    // the bound still refuses (no mint) but is told apart from a genuine "not yours".
+    test('LIN-3626: an id absent from a TRUNCATED list is refused with the distinct copy and log reason, never minted', async () => {
+      const truncatedList = Object.assign([{ id: '99', account: { login: 'octocat' } }], { truncated: true });
+      const { provider, calls } = mintSpy({ listUserInstallations: async () => truncatedList });
+      const logged = [];
+      const orig = console.log;
+      console.log = (...a) => { logged.push(JSON.stringify(a)); };
+      let res;
+      try {
+        ({ res } = await callback(provider, { installation_id: '555', setup_action: 'install', code: 'oauth-code' }));
+      } finally {
+        console.log = orig;
+      }
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.redirectedTo, null);
+      assert.match(res.body, /more installations than we can check/);
+      assert.doesNotMatch(res.body, /cannot access that installation/);
+      assert.ok(logged.some((l) => l.includes('installation-not-found-within-bound')));
+      assert.deepEqual(calls, []);
+    });
+
+    test('LIN-3626: an id present in a truncated list still mints', async () => {
+      const truncatedList = Object.assign([{ id: '99', account: { login: 'octocat' } }], { truncated: true });
+      const { provider, calls } = mintSpy({ listUserInstallations: async () => truncatedList });
+      const { res } = await callback(provider, { installation_id: '99', code: 'oauth-code' });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(calls, ['99']);
+    });
+
+    test('LIN-3626: an id absent from a COMPLETE list keeps the original copy', async () => {
+      const { provider, calls } = mintSpy();
+      const { res } = await callback(provider, { installation_id: '555', code: 'oauth-code' });
+      assert.equal(res.statusCode, 400);
+      assert.match(res.body, /cannot access that installation/);
+      assert.doesNotMatch(res.body, /more installations than we can check/);
+      assert.deepEqual(calls, []);
+    });
+
     test('a failed code exchange is refused before any membership lookup or mint', async () => {
       let listed = false;
       const { provider, calls } = mintSpy({ listUserInstallations: async () => { listed = true; return []; } });

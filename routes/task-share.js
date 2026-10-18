@@ -38,6 +38,7 @@ import { isValidIssueId } from '../lib/workspace.js';
 import { isWellFormedTaskShareToken } from '../lib/task-share-store.js';
 import { maskSecretsInHtml } from '../lib/mask-secrets-in-html.js';
 import { resolveOwnerMintRefusal } from '../lib/owner-mint-refusals.js';
+import { isOwnerAnswer } from '../lib/workspace-owner.js';
 import {
   renderTaskPage,
   renderTaskStatus,
@@ -152,7 +153,7 @@ export function createTaskShareRoutes({
     } catch {
       return { kind: 'unavailable' };
     }
-    if (!owner || owner.status !== 'owner') return { kind: 'notfound' };
+    if (!isOwnerAnswer(owner)) return { kind: 'notfound' };
     return { kind: 'ok', record };
   }
 
