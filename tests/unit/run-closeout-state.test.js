@@ -155,9 +155,12 @@ describe('deriveCloseOutState — truth table', () => {
   });
 
   test('a merge after a moved head still sets Done as before (closeOutSetsDone unchanged)', () => {
-    const base = movedArgs({ prStatuses: [mergedStatus('bbbbbbb')] });
+    // `byPersonCheck` is required for setDone to be true at all; without it both
+    // sides read false and the equality below pins nothing.
+    const base = movedArgs({ prStatuses: [mergedStatus('bbbbbbb')], byPersonCheck: true });
     const state = deriveCloseOutState(base);
     assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
+    assert.strictEqual(state.setDone, true);
     const before = deriveCloseOutState({ ...base, prStatuses: [mergedStatus('aaaaaaa')] });
     assert.strictEqual(state.setDone, before.setDone);
   });

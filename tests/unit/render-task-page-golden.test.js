@@ -355,6 +355,13 @@ describe('task page structure', () => {
     const sentence = 'PR #41 is approved and ready to merge.';
     assert.equal(lead(ownerState, 'owner'), sentence);
     assert.equal(lead(guestState, 'guest'), sentence, 'the guest reads the same sentence as the owner');
+    // LIN-3418: a moved head is not ready for the owner, and the guest reads the same.
+    const moved = { prStatuses: [{ repo: REPO, readable: true, number: 41, state: 'open', merged: false, head: { ref: 'x', sha: 'bbbbbbb' }, ref: 'bbbbbbb', checks: [] }] };
+    const movedOwner = derive({ owner: true, runnerReady: true, ...moved });
+    assert.equal(movedOwner.reason, 'head-moved');
+    const notReady = 'PR #41 is open, but it isn&#039;t ready to merge yet.';
+    assert.equal(lead(movedOwner, 'owner'), notReady);
+    assert.equal(lead(derive({ owner: false, runnerReady: false, ...moved }), 'guest'), notReady, 'the guest reads the owner\'s sentence on a moved head');
     // Other not-ready reasons keep their wording.
     assert.match(lead(derive({ owner: false, runnerReady: false, review: { verdict: 'request-changes', verdictText: 'Request changes', sha: 'aaaaaaa' } }), 'guest'), /isn&#039;t ready to merge yet/);
   });
