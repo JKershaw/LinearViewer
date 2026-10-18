@@ -642,10 +642,10 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
     test('a request source (body or query) wins over the row', async () => {
       const { built, seen, id } = await withRow({ issueIdentifier: 'LIN-1', issueSource: 'jira' });
       await press(built, pressReq({ dispatchId: id, source: 'github' }));
-      assert.ok(seen.every(s => s === 'github'), JSON.stringify(seen));
+      assert.ok(seen.length > 0 && seen.every(s => s === 'github'), JSON.stringify(seen));
       seen.length = 0;
       await press(built, baseReq({ query: { source: 'gitlab' }, body: { prUrl: PR_A, headSha: MOVED, dispatchId: id } }));
-      assert.ok(seen.every(s => s === 'gitlab'), JSON.stringify(seen));
+      assert.ok(seen.length > 0 && seen.every(s => s === 'gitlab'), JSON.stringify(seen));
     });
 
     test("a row for a different issue does not steer the source", async () => {
@@ -658,7 +658,7 @@ describe('LIN-3657: close-out-press on a head-moved close-out', () => {
       const { built, seen } = await withRow({ issueIdentifier: 'LIN-1', issueSource: 'jira' });
       const res = await press(built, pressReq({ dispatchId: 'no-such-row' }));
       assert.equal(res.statusCode, 409);
-      assert.ok(seen.every(s => s === null), JSON.stringify(seen));
+      assert.ok(seen.length > 0 && seen.every(s => s === null), JSON.stringify(seen));
     });
   });
 });
