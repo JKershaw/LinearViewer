@@ -25,7 +25,7 @@
  * slug regex, the repo-picker renderer, and the descriptor's copy/knobs.
  */
 import { renderGitHubRepoSelectPage } from '../lib/render-pages.js'
-import { createGitHubInstallFlowRoutes } from '../lib/github-install-flow.js'
+import { createGitHubInstallFlowRoutes, installationIdsOf } from '../lib/github-install-flow.js'
 
 // A GitHub issues binding's scope is an `owner/name` repo slug. Validate the
 // shape of the picked repo before writing it as a binding scope.
@@ -67,7 +67,7 @@ export function createGitHubAuthRoutes({ provider, accountStore, accountWorkspac
     slugRegex: REPO_SLUG_REGEX,
     rebindMapKey: 'repoInstallations',
     listReboundable: (p, userToken) => p.listReboundableRepos(userToken),
-    listUserInstallationIds: async (p, userToken) => (await p.listUserInstallations(userToken)).map((i) => String(i.id)),
+    listUserInstallationIds: async (p, userToken) => installationIdsOf(await p.listUserInstallations(userToken)),
     rebindSlugOf: (r) => r.slug,
     listChoices: (p, creds) => p.listRepos(creds.token),
     renderPicker: (choices, opts) => renderGitHubRepoSelectPage(choices, opts),
