@@ -1,12 +1,14 @@
 /**
  * LIN-3661: the CI wake sweep over REAL dispatch rows.
  *
- * Rows are built the way production builds them (a real DispatchQueueStore, the
- * real lean `getLoopsForWorkspace`, the real `enqueueFollowUp` wake path where it
- * matters), with fakes only for what is external: the PR reader, the issue
- * comments, the workspace access resolver and the sessions collection. No session
- * object anywhere: the deps are built through `createTickWorkspaceResolver` the
- * way server.js builds them.
+ * Rows are built the way production builds them (a real DispatchQueueStore and the
+ * real lean `getLoopsForWorkspace`), with fakes only for what is external: the PR
+ * reader, the issue comments, the workspace access resolver and the sessions
+ * collection. No session object anywhere: the deps are built through
+ * `createTickWorkspaceResolver` the way server.js builds them. Most cases spy
+ * `enqueue`; the "real enqueueFollowUp" describe drives the default one (harness
+ * `null`, so the `claude-code` mint branch of `provisionResumeCredential` is not
+ * exercised here).
  */
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -103,8 +105,8 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
       },
       getProviderByName: () => ({
         fetchIssueComments: async (scope, identifier) => { commentFetches.push({ scope, identifier }); return comments; }
-      }),
-      now: () => clock
+      })
+      // No `now`, as in server.js: the tick time reaches the resolver only through reset(tickNow).
     });
     const spy = async (args) => {
       posted.push(args);
@@ -115,7 +117,7 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
       agentStatusStore,
       proxyTokenStore: {},
       workspacePreferencesStore: {},
-      ownerCheck: async () => ownerAllowed,
+      ownerCheck: async () => ({ status: ownerAllowed ? 'owner' : 'not-owner' }),
       resolver,
       baseUrl,
       now: () => clock,
@@ -406,5 +408,96 @@ describe('ci-wake-sweep: over a real DispatchQueueStore', () => {
     await seedParked({ target: 'dash' });
     await buildRun()();
     assert.equal(posted.length, 0);
+  });
+
+  test('a 403 on a PR read ends that tick\'s reads', async () => {
+    for (let i = 0; i < 3; i++) {
+      await seedParked({ message: `[pending] https://github.com/o/r/pull/${300 + i}`, issue: `LIN-${i + 30}` });
+    }
+    prStatus = () => ({ readable: false, reason: 'GitHub API error checking o/r: HTTP 403: API rate limit exceeded' });
+    await buildRun()();
+    assert.equal(prReads.length, 1);
+    assert.equal(posted.length, 0);
+  });
+
+  test('the lineage tail moving between the PR read and the post posts nothing', async () => {
+    const worker = await seedParked();
+    const logs = [];
+    const realLog = console.log;
+    console.log = (...args) => { logs.push(args.join(' ')); };
+    try {
+      await buildRun({
+        extra: {
+          readStatuses: async ({ prUrls }) => {
+            // The worker resumes (a follow-up row joins its lineage) while the checks are being read.
+            await store.addItem(URL_KEY, {
+              prompt: 'f', promptName: 'follow-up', kind: 'custom', issueIdentifier: 'LIN-3647',
+              followUpTo: worker._id, rootItemId: worker._id, dispatchedBy: OWNER, target: 'cli'
+            });
+            prReads.push(prUrls[0]);
+            return [PASSING];
+          }
+        }
+      })();
+    } finally {
+      console.log = realLog;
+    }
+    assert.equal(prReads.length, 1);
+    assert.equal(posted.length, 0);
+    assert.ok(logs.some((l) => l.includes('lineage tail moved')), logs.join('\n'));
+  });
+
+  test('session rows are judged at the tick clock, not wall-clock time', async () => {
+    await seedParked();
+    clock = Date.now() + 2 * 60 * 60 * 1000;
+    // Live by wall-clock time, expired at the tick's time (expiry field per lib/session-row-live.js).
+    sessionsRows = [{
+      expires: new Date(Date.now() + 60 * 60 * 1000),
+      session: JSON.stringify({ workspaces: [{ id: 'ws-id-1', urlKey: URL_KEY, provider: 'linear' }] })
+    }];
+    const logs = [];
+    const realLog = console.log;
+    console.log = (...args) => { logs.push(args.join(' ')); };
+    try {
+      await buildRun()();
+    } finally {
+      console.log = realLog;
+    }
+    assert.equal(posted.length, 0);
+    assert.equal(prReads.length, 0);
+    assert.ok(logs.some((l) => l.includes('no-live-session-for-url-key')), logs.join('\n'));
+  });
+
+  describe('real enqueueFollowUp (default enqueue, owner-status gate)', () => {
+    // `enqueue: undefined` overrides the spy so the run falls back to the real `enqueueFollowUp`.
+    const real = { enqueue: undefined, proxyTokenStore: null, workspacePreferencesStore: { getWorkspacePreferences: async () => ({}) } };
+
+    test('an owner gets one queued row to the worker lineage, and a second tick queues nothing', async () => {
+      const anchor = await store.addItem(URL_KEY, { prompt: 'a', promptName: 'autopilot', kind: 'autopilot', issueIdentifier: 'LIN-1' });
+      const worker = await seedParked({ anchor: anchor._id });
+      const run = buildRun({ extra: real });
+      await run();
+      const queued = await store.listItems(URL_KEY, { rootItemId: worker._id });
+      const wake = queued.filter((row) => row.followUpTo === worker._id);
+      assert.equal(wake.length, 1);
+      assert.equal(wake[0].rootItemId, worker._id);
+      assert.equal(wake[0].force, false);
+      assert.equal(wake[0].target, 'cli');
+      assert.equal(wake[0].dispatchedBy, OWNER);
+      assert.ok(wake[0].prompt.split('\n').includes(ciWakeMarker('abc1234', 'passing')));
+
+      clock += 2 * 60 * 60 * 1000;
+      await run();
+      const after = await store.listItems(URL_KEY, { rootItemId: worker._id });
+      assert.equal(after.filter((row) => row.followUpTo === worker._id).length, 1);
+    });
+
+    test('a not-owner is refused (422) and nothing is queued', async () => {
+      ownerAllowed = false;
+      const worker = await seedParked();
+      await buildRun({ extra: real })();
+      const queued = await store.listItems(URL_KEY, { rootItemId: worker._id });
+      assert.equal(queued.filter((row) => row.followUpTo === worker._id).length, 0);
+    });
   });
 });
