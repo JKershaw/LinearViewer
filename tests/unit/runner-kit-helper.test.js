@@ -438,7 +438,7 @@ describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
     assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: X }), live).decision, 'take');
   });
 
-  test('an unknown halt mode fails closed (a deliberate difference from Simple Dispatcher)', () => {
+  test('an unknown halt mode leaves every item, aborts included; a named difference from Simple Dispatcher, which reads it as pause', () => {
     assert.equal(haltAction({ mode: 'drain' }, item(), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'drain' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'leave');
   });

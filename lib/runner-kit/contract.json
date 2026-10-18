@@ -112,9 +112,21 @@
       "item": {
         "route": "fresh"
       },
+      "sd": "left",
+      "kit": "left"
+    },
+    {
+      "area": "halt",
+      "case": "abort row under an unknown halt mode",
+      "halt": {
+        "mode": "drain"
+      },
+      "item": {
+        "route": "abort"
+      },
       "sd": "claimed",
       "kit": "left",
-      "difference": "The kit fails closed on a mode it does not know; SD fails open (dispatcher.js collectHarbourHalt). Deliberate (LIN-3451); whether SD should fail closed is an open question."
+      "difference": "SD reads an unknown mode as pause, so an abort still flows (pacing.js never defers one); the kit does not guess at a mode it does not know and leaves every item, aborts included. Kept: the kit is unchanged in LIN-3630."
     },
     {
       "area": "halt-text",
