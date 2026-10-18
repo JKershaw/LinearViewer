@@ -30,7 +30,7 @@ import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { buildEditionModel, windowRange } from '../lib/ship-biscuit.js';
 import { buildEditorMessages, parseEditorResponse, assessEditorOutcome, buildQuietEdition, buildMockEdition } from '../lib/prompts/ship-biscuit-editor.js';
 import { DEFAULT_MODEL, streamChat, resolveReasoningBudget } from '../lib/openrouter.js';
-import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { armKeepalive } from '../lib/http-keepalive.js';
@@ -185,9 +185,7 @@ export function createShipBiscuitRoutes({
         if (isFreeTier) {
           const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
           if (check) {
-            return keepaliveError(keepalive, 429, check.reason, {
-              freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
-            });
+            return keepaliveError(keepalive, 429, check.reason, freeTierRefusalBlock(check));
           }
         }
         modelId = await resolveAiOperationModel({ urlKey: workspace.urlKey, workspacePreferencesStore, opKind: 'ship-biscuit', forceDefault: isFreeTier });

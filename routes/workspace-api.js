@@ -33,8 +33,8 @@ import { renderDetailsContent, PRIORITY_OPTION_LABELS } from '../lib/render.js';
 import { buildPromptFilename } from '../lib/prompt-formatters.js';
 import { attachProxyContext, isCodedGrantRefusal, codedGrantRefusalResponse } from '../lib/proxy-preamble.js';
 import { buildAutopilotKickoff, AUTOPILOT_MODES, AUTOPILOT_MODE_DEFAULT, AUTOPILOT_VARIANTS, AUTOPILOT_VARIANT_DEFAULT } from '../lib/prompts/autopilot-kickoff.js';
-import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, hasPaidEnvKey, streamChat } from '../lib/openrouter.js';
-import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, buildRunGate } from '../lib/chat-request.js';
+import { isRecommendationEnabled, getRecommendation, getRecommendationStream, getModelDisplayName, streamChat } from '../lib/openrouter.js';
+import { resolveChatCredential, isAiUnavailable, checkFreeTierGate, buildRunGate, isFlagFreeTier, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { getModelCatalog, isFreeModel } from '../lib/openrouter-catalog.js';
 import { resolveRecommendation, armHopSignal } from '../lib/recommend-recurse.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
@@ -147,13 +147,7 @@ export const decisionStampDedupe = createDedupeCache();
  */
 const isTestToken = (workspace) => process.env.NODE_ENV === 'test' && workspace.accessToken === 'test-token';
 
-/** The session is on the shared free-tier key: flagged on, no own key, no paid env key. */
-const sessionIsFreeTier = (session) => session.freeTierEnabled && !session.openRouterApiKey && !hasPaidEnvKey();
-
-/** The `freeTier` block every 429 from the free-tier gate carries. */
-const freeTierBody = (check) => ({ freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
-
-const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierBody(check));
+const refuseFreeTier = (res, check) => jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
 
 const aiNotConfigured = (res, noun) =>
   jsonError(res, 503, `AI ${noun} is not configured. Connect OpenRouter or set OPENROUTER_API_KEY.`, { code: 'AI_NOT_CONFIGURED' });
@@ -840,7 +834,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
   // The test-token DATA mock charges the free tier on its own (the AI-gate above it is
   // scoped to !isTestMode). Returns the denying check, or null when the call may proceed.
   const chargeTestFreeTier = async (workspace, session) => {
-    if (!sessionIsFreeTier(session)) return null;
+    if (!isFlagFreeTier({ sessionApiKey: session.openRouterApiKey, sessionFreeTierFlag: session.freeTierEnabled })) return null;
     const check = await freeTierStore.tryUse(workspace.urlKey);
     return check.allowed ? null : check;
   };
@@ -1364,7 +1358,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     // Free-tier on the AI-mock path is the session flag (CI sets no env key, so
     // `isFreeTier` is always false there); the test-token DATA mock charges its
     // own inside the isTestMode block below, so this is scoped to !isTestMode.
-    const surfaceFreeTier = !isTestMode && (mockAi ? sessionIsFreeTier(req.session) : isFreeTier);
+    const surfaceFreeTier = !isTestMode && (mockAi ? isFlagFreeTier({ sessionApiKey: req.session.openRouterApiKey, sessionFreeTierFlag: req.session.freeTierEnabled }) : isFreeTier);
     if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI recommendation feature is not configured. Connect your OpenRouter account or set OPENROUTER_API_KEY.');
     }
@@ -1392,7 +1386,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
         // Atomically check free tier limits and record usage in test mode
         const denied = await chargeTestFreeTier(workspace, req.session);
         if (denied) {
-          return keepaliveError(keepalive, 429, denied.reason, freeTierBody(denied));
+          return keepaliveError(keepalive, 429, denied.reason, freeTierRefusalBlock(denied));
         }
 
         const { reasoning, prompt } = generateMockRecommendation(mockIssue);
@@ -1484,7 +1478,7 @@ export function createWorkspaceApiRoutes({ workspaceFromUrl, freeTierStore, getO
     const mockAi = shouldMockAi(workspace);
     const credential = resolveChatCredential({ sessionApiKey: req.session.openRouterApiKey });
     const { apiKey: apiKeyToUse, isFreeTier } = credential;
-    const surfaceFreeTier = !isTestMode && (mockAi ? sessionIsFreeTier(req.session) : isFreeTier);
+    const surfaceFreeTier = !isTestMode && (mockAi ? isFlagFreeTier({ sessionApiKey: req.session.openRouterApiKey, sessionFreeTierFlag: req.session.freeTierEnabled }) : isFreeTier);
 
     if (isAiUnavailable({ credential, mockAi })) {
       return jsonError(res, 503, 'AI recommendation feature is not configured.');

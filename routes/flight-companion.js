@@ -101,7 +101,7 @@ import { sendSSE } from '../lib/sse.js';
 // turn, the playbook memory and the scheduler tick can each run one without
 // pretending to be an Express handler. This route is the browser's adapter.
 import { runAgentTurn, FC_MAX_TOKENS } from '../lib/agent-turn.js';
-import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, freeTierRefusalBlock } from '../lib/chat-request.js';
 
 const MAX_MESSAGE_LENGTH = CHAT_MESSAGE_MAX_LENGTH;
 
@@ -760,9 +760,7 @@ export function createFlightCompanionRoutes({
         // one watching it.
         if (outcome.reason === 'free-tier' && turnKind === 'user-initiated') {
           const check = outcome.freeTierCheck;
-          return jsonError(res, 429, check.reason, {
-            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
-          });
+          return jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
         }
         return res.json({
           turnKind: outcome.turnKind,
@@ -911,9 +909,7 @@ export function createFlightCompanionRoutes({
         // matches a typed turn's — never auto-wake's silent 200.
         if (outcome.reason === 'free-tier') {
           const check = outcome.freeTierCheck;
-          return jsonError(res, 429, check.reason, {
-            freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt },
-          });
+          return jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
         }
         return res.json({
           turnKind: outcome.turnKind,

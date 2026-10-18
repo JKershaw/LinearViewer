@@ -69,7 +69,7 @@ import { computeSupersededLoopIds } from '../lib/loop-supersede.js';
 import { collectUnansweredDecisions } from '../lib/unanswered-decisions.js';
 import { attachStandingSuggestions } from '../lib/dismissal-suggestions-store.js';
 import { collectAgentTokenIds, foldCredentialIndex } from '../lib/credential-state.js';
-import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import {
   generateRunSummary,
@@ -2795,7 +2795,7 @@ export function createDashboardRoutes({
     if (isFreeTier && freeTierStore) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
       }
     }
 
@@ -2981,7 +2981,7 @@ export function createDashboardRoutes({
     if (isFreeTier && freeTierStore) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, { freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt } });
+        return jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
       }
     }
 

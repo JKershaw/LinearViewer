@@ -24,7 +24,7 @@ import { jsonError, serviceUnavailable, unauthorized } from '../lib/errors.js';
 import { getFeatureFlags } from '../lib/feature-defaults.js';
 import { generateGoalSuggestions, CONTINUE_UNTIL_STOPPED_OPTION, formatNextRunContext, buildNextRunSummary, ensureSizeCoverage, attachReferencedTaskTitles, resolveDirections } from '../lib/next-run.js';
 import { buildRoadmapModel } from '../lib/roadmap.js';
-import { resolveChatCredential, checkFreeTierGate } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { getWorkspaceCallScope } from '../lib/workspace.js';
@@ -184,9 +184,7 @@ export function createNextRunRoutes({ workspaceFromUrl, freeTierStore, workspace
     if (!mockAi && isFreeTier) {
       const check = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (check) {
-        return jsonError(res, 429, check.reason, {
-          freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
-        });
+        return jsonError(res, 429, check.reason, freeTierRefusalBlock(check));
       }
     }
 

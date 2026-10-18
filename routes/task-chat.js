@@ -32,7 +32,7 @@ import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { getProvider, getProviderForWorkspace } from '../lib/providers/registry.js';
 import { testMockData } from '../lib/sample-data/mock-data.js';
 import { filterChatTurns } from '../lib/chat-transcript.js';
-import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { sendSSE } from '../lib/sse.js';
 import { badRequest, jsonError, notFound, serverError, serviceUnavailable, unauthorized } from '../lib/errors.js';
 
@@ -446,14 +446,7 @@ export function createTaskChatRoutes({ workspaceFromUrl, freeTierStore, workspac
     if (!mockAi) {
       const gate = await checkFreeTierGate({ isFreeTier, urlKey: workspace.urlKey, freeTierStore });
       if (gate) {
-        return jsonError(res, 429, gate.reason, {
-          freeTier: {
-            used: true,
-            remaining: gate.remaining,
-            limit: gate.limit,
-            resetsAt: gate.resetsAt
-          }
-        });
+        return jsonError(res, 429, gate.reason, freeTierRefusalBlock(gate));
       }
     }
 

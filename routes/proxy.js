@@ -66,7 +66,7 @@ import { localProvider } from '../lib/providers/local/index.js';
 import { getProviderForWorkspace } from '../lib/providers/registry.js';
 import { collectIssueAttachments } from '../lib/proxy-wire.js';
 import { getRecommendation } from '../lib/openrouter.js';
-import { resolveChatCredential } from '../lib/chat-request.js';
+import { resolveChatCredential, freeTierRefusalBlock } from '../lib/chat-request.js';
 import { prepareRecommendationInput } from '../lib/recommendation-input.js';
 import { resolveRecommendation, describeDescent, armHopSignal } from '../lib/recommend-recurse.js';
 import { resolveWorkspaceModel, resolveAiOperationModel } from '../lib/workspace-preferences.js';
@@ -1366,7 +1366,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
       body: {
         error: check.reason,
         reason: 'no_paid_key_resolved',
-        freeTier: { used: true, remaining: check.remaining, limit: check.limit, resetsAt: check.resetsAt }
+        ...freeTierRefusalBlock(check)
       }
     };
   }
