@@ -424,13 +424,23 @@ describe('haltAction and haltSweep (Simple Dispatcher\'s halt meaning)', () => {
     assert.equal(haltAction({ mode: 'pause' }, item(), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: K }), live).decision, 'take');
     assert.equal(haltAction({ mode: 'pause' }, item({ kind: 'wake', followUpTo: K }), live).decision, 'take');
-    assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: W2 }), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'pause' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
   });
 
-  test('stop: nothing is taken', () => {
+  test('stop: nothing fresh or follow-up is taken; aborts flow as in Simple Dispatcher (LIN-3451)', () => {
+    assert.equal(haltAction({ mode: 'stop' }, item(), live).decision, 'leave');
     assert.equal(haltAction({ mode: 'stop' }, item({ followUpTo: K }), live).decision, 'leave');
-    assert.equal(haltAction({ mode: 'stop' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'leave');
+    assert.equal(haltAction({ mode: 'stop' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'take');
+  });
+
+  test('pause: a follow-up with no live session is taken so it is failed, not left queued (LIN-3451)', () => {
+    assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: W2 }), live).decision, 'take');
+    assert.equal(haltAction({ mode: 'pause' }, item({ followUpTo: X }), live).decision, 'take');
+  });
+
+  test('an unknown halt mode fails closed (a deliberate difference from Simple Dispatcher)', () => {
+    assert.equal(haltAction({ mode: 'drain' }, item(), live).decision, 'leave');
+    assert.equal(haltAction({ mode: 'drain' }, item({ abort: true, abortTo: K, prompt: null }), live).decision, 'leave');
   });
 
   test('stop sweeps every running subagent with Simple Dispatcher\'s [aborted] line and keeps it in the ledger as stopped (N4)', () => {
@@ -532,7 +542,7 @@ describe('resolveFollowUp', () => {
   test('a miss posts Simple Dispatcher\'s failure line, which reads as failed', () => {
     const r = resolveFollowUp(item({ followUpTo: X }), ledger);
     assert.equal(r.action, 'reject');
-    assert.equal(r.message, `[failed] No live subagent to resume for follow-up (original dispatch ${X} not found).`);
+    assert.equal(r.message, `[failed] No live session to resume for follow-up (original dispatch ${X} not found or already archived).`);
     assert.equal(findTerminalFeedback(fb(r.message)).status, 'failed');
   });
 });
