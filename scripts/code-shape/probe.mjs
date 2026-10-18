@@ -5,7 +5,8 @@
 // Extracts <commit> (git archive) into a temp dir, runs --test-cmd there unmodified, then once per
 // rewrite with --target replaced, and reports the failures each rewrite adds. The command must print
 // TAP (e.g. `node --test --test-reporter=tap tests/a.test.js`). Blocking the network is the test
-// command's job (see experiments/rebuild-exp1/kit/lib/no-network.mjs). Failing tests are data, not an exit code.
+// command's job (see experiments/rebuild-exp1/kit/lib/no-network.mjs). Failing tests are data, not an exit code;
+// so is a rewrite that throws (e.g. nocomment on a file acorn cannot parse): it is reported as `error` and the rest still run.
 import { mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, isAbsolute, normalize } from 'node:path';
@@ -59,7 +60,8 @@ await runCli(async () => {
     const results = [];
     try {
       for (const [name, fn] of Object.entries(rewrites)) {
-        const text = fn(original);
+        let text;
+        try { text = fn(original); } catch (e) { results.push({ rewrite: name, error: String(e?.message ?? e) }); continue; }
         let astEqual = null;
         try { astEqual = core.astEqual(original, text); } catch { /* a file acorn cannot parse has no AST verdict */ }
         writeFileSync(targetPath, text);
@@ -76,7 +78,7 @@ await runCli(async () => {
       skipped: renameMap ? [] : [{ rewrite: 'rename', reason: 'no --rename-map' }],
       ...(flags['--keep'] ? { tree } : {}),
     });
-    console.error(`probe ${sha.slice(0, 8)} ${target}: ${baseline.length} baseline failures; ${results.map((r) => `${r.rewrite} +${r.addedFailures.length}`).join(', ')}`);
+    console.error(`probe ${sha.slice(0, 8)} ${target}: ${baseline.length} baseline failures; ${results.map((r) => (r.error ? `${r.rewrite} error` : `${r.rewrite} +${r.addedFailures.length}`)).join(', ')}`);
   } finally {
     if (!flags['--keep']) rmSync(tree, { recursive: true, force: true });
   }

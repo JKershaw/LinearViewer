@@ -170,6 +170,22 @@ test('probe: reports the failure a rewrite adds; baseline failures are data; the
   } finally { probeRepo.cleanup(); rmSync(scratch, { recursive: true, force: true }); }
 });
 
+test('probe: a rewrite that throws is reported as an error entry and the other rewrites still run', () => {
+  const probeRepo = makeRepo();
+  const scratch = mkdtempSync(join(tmpdir(), 'code-shape-scratch-'));
+  try {
+    const sha = probeRepo.commit(PROBE_FILES, '2026-01-01T00:00:00Z');
+    writeFileSync(join(scratch, 'boom.mjs'), "export default { boom: () => { throw new Error('cannot rewrite'); } };\n");
+    const r = cli('probe.mjs', [probeRepo.dir, sha, '--target', 'lib/target.js', '--test-cmd', 'node --test --test-reporter=tap tests/t.test.js', '--perturb-module', join(scratch, 'boom.mjs')]);
+    assert.equal(r.status, 0, r.stderr);
+    const byName = Object.fromEntries(r.json.rewrites.map((x) => [x.rewrite, x]));
+    assert.deepEqual(Object.keys(byName), ['indent', 'nocomment', 'boom']);
+    assert.deepEqual(byName.boom, { rewrite: 'boom', error: 'cannot rewrite' });
+    assert.deepEqual(byName.nocomment.addedFailures.map((f) => f.name), ['target keeps its marker']);
+    assert.deepEqual(byName.indent.addedFailures, []);
+  } finally { probeRepo.cleanup(); rmSync(scratch, { recursive: true, force: true }); }
+});
+
 test('probe: --rename-map and --perturb-module add rewrites; a bad --target or --perturb-module exits 2', () => {
   const probeRepo = makeRepo();
   const scratch = mkdtempSync(join(tmpdir(), 'code-shape-scratch-'));
