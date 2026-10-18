@@ -68,8 +68,10 @@ on judgement, with no fresh reader.
   seeds, the operator and `proposals.md` where each first appears; and the outside terms strangler fig, shotgun
   surgery, DRY and hotspots.
 - **Readability:** the method in brief, as five bullets, after the opening paragraph; long paragraphs in sections 2
-  and 4 split; what may be new and what is not yet known set out as lists; the history of the name corrected to
-  say the ship came first (`theseus.md` and `drawing-the-ship.md`, 15 October).
+  and 4 split; what may be new and what is not yet known set out as lists; the history of the name corrected,
+  here and in the long version. Version 1 said John named the method. John's correction (18 October): the name
+  arrived on 15 October in the session where he was visualising the codebase, where four experimental views led to
+  the ship view (`drawing-the-ship.md`), so the idea was his but the name was not.
 - **Length:** about 4,700 words of body, against 4,100 for version 1.
 - **Standard:** `docs/papers/standard.md` now says an essay's body can link its sources and other archive documents
   where it uses them, and explains a Harbour term where it first appears.
