@@ -21,9 +21,10 @@ import { starterSeed } from '../lib/starter-seed.js'
  * @param {(key: string) => void} [deps.evictWorkspaceToken] - LIN-1507: evicts a resolved-token cache entry by its pre-computed key (see `workspaceTokenCacheKey`).
  * @param {import('../lib/owner-credential-store.js').OwnerCredentialStore} [deps.ownerCredentialStore] - LIN-1523: durable owner-credential store. Deleted alongside the LIN-1507 cache eviction on disconnect — a cache is not a grant, but a disconnected workspace's durable credential must not outlive the disconnect either.
  * @param {function(Object): Promise<Object>} [deps.resolveWorkspaceUrlKey] - LIN-3382: the one urlKey resolver (lib/workspace-urlkey.js). NO default: `POST /workspace/new` fails closed (503 retry page, nothing written) without it.
+ * @param {function({urlKey: string, workspaceId: string, accountId: string}): Promise<Object>} [deps.revokeWorkspaceArtifacts] - LIN-3421: `createWorkspaceRemovalRevoker(...).revoke`. Revokes the removing account's own proxy tokens, dispatch tokens and `/t/` links for the key, beside each `deleteAll`. Absent = nothing extra revoked (like `ownerCredentialStore`).
  * @returns {Router} Express router
  */
-export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey } = {}) {
+export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspaceStore, evictWorkspaceToken, ownerCredentialStore, connectionStore, resolveWorkspaceUrlKey, revokeWorkspaceArtifacts } = {}) {
   const router = Router()
 
   /**
@@ -121,6 +122,9 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
         // LIN-1887 N2: whole-workspace teardown, so EVERY provider partition
         // goes — a single-partition delete would orphan the others.
         if (ownerCredentialStore) await ownerCredentialStore.deleteAll(accountId, workspace.urlKey)
+        // LIN-3421: the proxy tokens, dispatch tokens and /t/ links this account
+        // made for the workspace die with it (its own rows only).
+        if (revokeWorkspaceArtifacts) await revokeWorkspaceArtifacts({ urlKey: workspace.urlKey, workspaceId: workspace.id, accountId })
         // LIN-3124 PR2 (D4, whole-workspace removal): last-referent per
         // connection-backed binding. Inert for a legacy workspace.
         await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove', evict: (urlKey) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, accountId) })
@@ -140,6 +144,8 @@ export function createWorkspaceRoutes({ localStore, accountStore, accountWorkspa
     // LIN-1523: durable delete alongside the cache eviction — see the note above.
     // LIN-1887 N2: whole-workspace teardown → every provider partition.
     if (ownerCredentialStore) await ownerCredentialStore.deleteAll(req.session.accountId, workspace.urlKey)
+    // LIN-3421: see the note in the branch above.
+    if (revokeWorkspaceArtifacts) await revokeWorkspaceArtifacts({ urlKey: workspace.urlKey, workspaceId: workspace.id, accountId: req.session.accountId })
     // LIN-3124 PR2 (D4, whole-workspace removal).
     await releaseConnectionCredential({ connectionStore, ownerCredentialStore, workspace, mode: 'remove', evict: (urlKey) => evictWorkspaceTokenPair(evictWorkspaceToken, urlKey, req.session.accountId) })
 

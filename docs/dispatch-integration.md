@@ -1155,7 +1155,7 @@ done
 
 - Tokens have 256 bits of entropy (cryptographically secure)
 - Only the SHA-256 hash is stored server-side
-- Tokens never expire but can be revoked
+- Tokens have no expiry by default (optional `expiresAt`, enforced at validate time) and can be revoked; removing a workspace revokes the tokens the removing account made for it
 - Each token is scoped to a single workspace
 - Validation hashes the presented token and looks the hash up in the database (an exact-match query). There is no constant-time string compare — timing is a non-concern because the lookup keys off the hash, not a byte-by-byte comparison of the raw token
 

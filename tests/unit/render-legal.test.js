@@ -53,6 +53,8 @@ describe('privacy page', () => {
     assert.match(text, /not swept every path|have not swept every path/);
     assert.doesNotMatch(text, /some controls such as halt and resume, are not covered/);
     assert.match(text, /does not revoke/);
+    // LIN-3421: removing a workspace revokes what the account made for it.
+    assert.match(text, /Removing a workspace revokes the task links and tokens you made for it/);
   });
 
   // LIN-3424: the hourly cleanup loop (lib/hourly-cleanup.js) now removes

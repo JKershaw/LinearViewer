@@ -93,6 +93,7 @@ describe('buildInstructions — per-path token lifetime table (LIN-1938 S1)', ()
     assert.match(text, /prompt-proxy` \(`PROMPT_PROXY_TOKEN_TTL_SECONDS`/);
     assert.match(text, /90d {2}- an operator standard mint under any other label/);
     assert.match(text, /never - dispatch tokens/); // LIN-3131 S2b.4: runner moved off this line
+    assert.match(text, /never - dispatch tokens by default; optional `expiresAt`/); // LIN-3421
     // LIN-3131 S2b.4: the runner copy's own rows (1h bootstrap / 24h working).
     assert.match(text, /1h {2}- the runner copy's single-use bootstrap/);
     assert.match(text, /24h - the runner copy's working token after exchange/);
