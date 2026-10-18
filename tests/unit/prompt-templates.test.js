@@ -2559,7 +2559,7 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const land = section(prompt, '### Land It and Close the Loop', '### Follow-up Triage');
       assert.ok(/If a post-deploy step fails, or one the ticket asked for is beyond your access, the task stays open: say what is left and name the next action\./.test(land),
         'a failed step and a ticket-asked step beyond access still keep the task open');
-      assert.ok(/An unasked live or post-deploy check you cannot run does not hold the close: record it as not run \(what, why, who could run it later or "none"\) on the ticket and in the PR, then close/.test(land),
+      assert.ok(/An unasked live or post-deploy check you cannot run does not hold the close: record it as not run \(what, why, who or what can run it, or "none"\) on the ticket and in the PR, then close/.test(land),
         'an unasked check is recorded as not run with what, why and the follow-up, then the task closes');
       assert.ok(/no monitor settles it, and raise no ruling/.test(land), 'no monitor settles it and no ruling is raised');
     });
