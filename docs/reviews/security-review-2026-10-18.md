@@ -7,9 +7,9 @@
 
 ## Verdict
 
-**No Critical. No new High.** Five of the six fix claims hold at HEAD, and each holds as an attacker would test it. The sixth, LIN-3418, shipped only half its title. That gap is the first of two new Medium findings, both now ticketed:
+**No Critical. One new High (provisional): LIN-3642.** The first pass of this report said "No new High". That was wrong: an independent review found the miss (see the second read below). Five of the six fix claims hold at HEAD, and each holds as an attacker would test it. The sixth, LIN-3418, shipped only half its title. That gap is the first of two new Medium findings. All three new findings are ticketed:
 
-- **LIN-3634 (Medium, new).** The server admits a close-out dispatch whatever the PR's readiness. LIN-3418 step 2 was dropped, nothing was filed, and the ticket is Done.
+- **LIN-3642 (High, provisional, new).** The Linear OAuth callback (`routes/auth.js:134`) passes its CSRF check when both `state` and `session.oauthState` are undefined. A callback with no `state` on a session with no `oauthState` signs in, or links the callback's Linear identity onto an already signed-in account (`establishAccount`, `lib/account-session.js`, the `else if (session.accountId)` branch). The siblings require the nonce (`lib/github-install-flow.js:522`, `routes/jira-auth.js:432`). Reproduced with the `tests/unit/auth-route.test.js` fakes. What an account id shared this way unlocks (owner checks, `listAccountsForWorkspace`, owner-credential reads) was not traced, hence "provisional".- **LIN-3634 (Medium, new).** The server admits a close-out dispatch whatever the PR's readiness. LIN-3418 step 2 was dropped, nothing was filed, and the ticket is Done.
 - **LIN-3635 (Medium, carried from June M3, never ticketed).** Feedback intake spends the shared free-tier key outside the hourly net. It also has no rate limit and a 12 MB parser that accepts any content type.
 
 Tenant isolation is still clean on both lanes. Credentials are clean across the tree and 3,954 commits of history.
@@ -18,6 +18,7 @@ Tenant isolation is still clean on both lanes. Credentials are clean across the 
 
 | # | Sev | Delta | Finding | Ticket |
 |---|---|---|---|---|
+| 0 | **High (provisional)** | **new** | Linear OAuth callback passes the CSRF check when `state` and `session.oauthState` are both undefined (`routes/auth.js:134`), and links the callback's identity onto a signed-in account. | **LIN-3642** |
 | 1 | High | unchanged, open | No unique `urlKey` registry/index. The only backstop is the bind-time holder read. `lib/db-indexes.js` has no `workspaces.urlKey` unique spec. | LIN-3394 (Backlog) |
 | 2 | High | unchanged, open | The bootstrap token is still inline in prompt text for non-`claude-code` harnesses (`lib/proxy-preamble.js:200`). | LIN-1410 (Backlog) |
 | 3 | High (tracker) | open, not re-verified | Run-page evidence reads bypass the GitHub budget. | LIN-3273 |
@@ -38,8 +39,11 @@ Tenant isolation is still clean on both lanes. Credentials are clean across the 
 | 18 | Low | new | `nosniff` is set only on `text/html` responses (`lib/security-headers.js:79`). Text and markdown endpoints are served without it. I found no usable `script-src 'self'` gadget: they all start with fixed template text. | report only (LIN-3627 covers `img-src`/`form-action`) |
 | 19 | Low | already filed | The proxy credential resolver reads expired session rows (`server.js:2661`). The window is ≤1 h because of the hourly sweep (`lib/hourly-cleanup.js:86`, LIN-3424). | LIN-3616 |
 | 20 | Low | already filed | `/user/installations` reads page 1 only. It fails closed, so this is availability, not security. | LIN-3626 |
+| 21 | Low | unchanged, open (omitted from the first pass) | The OpenRouter callback has no `state` (`routes/openrouter-auth.js:123`). It relies on the PKCE verifier held in the session (`:89`, `:129`), so a code minted by someone else's flow fails the exchange. The residual is low. | LIN-676 (Backlog) |
 
-**Resolved since June:** H1 SVG stored XSS (LIN-682: `sniffRasterType` and `nosniff`, `routes/workspace-api.js:2905-2925`). M1 GitHub `repo` scope (LIN-683/703: GitHub App with per-installation tokens). L1 OAuth `state` not single-use (LIN-2499). L3 no CSP (LIN-3420). The baseline's prompt-injection H1 is now tracked as LIN-3402.
+**Resolved since June:** H1 SVG stored XSS (LIN-682: `sniffRasterType` and `nosniff`, `routes/workspace-api.js:2905-2925`). M1 GitHub `repo` scope (LIN-683/703: GitHub App with per-installation tokens). L3 no CSP (LIN-3420). The baseline's prompt-injection H1 is now tracked as LIN-3402.
+
+**Partly resolved:** L1 OAuth `state` (LIN-2499). LIN-2499 fixed nonce reuse, but its replay test only replays with `state: 'real'`, never with `state` missing. The class "the callback is bound to the session" is still open on the Linear path (LIN-3642).
 
 ## The fix claims, re-read as an attacker
 
@@ -55,7 +59,7 @@ Tenant isolation is still clean on both lanes. Credentials are clean across the 
 ## The LIN-2954 inventory at HEAD
 
 **Fixed (Done):** 3418 (half, see #6), 3420, 3421 (narrowed, residuals filed), 3424, 3426, 3398 (and parts 3408 and 3409), 3401, 3404, 3395, 3269, 3506.
-**Still open:** 3417, 3422, 3423, 3425, 3394, 3402, 1410, 2850, 2852, 3261, 3346, 3348, 2530, 2642, 3273, 3281, 3280, 1301, 3284, 3400, 3264, 3321, 619, 620, 684.
+**Still open:** 3642, 676, 3417, 3422, 3423, 3425, 3394, 3402, 1410, 2850, 2852, 3261, 3346, 3348, 2530, 2642, 3273, 3281, 3280, 1301, 3284, 3400, 3264, 3321, 619, 620, 684.
 LIN-618 is Canceled, superseded by LIN-376 (Done: single-use bootstraps).
 
 ## Per-layer audit (v1 path)
@@ -89,27 +93,43 @@ LIN-618 is Canceled, superseded by LIN-376 (Done: single-use bootstraps).
 - Whether production sets `SESSION_SECRET`, `NODE_ENV=production` and `OPENROUTER_FREE_TIER_KEY`. That decides #7's real exposure and #14.
 - The live CSP in a browser on `/t/`, the task page and the run page.
 - `npm audit` against the live registry (#9), and upstream advisories for the vendored DOMPurify and marked (#17).
-- The deploy's TLS and HSTS posture, and any CDN caching of `Host`-derived responses.
+- The deploy's TLS and HSTS posture, and any CDN caching of `Host`-derived responses. Neither has a ticket of its own yet; a routed human-check ticket is filed at LIN-3419 close-out.
 - How many production workspaces other than the operator's have a runner (inherited from the LIN-2954 inventory).
 
-## Not covered in depth this run
+## Coverage added after the first pass, and what stays out of depth
 
-The Linear and Jira OAuth callbacks beyond their existing tickets, the account-merge internals beyond the fresh-auth gate, connection lifecycle release paths, and LIN-3273 and LIN-3281 beyond a read of the predicate.
+The first pass listed the Linear and Jira OAuth callbacks, the account-merge internals and the connection release paths as not covered in depth. The independent review found a High in the first of them, so they were covered read-only in the amendment (comment `992d04d4`):
+
+- **Linear callback, both arms.** Beyond LIN-3642: the add-source arm restores `session.workspaces` on any refusal, and the new-login arm carries `accountId` across `regenerate()` and restores the workspace list on conflict. The token and refresh token go to the durable owner store, not the session. The add-source arm's mode depends on server-side `oauthIntent`, which a fresh session lacks, so only the `mode:'new'` path is reachable with a missing `state`.
+- **Account merge.** `POST /auth/merge/confirm` (`routes/account-merge.js:86`) re-checks freshness (`:96`, `isFreshlyAuthenticated`). `respondToAccountConflict` (`lib/account-conflict.js:108`) refuses a merge unless the live account was freshly proven. In the LIN-3642 path the foreign identity does not stamp freshness, so the bypass is the plain "link a new identity" branch, not merge-confirm.
+- **Jira callback.** Guarded (`routes/jira-auth.js:432`). The site is pinned to `*.atlassian.net`. The pending-token-in-session and multi-site nonce items are already LIN-2642 and LIN-2530. No new finding.
+- **Connection lifecycle release paths.** Dropped from depth, with the reason: they sit behind the canonical-account compare in `authorizeConnection` (item 3 above), and LIN-3617 to 3619 own the lifetime gaps. Nothing new turned up on the way through. A deeper trace belongs to a ticket-scoped review, not a delta rerun.
+- **Still not in depth:** LIN-3273 and LIN-3281 beyond a read of the predicate.
+
+### OAuth-callback class: nonce compared without being required
+
+| Callback | Requires the nonce? |
+|---|---|
+| Linear `/auth/callback` (`routes/auth.js:134`) | **No** (LIN-3642) |
+| GitHub and GitHub Projects (`lib/github-install-flow.js:522`) | Yes |
+| Jira (`routes/jira-auth.js:432`) | Yes |
+| OpenRouter (`routes/openrouter-auth.js:123`) | No `state`; the PKCE verifier is bound to the session (LIN-676, open) |
+| Email confirm (`routes/email-auth.js`) | Not an OAuth callback. Per-browser nonce plus Sec-Fetch-Site, audited clean above |
 
 ## Departures from the periodical template, with the reason
 
-- **Where the report lives.** It was first posted as LIN-3419 comment `2f92653f`. The operator notes for that run allowed no docs change. Committing it here was agreed afterwards as a follow-up docs PR (the `lin3419-report-commit` decision), so the ledger persists for the next run. This avoids the loss described in LIN-694 and seen with the 23 June baseline. The text is the posted comment, otherwise unchanged.
-- **Second read: Tier 3, the same session.** The operator notes bar sub-agents ("No parallel forks or background sub-agents"). The template's Tier 1/2 reader is still owed if the gate needs it.
+- **Where the report lives.** It was first posted as LIN-3419 comment `2f92653f`. The operator notes for that run allowed no docs change. The `lin3419-report-commit` ruling answered "Yes, follow-up docs PR", so this file is the committed copy and the ledger persists for the next run. This avoids the loss described in LIN-694 and seen with the 23 June baseline. The text is the posted comment with the amendment (comment `992d04d4`) folded in.
+- **Second read: Tier 3 in the run, then an independent read.** The operator notes bar sub-agents ("No parallel forks or background sub-agents"), so the run's own second read was Tier 3, the same session. The independent review `40546d6c` then served as the Tier 1/2 read and found a miss. Tier 3 alone was not enough.
 
 ## Adversarial second read
 
 Tier: **3 (same session, by operator rule).** Question: *what is the largest item in this window that this report missed or misfiled?*
-Answer: there were two misfiles in the draft, both fixed in place. (1) A delta-only layout ranked my two new Mediums above open Highs that carry over (LIN-3394, LIN-1410). The table is now severity-first. (2) LIN-619 is filed High in the tracker, but its blast radius is Low. It is now re-rated in #14 with the reason. I found no unreported Critical or High.
+Answer: there were two misfiles in the draft, both fixed in place. (1) A delta-only layout ranked my two new Mediums above open Highs that carry over (LIN-3394, LIN-1410). The table is now severity-first. (2) LIN-619 is filed High in the tracker, but its blast radius is Low. It is now re-rated in #14 with the reason. I found no unreported Critical or High. **That answer was incomplete.** The independent review (`40546d6c`, Request Changes) found a High the report had missed on the sign-in path: LIN-3642, the Linear callback with no `state` requirement. It also found a misfile: L1/LIN-2499 had been listed as resolved, and is partly resolved. LIN-676 had been left out of the open list. All three are corrected above.
 
-Adversarial second-read verdict: AGREE
+Adversarial second-read verdict: DISAGREE (the independent read found LIN-3642; the Tier 3 read had found nothing)
 Differed from top finding: YES
-Disposition: fixed in place
+Disposition: fixed in place (headline, row 0, L1 and LIN-676 amended; sign-in layers covered)
 
 ## Surface Assessment
 
-`Surface Assessment: [lands cleanly]`. This was a review-only run: there is no change to land. The two new findings are small, separate fixes, each scoped in its own ticket.
+`Surface Assessment: [lands cleanly]`. This was a review-only run: there is no change to land. The three new findings (LIN-3642, LIN-3634, LIN-3635) are small, separate fixes, each scoped in its own ticket.
