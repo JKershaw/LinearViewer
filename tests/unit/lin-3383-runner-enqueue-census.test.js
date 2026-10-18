@@ -39,6 +39,10 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 
+// LIN-3635: feedbackSubmitLimiter skips only under NODE_ENV=test; this file posts the
+// route more than its 5-per-window budget.
+process.env.NODE_ENV = 'test';
+
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function walk(dir, out = []) {
