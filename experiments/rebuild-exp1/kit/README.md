@@ -223,3 +223,10 @@ shrunk and grouped as in diff. Run it on old and new and compare the files.
 - `json-equal` treats `{a: undefined}` and `{}` as the same on the wire;
   everything else is strict.
 - Timings depend on the machine and on parallel load (`--jobs`).
+
+## Generic versions (LIN-3628)
+
+`shape.mjs` here measures one file. For a whole commit, with a per-area rollup and the same
+definitions, use `scripts/code-shape/shape.mjs` (its `shape-core.mjs` is a copy of
+`lib/shape-core.mjs`). Its census, verbatim and perturbation-probe counterparts, and what they
+cannot see, are in `scripts/code-shape/README.md`. The scripts here are unchanged.
