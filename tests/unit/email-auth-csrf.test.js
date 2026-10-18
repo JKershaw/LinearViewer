@@ -23,6 +23,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { startEmailAuthHarness, tokenFromOutbox, hiddenField, sha256 } from '../fixtures/email-auth-harness.js';
 import { EMAIL_NONCE_MAX_AGE_MS } from '../../lib/email-auth.js';
+import { APP_CSP } from '../../lib/security-headers.js';
+import { themePrepaintScriptHash } from '../../lib/components/page.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const CROSS_SITE = { 'Sec-Fetch-Site': 'cross-site' };
@@ -214,7 +216,12 @@ describe('email confirm login-CSRF defence (G1)', () => {
   test('headers: the GET confirm page cannot be framed, cached, or leak its URL', async () => {
     const { legit, t } = await freshLink();
     const { res } = await legit.openConfirm(t);
-    assert.strictEqual(res.headers['content-security-policy'], "frame-ancestors 'none'");
+    // LIN-3627: the route sets the shared app CSP itself, so the page keeps
+    // `frame-ancestors 'none'` and also gets a `script-src`.
+    const csp = res.headers['content-security-policy'];
+    assert.strictEqual(csp, APP_CSP);
+    assert.ok(csp.includes("frame-ancestors 'none'"));
+    assert.ok(csp.includes(themePrepaintScriptHash()), 'script-src pins the theme pre-paint hash');
     assert.strictEqual(res.headers['x-frame-options'], 'DENY');
     assert.strictEqual(res.headers['cache-control'], 'no-store');
     assert.strictEqual(res.headers['referrer-policy'], 'no-referrer');
