@@ -1731,11 +1731,12 @@ describe('observer-sweep: negative capability — no automated-intervention path
     const specifiers = [...src.matchAll(/^import\s+(?:[^;]*?from\s+)?['"](.+?)['"]\s*;?\s*$/gm)].map((m) => m[1]);
     assert.deepStrictEqual(
       specifiers.sort(),
-      ['./dispatch-terminal.js', './live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js'].sort(),
+      ['./dispatch-terminal.js', './live-console.js', './loop-supersede.js', './pipeline-loops.js', './observer-shadow-log.js', './unanswered-decisions.js', './session-row-live.js'].sort(),
       'a new import here (e.g. a direct dispatch-store/agent-status-store import bypassing the injected deps seam, in EITHER statement form) must be caught by this assertion. ' +
       './observer-shadow-log.js (LIN-2132) is the one addition this ticket makes — it is itself pure (no dispatch-store/agent-status-store/linear-provider import; see its own static-import test in observer-shadow-log.test.js) and exports only the pure computeWouldBeActions, never a store instance. ' +
       './unanswered-decisions.js (LIN-2671) is itself pure (imports ./loop-supersede.js and, since LIN-3364, ./dispatch-terminal.js; see unanswered-decisions.js) and exports the ONE answered-decision predicate classifyLoop must reuse rather than fork. ' +
-      './dispatch-terminal.js (LIN-3602) is itself pure (imports only ./utils/time.js) and exports the ONE waiting-wake-marker predicate isWaitingWakeMarker that classifyLoop must reuse rather than fork'
+      './dispatch-terminal.js (LIN-3602) is itself pure (imports only ./utils/time.js) and exports the ONE waiting-wake-marker predicate isWaitingWakeMarker that classifyLoop must reuse rather than fork. ' +
+      './session-row-live.js (LIN-3506) is itself pure (imports only ./utils/time.js) and exports the ONE session-row liveness rule resolveRosterFromSessions must reuse rather than fork'
     );
   });
 
