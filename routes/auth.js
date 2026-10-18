@@ -130,8 +130,12 @@ export function createAuthRoutes({ userPreferencesStore, provider, accountStore,
       return res.status(400).send(html)
     }
 
-    // Validate state token (CSRF protection)
-    if (state !== req.session.oauthState) {
+    // Validate state token (CSRF protection). The nonce must be PRESENT, not just
+    // equal: a callback with no `state` against a session with no `oauthState`
+    // (a fresh visitor, or anyone who finished sign-in — LIN-2499) is
+    // `undefined !== undefined` and would pass a bare inequality (LIN-3642).
+    // Same shape as lib/github-install-flow.js and routes/jira-auth.js.
+    if (!state || state !== req.session.oauthState) {
       // Clear the OAuth state/intent so no intent (e.g. a stale add-source
       // mode) leaks across this failed round-trip (LIN-1351 review).
       delete req.session.oauthState

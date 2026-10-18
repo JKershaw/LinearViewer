@@ -617,6 +617,40 @@ describe('routes/auth.js — Linear OAuth callback', () => {
     assert.strictEqual(replay.redirectedTo, null, 'the flow did not re-run');
   });
 
+  test('a callback with NO state is rejected on a fresh session (no oauthState): undefined !== undefined must not pass (LIN-3642)', async () => {
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = makeSession();
+    const res = makeRes();
+
+    await handler({ query: { code: 'good-code' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.match(res.body, /Session Expired/);
+    assert.strictEqual(res.redirectedTo, null, 'the flow did not run');
+    assert.strictEqual(session.accountId, undefined, 'no account established');
+  });
+
+  test('a callback with NO state is rejected on a signed-in session and links nothing onto its account (LIN-3642)', async () => {
+    const stores = freshAccountStores();
+    const myAccount = await stores.accountStore.createAccount();
+    await stores.accountStore.linkIdentity(myAccount._id, 'linear', 'viewer-1', {});
+    const router = createAuthRoutes({ ...withResolver(), provider: fakeProvider({
+      fetchOrganization: async () => ({ id: 'org-2', name: 'Beta', urlKey: 'beta' }),
+      fetchViewer: async () => ({ id: 'attacker' }),
+    }), ...stores });
+    const handler = getHandler(router, 'get', '/auth/callback');
+    const session = makeSession({ accountId: myAccount._id });
+    const res = makeRes();
+
+    await handler({ query: { code: 'attacker-code' }, session }, res);
+
+    assert.strictEqual(res.statusCode, 400);
+    assert.match(res.body, /Session Expired/);
+    assert.strictEqual(session.accountId, myAccount._id, 'session untouched');
+    assert.strictEqual(await stores.accountStore.findAccountByIdentity('linear', 'attacker'), null, 'attacker identity not linked');
+  });
+
   // The one test that actually exercises routes/auth.js's own clear. The shim's
   // regenerate deliberately does NOT wipe, so the explicit `delete` above it is
   // the only thing that can clear these fields — delete that line and this test
