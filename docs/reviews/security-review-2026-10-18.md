@@ -93,7 +93,7 @@ LIN-618 is Canceled, superseded by LIN-376 (Done: single-use bootstraps).
 - Whether production sets `SESSION_SECRET`, `NODE_ENV=production` and `OPENROUTER_FREE_TIER_KEY`. That decides #7's real exposure and #14.
 - The live CSP in a browser on `/t/`, the task page and the run page.
 - `npm audit` against the live registry (#9), and upstream advisories for the vendored DOMPurify and marked (#17).
-- The deploy's TLS and HSTS posture, and any CDN caching of `Host`-derived responses. Neither has a ticket of its own yet; a routed human-check ticket is filed at LIN-3419 close-out.
+- The deploy's TLS and HSTS posture, and any CDN caching of `Host`-derived responses. Neither had a ticket; the routed human-check ticket is LIN-3643.
 - How many production workspaces other than the operator's have a runner (inherited from the LIN-2954 inventory).
 
 ## Coverage added after the first pass, and what stays out of depth
