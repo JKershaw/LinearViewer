@@ -25,7 +25,7 @@ import { getWorkspaceCallScope, matchTeamId } from '../lib/workspace.js';
 import { testMockTeams, testMockData } from '../lib/sample-data/mock-data.js';
 import { shouldMockAi } from '../lib/should-mock-ai.js';
 import { sendSSE } from '../lib/sse.js';
-import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH } from '../lib/chat-request.js';
+import { resolveChatCredential, checkFreeTierGate, CHAT_MESSAGE_MAX_LENGTH, freeTierRefusalBlock } from '../lib/chat-request.js';
 
 /**
  * Apply a per-request roadmap model override against the already-resolved
@@ -640,7 +640,7 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     // free user gets a clean 429 rather than a 200 stream that errors instantly.
     const firstCharge = await chargeRoadmapLayer(req, llm.isFreeTier);
     if (!firstCharge.allowed) {
-      return jsonError(res, 429, firstCharge.reason, { freeTier: { used: true, remaining: firstCharge.remaining, limit: firstCharge.limit, resetsAt: firstCharge.resetsAt } });
+      return jsonError(res, 429, firstCharge.reason, freeTierRefusalBlock(firstCharge));
     }
 
     res.set({
@@ -802,7 +802,7 @@ export function createRoadmapRoutes({ workspaceFromUrl, freeTierStore, userPrefe
     // Atomically check rate limits for free tier users
     const gate = await checkFreeTierGate({ isFreeTier, urlKey: req.workspace.urlKey, freeTierStore });
     if (gate) {
-      return jsonError(res, 429, gate.reason, { freeTier: { used: true, remaining: gate.remaining, limit: gate.limit, resetsAt: gate.resetsAt } });
+      return jsonError(res, 429, gate.reason, freeTierRefusalBlock(gate));
     }
 
     const { question, roadmapModel, history } = req.body;

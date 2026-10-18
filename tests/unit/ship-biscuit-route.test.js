@@ -271,3 +271,67 @@ describe('ship-biscuit generate threads the latest roadmap report into the editi
     }
   });
 });
+
+// ─── LIN-3658: the free-tier refusal body on the keepalive transport ───────────
+
+describe('ship-biscuit generate 429s a free-tier denial with the exact error + freeTier body (LIN-3658)', () => {
+  test('a free-tier session denied by the store gets {error, freeTier:{used,remaining,limit,resetsAt}} in that order', async () => {
+    const keys = ['NODE_ENV', 'OPENROUTER_API_KEY', 'OPENROUTER_FREE_TIER_KEY'];
+    const prev = Object.fromEntries(keys.map(k => [k, process.env[k]]));
+    // NODE_ENV stays off 'test': the real editor path (not the offline mock) is
+    // the one that charges the free tier.
+    process.env.NODE_ENV = 'production';
+    delete process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_FREE_TIER_KEY = 'free-tier-test-key';
+    try {
+      const tryUseCalls = [];
+      const router = createShipBiscuitRoutes({
+        workspaceFromUrl: (req, res, next) => next(),
+        freeTierStore: {
+          async tryUse(urlKey) {
+            tryUseCalls.push(urlKey);
+            return { allowed: false, reason: 'Free tier limit reached', remaining: 0, limit: 10, resetsAt: '2026-09-01T00:00:00.000Z' };
+          },
+        },
+        workspacePreferencesStore: null,
+        getOpenRouterSource: () => 'free',
+        getDeployInfo: () => ({}),
+        observationSessionsStore: { async findByWorkspace() { return { sessions: [] }; } },
+        agentStatusStore: { async listStatus() { return { items: [] }; } },
+        llmCallLogStore: { async summarize() { return null; } },
+        taskSnapshotStore: { async listByWorkspace() { return { items: [] }; } },
+        // An in-window roadmap report makes the window non-quiet, so the handler
+        // reaches the one paid call (and its free-tier gate).
+        reportHistoryStore: {
+          async getLatest() {
+            return {
+              id: 'rep-1', generatedAt: new Date().toISOString(), northStar: 'Ship faster',
+              narrative: { digest: 'Steady progress.', technical: null, product: null },
+              orientation: [{ identifier: 'LIN-9', bearing: 'toward', reason: 'core path', archived: false }],
+            };
+          },
+        },
+        shipBiscuitHistoryStore: { async save(_urlKey, edition) { return { id: 'ed-1', ...edition }; } },
+      });
+      const handler = getRouteHandler(router, 'post', '/workspace/:urlKey/api/ship-biscuit/generate');
+      const req = {
+        workspace: { urlKey: 'ws-a', name: 'Alpha' },
+        session: { features: { shipBiscuit: true } },
+        body: {},
+      };
+      const res = makeFlushRes();
+      await handler(req, res);
+
+      assert.equal(res.statusCode, 429);
+      assert.equal(
+        JSON.stringify(res.jsonBody),
+        '{"error":"Free tier limit reached","freeTier":{"used":true,"remaining":0,"limit":10,"resetsAt":"2026-09-01T00:00:00.000Z"}}'
+      );
+      assert.deepEqual(tryUseCalls, ['ws-a'], 'the gate charged the store once');
+    } finally {
+      for (const k of keys) {
+        if (prev[k] === undefined) delete process.env[k]; else process.env[k] = prev[k];
+      }
+    }
+  });
+});

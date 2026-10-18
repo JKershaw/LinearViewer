@@ -179,7 +179,8 @@ import { buildSessionCounts } from './lib/sessions-view.js'
 import { renderRoadmapPage } from './lib/render-roadmap.js'
 import { buildRoadmapModel } from './lib/roadmap.js'
 import { renderProxyPage } from './lib/render-proxy.js'
-import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, hasPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
+import { AVAILABLE_MODELS, setLlmCallRecorder, setPromptTraceRecorder, getPaidEnvKey, getFreeTierModelConfigWarning, streamChatWithTools } from './lib/openrouter.js'
+import { resolveOpenRouterSource } from './lib/chat-request.js'
 import { resolveWorkspaceModel, resolveAiOperationModel, getWorkspaceFeatures, isWorkspaceFeatureEnabled, setWorkspaceFeature, resolveDispatchDefaults, AI_OPERATION_KINDS } from './lib/workspace-preferences.js'
 import { getFeatureFlags, isValidFeatureKey, isValidWorkspaceFeatureKey, WORKSPACE_FEATURES } from './lib/feature-defaults.js'
 import { DISPATCH_DEFAULT_KINDS } from './lib/prompt-templates.js'
@@ -1058,21 +1059,15 @@ if (process.env.NODE_ENV === 'test') {
 
 /**
  * Determines the source of the OpenRouter API key for the current request.
- * Priority: user OAuth key > server env key > free tier key > null
+ * Priority: user OAuth key > server env key > free tier key (or the test-only
+ * session flag) > null. The rule lives in lib/chat-request.js (LIN-3658); this
+ * stays a function because many route factories receive it by injection.
  *
  * @param {Object} req - Express request object
  * @returns {'oauth'|'env'|'free'|null} The source of the API key
  */
 function getOpenRouterSource(req) {
-  if (req.session.openRouterApiKey) return 'oauth';
-  // hasPaidEnvKey() trims, so a blank/whitespace OPENROUTER_API_KEY is NOT
-  // classified as a paid `env` source (LIN-961). This keeps the operator-facing
-  // status honest: the footer can no longer read a blank key as `env` while the
-  // token-authed proxy path silently runs on the free tier — the exact
-  // divergence that hid this bug.
-  if (hasPaidEnvKey()) return 'env';
-  if (process.env.OPENROUTER_FREE_TIER_KEY || req.session.freeTierEnabled) return 'free';
-  return null;
+  return resolveOpenRouterSource({ sessionApiKey: req.session.openRouterApiKey, sessionFreeTierFlag: req.session.freeTierEnabled });
 }
 
 // =============================================================================
