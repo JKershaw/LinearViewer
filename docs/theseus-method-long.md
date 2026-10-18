@@ -267,7 +267,7 @@ The evidence is three rounds on one codebase over three days in October 2026, ea
 
 ## 13 Running it: a runbook for an agent
 
-This section is written for an agent asked to run the method on a codebase it has not seen, working as the operator. Harbour's instruments and records are named as worked examples; nothing here depends on them. Each rule carries how far it has been tested: **(tested)** where it caught or held more than once, **(used)** where it was used once, with a note where it did not fully hold, **(proposed)** where it has not been run.
+This section is written for an agent asked to run the method on a codebase it has not seen, working as the operator. Harbour's instruments and records are named as worked examples; nothing here depends on them. The operator's step-by-step for a whole improvement cycle is `docs/runbooks/improvement-cycles.md`. Each rule carries how far it has been tested: **(tested)** where it caught or held more than once, **(used)** where it was used once, with a note where it did not fully hold, **(proposed)** where it has not been run.
 
 ### What it assumes
 
