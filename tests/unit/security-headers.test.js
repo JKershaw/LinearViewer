@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { securityHeaders, APP_CSP, INLINE_SCRIPT_HASHES } from '../../lib/security-headers.js';
-import { renderPage } from '../../lib/components/page.js';
+import { renderPage, scriptBodyHash } from '../../lib/components/page.js';
 import { renderErrorPage } from '../../lib/render-pages.js';
 import { createLibraryRouter, LIBRARY_CSP } from '../../routes/library.js';
 import { createTaskShareRoutes } from '../../routes/task-share.js';
@@ -33,6 +33,10 @@ async function build() {
     title: 'Dash', content: '<main>hi</main>', embeddedData: { globalVar: '__X__', value: { a: 1 } },
   })));
   app.get('/error', (req, res) => res.status(500).send(renderErrorPage('Oops', 'Broken')));
+  // Mirrors server.js: verbatim docs/archive/*.html via sendFile (text/html).
+  app.get('/archive/:n(\\d+)', (req, res) => {
+    res.sendFile(`${req.params.n}.html`, { root: fileURLToPath(new URL('../../docs/archive', import.meta.url)) });
+  });
   app.get('/api/thing', (req, res) => res.json({ ok: true }));
   app.get('/plain', (req, res) => res.type('text/plain').send('hello'));
   app.get('/confirm', (req, res) => {
@@ -120,6 +124,22 @@ describe('securityHeaders()', () => {
       assert.equal(down.status, 503);
       assertAppPolicy(down);
     } finally { await new Promise(r => server.close(r)); }
+  });
+
+  test('/archive/:n (sendFile of verbatim HTML) carries the policy, with its inline scripts pinned', async () => {
+    const { base, close } = await build();
+    try {
+      for (const n of [1, 2, 4, 6]) {
+        const res = await fetch(`${base}/archive/${n}`);
+        assert.equal(res.status, 200);
+        assertAppPolicy(res);
+        const html = await res.text();
+        const src = scriptSrc(res.headers.get('content-security-policy'));
+        const bodies = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+        assert.ok(bodies.length > 0, `archive ${n} has an inline script`);
+        for (const body of bodies) assert.ok(src.includes(`'${scriptBodyHash(body)}'`), `archive ${n} script pinned`);
+      }
+    } finally { await close(); }
   });
 
   test('JSON and plain-text responses are untouched', async () => {

@@ -112,6 +112,23 @@ describe('rendered inline code is covered by APP_CSP', () => {
   });
 });
 
+describe('verbatim archive HTML served by /archive/:n', () => {
+  // The route sendFile's docs/archive/*.html as text/html, so APP_CSP applies:
+  // every inline script in them must be pinned or the browser blocks it.
+  const dir = join(ROOT, 'docs/archive');
+  const files = readdirSync(dir).filter(n => n.endsWith('.html'));
+
+  test('there are archives to check', () => {
+    assert.ok(files.length >= 9);
+  });
+
+  for (const name of files) {
+    test(`archive ${name}: every inline script is in script-src, no on*= handler`, () => {
+      assertCovered(`archive ${name}`, readFileSync(join(dir, name), 'utf8'));
+    });
+  }
+});
+
 describe('source sweep (no unaccounted inline code)', () => {
   const ALLOWED_INLINE_SCRIPT_FILES = new Map([
     ['lib/components/page.js', 'theme pre-paint + data loader'],
