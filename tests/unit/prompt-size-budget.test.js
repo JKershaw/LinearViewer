@@ -9,13 +9,18 @@
  * the freeze landed (menu M25, `docs/steady-base.md`).
  *
  * The unit is UTF-8 bytes (`Buffer.byteLength`), not `.length` — an em dash is
- * three bytes. A ceiling moves DOWN freely (a shrink needs no edit); it moves UP
- * only by removing at least as many bytes from another surface in the same
- * change. The net-zero total is enforced mechanically by `FROZEN_TOTAL_BYTES`,
- * which sums every ceiling below: raising one ceiling without lowering another
- * by the same amount pushes the sum over that constant and fails. Raising the
- * total itself means editing a second, clearly labelled constant — a visible,
- * reviewable act, not an incidental one.
+ * three bytes. Prompt text still lands as code or a test first where it can, and a
+ * shrink needs no edit. A surface grows only with its reason recorded beside the
+ * ceiling it raises: the ticket, the bytes, and why the lesson cannot be code or a
+ * test (LIN-3633; it replaced the earlier rule that a ceiling could rise only by
+ * removing as many bytes from another surface in the same change). No other approval
+ * is needed; review reads the comment. `FROZEN_TOTAL_BYTES` sums every ceiling below:
+ * raising one ceiling without raising that constant pushes the sum over it and fails,
+ * so a raise is a visible edit of a second, clearly labelled constant. The reason is
+ * held by `ceilingLinesWithoutTicket` below: every ceiling's line must carry a ticket
+ * reference in its comment. That check proves a reference is present, not that a raise
+ * changed it; review reads the comment, and `scripts/steady-base-growth.mjs` keeps
+ * reporting growth so a trend stays visible.
  *
  * Surfaces and the files that compose them mirror the `GROUPS` table in
  * `scripts/steady-base-growth.mjs` (the four-week growth read), so a drift in
@@ -55,7 +60,8 @@ import { buildRunnerKickoff } from '../../lib/prompts/runner-kickoff.js';
 // ─── Ceilings, measured at the freeze (LIN-3203) ─────────────────────────────
 // Each is the surface's UTF-8 byte count on the freeze branch. A ceiling is a
 // cap, not an identity pin: shrinking a surface needs no edit here. Growing one
-// needs an equal-or-greater removal elsewhere; see the message on each assert.
+// needs its reason recorded in the comment beside the ceiling it raises; see
+// OVER_CEILING_FIX, used by each assert.
 
 /** Templates, source bytes. Same files `steady-base-growth.mjs` GROUPS as
  * "worker templates". LIN-3292: the stage contract joins them, its 3481 bytes paid by
@@ -64,7 +70,7 @@ export const TEMPLATES_SOURCE_CEILINGS = {
   'lib/prompt-template-defs.js': 109931, // LIN-3615: -11 (109942), Check 5's pin-conversion rule and review's move-witness bullet paid by four unpinned cuts. Earlier: // LIN-3614: -1 (109943), the three close-out/review rules paid by cuts; net of the three touched ceilings is -2. Earlier: // LIN-3378: +16 net, retrospective-audit's whenNot names merged-and-approved but not Done (+72), paid by blocked's, context's and recap's route text (-56)
   'lib/prompt-templates.js': 19955, // LIN-3378: +20, defer's whenNot names plan-review (+36), its requires tightened (-16)
   'lib/prompt-formatters.js': 50224, // LIN-3299: +34, the hypothesis sentence covers a proposed solution or limit
-  'lib/prompt-contract.js': 3424,
+  'lib/prompt-contract.js': 3424, // LIN-3300: at 3424 since the one-path recommendation change
 };
 
 /** Templates, rendered bytes for each PROMPT_TEMPLATES key under FIXTURE_ISSUE +
@@ -79,23 +85,23 @@ export const TEMPLATES_SOURCE_CEILINGS = {
  * existed only in the deleted meta-prompt (+359 rendered), paid from its ceilings;
  * close-out's bug-label line renders only for a bug-labelled task, so not here. */
 export const TEMPLATES_RENDERED_CEILINGS = {
-  blocked: 3244,
-  bug: 4744,
+  blocked: 3244, // LIN-3299: at 3244 since Scope and Authority on every path
+  bug: 4744, // LIN-3299: at 4744 since Scope and Authority on every path
   plan: 15793, // LIN-3300: the planner's revision line no longer asks for an exact form or names the loop bound
-  'look-into': 1762,
-  triage: 2429,
-  breakdown: 5096,
-  research: 11514,
-  scoping: 2427,
-  design: 2562,
-  spike: 2581,
-  context: 2021,
+  'look-into': 1762, // LIN-3299: at 1762 since Scope and Authority on every path
+  triage: 2429, // LIN-3299: at 2429 since Scope and Authority on every path
+  breakdown: 5096, // LIN-3299: at 5096 since Scope and Authority on every path
+  research: 11514, // LIN-3299: at 11514 since Scope and Authority on every path
+  scoping: 2427, // LIN-3300: at 2427 since the stage rules only the meta-prompt carried moved into their templates
+  design: 2562, // LIN-3299: at 2562 since Scope and Authority on every path
+  spike: 2581, // LIN-3299: at 2581 since Scope and Authority on every path
+  context: 2021, // LIN-3300: at 2021 since the stage rules only the meta-prompt carried moved into their templates
   'plan-review': 7856, // LIN-3615: -99 (7955), the pin-conversion rule (+209) paid by cutting Verdict's restated opening, Completion's restated record line and the planner-owns-the-edit clause.
-  implementation: 7937,
+  implementation: 7937, // LIN-3300: at 7937 since the stage rules only the meta-prompt carried moved into their templates
   review: 15165, // LIN-3615: +88 (15077), the source-reading-test-is-no-witness bullet, paid by retiring the 'Code is ready for production' checklist item and by plan-review's cuts. Earlier: // LIN-3614: -521 (15598), unverifiable claims go in the ledger as not run; paid by cutting the repeated class-vs-ledger sentence, Completion's CI restatement and the Outside wording close-out restates. Earlier: // LIN-3326: -3297, the risk lanes and the authoring bound leave review
   'close-out': 11379, // LIN-3614: +520 (10859), an unasked live or post-deploy check is recorded as not run and the close goes ahead; stale citations are fixes; Triage states the outsider standard. Earlier: // LIN-3326: -7893, close-out finishes the work: no authoring bound, no hard gate, one statement of each floor
-  'retrospective-audit': 4427,
-  retro: 4265,
+  'retrospective-audit': 4427, // LIN-3299: at 4427 since Scope and Authority on every path
+  retro: 4265, // LIN-3299: at 4265 since Scope and Authority on every path
 };
 
 /**
@@ -122,15 +128,14 @@ export const ROUTER_PROMPT_RENDERED_CEILING = 9545; // LIN-3378: -10 net of b an
 export const STAGE_INTENT_SOURCE_CEILING = 2912; // LIN-3326: +82, close-out's own line (engineering calls in finishing the work are its), paid from close-out's rendered ceiling
 
 /** Served runner prompt, source bytes (docs/runner-prompt.md). */
-export const RUNNER_PROMPT_SOURCE_CEILING = 17474;
+export const RUNNER_PROMPT_SOURCE_CEILING = 17474; // LIN-3451: at 17474 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
 /** Served runner prompt, rendered bytes (buildRunnerKickoff at BASE_URL). */
-export const RUNNER_PROMPT_RENDERED_CEILING = 15789;
+export const RUNNER_PROMPT_RENDERED_CEILING = 15789; // LIN-3451: at 15789 since the runner kit matched Simple Dispatcher (halt / target / repo / cap)
 
 /**
- * The net-zero total: the sum of every ceiling above at the freeze. A PR may
- * move a ceiling up only by moving another down by at least as much; raising
- * the total is a deliberate edit to THIS number, in the same change, so it is
- * reviewed rather than assumed.
+ * The total: the sum of every ceiling above. A PR that raises a ceiling raises
+ * THIS number with it, in the same change, and says why in the comment beside the
+ * ceiling it raises; the raise is a visible edit, reviewed rather than assumed.
  *
  * LIN-3304 raised it by 6990 (568534 -> 575524) when lib/stage-router.js joined the
  * frozen surfaces. LIN-3300 lowered it to the sum of the ceilings above, each at its
@@ -185,6 +190,11 @@ const ROUTER_PROMPT_ARGS = {
   featureFlags: {}
 };
 
+// What every over-ceiling failure tells the author to do (LIN-3633).
+const OVER_CEILING_FIX =
+  'Land the lesson as code or a test first. If the text must grow, raise the ceiling and FROZEN_TOTAL_BYTES ' +
+  'with the reason in the comment beside the ceiling (the ticket, the bytes, why not code or a test).';
+
 const sourceBytes = (path) => Buffer.byteLength(readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url))));
 const renderBytes = (key) => Buffer.byteLength(generatePrompt(key, FIXTURE_ISSUE, FIXTURE_CONTEXT).prompt);
 
@@ -196,8 +206,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       if (actual > ceiling) over.push(`${file} is ${actual} bytes, ${actual - ceiling} over its ${ceiling}-byte ceiling`);
     }
     assert.deepStrictEqual(over, [],
-      `Prompt template source file(s) grew: ${over.join('; ')}. Remove at least the overage bytes elsewhere in the ` +
-      `same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+      `Prompt template source file(s) grew: ${over.join('; ')}. ${OVER_CEILING_FIX}`);
   });
 
   test('templates rendered bytes', () => {
@@ -207,8 +216,7 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
       if (actual > ceiling) over.push(`"${key}" renders to ${actual} bytes, ${actual - ceiling} over its ${ceiling}-byte ceiling`);
     }
     assert.deepStrictEqual(over, [],
-      `Template(s) grew: ${over.join('; ')}. Remove at least the overage bytes elsewhere in the same change, or ` +
-      `land the lesson as code or a test; raising a number alone is not the fix.`);
+      `Template(s) grew: ${over.join('; ')}. ${OVER_CEILING_FIX}`);
   });
 
 
@@ -216,50 +224,45 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
     const actual = sourceBytes('lib/stage-router.js');
     assert.ok(actual <= STAGE_ROUTER_SOURCE_CEILING,
       `lib/stage-router.js is ${actual} bytes, ${actual - STAGE_ROUTER_SOURCE_CEILING} over its ` +
-      `${STAGE_ROUTER_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - STAGE_ROUTER_SOURCE_CEILING} bytes ` +
-      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+      `${STAGE_ROUTER_SOURCE_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
   test('routing prompt rendered bytes', () => {
     const actual = Buffer.byteLength(buildRouterPrompt(ROUTER_PROMPT_ARGS));
     assert.ok(actual <= ROUTER_PROMPT_RENDERED_CEILING,
       `The routing prompt renders to ${actual} bytes, ${actual - ROUTER_PROMPT_RENDERED_CEILING} over its ` +
-      `${ROUTER_PROMPT_RENDERED_CEILING}-byte ceiling. Remove at least ${actual - ROUTER_PROMPT_RENDERED_CEILING} ` +
-      `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+      `${ROUTER_PROMPT_RENDERED_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
   test('stage intent source bytes', () => {
     const actual = sourceBytes('lib/prompts/stage-intent.js');
     assert.ok(actual <= STAGE_INTENT_SOURCE_CEILING,
       `lib/prompts/stage-intent.js is ${actual} bytes, ${actual - STAGE_INTENT_SOURCE_CEILING} over its ` +
-      `${STAGE_INTENT_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - STAGE_INTENT_SOURCE_CEILING} bytes ` +
-      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+      `${STAGE_INTENT_SOURCE_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
   test('served runner prompt source bytes', () => {
     const actual = sourceBytes('docs/runner-prompt.md');
     assert.ok(actual <= RUNNER_PROMPT_SOURCE_CEILING,
       `docs/runner-prompt.md is ${actual} bytes, ${actual - RUNNER_PROMPT_SOURCE_CEILING} over its ` +
-      `${RUNNER_PROMPT_SOURCE_CEILING}-byte ceiling. Remove at least ${actual - RUNNER_PROMPT_SOURCE_CEILING} bytes ` +
-      `elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+      `${RUNNER_PROMPT_SOURCE_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
   test('served runner prompt rendered bytes', () => {
     const actual = Buffer.byteLength(buildRunnerKickoff({ baseUrl: BASE_URL }));
     assert.ok(actual <= RUNNER_PROMPT_RENDERED_CEILING,
       `The served runner prompt renders to ${actual} bytes, ${actual - RUNNER_PROMPT_RENDERED_CEILING} over its ` +
-      `${RUNNER_PROMPT_RENDERED_CEILING}-byte ceiling. Remove at least ${actual - RUNNER_PROMPT_RENDERED_CEILING} ` +
-      `bytes elsewhere in the same change, or land the lesson as code or a test; raising a number alone is not the fix.`);
+      `${RUNNER_PROMPT_RENDERED_CEILING}-byte ceiling. ${OVER_CEILING_FIX}`);
   });
 
   test('the rendered budget covers exactly the live PROMPT_TEMPLATES key set', () => {
     // A new template without a budget (or a stale budget for a removed one) is a
-    // failure: adding a template means taking its bytes from somewhere else.
+    // failure: adding a template means giving it a ceiling with its reason beside it.
     assert.deepStrictEqual(
       Object.keys(TEMPLATES_RENDERED_CEILINGS).sort(),
       Object.keys(PROMPT_TEMPLATES).sort(),
-      'Every PROMPT_TEMPLATES key must carry a rendered ceiling and vice versa. A new template needs a budget ' +
-      'taken from another surface in the same change; land the lesson as code or a test instead of growing prompts.'
+      'Every PROMPT_TEMPLATES key must carry a rendered ceiling and vice versa. A new template needs a ceiling ' +
+      'with its reason recorded beside it, and FROZEN_TOTAL_BYTES raised to match. ' + OVER_CEILING_FIX
     );
   });
 
@@ -275,7 +278,53 @@ describe('prompt surfaces stay within their frozen byte budgets (LIN-3203)', () 
     ].reduce((sum, n) => sum + n, 0);
     assert.ok(ceilingSum <= FROZEN_TOTAL_BYTES,
       `The ceilings sum to ${ceilingSum} bytes, ${ceilingSum - FROZEN_TOTAL_BYTES} over the frozen total ` +
-      `${FROZEN_TOTAL_BYTES}. Lower another ceiling by at least ${ceilingSum - FROZEN_TOTAL_BYTES} bytes, or land ` +
-      `the lesson as code or a test; editing FROZEN_TOTAL_BYTES upward is a deliberate, reviewable act, not a fix.`);
+      `${FROZEN_TOTAL_BYTES}. Raising FROZEN_TOTAL_BYTES by ${ceilingSum - FROZEN_TOTAL_BYTES} is a deliberate, ` +
+      `reviewable edit, made together with the reason beside the ceiling that rose. ${OVER_CEILING_FIX}`);
+  });
+});
+
+// ─── The reason beside every ceiling (LIN-3633) ──────────────────────────────
+
+/**
+ * The ceiling lines in the block between the "Ceilings, measured at the freeze" banner
+ * and BASE_URL whose `//` comment carries no ticket reference. A ceiling line's code
+ * part is `NAME = <digits>` or `key: <digits>`. Pure over a source string so the tests
+ * below can run it on mutated copies of this file.
+ */
+const CEILING_LINE = /^\s*(?:export\s+const\s+\w+\s*=|['"]?[\w./-]+['"]?\s*:)\s*\d+/;
+const ceilingLines = (source) =>
+  source.slice(source.indexOf('Ceilings, measured at the freeze'), source.indexOf('const BASE_URL')).split('\n').filter(l => CEILING_LINE.test(l));
+
+export function ceilingLinesWithoutTicket(source) {
+  return ceilingLines(source).filter(l => !/\bLIN-\d+\b/.test(l.includes('//') ? l.slice(l.indexOf('//')) : ''));
+}
+
+describe('every ceiling carries its reason (LIN-3633)', () => {
+  const real = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  const strip = (line) => line.replace(/\bLIN-\d+\b/g, '');
+
+  test('the matcher sees every ceiling, so a pass is not vacuous', () => {
+    // Source and rendered keys, router source and rendered, intent, runner source and rendered, the total.
+    const expected = Object.keys(TEMPLATES_SOURCE_CEILINGS).length + Object.keys(TEMPLATES_RENDERED_CEILINGS).length + 5 + 1;
+    assert.equal(ceilingLines(real).length, expected,
+      'A ceiling is in a shape the matcher misses (or the matcher over-matches). Keep ceilings as `NAME = <digits>` or `key: <digits>`.');
+  });
+
+  test('on the real file, every ceiling line names a ticket in its comment', () => {
+    assert.deepStrictEqual(ceilingLinesWithoutTicket(real), [],
+      'A ceiling line has no ticket reference in its comment. A raise says why beside the ceiling: ' + OVER_CEILING_FIX);
+  });
+
+  test('a ceiling whose comment lost its ticket reference is reported', () => {
+    const line = real.split('\n').find(l => l.startsWith("  'plan-review':"));
+    assert.ok(line, 'fixture line not found');
+    assert.deepStrictEqual(ceilingLinesWithoutTicket(real.replace(line, strip(line))), [strip(line)]);
+  });
+
+  test('a ceiling raised with its comment deleted is reported', () => {
+    const line = real.split('\n').find(l => l.startsWith('export const STAGE_INTENT_SOURCE_CEILING'));
+    assert.ok(line, 'fixture line not found');
+    const raised = line.replace(/= \d+;.*/, '= 99999;');
+    assert.deepStrictEqual(ceilingLinesWithoutTicket(real.replace(line, raised)), [raised]);
   });
 });
