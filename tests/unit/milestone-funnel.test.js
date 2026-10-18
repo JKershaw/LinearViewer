@@ -558,6 +558,38 @@ describe('collectMilestoneFunnel — cross-account aggregate (LIN-2952)', () => 
     assert.equal(mode, null);
   });
 
+  // LIN-3501 close-out L2: "any person's no-signal step makes the whole step no-signal, count null,
+  // never a partial count". A person B who DID reach must not leak a count of 1 when person A's
+  // read fails, which is what `every(no-signal)` instead of `includes(no-signal)` would do.
+  test('one person\'s unreadable step makes the whole step no-signal, never a partial count (LIN-3501)', async () => {
+    const w = freshWorld();
+    const a = await w.accountStore.createAccount();
+    const b = await w.accountStore.createAccount();
+    const prEvidence = [{ kind: 'evidence', url: 'https://github.com/o/r/pull/1', timestamp: PAST(500) }];
+    await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(2000), { feedback: prEvidence }));
+    await w.dispatchHistory.insertOne(dispatchRow(b._id, PAST(1500), { feedback: prEvidence }));
+
+    // Throws only for A's group; B's read delegates to the real collection.
+    const failsForA = {
+      find(filter, options) {
+        if (filter?.dispatchedBy?.$in?.includes(a._id)) throw new Error('read failed for A');
+        return w.dispatchHistory.find(filter, options);
+      }
+    };
+
+    const { steps } = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w), dispatchHistory: failsForA });
+    assert.equal(steps.login.count, 2, 'both people signed up in the window');
+    for (const key of ['firstGo', 'prOpened']) {
+      assert.equal(steps[key].state, STEP_STATES.NO_SIGNAL, `${key}: one person's no-signal makes the step no-signal`);
+      assert.equal(steps[key].count, null, `${key}: never a partial count of the person who did read`);
+    }
+
+    // Control: with A's read healthy, both people reach both steps.
+    const healthy = await collectMilestoneFunnel({ since: WINDOW_START, ...aggDeps(w) });
+    assert.equal(healthy.steps.firstGo.count, 2);
+    assert.equal(healthy.steps.prOpened.count, 2);
+  });
+
   test('a candidate whose sign-in cannot be read makes all five steps no-signal, not an under-count', async () => {
     const w = freshWorld();
     await w.accountStore.createAccount();

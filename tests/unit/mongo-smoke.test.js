@@ -40,6 +40,7 @@ import { LINEAGE_QUERY_LIMIT } from '../../routes/proxy.js';
 import { establishAccount } from '../../lib/account-session.js';
 import { MagicLinkStore } from '../../lib/email-auth.js';
 import { __internal as pipelineInternal } from '../../lib/pipeline-loops.js';
+import { stepsForAccountGroup, STEP_STATES } from '../../lib/milestone-funnel.js';
 import { computeOwnershipReport } from '../../scripts/dry-run-workspace-ownership.mjs';
 import { computeUrlKeyDuplicateReport } from '../../scripts/dry-run-urlkey-duplicates.mjs';
 
@@ -2099,6 +2100,53 @@ describe(
 
       assert.deepStrictEqual(digestBacked, baseline,
         'no JSON normalization: a lingering Date-vs-ISO-string divergence must fail this, not be silently coerced to matching strings');
+    });
+
+    // LIN-3501 close-out L1: the milestone-funnel reader projects `feedback.kind/url/timestamp`
+    // (DISPATCH_PROJECTION) and scans EVERY feedback entry for PR evidence. MangoDB collapses a
+    // dotted projection into one object (first element's fields), so only a real mongod proves
+    // the within-row scan: on MangoDB both rows below read not-reached.
+    test('LIN-3501 (L1): PR opened scans every feedback entry of a row through the real dotted projection', async () => {
+      const history = freshCollection('lin3501-history');
+      const dispatchedBy = randomUUID();
+      const dispatchedAt = new Date(Date.now() - 60 * 60 * 1000);
+      const t1 = new Date(dispatchedAt.getTime() + 1000);
+      const t2 = new Date(dispatchedAt.getTime() + 2000);
+      const t3 = new Date(dispatchedAt.getTime() + 3000);
+      const t4 = new Date(dispatchedAt.getTime() + 4000);
+      const row = (feedback) => ({ _id: randomUUID(), dispatchedBy, dispatchedAt, target: 'cli', status: 'taken', feedback });
+
+      // Only the LAST entry is PR evidence; the earlier two are a non-PR evidence url and a PR url that is only a status.
+      const first = row([
+        { kind: 'evidence', url: 'https://github.com/o/r/issues/5', timestamp: t1 },
+        { kind: 'status', url: 'https://github.com/o/r/pull/7', timestamp: t2 },
+        { kind: 'evidence', url: 'https://github.com/o/r/pull/7', timestamp: t3 }
+      ]);
+      await history.insertOne(first);
+      const readFor = async () => (await stepsForAccountGroup({ accountIds: [dispatchedBy], dispatchHistory: history })).steps;
+
+      let steps = await readFor();
+      assert.strictEqual(steps.prOpened.state, STEP_STATES.REACHED, 'evidence that is not the first feedback entry is still found');
+      assert.strictEqual(steps.prOpened.at, t3.toISOString());
+
+      // A second row shaped [status, PR evidence] reaches too; the earliest evidence across rows wins.
+      await history.insertOne(row([
+        { kind: 'status', url: 'https://github.com/o/r/pull/8', timestamp: t1 },
+        { kind: 'evidence', url: 'https://github.com/o/r/pull/8', timestamp: t4 }
+      ]));
+      steps = await readFor();
+      assert.strictEqual(steps.prOpened.state, STEP_STATES.REACHED);
+      assert.strictEqual(steps.prOpened.at, t3.toISOString());
+
+      // The second row alone also reaches (at t4), so it is not riding on the first.
+      const alone = freshCollection('lin3501-history-alone');
+      await alone.insertOne(row([
+        { kind: 'status', url: 'https://github.com/o/r/pull/8', timestamp: t1 },
+        { kind: 'evidence', url: 'https://github.com/o/r/pull/8', timestamp: t4 }
+      ]));
+      const aloneSteps = (await stepsForAccountGroup({ accountIds: [dispatchedBy], dispatchHistory: alone })).steps;
+      assert.strictEqual(aloneSteps.prOpened.state, STEP_STATES.REACHED);
+      assert.strictEqual(aloneSteps.prOpened.at, t4.toISOString());
     });
   }
 );
