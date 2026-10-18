@@ -392,7 +392,7 @@ describe('computeUsageCostUsd — long-context override tier (LIN-2403)', () => 
     assert.strictEqual(cost, 5_000_000 * 5.00 / 1e6);
   });
 
-  test('the 7 rows with no override tier price byte-identically to HEAD', () => {
+  test('the 10 rows with no override tier price byte-identically to HEAD', () => {
     for (const id of Object.keys(MODEL_PRICING)) {
       if (Array.isArray(MODEL_PRICING[id].overrides)) continue;
       const usage = { model: id, harness: 'claude-code', inputTokens: 1_000_000, outputTokens: 1 };
@@ -508,13 +508,13 @@ describe('rate table shape (LIN-1495)', () => {
     }
   });
 
-  test('cacheWrite1h (LIN-2113) is present ONLY on the 6 anthropic/claude-* rows, at exactly 2x prompt', () => {
+  test('cacheWrite1h (LIN-2113) is present ONLY on the 9 anthropic/claude-* rows, at exactly 2x prompt', () => {
     // Verified live against https://openrouter.ai/api/v1/models on 2026-08-15: all six
     // anthropic/claude-* rows publish input_cache_write_1h at exactly prompt x 2;
     // openai/gpt-5.6-sol carries input_cache_write but no 1h key, and the other three
     // OpenAI rows carry neither.
     const anthropicRows = Object.keys(MODEL_PRICING).filter(id => id.startsWith('anthropic/claude-'));
-    assert.strictEqual(anthropicRows.length, 6, 'expected exactly 6 anthropic/claude-* rows');
+    assert.strictEqual(anthropicRows.length, 9, 'expected exactly 9 anthropic/claude-* rows (LIN-3094 added 3)');
     for (const id of anthropicRows) {
       const rate = MODEL_PRICING[id];
       assert.strictEqual(rate.cacheWrite1h, rate.prompt * 2, `${id} cacheWrite1h must be prompt x 2`);
@@ -670,6 +670,38 @@ describe('AVAILABLE_MODELS derives its pricing from this table (LIN-993 charter 
       assert.deepStrictEqual(Object.keys(display).sort(), ['completion', 'prompt']);
       assert.strictEqual(display.prompt, MODEL_PRICING[id].prompt);
       assert.strictEqual(display.completion, MODEL_PRICING[id].completion);
+    }
+  });
+});
+
+describe('models in use are priced (LIN-3094)', () => {
+  // CI guard: a model Harbour's workers actually run must never price to null.
+  // Add the next model here when it enters use; a null total on a task is what this prevents.
+  const MODELS_IN_USE = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1'];
+
+  for (const model of MODELS_IN_USE) {
+    test(`${model} prices to a number through computeUsageCostUsd`, () => {
+      const cost = computeUsageCostUsd({
+        model, harness: 'claude-code', inputTokens: 1000, outputTokens: 1000,
+        cacheReadInputTokens: 1000, cacheCreationInputTokens: 1000,
+      });
+      assert.ok(Number.isFinite(cost), `${model} priced to ${cost}`);
+    });
+  }
+
+  test('rows carry Anthropic\'s published rates, cache-read exceptions included', () => {
+    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-fable-5.1'] },
+      { prompt: 10.00, completion: 50.00, cacheRead: 0.25, cacheWrite: 12.50, cacheWrite1h: 20.00 });
+    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-opus-5.5'] },
+      { prompt: 4.00, completion: 20.00, cacheRead: 0.20, cacheWrite: 5.00, cacheWrite1h: 8.00 });
+    assert.deepStrictEqual({ ...MODEL_PRICING['anthropic/claude-sonnet-5.5'] },
+      { prompt: 2.00, completion: 10.00, cacheRead: 0.20, cacheWrite: 2.50, cacheWrite1h: 4.00 });
+  });
+
+  test('pricing rows are not permissions: none of the new ids is in AVAILABLE_MODELS', () => {
+    const ids = AVAILABLE_MODELS.map(m => m.id);
+    for (const id of ['anthropic/claude-fable-5.1', 'anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5']) {
+      assert.ok(!ids.includes(id), `${id} must not be selectable`);
     }
   });
 });
