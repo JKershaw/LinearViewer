@@ -16,7 +16,8 @@ import { localSeedId } from '../fixtures/local-harness.js';
 
 const REPO = 'acme/widget';
 const PR = `https://github.com/${REPO}/pull/12`;
-const PR_HEAD = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+// Begins with REVIEW_SHA: a head the review saw, so the box is ready (LIN-3418: a moved head is not).
+const PR_HEAD = 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0';
 const REVIEW_SHA = 'abc1234';
 
 const REVIEW_BODY = [
