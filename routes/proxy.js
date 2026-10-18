@@ -97,6 +97,7 @@ import {
   RefResolutionError,
 } from '../lib/proxy-ref-resolver.js';
 import { PartialWriteError } from '../lib/partial-write-error.js';
+import { tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, keepaliveError, notFound, workspaceUnavailableEnvelope, classifyUpstreamError } from '../lib/errors.js';
 
 // LIN-1458: which OpenRouter credential source served a request whose token
@@ -542,7 +543,7 @@ export function createProxyRoutes({ proxyTokenStore, proxyEventStore, agentStatu
     }
 
     try {
-      const result = await proxyTokenStore.validateToken(token);
+      const result = await proxyTokenStore.validateToken(token, tokenValidationOptions(req));
       if (!result) {
         // A rejected CALLER token and a rejected WORKSPACE credential are
         // both 401 and were, until LIN-1985, distinguishable ONLY in Harbour's

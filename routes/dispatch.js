@@ -21,7 +21,7 @@
  */
 
 import { Router } from 'express';
-import { createHeartbeatIngest } from '../lib/consumer-heartbeat-ingest.js';
+import { createHeartbeatIngest, tokenValidationOptions } from '../lib/consumer-heartbeat-ingest.js';
 import { badRequest, jsonError, notFound, unauthorized, serviceUnavailable } from '../lib/errors.js';
 import rateLimit from 'express-rate-limit';
 import fs from 'fs';
@@ -285,7 +285,7 @@ export function createDispatchRoutes({ dispatchQueueStore, dispatchTokenStore, w
     }
 
     try {
-      const result = await dispatchTokenStore.validateToken(token);
+      const result = await dispatchTokenStore.validateToken(token, tokenValidationOptions(req));
 
       if (!result) {
         return unauthorized.json(res, 'Invalid or expired token');

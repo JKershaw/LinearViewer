@@ -13,6 +13,10 @@ import { join } from 'node:path';
 import { MangoClient } from '@jkershaw/mangodb';
 import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { ConsumerHeartbeatStore } from '../../lib/consumer-heartbeat-store.js';
+import { DispatchTokenStore } from '../../lib/dispatch-tokens.js';
+import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
+import { isHeartbeatRequest } from '../../lib/consumer-heartbeat-ingest.js';
+import { getConsumerLastSeenAt } from '../../lib/consumer-poll-warning.js';
 import { ACME, buildApp, call } from './lib/proxy-fake-deps.js';
 
 const beat = (extra = {}) => ({
@@ -182,5 +186,92 @@ describe('GET /api/proxy/heartbeats', () => {
     store.listLive = async () => { throw new Error('down'); };
     const real = console.error; console.error = () => {};
     try { assert.equal((await call(readApp(), 'GET', '/api/proxy/heartbeats')).status, 500); } finally { console.error = real; }
+  });
+});
+
+// LIN-3647: a heartbeat is not a poll. Real token stores behind both doors; the
+// "did not touch" assertions wait for a control token's fire-and-forget write.
+describe('heartbeat routes do not refresh lastUsedAt (LIN-3647)', () => {
+  let dStore, pStore;
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const lastUsed = async (s, token) => (await s.collection.findOne({ tokenHash: s._hashToken(token) })).lastUsedAt;
+  async function until(fn) { for (let i = 0; i < 200 && !(await fn()); i++) await wait(5); return fn(); }
+
+  beforeEach(async () => {
+    const tokens = client.db('linear-viewer');
+    await tokens.collection('dispatch-tokens-3647').deleteMany({});
+    await tokens.collection('proxy-tokens-3647').deleteMany({});
+    dStore = new DispatchTokenStore({ collection: tokens.collection('dispatch-tokens-3647') });
+    pStore = new ProxyTokenStore({ collection: tokens.collection('proxy-tokens-3647') });
+  });
+
+  function dApp() {
+    const app = express();
+    app.use(express.json({ limit: '250kb' }));
+    app.use(createDispatchRoutes({
+      dispatchQueueStore: { pollAvailable: async () => [] },
+      dispatchTokenStore: dStore,
+      workspaceFromUrl: (req, res, next) => next(),
+      userPreferencesStore: {},
+      consumerHeartbeatStore: store
+    }));
+    return app;
+  }
+  // The real store behind the door; only grants are stubbed (public createToken cannot mint them).
+  const pApp = () => buildApp({
+    consumerHeartbeatStore: store,
+    proxyTokenStore: {
+      validateToken: async (t, o) => { const r = await pStore.validateToken(t, o); return r && { ...r, grants: ['take'] }; },
+      listTokens: async () => [], describeRejectionCause: async () => null
+    }
+  });
+
+  // Control tokens live in ANOTHER workspace so getConsumerLastSeenAt('acme') never counts them.
+  async function settled(s, control) {
+    await s.validateToken(control);
+    assert.ok(await until(() => lastUsed(s, control)), 'control write landed');
+  }
+  const seen = () => getConsumerLastSeenAt({ listTokens: (u) => dStore.listTokens(u) }, 'acme');
+  const poll = async (app, path, token) => {
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(r => server.once('listening', r));
+    try {
+      return (await fetch(`http://127.0.0.1:${server.address().port}${path}`, { headers: { Authorization: `Bearer ${token}` } })).status;
+    } finally { server.closeAllConnections(); await new Promise(r => server.close(r)); }
+  };
+
+  test('dispatch door: heartbeats (any routable spelling) leave lastUsedAt null; a poll stamps it', async () => {
+    const { token } = await dStore.createToken('acme', 'sd', 'a');
+    const control = (await dStore.createToken('ctl', 'control', 'a')).token;
+    for (const path of ['/api/dispatch/heartbeat', '/api/dispatch/heartbeat/', '/API/Dispatch/Heartbeat?x=1']) {
+      assert.equal((await post(dApp(), path, { body: beat(), token })).status, 204, path);
+    }
+    await settled(dStore, control);
+    assert.equal(await lastUsed(dStore, token), null, 'heartbeats did not touch');
+    assert.equal(await seen(), null, 'consumer reads as never polled');
+
+    assert.equal(await poll(dApp(), '/api/dispatch/poll', token), 200);
+    assert.ok(await until(() => lastUsed(dStore, token)), 'a non-heartbeat call still touches');
+    assert.notEqual(await seen(), null);
+  });
+
+  test('runner door: heartbeats leave lastUsedAt null; a non-heartbeat runner call stamps it', async () => {
+    const { token } = await pStore.createToken('acme', { label: 'kit' });
+    const control = (await pStore.createToken('ctl', { label: 'control' })).token;
+    for (const path of ['/api/proxy/runner/heartbeat', '/api/proxy/runner/heartbeat/', '/API/proxy/Runner/HEARTBEAT']) {
+      assert.equal((await post(pApp(), path, { body: beat({ consumerKind: 'runner-kit' }), token })).status, 204, path);
+    }
+    await settled(pStore, control);
+    assert.equal(await lastUsed(pStore, token), null, 'heartbeats did not touch');
+
+    assert.equal(await poll(pApp(), '/api/proxy/runner/poll', token), 200);
+    assert.ok(await until(() => lastUsed(pStore, token)), 'a non-heartbeat call still touches');
+  });
+
+  test('isHeartbeatRequest matches only the two heartbeat paths', () => {
+    const yes = ['/api/dispatch/heartbeat', '/api/proxy/runner/heartbeat/', '/Api/Proxy/Runner/Heartbeat?a=b'];
+    const no = ['/api/dispatch/poll', '/api/proxy/heartbeats', '/api/proxy/runner/take/x', '/api/dispatch/heartbeat/x', '/x/api/dispatch/heartbeat'];
+    for (const u of yes) assert.equal(isHeartbeatRequest({ originalUrl: u }), true, u);
+    for (const u of no) assert.equal(isHeartbeatRequest({ originalUrl: u }), false, u);
   });
 });
