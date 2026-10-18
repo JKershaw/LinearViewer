@@ -18,6 +18,7 @@ import { createDispatchRoutes } from '../../routes/dispatch.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
 import { closeOutNotReady, CLOSE_OUT_NOT_READY_CODE } from '../../lib/close-out-readiness.js';
 import { clearFailOpenPrStatus } from '../../lib/github-pr-status.js';
+import { ISSUE_NOT_FOUND_CODE } from '../../lib/dispatch-referent-guard.js';
 import { createMockCollection } from '../fixtures/mock-collection.js';
 
 const PR = 'https://github.com/acme/widget/pull/41';
@@ -57,7 +58,7 @@ function makeSeam({ comments = COMMENTS, statuses = { 41: openStatus(41, MOVED) 
   };
 }
 
-function buildApp(store, closeOut) {
+function buildApp(store, closeOut, { provider, accessToken } = {}) {
   const app = express();
   app.use(express.json());
   app.use(createDispatchRoutes({
@@ -65,7 +66,7 @@ function buildApp(store, closeOut) {
     dispatchQueueStore: store,
     dispatchTokenStore: {},
     workspaceFromUrl: (req, res, next) => {
-      req.workspace = { urlKey: req.params.urlKey };
+      req.workspace = { urlKey: req.params.urlKey, ...(accessToken ? { id: 'ws-1', accessToken } : {}) };
       req.session = { accountId: 'u1', linearUserId: 'u1' };
       next();
     },
@@ -73,6 +74,7 @@ function buildApp(store, closeOut) {
     harbourFeedbackTokenStore: null,
     workspacePreferencesStore: undefined,
     dispatchPresetsStore: undefined,
+    ...(provider ? { provider } : {}),
     closeOut
   }));
   return app;
@@ -159,6 +161,36 @@ describe('LIN-3634: session close-out readiness stage', () => {
       const { store } = makeStore();
       assert.equal((await post(buildApp(store, seam), CLOSE_OUT)).status, 201);
     }
+  });
+
+  test('a dangling issue answers 422 before any readiness read', async () => {
+    // The dangling stage needs a credential-bearing workspace and a guarded provider
+    // (name in GUARDED_PROVIDERS) whose issueWriteGuard answers a definitive null.
+    const { store, getInsertCount } = makeStore();
+    const seam = makeSeam();
+    const provider = { name: 'local', supports: () => true, issueWriteGuard: async () => null };
+    const res = await post(buildApp(store, seam, { provider, accessToken: 'test-token' }), CLOSE_OUT);
+    assert.equal(res.status, 422, JSON.stringify(res.body));
+    assert.equal(res.body.code, ISSUE_NOT_FOUND_CODE);
+    assert.deepEqual(seam.calls, { resolveProvider: 0, fetchIssueComments: 0, readPrStatus: 0 });
+    assert.equal(getInsertCount(), 0);
+  });
+
+  test('an unreadable PR admits and leaves a warn line naming the task', async () => {
+    const { store } = makeStore();
+    const warns = [];
+    const original = console.warn;
+    console.warn = (...args) => { warns.push(args); };
+    try {
+      const res = await post(buildApp(store, makeSeam({ unreadable: true })), CLOSE_OUT);
+      assert.equal(res.status, 201, JSON.stringify(res.body));
+    } finally {
+      console.warn = original;
+    }
+    assert.ok(
+      warns.some(a => a[0] === '[close-out-readiness] PR unreadable, admitting:' && a[1] === 'LIN-1'),
+      `expected the unreadable-PR warn, got ${JSON.stringify(warns)}`
+    );
   });
 
   test('an abort, and a close-out with no issue anywhere, never read', async () => {
