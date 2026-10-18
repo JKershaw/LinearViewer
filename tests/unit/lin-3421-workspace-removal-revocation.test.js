@@ -105,13 +105,14 @@ describe('workspace removal revokes the removing account\'s artifacts (LIN-3421)
     });
   }
 
-  test('a merged-away alias in createdBy is covered via the canonical id', async () => {
+  test('a stale alias session also revokes rows under the canonical id', async () => {
     revoker = createWorkspaceRemovalRevoker({
       proxyTokenStore: proxy, dispatchTokenStore: dispatch, taskShareStore: shares,
       workspaceOwnerCheck: async () => ({ status: 'not-owner' }),
       resolveCanonicalAccountId: async (id) => (id === 'acct-old' ? 'acct-a' : id)
     });
-    const old = await seed('acct-old');
+    // Rows sit under the canonical id; the session still carries the stale alias.
+    const old = await seed('acct-a');
     await route()({ params: { urlKey: KEY }, session: oneWorkspace('acct-old') }, makeRes());
     assert.deepEqual(await live(old), { proxy: false, dispatch: false, link: false });
     // canonical lookup failure falls back to the session account only
