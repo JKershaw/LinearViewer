@@ -357,6 +357,8 @@ function fakeProvider() {
     ]),
     // LIN-1329: the human GitHub identity, resolved from the discovery user
     // token — distinct from the installation account (`userId` above).
+    // LIN-3404: the signed-in user's own installations (fresh-install membership check).
+    listUserInstallations: async () => ([{ id: '99', account: { login: 'octocat' } }, { id: 'bad', account: { login: 'octocat' } }]),
     fetchViewer: async () => ({ id: 'human-42', login: 'octocat', name: 'The Octocat' }),
   };
 }
@@ -603,7 +605,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
-    await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', setup_action: 'install', code: 'oauth-code', state: 'real' }, session }, res);
     // Installation token + installation-account identity held in pending; installationId
     // (re-mint key) and the raw expires_at both carried for the binding-shape surface (LIN-711).
     assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'new', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z' });
@@ -621,7 +623,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
-    await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', setup_action: 'install', code: 'oauth-code', state: 'real' }, session }, res);
     assert.match(res.body, /https:\/\/github\.com\/settings\/installations\/99/);
   });
 
@@ -638,8 +640,120 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
-    await handler({ query: { installation_id: '99', setup_action: 'install', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', setup_action: 'install', code: 'oauth-code', state: 'real' }, session }, res);
     assert.match(res.body, /repo-picker-truncated-note/);
+  });
+
+  // LIN-3404: the fresh-install branch must not mint from a bare `installation_id`
+  // (GitHub's setup-URL id is not proof of ownership). It mints only for an id on
+  // the signed-in user's own /user/installations list.
+  describe('GET callback fresh-install membership check (LIN-3404)', () => {
+    function mintSpy(overrides = {}) {
+      const calls = [];
+      const base = fakeProvider();
+      const provider = {
+        ...base,
+        completeInstallation: async (id) => { calls.push(id); return base.completeInstallation(id); },
+        ...overrides,
+      };
+      return { provider, calls };
+    }
+    async function callback(provider, query, sessionInit = {}) {
+      const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
+      const handler = getHandler(router, 'get', '/auth/github/callback');
+      const res = makeRes();
+      const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' }, ...sessionInit });
+      await handler({ query: { state: 'real', ...query }, session }, res);
+      return { res, session };
+    }
+
+    test('WITNESS: an installation_id not on the user\'s list is refused with a 400 and never minted', async () => {
+      const { provider, calls } = mintSpy();
+      const { res, session } = await callback(provider, { installation_id: '555', setup_action: 'install', code: 'oauth-code' });
+      assert.equal(res.statusCode, 400);
+      assert.match(res.body, /cannot access that installation/);
+      assert.deepEqual(calls, [], 'completeInstallation must never be called');
+      assert.equal(session.githubPending, undefined);
+      assert.equal(session.githubHumanId, undefined, 'a refused callback does not stash an identity');
+    });
+
+    test('arm 1: code + a listed installation_id mints, renders the picker and stashes the viewer id', async () => {
+      const { provider, calls } = mintSpy();
+      const { res, session } = await callback(provider, { installation_id: '99', setup_action: 'install', code: 'oauth-code' });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(calls, ['99']);
+      assert.equal(session.githubPending.installationId, '99');
+      assert.equal(session.githubHumanId, 'human-42');
+    });
+
+    test('arm 2: installation_id with no code is a plain 400 page (no redirect, no mint) that restarts the flow', async () => {
+      const { provider, calls } = mintSpy();
+      const { res } = await callback(provider, { installation_id: '99', setup_action: 'install' });
+      assert.equal(res.statusCode, 400);
+      assert.equal(res.redirectedTo, null);
+      assert.deepEqual(calls, []);
+      assert.match(res.body, /Authentication Required/);
+      assert.ok(res.body.includes('href="/auth/github"'));
+    });
+
+    test('an array-valued installation_id or code never matches or mints', async () => {
+      const { provider, calls } = mintSpy();
+      const a = await callback(provider, { installation_id: ['99', '555'], code: 'oauth-code' });
+      const b = await callback(provider, { installation_id: '99', code: ['x', 'y'] });
+      assert.equal(a.res.statusCode, 400);
+      assert.equal(b.res.statusCode, 400);
+      assert.deepEqual(calls, []);
+    });
+
+    test('a viewer whose id differs from the session githubHumanId is refused, no mint', async () => {
+      const { provider, calls } = mintSpy();
+      const { res, session } = await callback(provider, { installation_id: '99', code: 'oauth-code' }, { githubHumanId: 'someone-else' });
+      assert.equal(res.statusCode, 400);
+      assert.match(res.body, /does not match/);
+      assert.deepEqual(calls, []);
+      assert.equal(session.githubHumanId, 'someone-else');
+    });
+
+    test('a matching session githubHumanId does not block the mint', async () => {
+      const { provider, calls } = mintSpy();
+      const { res } = await callback(provider, { installation_id: '99', code: 'oauth-code' }, { githubHumanId: 'human-42' });
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(calls, ['99']);
+    });
+
+    test('fails closed when the membership lookup throws', async () => {
+      const { provider, calls } = mintSpy({ listUserInstallations: async () => { throw new Error('boom'); } });
+      const { res } = await callback(provider, { installation_id: '99', code: 'oauth-code' });
+      assert.equal(res.statusCode, 400);
+      assert.match(res.body, /Could not verify your access/);
+      assert.deepEqual(calls, []);
+    });
+
+    test('a failed code exchange is refused before any membership lookup or mint', async () => {
+      let listed = false;
+      const { provider, calls } = mintSpy({ listUserInstallations: async () => { listed = true; return []; } });
+      const { res } = await callback(provider, { installation_id: '99', code: 'bad' });
+      assert.equal(res.statusCode, 400);
+      assert.equal(listed, false);
+      assert.deepEqual(calls, []);
+    });
+
+    test('rejected callbacks log flags only, never the raw query values', async () => {
+      const logged = [];
+      const orig = console.log;
+      console.log = (...a) => { logged.push(JSON.stringify(a)); };
+      try {
+        const { provider } = mintSpy();
+        await callback(provider, { installation_id: '555', code: 'secret-code-value' });
+        await callback(provider, { installation_id: '555' });
+      } finally {
+        console.log = orig;
+      }
+      assert.ok(logged.length >= 2);
+      for (const line of logged) {
+        assert.doesNotMatch(line, /secret-code-value|555/);
+      }
+    });
   });
 
   test('GET callback (add-source) carries the viewed-workspace urlKey from intent into pending', async () => {
@@ -647,7 +761,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'add-source', provider: 'github', workspaceUrlKey: 'acme' } });
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, res);
     assert.deepEqual(session.githubPending, { token: 'ghs_inst', mode: 'add-source', login: 'octocat', userId: '42', installationId: '99', tokenExpiresAt: '2026-06-25T20:00:00Z', workspaceUrlKey: 'acme' });
   });
 
@@ -662,7 +776,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', fresh: true } });
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, res);
     assert.strictEqual(session.githubPending.fresh, true);
   });
 
@@ -670,7 +784,7 @@ describe('GitHub auth routes', () => {
     const router = createGitHubAuthRoutes({ ...withResolver(), provider: fakeProvider(), ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
-    await handler({ query: { installation_id: 'bad', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    await handler({ query: { installation_id: 'bad', code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/);
   });
@@ -1593,7 +1707,7 @@ describe('GitHub auth routes', () => {
     const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
-    await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 400);
     assert.match(res.body, /Authentication Failed/, 'generic friendly headline preserved');
     assert.match(res.body, /error-details/, 'diagnostic block rendered');
@@ -1678,7 +1792,7 @@ describe('GitHub auth routes', () => {
     const router = createGitHubAuthRoutes({ ...withResolver(), provider, ...freshAccountStores() });
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
-    await handler({ query: { installation_id: '99', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session: makeSession({ oauthState: 'real' }) }, res);
     assert.equal(res.statusCode, 500);
     assert.match(res.body, /Connection Error/);
     assert.match(res.body, /Could not fetch your repositories from GitHub/);
@@ -1701,7 +1815,7 @@ describe('GitHub auth routes', () => {
     const res = makeRes();
     const session = makeSession({ oauthState: 'real' });
     session.save = () => { throw new Error('session store unavailable') };
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, res);
     assert.equal(res.statusCode, 500);
     assert.match(res.body, /Something Went Wrong/);
     assert.match(res.body, /An unexpected error occurred during GitHub authentication/);
@@ -1730,7 +1844,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { provider: 'github' } });
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, res);
     assert.equal(session.githubPending.mode, 'new');
   });
 
@@ -1739,7 +1853,7 @@ describe('GitHub auth routes', () => {
     const handler = getHandler(router, 'get', '/auth/github/callback');
     const res = makeRes();
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'nonsense', provider: 'github' } });
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, res);
     assert.equal(session.githubPending.mode, 'new');
   });
 
@@ -1797,7 +1911,7 @@ describe('GitHub auth routes', () => {
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
     const res = makeRes();
 
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, res);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, res);
 
     assert.match(res.body, /github-repo-form/, 'the picker still renders');
     assert.equal(session.oauthState, undefined);
@@ -1826,12 +1940,12 @@ describe('GitHub auth routes', () => {
     const session = makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: 'github' } });
 
     const first = makeRes();
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, first);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, first);
     assert.match(first.body, /github-repo-form/);
 
     // Same session, same nonce, replayed — the guard now has nothing to match.
     const replay = makeRes();
-    await handler({ query: { installation_id: '99', state: 'real' }, session }, replay);
+    await handler({ query: { installation_id: '99', code: 'oauth-code', state: 'real' }, session }, replay);
 
     assert.equal(replay.statusCode, 400);
     assert.match(replay.body, /Session Expired/);

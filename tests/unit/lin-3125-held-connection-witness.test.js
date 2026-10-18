@@ -162,10 +162,12 @@ async function firstConnect(h, session, repo) {
   await getHandler(h.flow, 'get', '/auth/github/callback')({ query: { code: 'code-1', state }, session }, c1);
   assert.match(c1.redirectedTo, /installations\/new/, 'first-time connect falls through to the App install');
 
-  // The user installs the App; GitHub returns an installation_id (same nonce).
+  // The user installs the App; GitHub returns an installation_id (same nonce). LIN-3404:
+  // the return carries the OAuth `code` (arm 1), so the user's access to the installation
+  // is proven before it is minted. The no-code shape is covered by its own witness below.
   h.setInstallationsVisible(true);
   const c2 = makeRes();
-  await getHandler(h.flow, 'get', '/auth/github/callback')({ query: { installation_id: INSTALLATION, setup_action: 'install', state }, session }, c2);
+  await getHandler(h.flow, 'get', '/auth/github/callback')({ query: { code: 'code-2', installation_id: INSTALLATION, setup_action: 'install', state }, session }, c2);
   assert.match(c2.body, /github-repo-form/, 'callback renders the repo picker');
 
   const l = makeRes();
@@ -266,6 +268,31 @@ describe('LIN-3125 Phase 3 — acceptance witness: three repos, one connection',
 
     // (5) no identity freshness stamp from the refused held add.
     assert.equal(session.identityAuthenticatedAt, freshness, 'identityAuthenticatedAt unchanged by the held refusal');
+  });
+
+  test('LIN-3404 arm 2: an install return with no code is refused (no mint), and the restart round trip reaches the picker', async () => {
+    const h = await harness(client);
+    const session = makeSession();
+    const g = makeRes();
+    await getHandler(h.flow, 'get', '/auth/github')({ query: { mode: 'new' }, session }, g);
+    const state = session.oauthState;
+    h.setInstallationsVisible(true);
+    const mark = snap(h.counters);
+
+    const noCode = makeRes();
+    await getHandler(h.flow, 'get', '/auth/github/callback')({ query: { installation_id: INSTALLATION, setup_action: 'install', state }, session }, noCode);
+    assert.equal(noCode.statusCode, 400);
+    assert.equal(noCode.redirectedTo, null);
+    assert.equal(deltas(mark, h.counters).mint, 0, 'no installation token minted');
+    assert.equal(session.oauthState, state, 'the nonce survives the refusal so the restart/retry still works');
+
+    // The page's action restarts the flow; the code-only callback lists the user's
+    // installations (including the new one) and renders the re-bind picker.
+    const restart = makeRes();
+    await getHandler(h.flow, 'get', '/auth/github')({ query: { mode: 'new' }, session }, restart);
+    const c = makeRes();
+    await getHandler(h.flow, 'get', '/auth/github/callback')({ query: { code: 'code-3', state: session.oauthState }, session }, c);
+    assert.match(c.body, /github-repo-form/, 'restart reaches the picker');
   });
 
   test('stale-token variant: a held add onto a workspace without this kind refreshes exactly once', async () => {

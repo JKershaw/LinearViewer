@@ -221,19 +221,19 @@ export function buildBranches(d) {
     {
       key: 'callback:install-completeInstallation-fails',
       method: 'get', path: callback,
-      build: () => ({ req: { query: { installation_id: 'bad', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
-      provider: P,
+      build: () => ({ req: { query: { installation_id: '99', code: 'oauth-code', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
+      provider: () => ({ ...P(), completeInstallation: async () => { throw new Error('GitHub App auth: installation-token request failed'); } }),
     },
     {
       key: 'callback:install-listChoices-fails',
       method: 'get', path: callback,
-      build: () => ({ req: { query: { installation_id: '99', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
+      build: () => ({ req: { query: { installation_id: '99', code: 'oauth-code', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
       provider: () => ({ ...P(), [d.listChoicesMethod]: async () => { throw new Error('boom'); } }),
     },
     {
       key: 'callback:install-success-renders-picker',
       method: 'get', path: callback,
-      build: () => ({ req: { query: { installation_id: '99', setup_action: 'install', state: 'real' } }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: d.providerName } }) }),
+      build: () => ({ req: { query: { installation_id: '99', setup_action: 'install', code: 'oauth-code', state: 'real' } }, session: makeSession({ oauthState: 'real', oauthIntent: { mode: 'new', provider: d.providerName } }) }),
       provider: P,
     },
     {
@@ -242,9 +242,36 @@ export function buildBranches(d) {
       build: () => {
         const session = makeSession({ oauthState: 'real' });
         session.save = () => { throw new Error('session store unavailable'); };
-        return { req: { query: { installation_id: '99', state: 'real' } }, session };
+        return { req: { query: { installation_id: '99', code: 'oauth-code', state: 'real' } }, session };
       },
       provider: P,
+    },
+
+    // LIN-3404: the fresh-install branch mints only for an id on the signed-in
+    // user's own /user/installations list. Each refusal is a plain 400, no mint.
+    {
+      key: 'callback:install-no-code-refused',
+      method: 'get', path: callback,
+      build: () => ({ req: { query: { installation_id: '99', setup_action: 'install', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
+      provider: P,
+    },
+    {
+      key: 'callback:install-not-on-user-list',
+      method: 'get', path: callback,
+      build: () => ({ req: { query: { installation_id: '555', code: 'oauth-code', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
+      provider: P,
+    },
+    {
+      key: 'callback:install-human-id-mismatch',
+      method: 'get', path: callback,
+      build: () => ({ req: { query: { installation_id: '99', code: 'oauth-code', state: 'real' } }, session: makeSession({ oauthState: 'real', githubHumanId: 'someone-else' }) }),
+      provider: P,
+    },
+    {
+      key: 'callback:install-access-check-fails',
+      method: 'get', path: callback,
+      build: () => ({ req: { query: { installation_id: '99', code: 'oauth-code', state: 'real' } }, session: makeSession({ oauthState: 'real' }) }),
+      provider: () => ({ ...P(), listUserInstallations: async () => { throw new Error('boom'); } }),
     },
 
     // --- link ------------------------------------------------------------
