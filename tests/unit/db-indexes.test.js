@@ -156,18 +156,6 @@ describe('db-indexes', () => {
     }
   });
 
-  test('declares the funnel-events first-per-account index, not a TTL (LIN-2952)', () => {
-    // FunnelEventStore.firstPerAccount reads {step, accountId} sorted by `at`
-    // oldest first; the `step` prefix also serves the instance-wide aggregate
-    // read. The log is lifetime-retained, so it may not be a TTL.
-    const spec = INDEX_SPECS.find(s =>
-      s.collection === 'funnel-events' &&
-      JSON.stringify(s.keySpec) === JSON.stringify({ step: 1, accountId: 1, at: 1 })
-    );
-    assert.ok(spec, 'funnel-events must have a {step:1, accountId:1, at:1} index');
-    assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
-  });
-
   test('declares the per-account dispatch indexes on both collections (LIN-2952 + LIN-3238)', () => {
     // ONE index per collection serves both readers: the milestone funnel reads a
     // person's dispatches by `dispatchedBy`, earliest `dispatchedAt` first
@@ -207,6 +195,18 @@ describe('db-indexes', () => {
     );
     assert.ok(perTask, 'close-out-events must have a {urlKey:1,issueIdentifier:1,at:1} index');
     assert.strictEqual(perTask.options?.expireAfterSeconds, undefined);
+  });
+
+  test('declares the close-out-events press index for the funnel\'s merge-clicked step, not a TTL (LIN-3500)', () => {
+    // CloseOutEventsStore.firstPressAt reads {by:'press', accountId $in} sorted
+    // by `at` oldest first. The log is lifetime-retained, so it may not be a TTL.
+    const spec = INDEX_SPECS.find(s =>
+      s.collection === 'close-out-events' &&
+      JSON.stringify(s.keySpec) === JSON.stringify({ by: 1, accountId: 1, at: 1 })
+    );
+    assert.ok(spec, 'close-out-events must have a {by:1,accountId:1,at:1} index');
+    assert.strictEqual(spec.options?.expireAfterSeconds, undefined);
+    assert.ok(!INDEX_SPECS.some(s => s.collection === 'funnel-events'), 'the funnel-events store is retired (LIN-3500)');
   });
 
   test('declares observer-state\'s eviction index keyed on lastSeenAt, never updatedAt (LIN-2129 review F1, pinned LIN-2142)', () => {

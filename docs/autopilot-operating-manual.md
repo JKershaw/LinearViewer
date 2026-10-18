@@ -506,7 +506,7 @@ bounded, whether or not research's enumeration listed it — the list is evidenc
 edge — or a claim this ticket's own change depends on. An inside item settles only by cited evidence
 it's done, or by being left undone with what's left and why (warranted only when finishing it is a
 change the team would need to hear about first); **filing a follow-up ticket for it is never a
-discharge**, however well the ticket reads, and an inside item left undone is not filed later. Only an
+discharge**, however well the ticket reads, and an inside item left undone is not filed later. (The one exception, LIN-3614: a live or post-deploy check the ticket did not ask for, which close-out cannot run, is recorded as not run, with what, why and the follow-up, and does not hold the close.) Only an
 item **outside** every bounded class — a genuinely different kind of problem — may be filed, and only
 when the filing states the problem on its own terms. So when a review lands an Approve (or a
 conditional Approve) on work that's still unmerged, your move is the same as anywhere else —

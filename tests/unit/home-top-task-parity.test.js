@@ -18,6 +18,7 @@ import { nodeKey } from '../../lib/tree.js';
 // Side-effect import: the Linear provider self-registers so getProviderForWorkspace
 // resolves for the workspace below (same idiom as tests/unit/render.test.js).
 import '../../lib/providers/linear/index.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 // ---------------------------------------------------------------------------
 // Linear-shaped fixture. The front card must carry a non-empty `why` (a started
@@ -54,9 +55,7 @@ function buildTrees() {
 const WORKSPACE = { urlKey: 'ws', name: 'WS', provider: 'linear' };
 
 function embedded(html, globalVar) {
-  const m = html.match(new RegExp(`window\\.${globalVar} = (.*?);</script>`, 's'));
-  assert.ok(m, `${globalVar} embedded script present`);
-  return JSON.parse(m[1]);
+  return extractEmbeddedData(html, globalVar);
 }
 
 // Read Home's marked row: its id and decoded why array.

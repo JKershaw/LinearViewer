@@ -17,6 +17,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderPage, renderDetailsContent } from '../../lib/render.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 const STUB_PROVIDER = { name: 'jira', ui: { write: false, comments: true, estimates: true, subtasks: true, displayName: 'Jira' } };
 const WORKSPACE = { urlKey: 'ws', name: 'WS', provider: 'jira' };
@@ -33,9 +34,7 @@ function homeOpts(overrides = {}) {
   const html = renderPage([], [], [], 'Org', {
     urlKey: 'ws', workspaces: [WORKSPACE], openRouterSource: 'oauth', featureFlags: {}, ...overrides
   });
-  const m = html.match(/window\.__HOME_PROMPT_OPTS__ = (.*?);<\/script>/s);
-  assert.ok(m, '__HOME_PROMPT_OPTS__ embedded');
-  return JSON.parse(m[1]);
+  return extractEmbeddedData(html, '__HOME_PROMPT_OPTS__');
 }
 
 describe('Home opened-task mount: source provenance (LIN-1904/LIN-1910)', () => {

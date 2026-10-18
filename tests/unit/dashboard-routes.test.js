@@ -23,6 +23,7 @@ import { createTaskDoneCache } from '../../lib/task-done-cache.js';
 import { DismissalSuggestionsStore } from '../../lib/dismissal-suggestions-store.js';
 import { TaskDecisionsStore } from '../../lib/task-decisions-store.js';
 import { withFreshDigests } from '../fixtures/with-fresh-digests.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 const NOW_ISO = new Date().toISOString();
 // >24h ago: a session whose last activity is this old falls into Archive under
@@ -5695,8 +5696,8 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    assert.match(res.sentBody, /window\.__OBSERVATION_DATA__/);
-    const data = JSON.parse(res.sentBody.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/)[1]);
+    assert.ok(embeddedDataText(res.sentBody, '__OBSERVATION_DATA__') !== null);
+    const data = extractEmbeddedData(res.sentBody, '__OBSERVATION_DATA__');
     assert.ok('scanCostEstimate' in data, 'scanCostEstimate key is present in the embedded data');
     assert.strictEqual(data.scanCostEstimate, null, 'an unwired store degrades to null (renders as "unknown"), never a fabricated number');
   });
@@ -5712,7 +5713,7 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    const data = JSON.parse(res.sentBody.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/)[1]);
+    const data = extractEmbeddedData(res.sentBody, '__OBSERVATION_DATA__');
     assert.ok('scanCostEstimate' in data, 'scanCostEstimate key is present in the embedded data');
     assert.strictEqual(data.scanCostEstimate, null, 'the retained .catch(() => null) degrades a rejected read to null, rendered client-side as "unknown"');
   });
@@ -5729,7 +5730,7 @@ describe('GET /workspace/:urlKey/observation — scan cost estimate wiring + asy
     await handler(req, res);
 
     assert.equal(res.statusCode, 200);
-    const data = JSON.parse(res.sentBody.match(/window\.__OBSERVATION_DATA__ = ([\s\S]*?);<\/script>/)[1]);
+    const data = extractEmbeddedData(res.sentBody, '__OBSERVATION_DATA__');
     assert.deepEqual(data.scanCostEstimate, estimate);
   });
 

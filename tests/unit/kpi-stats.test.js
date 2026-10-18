@@ -535,7 +535,7 @@ describe('collectKpiStats', () => {
         listEdgesForAccounts: async () => [{ accountId: 'MILESTONE-SECRET-ACCOUNT', workspaceId: 'MILESTONE-SECRET-WSID', createdAt: NOW }]
       },
       taskModeStore: { countByEntryRung: async () => ({ total: 1, byRung: [{ rung: 'copy', entries: 1, notReady: 0 }], coverage: { surfaces: ['swipe'] } }) },
-      funnelEventStore: { firstPerAccount: async () => [leakyAccount] },
+      closeOutEventsStore: { firstPressAt: async () => NOW },
       dispatchQueue: createMockCollection([]),
       dispatchHistory: createMockCollection([{
         _id: 'MILESTONE-SECRET-DISPATCH', urlKey: 'MILESTONE-SECRET-WSKEY',

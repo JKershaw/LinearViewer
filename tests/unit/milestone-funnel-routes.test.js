@@ -20,7 +20,7 @@ import { createMilestoneFunnelRoutes } from '../../routes/milestone-funnel.js';
 import { AccountStore } from '../../lib/account-store.js';
 import { AccountWorkspaceStore } from '../../lib/account-workspace-store.js';
 import { TaskModeStore } from '../../lib/task-mode-store.js';
-import { FunnelEventStore } from '../../lib/funnel-event-store.js';
+import { CloseOutEventsStore } from '../../lib/close-out-events-store.js';
 import { createMangoTmpdir } from '../fixtures/mango-tmpdir.js';
 
 const PATH = '/workspace/acme/api/milestone-funnel';
@@ -43,7 +43,7 @@ function freshWorld() {
     accountStore: new AccountStore({ collection: db.collection('accounts') }),
     accountWorkspaceStore: new AccountWorkspaceStore({ collection: db.collection('account-workspaces') }),
     taskModeStore: new TaskModeStore({ collection: db.collection('task-mode-events') }),
-    funnelEventStore: new FunnelEventStore({ collection: db.collection('funnel-events') }),
+    closeOutEventsStore: new CloseOutEventsStore({ collection: db.collection('close-out-events') }),
     dispatchQueue: db.collection('dispatch-queue'),
     dispatchHistory: db.collection('dispatch-history')
   };
@@ -58,7 +58,7 @@ function buildApp(w, session = { accountId: 'acct-1' }, overrides = {}) {
     accountWorkspaceStore: w.accountWorkspaceStore,
     dispatchQueue: w.dispatchQueue,
     dispatchHistory: w.dispatchHistory,
-    funnelEventStore: w.funnelEventStore,
+    closeOutEventsStore: w.closeOutEventsStore,
     ...overrides,
     workspaceFromUrl: stubWorkspaceFromUrl(session)
   }));
@@ -107,6 +107,11 @@ describe('LIN-2952 — GET /workspace/:urlKey/api/milestone-funnel', () => {
     await w.dispatchHistory.insertOne(dispatchRow(a._id, PAST(1500), {
       feedback: [{ kind: 'evidence', url: 'https://github.com/o/r/pull/9', timestamp: prAt }]
     }));
+    const mergeAt = new Date(Date.now() - 500);
+    await w.closeOutEventsStore.collection.insertOne({
+      _id: 'co-1', urlKey: 'acme', accountId: a._id, issueIdentifier: 'LIN-1', by: 'press',
+      dispatchId: 'd-1', prUrl: 'https://github.com/o/r/pull/9', merged: false, at: mergeAt
+    });
     await w.taskModeStore.record({
       accountId: a._id, urlKey: 'acme', issueId: null, issueIdentifier: 'LIN-1',
       rung: 'run-task', ready: false, needs: 'proxy', act: 'press', surface: 'swipe'
@@ -121,7 +126,8 @@ describe('LIN-2952 — GET /workspace/:urlKey/api/milestone-funnel', () => {
     assert.equal(res.body.steps.connected.at, connectedAt.toISOString());
     assert.equal(res.body.steps.firstGo.at, goAt.toISOString());
     assert.equal(res.body.steps.prOpened.at, prAt.toISOString());
-    assert.equal(res.body.steps.mergeClicked.state, 'no-signal');
+    assert.equal(res.body.steps.mergeClicked.state, 'reached');
+    assert.equal(res.body.steps.mergeClicked.at, mergeAt.toISOString());
     assert.deepEqual(res.body.outOfOrder, []);
     // The mode join exposes the not-ready entry press (the settled entry rule).
     assert.equal(res.body.mode.entry.rung, 'run-task');
@@ -158,12 +164,11 @@ describe('LIN-2952 — GET /workspace/:urlKey/api/milestone-funnel', () => {
     assert.equal(res.body.steps.login.at, mergedAt.toISOString(), 'the group\'s EARLIEST createdAt wins');
   });
 
-  test('R2: an instrumented merge-click read that throws is no-signal, not not-reached', async () => {
+  test('R2: a merge-click read that throws is no-signal, not not-reached', async () => {
     const w = freshWorld();
     const a = await w.accountStore.createAccount();
     const res = await call(buildApp(w, { accountId: a._id }, {
-      funnelEventStore: new FunnelEventStore({ collection: { find: () => { throw new Error('db down'); } } }),
-      instrumentedSteps: ['merge-clicked']
+      closeOutEventsStore: new CloseOutEventsStore({ collection: { find: () => { throw new Error('db down'); } } })
     }), 'get', PATH);
     assert.equal(res.status, 200, res.text);
     assert.equal(res.body.steps.mergeClicked.state, 'no-signal');

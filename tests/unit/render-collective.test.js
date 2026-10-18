@@ -6,6 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { renderCollectivePage } from '../../lib/render-collective.js';
+import { extractEmbeddedData, embeddedDataText } from '../helpers/embedded-data.js';
 
 function render(data = {}, options = {}) {
   return renderCollectivePage(
@@ -92,7 +93,7 @@ describe('renderCollectivePage', () => {
 
   test('embeds config in __COLLECTIVE_DATA__', () => {
     const html = render();
-    assert.ok(html.includes('window.__COLLECTIVE_DATA__'));
+    assert.ok(embeddedDataText(html, '__COLLECTIVE_DATA__') !== null);
     assert.ok(html.includes('"defaultChannel":"#Collective"'));
     assert.ok(html.includes('"yapConfigured":true'));
   });
