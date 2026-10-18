@@ -117,7 +117,7 @@ async function gotoSession(page, sessionId) {
 }
 
 test.describe('Run evidence on the session page (LIN-3247)', () => {
-  test('ready: asked/done/checked rows, collapsed ledger, ready box — and no straggler flags', async ({ page }) => {
+  test('moved head: asked/done/checked rows, collapsed ledger, not-ready box — and no straggler flags', async ({ page }) => {
     await seedLocalWorkspaceWithEvidence(page);
     await seedFinishedRun(page);
     await page.request.post('/test/seed-pr-status', {
@@ -168,10 +168,12 @@ test.describe('Run evidence on the session page (LIN-3247)', () => {
     // Each claim is one step from its proof: the follow-up ticket is shown.
     await expect(page.locator('[data-testid="run-evidence-ledger-followup"]')).toContainText('LIN-9999');
 
-    // The ready box, with the "or merge it yourself" wording.
-    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toBeVisible();
-    await expect(page.locator('[data-testid="run-evidence-closeout-ready"]')).toContainText('PR ready for close-out');
-    await expect(page.locator('[data-testid="run-evidence-closeout-merge-yourself"]')).toContainText('or merge it yourself on GitHub');
+    // LIN-3418: the review saw a different head, so the box is NOT ready: it says
+    // why instead of inviting a close-out beside the "head moved" line.
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="not-ready"]')).toBeVisible();
+    await expect(page.locator('[data-testid="run-evidence-closeout-withheld"]')).toContainText('the pull request changed since the review approved it');
+    await expect(page.locator('[data-testid="run-evidence-closeout-press"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="run-evidence-closeout"][data-state="ready"]')).toHaveCount(0);
   });
 
   test('withheld: an unreadable PR read says "not checked" and shows the withheld box', async ({ page }) => {

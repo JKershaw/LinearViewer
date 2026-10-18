@@ -116,17 +116,53 @@ describe('deriveCloseOutState — truth table', () => {
     assert.match(state.readyCopy, /PR ready for close-out/);
   });
 
-  test('a moved head keeps the run ready but flags it', () => {
-    const state = deriveCloseOutState({
-      prs: [pr(41)],
-      prStatuses: [openStatus('bbbbbbb')],
-      review: approve(),
-      runnerReady: true,
-      owner: true,
-      stopAt: 'pr',
-    });
-    assert.strictEqual(state.status, CLOSE_OUT_STATUS.READY);
+  // LIN-3418: a head that moved after the review approved it is never ready.
+  const movedArgs = (over = {}) => ({
+    prs: [pr(41)],
+    prStatuses: [openStatus('bbbbbbb')],
+    review: approve(),
+    runnerReady: true,
+    owner: true,
+    stopAt: 'pr',
+    ...over,
+  });
+
+  test('a moved head is not ready and not pressable (head-moved)', () => {
+    const state = deriveCloseOutState(movedArgs());
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.NOT_READY);
+    assert.strictEqual(state.reason, 'head-moved');
+    assert.strictEqual(state.message, 'the pull request changed since the review approved it');
+    assert.strictEqual(state.ready, false);
+    assert.strictEqual(state.pressable, false);
     assert.strictEqual(state.headMoved, true);
+  });
+
+  test('the same sha and an abbreviated sha stay ready', () => {
+    for (const sha of ['aaaaaaa', 'aaaaaaa1234567', 'aaa']) {
+      const state = deriveCloseOutState(movedArgs({ prStatuses: [openStatus(sha)] }));
+      assert.strictEqual(state.status, CLOSE_OUT_STATUS.READY, sha);
+    }
+  });
+
+  test('head-moved never overrides an earlier not-ready reason', () => {
+    assert.strictEqual(deriveCloseOutState(movedArgs({ stopAt: null })).reason, 'not-stop-at-run');
+    assert.strictEqual(deriveCloseOutState(movedArgs({ review: approve('request-changes') })).reason, 'review-not-approve');
+    assert.strictEqual(deriveCloseOutState(movedArgs({ runnerReady: false })).reason, 'runner-not-set-up');
+    assert.strictEqual(
+      deriveCloseOutState(movedArgs({ prs: [pr(41), pr(42)], prStatuses: [openStatus('bbbbbbb', { number: 41 }), openStatus('bbbbbbb', { number: 42 })] })).reason,
+      'multiple-prs'
+    );
+  });
+
+  test('a merge after a moved head still sets Done as before (closeOutSetsDone unchanged)', () => {
+    // `byPersonCheck` is required for setDone to be true at all; without it both
+    // sides read false and the equality below pins nothing.
+    const base = movedArgs({ prStatuses: [mergedStatus('bbbbbbb')], byPersonCheck: true });
+    const state = deriveCloseOutState(base);
+    assert.strictEqual(state.status, CLOSE_OUT_STATUS.MERGED);
+    assert.strictEqual(state.setDone, true);
+    const before = deriveCloseOutState({ ...base, prStatuses: [mergedStatus('aaaaaaa')] });
+    assert.strictEqual(state.setDone, before.setDone);
   });
 
   test('a non-stop-at-PR run is never ready, however the PR reads', () => {

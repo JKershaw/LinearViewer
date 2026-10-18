@@ -450,7 +450,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     // the person to merge".
     await postFeedback(page, token, anchorId, '[done] orchestrated the run');
     await page.request.post('/test/seed-pr-status', {
-      data: { repo: 'acme/app', number: 41, readable: true, state: 'open', merged: false, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+      data: { repo: 'acme/app', number: 41, readable: true, state: 'open', merged: false, headSha: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0', checks: [{ name: 'unit', conclusion: 'success' }] },
     });
 
     await page.goto(`/workspace/${URL_KEY}/task/LOCAL-TP1`);
@@ -542,7 +542,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await postFeedback(page, token, anchorId, '[done] orchestrated the run');
     // The PR is merged and the tracker is already Done: the end state.
     await page.request.post('/test/seed-pr-status', {
-      data: { repo: 'acme/app', number: 41, readable: true, state: 'closed', merged: true, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+      data: { repo: 'acme/app', number: 41, readable: true, state: 'closed', merged: true, headSha: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0', checks: [{ name: 'unit', conclusion: 'success' }] },
     });
 
     let loads = 0;
@@ -606,7 +606,7 @@ test.describe('Task page, owner view (LIN-3329)', () => {
     await postFeedback(page, token, anchorId, '[done] orchestrated the run');
     // The PR is merged, the tracker is NOT done: the first check writes Done.
     await page.request.post('/test/seed-pr-status', {
-      data: { repo: 'acme/app', number: PR_NUM, readable: true, state: 'closed', merged: true, headSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef', checks: [{ name: 'unit', conclusion: 'success' }] },
+      data: { repo: 'acme/app', number: PR_NUM, readable: true, state: 'closed', merged: true, headSha: 'abc1234deadbeefdeadbeefdeadbeefdeadbeef0', checks: [{ name: 'unit', conclusion: 'success' }] },
     });
 
     let loads = 0;
