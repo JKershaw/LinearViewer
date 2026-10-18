@@ -14,7 +14,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { readPrStatusFailOpen, fetchPrStatus, isGitHubRepoSlug } from '../../lib/github-pr-status.js';
+import { readPrStatusFailOpen, fetchPrStatus, isGitHubRepoSlug, primeFailOpenPrStatus, clearFailOpenPrStatus } from '../../lib/github-pr-status.js';
 
 const REPO = 'JKershaw/LinearViewer';
 const SHA = 'abc1234abc1234abc1234abc1234abc1234abcd';
@@ -143,5 +143,44 @@ describe('readPrStatusFailOpen', () => {
     assert.ok(callsAfterFirst > 0);
     await readPrStatusFailOpen(args);
     assert.strictEqual(doFetch.calls.length, callsAfterFirst, 'the second read must be served from the wrapper cache');
+  });
+});
+
+describe('primeFailOpenPrStatus seed (LIN-3634)', () => {
+  const primed = { repo: REPO, readable: true, number: 42, state: 'open', merged: false, head: { ref: null, sha: 'seeded' }, ref: 'seeded', checks: [] };
+  const throwingFetch = () => { throw new Error('live GitHub must not be reached'); };
+
+  test('a primed value answers a read with a FRESH cache and a fetch that throws', async () => {
+    clearFailOpenPrStatus();
+    primeFailOpenPrStatus({ repo: REPO, number: 42, value: primed });
+    const got = await readPrStatusFailOpen({ repo: REPO, number: 42, doFetch: throwingFetch, cache: new Map() });
+    assert.strictEqual(got, primed);
+    clearFailOpenPrStatus();
+  });
+
+  test('a primed value does not expire with the prime\'s ttl', async () => {
+    clearFailOpenPrStatus();
+    primeFailOpenPrStatus({ repo: REPO, number: 42, value: primed, ttlMs: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const got = await readPrStatusFailOpen({ repo: REPO, number: 42, doFetch: throwingFetch, cache: new Map() });
+    assert.strictEqual(got, primed);
+    clearFailOpenPrStatus();
+  });
+
+  test('after clearFailOpenPrStatus the read goes to the fetch', async () => {
+    primeFailOpenPrStatus({ repo: REPO, number: 42, value: primed });
+    clearFailOpenPrStatus();
+    let fetched = false;
+    const got = await readPrStatusFailOpen({ repo: REPO, number: 42, doFetch: () => { fetched = true; throw new Error('x'); }, cache: new Map() });
+    assert.ok(fetched, 'the fetch is called once the seed is cleared');
+    assert.strictEqual(got.readable, false);
+  });
+
+  test('with no prime a read is unchanged', async () => {
+    clearFailOpenPrStatus();
+    const doFetch = makeFakeFetch(SUCCESS_RESPONSES);
+    const got = await readPrStatusFailOpen({ repo: REPO, number: 42, sha: SHA, doFetch, cache: new Map() });
+    assert.ok(doFetch.calls.length > 0);
+    assert.strictEqual(got.readable, true);
   });
 });

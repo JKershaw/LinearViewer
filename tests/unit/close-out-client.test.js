@@ -127,6 +127,51 @@ describe('close-out.js: the press (the 8 Oct witness)', () => {
   });
 });
 
+describe('close-out.js: a not-ready refusal (LIN-3634)', () => {
+  function pressWith(rejection) {
+    const attrs = { 'data-url-key': 'acme', 'data-issue-id': UUID, 'data-issue-identifier': 'LIN-50', 'data-state': 'ready' };
+    const painted = [];
+    const b = {
+      firstChild: null,
+      getAttribute: (k) => (k in attrs ? attrs[k] : null),
+      setAttribute(k, v) { attrs[k] = v; },
+      appendChild(el) { painted.push(el); },
+      removeChild() {},
+    };
+    const window = {
+      api() { return Promise.resolve({ prompt: 'P' }); },
+      dispatchPrompt() { return Promise.reject(rejection); },
+    };
+    const btn = { textContent: 'close out', disabled: false };
+    const quiet = { ...console, error() {} };
+    const module = { exports: {} };
+    vm.runInNewContext(SRC, {
+      module, window, console: quiet, URLSearchParams, setTimeout, clearTimeout, Promise, Array, String, encodeURIComponent,
+      document: { createElement() { return { attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, textContent: '' }; }, addEventListener() {} },
+    });
+    return { run: () => module.exports.pressCloseOut(b, btn), attrs, painted, btn };
+  }
+
+  test('a 409 CLOSE_OUT_NOT_READY repaints the box from the refusal state and re-enables the button', async () => {
+    const err = Object.assign(new Error('The pull request changed since the review approved it'), {
+      body: { code: 'CLOSE_OUT_NOT_READY', reason: 'head-moved', state: { status: 'not-ready', reason: 'head-moved' } },
+    });
+    const { run, attrs, painted, btn } = pressWith(err);
+    await run();
+    assert.equal(attrs['data-state'], 'not-ready');
+    assert.equal(painted.length, 1, 'the box shows the not-ready line');
+    assert.equal(btn.disabled, false);
+    assert.equal(btn.textContent, 'close out');
+  });
+
+  test('any other failure leaves the box as it was', async () => {
+    const { run, attrs, painted } = pressWith(Object.assign(new Error('nope'), { body: { code: 'SOMETHING_ELSE' } }));
+    await run();
+    assert.equal(attrs['data-state'], 'ready');
+    assert.equal(painted.length, 0);
+  });
+});
+
 describe('close-out.js: the check', () => {
   test('only a stop-at-PR run at ready/merged/partial checks, and the body carries source', async () => {
     const calls = [];
