@@ -233,7 +233,8 @@ Feedback entries are displayed in the dispatch history UI and are **retained for
 Optional. A consumer may report its host load and session counts so the operator can pace lanes
 from one read (`GET /api/proxy/heartbeats` on the Agent API) instead of guessing. It is a different
 channel from the per-item `[working]` line: it is about the consumer, not an item. It adds to, and
-does not replace, last-poll tracking.
+does not replace, last-poll tracking: a heartbeat does not refresh the token's
+`lastUsedAt`, so it never counts as a poll.
 
 ```
 POST /api/dispatch/heartbeat

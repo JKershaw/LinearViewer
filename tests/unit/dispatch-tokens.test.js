@@ -97,3 +97,38 @@ describe('LIN-1397 — DispatchTokenStore createdBy plumbing', () => {
     assert.equal(validated.createdBy, null);
   });
 });
+
+// LIN-3647: a consumer heartbeat is not a poll. `touch: false` validates without
+// refreshing lastUsedAt. The write is fire-and-forget, so "did not touch" is only
+// meaningful once a control row's write (same code path, touch default) has landed.
+describe('LIN-3647 — DispatchTokenStore.validateToken touch option', () => {
+  const lastUsed = async (store, token) =>
+    (await store.collection.findOne({ tokenHash: store._hashToken(token) })).lastUsedAt;
+  async function settle(store, control) {
+    await store.validateToken(control);
+    for (let i = 0; i < 200 && !(await lastUsed(store, control)); i++) {
+      await new Promise(r => setTimeout(r, 5));
+    }
+    assert.ok(await lastUsed(store, control), 'control write landed');
+  }
+
+  test('touch: false leaves lastUsedAt null; the default still stamps it', async () => {
+    const store = new DispatchTokenStore({ collection: createMockCollection() });
+    const { token } = await store.createToken('acme', 'sd', 'account-A');
+    const control = (await store.createToken('acme', 'control', 'account-A')).token;
+
+    const validated = await store.validateToken(token, { touch: false });
+    assert.equal(validated.urlKey, 'acme', 'still authenticates');
+    await settle(store, control);
+    assert.equal(await lastUsed(store, token), null, 'heartbeat validation did not touch');
+
+    await store.validateToken(token);
+    for (let i = 0; i < 200 && !(await lastUsed(store, token)); i++) await new Promise(r => setTimeout(r, 5));
+    assert.ok(await lastUsed(store, token), 'default validation still touches');
+  });
+
+  test('touch: false still rejects unknown tokens', async () => {
+    const store = new DispatchTokenStore({ collection: createMockCollection() });
+    assert.equal(await store.validateToken('nope', { touch: false }), null);
+  });
+});

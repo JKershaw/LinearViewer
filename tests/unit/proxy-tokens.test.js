@@ -680,3 +680,44 @@ describe('ProxyTokenStore', () => {
     });
   });
 });
+
+// LIN-3647: `touch: false` (heartbeat routes) skips only the recency write.
+describe('ProxyTokenStore.validateToken touch option (LIN-3647)', () => {
+  let store;
+  beforeEach(() => { store = new ProxyTokenStore({ collection: createMockCollection() }); });
+  const row = (token) => store.collection.findOne({ tokenHash: store._hashToken(token) });
+  async function settle(control) {
+    await store.validateToken(control);
+    for (let i = 0; i < 200 && !(await row(control)).lastUsedAt; i++) await new Promise(r => setTimeout(r, 5));
+    assert.ok((await row(control)).lastUsedAt, 'control write landed');
+  }
+
+  test('touch: false leaves lastUsedAt unchanged on a reusable token; default stamps it', async () => {
+    const { token } = await store.createToken('workspace-1', { label: 'kit' });
+    const control = (await store.createToken('workspace-1', { label: 'control' })).token;
+
+    const validated = await store.validateToken(token, { touch: false });
+    assert.equal(validated.urlKey, 'workspace-1');
+    await settle(control);
+    assert.equal((await row(token)).lastUsedAt, null);
+
+    await store.validateToken(token);
+    for (let i = 0; i < 200 && !(await row(token)).lastUsedAt; i++) await new Promise(r => setTimeout(r, 5));
+    assert.ok((await row(token)).lastUsedAt, 'default validation still touches');
+  });
+
+  test('touch: false still consumes a single-use token and stamps lastUsedAt (cleanup prunes by it)', async () => {
+    const { token } = await store.createToken('workspace-1', { singleUse: true });
+    const validated = await store.validateToken(token, { touch: false });
+    assert.ok(validated, 'first use authenticates');
+    const doc = await row(token);
+    assert.equal(doc.consumed, true);
+    assert.ok(doc.lastUsedAt instanceof Date, 'consume stamp kept');
+    assert.equal(await store.validateToken(token, { touch: false }), null, 'second use rejected');
+  });
+
+  test('touch: false does not bypass expiry', async () => {
+    const { token } = await store.createToken('workspace-1', { ttl: -1 });
+    assert.equal(await store.validateToken(token, { touch: false }), null);
+  });
+});
