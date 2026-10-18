@@ -78,14 +78,14 @@ function emptyMilestoneFunnelDeps() {
   const emptyCollection = { find: () => ({ toArray: async () => [] }) };
   const emptyStore = {
     collection: emptyCollection,
-    firstPerAccount: async () => [],
+    firstPressAt: async () => null,
     countByEntryRung: async () => ({ total: 0, byRung: [], coverage: { surfaces: [] } })
   };
   return {
     taskModeStore: emptyStore,
     accountStore: emptyStore,
     accountWorkspaceStore: emptyStore,
-    funnelEventStore: emptyStore,
+    closeOutEventsStore: emptyStore,
     dispatchQueue: emptyCollection,
     dispatchHistory: emptyCollection
   };

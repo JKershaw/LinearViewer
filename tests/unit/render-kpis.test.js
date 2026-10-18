@@ -98,7 +98,7 @@ function buildStats(overrides = {}) {
         connected: { state: 'reached', count: 3, coverage: 'account↔workspace membership-edge createdAt' },
         firstGo: { state: 'reached', count: 2, coverage: 'fresh Go presses (one Go press = one fresh dispatch row), oldest first' },
         prOpened: { state: 'reached', count: 1, coverage: 'runner [evidence] feedback with a PR URL — a witnessed proxy for open time' },
-        mergeClicked: { state: 'no-signal', count: null, coverage: 'awaiting instrumentation (LIN-2949)' }
+        mergeClicked: { state: 'no-signal', count: null, coverage: 'close-out press events (by: press), earliest for the group' }
       },
       mode: { total: 3, byRung: [{ rung: 'copy', entries: 2, notReady: 1 }], coverage: { surfaces: ['swipe'] } }
     },
@@ -194,7 +194,7 @@ describe('renderKpisPage', () => {
     test('every no-signal step is a text row, naming the step and its coverage', () => {
       const html = renderKpisPage(buildStats());
       assert.ok(html.includes('data-milestone-step="mergeClicked"'));
-      assert.ok(html.includes('merge clicked: no signal, awaiting instrumentation (LIN-2949)'));
+      assert.ok(html.includes('merge clicked: no signal, close-out press events (by: press), earliest for the group'));
 
       const all = renderKpisPage(buildStats({
         milestoneFunnel: { steps: {
