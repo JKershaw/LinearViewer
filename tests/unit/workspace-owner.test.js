@@ -27,7 +27,7 @@ import { AccountStore } from '../../lib/account-store.js';
 import { INDEX_SPECS } from '../../lib/db-indexes.js';
 import { ProxyTokenStore } from '../../lib/proxy-tokens.js';
 import { RUNNER_GRANTS } from '../../lib/proxy-scopes.js';
-import { checkWorkspaceOwner, createWorkspaceOwnerCheck } from '../../lib/workspace-owner.js';
+import { checkWorkspaceOwner, createWorkspaceOwnerCheck, isOwnerAnswer, readOwnerStatus } from '../../lib/workspace-owner.js';
 
 // ---------------------------------------------------------------------------
 // Fakes for the seam boundary
@@ -357,5 +357,65 @@ describe('LIN-3131 — L2: an absent workspaceId fails closed for mint and excha
       0,
       'no working token may be minted'
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LIN-3648 — the one reader of the answer contract
+// ---------------------------------------------------------------------------
+
+describe('LIN-3648 — readOwnerStatus / isOwnerAnswer', () => {
+  const fnWith = (status) => Object.assign(() => {}, { status });
+  const countingGetter = (target) => {
+    let reads = 0;
+    Object.defineProperty(target, 'status', { get() { reads++; return 'owner'; } });
+    return () => reads;
+  };
+
+  test('recognised statuses on a plain object are returned as they are', () => {
+    for (const status of ['owner', 'not-owner', 'no-owner']) {
+      assert.equal(readOwnerStatus({ status }), status);
+    }
+  });
+
+  test('isOwnerAnswer is true only for an object whose status is owner', () => {
+    assert.equal(isOwnerAnswer({ status: 'owner' }), true);
+    assert.equal(isOwnerAnswer(Object.assign([], { status: 'owner' })), true);
+    for (const answer of [
+      { status: 'not-owner' }, { status: 'no-owner' }, { status: 'unavailable' }, { status: 'weird' },
+      {}, [], null, undefined, 5, 'owner', true,
+      fnWith('owner'), fnWith('not-owner'), fnWith('no-owner'), fnWith(undefined)
+    ]) {
+      assert.equal(isOwnerAnswer(answer), false, String(JSON.stringify(answer)));
+    }
+  });
+
+  test('every unrecognised answer reads as unavailable', () => {
+    for (const answer of [null, undefined, 5, 'owner', true, {}, [], { status: 'weird' }, { status: 'unavailable' }, fnWith('owner')]) {
+      assert.equal(readOwnerStatus(answer), 'unavailable');
+    }
+  });
+
+  test('shape first: status is read exactly once off an object, never off a function', () => {
+    const obj = {};
+    const objReads = countingGetter(obj);
+    assert.equal(readOwnerStatus(obj), 'owner');
+    assert.equal(objReads(), 1);
+
+    const fn = () => {};
+    const fnReads = countingGetter(fn);
+    assert.equal(readOwnerStatus(fn), 'unavailable');
+    assert.equal(isOwnerAnswer(fn), false);
+    assert.equal(fnReads(), 0);
+  });
+
+  test('a throwing status getter on an object or array propagates; on a function it is never read', () => {
+    const boom = () => { throw new Error('getter'); };
+    const obj = Object.defineProperty({}, 'status', { get: boom });
+    const arr = Object.defineProperty([], 'status', { get: boom });
+    const fn = Object.defineProperty(() => {}, 'status', { get: boom });
+    assert.throws(() => readOwnerStatus(obj), /getter/);
+    assert.throws(() => isOwnerAnswer(arr), /getter/);
+    assert.equal(readOwnerStatus(fn), 'unavailable');
   });
 });
