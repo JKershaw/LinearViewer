@@ -143,34 +143,36 @@ describe('targets', () => {
   });
 });
 
+// Harbour stub shared by the `take` and `feedback` rows: records every feedback message posted.
+function setup(taken) {
+  const home = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-'));
+  const dir = path.join(home, 'acme');
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  credentialStore({ file: path.join(dir, 'runner.token') }).set('runner-working-token');
+  fs.writeFileSync(path.join(dir, 'runner.json'), JSON.stringify({
+    baseUrl: 'http://127.0.0.1:1', urlKey: 'acme', ownerAccountId: OWNER,
+    expiresAt: new Date(Date.now() + 20 * 3600_000).toISOString()
+  }));
+  fs.writeFileSync(path.join(dir, 'ledger.json'), JSON.stringify(ledger));
+  fs.writeFileSync(path.join(dir, 'poll.json'), JSON.stringify({
+    [taken.id]: {
+      id: taken.id, promptSha256: crypto.createHash('sha256').update(taken.prompt ?? '').digest('hex'),
+      followUpTo: taken.followUpTo || null, abort: taken.abort === true, abortTo: taken.abortTo || null, dispatchedBy: OWNER
+    }
+  }));
+  const posts = [];
+  const fetchImpl = async (url, init) => {
+    const body = init.body ? JSON.parse(init.body) : null;
+    if (url.includes('/runner/feedback/')) posts.push(body.message);
+    const json = url.includes('/runner/take/') ? { item: taken } : { success: true };
+    return { status: 200, ok: true, json: async () => json };
+  };
+  return { home, posts, fetchImpl, cleanup: () => fs.rmSync(home, { recursive: true, force: true }) };
+}
+
 // The route rows: `resolveRepo` is pure, so it cannot show WHERE the gate sits.
 // Drive `take` with a stubbed Harbour and an item carrying a repo that has no directory.
 describe('repo is checked on the fresh route only (take)', () => {
-  function setup(taken) {
-    const home = fs.mkdtempSync(path.join(fs.existsSync('/tmp') ? '/tmp' : os.tmpdir(), 'rkc-'));
-    const dir = path.join(home, 'acme');
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    credentialStore({ file: path.join(dir, 'runner.token') }).set('runner-working-token');
-    fs.writeFileSync(path.join(dir, 'runner.json'), JSON.stringify({
-      baseUrl: 'http://127.0.0.1:1', urlKey: 'acme', ownerAccountId: OWNER,
-      expiresAt: new Date(Date.now() + 20 * 3600_000).toISOString()
-    }));
-    fs.writeFileSync(path.join(dir, 'ledger.json'), JSON.stringify(ledger));
-    fs.writeFileSync(path.join(dir, 'poll.json'), JSON.stringify({
-      [taken.id]: {
-        id: taken.id, promptSha256: crypto.createHash('sha256').update(taken.prompt ?? '').digest('hex'),
-        followUpTo: taken.followUpTo || null, abort: taken.abort === true, abortTo: taken.abortTo || null, dispatchedBy: OWNER
-      }
-    }));
-    const posts = [];
-    const fetchImpl = async (url, init) => {
-      const body = init.body ? JSON.parse(init.body) : null;
-      if (url.includes('/runner/feedback/')) posts.push(body.message);
-      const json = url.includes('/runner/take/') ? { item: taken } : { success: true };
-      return { status: 200, ok: true, json: async () => json };
-    };
-    return { home, posts, fetchImpl, cleanup: () => fs.rmSync(home, { recursive: true, force: true }) };
-  }
   const run = async (taken, cwd) => {
     const s = setup(taken);
     try {
@@ -233,5 +235,32 @@ describe('capFeedbackMessage', () => {
   });
   test('a [done] prefix survives truncation', () => {
     assert.match(capFeedbackMessage('[done] ' + 'z'.repeat(3000), 'status'), /^\[done\] z+\.\.\.$/);
+  });
+});
+
+// Row 7 on the real post path: the pure helper above cannot show that `post` applies it.
+describe('feedback is capped where it is posted (runCommand feedback)', () => {
+  const feedback = async (kind, message) => {
+    const s = setup({ id: ITEM_ID, prompt: 'x' });
+    try {
+      const args = ['feedback', ITEM_ID, kind, message, '--url-key', 'acme'];
+      let error = null;
+      try { await runCommand(args, { home: s.home, cwd: ROOT, fetchImpl: s.fetchImpl, now: () => Date.now() }); } catch (err) { error = err; }
+      return { posts: s.posts, error };
+    } finally { s.cleanup(); }
+  };
+
+  test('a status message over the cap is posted truncated to 2000 characters ending in "..."', async () => {
+    const { posts, error } = await feedback('status', 'x'.repeat(2500));
+    assert.equal(error, null);
+    assert.equal(posts.length, 1);
+    assert.equal(posts[0].length, 2000);
+    assert.ok(posts[0].endsWith('...'));
+  });
+
+  test('a decision message over the cap still errors and posts nothing (a cut ruling is malformed JSON)', async () => {
+    const { posts, error } = await feedback('decision', 'x'.repeat(2500));
+    assert.match(error.message, /decision exceeds 2000/);
+    assert.deepEqual(posts, []);
   });
 });

@@ -1388,6 +1388,16 @@ describe('commands (against a fake Harbour)', () => {
     assert.equal(r.reason, 'cap');
   });
 
+  // LIN-3451: the target gate lives in preConfirmDecision, which wait calls too; a dash item is not work.
+  test('wait does not report a dash-target item as work (left queued, target:dash)', TIMEOUT, async () => {
+    harbour.state.queue.length = 0;
+    const dash = harbour.enqueue({ target: 'dash' });
+    assert.deepEqual(preConfirmDecision(dash, ctx()), { decision: 'leave', reason: 'target:dash' });
+    const r = await run(['wait'], { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 60 });
+    assert.equal(r.reason, 'cap');
+    harbour.state.queue.length = 0;
+  });
+
   describe('wait debounce (LIN-3213)', () => {
     const seenFile = () => join(home, 'acme', 'wait-seen.json');
     const quick = { waitPollMs: 10, waitHeartbeatMs: 10, waitCapMs: 80 };
