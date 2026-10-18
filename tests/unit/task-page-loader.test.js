@@ -19,6 +19,8 @@ import assert from 'node:assert/strict';
 import { createTaskPageLoader, buildTaskPageModel, sessionMessage, buildTaskStages, briefCurrentSection, guessStages, deriveHeader, deriveReadyHeader, fmtWhen } from '../../lib/task-page-loader.js';
 import { DISPATCH_KINDS } from '../../lib/prompt-templates.js';
 import { ORCHESTRATION_KINDS } from '../../lib/effort-readout.js';
+import { STATE_ORDER } from '../../lib/providers/models.js';
+import { isTerminalState } from '../../lib/providers/state-map.js';
 import { readRunEvidence } from '../../lib/run-evidence.js';
 import { enrichLoop, deriveSessionWaiting } from '../../routes/dashboard.js';
 import { DispatchQueueStore } from '../../lib/dispatch-store.js';
@@ -302,6 +304,7 @@ describe('deriveHeader: one row per branch, in order done → waiting → runnin
   const cases = [
     ['done (completed), even with a stale running row', { sessions: [s('running', 'review')], waiting: noWait, tracker: tracker('completed') }, 'done', 'Finished 5 Oct, 12:00 UTC.'],
     ['done (canceled)', { sessions: [], waiting: noWait, tracker: tracker('canceled') }, 'done', 'Cancelled 5 Oct, 12:00 UTC.'],
+    ['done (duplicate): closed work, read as canceled (LIN-276)', { sessions: [], waiting: noWait, tracker: tracker('duplicate') }, 'done', 'Cancelled 5 Oct, 12:00 UTC.'],
     ['waiting beats running; message cut to one line, marker dropped', { sessions: [s('running', 'review')], waiting: { waiting: true, message: '[blocked] Which API?\nmore detail' }, tracker: tracker('started') }, 'waiting', 'Which API?'],
     ['running', { sessions: [s('done', 'plan'), s('running', 'implementation')], waiting: noWait, tracker: tracker('started') }, 'running', 'Build running since 6 Oct, 14:02 UTC.'],
     ['queued only', { sessions: [s('done', 'plan'), s('queued', 'review')], waiting: noWait, tracker: tracker('started') }, 'running', 'Review queued, waiting for a worker.'],
@@ -315,6 +318,18 @@ describe('deriveHeader: one row per branch, in order done → waiting → runnin
   ];
   for (const [name, input, status, sentence] of cases) {
     test(name, () => assert.deepEqual(deriveHeader({ ...input, now: NOW }), { status, sentence }));
+  }
+});
+
+describe('one finished rule: isTerminalState (LIN-3656)', () => {
+  const ctxOf = (type) => ({ issue: { id: 'u1', identifier: 'LIN-50', title: 't', state: { name: type, type } }, parent: null, children: [], comments: [], stateTransitions: [] });
+  for (const type of Object.keys(STATE_ORDER)) {
+    test(`${type}: finished and guesses follow isTerminalState`, () => {
+      const model = buildTaskPageModel({ identifier: 'LIN-50', loops: [], ctx: ctxOf(type), enrichLoop, deriveSessionWaiting, now: NOW });
+      assert.equal(model.finished, isTerminalState(type));
+      assert.equal(guessStages([], type).length === 0, isTerminalState(type));
+      assert.equal(model.status === 'done', isTerminalState(type));
+    });
   }
 });
 

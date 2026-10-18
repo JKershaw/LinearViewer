@@ -239,6 +239,14 @@ describe('B1 freshness gate', () => {
     assert.match(pageText(body(html)), /brief can't be checked against the latest changes/);
   });
 
+  test('a duplicate parent with an open child is unverifiable, as Done is (LIN-3656)', async () => {
+    const kids = [{ id: 'k1', identifier: 'LIN-52', title: 'k', state: { name: 'Todo', type: 'unstarted' } }];
+    const ctx = ctxFor({ stateType: 'duplicate', children: kids });
+    const model = await load(ctx, fresh(ctx));
+    assert.equal(model.summary, null);
+    assert.equal(model.contextMiss.brief, 'unverifiable');
+  });
+
   test('the state read builds its model with no brief, recap or summary', async () => {
     const { loader } = makeLoader({ ctx: ctxFor(), brief: fresh(ctxFor()) });
     const { model } = await loader.loadTaskState({ urlKey: 'ws', identifier: 'LIN-51', issueId: UUID });
