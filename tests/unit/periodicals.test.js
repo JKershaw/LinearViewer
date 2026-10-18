@@ -502,6 +502,54 @@ describe('Drift & Coherence Review specifics (LIN-369)', () => {
     // No repo-specific symbols leak in.
     assert.doesNotMatch(prompt, /escapeHtml|workspace-api|jsonError/);
   });
+
+  // LIN-3629: the review runs the committed census tool and rules on its groups. The instruction
+  // names the tool by search (as Seams & Tangles does) and reports; nothing here enforces a number.
+  describe('census instruction (LIN-3629)', () => {
+    const census = prompt.slice(prompt.indexOf('Do not find repeated decisions by eye'), prompt.indexOf('review as before.') + 'review as before.'.length);
+
+    test('the instruction is present and names the tool by search, with no path', () => {
+      assert.ok(census.length > 100, 'census instruction found');
+      assert.match(census, /search for the repo's committed code-shape census-review tool/);
+      assert.match(census, /no path is written here/);
+      assert.doesNotMatch(prompt, /scripts\/|\.mjs/);
+    });
+
+    test('runs at HEAD and at the previous report\'s commit with one area guide, recording full commits', () => {
+      assert.match(census, /at HEAD and at the commit the previous report measured/);
+      assert.match(census, /one area guide for both runs/);
+      assert.match(census, /record the full commits/);
+    });
+
+    test('with no previous report it says this is the baseline', () => {
+      assert.match(census, /no previous report, say this is the baseline/);
+    });
+
+    test('rules on every mustRule group in one compact table (real / borderline / noise + a reason) and lists the table groups with no ruling', () => {
+      assert.match(census, /every mustRule group one ruling in a compact table/);
+      assert.match(census, /real \(.*\), borderline or noise, with a one-line reason/);
+      assert.match(census, /List the table groups in one compact table, no ruling/);
+    });
+
+    test('a ruling is the finding, not a question to anyone; prose and follow-ups only for real groups and changes', () => {
+      assert.match(census, /a ruling is your finding, not a question to anyone/);
+      assert.match(census, /Prose and follow-up tasks only for real groups and for changes since the previous edition/);
+    });
+
+    test('falls back to the old review when the repo has no tool or it cannot run', () => {
+      assert.match(census, /If the tool is missing or cannot run, say so in the report and review as before/);
+    });
+
+    test('adds no enforcement wording', () => {
+      assert.doesNotMatch(census, /\b(check|gate|threshold|ratchet)/i);
+    });
+
+    test('the registry row is unchanged', () => {
+      const row = PERIODICALS.find(t => t.id === 'drift-coherence');
+      assert.deepEqual([row.id, row.title, row.mode, row.scope, row.cadence], ['drift-coherence', 'Drift & Coherence Review', 'corrective', 'repo', 'weekly']);
+      assert.equal(typeof row.generatePrompt, 'function');
+    });
+  });
 });
 
 describe('Comprehension-Debt Review specifics (LIN-370)', () => {

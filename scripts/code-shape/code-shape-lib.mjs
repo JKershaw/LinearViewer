@@ -155,6 +155,17 @@ export const churnByFile = (repo, sha, commitDate, days, paths) => {
   return fileCommits;
 };
 
+// Distinct commits in the window ending at <sha> that add or remove, in <paths>, a line matching the ERE
+// <regex> (`git log -G`; LIN-3629). Same stdin + literal-pathspec idiom as churnByFile. The count is an
+// upper bound for a common word: the pattern is returned beside it by the caller so a reader can judge.
+export const ownChurnByPattern = (repo, sha, commitDate, days, paths, regex, { ignoreCase = false } = {}) => {
+  if (!paths.length) return 0;
+  const since = new Date(new Date(commitDate).getTime() - days * 86400e3).toISOString();
+  const log = git(repo, ['--literal-pathspecs', 'log', '--stdin', `--since=${since}`, `-G${regex}`, ...(ignoreCase ? ['-i'] : []), '--format=%H', '--no-renames'],
+    { input: `${sha}\n--\n${paths.join('\n')}\n` });
+  return new Set(log.split('\n').filter(Boolean)).size;
+};
+
 // Extract a commit's tree into an existing directory (git archive | tar -x).
 export const archiveTo = (repo, sha, dir) => {
   if (spawnSync('tar', ['--version']).error) throw new UsageError('tar is not on PATH (git archive extraction needs it)');
