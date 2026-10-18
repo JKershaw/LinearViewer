@@ -2529,8 +2529,71 @@ describe('close-out template + review→close-out ledger handoff (LIN-550)', () 
       const deployAt = land.search(/wait until the deploy has landed/);
       const doneAt = land.search(/Then set the task to Done/);
       assert.ok(deployAt > -1 && doneAt > deployAt, 'Done comes after the post-deploy steps');
-      assert.ok(/If a post-deploy step fails or is beyond your access, the task stays open/.test(prompt),
-        'a failed post-deploy step keeps the task open');
+      // LIN-3614: both holds stay pinned; an unasked check no longer shares the second one.
+      assert.ok(/If a post-deploy step fails, or one the ticket asked for is beyond your access, the task stays open/.test(prompt),
+        'a failed post-deploy step, and a ticket-asked one beyond access, keep the task open');
+    });
+
+    // LIN-3614: a live or post-deploy check the ticket did not ask for, which
+    // close-out cannot run, is recorded as not run and the task closes. Each rule
+    // is checked in the rendered section that carries it.
+    const section = (prompt, from, to) => {
+      const start = prompt.indexOf(from);
+      assert.ok(start > -1, `${from} is rendered`);
+      const end = to ? prompt.indexOf(to, start + from.length) : -1;
+      return prompt.slice(start, end > -1 ? end : undefined);
+    };
+
+    test('review (LIN-3614): a claim only a human or the live system can verify goes in the ledger as not run, with why', () => {
+      const { prompt } = generatePrompt('review', issue, context);
+      const manual = section(prompt, '### Manual Verification', '### What CI Did Not Prove');
+      assert.ok(/list it in the ledger as not run, with why/.test(manual), 'Manual Verification routes it to the ledger as not run');
+      assert.ok(!/flag it for human testing/i.test(prompt), 'the human-testing route is gone');
+      const after = section(prompt, '- **After the deploy**', '- **A named monitor**');
+      assert.ok(/never as a condition on the merge\. Only where the ticket asks for it or close-out can run it\./.test(after),
+        'the After-the-deploy route applies only where the ticket asks for it or close-out can run it');
+    });
+
+    test('close-out (LIN-3614): Land It keeps two holds and records an unasked check it cannot run as not run, then closes', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      const land = section(prompt, '### Land It and Close the Loop', '### Follow-up Triage');
+      assert.ok(/If a post-deploy step fails, or one the ticket asked for is beyond your access, the task stays open: say what is left and name the next action\./.test(land),
+        'a failed step and a ticket-asked step beyond access still keep the task open');
+      assert.ok(/An unasked live or post-deploy check you cannot run does not hold the close: record it as not run \(what, why, who or what can run it, or "none"\) on the ticket and in the PR, then close/.test(land),
+        'an unasked check is recorded as not run with what, why and the follow-up, then the task closes');
+      assert.ok(/no monitor settles it, and raise no ruling/.test(land), 'no monitor settles it and no ruling is raised');
+    });
+
+    test('close-out (LIN-3614): Settle the Ledger points the unasked check to Land It and keeps the outsider standard on filing', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      const settle = section(prompt, '### Settle the Ledger', '### Land It and Close the Loop');
+      const inside = settle.split('\n').find(l => l.startsWith('- **Inside**'));
+      assert.ok(inside && /An unasked live or post-deploy check you cannot run: see Land It\./.test(inside),
+        'the Inside bullet carries the not-run exception, pointing to Land It');
+      assert.ok(/Leave one undone only when finishing it is a change the team would need to hear about first/.test(inside),
+        'the hold for real inside work stays');
+      assert.ok(/file it as a follow-up a reader with no access to this task can act on/.test(settle),
+        'the Outside bullet keeps the outsider standard: the retained bound of review\'s cut Outside wording (LIN-3293)');
+    });
+
+    test('close-out (LIN-3614): Follow-up Triage states the outsider standard for every outside item', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      const triage = section(prompt, '### Follow-up Triage', '### Archive & Prune');
+      assert.ok(/Write each for a reader with no access to this task\./.test(triage),
+        'the standard for a filed outside item, class-check siblings included, sits where filing happens (LIN-3293)');
+    });
+
+    test('close-out (LIN-3614): Make the Fixes makes a stale citation a fix, listed with its commit, with no ruling and no assertion or behaviour edits', () => {
+      const { prompt } = generatePrompt('close-out', issue, context);
+      const fixes = section(prompt, '### Make the Fixes Review Asked For', '### Settle the Ledger');
+      assert.ok(/A citation or comment this change made stale is a fix even outside the ticket's files: list it with its commit, raise no ruling; an assertion or behaviour change is not one\./.test(fixes),
+        'a stale citation is a fix outside the ticket\'s files, bounded to citations and comments');
+    });
+
+    test('close-out completion signals (LIN-3614) name the not-run route with its bound', () => {
+      const sig = COMPLETION_SIGNALS['close-out'];
+      assert.ok(sig.signals.some(s => /unasked live or post-deploy check/i.test(s) && /not run/i.test(s)),
+        'the ledger signal records an unasked live or post-deploy check close-out cannot run as not run');
     });
 
     test('close-out closes the loop on the related tickets the work settles', () => {
